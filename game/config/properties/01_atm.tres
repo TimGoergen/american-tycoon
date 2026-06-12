@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 1
+display_name = "ATM"
+base_cost = 50.0
+r0 = 1.07
+base_income_per_unit = 5.0
+base_cycle_length = 0.4
+staffer_name = "ATM Technician"

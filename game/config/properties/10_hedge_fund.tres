@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 10
+display_name = "Hedge Fund"
+base_cost = 117897384550.0
+r0 = 1.07
+base_income_per_unit = 3276800.0
+base_cycle_length = 512.0
+staffer_name = "Fund Administrator"

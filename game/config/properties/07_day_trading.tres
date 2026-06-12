@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 7
+display_name = "Day Trading"
+base_cost = 88578050.0
+r0 = 1.07
+base_income_per_unit = 51200.0
+base_cycle_length = 64.0
+staffer_name = "Portfolio Analyst"

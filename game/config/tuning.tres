@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="TuningConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/TuningConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+logic_hz = 10
+rush_pct = 0.05
+cycle_floor = 1.0
+band_step = 1.15
+offline_efficiency = 0.5
+offline_cap_seconds = 14400.0
+frenzy_max_multiplier = 4.0
+frenzy_burn_duration = 90.0
+frenzy_fill_per_tap = 0.004
+frenzy_decay_per_second = 0.005
+frenzy_idle_grace = 5.0
+frenzy_pop_floor = 0.15
+estate_exemption_base = 1000000.0
+estate_tax_rate_base = 0.6
+loophole_rate_floor = 0.05
+k_legacy = 1.0
+alpha_legacy = 0.5
+k_sprint = 1.0
+beta_sprint = 0.5
+k_residual = 0.1
+crash_multiplier = 0.5
+crash_duration_minutes = 10.0
+audit_settle_rate = 0.08
+audit_threshold = 1
+earth_economy_target = 103600000000000.0
+autosave_cadence = 10.0

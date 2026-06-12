@@ -31,10 +31,11 @@ func _init(configs: Array, tuning: TuningConfig) -> void:
 # ---------------------------------------------------------------------------
 
 ## Advance all properties by `delta` seconds and credit income to cash.
-func tick(delta: float) -> void:
+## `income_multiplier` (frenzy, events) applies at point of payment (Spec §3.4).
+func tick(delta: float, income_multiplier: float = 1.0) -> void:
 	income_this_tick = 0.0
 	for prop in properties:
-		income_this_tick += (prop as PropertyState).tick(delta)
+		income_this_tick += (prop as PropertyState).tick(delta, income_multiplier)
 	cash += income_this_tick
 	total_income += income_this_tick
 	time_elapsed += delta

@@ -1,40 +1,69 @@
 extends SceneTree
 
 # Headless balance simulator entry point (Mechanics Spec §13).
-# Runs 10 simulated minutes of gameplay and reports income/sec over time.
 #
-# Usage: godot --headless --script res://sim/Sim.gd
+# Usage: godot --headless --path . --script res://sim/Sim.gd
 #
-# Strategy: "Greedy Optimizer" — on each decision cycle, spend available cash
-# on whichever single unit yields the best marginal income/sec per dollar.
-# This approximates an engaged player always making the optimal buy.
+# Runs the M1 verification protocol end to end, headlessly:
+#   Phase 1 — 10 minutes of active play (wage taps, greedy buys, frenzy pops).
+#   Phase 2 — hire staffers wherever affordable (the offline income source).
+#   Phase 3 — save, reload into a fresh GameState, and return from a
+#             simulated 3-hour absence (closed-form, never cycle-simulated).
+#   Phase 4 — the return spike: spend the pile, report the income/sec jump.
+#             This is the moment M1 exists to verify (GDD §3.1).
 #
-# The simulated player is ACTIVE: unstaffed cycles stop after each payout
-# (Spec §4), so the player re-taps every idle property to restart it. Without
-# these taps no income would ever accrue. (Staffing would automate this, but
-# a free manual tap is economically identical in-sim, so we don't model hires.)
+# The simulated player is ACTIVE during Phase 1: unstaffed cycles stop after
+# each payout (Spec §4), so the player re-taps every idle property to restart
+# it. Every tap (wage, start, rush) feeds the frenzy meter, which is popped
+# greedily the moment it crosses the pop floor.
 
-const SIM_DURATION_SECONDS := 600.0   # 10 minutes
-const TICK_SIZE := 0.1                  # 0.1 s per tick (matches LOGIC_HZ = 10)
-const REPORT_INTERVAL := 60.0          # print income/sec every simulated minute
-const STARTING_CASH := 1000.0          # $1,000 — "No" origin path (GDD §8.1)
+const ACTIVE_SECONDS := 600.0          # Phase 1 duration: 10 minutes
+const TICK_SIZE := 0.1                 # matches LOGIC_HZ = 10
+const REPORT_INTERVAL := 60.0          # print a status line every sim minute
+const STARTING_CASH := 1000.0          # "No rich parents" origin (GDD §8.1)
+const OFFLINE_GAP_SECONDS := 10800.0   # 3 hours — the GDD §3.2 tuning anchor
+const WAGE_TAP_PERIOD := 0.3           # an active thumb: ~3 wage taps per second
+const SIM_SAVE_PATH := "user://sim_save.json"
+
+var _property_configs: Array = []
+var _title_configs: Array = []
+var _tuning: TuningConfig
 
 
 func _initialize() -> void:
-	print("=== American Tycoon — Balance Simulator ===")
-	print("Simulating %.0f seconds (%.0f minutes) of greedy-optimizer play." % [
-		SIM_DURATION_SECONDS, SIM_DURATION_SECONDS / 60.0
-	])
-	print("")
-
-	# Load tuning config.
-	var tuning := ResourceLoader.load("res://config/tuning.tres") as TuningConfig
-	if tuning == null:
-		push_error("Sim: could not load res://config/tuning.tres")
+	if not _load_configs():
 		quit(1)
 		return
 
-	# Load all 12 property configs in GDD order.
+	print("=== American Tycoon — Balance Simulator ===")
+	print("")
+
+	var game := GameState.new(_property_configs, _title_configs, _tuning)
+	game.economy.award_cash(STARTING_CASH)
+	print("Starting cash: %s" % Money.of(game.economy.cash).display())
+
+	_run_active_phase(game)
+	_run_hiring_phase(game)
+	var resumed := _run_offline_phase(game)
+	if resumed == null:
+		quit(1)
+		return
+	_run_return_spike_phase(resumed)
+
+	quit()
+
+
+# ---------------------------------------------------------------------------
+# Config loading — everything comes from /config, nothing from code
+# ---------------------------------------------------------------------------
+
+## Load every config Resource the sim needs. Returns false on any failure.
+func _load_configs() -> bool:
+	_tuning = ResourceLoader.load("res://config/tuning.tres") as TuningConfig
+	if _tuning == null:
+		push_error("Sim: could not load res://config/tuning.tres")
+		return false
+
 	var property_files := [
 		"res://config/properties/01_atm.tres",
 		"res://config/properties/02_money_tree.tres",
@@ -49,95 +78,225 @@ func _initialize() -> void:
 		"res://config/properties/11_legislative_assets.tres",
 		"res://config/properties/12_executive_assets.tres",
 	]
-	var configs: Array = []
 	for path in property_files:
-		var cfg := ResourceLoader.load(path) as PropertyConfig
-		if cfg == null:
+		var prop_cfg := ResourceLoader.load(path) as PropertyConfig
+		if prop_cfg == null:
 			push_error("Sim: could not load " + path)
-			quit(1)
-			return
-		configs.append(cfg)
+			return false
+		_property_configs.append(prop_cfg)
 
-	# Create the economy and give the player their starting capital.
-	var economy := EconomyState.new(configs, tuning)
-	economy.award_cash(STARTING_CASH)
+	var title_files := [
+		"res://config/titles/01_intern.tres",
+		"res://config/titles/02_associate.tres",
+		"res://config/titles/03_shift_supervisor.tres",
+	]
+	for path in title_files:
+		var title_cfg := ResourceLoader.load(path) as TitleRow
+		if title_cfg == null:
+			push_error("Sim: could not load " + path)
+			return false
+		_title_configs.append(title_cfg)
 
-	print("Starting cash: %s" % Money.of(economy.cash).display())
+	return true
+
+
+# ---------------------------------------------------------------------------
+# Phase 1 — active play
+# ---------------------------------------------------------------------------
+
+func _run_active_phase(game: GameState) -> void:
 	print("")
+	print("--- Phase 1: %d minutes of active play ---" % int(ACTIVE_SECONDS / 60.0))
 
-	var next_report_at := REPORT_INTERVAL
 	var sim_time := 0.0
+	var next_report := REPORT_INTERVAL
+	var next_wage_tap := 0.0
+	var frenzy_pops := 0
 
-	# Simulation main loop.
-	while sim_time < SIM_DURATION_SECONDS:
-		# Decision phase: try to make the best possible buy this second.
-		# Run decisions until no buy is affordable (max 100 buys per second of
-		# sim time to avoid infinite loops on a degenerate config).
-		var buys_this_second := 0
-		while buys_this_second < 100:
-			var best_index := -1
-			var best_value := 0.0  # marginal income/sec per dollar
+	while sim_time < ACTIVE_SECONDS:
+		# Wage taps (Layer 1) — also the early frenzy filler.
+		if sim_time >= next_wage_tap:
+			game.tap_wage()
+			next_wage_tap += WAGE_TAP_PERIOD
 
-			for i in range(economy.properties.size()):
-				var prop := economy.properties[i] as PropertyState
-				var cost := prop.get_next_cost()
-				if cost <= 0.0 or economy.cash < cost:
-					continue
-				# Marginal income/sec this unit adds.
-				var current_ips := prop.get_income_per_sec()
-				prop.units_owned += 1  # temporarily add unit to read new ips
-				var new_ips := prop.get_income_per_sec()
-				prop.units_owned -= 1  # restore
-				var marginal := new_ips - current_ips
-				var value := marginal / cost
-				if value > best_value:
-					best_value = value
-					best_index = i
+		# Claim a promotion the moment it's unlocked and affordable.
+		game.try_claim_promotion()
 
-			if best_index == -1:
-				break  # nothing affordable
+		# Pop frenzy greedily. (A real player would charge higher first; the
+		# greedy policy just proves the state machine cycles correctly.)
+		if game.pop_frenzy():
+			frenzy_pops += 1
 
-			economy.try_buy(best_index, 1)
-			buys_this_second += 1
+		_greedy_buy_spree(game)
 
-		# Active-player taps: restart any idle cycle (the Layer-2 start verb).
-		for i in range(economy.properties.size()):
-			var prop := economy.properties[i] as PropertyState
+		# Restart idle cycles — the Layer-2 start verb, tapped by the player.
+		for i in range(game.economy.properties.size()):
+			var prop := game.economy.properties[i] as PropertyState
 			if prop.units_owned > 0 and not prop.is_cycle_running:
-				economy.start_cycle(i)
+				game.tap_property(i)
 
-		# Tick the economy forward by TICK_SIZE.
-		economy.tick(TICK_SIZE)
+		game.tick(TICK_SIZE)
 		sim_time += TICK_SIZE
 
-		# Print report at each minute boundary.
-		if sim_time >= next_report_at:
-			var min_elapsed := int(sim_time / 60.0)
-			var ips := economy.get_total_income_per_sec()
-			var cash_display := Money.of(economy.cash).display()
-			var ips_display := Money.of(ips).display()
-			print("t=%02dm | income/sec: %s/s | cash: %s" % [
-				min_elapsed, ips_display, cash_display
+		if sim_time >= next_report:
+			print("t=%02dm | income/sec: %s/s | cash: %s | wage taps: %d | frenzy x%.2f" % [
+				int(sim_time / 60.0),
+				Money.of(game.economy.get_total_income_per_sec()).display(),
+				Money.of(game.economy.cash).display(),
+				game.wage.lifetime_taps,
+				game.frenzy.get_multiplier(),
 			])
-			next_report_at += REPORT_INTERVAL
+			next_report += REPORT_INTERVAL
 
-	# Final summary.
+	print("Frenzy pops this session: %d | final title: %s" % [
+		frenzy_pops, game.wage.get_current_title().title_name
+	])
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 — staff hires before stepping away
+# ---------------------------------------------------------------------------
+
+func _run_hiring_phase(game: GameState) -> void:
 	print("")
-	print("=== Simulation Complete ===")
-	print("Sim duration : %.0f seconds" % sim_time)
-	print("Total income : %s" % Money.of(economy.total_income).display())
-	print("Final cash   : %s" % Money.of(economy.cash).display())
-	print("Final ips    : %s/s" % Money.of(economy.get_total_income_per_sec()).display())
+	print("--- Phase 2: hiring staff before stepping away ---")
+
+	for i in range(game.economy.properties.size()):
+		var prop := game.economy.properties[i] as PropertyState
+		if prop.units_owned == 0 or prop.is_staffed:
+			continue
+		var cost := prop.get_staff_cost()
+		if game.try_hire(i):
+			print("  Hired %s for %s" % [
+				(prop.config as PropertyConfig).staffer_name,
+				Money.of(cost).display(),
+			])
+
+	var staffed_ips := 0.0
+	for prop in game.economy.properties:
+		var p := prop as PropertyState
+		if p.is_staffed:
+			staffed_ips += p.get_income_per_sec()
+
+	print("  Staffed income/sec: %s/s | cash remaining: %s" % [
+		Money.of(staffed_ips).display(),
+		Money.of(game.economy.cash).display(),
+	])
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 — save round-trip + the 3-hour absence
+# ---------------------------------------------------------------------------
+
+## Save, then load into a fresh GameState as if the app relaunched 3 hours
+## later. Returns the resumed game, or null if the save round-trip failed.
+func _run_offline_phase(game: GameState) -> GameState:
 	print("")
-	print("Property breakdown:")
-	for i in range(economy.properties.size()):
-		var prop := economy.properties[i] as PropertyState
+	print("--- Phase 3: away for %.1f hours ---" % (OFFLINE_GAP_SECONDS / 3600.0))
+
+	if not SaveManager.save_to_file(game, SIM_SAVE_PATH):
+		push_error("Sim: save failed")
+		return null
+
+	var save_dict := SaveManager.load_from_file(SIM_SAVE_PATH)
+	if save_dict.is_empty():
+		push_error("Sim: load failed")
+		return null
+
+	var resumed := GameState.new(_property_configs, _title_configs, _tuning)
+	resumed.load_save_dict(save_dict)
+
+	# Sanity-check the round trip before trusting the rest of the run.
+	# (Cash is always integer-valued — everything floors at award/charge —
+	# so exact float comparison is safe here.)
+	if resumed.economy.cash != game.economy.cash:
+		push_error("Sim: cash mismatch after save round-trip")
+		return null
+
+	var offline := resumed.apply_offline(OFFLINE_GAP_SECONDS)
+	print("  Welcome back. Hours worked: 0")
+	print("  Offline pile: %s (%.1f of %.1f hours paid, at %.0f%% efficiency)" % [
+		Money.of(offline.pile).display(),
+		offline.paid_seconds / 3600.0,
+		offline.elapsed_seconds / 3600.0,
+		_tuning.offline_efficiency * 100.0,
+	])
+	return resumed
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 — the return spike
+# ---------------------------------------------------------------------------
+
+func _run_return_spike_phase(game: GameState) -> void:
+	print("")
+	print("--- Phase 4: the return spike ---")
+
+	var ips_before := game.economy.get_total_income_per_sec()
+	var units_bought := _greedy_buy_spree(game)
+
+	# Restart anything idle the spree left behind (staffed ones auto-run).
+	for i in range(game.economy.properties.size()):
+		var prop := game.economy.properties[i] as PropertyState
+		if prop.units_owned > 0 and not prop.is_cycle_running:
+			game.tap_property(i)
+
+	var ips_after := game.economy.get_total_income_per_sec()
+	var delta_pct := 0.0
+	if ips_before > 0.0:
+		delta_pct = (ips_after / ips_before - 1.0) * 100.0
+
+	print("  Units bought with the pile: %d" % units_bought)
+	print("  Income/sec: %s/s -> %s/s  (+%.0f%%)" % [
+		Money.of(ips_before).display(),
+		Money.of(ips_after).display(),
+		delta_pct,
+	])
+
+	print("")
+	print("=== Final property breakdown ===")
+	for i in range(game.economy.properties.size()):
+		var prop := game.economy.properties[i] as PropertyState
 		if prop.units_owned > 0:
-			var cfg := prop.config as PropertyConfig
-			print("  %-30s owned: %4d | ips: %s/s" % [
-				cfg.display_name,
+			print("  %-26s owned: %4d | %s | ips: %s/s" % [
+				(prop.config as PropertyConfig).display_name,
 				prop.units_owned,
-				Money.of(prop.get_income_per_sec()).display()
+				"staffed" if prop.is_staffed else "manual",
+				Money.of(prop.get_income_per_sec()).display(),
 			])
 
-	quit()
+
+# ---------------------------------------------------------------------------
+# Shared player policy
+# ---------------------------------------------------------------------------
+
+## Spend cash on whichever single unit adds the best income/sec per dollar,
+## repeating until nothing is affordable. Returns the number of units bought.
+## (Capped to avoid a pathological loop on a degenerate config.)
+func _greedy_buy_spree(game: GameState) -> int:
+	var units_bought := 0
+	while units_bought < 1000:
+		var best_index := -1
+		var best_value := 0.0  # marginal income/sec per dollar
+
+		for i in range(game.economy.properties.size()):
+			var prop := game.economy.properties[i] as PropertyState
+			var cost := prop.get_next_cost()
+			if cost <= 0.0 or game.economy.cash < cost:
+				continue
+			var current_ips := prop.get_income_per_sec()
+			prop.units_owned += 1  # peek at the post-purchase rate
+			var new_ips := prop.get_income_per_sec()
+			prop.units_owned -= 1
+			var value := (new_ips - current_ips) / cost
+			if value > best_value:
+				best_value = value
+				best_index = i
+
+		if best_index == -1:
+			break  # nothing affordable
+
+		game.try_buy(best_index, 1)
+		units_bought += 1
+
+	return units_bought

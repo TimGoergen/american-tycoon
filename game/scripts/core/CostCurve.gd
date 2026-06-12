@@ -10,10 +10,15 @@ class_name CostCurve
 ## Return the milestone band for the unit at position `unit_index` (1-based).
 ## Band 0: units 1–19. Band 1: units 20–39. Band 2: units 40–79. Etc.
 static func get_band(unit_index: int) -> int:
-	if unit_index < 20:
-		return 0
-	# Every time we double past 20 we gain one band.
-	return 1 + int(log(unit_index / 20.0) / log(2.0))
+	# Counted with an integer threshold walk instead of log() — floating-point
+	# log ratios mis-round exactly at the power-of-two thresholds (e.g. at 160
+	# units, log(8)/log(2) evaluates to 2.9999999999999996 and truncates wrong).
+	var band := 0
+	var threshold := 20
+	while unit_index >= threshold:
+		band += 1
+		threshold *= 2
+	return band
 
 
 ## Per-unit ratio for band b: r0 × band_step^b.

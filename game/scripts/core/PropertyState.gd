@@ -114,12 +114,42 @@ func get_staff_cost() -> float:
 
 
 # ---------------------------------------------------------------------------
+# Save / load
+# ---------------------------------------------------------------------------
+
+## Rebuild state from a save file. Only raw facts are restored (unit count,
+## staffing, in-flight cycle); cost_product, cycle_length, income_per_unit,
+## and the milestone count are recomputed by replaying the purchases, so
+## derived values can never drift from the math that produced them.
+func restore(
+		p_units: int,
+		p_is_staffed: bool,
+		p_cycle_progress: float,
+		p_is_running: bool
+) -> void:
+	units_owned = 0
+	cost_product = 1.0
+	income_per_unit = config.base_income_per_unit
+	cycle_length = config.base_cycle_length
+	_milestones_crossed = 0
+	is_staffed = false
+
+	if p_units > 0:
+		buy(p_units)
+
+	is_staffed = p_is_staffed
+	cycle_progress = clampf(p_cycle_progress, 0.0, cycle_length)
+	is_cycle_running = (p_is_running or is_staffed) and units_owned > 0
+
+
+# ---------------------------------------------------------------------------
 # Simulation tick
 # ---------------------------------------------------------------------------
 
 ## Advance the property by `delta` seconds. Returns income earned this tick.
 ## Staffed properties loop automatically; unstaffed stop after one cycle.
-func tick(delta: float) -> float:
+## `income_multiplier` (frenzy, events) applies at point of payment (Spec §3.4).
+func tick(delta: float, income_multiplier: float = 1.0) -> float:
 	if not is_cycle_running or units_owned == 0:
 		return 0.0
 
@@ -133,7 +163,7 @@ func tick(delta: float) -> float:
 			# Cycle completes.
 			remaining -= time_to_complete
 			cycle_progress = 0.0
-			income_earned += _collect()
+			income_earned += _collect(income_multiplier)
 
 			if is_staffed:
 				_start_cycle_internal()  # auto-restart
@@ -193,8 +223,9 @@ func _start_cycle_internal() -> void:
 
 
 ## Collect income at the end of a cycle and return the amount earned.
-func _collect() -> float:
-	return floor(units_owned * income_per_unit)
+## Multipliers apply here — at point of payment — then floor (Spec §1, §3.4).
+func _collect(income_multiplier: float = 1.0) -> float:
+	return floorf(units_owned * income_per_unit * income_multiplier)
 
 
 ## Check whether a milestone has been crossed and apply the adaptive reward.

@@ -1,0 +1,20 @@
+# Godot 4 — generated files
+.godot/
+*.import
+
+# Export/build output
+export/
+*.apk
+*.aab
+*.exe
+*.zip
+
+# Editor metadata
+.vs/
+.vscode/
+*.suo
+*.user
+
+# OS junk
+.DS_Store
+Thumbs.db

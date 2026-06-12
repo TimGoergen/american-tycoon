@@ -67,6 +67,26 @@ func get_to_milestone_cost() -> float:
 	return get_bulk_cost(needed)
 
 
+## Largest unit count purchasable with `available_cash` at exact-sum pricing
+## (the MAX bulk-buy button). Capped so a degenerate config can't loop forever.
+func get_max_affordable(available_cash: float, cap: int = 1000) -> int:
+	var count := 0
+	var remaining := available_cash
+	var running_product := cost_product
+	var owned := units_owned
+	while count < cap:
+		var band := CostCurve.get_band(owned + 1)
+		var ratio := CostCurve.get_ratio(config.r0, band, tuning.band_step)
+		var unit_cost := floorf(config.base_cost * running_product * ratio)
+		if remaining < unit_cost:
+			break
+		remaining -= unit_cost
+		running_product *= ratio
+		owned += 1
+		count += 1
+	return count
+
+
 # ---------------------------------------------------------------------------
 # Purchases & staffing
 # ---------------------------------------------------------------------------

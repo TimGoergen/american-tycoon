@@ -20,7 +20,6 @@ extends SceneTree
 const ACTIVE_SECONDS := 600.0          # Phase 1 duration: 10 minutes
 const TICK_SIZE := 0.1                 # matches LOGIC_HZ = 10
 const REPORT_INTERVAL := 60.0          # print a status line every sim minute
-const STARTING_CASH := 1000.0          # "No rich parents" origin (GDD §8.1)
 const OFFLINE_GAP_SECONDS := 10800.0   # 3 hours — the GDD §3.2 tuning anchor
 const WAGE_TAP_PERIOD := 0.3           # an active thumb: ~3 wage taps per second
 const SIM_SAVE_PATH := "user://sim_save.json"
@@ -39,7 +38,7 @@ func _initialize() -> void:
 	print("")
 
 	var game := GameState.new(_property_configs, _title_configs, _tuning)
-	game.economy.award_cash(STARTING_CASH)
+	game.economy.award_cash(_tuning.m1_starting_cash)
 	print("Starting cash: %s" % Money.of(game.economy.cash).display())
 
 	_run_active_phase(game)
@@ -57,47 +56,13 @@ func _initialize() -> void:
 # Config loading — everything comes from /config, nothing from code
 # ---------------------------------------------------------------------------
 
-## Load every config Resource the sim needs. Returns false on any failure.
+## Load every config Resource the sim needs (via the same ConfigLoader the
+## game uses, so the two can never drift). Returns false on any failure.
 func _load_configs() -> bool:
-	_tuning = ResourceLoader.load("res://config/tuning.tres") as TuningConfig
-	if _tuning == null:
-		push_error("Sim: could not load res://config/tuning.tres")
-		return false
-
-	var property_files := [
-		"res://config/properties/01_atm.tres",
-		"res://config/properties/02_money_tree.tres",
-		"res://config/properties/03_nfts.tres",
-		"res://config/properties/04_tax_increment_financing.tres",
-		"res://config/properties/05_cross_border_distribution.tres",
-		"res://config/properties/06_money_laundering.tres",
-		"res://config/properties/07_day_trading.tres",
-		"res://config/properties/08_flipping_houses.tres",
-		"res://config/properties/09_multi_level_marketing.tres",
-		"res://config/properties/10_hedge_fund.tres",
-		"res://config/properties/11_legislative_assets.tres",
-		"res://config/properties/12_executive_assets.tres",
-	]
-	for path in property_files:
-		var prop_cfg := ResourceLoader.load(path) as PropertyConfig
-		if prop_cfg == null:
-			push_error("Sim: could not load " + path)
-			return false
-		_property_configs.append(prop_cfg)
-
-	var title_files := [
-		"res://config/titles/01_intern.tres",
-		"res://config/titles/02_associate.tres",
-		"res://config/titles/03_shift_supervisor.tres",
-	]
-	for path in title_files:
-		var title_cfg := ResourceLoader.load(path) as TitleRow
-		if title_cfg == null:
-			push_error("Sim: could not load " + path)
-			return false
-		_title_configs.append(title_cfg)
-
-	return true
+	_tuning = ConfigLoader.load_tuning()
+	_property_configs = ConfigLoader.load_property_configs()
+	_title_configs = ConfigLoader.load_title_configs()
+	return _tuning != null and not _property_configs.is_empty() and not _title_configs.is_empty()
 
 
 # ---------------------------------------------------------------------------

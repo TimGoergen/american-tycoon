@@ -5,6 +5,7 @@
 [resource]
 script = ExtResource("1")
 logic_hz = 10
+m1_starting_cash = 1000.0
 rush_pct = 0.05
 cycle_floor = 1.0
 band_step = 1.15

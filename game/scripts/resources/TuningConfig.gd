@@ -10,6 +10,12 @@ extends Resource
 ## Fixed logic tick rate in Hz (Spec §2).
 @export var logic_hz: int = 10
 
+# --- Run start ---
+
+## Starting cash for a fresh run (GDD §8.1 "No rich parents" path).
+## The full origin flow with all four paths arrives in M2.
+@export var m1_starting_cash: float = 1000.0
+
 # --- Cost curve (Spec §3.2) ---
 
 ## Global band-steepening factor; ratio multiplies by this at each milestone band.

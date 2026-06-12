@@ -5,6 +5,9 @@ extends PanelContainer
 # owned count, live cycle progress, milestone slider, and the buy/hire
 # buttons. Pure view: it reads game state every frame and emits a signal
 # for every action — all mutations happen in Main → GameState.
+#
+# Each row has a single buy button; what it buys is set by the global
+# buy-mode toggle on the Main screen (×1 / ×10 / UPGRADE / MAX).
 
 enum BuyMode { ONE, TEN, TO_MILESTONE, MAX }
 
@@ -16,6 +19,7 @@ var prop_index: int = -1
 
 var _prop: PropertyState
 var _economy: EconomyState
+var _buy_mode: BuyMode = BuyMode.ONE
 
 var _name_label: Label
 var _income_label: Label
@@ -23,10 +27,7 @@ var _tap_button: Button
 var _cycle_bar: ProgressBar
 var _milestone_bar: ProgressBar
 var _milestone_label: Label
-var _buy_one_button: Button
-var _buy_ten_button: Button
-var _buy_milestone_button: Button
-var _buy_max_button: Button
+var _buy_button: Button
 var _hire_button: Button
 
 
@@ -101,15 +102,19 @@ func _ready() -> void:
 	_milestone_label.add_theme_font_size_override("font_size", 22)
 	milestone_line.add_child(_milestone_label)
 
-	# Buy / hire buttons (bulk-buy is mandatory — GDD §3.1).
+	# Buy / hire buttons (bulk-buy is mandatory — GDD §3.1). The buy button's
+	# count follows the global buy-mode toggle.
 	var button_line := HBoxContainer.new()
 	button_line.add_theme_constant_override("separation", 8)
 	column.add_child(button_line)
 
-	_buy_one_button = _make_buy_button(button_line, BuyMode.ONE)
-	_buy_ten_button = _make_buy_button(button_line, BuyMode.TEN)
-	_buy_milestone_button = _make_buy_button(button_line, BuyMode.TO_MILESTONE)
-	_buy_max_button = _make_buy_button(button_line, BuyMode.MAX)
+	_buy_button = Button.new()
+	_buy_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_buy_button.size_flags_stretch_ratio = 2.0  # buy gets twice the hire button's width
+	_buy_button.add_theme_font_size_override("font_size", 22)
+	UiPalette.style_button(_buy_button, true)  # red: buying is a spend action (§8)
+	_buy_button.pressed.connect(func() -> void: buy_requested.emit(prop_index, _buy_mode))
+	button_line.add_child(_buy_button)
 
 	_hire_button = Button.new()
 	_hire_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -119,14 +124,9 @@ func _ready() -> void:
 	button_line.add_child(_hire_button)
 
 
-func _make_buy_button(parent: Container, mode: BuyMode) -> Button:
-	var button := Button.new()
-	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	button.add_theme_font_size_override("font_size", 20)
-	UiPalette.style_button(button, true)  # red: buying is a spend action (§8)
-	button.pressed.connect(func() -> void: buy_requested.emit(prop_index, mode))
-	parent.add_child(button)
-	return button
+## Called by Main when the player cycles the global buy-mode toggle.
+func set_buy_mode(mode: BuyMode) -> void:
+	_buy_mode = mode
 
 
 func _process(_delta: float) -> void:
@@ -159,21 +159,9 @@ func _refresh() -> void:
 	_milestone_bar.value = _prop.units_owned
 	_milestone_label.text = "%d / %d" % [_prop.units_owned, next_milestone]
 
+	_refresh_buy_button(next_milestone)
+
 	var cash := _economy.cash
-	_refresh_buy_button(_buy_one_button, "+1", 1, cash)
-	_refresh_buy_button(_buy_ten_button, "+10", 10, cash)
-	_refresh_buy_button(_buy_milestone_button, "+MS", next_milestone - _prop.units_owned, cash)
-
-	var max_count := _prop.get_max_affordable(cash)
-	if max_count > 0:
-		_buy_max_button.text = "MAX ×%d\n%s" % [
-			max_count, Money.of(_prop.get_bulk_cost(max_count)).display()
-		]
-		_buy_max_button.disabled = false
-	else:
-		_buy_max_button.text = "MAX\n—"
-		_buy_max_button.disabled = true
-
 	if _prop.is_staffed:
 		_hire_button.text = "STAFFED"
 		_hire_button.disabled = true
@@ -183,11 +171,30 @@ func _refresh() -> void:
 		_hire_button.disabled = cash < staff_cost
 
 
-func _refresh_buy_button(button: Button, caption: String, count: int, cash: float) -> void:
+## Update the buy button's caption, cost, and enabled state for the
+## current global buy mode.
+func _refresh_buy_button(next_milestone: int) -> void:
+	var count := 0
+	var caption := ""
+	match _buy_mode:
+		BuyMode.ONE:
+			count = 1
+			caption = "BUY ×1"
+		BuyMode.TEN:
+			count = 10
+			caption = "BUY ×10"
+		BuyMode.TO_MILESTONE:
+			count = next_milestone - _prop.units_owned
+			caption = "UPGRADE +%d" % count
+		BuyMode.MAX:
+			count = _prop.get_max_affordable(_economy.cash)
+			caption = "MAX ×%d" % count
+
 	if count <= 0:
-		button.text = "%s\n—" % caption
-		button.disabled = true
+		_buy_button.text = "%s\n—" % caption
+		_buy_button.disabled = true
 		return
+
 	var cost := _prop.get_bulk_cost(count)
-	button.text = "%s\n%s" % [caption, Money.of(cost).display()]
-	button.disabled = cash < cost
+	_buy_button.text = "%s\n%s" % [caption, Money.of(cost).display()]
+	_buy_button.disabled = _economy.cash < cost

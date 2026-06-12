@@ -19,6 +19,11 @@ var _hero_stat: HeroStat
 var _frenzy_bar: FrenzyBar
 var _wage_panel: WagePanel
 var _welcome_overlay: WelcomeBackOverlay
+var _buy_mode_button: Button
+var _rows: Array = []
+
+## Global buy mode — one toggle drives every row's buy button.
+var _buy_mode: PropertyRow.BuyMode = PropertyRow.BuyMode.ONE
 
 ## Wall-clock seconds since the loaded save was written (0 on a fresh run).
 var _elapsed_since_save := 0.0
@@ -112,6 +117,23 @@ func _build_ui() -> void:
 	_frenzy_bar.pop_requested.connect(_on_pop_requested)
 	column.add_child(_frenzy_bar)
 
+	# Global buy-mode toggle: one button cycles ×1 → ×10 → UPGRADE → MAX
+	# and every row's buy button follows it (GDD §3.1 bulk-buy requirement).
+	var toggle_line := HBoxContainer.new()
+	column.add_child(toggle_line)
+
+	var toggle_spacer := Control.new()
+	toggle_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	toggle_line.add_child(toggle_spacer)
+
+	_buy_mode_button = Button.new()
+	_buy_mode_button.custom_minimum_size = Vector2(320, 56)
+	_buy_mode_button.add_theme_font_size_override("font_size", 24)
+	UiPalette.style_button(_buy_mode_button, false)
+	_buy_mode_button.text = "BUY MODE: " + _buy_mode_caption(_buy_mode)
+	_buy_mode_button.pressed.connect(_on_buy_mode_toggled)
+	toggle_line.add_child(_buy_mode_button)
+
 	# The property ladder: 12 rows in a vertical scroll (GDD §2: a vertical
 	# ladder scrolled upward as you ascend).
 	var scroll := ScrollContainer.new()
@@ -131,6 +153,7 @@ func _build_ui() -> void:
 		row.tap_requested.connect(_on_tap_requested)
 		row.hire_requested.connect(_on_hire_requested)
 		ladder.add_child(row)
+		_rows.append(row)
 
 	_wage_panel = WagePanel.new()
 	_wage_panel.setup(game.wage, game.economy)
@@ -187,3 +210,23 @@ func _on_promotion_requested() -> void:
 
 func _on_pop_requested() -> void:
 	game.pop_frenzy()
+
+
+func _on_buy_mode_toggled() -> void:
+	_buy_mode = ((_buy_mode + 1) % PropertyRow.BuyMode.size()) as PropertyRow.BuyMode
+	_buy_mode_button.text = "BUY MODE: " + _buy_mode_caption(_buy_mode)
+	for row in _rows:
+		(row as PropertyRow).set_buy_mode(_buy_mode)
+
+
+func _buy_mode_caption(mode: PropertyRow.BuyMode) -> String:
+	match mode:
+		PropertyRow.BuyMode.ONE:
+			return "×1"
+		PropertyRow.BuyMode.TEN:
+			return "×10"
+		PropertyRow.BuyMode.TO_MILESTONE:
+			return "UPGRADE"
+		PropertyRow.BuyMode.MAX:
+			return "MAX"
+	return "×1"

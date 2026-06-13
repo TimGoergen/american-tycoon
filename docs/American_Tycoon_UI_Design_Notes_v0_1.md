@@ -142,9 +142,15 @@ Art Style Guide.
   not jerkily (Tim, 2026-06-13). Cause: logic ticks at 10 Hz but the bar renders per frame,
   so the raw value steps ~10×/sec. Fix: ease the displayed value toward the true value each
   frame (`CYCLE_BAR_SMOOTH_SPEED`), snapping on cycle-reset so it refills cleanly.
+- **Staffed hire button is faint green (Tim, 2026-06-13).** Once a property is staffed,
+  its hire button turns a faint green (`UiPalette.make_staffed_style`) instead of the
+  default disabled cream, so automated properties read at a glance.
 
 ### Buy-mode toggle & buy buttons
--
+- **Show the next-unit cost when unaffordable (Tim, 2026-06-13).** When the buy button has
+  nothing affordable (MAX mode with insufficient cash), show the cost of the next single
+  unit instead of a blank "—", so the player sees how close they are. (×1/×10/×100 already
+  show their fixed cost and just disable when unaffordable.)
 
 ### Milestone slider
 -

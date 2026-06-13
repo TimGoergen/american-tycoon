@@ -74,6 +74,12 @@ static func style_gold_progress(bar: ProgressBar) -> void:
 	bar.add_theme_stylebox_override("fill", fill)
 
 
+## Faint-green plate for a staffed property's hire button — signals "this one is
+## automated" (a soft money-green wash over the cream card, navy border).
+static func make_staffed_style() -> StyleBoxFlat:
+	return _make_plate(CREAM.lerp(MONEY_GREEN, 0.45), NAVY)
+
+
 static func _make_plate(bg_color: Color, border_color: Color) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	style.bg_color = bg_color

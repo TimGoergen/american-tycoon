@@ -112,7 +112,12 @@ Art Style Guide.
 -
 
 ### Property ladder / property row
--
+- **Hold START/RUSH to auto-repeat.** Click-and-hold on the start/rush button should
+  continually execute the next action (Tim, 2026-06-13). Note: hold-to-rush already exists
+  for a *running* cycle (`PropertyRow._pump_held_rush`, rate `hold_rush_per_second`). The
+  open gap is holding while *idle* (button shows START) — today the cycle only starts on
+  release, so holding an idle property doesn't begin-then-auto-rush. Intended behavior:
+  hold START → cycle begins → keeps rushing while held, no re-press.
 
 ### Buy-mode toggle & buy buttons
 -

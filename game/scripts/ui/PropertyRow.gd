@@ -138,18 +138,25 @@ func _process(delta: float) -> void:
 	_pump_held_rush(delta)
 
 
-## Holding the rush button auto-rushes at the tuning hold rate. A quick tap
-## releases before the first pulse accrues, so taps and holds stay distinct
-## (the normal tap still fires on release via the button's pressed signal).
+## Holding the start/rush button continually drives the property at the tuning
+## hold rate (UI notes §2): an idle cycle is STARTED on the first held pulse,
+## then a running cycle is RUSHED on every pulse after. Both are gated behind the
+## same accumulator, so a quick tap accrues no pulse and stays a plain single
+## action (which still fires on release via the button's pressed signal).
 func _pump_held_rush(delta: float) -> void:
-	if not _tap_button.button_pressed or not _prop.is_cycle_running:
+	if not _tap_button.button_pressed or _prop.units_owned == 0:
 		_hold_accumulator = 0.0
 		return
 	_hold_accumulator += delta
 	var pulse_interval := 1.0 / _prop.tuning.hold_rush_per_second
 	while _hold_accumulator >= pulse_interval:
 		_hold_accumulator -= pulse_interval
-		hold_rush_requested.emit(prop_index)
+		if _prop.is_cycle_running:
+			hold_rush_requested.emit(prop_index)
+		else:
+			# Idle: the held pulse starts the cycle. Signals are synchronous, so
+			# the property is running by the next pulse/frame and rushes follow.
+			tap_requested.emit(prop_index)
 
 
 func _refresh() -> void:

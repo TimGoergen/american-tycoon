@@ -25,6 +25,11 @@ var _buy_mode: BuyMode = BuyMode.ONE
 ## Accumulates held-down time on the tap button to pace auto-rush pulses.
 var _hold_accumulator := 0.0
 
+## How fast the cycle progress bar eases toward its true value (higher = snappier).
+## Logic ticks at LOGIC_HZ (10 Hz) while rendering is per-frame, so reading the raw
+## value makes the bar step ~10×/sec (jerky); easing turns that into smooth motion.
+const CYCLE_BAR_SMOOTH_SPEED := 20.0
+
 var _name_label: Label
 var _income_label: Label
 var _tap_button: Button
@@ -134,7 +139,7 @@ func set_buy_mode(mode: BuyMode) -> void:
 
 
 func _process(delta: float) -> void:
-	_refresh()
+	_refresh(delta)
 	_pump_held_rush(delta)
 
 
@@ -159,7 +164,7 @@ func _pump_held_rush(delta: float) -> void:
 			tap_requested.emit(prop_index)
 
 
-func _refresh() -> void:
+func _refresh(delta: float) -> void:
 	var config := _prop.config as PropertyConfig
 	_name_label.text = "%s  ×%d" % [config.display_name, _prop.units_owned]
 	_income_label.text = Money.of(_prop.get_income_per_sec()).display() + "/s"
@@ -175,7 +180,14 @@ func _refresh() -> void:
 		_tap_button.text = "START"
 		_tap_button.disabled = false
 
-	_cycle_bar.value = _prop.cycle_progress / _prop.cycle_length if _prop.cycle_length > 0.0 else 0.0
+	# Ease the cycle bar toward its true value so the 10 Hz logic stepping reads as
+	# smooth motion. On a cycle reset (target drops below the bar), snap instead so
+	# the bar refills cleanly rather than sliding backward.
+	var cycle_target := _prop.cycle_progress / _prop.cycle_length if _prop.cycle_length > 0.0 else 0.0
+	if cycle_target < _cycle_bar.value:
+		_cycle_bar.value = cycle_target
+	else:
+		_cycle_bar.value = lerpf(_cycle_bar.value, cycle_target, clampf(delta * CYCLE_BAR_SMOOTH_SPEED, 0.0, 1.0))
 
 	# Milestone slider runs from the last crossed milestone to the next one.
 	var next_milestone := _prop.get_next_milestone_count()

@@ -118,6 +118,10 @@ Art Style Guide.
   open gap is holding while *idle* (button shows START) — today the cycle only starts on
   release, so holding an idle property doesn't begin-then-auto-rush. Intended behavior:
   hold START → cycle begins → keeps rushing while held, no re-press.
+- **Smooth cycle progress bar.** The per-property cycle progress bar should move smoothly,
+  not jerkily (Tim, 2026-06-13). Cause: logic ticks at 10 Hz but the bar renders per frame,
+  so the raw value steps ~10×/sec. Fix: ease the displayed value toward the true value each
+  frame (`CYCLE_BAR_SMOOTH_SPEED`), snapping on cycle-reset so it refills cleanly.
 
 ### Buy-mode toggle & buy buttons
 -

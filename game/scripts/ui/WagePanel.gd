@@ -27,9 +27,22 @@ var _hold_accumulator := 0.0
 # the button — a quick brighten that decays. The button never changes size. Held
 # down, it pulses at the auto-tap cadence, i.e. once per income tick. _impact runs
 # 1→0; decaying it in _process (instead of per-tap tweens) keeps rapid taps from
-# piling up.
+# piling up. The flash lightens the gold toward white — a brighter shade of the
+# SAME gold, not a tint toward a different yellow — and touches only the gold
+# plate, so the navy border and label stay put.
 const IMPACT_DECAY := 8.0
+
+## How far the gold is lightened toward white at the peak of a flash (0 = none,
+## 1 = pure white). Modest, so the flash reads as "brighter gold", not "blown out".
+const FLASH_LIGHTEN := 0.45
 var _impact := 0.0
+
+# The meter's two gold plates — captured so the flash can lighten them in place and
+# restore them. Their unflashed colors are remembered in *_base.
+var _fill_style: StyleBoxFlat
+var _track_style: StyleBoxFlat
+var _fill_base: Color
+var _track_base: Color
 
 var _wage_meter: ProgressBar
 var _wage_button: Button
@@ -57,6 +70,11 @@ func _ready() -> void:
 	_wage_meter.show_percentage = false
 	_wage_meter.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	UiPalette.style_gold_progress(_wage_meter)
+	# Capture the gold styleboxes so the click-impact flash can lighten them in place.
+	_fill_style = _wage_meter.get_theme_stylebox("fill") as StyleBoxFlat
+	_track_style = _wage_meter.get_theme_stylebox("background") as StyleBoxFlat
+	_fill_base = _fill_style.bg_color
+	_track_base = _track_style.bg_color
 	add_child(_wage_meter)
 
 	# Transparent button overlaying the meter — the gold shows through, only the
@@ -71,6 +89,9 @@ func _ready() -> void:
 	_wage_button.add_theme_color_override("font_color", UiPalette.NAVY)
 	_wage_button.add_theme_color_override("font_hover_color", UiPalette.NAVY)
 	_wage_button.add_theme_color_override("font_pressed_color", UiPalette.INK_NAVY)
+	# Fire on press, not release, so the tap and its flash land the instant the
+	# button goes down — releasing first makes the feedback feel laggy.
+	_wage_button.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	_wage_button.pressed.connect(func() -> void:
 		wage_tapped.emit()
 		_pulse_impact())
@@ -162,14 +183,17 @@ func _pulse_impact() -> void:
 	_impact = 1.0
 
 
-## Render the click impact: a quick brighten flash on the button that decays to
-## rest. No scale change — the button never resizes. Called every frame so held-down
-## auto-taps re-trigger the flash at the income cadence.
+## Render the click impact: a quick brighten of the gold plate that decays back to
+## rest. Lightening the SAME gold toward white keeps its hue — a brighter shade, not
+## a different yellow. No scale change (the button never resizes), and called every
+## frame so held-down auto-taps re-trigger the flash at the income cadence.
 func _apply_impact(delta: float) -> void:
 	if _impact <= 0.0:
-		if _wage_meter.modulate != Color.WHITE:
-			_wage_meter.modulate = Color.WHITE
+		if _fill_style.bg_color != _fill_base:
+			_fill_style.bg_color = _fill_base
+			_track_style.bg_color = _track_base
 		return
 	_impact = maxf(0.0, _impact - delta * IMPACT_DECAY)
-	# Brighten toward a warm near-white; modulate values > 1 brighten the render.
-	_wage_meter.modulate = Color.WHITE.lerp(Color(1.7, 1.6, 1.3), _impact)
+	var amount := _impact * FLASH_LIGHTEN
+	_fill_style.bg_color = _fill_base.lightened(amount)
+	_track_style.bg_color = _track_base.lightened(amount)

@@ -2,19 +2,47 @@ class_name HeroStat
 extends PanelContainer
 
 # The income/sec hero stat (GDD §3.1: the dopamine delivery vehicle — do
-# not stub). Cream ticket plate with red frame, navy numerals (Style Guide
-# §8). Purchases trigger a hard stamp-pop plus a flashed red delta
-# (§9: stamps, not bounces — mechanical, ~120 ms).
+# not stub). Cream ticket plate with red frame, navy numerals (Style Guide §8).
+#
+# Layout is edge-pinned rather than stacked, to keep the readable values clear of
+# a phone's top camera cutout (Tim's device):
+#   • the income/sec NUMBER is pinned to the left edge, centered vertically;
+#   • the CASH-on-hand is pinned to the right edge, centered vertically;
+#   • the "INCOME PER SECOND" caption is pinned to the centre of the bottom edge.
+# PanelContainer only fits a single child, so the labels live inside a plain
+# Control ("content") that fills the plate, and we position them by hand each frame
+# (their widths change as the values do) in _layout_labels.
+#
+# A purchase triggers a mild flash (a soft brightness pulse) — deliberately no color
+# change and no size change (Tim's call, overriding §9's red delta and stamp-pop:
+# read as a gentle "noted", not a recolor or resize).
 
-# Animation feel values from Style Guide §9 (art direction, not game tuning).
-const STAMP_SCALE := 1.12
-const STAMP_SECONDS := 0.12
-const DELTA_VISIBLE_SECONDS := 0.8
+# Type sizes (art direction, not game tuning). Large for at-a-glance reading; the
+# matching-color outline fakes a bold weight until real bold fonts arrive in M3.
+const INCOME_FONT_SIZE := 64
+const CASH_FONT_SIZE := 42
+const CAPTION_FONT_SIZE := 30
+const INCOME_BOLD := 3
+const CASH_BOLD := 2
+const CAPTION_BOLD := 2
 
+## Gap kept between a pinned label and the panel edge it hugs.
+const EDGE_MARGIN := 14
+## Panel height — tall enough that the vertically-centered values clear the caption
+## pinned along the bottom edge.
+const PANEL_MIN_HEIGHT := 190
+
+# The brightness flash briefly lifts the whole panel toward white and eases back.
+# Multiplying modulate (rather than tinting the background) keeps the hue exactly
+# the same — it's a flash of light, not a color change — and stays out of the way
+# of the frenzy glow, which owns the background color.
+const FLASH_BRIGHTNESS := 1.18
+const FLASH_SECONDS := 0.18
+
+var _content: Control
 var _income_label: Label
 var _cash_label: Label
-var _delta_label: Label
-var _delta_timer := 0.0
+var _caption_label: Label
 
 # Frenzy glow: while a burn is active the ticket pulses toward red to signal the
 # accelerated state. Subtle — navy numerals stay readable over the tint.
@@ -31,37 +59,32 @@ func _ready() -> void:
 	add_theme_stylebox_override("panel", style)
 	_panel_style = style  # kept so the frenzy glow can pulse its background
 
-	var column := VBoxContainer.new()
-	add_child(column)
+	# Free-form layer the labels are pinned within. Its minimum height drives the
+	# whole panel's height (PanelContainer grows to fit it plus the stylebox margins).
+	_content = Control.new()
+	_content.custom_minimum_size = Vector2(0, PANEL_MIN_HEIGHT)
+	add_child(_content)
 
-	var caption := Label.new()
-	caption.text = "I N C O M E   P E R   S E C O N D"
-	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	caption.add_theme_color_override("font_color", UiPalette.NAVY)
-	caption.add_theme_font_size_override("font_size", 20)
-	column.add_child(caption)
+	_income_label = _make_label(UiPalette.NAVY, INCOME_FONT_SIZE, INCOME_BOLD)
+	_content.add_child(_income_label)
 
-	var stat_line := HBoxContainer.new()
-	stat_line.alignment = BoxContainer.ALIGNMENT_CENTER
-	stat_line.add_theme_constant_override("separation", 18)
-	column.add_child(stat_line)
+	_cash_label = _make_label(UiPalette.MONEY_GREEN, CASH_FONT_SIZE, CASH_BOLD)
+	_content.add_child(_cash_label)
 
-	_income_label = Label.new()
-	_income_label.add_theme_color_override("font_color", UiPalette.NAVY)
-	_income_label.add_theme_font_size_override("font_size", 56)
-	stat_line.add_child(_income_label)
+	_caption_label = _make_label(UiPalette.NAVY, CAPTION_FONT_SIZE, CAPTION_BOLD)
+	_caption_label.text = "INCOME PER SECOND"
+	_content.add_child(_caption_label)
 
-	_delta_label = Label.new()
-	_delta_label.visible = false
-	_delta_label.add_theme_color_override("font_color", UiPalette.KETCHUP_RED)
-	_delta_label.add_theme_font_size_override("font_size", 40)
-	stat_line.add_child(_delta_label)
 
-	_cash_label = Label.new()
-	_cash_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_cash_label.add_theme_color_override("font_color", UiPalette.MONEY_GREEN)
-	_cash_label.add_theme_font_size_override("font_size", 34)
-	column.add_child(_cash_label)
+## Build a large, faux-bold label in the given color. The bold weight is faked with
+## a same-color outline (no bold font asset exists yet — they arrive in M3).
+func _make_label(color: Color, font_size: int, outline: int) -> Label:
+	var label := Label.new()
+	label.add_theme_color_override("font_color", color)
+	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_color_override("font_outline_color", color)
+	label.add_theme_constant_override("outline_size", outline)
+	return label
 
 
 func set_income_per_sec(income_per_sec: float) -> void:
@@ -77,22 +100,14 @@ func set_frenzy_glow(active: bool) -> void:
 	_frenzy_glow = active
 
 
-## Announce a purchase: stamp the ticket and flash the income/sec delta.
-func flash_purchase(ips_before: float, ips_after: float) -> void:
-	if ips_before > 0.0:
-		_delta_label.text = "+%.0f%%" % ((ips_after / ips_before - 1.0) * 100.0)
-	else:
-		_delta_label.text = "NEW!"
-	_delta_label.visible = true
-	_delta_timer = DELTA_VISIBLE_SECONDS
-	_stamp()
+## Announce a purchase: a mild flash (a soft brightness pulse). No color change and
+## no size change — the panel never resizes — see the class header.
+func flash_purchase() -> void:
+	_flash()
 
 
 func _process(delta: float) -> void:
-	if _delta_timer > 0.0:
-		_delta_timer -= delta
-		if _delta_timer <= 0.0:
-			_delta_label.visible = false
+	_layout_labels()
 
 	# Frenzy glow: pulse the ticket background between cream and a soft red while
 	# a burn is active; snap back to plain cream the moment it ends.
@@ -105,10 +120,34 @@ func _process(delta: float) -> void:
 		_panel_style.bg_color = UiPalette.CREAM
 
 
-## The hard stamp: scale up and straight back down, no easing curves —
-## print-press energy, not mobile-game bounce (Style Guide §9).
-func _stamp() -> void:
-	pivot_offset = size / 2.0
+## Pin each label to its edge of the plate. Done every frame because the values'
+## widths change, and a pinned label must stay flush to its edge as it does.
+func _layout_labels() -> void:
+	var area := _content.size
+
+	# Income/sec number: left edge, centered vertically.
+	_income_label.size = _income_label.get_minimum_size()
+	_income_label.position = Vector2(EDGE_MARGIN, (area.y - _income_label.size.y) / 2.0)
+
+	# Cash on hand: right edge, centered vertically.
+	_cash_label.size = _cash_label.get_minimum_size()
+	_cash_label.position = Vector2(
+		area.x - _cash_label.size.x - EDGE_MARGIN,
+		(area.y - _cash_label.size.y) / 2.0
+	)
+
+	# Caption: centre of the bottom edge.
+	_caption_label.size = _caption_label.get_minimum_size()
+	_caption_label.position = Vector2(
+		(area.x - _caption_label.size.x) / 2.0,
+		area.y - _caption_label.size.y - EDGE_MARGIN
+	)
+
+
+## The mild flash: lift the panel's brightness for an instant, then ease it back
+## to normal. modulate is a multiply over the panel's real colors, so this only
+## changes how bright it is, never its hue.
+func _flash() -> void:
+	modulate = Color(FLASH_BRIGHTNESS, FLASH_BRIGHTNESS, FLASH_BRIGHTNESS)
 	var tween := create_tween()
-	tween.tween_property(self, "scale", Vector2.ONE * STAMP_SCALE, STAMP_SECONDS / 2.0)
-	tween.tween_property(self, "scale", Vector2.ONE, STAMP_SECONDS / 2.0)
+	tween.tween_property(self, "modulate", Color.WHITE, FLASH_SECONDS)

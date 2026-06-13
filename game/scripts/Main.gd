@@ -49,11 +49,10 @@ func _process(delta: float) -> void:
 		_autosave_timer = 0.0
 		SaveManager.save_to_file(game)
 
-	# Reflect the active frenzy multiplier in the headline income/sec so the hero
-	# stat jumps during a burn (frenzy boosts income at payment — Spec §7).
-	# Effective rate (EMA of actual inflow — rushing, wage taps, frenzy all included),
-	# so the headline reflects what the player is earning right now, not just passively.
-	_hero_stat.set_income_per_sec(game.effective_income_per_sec)
+	# Headline income/sec: the guaranteed staffed floor plus a smoothed bonus from
+	# active play (rushes, wage taps, frenzy). Built in GameState so it never reads
+	# below the income staffed properties keep earning hands-off.
+	_hero_stat.set_income_per_sec(game.displayed_income_per_sec)
 	_hero_stat.set_cash(game.economy.cash)
 	_hero_stat.set_frenzy_glow(game.frenzy.get_multiplier() > 1.0)
 
@@ -130,6 +129,17 @@ func _build_ui() -> void:
 	var toggle_line := HBoxContainer.new()
 	column.add_child(toggle_line)
 
+	# Temporary play-testing tool: wipe the save and restart from a clean slate.
+	# Sits on the left of the buy-mode toggle for now; it will move into a proper
+	# settings screen later (Tim's note). Red because it is a destructive action.
+	var reset_button := Button.new()
+	reset_button.custom_minimum_size = Vector2(150, 56)
+	reset_button.add_theme_font_size_override("font_size", 20)
+	UiPalette.style_button(reset_button, true)
+	reset_button.text = "RESET"
+	reset_button.pressed.connect(_on_reset_requested)
+	toggle_line.add_child(reset_button)
+
 	var toggle_spacer := Control.new()
 	toggle_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	toggle_line.add_child(toggle_spacer)
@@ -197,10 +207,8 @@ func _on_buy_requested(prop_index: int, mode: PropertyRow.BuyMode) -> void:
 	if count <= 0:
 		return
 
-	var ips_before := game.economy.get_total_income_per_sec()
 	if game.try_buy(prop_index, count):
-		var ips_after := game.economy.get_total_income_per_sec()
-		_hero_stat.flash_purchase(ips_before, ips_after)
+		_hero_stat.flash_purchase()
 
 
 func _on_tap_requested(prop_index: int) -> void:
@@ -229,6 +237,13 @@ func _on_promotion_requested() -> void:
 
 func _on_pop_requested() -> void:
 	game.pop_frenzy()
+
+
+## Temporary play-testing reset: delete the save and reload the scene, which
+## re-runs startup with no save present and so begins a fresh run.
+func _on_reset_requested() -> void:
+	SaveManager.delete_save_file()
+	get_tree().reload_current_scene()
 
 
 func _on_buy_mode_toggled() -> void:

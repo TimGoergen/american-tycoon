@@ -26,11 +26,21 @@ var _buy_mode: BuyMode = BuyMode.ONE
 ## Accumulates held-down time on the tap button to pace auto-rush pulses.
 var _hold_accumulator := 0.0
 
-## How fast the cycle progress bar eases toward its true value (higher = snappier).
-## Logic ticks at LOGIC_HZ (10 Hz) while rendering is per-frame, so reading the raw
-## value makes the bar step ~10×/sec (jerky); easing turns that into smooth motion.
-const CYCLE_BAR_SMOOTH_SPEED := 20.0
+# The cycle progress bar is driven by our own smooth, per-frame prediction rather
+# than the raw logic value. Logic ticks at LOGIC_HZ (10 Hz) while rendering runs
+# every frame (~60 Hz), so reading cycle_progress directly makes the bar lurch in
+# ~10 steps/sec — jumpy and staccato. Instead we advance a displayed fraction at
+# real time (delta / cycle_length each frame, the true fill rate) and only re-sync
+# to the logic state on the events that prediction can't see: a rush jumping the
+# cycle forward, or the cycle completing and restarting. The result is constant-
+# velocity motion at the full frame rate.
+var _displayed_cycle_fraction := 0.0
 
+## Last frame's true cycle fraction. Cycle progress only ever decreases when a
+## cycle completes and restarts, so a drop tells us to snap the bar back to zero.
+var _last_true_cycle_fraction := 0.0
+
+var _manager_circle: ManagerCircle
 var _name_label: Label
 var _income_label: Label
 var _tap_button: Button
@@ -60,9 +70,26 @@ func _ready() -> void:
 	column.add_theme_constant_override("separation", 6)
 	add_child(column)
 
+	# Top of the row: a round manager-portrait slot on the left, and to its right a
+	# section holding the title and the cycle progress bar. The circle is sized in
+	# _refresh to be a square as tall as that whole section (title + progress bar
+	# combined), so it reads as one portrait spanning both lines.
+	var top_row := HBoxContainer.new()
+	top_row.add_theme_constant_override("separation", 12)
+	column.add_child(top_row)
+
+	_manager_circle = ManagerCircle.new()
+	_manager_circle.size_flags_vertical = Control.SIZE_FILL  # stretch to the section's height
+	top_row.add_child(_manager_circle)
+
+	var top_section := VBoxContainer.new()
+	top_section.add_theme_constant_override("separation", 6)
+	top_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top_row.add_child(top_section)
+
 	# Header: name ×count on the left, income/sec on the right.
 	var header := HBoxContainer.new()
-	column.add_child(header)
+	top_section.add_child(header)
 
 	_name_label = Label.new()
 	_name_label.add_theme_color_override("font_color", UiPalette.NAVY)
@@ -79,7 +106,7 @@ func _ready() -> void:
 	# the "spin" is the real cycle progress; placeholder bar until hero art).
 	var cycle_line := HBoxContainer.new()
 	cycle_line.add_theme_constant_override("separation", 10)
-	column.add_child(cycle_line)
+	top_section.add_child(cycle_line)
 
 	_tap_button = Button.new()
 	_tap_button.custom_minimum_size = Vector2(150, 0)
@@ -173,10 +200,16 @@ func _pump_held_rush(delta: float) -> void:
 func _refresh(delta: float) -> void:
 	var config := _prop.config as PropertyConfig
 	_name_label.text = "%s  ×%d" % [config.display_name, _prop.units_owned]
-	# During a frenzy burn, property income is multiplied at point of payment
-	# (Spec §7). Reflect that boost in the live income/sec readout so the screen
-	# visibly lights up while the burn is active (1.0 when no burn).
-	_income_label.text = Money.of(_prop.get_income_per_sec() * _frenzy.get_multiplier()).display() + "/s"
+
+	# Keep the portrait circle square and as tall as this top section: its height is
+	# already stretched to the section by the layout, so we just match the width to it.
+	_manager_circle.custom_minimum_size.x = _manager_circle.size.y
+	_manager_circle.set_state(_prop.is_staffed, config.manager_portrait, config.staffer_name)
+	# Show the cash paid out each time the bar fills (per cycle), so the figure on
+	# screen matches what the player actually receives on a completion. During a
+	# frenzy burn that payout is multiplied at point of payment (Spec §7), so the
+	# readout lights up while the burn is active (multiplier is 1.0 when no burn).
+	_income_label.text = Money.of(_prop.get_income_per_cycle() * _frenzy.get_multiplier()).display() + "/cycle"
 
 	# The tap verb mirrors Spec §4: START an idle cycle, RUSH a running one.
 	if _prop.units_owned == 0:
@@ -189,14 +222,23 @@ func _refresh(delta: float) -> void:
 		_tap_button.text = "START"
 		_tap_button.disabled = false
 
-	# Ease the cycle bar toward its true value so the 10 Hz logic stepping reads as
-	# smooth motion. On a cycle reset (target drops below the bar), snap instead so
-	# the bar refills cleanly rather than sliding backward.
-	var cycle_target := _prop.cycle_progress / _prop.cycle_length if _prop.cycle_length > 0.0 else 0.0
-	if cycle_target < _cycle_bar.value:
-		_cycle_bar.value = cycle_target
+	# Smooth, constant-velocity cycle bar (see _displayed_cycle_fraction above).
+	var true_fraction := _prop.cycle_progress / _prop.cycle_length if _prop.cycle_length > 0.0 else 0.0
+	if not _prop.is_cycle_running or _prop.units_owned == 0:
+		# Idle or empty: nothing is advancing, so just mirror the true value exactly.
+		_displayed_cycle_fraction = true_fraction
+	elif true_fraction < _last_true_cycle_fraction:
+		# The cycle just completed and restarted — snap back so the bar refills from
+		# the start rather than sliding backward.
+		_displayed_cycle_fraction = true_fraction
 	else:
-		_cycle_bar.value = lerpf(_cycle_bar.value, cycle_target, clampf(delta * CYCLE_BAR_SMOOTH_SPEED, 0.0, 1.0))
+		# Running: advance at the real fill rate, and never let the bar lag behind the
+		# true value. taking the max means a rush (which jumps cycle_progress forward)
+		# pulls the bar up immediately instead of crawling to catch up.
+		var advanced := _displayed_cycle_fraction + delta / _prop.cycle_length
+		_displayed_cycle_fraction = clampf(maxf(advanced, true_fraction), 0.0, 1.0)
+	_last_true_cycle_fraction = true_fraction
+	_cycle_bar.value = _displayed_cycle_fraction
 
 	# Milestone slider runs from the last crossed milestone to the next one.
 	var next_milestone := _prop.get_next_milestone_count()

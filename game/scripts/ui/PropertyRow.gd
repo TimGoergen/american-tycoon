@@ -7,9 +7,9 @@ extends PanelContainer
 # for every action — all mutations happen in Main → GameState.
 #
 # Each row has a single buy button; what it buys is set by the global
-# buy-mode toggle on the Main screen (×1 / ×10 / UPGRADE / MAX).
+# buy-mode toggle on the Main screen (×1 / ×10 / ×100 / MAX).
 
-enum BuyMode { ONE, TEN, TO_MILESTONE, MAX }
+enum BuyMode { ONE, TEN, HUNDRED, MAX }
 
 signal buy_requested(prop_index: int, mode: BuyMode)
 signal tap_requested(prop_index: int)
@@ -178,7 +178,7 @@ func _refresh() -> void:
 	_milestone_bar.value = _prop.units_owned
 	_milestone_label.text = "%d / %d" % [_prop.units_owned, next_milestone]
 
-	_refresh_buy_button(next_milestone)
+	_refresh_buy_button()
 
 	var cash := _economy.cash
 	if _prop.is_staffed:
@@ -192,7 +192,7 @@ func _refresh() -> void:
 
 ## Update the buy button's caption, cost, and enabled state for the
 ## current global buy mode.
-func _refresh_buy_button(next_milestone: int) -> void:
+func _refresh_buy_button() -> void:
 	var count := 0
 	var caption := ""
 	match _buy_mode:
@@ -202,9 +202,9 @@ func _refresh_buy_button(next_milestone: int) -> void:
 		BuyMode.TEN:
 			count = 10
 			caption = "BUY ×10"
-		BuyMode.TO_MILESTONE:
-			count = next_milestone - _prop.units_owned
-			caption = "UPGRADE +%d" % count
+		BuyMode.HUNDRED:
+			count = 100
+			caption = "BUY ×100"
 		BuyMode.MAX:
 			count = _prop.get_max_affordable(_economy.cash)
 			caption = "MAX ×%d" % count

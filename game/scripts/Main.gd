@@ -180,8 +180,8 @@ func _on_buy_requested(prop_index: int, mode: PropertyRow.BuyMode) -> void:
 			count = 1
 		PropertyRow.BuyMode.TEN:
 			count = 10
-		PropertyRow.BuyMode.TO_MILESTONE:
-			count = prop.get_next_milestone_count() - prop.units_owned
+		PropertyRow.BuyMode.HUNDRED:
+			count = 100
 		PropertyRow.BuyMode.MAX:
 			count = prop.get_max_affordable(game.economy.cash)
 	if count <= 0:
@@ -230,8 +230,8 @@ func _buy_mode_caption(mode: PropertyRow.BuyMode) -> String:
 			return "×1"
 		PropertyRow.BuyMode.TEN:
 			return "×10"
-		PropertyRow.BuyMode.TO_MILESTONE:
-			return "UPGRADE"
+		PropertyRow.BuyMode.HUNDRED:
+			return "×100"
 		PropertyRow.BuyMode.MAX:
 			return "MAX"
 	return "×1"

@@ -21,6 +21,11 @@ var frenzy: FrenzyState
 ## (Spec §9.4). Monotonic — only ever rises within a generation.
 var peak_net_worth: float = 0.0
 
+## UI preference: the player's selected global buy mode (a PropertyRow.BuyMode int).
+## Stored here only so it persists in the save file across sessions; the headless
+## model never reads it.
+var ui_buy_mode: int = 0
+
 ## Smoothed "effective" income/sec — an exponential moving average of ACTUAL cash
 ## inflow (property completions + wage taps, frenzy included). Unlike the theoretical
 ## per-property rate, this rises while the player is actively rushing/tapping and
@@ -184,6 +189,7 @@ func to_save_dict() -> Dictionary:
 		"saved_at_unix": Time.get_unix_time_from_system(),
 		"cash": economy.cash,
 		"peak_net_worth": peak_net_worth,
+		"buy_mode": ui_buy_mode,
 		# Per-generation book-value accumulators (Spec §9.2). Saved raw because
 		# they are sunk history, not derivable from the current holdings.
 		"spent_on_units_this_gen": economy.spent_on_units_this_gen,
@@ -209,6 +215,7 @@ func load_save_dict(data: Dictionary) -> void:
 
 	economy.cash = float(data.get("cash", 0.0))
 	peak_net_worth = float(data.get("peak_net_worth", 0.0))
+	ui_buy_mode = int(data.get("buy_mode", 0))
 	economy.spent_on_units_this_gen = float(data.get("spent_on_units_this_gen", 0.0))
 	economy.spent_on_staff_this_gen = float(data.get("spent_on_staff_this_gen", 0.0))
 

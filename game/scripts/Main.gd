@@ -82,6 +82,9 @@ func _create_game() -> void:
 		game.load_save_dict(save_dict)
 		_elapsed_since_save = SaveManager.get_seconds_since_save(save_dict)
 
+	# Restore the saved buy-mode preference (defaults to ×1 for a fresh game).
+	_buy_mode = game.ui_buy_mode as PropertyRow.BuyMode
+
 
 func _apply_offline_if_due() -> void:
 	if _elapsed_since_save <= 0.0:
@@ -158,6 +161,7 @@ func _build_ui() -> void:
 		row.tap_requested.connect(_on_tap_requested)
 		row.hold_rush_requested.connect(_on_hold_rush_requested)
 		row.hire_requested.connect(_on_hire_requested)
+		row.set_buy_mode(_buy_mode)  # apply the restored buy-mode preference
 		ladder.add_child(row)
 		_rows.append(row)
 
@@ -229,6 +233,7 @@ func _on_pop_requested() -> void:
 
 func _on_buy_mode_toggled() -> void:
 	_buy_mode = ((_buy_mode + 1) % PropertyRow.BuyMode.size()) as PropertyRow.BuyMode
+	game.ui_buy_mode = _buy_mode  # persisted on the next autosave / on background
 	_buy_mode_button.text = "BUY MODE: " + _buy_mode_caption(_buy_mode)
 	for row in _rows:
 		(row as PropertyRow).set_buy_mode(_buy_mode)

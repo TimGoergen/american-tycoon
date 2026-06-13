@@ -31,6 +31,13 @@ extends Resource
 ## Fraction of cycle_length that one rush-tap advances the cycle.
 @export var rush_pct: float = 0.05  # TBD-SIM
 
+## Auto-rush pulses per second while the rush button is held down.
+@export var hold_rush_per_second: float = 5.0  # feel-tune M1
+
+## Frenzy fill per held-rush pulse, as a fraction of a manual tap's fill.
+## Holding is convenient, so it charges the meter slower than real tapping.
+@export var frenzy_fill_hold_factor: float = 0.6  # feel-tune M1
+
 # --- Staffing & offline (Spec §6) ---
 
 ## Offline income efficiency vs. live play (0–1).

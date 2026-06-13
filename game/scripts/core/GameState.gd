@@ -47,6 +47,17 @@ func tap_property(prop_index: int) -> void:
 		prop.start_cycle()
 
 
+## Layer 2 held-rush: one auto-rush pulse while the rush button is held.
+## Rushes exactly like a tap, but charges the frenzy meter at the reduced
+## hold factor — holding is convenient, so real tapping stays superior.
+func hold_rush_property(prop_index: int) -> void:
+	var prop := economy.properties[prop_index] as PropertyState
+	if not prop.is_cycle_running:
+		return
+	frenzy.on_tap(tuning.frenzy_fill_hold_factor)
+	prop.rush_cycle()
+
+
 ## Pop the frenzy meter if allowed. Returns true if a burn started.
 func pop_frenzy() -> bool:
 	if not frenzy.can_pop():

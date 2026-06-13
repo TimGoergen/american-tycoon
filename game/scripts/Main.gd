@@ -151,6 +151,7 @@ func _build_ui() -> void:
 		row.setup(i, game.economy.properties[i] as PropertyState, game.economy)
 		row.buy_requested.connect(_on_buy_requested)
 		row.tap_requested.connect(_on_tap_requested)
+		row.hold_rush_requested.connect(_on_hold_rush_requested)
 		row.hire_requested.connect(_on_hire_requested)
 		ladder.add_child(row)
 		_rows.append(row)
@@ -194,6 +195,10 @@ func _on_buy_requested(prop_index: int, mode: PropertyRow.BuyMode) -> void:
 
 func _on_tap_requested(prop_index: int) -> void:
 	game.tap_property(prop_index)
+
+
+func _on_hold_rush_requested(prop_index: int) -> void:
+	game.hold_rush_property(prop_index)
 
 
 func _on_hire_requested(prop_index: int) -> void:

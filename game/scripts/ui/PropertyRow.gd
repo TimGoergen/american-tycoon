@@ -13,6 +13,7 @@ enum BuyMode { ONE, TEN, TO_MILESTONE, MAX }
 
 signal buy_requested(prop_index: int, mode: BuyMode)
 signal tap_requested(prop_index: int)
+signal hold_rush_requested(prop_index: int)
 signal hire_requested(prop_index: int)
 
 var prop_index: int = -1
@@ -20,6 +21,9 @@ var prop_index: int = -1
 var _prop: PropertyState
 var _economy: EconomyState
 var _buy_mode: BuyMode = BuyMode.ONE
+
+## Accumulates held-down time on the tap button to pace auto-rush pulses.
+var _hold_accumulator := 0.0
 
 var _name_label: Label
 var _income_label: Label
@@ -129,8 +133,23 @@ func set_buy_mode(mode: BuyMode) -> void:
 	_buy_mode = mode
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	_refresh()
+	_pump_held_rush(delta)
+
+
+## Holding the rush button auto-rushes at the tuning hold rate. A quick tap
+## releases before the first pulse accrues, so taps and holds stay distinct
+## (the normal tap still fires on release via the button's pressed signal).
+func _pump_held_rush(delta: float) -> void:
+	if not _tap_button.button_pressed or not _prop.is_cycle_running:
+		_hold_accumulator = 0.0
+		return
+	_hold_accumulator += delta
+	var pulse_interval := 1.0 / _prop.tuning.hold_rush_per_second
+	while _hold_accumulator >= pulse_interval:
+		_hold_accumulator -= pulse_interval
+		hold_rush_requested.emit(prop_index)
 
 
 func _refresh() -> void:

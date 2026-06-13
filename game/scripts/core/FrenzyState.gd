@@ -27,10 +27,12 @@ func _init(p_tuning: TuningConfig) -> void:
 
 ## Register a player tap (any verb). Charges the meter while FILLING;
 ## during a burn taps still perform their verbs but feed nothing (Spec §7).
-func on_tap() -> void:
+## `fill_scale` discounts the charge for held-button auto-rushes (1.0 = a
+## real tap; see TuningConfig.frenzy_fill_hold_factor).
+func on_tap(fill_scale: float = 1.0) -> void:
 	_seconds_since_tap = 0.0
 	if mode == Mode.FILLING:
-		meter = minf(meter + tuning.frenzy_fill_per_tap, 1.0)
+		meter = minf(meter + tuning.frenzy_fill_per_tap * fill_scale, 1.0)
 
 
 func tick(delta: float) -> void:

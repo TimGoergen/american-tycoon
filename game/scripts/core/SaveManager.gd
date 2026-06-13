@@ -7,15 +7,22 @@ class_name SaveManager
 const DEFAULT_SAVE_PATH := "user://save.json"
 
 
-## Write the game's save dict to `path` as JSON. Returns true on success.
+## Write a single generation's save dict to `path` as JSON. Returns true on success.
 static func save_to_file(game: GameState, path: String = DEFAULT_SAVE_PATH) -> bool:
+	return save_dict_to_file(game.to_save_dict(), path)
+
+
+## Write any already-built save dict to `path` as JSON. Used for the dynastic
+## save (DynastyState.to_save_dict), which wraps a generation rather than being
+## one. Returns true on success.
+static func save_dict_to_file(data: Dictionary, path: String = DEFAULT_SAVE_PATH) -> bool:
 	var file := FileAccess.open(path, FileAccess.WRITE)
 	if file == null:
 		push_error("SaveManager: cannot open %s for writing (error %d)" % [
 			path, FileAccess.get_open_error()
 		])
 		return false
-	file.store_string(JSON.stringify(game.to_save_dict(), "\t"))
+	file.store_string(JSON.stringify(data, "\t"))
 	file.close()
 	return true
 

@@ -19,6 +19,15 @@ var total_income: float = 0.0
 ## Total simulated time elapsed in seconds.
 var time_elapsed: float = 0.0
 
+## Lifetime dollars spent buying property units this generation. Together with
+## staff spend, this is the estate's "asset book value" — what the holdings are
+## worth on the will (Spec §9.2). Resets naturally each generation because a new
+## generation builds a fresh EconomyState.
+var spent_on_units_this_gen: float = 0.0
+
+## Lifetime dollars spent hiring staff this generation (the other half of book value).
+var spent_on_staff_this_gen: float = 0.0
+
 
 func _init(configs: Array, tuning: TuningConfig) -> void:
 	properties = []
@@ -53,6 +62,7 @@ func try_buy(prop_index: int, count: int) -> bool:
 	if cash < cost:
 		return false
 	cash -= cost
+	spent_on_units_this_gen += cost
 	prop.buy(count)
 	return true
 
@@ -67,6 +77,7 @@ func try_hire(prop_index: int) -> bool:
 	if cash < cost:
 		return false
 	cash -= cost
+	spent_on_staff_this_gen += cost
 	prop.hire_staff()
 	return true
 
@@ -96,3 +107,17 @@ func get_total_income_per_sec() -> float:
 ## Credit cash directly (for starting money, offline pile, events).
 func award_cash(amount: float) -> void:
 	cash += floor(amount)
+
+
+## Estate "asset book value" — lifetime spent on units + staff this generation
+## (Spec §9.2). A provisional valuation rule (TBD-SIM): holdings are worth what
+## was paid for them, not a resale or income-multiple estimate.
+func get_asset_book_value() -> float:
+	return spent_on_units_this_gen + spent_on_staff_this_gen
+
+
+## Net worth = liquid cash + book value of holdings. Drives the death waterfall's
+## gross estate and the peak-net-worth the next heir must out-sprint (Spec §9.4).
+## Provisional definition (TBD-SIM): equals estate_gross before debt/tax.
+func get_net_worth() -> float:
+	return cash + get_asset_book_value()

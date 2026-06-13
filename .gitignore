@@ -4,10 +4,15 @@
 
 # Export/build output
 export/
+dist/
 *.apk
 *.aab
 *.exe
 *.zip
+
+# Android signing — never commit the keystore or its password note
+build/android_release.keystore
+build/keystore_info.txt
 
 # Editor metadata
 .vs/

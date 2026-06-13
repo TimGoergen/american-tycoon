@@ -1,0 +1,404 @@
+# Build & Deploy pipeline for American Tycoon.
+#
+# Cloned from the proven Critter Quitters pipeline (same Godot version, same
+# runner quirks and workarounds — see the inline comments carried over).
+#
+# Triggered on every push to main and feature/** branches, and on manual runs.
+# Produces a Windows installer (.exe via Inno Setup) and a signed Android APK,
+# then creates a GitHub pre-release tagged with the short commit SHA (main only).
+#
+# Required GitHub Secrets (Settings > Secrets and variables > Actions):
+#   ANDROID_KEYSTORE_BASE64      — base64-encoded keystore file
+#   ANDROID_KEYSTORE_PASS        — keystore and key password
+#   FIREBASE_APP_ID              — Firebase Android App ID (e.g. 1:123456789:android:abcdef)
+#                                  Leave unset to skip Firebase deployment.
+#   FIREBASE_SERVICE_ACCOUNT_KEY — Service account JSON with Firebase App Distribution Admin role
+#
+# To update the Godot version: change GODOT_VERSION below and clear the Actions cache.
+# NOTE: We use the standard (non-Mono) Godot binary. The Mono binary blocks Android
+#       export with "C#/.NET is experimental"; the game is pure GDScript so the
+#       standard binary exports identically and avoids that check.
+
+name: Build & Deploy
+
+on:
+  push:
+    branches: [main, 'feature/**']
+  workflow_dispatch:
+
+env:
+  GODOT_VERSION: "4.5.1"
+  GODOT_CHANNEL: "stable"
+
+jobs:
+  # ── Job 1: Export both targets using the Godot Linux headless binary ─────────
+  # Linux can cross-export to Windows and Android; no Windows runner needed here.
+  export:
+    name: Export (Windows + Android)
+    runs-on: ubuntu-latest
+    outputs:
+      sha:       ${{ steps.version.outputs.sha }}
+      build_num: ${{ steps.version.outputs.build_num }}
+      branch:    ${{ steps.version.outputs.branch }}
+      msg:       ${{ steps.version.outputs.msg }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compute short SHA for version stamping
+        id: version
+        run: |
+          SHA="${GITHUB_SHA:0:7}"
+          BUILD_NUM=$(printf '%04d' "$GITHUB_RUN_NUMBER")
+          echo "sha=$SHA"                             >> "$GITHUB_OUTPUT"
+          echo "build_num=$BUILD_NUM"                 >> "$GITHUB_OUTPUT"
+          echo "branch=${GITHUB_REF_NAME}"            >> "$GITHUB_OUTPUT"
+          echo "msg=$(git log -1 --format='%s')"      >> "$GITHUB_OUTPUT"
+
+      - name: Set up Java 17
+        # Required for Android APK signing (Godot calls apksigner/jarsigner internally)
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: temurin
+
+      - name: Restore Godot binary and export templates from cache
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/godot-ci/
+            ~/.local/share/godot/export_templates/
+          # Bump this suffix if the cached state ever becomes corrupt
+          key: godot-${{ env.GODOT_VERSION }}-${{ env.GODOT_CHANNEL }}-v1
+
+      - name: Download Godot Linux headless binary
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          BASE="https://github.com/godotengine/godot/releases/download"
+          VER="${GODOT_VERSION}-${GODOT_CHANNEL}"
+          # Standard (non-Mono) build: zip uses a period before arch (linux.x86_64).
+          ZIP="Godot_v${VER}_linux.x86_64.zip"
+          wget -q "${BASE}/${VER}/${ZIP}" -O /tmp/godot.zip
+          mkdir -p ~/.local/godot-ci
+          # Standard zip contains a single binary (no subdirectory unlike the Mono zip)
+          unzip -q /tmp/godot.zip -d ~/.local/godot-ci/
+          chmod +x ~/.local/godot-ci/Godot_v${VER}_linux.x86_64
+
+      - name: Download Godot export templates
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          BASE="https://github.com/godotengine/godot/releases/download"
+          VER="${GODOT_VERSION}-${GODOT_CHANNEL}"
+          TPZ="Godot_v${VER}_export_templates.tpz"
+          wget -q "${BASE}/${VER}/${TPZ}" -O /tmp/templates.tpz
+          # The directory name must exactly match the version string the Godot editor uses
+          TEMPLATES_DIR="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_CHANNEL}"
+          mkdir -p "$TEMPLATES_DIR"
+          # .tpz is a renamed zip; templates live inside a "templates/" subdirectory within it
+          unzip -q /tmp/templates.tpz -d /tmp/templates_extract/
+          cp -r /tmp/templates_extract/templates/* "$TEMPLATES_DIR/"
+
+      - name: Decode Android release keystore
+        env:
+          # Pass via env var rather than inline expansion to avoid shell-escaping issues
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          mkdir -p build
+          python3 -c "
+          import base64, os
+          data = os.environ['KEYSTORE_B64']
+          # Strip BOM that PowerShell adds, plus any other non-ASCII or whitespace
+          data = data.encode('ascii', errors='ignore').decode()
+          data = ''.join(data.split())
+          open('build/android_release.keystore', 'wb').write(base64.b64decode(data))
+          "
+
+      - name: Inject Android keystore password into export presets
+        # Uses Python to avoid shell-escaping problems with special characters in the password
+        env:
+          KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+        run: |
+          python3 - <<'EOF'
+          import os
+          path = "game/export_presets.cfg"
+          content = open(path).read()
+          password = os.environ["KEYSTORE_PASS"]
+          content = content.replace(
+              'keystore/release_password=""',
+              f'keystore/release_password="{password}"'
+          )
+          open(path, "w").write(content)
+          EOF
+
+      - name: Stamp build version into Android export preset
+        # Sets version/code (integer) and version/name (string) from GITHUB_RUN_NUMBER
+        # so that Firebase App Distribution and Android settings show the correct build.
+        # version/code must be a plain integer; version/name matches the Windows "0.0.0.NNNN" format.
+        run: |
+          python3 - <<'EOF'
+          import os, re
+          path = "game/export_presets.cfg"
+          content = open(path).read()
+          run_num = int(os.environ["GITHUB_RUN_NUMBER"])
+          build_num = f"{run_num:04d}"
+          content = re.sub(r'^version/code=\d+',           f'version/code={run_num}',             content, flags=re.MULTILINE)
+          content = re.sub(r'^version/name="[^"]*"',       f'version/name="0.0.0.{build_num}"',   content, flags=re.MULTILINE)
+          open(path, "w").write(content)
+          print(f"Android version: 0.0.0.{build_num} (code {run_num})")
+          EOF
+
+      - name: Verify keystore and Android SDK
+        run: |
+          if grep -q 'keystore/release_password=""' game/export_presets.cfg; then
+            echo "ERROR: keystore password was NOT injected" && exit 1
+          fi
+          echo "Keystore password injected: OK"
+          echo "Keystore file: $(test -f build/android_release.keystore && echo present || echo MISSING)"
+          echo "Android build-tools: $(ls /usr/local/lib/android/sdk/build-tools/ 2>/dev/null || echo MISSING)"
+          echo "JAVA_HOME: $JAVA_HOME"
+
+      - name: Configure Godot editor settings
+        # Godot needs the Android SDK path and Java SDK path to sign the APK.
+        # Both are pre-installed on ubuntu-latest; JAVA_HOME is set by actions/setup-java.
+        #
+        # The three debug_keystore lines are required to satisfy Godot 4.5 issue #109551:
+        # the debug keystore validator runs even with package/signed=false and fails with a
+        # blank error if any of the three fields are set while the others are not. Setting
+        # all three to "" explicitly satisfies the "none of them" branch of that check.
+        run: |
+          python3 - <<'PYEOF'
+          import os
+          java_home = os.environ.get('JAVA_HOME', '')
+          sdk_path = '/usr/local/lib/android/sdk'
+          settings = (
+              '[gd_resource type="EditorSettings" format=3]\n\n'
+              '[resource]\n'
+              f'export/android/android_sdk_path = "{sdk_path}"\n'
+              f'export/android/java_sdk_path = "{java_home}"\n'
+              'export/android/debug_keystore = ""\n'
+              'export/android/debug_keystore_user = ""\n'
+              'export/android/debug_keystore_pass = ""\n'
+          )
+          dest = os.path.expanduser('~/.config/godot')
+          os.makedirs(dest, exist_ok=True)
+          path = os.path.join(dest, 'editor_settings-4.5.tres')
+          open(path, 'w').write(settings)
+          print(f"Wrote {path}:")
+          print(settings)
+          PYEOF
+
+      - name: Create output directory
+        run: mkdir -p dist
+
+      - name: Export — Windows Desktop
+        working-directory: game
+        run: |
+          GODOT="$HOME/.local/godot-ci/Godot_v${GODOT_VERSION}-${GODOT_CHANNEL}_linux.x86_64"
+          "$GODOT" --headless --export-release "Windows Desktop" "../dist/american_tycoon_win.exe"
+
+      - name: Export — Android APK (unsigned, sign manually)
+        # Godot 4.5 headless export on Linux silently fails its signing config check even
+        # with valid settings. We disable Godot's signing and use apksigner directly instead.
+        working-directory: game
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+          KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+        run: |
+          # The ubuntu-latest runner auto-generates ~/.android/debug.keystore. Godot detects
+          # this at runtime and sets the debug keystore path internally, then fails with a
+          # blank error when debug_keystore_user/pass are unset (Godot 4.5 issue #109551).
+          # Removing it forces Godot to see an empty path, satisfying the "none set" branch.
+          rm -f ~/.android/debug.keystore
+
+          # Disable Godot's built-in signing so the export proceeds past the config check
+          python3 -c "
+          path = 'export_presets.cfg'
+          content = open(path).read()
+          content = content.replace('package/signed=true', 'package/signed=false')
+          open(path, 'w').write(content)
+          print('Godot signing disabled')
+          "
+          GODOT="$HOME/.local/godot-ci/Godot_v${GODOT_VERSION}-${GODOT_CHANNEL}_linux.x86_64"
+          # Godot logs errors to stdout, so capture both streams together.
+          # tee lets the output appear in the Actions log in real time AND saves it for the
+          # error-message dump below, which makes blank-ANSI-code errors visible via cat -A.
+          "$GODOT" --headless --export-release "Android" "../dist/american_tycoon_raw.apk" 2>&1 | tee /tmp/godot_out.txt; GODOT_EXIT=${PIPESTATUS[0]}
+          if [ $GODOT_EXIT -ne 0 ]; then
+            echo "=== Godot output (raw bytes, ANSI visible) ==="
+            cat -A /tmp/godot_out.txt | tail -50
+            exit $GODOT_EXIT
+          fi
+          # Strip non-ASCII and non-printable characters from the password before signing.
+          # GitHub secrets can gain a BOM or stray bytes from copy-paste tools, which causes
+          # Java's PKCS12 implementation to reject the password ("Password is not ASCII").
+          CLEAN_PASS=$(printf '%s' "$KEYSTORE_PASS" | tr -cd '[:print:]')
+          # Sign the exported APK with apksigner from the Android build-tools
+          BUILD_TOOLS=$(ls "$ANDROID_HOME/build-tools/" | sort -V | tail -1)
+          "$ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner" sign \
+            --ks ../build/android_release.keystore \
+            --ks-key-alias american_tycoon \
+            --ks-pass "pass:$CLEAN_PASS" \
+            --key-pass "pass:$CLEAN_PASS" \
+            --out ../dist/american_tycoon.apk \
+            ../dist/american_tycoon_raw.apk
+          rm ../dist/american_tycoon_raw.apk
+
+      - name: Stamp version into filenames
+        run: |
+          SHA="${{ steps.version.outputs.sha }}"
+          mv dist/american_tycoon_win.exe  "dist/american_tycoon_${SHA}_win.exe"
+          mv dist/american_tycoon.apk      "dist/american_tycoon_${SHA}.apk"
+
+      - name: Upload Windows exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-exe
+          path: dist/american_tycoon_*_win.exe
+          if-no-files-found: error
+
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: dist/american_tycoon_*.apk
+          if-no-files-found: error
+
+  # ── Job 2: Wrap Windows exe in Inno Setup installer ──────────────────────────
+  # Inno Setup 6 is pre-installed on GitHub Windows runners.
+  windows-installer:
+    name: Windows Installer
+    needs: export
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Windows exe artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-exe
+          path: dist\
+
+      - name: Build installer with Inno Setup
+        shell: pwsh
+        run: |
+          $sha      = "${{ needs.export.outputs.sha }}"
+          $buildNum = "${{ needs.export.outputs.build_num }}"
+          $version  = "0.0.0.$buildNum"
+          $srcExe   = (Get-ChildItem "dist\american_tycoon_*_win.exe" | Select-Object -First 1).FullName
+          # ISCC resolves OutputDir relative to the .iss file (build\), so pass an absolute path.
+          $outputDir = (Resolve-Path "dist").Path
+
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
+            "/DAppVersion=$version" `
+            "/DSourceExe=$srcExe" `
+            "/DOutputDir=$outputDir" `
+            "/DOutputFilename=american_tycoon_setup_$sha" `
+            "build\setup.iss"
+
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: dist\american_tycoon_setup_*.exe
+          if-no-files-found: error
+
+  # ── Job 3: Publish GitHub pre-release with both artifacts ────────────────────
+  release:
+    name: Publish Release
+    needs: [export, windows-installer]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # required to create releases and upload assets
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-files/
+
+      - name: Create GitHub pre-release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "build-${{ needs.export.outputs.sha }}"
+          name: "Build ${{ needs.export.outputs.sha }}"
+          prerelease: true
+          body: |
+            Automated build from commit ${{ github.sha }}.
+
+            **Install — Windows:** run `american_tycoon_setup_*.exe`
+            **Install — Android:** enable "Install from unknown sources" on your Pixel, then install `american_tycoon_*.apk`
+          files: |
+            release-files/windows-installer/*.exe
+            release-files/android-apk/*.apk
+
+  # ── Job 4: Push APK to Firebase App Distribution ────────────────────────────
+  # Uploads the signed APK to Firebase so the registered Pixel tester receives
+  # an install/update notification automatically after each build.
+  #
+  # This job is skipped when FIREBASE_APP_ID is not set, so the rest of the
+  # pipeline continues to work while Firebase is being configured.
+  #
+  # One-time setup (see Firebase console at console.firebase.google.com):
+  #   1. In the existing Firebase project (or a new one), register the Android app
+  #      (package name: com.timgoergen.americantycoon).
+  #   2. Enable App Distribution in the Firebase console.
+  #   3. Add goergen.tim@gmail.com as a tester in a group named "testers".
+  #   4. Accept the tester invitation on the Pixel (Firebase App Tester app).
+  #   5. Reuse the existing service account JSON (Firebase App Distribution Admin role)
+  #      or create a new one under IAM > Service Accounts.
+  #   6. Add two GitHub secrets (Settings > Secrets > Actions):
+  #        FIREBASE_APP_ID              — from Firebase console > Project Settings > Your apps
+  #        FIREBASE_SERVICE_ACCOUNT_KEY — the full contents of the service account JSON key file
+  firebase-deploy:
+    name: Deploy to Firebase
+    needs: export
+    runs-on: ubuntu-latest
+    # No job-level `if` here: GitHub Actions cannot access secrets in job-level
+    # if conditions (they are evaluated before secrets are injected). Instead,
+    # the first step checks and sets an output flag; all subsequent steps are
+    # conditioned on that flag so the job exits cleanly when Firebase is not set up.
+
+    steps:
+      - name: Check Firebase configured
+        id: check
+        run: |
+          if [ -n "${{ secrets.FIREBASE_APP_ID }}" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "FIREBASE_APP_ID not set — skipping Firebase deploy"
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download Android APK artifact
+        if: steps.check.outputs.configured == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: android-apk
+          path: dist/
+
+      - name: Resolve APK path
+        # The artifact contains exactly one file; resolve it so the Firebase action
+        # receives a concrete path rather than a glob (which it does not support).
+        if: steps.check.outputs.configured == 'true'
+        id: apk
+        run: |
+          APK=$(ls dist/*.apk | head -1)
+          echo "path=$APK" >> "$GITHUB_OUTPUT"
+
+      - name: Upload to Firebase App Distribution
+        if: steps.check.outputs.configured == 'true'
+        uses: wzieba/Firebase-Distribution-Github-Action@v1
+        with:
+          appId: ${{ secrets.FIREBASE_APP_ID }}
+          serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KEY }}
+          groups: testers
+          file: ${{ steps.apk.outputs.path }}
+          releaseNotes: "[${{ needs.export.outputs.branch }}] ${{ needs.export.outputs.sha }}: ${{ needs.export.outputs.msg }}"

@@ -20,6 +20,7 @@ var prop_index: int = -1
 
 var _prop: PropertyState
 var _economy: EconomyState
+var _frenzy: FrenzyState
 var _buy_mode: BuyMode = BuyMode.ONE
 
 ## Accumulates held-down time on the tap button to pace auto-rush pulses.
@@ -41,10 +42,11 @@ var _hire_button: Button
 
 
 ## Call before adding to the tree.
-func setup(p_index: int, prop: PropertyState, economy: EconomyState) -> void:
+func setup(p_index: int, prop: PropertyState, economy: EconomyState, frenzy: FrenzyState) -> void:
 	prop_index = p_index
 	_prop = prop
 	_economy = economy
+	_frenzy = frenzy
 
 
 func _ready() -> void:
@@ -167,7 +169,10 @@ func _pump_held_rush(delta: float) -> void:
 func _refresh(delta: float) -> void:
 	var config := _prop.config as PropertyConfig
 	_name_label.text = "%s  ×%d" % [config.display_name, _prop.units_owned]
-	_income_label.text = Money.of(_prop.get_income_per_sec()).display() + "/s"
+	# During a frenzy burn, property income is multiplied at point of payment
+	# (Spec §7). Reflect that boost in the live income/sec readout so the screen
+	# visibly lights up while the burn is active (1.0 when no burn).
+	_income_label.text = Money.of(_prop.get_income_per_sec() * _frenzy.get_multiplier()).display() + "/s"
 
 	# The tap verb mirrors Spec §4: START an idle cycle, RUSH a running one.
 	if _prop.units_owned == 0:

@@ -205,6 +205,13 @@ func _pump_held_rush(delta: float) -> void:
 
 
 func _refresh(delta: float) -> void:
+	# Ladder visibility: show only owned rungs plus the next rung up. A row is shown
+	# if the player owns at least one unit of it, or it is the next property above the
+	# highest they own (the one available to buy). Everything higher stays hidden until
+	# a purchase unlocks it. An invisible child takes no space in the VBox, so the list
+	# grows downward as the player climbs.
+	visible = _prop.units_owned > 0 or prop_index == _economy.get_highest_owned_index() + 1
+
 	var config := _prop.config as PropertyConfig
 	_name_label.text = "%s  ×%d" % [config.display_name, _prop.units_owned]
 

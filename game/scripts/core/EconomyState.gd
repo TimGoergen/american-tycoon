@@ -117,6 +117,17 @@ func get_staffed_income_per_sec() -> float:
 	return total
 
 
+## Highest property index the player owns at least one unit of, or -1 if they own
+## none. Drives the Main screen's ladder: only owned rungs and the next rung up are
+## shown, so the list grows as the player climbs instead of dumping all 12 at once.
+func get_highest_owned_index() -> int:
+	var highest := -1
+	for i in range(properties.size()):
+		if (properties[i] as PropertyState).units_owned > 0:
+			highest = i
+	return highest
+
+
 ## Credit cash directly (for starting money, offline pile, events).
 func award_cash(amount: float) -> void:
 	cash += floor(amount)

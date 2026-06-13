@@ -200,6 +200,10 @@ func _build_ui() -> void:
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	# Reserve the vertical scrollbar's width permanently so the rows never reflow when
+	# it appears or disappears (Godot 4.4+ RESERVE: the space is always held, but the
+	# bar itself only shows when there's something to scroll).
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_RESERVE
 	column.add_child(scroll)
 
 	var ladder := VBoxContainer.new()

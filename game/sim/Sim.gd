@@ -24,6 +24,11 @@ const OFFLINE_GAP_SECONDS := 10800.0   # 3 hours — the GDD §3.2 tuning anchor
 const WAGE_TAP_PERIOD := 0.3           # an active thumb: ~3 wage taps per second
 const SIM_SAVE_PATH := "user://sim_save.json"
 
+# --- Dynasty protocol (M2 prestige verification) ---
+const DYNASTY_GENERATIONS := 6         # ≥5 generations (GDD §13 exit criterion)
+const GEN_PLAY_SECONDS := 180.0        # fixed active play per generation, so estates grow
+const DYNASTY_SAVE_PATH := "user://sim_dynasty_save.json"
+
 var _property_configs: Array = []
 var _title_configs: Array = []
 var _tuning: TuningConfig
@@ -48,6 +53,9 @@ func _initialize() -> void:
 		quit(1)
 		return
 	_run_return_spike_phase(resumed)
+
+	# M2 prestige spine: prove the dynasty "speeds up every time" (GDD §13).
+	_run_dynasty_protocol()
 
 	quit()
 
@@ -265,3 +273,167 @@ func _greedy_buy_spree(game: GameState) -> int:
 		units_bought += 1
 
 	return units_bought
+
+
+# ---------------------------------------------------------------------------
+# Dynasty protocol — the M2 prestige spine, verified across generations
+# ---------------------------------------------------------------------------
+
+## Run several generations back to back and show that each heir reaches the
+## previous generation's peak position in LESS time than the one before — the
+## GDD §13 "speeds up every time" exit criterion for the prestige loop. Each
+## generation plays a fixed span of active time (so estates keep growing and
+## Legacy compounds); we measure how quickly it overtakes the predecessor.
+func _run_dynasty_protocol() -> void:
+	print("")
+	print("=== Dynasty protocol: %d generations (GDD §13 'speeds up every time') ===" % DYNASTY_GENERATIONS)
+	print("Each generation plays %d s of active time; we report how fast each heir reaches the founder's peak." % int(GEN_PLAY_SECONDS))
+
+	if not _verify_waterfall_math():
+		push_error("Sim: estate waterfall math spot-check failed")
+		return
+
+	var dynasty := DynastyState.new(_property_configs, _title_configs, _tuning)
+
+	# The fixed yardstick for "speeds up every time": the founder's (gen 1) peak
+	# net worth. Every later heir should reach THIS SAME position faster than the
+	# last (GDD §5.1: "run 1's first hour is run 5's first ninety seconds").
+	# Set after generation 1 plays; 0 until then.
+	var founder_peak := 0.0
+	var previous_time_to_founder := -1.0
+
+	for _g in range(DYNASTY_GENERATIONS):
+		var generation := dynasty.generation
+		var legacy_at_birth := dynasty.legacy_total
+		var sprint_at_birth := EstateWaterfall.sprint_mult(
+			legacy_at_birth, _tuning.k_sprint, _tuning.beta_sprint
+		)
+
+		var time_to_founder := _play_generation(dynasty, GEN_PLAY_SECONDS, founder_peak)
+		var will := dynasty.get_draft_will()
+
+		print("")
+		print("--- Generation %d ---" % generation)
+		print("  Born with Legacy: %d  (sprint x%.2f on property income)" % [
+			legacy_at_birth, sprint_at_birth,
+		])
+		if founder_peak > 0.0:
+			print("  Time to reach the founder's peak (%s): %s" % [
+				Money.of(founder_peak).display(),
+				_format_time_to_reference(time_to_founder, previous_time_to_founder),
+			])
+		print("  Peak net worth this life: %s" % Money.of(dynasty.current.peak_net_worth).display())
+		print("  Estate at death: gross %s -> tax %s -> net %s  ==>  +%d Legacy" % [
+			Money.of(will["estate_gross"]).display(),
+			Money.of(will["tax"]).display(),
+			Money.of(will["estate_net"]).display(),
+			int(will["legacy_gain"]),
+		])
+
+		# Freeze the founder's peak after generation 1; track the trend thereafter.
+		if founder_peak <= 0.0:
+			founder_peak = dynasty.current.peak_net_worth
+		elif time_to_founder >= 0.0:
+			previous_time_to_founder = time_to_founder
+
+		dynasty.perform_succession()
+
+	print("")
+	print("Dynasty total Legacy after %d generations: %d (brackets: %d)" % [
+		DYNASTY_GENERATIONS, dynasty.legacy_total, dynasty.brackets_attained,
+	])
+	_verify_dynasty_save_roundtrip(dynasty)
+
+
+## Play one generation for `seconds` of active time using the same greedy policy
+## as the M1 phases, but ticking through the dynasty so the Legacy multiplier
+## applies. Returns the sim-time (seconds) at which this generation first reached
+## `reference_target` net worth, or -1.0 if it never did (or if the target is 0,
+## i.e. the founder generation that defines the yardstick).
+func _play_generation(dynasty: DynastyState, seconds: float, reference_target: float) -> float:
+	var sim_time := 0.0
+	var next_wage_tap := 0.0
+	var time_to_reference := -1.0
+
+	while sim_time < seconds:
+		var game := dynasty.current
+
+		if sim_time >= next_wage_tap:
+			game.tap_wage()
+			next_wage_tap += WAGE_TAP_PERIOD
+
+		game.try_claim_promotion()
+		game.pop_frenzy()
+		_greedy_buy_spree(game)
+
+		# Restart idle cycles — the Layer-2 start verb, tapped by the player.
+		for i in range(game.economy.properties.size()):
+			var prop := game.economy.properties[i] as PropertyState
+			if prop.units_owned > 0 and not prop.is_cycle_running:
+				game.tap_property(i)
+
+		dynasty.tick(TICK_SIZE)
+		sim_time += TICK_SIZE
+
+		# Record the moment we reach the fixed reference (net worth is monotonic).
+		if time_to_reference < 0.0 and reference_target > 0.0 \
+				and game.peak_net_worth >= reference_target:
+			time_to_reference = sim_time
+
+	return time_to_reference
+
+
+## Format the "time to reach the founder's peak" line, flagging whether it shrank
+## vs. the prior generation (the actual thing we want to see — acceleration).
+func _format_time_to_reference(time_to_reference: float, previous_time: float) -> String:
+	if time_to_reference < 0.0:
+		return "NOT REACHED within %d s" % int(GEN_PLAY_SECONDS)
+	if previous_time < 0.0:
+		return "%.1f s" % time_to_reference
+	var faster := previous_time - time_to_reference
+	var trend := "FASTER" if faster > 0.0 else "slower"
+	return "%.1f s  (%.1f s %s than previous)" % [time_to_reference, absf(faster), trend]
+
+
+## One hand-computable case through the waterfall, so a future formula change
+## that breaks the math fails loudly here (Spec §9.2–9.3):
+##   gross $2.0M, no debt, exemption $1.0M, rate 60%
+##     -> taxable $1.0M -> tax $600k -> net $1.4M
+##     -> legacy = floor(K_LEGACY × 1.4M^0.5)  (with default K_LEGACY=1, =1183)
+func _verify_waterfall_math() -> bool:
+	var will := EstateWaterfall.compute(2_000_000.0, 0.0, 1_000_000.0, 0.6)
+	# Typed bool: Dictionary lookups are Variants, so := would infer Variant here.
+	var ok: bool = will["taxable"] == 1_000_000.0 \
+			and will["tax"] == 600_000.0 \
+			and will["estate_net"] == 1_400_000.0
+	var expected_legacy := int(floor(_tuning.k_legacy * pow(1_400_000.0, _tuning.alpha_legacy)))
+	var legacy := EstateWaterfall.legacy_gain(
+		will["estate_net"], _tuning.k_legacy, _tuning.alpha_legacy
+	)
+	ok = ok and legacy == expected_legacy
+	print("  Waterfall spot-check: net %s, +%d Legacy ... %s" % [
+		Money.of(will["estate_net"]).display(), legacy, "PASS" if ok else "FAIL",
+	])
+	return ok
+
+
+## Save the dynasty, reload it into a fresh DynastyState, and confirm the
+## cross-generation facts survive the round trip (Spec §12 + the M2 save bump).
+func _verify_dynasty_save_roundtrip(dynasty: DynastyState) -> void:
+	if not SaveManager.save_dict_to_file(dynasty.to_save_dict(), DYNASTY_SAVE_PATH):
+		push_error("Sim: dynasty save failed")
+		return
+	var data := SaveManager.load_from_file(DYNASTY_SAVE_PATH)
+	if data.is_empty():
+		push_error("Sim: dynasty load failed")
+		return
+
+	var reloaded := DynastyState.new(_property_configs, _title_configs, _tuning)
+	reloaded.load_save_dict(data)
+
+	var ok := reloaded.legacy_total == dynasty.legacy_total \
+			and reloaded.generation == dynasty.generation \
+			and reloaded.predecessor_peak_net_worth == dynasty.predecessor_peak_net_worth
+	print("Dynasty save round-trip (Legacy %d, generation %d): %s" % [
+		reloaded.legacy_total, reloaded.generation, "PASS" if ok else "FAIL",
+	])

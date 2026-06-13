@@ -6,12 +6,20 @@ class_name GameState
 # simulator both drive the game exclusively through this class (Spec §13:
 # same code, no rendering), so nothing here may touch the scene tree.
 
-const SAVE_VERSION := 1
+# v2 added the per-generation spend accumulators and peak net worth that the
+# prestige/estate math reads (Spec §9). v1 saves still load (missing fields
+# default to a clean slate).
+const SAVE_VERSION := 2
 
 var tuning: TuningConfig
 var economy: EconomyState
 var wage: WageState
 var frenzy: FrenzyState
+
+## Highest net worth this generation has reached. The next heir must out-earn
+## this peak before its Legacy sprint multiplier gives way to the residual
+## (Spec §9.4). Monotonic — only ever rises within a generation.
+var peak_net_worth: float = 0.0
 
 
 func _init(property_configs: Array, titles: Array, p_tuning: TuningConfig) -> void:
@@ -22,9 +30,17 @@ func _init(property_configs: Array, titles: Array, p_tuning: TuningConfig) -> vo
 
 
 ## Advance the whole game by `delta` seconds of active play.
-func tick(delta: float) -> void:
+##
+## `extra_property_multiplier` is an income multiplier applied to PROPERTY income
+## only — never to the wage. The dynasty layer passes the Legacy sprint/residual
+## multiplier here (Spec §9.4: "the wage is honest"). Frenzy still applies to
+## both, so property income is scaled by frenzy × Legacy while the wage keeps
+## only frenzy (paid separately in tap_wage). Defaults to 1.0 so a standalone
+## single-generation run is unaffected.
+func tick(delta: float, extra_property_multiplier: float = 1.0) -> void:
 	frenzy.tick(delta)
-	economy.tick(delta, frenzy.get_multiplier())
+	economy.tick(delta, frenzy.get_multiplier() * extra_property_multiplier)
+	peak_net_worth = maxf(peak_net_worth, economy.get_net_worth())
 
 
 # ---------------------------------------------------------------------------
@@ -121,6 +137,11 @@ func to_save_dict() -> Dictionary:
 		"version": SAVE_VERSION,
 		"saved_at_unix": Time.get_unix_time_from_system(),
 		"cash": economy.cash,
+		"peak_net_worth": peak_net_worth,
+		# Per-generation book-value accumulators (Spec §9.2). Saved raw because
+		# they are sunk history, not derivable from the current holdings.
+		"spent_on_units_this_gen": economy.spent_on_units_this_gen,
+		"spent_on_staff_this_gen": economy.spent_on_staff_this_gen,
 		"properties": props,
 		"wage": {
 			"current_title_index": wage.current_title_index,
@@ -141,6 +162,9 @@ func load_save_dict(data: Dictionary) -> void:
 		])
 
 	economy.cash = float(data.get("cash", 0.0))
+	peak_net_worth = float(data.get("peak_net_worth", 0.0))
+	economy.spent_on_units_this_gen = float(data.get("spent_on_units_this_gen", 0.0))
+	economy.spent_on_staff_this_gen = float(data.get("spent_on_staff_this_gen", 0.0))
 
 	var saved_props: Array = data.get("properties", [])
 	for i in range(mini(saved_props.size(), economy.properties.size())):

@@ -30,6 +30,17 @@ var cycle_progress: float = 0.0
 ## True while a cycle is in progress.
 var is_cycle_running: bool = false
 
+## Dynasty-wide cycle-speed multiplier from the Legacy "Efficiency Experts"
+## upgrade (1.0 = normal). The cycle's EFFECTIVE length is cycle_length divided
+## by this, so a higher value means cycles finish sooner and income/sec rises.
+## Set by DynastyState from the purchased upgrades; defaults to 1.0 so a bare
+## single-generation run (or the M1 sim) is unaffected.
+var cycle_speed_multiplier: float = 1.0
+
+## Dynasty-wide staff-hiring-cost multiplier from the "Loyal Staff" upgrade
+## (1.0 = full price, below 1.0 = a discount). Applied in get_staff_cost.
+var staff_cost_multiplier: float = 1.0
+
 ## How many milestone bands have been crossed. Used to know which reward fires next.
 var _milestones_crossed: int = 0
 
@@ -112,6 +123,22 @@ func hire_staff() -> void:
 		_start_cycle_internal()
 
 
+## Set the Legacy cycle-speed multiplier and keep the in-flight cycle consistent.
+## Because the effective cycle length shrinks as speed rises, an in-progress
+## cycle could suddenly be "past the end"; we clamp progress so it simply
+## completes on the next tick rather than overshooting.
+func set_cycle_speed_multiplier(multiplier: float) -> void:
+	cycle_speed_multiplier = maxf(0.01, multiplier)
+	cycle_progress = minf(cycle_progress, _effective_cycle_length())
+
+
+## The cycle length actually used for timing — the base length sped up by the
+## Legacy "Efficiency Experts" upgrade. Everything that measures cycle time goes
+## through here so the speed bonus applies uniformly (completion, rush, rate).
+func _effective_cycle_length() -> float:
+	return cycle_length / cycle_speed_multiplier
+
+
 ## One-time hire cost: 50× the unit cost at band 1 (Spec §6).
 ## Computed fresh each call so it tracks the current cost curve.
 func get_staff_cost() -> float:
@@ -130,7 +157,8 @@ func get_staff_cost() -> float:
 		prod *= CostCurve.get_ratio(config.r0, b, tuning.band_step)
 	# floorf (not floor) — floor() returns Variant, which breaks := type inference.
 	var unit_20_cost := floorf(config.base_cost * prod * band1_ratio)
-	return unit_20_cost * 50.0
+	# The Legacy "Loyal Staff" upgrade discounts hiring (multiplier ≤ 1.0).
+	return floorf(unit_20_cost * 50.0 * staff_cost_multiplier)
 
 
 # ---------------------------------------------------------------------------
@@ -158,7 +186,7 @@ func restore(
 		buy(p_units)
 
 	is_staffed = p_is_staffed
-	cycle_progress = clampf(p_cycle_progress, 0.0, cycle_length)
+	cycle_progress = clampf(p_cycle_progress, 0.0, _effective_cycle_length())
 	is_cycle_running = (p_is_running or is_staffed) and units_owned > 0
 
 
@@ -175,10 +203,11 @@ func tick(delta: float, income_multiplier: float = 1.0) -> float:
 
 	var income_earned := 0.0
 	var remaining := delta
+	var effective_length := _effective_cycle_length()
 
 	# A single tick may complete multiple short cycles (e.g., ATM at 0.4 s).
 	while remaining > 0.0 and is_cycle_running:
-		var time_to_complete := cycle_length - cycle_progress
+		var time_to_complete := effective_length - cycle_progress
 		if remaining >= time_to_complete:
 			# Cycle completes.
 			remaining -= time_to_complete
@@ -206,7 +235,8 @@ func start_cycle() -> void:
 func rush_cycle() -> void:
 	if not is_cycle_running:
 		return
-	cycle_progress = minf(cycle_progress + tuning.rush_pct * cycle_length, cycle_length)
+	var effective_length := _effective_cycle_length()
+	cycle_progress = minf(cycle_progress + tuning.rush_pct * effective_length, effective_length)
 
 
 # ---------------------------------------------------------------------------
@@ -217,7 +247,9 @@ func rush_cycle() -> void:
 func get_income_per_sec() -> float:
 	if units_owned == 0 or cycle_length <= 0.0:
 		return 0.0
-	return floor(units_owned * income_per_unit) / cycle_length
+	# Use the effective (sped-up) length so the Efficiency upgrade shows up as a
+	# higher income/sec, matching what the property actually pays over time.
+	return floor(units_owned * income_per_unit) / _effective_cycle_length()
 
 
 ## Cash paid out each time a full cycle completes, before frenzy/event

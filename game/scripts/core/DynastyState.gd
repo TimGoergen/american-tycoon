@@ -4,14 +4,20 @@ class_name DynastyState
 #
 # GameState models exactly one generation — one person's lifetime of earning. A
 # DynastyState owns the whole bloodline: it holds the current generation plus the
-# things that outlive any individual (total Legacy, the generation counter, the
-# predecessor's peak to out-sprint) and performs succession — death, the estate
-# waterfall, Legacy conversion, and the birth of a faster heir.
+# things that outlive any individual (the spendable Legacy wallet and the
+# purchased upgrades, the generation counter, carried-over Work Ethic) and
+# performs succession — death, the estate waterfall, Legacy conversion, and the
+# birth of an heir.
+#
+# Prestige reward model (revised): Legacy is no longer an automatic income
+# multiplier. It is a CURRENCY the player spends on permanent upgrades
+# (LegacyUpgrades / LegacyUpgradeCatalog). Those upgrades are what make each heir
+# faster — bigger starting cash, higher property income, quicker cycles, cheaper
+# staff, a fatter wage. The dynasty applies the purchased effects to every
+# generation it raises, and to the living generation the moment an upgrade is bought.
 #
 # This is headless and scene-tree-free, like the rest of the core, so the
-# simulator drives it directly. The M1 Main screen still drives a bare GameState;
-# wiring the UI to the dynasty (ceremony screens, Estate Planning tab) is a later
-# M2 slice. For now the prestige loop is exercised and verified only in the sim.
+# simulator drives it directly.
 
 var tuning: TuningConfig
 
@@ -19,20 +25,13 @@ var tuning: TuningConfig
 var _property_configs: Array
 var _title_configs: Array
 
-## Total dynastic Legacy. Accumulates at every death and is never spent down by
-## conversion (Legacy *upgrades*, a later slice, are what spend it).
-var legacy_total: int = 0
+## The spendable Legacy wallet and the purchased upgrade sheet (GDD §13). All
+## prestige value flows through here now: deaths bank Legacy into it, the shop
+## spends it, and the dynasty reads its effect getters when raising each heir.
+var upgrades: LegacyUpgrades
 
 ## Which generation is alive, 1-based — the Roman-numeral suffix (Wellington IX).
 var generation: int = 1
-
-## Peak net worth of the immediately preceding generation. The current heir's
-## sprint multiplier stays active until it surpasses this (Spec §9.4).
-var predecessor_peak_net_worth: float = 0.0
-
-## How many Legacy brackets the dynasty has attained — drives the permanent
-## residual multiplier after a sprint ends.
-var brackets_attained: int = 0
 
 ## Lifetime taps across all generations ("Work Ethic"); persists per Spec §5.
 var dynastic_taps: int = 0
@@ -45,6 +44,7 @@ func _init(property_configs: Array, titles: Array, p_tuning: TuningConfig) -> vo
 	_property_configs = property_configs
 	_title_configs = titles
 	tuning = p_tuning
+	upgrades = LegacyUpgrades.new()
 	current = _new_generation()
 
 
@@ -53,22 +53,17 @@ func _init(property_configs: Array, titles: Array, p_tuning: TuningConfig) -> vo
 # ---------------------------------------------------------------------------
 
 ## Advance the current generation by `delta` seconds, applying the dynasty's
-## Legacy multiplier to property income (never to the wage — Spec §9.4).
+## property-income multiplier (from the Legacy "Family Fortune" upgrade) to
+## property income only — never to the wage (Spec §9.4: the wage is honest).
 func tick(delta: float) -> void:
 	current.tick(delta, get_legacy_income_multiplier())
 
 
-## The Legacy income multiplier in force this instant (property income only).
-## While the heir is still poorer than the predecessor's peak, the big catch-up
-## SPRINT applies; once it surpasses that peak, the sprint is permanently spent
-## and only the smaller RESIDUAL remains. Peak net worth is monotonic, so this
-## switch happens exactly once per generation and never flips back.
+## The property-income multiplier in force this instant. It comes entirely from
+## the purchased Family Fortune upgrade now (1.0 when nothing is bought), so the
+## acceleration is something the player chooses to buy, not an automatic bonus.
 func get_legacy_income_multiplier() -> float:
-	if legacy_total <= 0:
-		return 1.0
-	if current.peak_net_worth < predecessor_peak_net_worth:
-		return EstateWaterfall.sprint_mult(legacy_total, tuning.k_sprint, tuning.beta_sprint)
-	return EstateWaterfall.residual_mult(brackets_attained, tuning.k_residual)
+	return upgrades.property_income_multiplier()
 
 
 # ---------------------------------------------------------------------------
@@ -88,9 +83,12 @@ func get_draft_will() -> Dictionary:
 		tuning.estate_exemption_base,
 		tuning.estate_tax_rate_base
 	)
-	will["legacy_gain"] = EstateWaterfall.legacy_gain(
+	# Base estate→Legacy conversion, then the "Estate Lawyers" upgrade boosts the
+	# yield. Floor after the multiplier so Legacy stays a whole number.
+	var base_gain := EstateWaterfall.legacy_gain(
 		will["estate_net"], tuning.k_legacy, tuning.alpha_legacy
 	)
+	will["legacy_gain"] = int(floor(float(base_gain) * upgrades.legacy_yield_multiplier()))
 	return will
 
 
@@ -109,16 +107,14 @@ func can_perform_succession() -> bool:
 # Succession — death, inheritance, rebirth
 # ---------------------------------------------------------------------------
 
-## Kill the current generation and raise its heir. Banks the estate's Legacy,
-## records the peak the heir must out-sprint, advances the generation counter,
-## carries dynastic Work Ethic forward, and replaces `current` with a fresh,
-## faster generation. Returns the executed will for ceremony/logging.
+## Kill the current generation and raise its heir. Banks the estate's Legacy into
+## the spendable wallet, advances the generation counter, carries dynastic Work
+## Ethic forward, and replaces `current` with a fresh generation that already has
+## all purchased upgrade effects applied. Returns the executed will for ceremony.
 func perform_succession() -> Dictionary:
 	var will := get_draft_will()
 
-	legacy_total += int(will["legacy_gain"])
-	brackets_attained = EstateWaterfall.brackets_for(legacy_total)
-	predecessor_peak_net_worth = current.peak_net_worth
+	upgrades.award(int(will["legacy_gain"]))
 	dynastic_taps = current.wage.lifetime_taps
 	generation += 1
 
@@ -126,15 +122,42 @@ func perform_succession() -> Dictionary:
 	return will
 
 
-## Build the next generation from scratch. The heir starts with the same opening
-## capital as anyone (the origin flow that varies this is a later slice) and
-## inherits only Work Ethic; its acceleration advantage comes entirely from the
-## Legacy multiplier applied at tick time, not from seeded cash.
+# ---------------------------------------------------------------------------
+# Building generations and applying purchased upgrade effects
+# ---------------------------------------------------------------------------
+
+## Build the next generation from scratch. The heir starts with the base opening
+## capital plus any Trust Fund bonus, inherits Work Ethic, and has every other
+## purchased upgrade effect (cycle speed, staff cost, wage) applied to its fresh
+## state. Property income is multiplied at tick time, not seeded as cash.
 func _new_generation() -> GameState:
 	var heir := GameState.new(_property_configs, _title_configs, tuning)
-	heir.economy.award_cash(tuning.m1_starting_cash)
+	heir.economy.award_cash(tuning.m1_starting_cash + upgrades.starting_cash_bonus())
 	heir.wage.lifetime_taps = dynastic_taps
+	_apply_upgrade_effects(heir)
 	return heir
+
+
+## Apply the purchased per-generation upgrade effects to a generation's state:
+## cycle speed and staff-cost discount on every property, and the wage multiplier
+## on the wage ladder. (Property income and Legacy yield are read live elsewhere,
+## so they need no baking-in here.)
+func _apply_upgrade_effects(game: GameState) -> void:
+	var cycle_speed := upgrades.cycle_speed_multiplier()
+	var staff_cost := upgrades.staff_cost_multiplier()
+	for prop in game.economy.properties:
+		var p := prop as PropertyState
+		p.set_cycle_speed_multiplier(cycle_speed)
+		p.staff_cost_multiplier = staff_cost
+	game.wage.wage_multiplier = upgrades.wage_multiplier()
+
+
+## Re-apply upgrade effects to the LIVING generation. Called after a purchase so a
+## newly-bought cycle/staff/wage upgrade takes hold immediately, mid-life. (The
+## Trust Fund starting-cash bonus is deliberately NOT retroactive — it only
+## affects heirs born after it is bought, as the upgrade description says.)
+func refresh_current_generation_effects() -> void:
+	_apply_upgrade_effects(current)
 
 
 # ---------------------------------------------------------------------------
@@ -145,26 +168,37 @@ func _new_generation() -> GameState:
 ## the current generation's own save dict (GameState.to_save_dict).
 func to_save_dict() -> Dictionary:
 	return {
-		"legacy_total": legacy_total,
+		"upgrades": upgrades.to_save_dict(),
 		"generation": generation,
-		"predecessor_peak_net_worth": predecessor_peak_net_worth,
-		"brackets_attained": brackets_attained,
 		"dynastic_taps": dynastic_taps,
 		"current": current.to_save_dict(),
 	}
 
 
-## Restore a dynasty from a save dict. A bare M1 GameState save (no dynastic
-## wrapper) reconstructs as a clean generation-1 dynasty, because every dynastic
-## field defaults and the whole dict is handed to the current generation to load.
+## Restore a dynasty from a save dict. Three save shapes load cleanly:
+##   • current shape — has an "upgrades" block.
+##   • the prior dynasty shape — had a flat "legacy_total"; we treat that banked
+##     total as the player's starting wallet (nothing was spendable before, so it
+##     becomes both available and lifetime).
+##   • a bare M1 GameState save — no dynastic wrapper at all; it reconstructs as a
+##     clean generation-1 dynasty, because every dynastic field defaults and the
+##     whole dict is handed to the current generation to load.
 func load_save_dict(data: Dictionary) -> void:
-	legacy_total = int(data.get("legacy_total", 0))
 	generation = int(data.get("generation", 1))
-	predecessor_peak_net_worth = float(data.get("predecessor_peak_net_worth", 0.0))
-	brackets_attained = int(data.get("brackets_attained", 0))
 	dynastic_taps = int(data.get("dynastic_taps", 0))
+
+	upgrades = LegacyUpgrades.new()
+	if data.has("upgrades"):
+		upgrades.load_save_dict(data["upgrades"])
+	elif data.has("legacy_total"):
+		# Migrate the old accumulate-only Legacy into the new spendable wallet.
+		var carried := int(data.get("legacy_total", 0))
+		upgrades.available = carried
+		upgrades.earned_lifetime = carried
 
 	current = GameState.new(_property_configs, _title_configs, tuning)
 	var current_data: Variant = data.get("current", data)
 	if current_data is Dictionary:
 		current.load_save_dict(current_data)
+	# Make sure the restored living generation reflects purchased upgrades.
+	_apply_upgrade_effects(current)

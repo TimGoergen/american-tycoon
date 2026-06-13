@@ -12,10 +12,15 @@ extends VBoxContainer
 # is met, the claim button appears.
 
 signal wage_tapped
+signal wage_hold_tapped
 signal promotion_requested
 
 var _wage: WageState
 var _economy: EconomyState
+var _tuning: TuningConfig
+
+## Accumulates held-down time on the clock-in button to pace auto-tap pulses.
+var _hold_accumulator := 0.0
 
 var _wage_meter: ProgressBar
 var _wage_button: Button
@@ -24,9 +29,10 @@ var _promotion_button: Button
 
 
 ## Call before adding to the tree.
-func setup(wage: WageState, economy: EconomyState) -> void:
+func setup(wage: WageState, economy: EconomyState, tuning: TuningConfig) -> void:
 	_wage = wage
 	_economy = economy
+	_tuning = tuning
 
 
 func _ready() -> void:
@@ -72,7 +78,9 @@ func _ready() -> void:
 	add_child(_promotion_button)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	_pump_auto_tap(delta)
+
 	var title := _wage.get_current_title()
 	_wage_button.text = "CLOCK IN\n%s / tap" % Money.of(title.wage_per_tap).display()
 
@@ -111,3 +119,22 @@ func _promotion_progress(title: TitleRow, next: TitleRow) -> float:
 	if span <= 0:
 		return 0.0
 	return clampf(float(_wage.lifetime_taps - title.tap_threshold) / float(span), 0.0, 1.0)
+
+
+## Holding the clock-in button auto-taps the wage at the configured rate — a
+## convenience the player can later speed up via Legacy upgrades. Gated behind an
+## accumulator so a quick tap accrues no pulse and stays a single manual tap (that
+## one still fires on release via the button's pressed signal). Auto-taps go out
+## as wage_hold_tapped so GameState can charge frenzy at the reduced hold factor.
+func _pump_auto_tap(delta: float) -> void:
+	if not _wage_button.button_pressed:
+		_hold_accumulator = 0.0
+		return
+	var rate := _tuning.wage_hold_taps_per_second
+	if rate <= 0.0:
+		return
+	_hold_accumulator += delta
+	var pulse_interval := 1.0 / rate
+	while _hold_accumulator >= pulse_interval:
+		_hold_accumulator -= pulse_interval
+		wage_hold_tapped.emit()

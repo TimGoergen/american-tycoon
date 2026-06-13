@@ -157,8 +157,9 @@ func _build_ui() -> void:
 		_rows.append(row)
 
 	_wage_panel = WagePanel.new()
-	_wage_panel.setup(game.wage, game.economy)
+	_wage_panel.setup(game.wage, game.economy, tuning)
 	_wage_panel.wage_tapped.connect(_on_wage_tapped)
+	_wage_panel.wage_hold_tapped.connect(_on_wage_hold_tapped)
 	_wage_panel.promotion_requested.connect(_on_promotion_requested)
 	column.add_child(_wage_panel)
 
@@ -207,6 +208,10 @@ func _on_hire_requested(prop_index: int) -> void:
 
 func _on_wage_tapped() -> void:
 	game.tap_wage()
+
+
+func _on_wage_hold_tapped() -> void:
+	game.hold_tap_wage()
 
 
 func _on_promotion_requested() -> void:

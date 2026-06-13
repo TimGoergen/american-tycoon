@@ -34,6 +34,11 @@ extends Resource
 ## Auto-rush pulses per second while the rush button is held down.
 @export var hold_rush_per_second: float = 5.0  # feel-tune M1
 
+## Auto-tap pulses per second while the wage ("clock in") button is held down.
+## This is the BASE rate; the effective rate is meant to be scaled by Legacy
+## upgrades later (configurable by upgrades — GDD §8.4 loophole/upgrade catalog).
+@export var wage_hold_taps_per_second: float = 5.0  # feel-tune
+
 ## Frenzy fill per held-rush pulse, as a fraction of a manual tap's fill.
 ## Holding is convenient, so it charges the meter slower than real tapping.
 @export var frenzy_fill_hold_factor: float = 0.6  # feel-tune M1

@@ -6,8 +6,8 @@
 script = ExtResource("1")
 property_id = 3
 display_name = "NFTs"
-base_cost = 6050.0
+base_cost = 2500.0
 r0 = 1.07
-base_income_per_unit = 200.0
-base_cycle_length = 4.0
+base_income_per_unit = 900.0
+base_cycle_length = 3.0
 staffer_name = "NFT Community Manager"

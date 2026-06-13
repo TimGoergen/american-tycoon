@@ -42,6 +42,8 @@ func _initialize() -> void:
 	print("=== American Tycoon — Balance Simulator ===")
 	print("")
 
+	_print_ladder_magnitude()
+
 	var game := GameState.new(_property_configs, _title_configs, _tuning)
 	game.economy.award_cash(_tuning.m1_starting_cash)
 	print("Starting cash: %s" % Money.of(game.economy.cash).display())
@@ -437,3 +439,35 @@ func _verify_dynasty_save_roundtrip(dynasty: DynastyState) -> void:
 	print("Dynasty save round-trip (Legacy %d, generation %d): %s" % [
 		reloaded.legacy_total, reloaded.generation, "PASS" if ok else "FAIL",
 	])
+
+
+# ---------------------------------------------------------------------------
+# Property ladder magnitude check (the "new magnitude per tier" feel)
+# ---------------------------------------------------------------------------
+
+## Print the base economics of each property tier and the step from the previous
+## tier. The design goal is that each new property unlocks a clear ~5× magnitude
+## of income/sec while staying worth buying (cost rises a touch faster, a gentle
+## efficiency taper). This table is how that intent is verified at a glance.
+func _print_ladder_magnitude() -> void:
+	print("--- Property ladder (base values, before milestones) ---")
+	print("  tier  property                    base cost     cycle    income/sec   ×inc  ×cost")
+	var prev_ips := 0.0
+	var prev_cost := 0.0
+	for cfg in _property_configs:
+		var c := cfg as PropertyConfig
+		var ips := c.base_income_per_unit / c.base_cycle_length if c.base_cycle_length > 0.0 else 0.0
+		var inc_ratio := ips / prev_ips if prev_ips > 0.0 else 0.0
+		var cost_ratio := c.base_cost / prev_cost if prev_cost > 0.0 else 0.0
+		print("  %2d    %-26s %12s  %5.1fs  %11s   %4s  %4s" % [
+			c.property_id,
+			c.display_name,
+			Money.of(c.base_cost).display(),
+			c.base_cycle_length,
+			Money.of(ips).display() + "/s",
+			("—" if inc_ratio == 0.0 else "%.1f" % inc_ratio),
+			("—" if cost_ratio == 0.0 else "%.1f" % cost_ratio),
+		])
+		prev_ips = ips
+		prev_cost = c.base_cost
+	print("")

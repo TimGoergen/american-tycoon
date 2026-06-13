@@ -23,6 +23,13 @@ var _frenzy: FrenzyState
 ## Accumulates held-down time on the clock-in button to pace auto-tap pulses.
 var _hold_accumulator := 0.0
 
+# Click impact: every wage tap (manual click OR auto-tap pulse while held) punches
+# the button — a quick scale+brighten that decays. Held down, it therefore pulses
+# at the auto-tap cadence, i.e. once per income tick. _impact runs 1→0; decaying
+# it in _process (instead of per-tap tweens) keeps rapid taps from piling up.
+const IMPACT_DECAY := 8.0
+var _impact := 0.0
+
 var _wage_meter: ProgressBar
 var _wage_button: Button
 var _context_label: Label
@@ -63,7 +70,9 @@ func _ready() -> void:
 	_wage_button.add_theme_color_override("font_color", UiPalette.NAVY)
 	_wage_button.add_theme_color_override("font_hover_color", UiPalette.NAVY)
 	_wage_button.add_theme_color_override("font_pressed_color", UiPalette.INK_NAVY)
-	_wage_button.pressed.connect(func() -> void: wage_tapped.emit())
+	_wage_button.pressed.connect(func() -> void:
+		wage_tapped.emit()
+		_pulse_impact())
 	_wage_meter.add_child(_wage_button)
 
 	# Compact context line (not enlarged): which title you hold and what's next.
@@ -82,6 +91,7 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_pump_auto_tap(delta)
+	_apply_impact(delta)
 
 	# The wage is paid wage_per_tap × frenzy multiplier at point of payment
 	# (Spec §7), so reflect the boosted per-tap value during a burn (1.0 otherwise).
@@ -143,3 +153,24 @@ func _pump_auto_tap(delta: float) -> void:
 	while _hold_accumulator >= pulse_interval:
 		_hold_accumulator -= pulse_interval
 		wage_hold_tapped.emit()
+		_pulse_impact()  # same visual cue as a manual click, once per income tick
+
+
+## Kick the click-impact to full; _apply_impact decays it back to rest.
+func _pulse_impact() -> void:
+	_impact = 1.0
+
+
+## Render the click impact: a quick scale punch + warm brighten on the button that
+## decays to rest. Called every frame so held-down auto-taps re-trigger it at the
+## income cadence. Pivot is re-centered each frame in case the button has resized.
+func _apply_impact(delta: float) -> void:
+	if _impact <= 0.0:
+		if _wage_meter.scale != Vector2.ONE:
+			_wage_meter.scale = Vector2.ONE
+			_wage_meter.modulate = Color.WHITE
+		return
+	_impact = maxf(0.0, _impact - delta * IMPACT_DECAY)
+	_wage_meter.pivot_offset = _wage_meter.size / 2.0
+	_wage_meter.scale = Vector2.ONE * (1.0 + _impact * 0.05)
+	_wage_meter.modulate = Color.WHITE.lerp(Color(1.25, 1.18, 1.0), _impact)

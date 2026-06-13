@@ -53,6 +53,7 @@ func _process(delta: float) -> void:
 	# stat jumps during a burn (frenzy boosts income at payment — Spec §7).
 	_hero_stat.set_income_per_sec(game.economy.get_total_income_per_sec() * game.frenzy.get_multiplier())
 	_hero_stat.set_cash(game.economy.cash)
+	_hero_stat.set_frenzy_glow(game.frenzy.get_multiplier() > 1.0)
 
 
 func _notification(what: int) -> void:

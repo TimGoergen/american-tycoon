@@ -15,6 +15,11 @@ var _bar: ProgressBar
 var _pop_button: Button
 var _showing_burn_style := false
 
+## Eased fill shown on the bar. The true meter is driven by the 10 Hz logic tick,
+## so we glide the displayed fill toward it each frame instead of copying it raw —
+## otherwise the bar steps visibly ~10 times a second (see BarSmoothing).
+var _displayed_fill := 0.0
+
 
 ## Call before adding to the tree.
 func setup(frenzy: FrenzyState, tuning: TuningConfig) -> void:
@@ -43,8 +48,9 @@ func _ready() -> void:
 	add_child(_pop_button)
 
 
-func _process(_delta: float) -> void:
-	_bar.value = _frenzy.meter
+func _process(delta: float) -> void:
+	_displayed_fill = BarSmoothing.approach(_displayed_fill, _frenzy.meter, delta)
+	_bar.value = _displayed_fill
 
 	if _frenzy.mode == FrenzyState.Mode.BURNING:
 		_set_burn_style(true)

@@ -57,6 +57,10 @@ var _wage_button: Button
 var _context_label: Label
 var _promotion_button: Button
 
+## Eased fill shown on the wage meter, glided toward its true target each frame so
+## tap-driven progress climbs smoothly instead of stepping per tap (see BarSmoothing).
+var _displayed_wage_fill := 0.0
+
 
 ## Call before adding to the tree.
 func setup(wage: WageState, economy: EconomyState, tuning: TuningConfig, frenzy: FrenzyState) -> void:
@@ -132,14 +136,14 @@ func _process(delta: float) -> void:
 	var next := _wage.get_next_title()
 	if next == null:
 		# Top of the placeholder ladder (the full title table arrives in M2).
-		_wage_meter.value = 1.0
+		_apply_wage_fill(1.0, delta)
 		_context_label.text = "%s — top of the ladder (for now)" % title.title_name
 		_promotion_button.visible = false
 		return
 
 	if _wage.is_promotion_unlocked():
 		# Threshold met — the claim is now just a purchase (the credential gag).
-		_wage_meter.value = 1.0
+		_apply_wage_fill(1.0, delta)
 		_context_label.text = "%s — promotion earned, claim it below" % title.title_name
 		_promotion_button.visible = true
 		_promotion_button.text = "CLAIM PROMOTION: %s — tuition %s" % [
@@ -147,13 +151,20 @@ func _process(delta: float) -> void:
 		]
 		_promotion_button.disabled = _economy.cash < next.tuition
 	else:
-		_wage_meter.value = _promotion_progress(title, next)
+		_apply_wage_fill(_promotion_progress(title, next), delta)
 		_context_label.text = "%s → %s: %d / %d taps + %s tuition" % [
 			title.title_name, next.title_name,
 			_wage.lifetime_taps, next.tap_threshold,
 			Money.of(next.tuition).display()
 		]
 		_promotion_button.visible = false
+
+
+## Glide the wage meter toward `target` (0–1) each frame so the fill climbs
+## smoothly rather than stepping on every tap (see BarSmoothing).
+func _apply_wage_fill(target: float, delta: float) -> void:
+	_displayed_wage_fill = BarSmoothing.approach(_displayed_wage_fill, target, delta)
+	_wage_meter.value = _displayed_wage_fill
 
 
 ## Fraction of the way from the current title's tap threshold to the next title's

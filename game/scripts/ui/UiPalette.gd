@@ -55,6 +55,25 @@ static func style_progress_bar(bar: ProgressBar, fill_color: Color) -> void:
 	bar.add_theme_stylebox_override("fill", fill)
 
 
+## Dark-gold plate with a bright-gold fill — the "clock in" wage button doubles
+## as a promotion-progress meter (UI notes §2: dark gold background, bright gold
+## bar). The dark gold is a darkened MUSTARD_GOLD; it's a deliberate extension of
+## the §1 nine-color palette for this one meter, pending style-guide blessing.
+static func style_gold_progress(bar: ProgressBar) -> void:
+	var track := StyleBoxFlat.new()
+	track.bg_color = MUSTARD_GOLD.darkened(0.45)
+	track.border_color = NAVY
+	track.set_border_width_all(3)
+	track.set_corner_radius_all(4)
+
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = MUSTARD_GOLD
+	fill.set_corner_radius_all(4)
+
+	bar.add_theme_stylebox_override("background", track)
+	bar.add_theme_stylebox_override("fill", fill)
+
+
 static func _make_plate(bg_color: Color, border_color: Color) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	style.bg_color = bg_color

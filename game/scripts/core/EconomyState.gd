@@ -104,6 +104,19 @@ func get_total_income_per_sec() -> float:
 	return total
 
 
+## Sum of income/sec from STAFFED properties only — the income the player keeps
+## earning hands-off. Unstaffed cycles stop after one payout, so they are not
+## guaranteed and do not count. Excludes frenzy/event multipliers, which are
+## temporary; this is the dependable floor the headline stat never reads below.
+func get_staffed_income_per_sec() -> float:
+	var total := 0.0
+	for prop in properties:
+		var p := prop as PropertyState
+		if p.is_staffed:
+			total += p.get_income_per_sec()
+	return total
+
+
 ## Credit cash directly (for starting money, offline pile, events).
 func award_cash(amount: float) -> void:
 	cash += floor(amount)

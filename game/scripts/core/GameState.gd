@@ -26,21 +26,28 @@ var peak_net_worth: float = 0.0
 ## model never reads it.
 var ui_buy_mode: int = 0
 
-## Smoothed "effective" income/sec — an exponential moving average of ACTUAL cash
-## inflow (property completions + wage taps, frenzy included). Unlike the theoretical
-## per-property rate, this rises while the player is actively rushing/tapping and
-## settles back to the passive rate when idle, so the headline stat reflects what
-## they are really earning right now. Display-only.
-var effective_income_per_sec: float = 0.0
+## The headline income/sec shown on the hero panel. It is built as a guaranteed
+## floor plus a bonus: it never reads below the guaranteed staffed income (what
+## idle play keeps earning), and on top of that it adds a smoothed average of the
+## extra the player is currently generating through their own inputs — manual
+## taps, rushes, wage clicks, and frenzy. Display-only.
+var displayed_income_per_sec: float = 0.0
 
-## Time constant (seconds) for the effective-income average — how fast it tracks a
-## change in earning rate. ~1.5s reads as live without being jittery.
-const EFFECTIVE_INCOME_TAU := 1.5
+## Smoothed bonus rate ($/sec) earned ABOVE the guaranteed staffed floor. Tracked
+## as a true average, so it can dip negative between the lumpy spikes of cycle
+## payouts; it is clamped to 0 only when added to the floor for display, so the
+## headline can never fall below the guaranteed staffed income.
+var _smoothed_bonus_per_sec: float = 0.0
+
+## Time constant (seconds) for the bonus average. Deliberately longer than a "live"
+## readout: individual cycle payouts arrive as spikes, and a longer window averages
+## those spikes (and the quiet gaps between them) into a steady bonus reading.
+const BONUS_INCOME_TAU := 4.0
 
 # Wage earned since the last tick (taps fire between ticks); folded into the
-# effective-income average on the next tick, then cleared.
+# bonus average on the next tick, then cleared.
 var _wage_earned_since_tick: float = 0.0
-var _effective_seeded := false
+var _bonus_seeded := false
 
 
 func _init(property_configs: Array, titles: Array, p_tuning: TuningConfig) -> void:
@@ -62,23 +69,30 @@ func tick(delta: float, extra_property_multiplier: float = 1.0) -> void:
 	frenzy.tick(delta)
 	economy.tick(delta, frenzy.get_multiplier() * extra_property_multiplier)
 	peak_net_worth = maxf(peak_net_worth, economy.get_net_worth())
-	_update_effective_income(delta)
+	_update_displayed_income(delta)
 
 
-## Fold this tick's actual cash inflow (property income + wage taps since the last
-## tick) into the smoothed effective income/sec. Seeded once to the theoretical
-## running rate so the stat doesn't visibly ramp up from zero on load.
-func _update_effective_income(delta: float) -> void:
+## Recompute the headline income/sec as "guaranteed staffed floor + smoothed bonus".
+## The bonus is the average amount this tick's ACTUAL inflow (property completions +
+## wage taps, frenzy included) ran above the guaranteed staffed rate. Because staffed
+## payouts arrive in lumps, the raw bonus swings positive on a payout and negative in
+## the gaps; we average it (allowing negatives so the swings cancel) and then clamp to
+## 0 at display time, so the headline sits at the floor when idle and lifts smoothly
+## above it while the player is actively earning extra.
+func _update_displayed_income(delta: float) -> void:
 	if delta <= 0.0:
 		return
+	var guaranteed := economy.get_staffed_income_per_sec()
 	var inflow := economy.income_this_tick + _wage_earned_since_tick
 	_wage_earned_since_tick = 0.0
-	if not _effective_seeded:
-		effective_income_per_sec = economy.get_total_income_per_sec()
-		_effective_seeded = true
-	var instantaneous := inflow / delta
-	var alpha := 1.0 - exp(-delta / EFFECTIVE_INCOME_TAU)
-	effective_income_per_sec += (instantaneous - effective_income_per_sec) * alpha
+	var bonus_instantaneous := inflow / delta - guaranteed
+	if not _bonus_seeded:
+		# Start with no bonus so a freshly loaded game reads exactly the floor.
+		_smoothed_bonus_per_sec = 0.0
+		_bonus_seeded = true
+	var alpha := 1.0 - exp(-delta / BONUS_INCOME_TAU)
+	_smoothed_bonus_per_sec += (bonus_instantaneous - _smoothed_bonus_per_sec) * alpha
+	displayed_income_per_sec = guaranteed + maxf(_smoothed_bonus_per_sec, 0.0)
 
 
 # ---------------------------------------------------------------------------

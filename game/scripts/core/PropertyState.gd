@@ -220,6 +220,16 @@ func get_income_per_sec() -> float:
 	return floor(units_owned * income_per_unit) / cycle_length
 
 
+## Cash paid out each time a full cycle completes, before frenzy/event
+## multipliers (those apply at point of payment in _collect). This is the number
+## the property row displays — it's what the player actually receives when the
+## progress bar fills, so the on-screen figure matches the cash they get.
+func get_income_per_cycle() -> float:
+	if units_owned == 0:
+		return 0.0
+	return floor(units_owned * income_per_unit)
+
+
 ## Current milestone band (how many bands have been crossed).
 func get_milestone_band() -> int:
 	return CostCurve.get_band(max(units_owned, 1))

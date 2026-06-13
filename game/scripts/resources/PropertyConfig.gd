@@ -25,3 +25,8 @@ extends Resource
 
 ## Name of the staffer card shown when this property is hired out (M3).
 @export var staffer_name: String = ""
+
+## Round head-shot of the property manager, shown in the row's portrait circle
+## once the property is staffed. Authored as a circular PNG (transparent corners).
+## Null until art lands in M3 — the circle then falls back to a lettered placeholder.
+@export var manager_portrait: Texture2D = null

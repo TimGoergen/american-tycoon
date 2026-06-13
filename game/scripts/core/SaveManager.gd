@@ -40,6 +40,13 @@ static func load_from_file(path: String = DEFAULT_SAVE_PATH) -> Dictionary:
 	return data
 
 
+## Delete the save file if it exists. Used by the temporary play-testing reset
+## button: with no save on disk, the next startup begins a clean fresh run.
+static func delete_save_file(path: String = DEFAULT_SAVE_PATH) -> void:
+	if FileAccess.file_exists(path):
+		DirAccess.remove_absolute(path)
+
+
 ## Wall-clock seconds since the save was written — the offline-calc input.
 ## Negative values (device clock moved backwards) clamp to 0 (Spec §2).
 static func get_seconds_since_save(save_dict: Dictionary) -> float:

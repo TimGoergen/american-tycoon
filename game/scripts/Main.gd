@@ -49,7 +49,9 @@ func _process(delta: float) -> void:
 		_autosave_timer = 0.0
 		SaveManager.save_to_file(game)
 
-	_hero_stat.set_income_per_sec(game.economy.get_total_income_per_sec())
+	# Reflect the active frenzy multiplier in the headline income/sec so the hero
+	# stat jumps during a burn (frenzy boosts income at payment — Spec §7).
+	_hero_stat.set_income_per_sec(game.economy.get_total_income_per_sec() * game.frenzy.get_multiplier())
 	_hero_stat.set_cash(game.economy.cash)
 
 
@@ -148,7 +150,7 @@ func _build_ui() -> void:
 
 	for i in range(game.economy.properties.size()):
 		var row := PropertyRow.new()
-		row.setup(i, game.economy.properties[i] as PropertyState, game.economy)
+		row.setup(i, game.economy.properties[i] as PropertyState, game.economy, game.frenzy)
 		row.buy_requested.connect(_on_buy_requested)
 		row.tap_requested.connect(_on_tap_requested)
 		row.hold_rush_requested.connect(_on_hold_rush_requested)

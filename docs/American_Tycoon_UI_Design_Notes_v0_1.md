@@ -106,7 +106,12 @@ Art Style Guide.
 -
 
 ### Income/sec hero ticket
--
+- **Reflect frenzy in the income readout.** When a frenzy is active, the income/sec
+  displays (hero ticket + each property row) should show the boosted rate, not the base
+  rate (Tim, 2026-06-13). *Interpretation note:* Tim's words were "reflect the changes to
+  costs," but frenzy is an income multiplier (Spec §7), not a cost modifier — so this was
+  read as "income values." Implemented by multiplying the displayed income/sec by
+  `frenzy.get_multiplier()` (1.0 when no burn). If "costs" meant something else, flag it.
 
 ### Frenzy bar
 -

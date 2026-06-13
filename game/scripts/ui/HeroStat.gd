@@ -20,7 +20,9 @@ extends PanelContainer
 # Type sizes (art direction, not game tuning). Large for at-a-glance reading; the
 # matching-color outline fakes a bold weight until real bold fonts arrive in M3.
 const INCOME_FONT_SIZE := 64
-const CASH_FONT_SIZE := 42
+# Cash on hand reads at the same size as income/sec (Tim's call) — kept tied to
+# INCOME_FONT_SIZE so the two stay matched if that value is ever retuned.
+const CASH_FONT_SIZE := INCOME_FONT_SIZE
 const CAPTION_FONT_SIZE := 30
 const INCOME_BOLD := 3
 const CASH_BOLD := 2

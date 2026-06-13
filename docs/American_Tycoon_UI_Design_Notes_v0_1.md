@@ -151,6 +151,9 @@ Art Style Guide.
   nothing affordable (MAX mode with insufficient cash), show the cost of the next single
   unit instead of a blank "—", so the player sees how close they are. (×1/×10/×100 already
   show their fixed cost and just disable when unaffordable.)
+- **Buy-mode persists across sessions (Tim, 2026-06-13).** The selected toggle value is
+  saved (`GameState.ui_buy_mode` in the save file) and restored on launch, so it survives
+  closing the app. Defaults to ×1 for a fresh game.
 
 ### Milestone slider
 -

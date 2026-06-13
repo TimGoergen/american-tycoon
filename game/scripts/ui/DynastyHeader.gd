@@ -68,9 +68,11 @@ func _make_label(color: Color, font_size: int, outline: int) -> Label:
 
 ## Update the displayed dynasty identity.
 ## `dynasty_name` is the full name string, e.g. "Wellington Pemberton IX".
-## `legacy_total` is the integer Legacy points accumulated across all generations.
-func set_dynasty(dynasty_name: String, legacy_total: int) -> void:
+## `legacy_available` is the SPENDABLE Legacy the player has banked — the wallet
+## they take into the upgrade shop. (It rises at each succession and falls when
+## upgrades are bought, so the header always shows what's left to spend.)
+func set_dynasty(dynasty_name: String, legacy_available: int) -> void:
 	# Always show the name in UPPERCASE — ticket-plate style convention,
 	# and the Roman numeral reads more clearly in all-caps.
 	_name_label.text = dynasty_name.to_upper()
-	_legacy_label.text = "LEGACY: " + str(legacy_total)
+	_legacy_label.text = "LEGACY: " + str(legacy_available)

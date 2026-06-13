@@ -13,6 +13,11 @@ var current_title_index: int = 0
 ## Persists across generations and planets — never reset.
 var lifetime_taps: int = 0
 
+## Dynasty-wide wage multiplier from the Legacy "Old-Money Connections" upgrade
+## (1.0 = base wage). Set by DynastyState from the purchased upgrades; multiplies
+## the wage earned per tap on top of the frenzy multiplier.
+var wage_multiplier: float = 1.0
+
 
 func _init(p_titles: Array) -> void:
 	titles = p_titles
@@ -24,7 +29,7 @@ func _init(p_titles: Array) -> void:
 func tap_wage(income_multiplier: float = 1.0) -> float:
 	lifetime_taps += 1
 	var title := titles[current_title_index] as TitleRow
-	return floorf(title.wage_per_tap * income_multiplier)
+	return floorf(title.wage_per_tap * income_multiplier * wage_multiplier)
 
 
 func get_current_title() -> TitleRow:

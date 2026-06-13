@@ -90,14 +90,9 @@ extends Resource
 ## Exponent for Legacy gain curve (0.5 = square-root compression).
 @export var alpha_legacy: float = 0.5  # TBD-SIM
 
-## Scaling constant for the sprint multiplier applied to each new heir.
-@export var k_sprint: float = 1.0  # TBD-SIM
-
-## Exponent for sprint multiplier scaling with Legacy.
-@export var beta_sprint: float = 0.5  # TBD-SIM
-
-## Per-Legacy-bracket bonus added permanently after sprint ends.
-@export var k_residual: float = 0.1  # TBD-SIM
+# Note: the old k_sprint / beta_sprint / k_residual constants were removed when
+# Legacy became a spendable upgrade currency. Per-level upgrade magnitudes and
+# costs now live in LegacyUpgradeCatalog.gd, not here.
 
 # --- Events (Spec §10) ---
 

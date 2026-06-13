@@ -306,18 +306,22 @@ func _run_dynasty_protocol() -> void:
 
 	for _g in range(DYNASTY_GENERATIONS):
 		var generation := dynasty.generation
-		var legacy_at_birth := dynasty.legacy_total
-		var sprint_at_birth := EstateWaterfall.sprint_mult(
-			legacy_at_birth, _tuning.k_sprint, _tuning.beta_sprint
-		)
+		var legacy_at_birth := dynasty.upgrades.available
+
+		# The new acceleration source: spend the banked Legacy on upgrades before
+		# this heir starts working. Each generation thus inherits a stronger perk
+		# sheet (more starting cash, higher income, faster cycles, …), which is
+		# what should make it reach the founder's peak faster than the last.
+		var upgrades_bought := _buy_upgrades_greedily(dynasty)
+		var income_mult := dynasty.get_legacy_income_multiplier()
 
 		var time_to_founder := _play_generation(dynasty, GEN_PLAY_SECONDS, founder_peak)
 		var will := dynasty.get_draft_will()
 
 		print("")
 		print("--- Generation %d ---" % generation)
-		print("  Born with Legacy: %d  (sprint x%.2f on property income)" % [
-			legacy_at_birth, sprint_at_birth,
+		print("  Born with Legacy: %d  (bought %d upgrade levels -> property income x%.2f)" % [
+			legacy_at_birth, upgrades_bought, income_mult,
 		])
 		if founder_peak > 0.0:
 			print("  Time to reach the founder's peak (%s): %s" % [
@@ -341,10 +345,36 @@ func _run_dynasty_protocol() -> void:
 		dynasty.perform_succession()
 
 	print("")
-	print("Dynasty total Legacy after %d generations: %d (brackets: %d)" % [
-		DYNASTY_GENERATIONS, dynasty.legacy_total, dynasty.brackets_attained,
+	print("Dynasty Legacy after %d generations: %d to spend, %d earned over the bloodline" % [
+		DYNASTY_GENERATIONS, dynasty.upgrades.available, dynasty.upgrades.earned_lifetime,
 	])
 	_verify_dynasty_save_roundtrip(dynasty)
+
+
+## Greedy upgrade buyer for the sim: repeatedly buy the cheapest affordable
+## upgrade level until nothing is affordable, then re-apply the effects to the
+## living generation. Returns how many levels were bought. (A real player would
+## specialize; the cheapest-first policy just proves the spend/effect loop works
+## and that buying upgrades accelerates each heir.)
+func _buy_upgrades_greedily(dynasty: DynastyState) -> int:
+	var bought := 0
+	while bought < 1000:
+		var best_id := ""
+		var best_cost := -1
+		for definition in LegacyUpgradeCatalog.all():
+			var id := String(definition["id"])
+			if not dynasty.upgrades.can_buy(id):
+				continue
+			var cost := dynasty.upgrades.get_next_cost(id)
+			if best_cost < 0 or cost < best_cost:
+				best_cost = cost
+				best_id = id
+		if best_id == "":
+			break  # nothing affordable
+		dynasty.upgrades.buy(best_id)
+		bought += 1
+	dynasty.refresh_current_generation_effects()
+	return bought
 
 
 ## Play one generation for `seconds` of active time using the same greedy policy
@@ -433,11 +463,11 @@ func _verify_dynasty_save_roundtrip(dynasty: DynastyState) -> void:
 	var reloaded := DynastyState.new(_property_configs, _title_configs, _tuning)
 	reloaded.load_save_dict(data)
 
-	var ok := reloaded.legacy_total == dynasty.legacy_total \
-			and reloaded.generation == dynasty.generation \
-			and reloaded.predecessor_peak_net_worth == dynasty.predecessor_peak_net_worth
-	print("Dynasty save round-trip (Legacy %d, generation %d): %s" % [
-		reloaded.legacy_total, reloaded.generation, "PASS" if ok else "FAIL",
+	var ok := reloaded.upgrades.available == dynasty.upgrades.available \
+			and reloaded.upgrades.earned_lifetime == dynasty.upgrades.earned_lifetime \
+			and reloaded.generation == dynasty.generation
+	print("Dynasty save round-trip (Legacy to spend %d, generation %d): %s" % [
+		reloaded.upgrades.available, reloaded.generation, "PASS" if ok else "FAIL",
 	])
 
 

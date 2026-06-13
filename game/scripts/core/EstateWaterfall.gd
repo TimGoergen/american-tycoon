@@ -57,34 +57,7 @@ static func legacy_gain(estate_net: float, k_legacy: float, alpha: float) -> int
 		return 0
 	return int(floor(k_legacy * pow(estate_net, alpha)))
 
-
-# ---------------------------------------------------------------------------
-# §9.4 — Legacy application (the "speeds up every time" multipliers)
-# ---------------------------------------------------------------------------
-
-## The catch-up sprint: a large temporary multiplier on property income that is
-## active only while the heir is still poorer than the predecessor's peak. This
-## is what lets each heir tear through tiers the parent crawled across.
-## SPRINT_MULT = 1 + K_SPRINT × Legacy ^ BETA
-static func sprint_mult(legacy_total: int, k_sprint: float, beta: float) -> float:
-	if legacy_total <= 0:
-		return 1.0
-	return 1.0 + k_sprint * pow(float(legacy_total), beta)
-
-
-## The permanent residual that remains after the sprint ends — a smaller, lasting
-## edge that grows with how many Legacy brackets the dynasty has attained.
-## RESIDUAL_MULT = 1 + K_RES × brackets_attained
-static func residual_mult(brackets_attained: int, k_res: float) -> float:
-	return 1.0 + k_res * float(brackets_attained)
-
-
-## How many Legacy "brackets" a running total has attained. Provisional model
-## (TBD-SIM): one bracket per doubling of total Legacy, so the residual edge
-## grows gently and never runs away. The GDD frames brackets as named tiers
-## ("the estate now qualifies for…"); the names are a later content pass.
-static func brackets_for(legacy_total: int) -> int:
-	if legacy_total <= 0:
-		return 0
-	# log2(legacy + 1): 1→1, 3→2, 7→3, 15→4 … each doubling adds one bracket.
-	return int(floor(log(float(legacy_total) + 1.0) / log(2.0)))
+# §9.4 note: Legacy is no longer applied as an automatic sprint/residual income
+# multiplier. The prestige reward is now a spendable currency — the player buys
+# permanent upgrades with it (LegacyUpgrades / LegacyUpgradeCatalog), and those
+# upgrades provide the per-generation acceleration the old multipliers used to.

@@ -25,8 +25,10 @@ var _frenzy_bar: FrenzyBar
 var _wage_panel: WagePanel
 var _welcome_overlay: WelcomeBackOverlay
 var _will_screen: WillScreen
+var _legacy_screen: LegacyScreen
 var _buy_mode_button: Button
 var _plan_button: Button
+var _legacy_button: Button
 var _rows: Array = []
 
 ## Global buy mode — one toggle drives every row's buy button.
@@ -43,10 +45,11 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	# Freeze the economy while the succession ceremony is on screen: no ticks, no
-	# autosave. This keeps the will's numbers from shifting under the player and
-	# avoids half-saving the generation swap that happens mid-ceremony.
-	if _will_screen.visible:
+	# Freeze the economy while a full-screen overlay is up (the succession
+	# ceremony or the upgrade shop): no ticks, no autosave. This keeps the will's
+	# numbers from shifting under the player, avoids half-saving the generation
+	# swap mid-ceremony, and lets the shop spend Legacy against a steady balance.
+	if _will_screen.visible or _legacy_screen.visible:
 		return
 
 	# Fixed-timestep logic (Spec §2): accumulate render time and tick in
@@ -71,9 +74,11 @@ func _process(delta: float) -> void:
 	_hero_stat.set_cash(game.economy.cash)
 	_hero_stat.set_frenzy_glow(game.frenzy.get_multiplier() > 1.0)
 
-	# Dynastic identity strip and the prestige-exit button reflect the live state.
-	_dynasty_header.set_dynasty(HeirNames.dynasty_name(dynasty.generation), dynasty.legacy_total)
+	# Dynastic identity strip shows the spendable Legacy wallet; the prestige-exit
+	# button and the Estate Office button reflect the live state.
+	_dynasty_header.set_dynasty(HeirNames.dynasty_name(dynasty.generation), dynasty.upgrades.available)
 	_update_plan_button()
+	_update_legacy_button()
 
 
 func _notification(what: int) -> void:
@@ -241,6 +246,19 @@ func _build_ui() -> void:
 	_plan_button.pressed.connect(_on_plan_estate_pressed)
 	column.add_child(_plan_button)
 
+	# The Estate Office: enter the Legacy upgrade shop to spend banked Legacy. It
+	# is hidden until the player's first prestige — there is nothing to spend and
+	# no shop to enter before then — and revealed for good once Legacy is earned
+	# (see _update_legacy_button). Gold styling marks it as the prestige reward.
+	_legacy_button = Button.new()
+	_legacy_button.custom_minimum_size = Vector2(0, 64)
+	_legacy_button.add_theme_font_size_override("font_size", 24)
+	UiPalette.style_button(_legacy_button, false)
+	_legacy_button.text = "THE ESTATE OFFICE"
+	_legacy_button.pressed.connect(_on_estate_office_pressed)
+	_legacy_button.visible = false
+	column.add_child(_legacy_button)
+
 	# The welcome-back overlay sits above everything and starts hidden.
 	_welcome_overlay = WelcomeBackOverlay.new()
 	_welcome_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -253,6 +271,15 @@ func _build_ui() -> void:
 	_will_screen.pass_on_confirmed.connect(_on_pass_on_confirmed)
 	_will_screen.heir_begin_pressed.connect(_on_heir_begin_pressed)
 	add_child(_will_screen)
+
+	# The Legacy upgrade shop overlay, also above everything and hidden until the
+	# player opens the Estate Office. It reads/writes the dynasty's upgrade state.
+	_legacy_screen = LegacyScreen.new()
+	_legacy_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_legacy_screen.setup(dynasty.upgrades)
+	_legacy_screen.purchased.connect(_on_upgrade_purchased)
+	_legacy_screen.closed.connect(_on_legacy_screen_closed)
+	add_child(_legacy_screen)
 
 
 # ---------------------------------------------------------------------------
@@ -326,6 +353,32 @@ func _update_plan_button() -> void:
 		_plan_button.text = "PLAN THE ESTATE  (+%d Legacy)" % dynasty.projected_legacy_gain()
 	else:
 		_plan_button.text = "PLAN THE ESTATE"
+
+
+## Reveal the Estate Office button once the dynasty has ever earned Legacy — i.e.
+## from the first prestige onward. earned_lifetime never falls back to 0, so once
+## shown the button stays for good (even after the wallet is spent down to 0).
+func _update_legacy_button() -> void:
+	_legacy_button.visible = dynasty.upgrades.earned_lifetime > 0
+
+
+## Player opened the Estate Office: show the upgrade shop. It refreshes itself
+## against the current Legacy wallet on open.
+func _on_estate_office_pressed() -> void:
+	_legacy_screen.open()
+
+
+## An upgrade was just bought in the shop. Apply its effect to the living
+## generation immediately (faster cycles / cheaper staff / fatter wage take hold
+## mid-life) and persist, so a purchase is never lost to a crash before autosave.
+func _on_upgrade_purchased(_upgrade_id: String) -> void:
+	dynasty.refresh_current_generation_effects()
+	SaveManager.save_dict_to_file(dynasty.to_save_dict())
+
+
+## Player closed the shop: persist and let the game resume on the next frame.
+func _on_legacy_screen_closed() -> void:
+	SaveManager.save_dict_to_file(dynasty.to_save_dict())
 
 
 ## Player opened the estate planner: show the will for the dying generation.

@@ -125,6 +125,9 @@ Art Style Guide.
 - **Progress feedback** — the button background should fill to show progress toward the
   next promotion (the wage-ladder title-up). See §5 — needs promotion-progress state
   exposed to the UI.
+- **Color treatment** — the button background is **dark gold**; a **bright gold bar** fills
+  that space left-to-right as a progress fill, so the button itself reads as the progress
+  meter (no separate bar). Fill fraction = progress toward the next promotion.
 
 ### Welcome-back overlay
 -

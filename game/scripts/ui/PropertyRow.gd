@@ -40,6 +40,13 @@ var _displayed_cycle_fraction := 0.0
 ## cycle completes and restarts, so a drop tells us to snap the bar back to zero.
 var _last_true_cycle_fraction := 0.0
 
+## While the player holds the rush button, the cycle bar fills in a brighter green
+## to signal the active push. How far the green is lightened toward white (0 = none).
+const HELD_RUSH_LIGHTEN := 0.35
+## Tracks the current fill color so we only rebuild the stylebox on a change, not
+## every frame (the same approach FrenzyBar uses for its burn-color swap).
+var _showing_held_rush := false
+
 var _manager_circle: ManagerCircle
 var _name_label: Label
 var _income_label: Label
@@ -240,6 +247,11 @@ func _refresh(delta: float) -> void:
 	_last_true_cycle_fraction = true_fraction
 	_cycle_bar.value = _displayed_cycle_fraction
 
+	# Brighter green while the rush button is held — a live cue that the player's
+	# holding is actively driving this property's cycle.
+	var rush_held := _tap_button.button_pressed and _prop.units_owned > 0
+	_set_cycle_highlight(rush_held)
+
 	# Milestone slider runs from the last crossed milestone to the next one.
 	var next_milestone := _prop.get_next_milestone_count()
 	var last_milestone := next_milestone / 2 if _prop.units_owned >= 20 else 0
@@ -266,6 +278,17 @@ func _refresh(delta: float) -> void:
 		var staff_cost := _prop.get_staff_cost()
 		_hire_button.text = "HIRE\n%s" % Money.of(staff_cost).display()
 		_hire_button.disabled = cash < staff_cost
+
+
+## Swap the cycle bar's fill between its normal green and a brighter green. Only on
+## change — rebuilding the stylebox every frame would be wasteful (same pattern as
+## FrenzyBar's burn-color swap).
+func _set_cycle_highlight(active: bool) -> void:
+	if active == _showing_held_rush:
+		return
+	_showing_held_rush = active
+	var fill := UiPalette.MONEY_GREEN.lightened(HELD_RUSH_LIGHTEN) if active else UiPalette.MONEY_GREEN
+	UiPalette.style_progress_bar(_cycle_bar, fill)
 
 
 ## Update the buy button's caption, cost, and enabled state for the

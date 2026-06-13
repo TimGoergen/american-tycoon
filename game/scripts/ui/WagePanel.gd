@@ -18,6 +18,7 @@ signal promotion_requested
 var _wage: WageState
 var _economy: EconomyState
 var _tuning: TuningConfig
+var _frenzy: FrenzyState
 
 ## Accumulates held-down time on the clock-in button to pace auto-tap pulses.
 var _hold_accumulator := 0.0
@@ -29,10 +30,11 @@ var _promotion_button: Button
 
 
 ## Call before adding to the tree.
-func setup(wage: WageState, economy: EconomyState, tuning: TuningConfig) -> void:
+func setup(wage: WageState, economy: EconomyState, tuning: TuningConfig, frenzy: FrenzyState) -> void:
 	_wage = wage
 	_economy = economy
 	_tuning = tuning
+	_frenzy = frenzy
 
 
 func _ready() -> void:
@@ -81,8 +83,11 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	_pump_auto_tap(delta)
 
+	# The wage is paid wage_per_tap × frenzy multiplier at point of payment
+	# (Spec §7), so reflect the boosted per-tap value during a burn (1.0 otherwise).
 	var title := _wage.get_current_title()
-	_wage_button.text = "CLOCK IN\n%s / tap" % Money.of(title.wage_per_tap).display()
+	var wage_per_tap := title.wage_per_tap * _frenzy.get_multiplier()
+	_wage_button.text = "CLOCK IN\n%s / tap" % Money.of(wage_per_tap).display()
 
 	var next := _wage.get_next_title()
 	if next == null:

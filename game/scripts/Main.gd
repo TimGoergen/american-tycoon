@@ -9,17 +9,24 @@ extends Control
 # (Unity analogue: FixedUpdate for logic, Update for presentation — except
 # Godot has no built-in fixed update for _process, so we accumulate.)
 
+# The dynasty owns the whole bloodline (total Legacy, the generation counter,
+# succession) and holds the living generation as `dynasty.current`. Every UI verb
+# acts on that living generation, so `game` is kept as a direct handle to it.
+var dynasty: DynastyState
 var game: GameState
 var tuning: TuningConfig
 
 var _tick_accumulator := 0.0
 var _autosave_timer := 0.0
 
+var _dynasty_header: DynastyHeader
 var _hero_stat: HeroStat
 var _frenzy_bar: FrenzyBar
 var _wage_panel: WagePanel
 var _welcome_overlay: WelcomeBackOverlay
+var _will_screen: WillScreen
 var _buy_mode_button: Button
+var _plan_button: Button
 var _rows: Array = []
 
 ## Global buy mode — one toggle drives every row's buy button.
@@ -36,18 +43,26 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	# Freeze the economy while the succession ceremony is on screen: no ticks, no
+	# autosave. This keeps the will's numbers from shifting under the player and
+	# avoids half-saving the generation swap that happens mid-ceremony.
+	if _will_screen.visible:
+		return
+
 	# Fixed-timestep logic (Spec §2): accumulate render time and tick in
-	# constant steps so the economy math is framerate-independent.
+	# constant steps so the economy math is framerate-independent. Ticking the
+	# dynasty (not the bare generation) applies the Legacy multiplier to property
+	# income — the dynastic acceleration that makes each heir faster (Spec §9.4).
 	var step := 1.0 / float(tuning.logic_hz)
 	_tick_accumulator += delta
 	while _tick_accumulator >= step:
-		game.tick(step)
+		dynasty.tick(step)
 		_tick_accumulator -= step
 
 	_autosave_timer += delta
 	if _autosave_timer >= tuning.autosave_cadence:
 		_autosave_timer = 0.0
-		SaveManager.save_to_file(game)
+		SaveManager.save_dict_to_file(dynasty.to_save_dict())
 
 	# Headline income/sec: the guaranteed staffed floor plus a smoothed bonus from
 	# active play (rushes, wage taps, frenzy). Built in GameState so it never reads
@@ -56,12 +71,16 @@ func _process(delta: float) -> void:
 	_hero_stat.set_cash(game.economy.cash)
 	_hero_stat.set_frenzy_glow(game.frenzy.get_multiplier() > 1.0)
 
+	# Dynastic identity strip and the prestige-exit button reflect the live state.
+	_dynasty_header.set_dynasty(HeirNames.dynasty_name(dynasty.generation), dynasty.legacy_total)
+	_update_plan_button()
+
 
 func _notification(what: int) -> void:
 	# Save on backgrounding (phone) and on close (desktop) — Spec §12.
 	if what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_WM_CLOSE_REQUEST:
-		if game != null:
-			SaveManager.save_to_file(game)
+		if dynasty != null:
+			SaveManager.save_dict_to_file(dynasty.to_save_dict())
 
 
 # ---------------------------------------------------------------------------
@@ -72,22 +91,42 @@ func _create_game() -> void:
 	tuning = ConfigLoader.load_tuning()
 	var property_configs := ConfigLoader.load_property_configs()
 	var titles := ConfigLoader.load_title_configs()
-	game = GameState.new(property_configs, titles, tuning)
+
+	# Constructing the dynasty also builds generation 1, already seeded with
+	# starting cash by DynastyState. So, unlike the old bare-GameState path, a
+	# fresh game needs no extra award_cash here.
+	dynasty = DynastyState.new(property_configs, titles, tuning)
 
 	var save_dict := SaveManager.load_from_file()
-	if save_dict.is_empty():
-		game.economy.award_cash(tuning.m1_starting_cash)
-	else:
-		game.load_save_dict(save_dict)
-		_elapsed_since_save = SaveManager.get_seconds_since_save(save_dict)
+	if not save_dict.is_empty():
+		# Loads both the new dynastic save and a legacy bare-generation save: a
+		# bare M1 save reconstructs as a clean generation-1 dynasty (see
+		# DynastyState.load_save_dict).
+		dynasty.load_save_dict(save_dict)
+		_elapsed_since_save = _seconds_since_save(save_dict)
+
+	# The UI verbs all act on the living generation; keep a direct handle to it.
+	game = dynasty.current
 
 	# Restore the saved buy-mode preference (defaults to ×1 for a fresh game).
 	_buy_mode = game.ui_buy_mode as PropertyRow.BuyMode
 
 
+## Wall-clock seconds since the save was written. The dynastic save nests the
+## generation (which carries the saved_at_unix timestamp) under "current"; a
+## legacy bare-generation save carries that timestamp at the top level. Read it
+## from wherever it actually lives.
+func _seconds_since_save(save_dict: Dictionary) -> float:
+	var stamped: Dictionary = save_dict.get("current", save_dict)
+	return SaveManager.get_seconds_since_save(stamped)
+
+
 func _apply_offline_if_due() -> void:
 	if _elapsed_since_save <= 0.0:
 		return
+	# Offline earnings accrue to the living generation at the staffed rate. They do
+	# NOT yet receive the dynasty's Legacy multiplier (OfflineCalculator predates
+	# the dynasty layer); folding Legacy into offline accrual is a later refinement.
 	var offline := game.apply_offline(_elapsed_since_save)
 	# The ritual only plays when a pile actually accrued (staffed income).
 	if offline.pile > 0.0:
@@ -115,6 +154,10 @@ func _build_ui() -> void:
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 14)
 	margin.add_child(column)
+
+	# Dynastic identity strip at the very top: heir name + total Legacy (GDD §13).
+	_dynasty_header = DynastyHeader.new()
+	column.add_child(_dynasty_header)
 
 	_hero_stat = HeroStat.new()
 	column.add_child(_hero_stat)
@@ -182,10 +225,30 @@ func _build_ui() -> void:
 	_wage_panel.promotion_requested.connect(_on_promotion_requested)
 	column.add_child(_wage_panel)
 
+	# The prestige exit: plan the estate, pass on, and raise a faster heir. Red
+	# because it is the big commit action (§8). It stays disabled until dying
+	# would actually grow the dynasty (dynasty.can_perform_succession()), and its
+	# label then previews the Legacy gain — see _update_plan_button.
+	_plan_button = Button.new()
+	_plan_button.custom_minimum_size = Vector2(0, 72)
+	_plan_button.add_theme_font_size_override("font_size", 26)
+	UiPalette.style_button(_plan_button, true)
+	_plan_button.text = "PLAN THE ESTATE"
+	_plan_button.pressed.connect(_on_plan_estate_pressed)
+	column.add_child(_plan_button)
+
 	# The welcome-back overlay sits above everything and starts hidden.
 	_welcome_overlay = WelcomeBackOverlay.new()
 	_welcome_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_welcome_overlay)
+
+	# The succession ceremony overlay (the Reading of the Will + heir reveal),
+	# also above everything and hidden until the player plans the estate.
+	_will_screen = WillScreen.new()
+	_will_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_will_screen.pass_on_confirmed.connect(_on_pass_on_confirmed)
+	_will_screen.heir_begin_pressed.connect(_on_heir_begin_pressed)
+	add_child(_will_screen)
 
 
 # ---------------------------------------------------------------------------
@@ -243,6 +306,46 @@ func _on_pop_requested() -> void:
 ## re-runs startup with no save present and so begins a fresh run.
 func _on_reset_requested() -> void:
 	SaveManager.delete_save_file()
+	get_tree().reload_current_scene()
+
+
+# ---------------------------------------------------------------------------
+# Succession — the prestige loop (Spec §9, GDD §13)
+# ---------------------------------------------------------------------------
+
+## Refresh the Plan-the-Estate button: enabled only when dying would convert to
+## at least 1 Legacy, and labeled with the Legacy it would yield right now.
+func _update_plan_button() -> void:
+	var can_succeed := dynasty.can_perform_succession()
+	_plan_button.disabled = not can_succeed
+	if can_succeed:
+		_plan_button.text = "PLAN THE ESTATE  (+%d Legacy)" % dynasty.projected_legacy_gain()
+	else:
+		_plan_button.text = "PLAN THE ESTATE"
+
+
+## Player opened the estate planner: show the will for the dying generation.
+func _on_plan_estate_pressed() -> void:
+	# Gated defensively even though the button is disabled when this is false.
+	if not dynasty.can_perform_succession():
+		return
+	var will := dynasty.get_draft_will()
+	_will_screen.show_will(will, HeirNames.dynasty_name(dynasty.generation))
+
+
+## Player signed the will: execute the death — bank Legacy, advance the
+## generation, raise the heir — then reveal who inherits.
+func _on_pass_on_confirmed() -> void:
+	dynasty.perform_succession()
+	_will_screen.show_heir_reveal(HeirNames.dynasty_name(dynasty.generation), dynasty.generation)
+
+
+## Player dismissed the heir reveal: persist the new dynasty state, then reload
+## the scene so the whole UI rebinds cleanly to the freshly-born generation
+## (the same proven path as startup). Reloading avoids hand-re-wiring every
+## property row, the wage panel, and the frenzy bar to the heir's new objects.
+func _on_heir_begin_pressed() -> void:
+	SaveManager.save_dict_to_file(dynasty.to_save_dict())
 	get_tree().reload_current_scene()
 
 

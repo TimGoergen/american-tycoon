@@ -40,6 +40,10 @@ var _milestone_label: Label
 var _buy_button: Button
 var _hire_button: Button
 
+## Set once when the property becomes staffed, so the faint-green restyle is applied
+## a single time rather than every frame (staffing is permanent).
+var _hire_staffed_styled := false
+
 
 ## Call before adding to the tree.
 func setup(p_index: int, prop: PropertyState, economy: EconomyState, frenzy: FrenzyState) -> void:
@@ -208,6 +212,14 @@ func _refresh(delta: float) -> void:
 	if _prop.is_staffed:
 		_hire_button.text = "STAFFED"
 		_hire_button.disabled = true
+		if not _hire_staffed_styled:
+			# Staffing is permanent; recolor the button a faint green once to signal
+			# the property is automated (instead of the default disabled cream).
+			var staffed_style := UiPalette.make_staffed_style()
+			_hire_button.add_theme_stylebox_override("disabled", staffed_style)
+			_hire_button.add_theme_stylebox_override("normal", staffed_style)
+			_hire_button.add_theme_color_override("font_disabled_color", UiPalette.NAVY)
+			_hire_staffed_styled = true
 	else:
 		var staff_cost := _prop.get_staff_cost()
 		_hire_button.text = "HIRE\n%s" % Money.of(staff_cost).display()
@@ -234,7 +246,9 @@ func _refresh_buy_button() -> void:
 			caption = "MAX ×%d" % count
 
 	if count <= 0:
-		_buy_button.text = "%s\n—" % caption
+		# MAX mode with nothing affordable yet: show the next single unit's cost so
+		# the player can see how close they are, instead of a blank "—".
+		_buy_button.text = "MAX\n%s" % Money.of(_prop.get_bulk_cost(1)).display()
 		_buy_button.disabled = true
 		return
 

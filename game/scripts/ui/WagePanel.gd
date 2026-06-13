@@ -23,10 +23,11 @@ var _frenzy: FrenzyState
 ## Accumulates held-down time on the clock-in button to pace auto-tap pulses.
 var _hold_accumulator := 0.0
 
-# Click impact: every wage tap (manual click OR auto-tap pulse while held) punches
-# the button — a quick scale+brighten that decays. Held down, it therefore pulses
-# at the auto-tap cadence, i.e. once per income tick. _impact runs 1→0; decaying
-# it in _process (instead of per-tap tweens) keeps rapid taps from piling up.
+# Click impact: every wage tap (manual click OR auto-tap pulse while held) flashes
+# the button — a quick brighten that decays. The button never changes size. Held
+# down, it pulses at the auto-tap cadence, i.e. once per income tick. _impact runs
+# 1→0; decaying it in _process (instead of per-tap tweens) keeps rapid taps from
+# piling up.
 const IMPACT_DECAY := 8.0
 var _impact := 0.0
 
@@ -161,16 +162,14 @@ func _pulse_impact() -> void:
 	_impact = 1.0
 
 
-## Render the click impact: a quick scale punch + warm brighten on the button that
-## decays to rest. Called every frame so held-down auto-taps re-trigger it at the
-## income cadence. Pivot is re-centered each frame in case the button has resized.
+## Render the click impact: a quick brighten flash on the button that decays to
+## rest. No scale change — the button never resizes. Called every frame so held-down
+## auto-taps re-trigger the flash at the income cadence.
 func _apply_impact(delta: float) -> void:
 	if _impact <= 0.0:
-		if _wage_meter.scale != Vector2.ONE:
-			_wage_meter.scale = Vector2.ONE
+		if _wage_meter.modulate != Color.WHITE:
 			_wage_meter.modulate = Color.WHITE
 		return
 	_impact = maxf(0.0, _impact - delta * IMPACT_DECAY)
-	_wage_meter.pivot_offset = _wage_meter.size / 2.0
-	_wage_meter.scale = Vector2.ONE * (1.0 + _impact * 0.05)
-	_wage_meter.modulate = Color.WHITE.lerp(Color(1.25, 1.18, 1.0), _impact)
+	# Brighten toward a warm near-white; modulate values > 1 brighten the render.
+	_wage_meter.modulate = Color.WHITE.lerp(Color(1.7, 1.6, 1.3), _impact)

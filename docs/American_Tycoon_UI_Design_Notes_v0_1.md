@@ -154,11 +154,11 @@ Art Style Guide.
   (Tim, 2026-06-13). Base rate `wage_hold_taps_per_second`; meant to be **scaled by Legacy
   upgrades** later. Auto-taps fill frenzy at the reduced hold factor (like held property
   rushes — holding is convenient, deliberate tapping stays superior).
-- **Click impact (Tim, 2026-06-13).** Every wage tap punches the button — a quick
-  scale + warm brighten that decays (`IMPACT_DECAY`). While held, the same cue fires on
-  each auto-tap pulse, so it visibly beats at the income-generation cadence. (The button's
-  styleboxes are transparent so the gold meter shows through; this punch is its only press
-  feedback.)
+- **Click impact (Tim, 2026-06-13).** Every wage tap **flashes** the button — a quick
+  brighten that decays (`IMPACT_DECAY`). **No size change** (Tim: the button must not
+  resize). While held, the same flash fires on each auto-tap pulse, so it visibly beats at
+  the income-generation cadence. (The button's styleboxes are transparent so the gold meter
+  shows through; this flash is its only press feedback.)
 
 ### Welcome-back overlay
 -

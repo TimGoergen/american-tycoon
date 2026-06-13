@@ -21,6 +21,22 @@ var frenzy: FrenzyState
 ## (Spec §9.4). Monotonic — only ever rises within a generation.
 var peak_net_worth: float = 0.0
 
+## Smoothed "effective" income/sec — an exponential moving average of ACTUAL cash
+## inflow (property completions + wage taps, frenzy included). Unlike the theoretical
+## per-property rate, this rises while the player is actively rushing/tapping and
+## settles back to the passive rate when idle, so the headline stat reflects what
+## they are really earning right now. Display-only.
+var effective_income_per_sec: float = 0.0
+
+## Time constant (seconds) for the effective-income average — how fast it tracks a
+## change in earning rate. ~1.5s reads as live without being jittery.
+const EFFECTIVE_INCOME_TAU := 1.5
+
+# Wage earned since the last tick (taps fire between ticks); folded into the
+# effective-income average on the next tick, then cleared.
+var _wage_earned_since_tick: float = 0.0
+var _effective_seeded := false
+
 
 func _init(property_configs: Array, titles: Array, p_tuning: TuningConfig) -> void:
 	tuning = p_tuning
@@ -41,6 +57,23 @@ func tick(delta: float, extra_property_multiplier: float = 1.0) -> void:
 	frenzy.tick(delta)
 	economy.tick(delta, frenzy.get_multiplier() * extra_property_multiplier)
 	peak_net_worth = maxf(peak_net_worth, economy.get_net_worth())
+	_update_effective_income(delta)
+
+
+## Fold this tick's actual cash inflow (property income + wage taps since the last
+## tick) into the smoothed effective income/sec. Seeded once to the theoretical
+## running rate so the stat doesn't visibly ramp up from zero on load.
+func _update_effective_income(delta: float) -> void:
+	if delta <= 0.0:
+		return
+	var inflow := economy.income_this_tick + _wage_earned_since_tick
+	_wage_earned_since_tick = 0.0
+	if not _effective_seeded:
+		effective_income_per_sec = economy.get_total_income_per_sec()
+		_effective_seeded = true
+	var instantaneous := inflow / delta
+	var alpha := 1.0 - exp(-delta / EFFECTIVE_INCOME_TAU)
+	effective_income_per_sec += (instantaneous - effective_income_per_sec) * alpha
 
 
 # ---------------------------------------------------------------------------
@@ -50,7 +83,9 @@ func tick(delta: float, extra_property_multiplier: float = 1.0) -> void:
 ## Layer 1: tap the wage button. Pays the current title's wage immediately.
 func tap_wage() -> void:
 	frenzy.on_tap()
-	economy.award_cash(wage.tap_wage(frenzy.get_multiplier()))
+	var earned := wage.tap_wage(frenzy.get_multiplier())
+	economy.award_cash(earned)
+	_wage_earned_since_tick += earned
 
 
 ## Layer 1 auto-tap: one held "clock in" pulse. Earns the wage in full (it is
@@ -59,7 +94,9 @@ func tap_wage() -> void:
 ## (Spec §7). The pulse rate lives in the UI (WagePanel), upgrade-scalable later.
 func hold_tap_wage() -> void:
 	frenzy.on_tap(tuning.frenzy_fill_hold_factor)
-	economy.award_cash(wage.tap_wage(frenzy.get_multiplier()))
+	var earned := wage.tap_wage(frenzy.get_multiplier())
+	economy.award_cash(earned)
+	_wage_earned_since_tick += earned
 
 
 ## Layer 2: tap a property. Starts the cycle if idle, rushes it if running.

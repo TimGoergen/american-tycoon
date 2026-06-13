@@ -106,6 +106,13 @@ Art Style Guide.
 -
 
 ### Income/sec hero ticket
+- **Effective income/sec, not just passive (Tim, 2026-06-13).** The headline income/sec
+  should reflect what the player is *actually earning right now* across all inputs — active
+  rushing (which completes cycles faster), wage taps, frenzy — not only the passive rate.
+  Implemented as `GameState.effective_income_per_sec`: an exponential moving average
+  (τ≈1.5s) of real cash inflow per tick (property completions + wage taps, frenzy included).
+  Rises while active, settles back to passive when idle. This also reconciles the "holding
+  rush gives ~10× money" report — the money was correct; the stat just wasn't showing it.
 - **Reflect frenzy in the income readout.** When a frenzy is active, the income/sec
   displays (hero ticket + each property row) should show the boosted rate, not the base
   rate (Tim, 2026-06-13). *Interpretation note:* Tim's words were "reflect the changes to

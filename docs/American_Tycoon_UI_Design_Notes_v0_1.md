@@ -133,6 +133,10 @@ Art Style Guide.
 - **Color treatment** — the button background is **dark gold**; a **bright gold bar** fills
   that space left-to-right as a progress fill, so the button itself reads as the progress
   meter (no separate bar). Fill fraction = progress toward the next promotion.
+- **Hold to auto-clock-in** — holding the button auto-taps the wage at a configurable rate
+  (Tim, 2026-06-13). Base rate `wage_hold_taps_per_second`; meant to be **scaled by Legacy
+  upgrades** later. Auto-taps fill frenzy at the reduced hold factor (like held property
+  rushes — holding is convenient, deliberate tapping stays superior).
 
 ### Welcome-back overlay
 -

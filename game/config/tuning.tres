@@ -8,6 +8,7 @@ logic_hz = 10
 m1_starting_cash = 1000.0
 rush_pct = 0.1
 hold_rush_per_second = 5.0
+wage_hold_taps_per_second = 5.0
 frenzy_fill_hold_factor = 0.6
 cycle_floor = 1.0
 band_step = 1.15

@@ -53,6 +53,15 @@ func tap_wage() -> void:
 	economy.award_cash(wage.tap_wage(frenzy.get_multiplier()))
 
 
+## Layer 1 auto-tap: one held "clock in" pulse. Earns the wage in full (it is
+## honest money) but fills frenzy at the reduced hold factor, exactly like held
+## property rushes — holding is convenient, so deliberate tapping stays superior
+## (Spec §7). The pulse rate lives in the UI (WagePanel), upgrade-scalable later.
+func hold_tap_wage() -> void:
+	frenzy.on_tap(tuning.frenzy_fill_hold_factor)
+	economy.award_cash(wage.tap_wage(frenzy.get_multiplier()))
+
+
 ## Layer 2: tap a property. Starts the cycle if idle, rushes it if running.
 func tap_property(prop_index: int) -> void:
 	frenzy.on_tap()

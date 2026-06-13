@@ -24,18 +24,26 @@ var _frenzy: FrenzyState
 var _hold_accumulator := 0.0
 
 # Click impact: every wage tap (manual click OR auto-tap pulse while held) flashes
-# the button — a quick brighten that decays. The button never changes size. Held
-# down, it pulses at the auto-tap cadence, i.e. once per income tick. _impact runs
-# 1→0; decaying it in _process (instead of per-tap tweens) keeps rapid taps from
-# piling up. The flash lightens the gold toward white — a brighter shade of the
-# SAME gold, not a tint toward a different yellow — and touches only the gold
-# plate, so the navy border and label stay put.
-const IMPACT_DECAY := 8.0
+# the button between two discrete colors — the gold plate snaps to a brighter gold
+# for a brief fixed moment, then snaps straight back. There is no easing or decay
+# ramp: the plate is only ever the base gold or the brighter gold, never a shade
+# between (Tim's call — a smooth decay read as a pulse). The button never changes
+# size. The flash lightens the gold toward white — a brighter shade of the SAME
+# gold, not a tint toward a different yellow — and touches only the gold plate, so
+# the navy border and label stay put. Held down, it re-arms at the auto-tap
+# cadence, i.e. once per income tick.
 
-## How far the gold is lightened toward white at the peak of a flash (0 = none,
-## 1 = pure white). Modest, so the flash reads as "brighter gold", not "blown out".
+## How long the brighter-gold flash stays on per tap, in seconds. Short, so it
+## reads as a crisp blink rather than a pulse.
+const FLASH_DURATION := 0.05
+
+## How far the gold is lightened toward white during a flash (0 = none, 1 = pure
+## white). Applied as a single discrete shade, never ramped.
 const FLASH_LIGHTEN := 0.45
-var _impact := 0.0
+
+## Seconds left in the current flash. >0 means show the brighter gold; 0 means show
+## the base gold. Counted down in _apply_impact.
+var _flash_remaining := 0.0
 
 # The meter's two gold plates — captured so the flash can lighten them in place and
 # restore them. Their unflashed colors are remembered in *_base.
@@ -178,22 +186,32 @@ func _pump_auto_tap(delta: float) -> void:
 		_pulse_impact()  # same visual cue as a manual click, once per income tick
 
 
-## Kick the click-impact to full; _apply_impact decays it back to rest.
+## Start a flash: snap the gold to its brighter shade now and arm the countdown
+## that _apply_impact uses to snap it back. Re-arming on every tap keeps held-down
+## auto-taps blinking at the income cadence.
 func _pulse_impact() -> void:
-	_impact = 1.0
+	_flash_remaining = FLASH_DURATION
+	_set_flashed(true)
 
 
-## Render the click impact: a quick brighten of the gold plate that decays back to
-## rest. Lightening the SAME gold toward white keeps its hue — a brighter shade, not
-## a different yellow. No scale change (the button never resizes), and called every
-## frame so held-down auto-taps re-trigger the flash at the income cadence.
+## Count the flash down and snap the gold back to rest the instant it expires.
+## There is no interpolation — the plate is only ever the base gold or the brighter
+## gold, never a shade between (Tim's call: no transition states).
 func _apply_impact(delta: float) -> void:
-	if _impact <= 0.0:
-		if _fill_style.bg_color != _fill_base:
-			_fill_style.bg_color = _fill_base
-			_track_style.bg_color = _track_base
+	if _flash_remaining <= 0.0:
 		return
-	_impact = maxf(0.0, _impact - delta * IMPACT_DECAY)
-	var amount := _impact * FLASH_LIGHTEN
-	_fill_style.bg_color = _fill_base.lightened(amount)
-	_track_style.bg_color = _track_base.lightened(amount)
+	_flash_remaining = maxf(0.0, _flash_remaining - delta)
+	if _flash_remaining <= 0.0:
+		_set_flashed(false)
+
+
+## Swap both gold plates between their base color and the brighter flashed shade.
+## Lightening the SAME gold toward white keeps its hue — a brighter shade, not a
+## different yellow. No scale change (the button never resizes).
+func _set_flashed(on: bool) -> void:
+	if on:
+		_fill_style.bg_color = _fill_base.lightened(FLASH_LIGHTEN)
+		_track_style.bg_color = _track_base.lightened(FLASH_LIGHTEN)
+	else:
+		_fill_style.bg_color = _fill_base
+		_track_style.bg_color = _track_base

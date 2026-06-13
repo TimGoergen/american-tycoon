@@ -51,7 +51,9 @@ func _process(delta: float) -> void:
 
 	# Reflect the active frenzy multiplier in the headline income/sec so the hero
 	# stat jumps during a burn (frenzy boosts income at payment — Spec §7).
-	_hero_stat.set_income_per_sec(game.economy.get_total_income_per_sec() * game.frenzy.get_multiplier())
+	# Effective rate (EMA of actual inflow — rushing, wage taps, frenzy all included),
+	# so the headline reflects what the player is earning right now, not just passively.
+	_hero_stat.set_income_per_sec(game.effective_income_per_sec)
 	_hero_stat.set_cash(game.economy.cash)
 	_hero_stat.set_frenzy_glow(game.frenzy.get_multiplier() > 1.0)
 

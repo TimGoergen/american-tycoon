@@ -6,8 +6,8 @@
 script = ExtResource("1")
 property_id = 8
 display_name = "Flipping Houses"
-base_cost = 974358550.0
+base_cost = 42000000.0
 r0 = 1.07
-base_income_per_unit = 204800.0
-base_cycle_length = 128.0
+base_income_per_unit = 20000000.0
+base_cycle_length = 22.0
 staffer_name = "Property Manager"

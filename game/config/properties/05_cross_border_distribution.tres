@@ -6,8 +6,8 @@
 script = ExtResource("1")
 property_id = 5
 display_name = "Cross Border Distribution"
-base_cost = 732050.0
+base_cost = 120000.0
 r0 = 1.07
-base_income_per_unit = 3200.0
-base_cycle_length = 16.0
+base_income_per_unit = 60000.0
+base_cycle_length = 8.0
 staffer_name = "Logistics Director"

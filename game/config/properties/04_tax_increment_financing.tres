@@ -6,8 +6,8 @@
 script = ExtResource("1")
 property_id = 4
 display_name = "Tax Increment Financing"
-base_cost = 66550.0
+base_cost = 17500.0
 r0 = 1.07
-base_income_per_unit = 800.0
-base_cycle_length = 8.0
+base_income_per_unit = 7500.0
+base_cycle_length = 5.0
 staffer_name = "Tax Strategist"

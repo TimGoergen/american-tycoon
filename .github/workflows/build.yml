@@ -3,7 +3,9 @@
 # Cloned from the proven Critter Quitters pipeline (same Godot version, same
 # runner quirks and workarounds — see the inline comments carried over).
 #
-# Triggered on every push to main and feature/** branches, and on manual runs.
+# Triggered on every push to ANY branch, and on manual runs. Every push produces
+# a signed Android APK and pushes it to Firebase App Distribution, so any commit
+# is installable on the phone — regardless of branch name.
 # Produces a Windows installer (.exe via Inno Setup) and a signed Android APK,
 # then creates a GitHub pre-release tagged with the short commit SHA (main only).
 #
@@ -23,7 +25,7 @@ name: Build & Deploy
 
 on:
   push:
-    branches: [main, 'feature/**']
+    branches: ['**']   # every branch — each push builds and ships to the phone via Firebase
   workflow_dispatch:
 
 env:

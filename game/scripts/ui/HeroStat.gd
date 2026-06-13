@@ -16,11 +16,20 @@ var _cash_label: Label
 var _delta_label: Label
 var _delta_timer := 0.0
 
+# Frenzy glow: while a burn is active the ticket pulses toward red to signal the
+# accelerated state. Subtle — navy numerals stay readable over the tint.
+const GLOW_PULSE_HZ := 2.5
+const GLOW_MAX_TINT := 0.30
+var _panel_style: StyleBoxFlat
+var _frenzy_glow := false
+var _glow_time := 0.0
+
 
 func _ready() -> void:
 	var style := UiPalette.make_panel_style()
 	style.border_color = UiPalette.KETCHUP_RED  # the red ticket frame (§8)
 	add_theme_stylebox_override("panel", style)
+	_panel_style = style  # kept so the frenzy glow can pulse its background
 
 	var column := VBoxContainer.new()
 	add_child(column)
@@ -63,6 +72,11 @@ func set_cash(cash: float) -> void:
 	_cash_label.text = "Cash: " + Money.of(cash).display()
 
 
+## Toggle the frenzy glow. Main drives this from the live frenzy state each frame.
+func set_frenzy_glow(active: bool) -> void:
+	_frenzy_glow = active
+
+
 ## Announce a purchase: stamp the ticket and flash the income/sec delta.
 func flash_purchase(ips_before: float, ips_after: float) -> void:
 	if ips_before > 0.0:
@@ -79,6 +93,16 @@ func _process(delta: float) -> void:
 		_delta_timer -= delta
 		if _delta_timer <= 0.0:
 			_delta_label.visible = false
+
+	# Frenzy glow: pulse the ticket background between cream and a soft red while
+	# a burn is active; snap back to plain cream the moment it ends.
+	if _frenzy_glow:
+		_glow_time += delta
+		var pulse := 0.5 + 0.5 * sin(_glow_time * TAU * GLOW_PULSE_HZ)
+		_panel_style.bg_color = UiPalette.CREAM.lerp(UiPalette.KETCHUP_RED, pulse * GLOW_MAX_TINT)
+	elif _panel_style.bg_color != UiPalette.CREAM:
+		_glow_time = 0.0
+		_panel_style.bg_color = UiPalette.CREAM
 
 
 ## The hard stamp: scale up and straight back down, no easing curves —

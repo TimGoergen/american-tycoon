@@ -111,7 +111,15 @@ Art Style Guide.
   rate (Tim, 2026-06-13). *Interpretation note:* Tim's words were "reflect the changes to
   costs," but frenzy is an income multiplier (Spec §7), not a cost modifier — so this was
   read as "income values." Implemented by multiplying the displayed income/sec by
-  `frenzy.get_multiplier()` (1.0 when no burn). If "costs" meant something else, flag it.
+  `frenzy.get_multiplier()` (1.0 when no burn).
+- **All temporarily-boosted values reflect the burn (Tim, 2026-06-13).** Extended to every
+  number frenzy actually multiplies: income/sec (hero + rows) AND the wage **"$X / tap"** on
+  the clock-in button (wage is paid `wage_per_tap × multiplier`). Values frenzy does NOT
+  change stay put by design: buy/hire/tuition **costs** and the **cash balance** (frenzy is
+  an income multiplier, not a cost or balance modifier — Spec §7).
+- **Frenzy glow (Tim, 2026-06-13).** While a frenzy burn is active, the income ticket
+  pulses its background toward red (subtle, ~2.5 Hz, up to 30% tint) to signal the
+  accelerated state. Snaps back to plain cream when the burn ends.
 
 ### Frenzy bar
 -
@@ -146,6 +154,11 @@ Art Style Guide.
   (Tim, 2026-06-13). Base rate `wage_hold_taps_per_second`; meant to be **scaled by Legacy
   upgrades** later. Auto-taps fill frenzy at the reduced hold factor (like held property
   rushes — holding is convenient, deliberate tapping stays superior).
+- **Click impact (Tim, 2026-06-13).** Every wage tap **flashes** the button — a quick
+  brighten that decays (`IMPACT_DECAY`). **No size change** (Tim: the button must not
+  resize). While held, the same flash fires on each auto-tap pulse, so it visibly beats at
+  the income-generation cadence. (The button's styleboxes are transparent so the gold meter
+  shows through; this flash is its only press feedback.)
 
 ### Welcome-back overlay
 -

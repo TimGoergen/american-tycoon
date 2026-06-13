@@ -53,6 +53,7 @@ func _process(delta: float) -> void:
 	# stat jumps during a burn (frenzy boosts income at payment — Spec §7).
 	_hero_stat.set_income_per_sec(game.economy.get_total_income_per_sec() * game.frenzy.get_multiplier())
 	_hero_stat.set_cash(game.economy.cash)
+	_hero_stat.set_frenzy_glow(game.frenzy.get_multiplier() > 1.0)
 
 
 func _notification(what: int) -> void:
@@ -159,7 +160,7 @@ func _build_ui() -> void:
 		_rows.append(row)
 
 	_wage_panel = WagePanel.new()
-	_wage_panel.setup(game.wage, game.economy, tuning)
+	_wage_panel.setup(game.wage, game.economy, tuning, game.frenzy)
 	_wage_panel.wage_tapped.connect(_on_wage_tapped)
 	_wage_panel.wage_hold_tapped.connect(_on_wage_hold_tapped)
 	_wage_panel.promotion_requested.connect(_on_promotion_requested)

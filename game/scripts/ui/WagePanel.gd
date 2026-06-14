@@ -39,8 +39,9 @@ var _hold_accumulator := 0.0
 const FLASH_DURATION := 0.05
 
 ## How far the gold is lightened toward white at the peak of a tap blink and at the
-## core of the gliding highlight band (0 = none, 1 = pure white).
-const FLASH_LIGHTEN := 0.25
+## core of the gliding highlight band (0 = none, 1 = pure white). High, so the
+## held sweep reads as a bright, intense band of light.
+const FLASH_LIGHTEN := 0.45
 
 ## Seconds for one full left→right→left glide of the held highlight band. Slow on
 ## purpose, so the held state reads as a calm sweep rather than a flicker.
@@ -55,11 +56,18 @@ const PULSE_RAMP_TAU := 0.18
 const SWEEP_WIDTH_FRACTION := 0.4
 
 ## Peak opacity of the highlight band at its center (it feathers to 0 at its edges).
-const SWEEP_PEAK_ALPHA := 0.55
+## Near-opaque, so the gliding band is bright and intense rather than a faint sheen.
+const SWEEP_PEAK_ALPHA := 0.9
 
 ## Inset (px) that keeps the highlight band inside the meter's navy frame; matches
 ## the frame thickness used in UiPalette.style_gold_progress.
 const SWEEP_FRAME_INSET := 8.0
+
+## Floating "+income" indicators: font size, how long each rises before vanishing,
+## and how far up it travels as a fraction of the meter's height.
+const INCOME_FLOAT_FONT_SIZE := 40
+const INCOME_FLOAT_DURATION := 0.9
+const INCOME_FLOAT_RISE_FRACTION := 0.5
 
 ## Seconds left in the current manual-tap blink. >0 means the blink is showing.
 var _flash_remaining := 0.0
@@ -143,7 +151,8 @@ func _ready() -> void:
 	_wage_button.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	_wage_button.pressed.connect(func() -> void:
 		wage_tapped.emit()
-		_pulse_impact())
+		_pulse_impact()
+		_spawn_income_float(_current_tap_income()))
 	_wage_meter.add_child(_wage_button)
 
 	# Compact context line (not enlarged): which title you hold and what's next.
@@ -231,12 +240,14 @@ func _pump_auto_tap(delta: float) -> void:
 	while _hold_accumulator >= pulse_interval:
 		_hold_accumulator -= pulse_interval
 		wage_hold_tapped.emit()
-		# No per-tap blink here: while held, the breathing pulse (see
-		# _update_plate_glow) is the active-state cue instead.
+		# No per-tap blink here: the gliding highlight (see _update_plate_glow) is
+		# the held-state cue. But each held pulse still earns income, so it gets the
+		# same floating "+income" indicator a manual tap does.
+		_spawn_income_float(_current_tap_income())
 
 
-## Arm a single brief manual-tap blink. The color itself is applied by
-## _update_plate_glow, which combines this blink with the held breathing pulse.
+## Arm a single brief manual-tap blink. The color itself is applied on the plate by
+## _update_plate_glow (the held glide is drawn separately by _draw_sweep).
 func _pulse_impact() -> void:
 	_flash_remaining = FLASH_DURATION
 
@@ -296,3 +307,54 @@ func _draw_sweep() -> void:
 		var x_right := clampf(x + slice_w + 1.0, x_min, x_max)
 		if x_right > x_left:
 			_sweep_overlay.draw_rect(Rect2(x_left, top, x_right - x_left, height), highlight)
+
+
+## The dollars one wage tap earns right now — the same figure WageState.tap_wage
+## pays (base wage × frenzy × the Old-Money Connections wage multiplier), floored.
+## Used to label the floating "+income" indicators.
+func _current_tap_income() -> float:
+	var title := _wage.get_current_title()
+	return floorf(title.wage_per_tap * _frenzy.get_multiplier() * _wage.wage_multiplier)
+
+
+## Spawn a small black "+income" label that rises from a slightly random spot and
+## drifts toward the right end of the button while fading out, then frees itself —
+## a per-tap progress flourish that fires on manual taps and held auto-taps alike.
+func _spawn_income_float(amount: float) -> void:
+	if amount <= 0.0:
+		return
+	var meter_size := _wage_meter.size
+	if meter_size.x <= 0.0 or meter_size.y <= 0.0:
+		return
+
+	var label := Label.new()
+	label.text = "+%s" % Money.of(amount).display()
+	label.add_theme_color_override("font_color", Color.BLACK)
+	label.add_theme_font_size_override("font_size", INCOME_FLOAT_FONT_SIZE)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_wage_meter.add_child(label)
+
+	# Start at a slightly random spot in the left-center of the button; end near the
+	# right edge, risen by INCOME_FLOAT_RISE_FRACTION of the button's height. The
+	# text width keeps the right-end target fully on the plate.
+	var text_width := ThemeDB.fallback_font.get_string_size(
+		label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, INCOME_FLOAT_FONT_SIZE
+	).x
+	var start_pos := Vector2(
+		randf_range(meter_size.x * 0.12, meter_size.x * 0.45),
+		randf_range(meter_size.y * 0.35, meter_size.y * 0.6)
+	)
+	var end_pos := Vector2(
+		maxf(start_pos.x, meter_size.x - SWEEP_FRAME_INSET - text_width - 6.0),
+		start_pos.y - meter_size.y * INCOME_FLOAT_RISE_FRACTION
+	)
+	label.position = start_pos
+
+	# Rise + drift right while fading, then free the label when the motion ends.
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(label, "position", end_pos, INCOME_FLOAT_DURATION) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(label, "modulate:a", 0.0, INCOME_FLOAT_DURATION) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tween.finished.connect(label.queue_free)

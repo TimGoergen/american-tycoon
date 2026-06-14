@@ -61,6 +61,11 @@ var _hire_button: Button
 ## a single time rather than every frame (staffing is permanent).
 var _hire_staffed_styled := false
 
+## Tracks which ownership look is currently applied so the panel/start-button
+## styleboxes are only rebuilt when ownership flips, not every frame.
+## -1 = not yet applied, 0 = owned (normal), 1 = unowned (gray).
+var _ownership_style_applied := -1
+
 
 ## Call before adding to the tree.
 func setup(p_index: int, prop: PropertyState, economy: EconomyState, frenzy: FrenzyState) -> void:
@@ -220,10 +225,15 @@ func _refresh(delta: float) -> void:
 	var config := _prop.config as PropertyConfig
 	_name_label.text = "%s  ×%d" % [config.display_name, _prop.units_owned]
 
+	# A rung the player owns no units of yet gets a drab gray "locked" look; once a
+	# unit is bought it switches to the normal cream styling (applied on change).
+	var owned := _prop.units_owned > 0
+	_apply_ownership_styling(owned)
+
 	# Keep the portrait circle square and as tall as this top section: its height is
 	# already stretched to the section by the layout, so we just match the width to it.
 	_manager_circle.custom_minimum_size.x = _manager_circle.size.y
-	_manager_circle.set_state(_prop.is_staffed, config.manager_portrait, config.staffer_name)
+	_manager_circle.set_state(_prop.is_staffed, config.manager_portrait, config.staffer_name, owned)
 	# Show the cash paid out each time the bar fills (per cycle), so the figure on
 	# screen matches what the player actually receives on a completion. During a
 	# frenzy burn that payout is multiplied at point of payment (Spec §7), so the
@@ -301,6 +311,22 @@ func _set_cycle_highlight(active: bool) -> void:
 	_showing_held_rush = active
 	var fill := UiPalette.MONEY_GREEN.lightened(HELD_RUSH_LIGHTEN) if active else UiPalette.MONEY_GREEN
 	UiPalette.style_progress_bar(_cycle_bar, fill)
+
+
+## Swap the row's panel background and START button between the normal cream look
+## (owned) and the drab gray "locked" look (no units owned yet). Only rebuilds the
+## styleboxes when the state actually flips, not every frame.
+func _apply_ownership_styling(owned: bool) -> void:
+	var want := 0 if owned else 1
+	if want == _ownership_style_applied:
+		return
+	_ownership_style_applied = want
+	if owned:
+		add_theme_stylebox_override("panel", UiPalette.make_panel_style())
+		UiPalette.style_button(_tap_button, false)
+	else:
+		add_theme_stylebox_override("panel", UiPalette.make_unowned_panel_style())
+		UiPalette.style_unowned_button(_tap_button)
 
 
 ## Update the buy button's caption, cost, and enabled state for the

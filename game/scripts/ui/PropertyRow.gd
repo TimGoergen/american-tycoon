@@ -43,6 +43,12 @@ var _last_true_cycle_fraction := 0.0
 ## While the player holds the rush button, the cycle bar fills in a brighter green
 ## to signal the active push. How far the green is lightened toward white (0 = none).
 const HELD_RUSH_LIGHTEN := 0.35
+
+## Time constant (seconds) for the cycle bar to ease up to a rush-jumped target.
+## A rush jumps the true progress forward in a discrete step (and held rushes fire
+## several times a second); easing toward that target instead of snapping to it
+## makes a held rush read as smooth acceleration rather than a stutter of jumps.
+const RUSH_CATCHUP_TAU := 0.12
 ## Tracks the current fill color so we only rebuild the stylebox on a change, not
 ## every frame (the same approach FrenzyBar uses for its burn-color swap).
 var _showing_held_rush := false
@@ -261,11 +267,16 @@ func _refresh(delta: float) -> void:
 		# the start rather than sliding backward.
 		_displayed_cycle_fraction = true_fraction
 	else:
-		# Running: advance at the real fill rate, and never let the bar lag behind the
-		# true value. taking the max means a rush (which jumps cycle_progress forward)
-		# pulls the bar up immediately instead of crawling to catch up.
+		# Running: advance at the real fill rate. If the true progress has jumped
+		# ahead of that prediction — a rush, or several per second while the rush
+		# button is held — ease the bar UP toward it instead of snapping, so a held
+		# rush reads as smooth acceleration rather than a stutter of discrete jumps.
 		var advanced := _displayed_cycle_fraction + delta / _prop.cycle_length
-		_displayed_cycle_fraction = clampf(maxf(advanced, true_fraction), 0.0, 1.0)
+		if true_fraction > advanced:
+			var catchup := 1.0 - exp(-delta / RUSH_CATCHUP_TAU)
+			_displayed_cycle_fraction = clampf(lerpf(advanced, true_fraction, catchup), 0.0, 1.0)
+		else:
+			_displayed_cycle_fraction = clampf(advanced, 0.0, 1.0)
 	_last_true_cycle_fraction = true_fraction
 	_cycle_bar.value = _displayed_cycle_fraction
 

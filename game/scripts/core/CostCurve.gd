@@ -26,22 +26,14 @@ static func get_ratio(r0: float, band: int, band_step: float) -> float:
 	return r0 * pow(band_step, band)
 
 
-## Snap a raw cost to a clean "round" number for display and charging — roughly two
-## significant figures, always zeroing the smallest digits — so the player never
-## sees prices like $53 or $1,247; they see $50, $1,200, etc. (Tim's call). Only the
-## per-unit cost a player actually pays is rounded; the geometric cost_product that
-## drives the curve is kept raw (see advance_cost_product), so the curve still
-## climbs smoothly underneath. Snapping a strictly-rising curve to a fixed grid
-## stays non-decreasing, so bulk costs never go backwards.
+## Snap a raw cost to the nearest $5 (Tim's call), so the player never sees odd
+## prices like $53 or $57 — costs land on clean multiples of five ($55, $375, …).
+## Only the per-unit cost a player actually pays is rounded; the geometric
+## cost_product that drives the curve is kept raw (see advance_cost_product), so
+## the curve still climbs smoothly underneath. Snapping a strictly-rising curve to
+## a fixed grid stays non-decreasing, so bulk costs never go backwards.
 static func round_nice(value: float) -> float:
-	if value < 10.0:
-		return floor(value)  # tiny opening costs: just whole dollars
-	# Number of digits − 1 (10s→1, 100s→2, …); the +epsilon guards exact powers of
-	# ten where float log returns e.g. 2.9999999 and would mis-round downward.
-	var magnitude := floori(log(value) / log(10.0) + 1e-9)
-	# Step zeroes all but the top ~2 digits, but never coarser than the nearest 10.
-	var step := pow(10.0, maxf(1.0, float(magnitude) - 1.0))
-	return snappedf(value, step)
+	return snappedf(value, 5.0)
 
 
 ## Cost to buy the next unit when `units_owned` are already owned.

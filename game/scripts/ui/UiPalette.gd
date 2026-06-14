@@ -16,6 +16,13 @@ const INK_NAVY := Color("#0D1830")
 const BRICK := Color("#8E2F1E")
 const PALE_GOLD := Color("#F0D49A")
 
+# Grays for the "not yet owned" property state — a deliberately drab, inactive
+# look so an unbought rung reads as locked next to the live cream rungs. A small
+# extension of the §1 palette for this one UI state, pending style-guide blessing.
+const LIGHT_GRAY := Color("#CBCBCB")  # unowned row background
+const MID_GRAY := Color("#9A9A9A")    # unowned borders
+const DARK_GRAY := Color("#6E6E6E")   # unowned start button + portrait circle
+
 
 ## Cream plate with a navy border — the standard card/panel (§8).
 static func make_panel_style() -> StyleBoxFlat:
@@ -39,6 +46,25 @@ static func style_button(button: Button, is_action: bool) -> void:
 	button.add_theme_color_override("font_hover_color", label_color)
 	button.add_theme_color_override("font_pressed_color", NAVY)
 	button.add_theme_color_override("font_disabled_color", Color(NAVY, 0.45))
+
+
+## Light-gray plate with a mid-gray border — the background for a property rung
+## the player does not own any units of yet (reads as locked/inactive).
+static func make_unowned_panel_style() -> StyleBoxFlat:
+	return _make_plate(LIGHT_GRAY, MID_GRAY)
+
+
+## Style a button as the drab dark-gray "unowned" control (the START button on a
+## rung the player doesn't own yet). All states share the one gray plate so the
+## disabled button still reads as gray rather than the default cream.
+static func style_unowned_button(button: Button) -> void:
+	var plate := _make_plate(DARK_GRAY, MID_GRAY)
+	button.add_theme_stylebox_override("normal", plate)
+	button.add_theme_stylebox_override("hover", plate)
+	button.add_theme_stylebox_override("pressed", plate)
+	button.add_theme_stylebox_override("disabled", plate)
+	button.add_theme_color_override("font_color", CREAM)
+	button.add_theme_color_override("font_disabled_color", CREAM)
 
 
 ## Teal track with a fill in the given color (§8: sliders and meters).

@@ -26,13 +26,18 @@ signal purchased(upgrade_id: String)
 signal closed
 
 
-# Type sizes — large for at-a-glance phone reading (UI notes §1).
-const TITLE_SIZE   := 40
-const WALLET_SIZE  := 30
-const CATEGORY_SIZE := 24
-const CARD_NAME_SIZE := 26
-const CARD_BODY_SIZE := 20
-const BUTTON_SIZE  := 22
+# Type sizes — large for at-a-glance phone reading (UI notes §1). Enlarged 2.2×
+# from the first pass (Tim's call) so the whole page reads big at arm's length.
+const TITLE_SIZE   := 88
+const WALLET_SIZE  := 66
+const CATEGORY_SIZE := 53
+const CARD_NAME_SIZE := 57
+const CARD_BODY_SIZE := 44
+const BUTTON_SIZE  := 48
+
+## Top inset (in the 1080×1920 design space) that pushes the header row clear of
+## the phone's front camera cut-out, so the title and Legacy readout aren't hidden.
+const CAMERA_CUTOUT_INSET := 130
 
 # The live upgrade/wallet state this shop reads and spends from.
 var _upgrades: LegacyUpgrades
@@ -70,7 +75,8 @@ func _build_ui() -> void:
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
 	margin.add_theme_constant_override("margin_left", 20)
 	margin.add_theme_constant_override("margin_right", 20)
-	margin.add_theme_constant_override("margin_top", 20)
+	# Extra top inset clears the phone's camera cut-out (see CAMERA_CUTOUT_INSET).
+	margin.add_theme_constant_override("margin_top", CAMERA_CUTOUT_INSET)
 	margin.add_theme_constant_override("margin_bottom", 20)
 	add_child(margin)
 
@@ -78,22 +84,29 @@ func _build_ui() -> void:
 	column.add_theme_constant_override("separation", 12)
 	margin.add_child(column)
 
-	# ── Title + wallet ──
+	# ── Header row: "Estate Planning" pinned left, Legacy readout pinned right ──
+	var header_row := HBoxContainer.new()
+	column.add_child(header_row)
+
 	var title := Label.new()
-	title.text = "THE ESTATE OFFICE"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.text = "Estate Planning"
+	# Expand fill pushes the title to the left edge and the wallet to the right.
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	title.add_theme_color_override("font_color", UiPalette.NAVY)
 	title.add_theme_font_size_override("font_size", TITLE_SIZE)
-	column.add_child(title)
+	header_row.add_child(title)
 
 	_wallet_label = Label.new()
-	_wallet_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_wallet_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_wallet_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_wallet_label.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD)
 	# Faux-bold via a same-color outline, matching the project's plate aesthetic.
 	_wallet_label.add_theme_color_override("font_outline_color", UiPalette.MUSTARD_GOLD)
-	_wallet_label.add_theme_constant_override("outline_size", 2)
+	_wallet_label.add_theme_constant_override("outline_size", 4)
 	_wallet_label.add_theme_font_size_override("font_size", WALLET_SIZE)
-	column.add_child(_wallet_label)
+	header_row.add_child(_wallet_label)
 
 	# ── Scrollable list of upgrade cards (grouped by category) ──
 	# Takes all the leftover height between the wallet readout and the close
@@ -124,8 +137,8 @@ func _build_ui() -> void:
 	# ── Close button ──
 	var close_button := Button.new()
 	close_button.text = "BACK TO THE EMPIRE"
-	close_button.custom_minimum_size = Vector2(0, 72)
-	close_button.add_theme_font_size_override("font_size", 26)
+	close_button.custom_minimum_size = Vector2(0, 158)
+	close_button.add_theme_font_size_override("font_size", 57)
 	UiPalette.style_button(close_button, false)
 	close_button.pressed.connect(_on_close_pressed)
 	column.add_child(close_button)
@@ -191,7 +204,7 @@ func _add_upgrade_card(parent: VBoxContainer, definition: Dictionary) -> void:
 	bottom_row.add_child(effect_label)
 
 	var buy_button := Button.new()
-	buy_button.custom_minimum_size = Vector2(200, 56)
+	buy_button.custom_minimum_size = Vector2(440, 123)
 	buy_button.add_theme_font_size_override("font_size", BUTTON_SIZE)
 	UiPalette.style_button(buy_button, true)  # red: this is a spend action
 	# bind(id) passes which upgrade this button buys to the shared handler.
@@ -217,7 +230,8 @@ func open() -> void:
 
 ## Re-read the live state and update the wallet readout and every card.
 func refresh() -> void:
-	_wallet_label.text = "Legacy to spend: %d" % _upgrades.available
+	# Short label so it fits beside the large title on the header row.
+	_wallet_label.text = "Legacy: %d" % _upgrades.available
 
 	for definition in LegacyUpgradeCatalog.all():
 		var id := String(definition["id"])

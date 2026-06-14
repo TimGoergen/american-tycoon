@@ -17,13 +17,18 @@ const OUTLINE_WIDTH := 2.0
 var _staffed := false
 var _portrait: Texture2D
 var _initial := ""
+## True when the property has no units bought yet; draws the circle a drab dark
+## gray to match the locked/unowned look of its row.
+var _owned := true
 
 
 ## Tell the circle what to show. Called by PropertyRow whenever the row refreshes.
-func set_state(staffed: bool, portrait: Texture2D, manager_name: String) -> void:
+## `owned` is false for a rung the player hasn't bought any units of yet.
+func set_state(staffed: bool, portrait: Texture2D, manager_name: String, owned: bool = true) -> void:
 	_staffed = staffed
 	_portrait = portrait
 	_initial = manager_name.substr(0, 1).to_upper() if manager_name != "" else ""
+	_owned = owned
 	queue_redraw()
 
 
@@ -31,6 +36,13 @@ func _draw() -> void:
 	# The circle is inscribed in the (square) control rect.
 	var radius := minf(size.x, size.y) / 2.0
 	var center := size / 2.0
+
+	if not _owned:
+		# Unowned rung: a filled dark-gray disc with a mid-gray ring, so the
+		# portrait slot reads as inactive alongside the gray row background.
+		draw_circle(center, radius - OUTLINE_WIDTH, UiPalette.DARK_GRAY)
+		draw_arc(center, radius - OUTLINE_WIDTH, 0.0, TAU, 64, UiPalette.MID_GRAY, OUTLINE_WIDTH, true)
+		return
 
 	if not _staffed:
 		# Empty slot: just the outline ring, interior left clear.

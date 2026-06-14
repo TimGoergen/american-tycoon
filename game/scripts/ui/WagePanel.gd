@@ -40,13 +40,12 @@ var _hold_accumulator := 0.0
 const FLASH_DURATION := 0.05
 
 ## How far the gold is lightened toward white at the peak of a tap blink or the
-## breathing pulse (0 = none, 1 = pure white). Kept subtle — a brighter value read
-## as a strobe (Tim's call: about a quarter of the old 0.45).
-const FLASH_LIGHTEN := 0.11
+## breathing pulse (0 = none, 1 = pure white).
+const FLASH_LIGHTEN := 0.25
 
 ## Seconds for one full breathe-in-and-out of the held pulse. Slow on purpose, so
 ## the held state reads as a calm wave rather than a flicker.
-const PULSE_PERIOD := 1.2
+const PULSE_PERIOD := 2.0
 
 ## How quickly the breathing pulse ramps in when held and fades out when released,
 ## as a smoothing time constant in seconds — small enough to feel responsive,

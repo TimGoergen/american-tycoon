@@ -63,11 +63,17 @@ const SWEEP_PEAK_ALPHA := 0.9
 ## the frame thickness used in UiPalette.style_gold_progress.
 const SWEEP_FRAME_INSET := 8.0
 
-## Floating "+income" indicators: font size, how long each rises before vanishing,
-## and how far up it travels as a fraction of the meter's height.
+## Floating "+income" indicators that rise off the button on each earning tap.
+## They originate at the button's vertical center, INCOME_FLOAT_RIGHT_FRACTION of
+## the width in from the right edge (± INCOME_FLOAT_ORIGIN_JITTER px of random
+## spread), then float up while swaying gently side to side and fading out.
 const INCOME_FLOAT_FONT_SIZE := 40
 const INCOME_FLOAT_DURATION := 0.9
-const INCOME_FLOAT_RISE_FRACTION := 0.5
+const INCOME_FLOAT_RISE_FRACTION := 0.7    # how far up it travels (× button height)
+const INCOME_FLOAT_RIGHT_FRACTION := 0.15  # origin distance in from the right edge
+const INCOME_FLOAT_ORIGIN_JITTER := 5.0    # px of random spread on the origin x
+const INCOME_FLOAT_SWAY := 8.0             # px amplitude of the side-to-side wave
+const INCOME_FLOAT_WAVES := 1.5            # full side-to-side waves over the rise
 
 ## Seconds left in the current manual-tap blink. >0 means the blink is showing.
 var _flash_remaining := 0.0
@@ -334,27 +340,32 @@ func _spawn_income_float(amount: float) -> void:
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_wage_meter.add_child(label)
 
-	# Start at a slightly random spot in the left-center of the button; end near the
-	# right edge, risen by INCOME_FLOAT_RISE_FRACTION of the button's height. The
-	# text width keeps the right-end target fully on the plate.
-	var text_width := ThemeDB.fallback_font.get_string_size(
+	# Origin: the button's vertical center, INCOME_FLOAT_RIGHT_FRACTION of the width
+	# in from the right edge, with a few px of random spread on x. The label is
+	# centered on that point (its `position` is the top-left corner).
+	var text_size := ThemeDB.fallback_font.get_string_size(
 		label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, INCOME_FLOAT_FONT_SIZE
-	).x
-	var start_pos := Vector2(
-		randf_range(meter_size.x * 0.12, meter_size.x * 0.45),
-		randf_range(meter_size.y * 0.35, meter_size.y * 0.6)
 	)
-	var end_pos := Vector2(
-		maxf(start_pos.x, meter_size.x - SWEEP_FRAME_INSET - text_width - 6.0),
-		start_pos.y - meter_size.y * INCOME_FLOAT_RISE_FRACTION
-	)
-	label.position = start_pos
+	var origin_x := meter_size.x * (1.0 - INCOME_FLOAT_RIGHT_FRACTION) \
+		+ randf_range(-INCOME_FLOAT_ORIGIN_JITTER, INCOME_FLOAT_ORIGIN_JITTER)
+	var origin := Vector2(origin_x - text_size.x * 0.5, meter_size.y * 0.5 - text_size.y * 0.5)
+	label.position = origin
 
-	# Rise + drift right while fading, then free the label when the motion ends.
+	# Drive rise + gentle side-to-side sway + fade per frame from a 0→1 tween, then
+	# free the label (a sine sway can't be expressed as a plain property tween).
 	var tween := create_tween()
-	tween.set_parallel(true)
-	tween.tween_property(label, "position", end_pos, INCOME_FLOAT_DURATION) \
-		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tween.tween_property(label, "modulate:a", 0.0, INCOME_FLOAT_DURATION) \
-		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tween.tween_method(
+		func(t: float) -> void: _animate_income_float(label, origin, t),
+		0.0, 1.0, INCOME_FLOAT_DURATION
+	)
 	tween.finished.connect(label.queue_free)
+
+
+## Per-frame placement for a rising "+income" float; `t` runs 0→1 over its life.
+## It floats straight up by INCOME_FLOAT_RISE_FRACTION of the button height while
+## swaying gently side to side (a low-amplitude sine) and fading to transparent.
+func _animate_income_float(label: Label, origin: Vector2, t: float) -> void:
+	var rise := _wage_meter.size.y * INCOME_FLOAT_RISE_FRACTION
+	var sway := sin(t * TAU * INCOME_FLOAT_WAVES) * INCOME_FLOAT_SWAY
+	label.position = Vector2(origin.x + sway, origin.y - rise * t)
+	label.modulate.a = 1.0 - t

@@ -88,7 +88,8 @@ func get_max_affordable(available_cash: float, cap: int = 1000) -> int:
 	while count < cap:
 		var band := CostCurve.get_band(owned + 1)
 		var ratio := CostCurve.get_ratio(config.r0, band, tuning.band_step)
-		var unit_cost := floorf(config.base_cost * running_product * ratio)
+		# Match the rounded price the player is actually charged (see CostCurve).
+		var unit_cost := CostCurve.round_nice(config.base_cost * running_product * ratio)
 		if remaining < unit_cost:
 			break
 		remaining -= unit_cost
@@ -157,8 +158,9 @@ func get_staff_cost() -> float:
 		prod *= CostCurve.get_ratio(config.r0, b, tuning.band_step)
 	# floorf (not floor) — floor() returns Variant, which breaks := type inference.
 	var unit_20_cost := floorf(config.base_cost * prod * band1_ratio)
-	# The Legacy "Loyal Staff" upgrade discounts hiring (multiplier ≤ 1.0).
-	return floorf(unit_20_cost * 50.0 * staff_cost_multiplier)
+	# The Legacy "Loyal Staff" upgrade discounts hiring (multiplier ≤ 1.0). Round the
+	# final hire price to a clean number too, matching the property purchase costs.
+	return CostCurve.round_nice(unit_20_cost * 50.0 * staff_cost_multiplier)
 
 
 # ---------------------------------------------------------------------------

@@ -12,9 +12,10 @@ extends Resource
 
 # --- Run start ---
 
-## Starting cash for a fresh run (GDD §8.1 "No rich parents" path).
-## The full origin flow with all four paths arrives in M2.
-@export var m1_starting_cash: float = 100.0
+## Starting cash for a fresh run. Intentionally $0 (Tim's call): the player taps
+## the "clock in" wage button to earn the cash for their first property, even
+## though that doesn't track thematically. The full origin flow arrives in M2.
+@export var m1_starting_cash: float = 0.0
 
 # --- Cost curve (Spec §3.2) ---
 

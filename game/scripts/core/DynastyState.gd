@@ -83,10 +83,15 @@ func get_draft_will() -> Dictionary:
 		tuning.estate_exemption_base,
 		tuning.estate_tax_rate_base
 	)
+	# Legacy is earned only on wealth the generation BUILT: the seed cash every heir
+	# is handed (starting capital + Trust Fund) is excluded, so granted money can
+	# never be converted into Legacy. The seed is far below one point early on, so
+	# this is what makes the first Legacy point take real playtime to reach.
+	var built_estate := maxf(0.0, will["estate_net"] - current.economy.starting_cash)
 	# Base estate→Legacy conversion, then the "Estate Lawyers" upgrade boosts the
 	# yield. Floor after the multiplier so Legacy stays a whole number.
 	var base_gain := EstateWaterfall.legacy_gain(
-		will["estate_net"], tuning.k_legacy, tuning.alpha_legacy
+		built_estate, tuning.k_legacy, tuning.alpha_legacy
 	)
 	will["legacy_gain"] = int(floor(float(base_gain) * upgrades.legacy_yield_multiplier()))
 	return will
@@ -132,7 +137,13 @@ func perform_succession() -> Dictionary:
 ## state. Property income is multiplied at tick time, not seeded as cash.
 func _new_generation() -> GameState:
 	var heir := GameState.new(_property_configs, _title_configs, tuning)
-	heir.economy.award_cash(tuning.m1_starting_cash + upgrades.starting_cash_bonus())
+	# Seed the heir with opening capital + any Trust Fund bonus, and record that
+	# seed so the estate→Legacy conversion can later exclude it (granted money is
+	# not dynastic achievement). award_cash floors the amount, so floor the record
+	# to match exactly.
+	var seed_cash := floorf(tuning.m1_starting_cash + upgrades.starting_cash_bonus())
+	heir.economy.award_cash(seed_cash)
+	heir.economy.starting_cash = seed_cash
 	heir.wage.lifetime_taps = dynastic_taps
 	_apply_upgrade_effects(heir)
 	return heir

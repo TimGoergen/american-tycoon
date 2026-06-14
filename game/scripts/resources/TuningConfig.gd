@@ -14,7 +14,7 @@ extends Resource
 
 ## Starting cash for a fresh run (GDD §8.1 "No rich parents" path).
 ## The full origin flow with all four paths arrives in M2.
-@export var m1_starting_cash: float = 1000.0
+@export var m1_starting_cash: float = 100.0
 
 # --- Cost curve (Spec §3.2) ---
 

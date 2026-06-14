@@ -270,6 +270,7 @@ func _build_ui() -> void:
 	_will_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_will_screen.pass_on_confirmed.connect(_on_pass_on_confirmed)
 	_will_screen.heir_begin_pressed.connect(_on_heir_begin_pressed)
+	_will_screen.cancelled.connect(_on_will_cancelled)
 	add_child(_will_screen)
 
 	# The Legacy upgrade shop overlay, also above everything and hidden until the
@@ -388,6 +389,12 @@ func _on_plan_estate_pressed() -> void:
 		return
 	var will := dynasty.get_draft_will()
 	_will_screen.show_will(will, HeirNames.dynasty_name(dynasty.generation))
+
+
+## Player backed out of the will: it has already hidden itself, so there is
+## nothing to undo — _process simply resumes ticking the living generation.
+func _on_will_cancelled() -> void:
+	pass
 
 
 ## Player signed the will: execute the death — bank Legacy, advance the

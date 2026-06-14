@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1")
 logic_hz = 10
-m1_starting_cash = 1000.0
+m1_starting_cash = 100.0
 rush_pct = 0.1
 hold_rush_per_second = 5.0
 wage_hold_taps_per_second = 5.0
@@ -23,8 +23,8 @@ frenzy_pop_floor = 0.15
 estate_exemption_base = 1000000.0
 estate_tax_rate_base = 0.6
 loophole_rate_floor = 0.05
-k_legacy = 1.0
-alpha_legacy = 0.5
+k_legacy = 0.01
+alpha_legacy = 0.4
 crash_multiplier = 0.5
 crash_duration_minutes = 10.0
 audit_settle_rate = 0.08

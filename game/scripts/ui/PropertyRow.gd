@@ -172,6 +172,11 @@ func _ready() -> void:
 	_hire_button.pressed.connect(func() -> void: hire_requested.emit(prop_index))
 	button_line.add_child(_hire_button)
 
+	# Let a swipe that lands anywhere on the row (the panel, labels, or progress
+	# bars — anything that isn't one of the buttons above) scroll the ladder,
+	# rather than being swallowed by the row. See UiPalette.allow_scroll_drag_through.
+	UiPalette.allow_scroll_drag_through(self)
+
 
 ## Called by Main when the player cycles the global buy-mode toggle.
 func set_buy_mode(mode: BuyMode) -> void:

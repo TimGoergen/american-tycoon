@@ -6,11 +6,11 @@ extends ColorRect
 # player has prestiged at least once. Here the player spends banked Legacy on the
 # permanent, dynasty-wide upgrades defined in LegacyUpgradeCatalog.
 #
-# This is a self-contained overlay, the same shape as WillScreen: a dark scrim
-# over the game, a centered cream panel, large legible type (Tim reads large —
-# UI notes §1). It reads and writes the live LegacyUpgrades state directly; Main
-# is told when a purchase happens so it can re-apply the new effect to the living
-# generation, and again when the player closes the shop.
+# This is a FULL-SCREEN page: an opaque cream sheet that fills the whole screen
+# while open (Main freezes the economy behind it), with large legible type (Tim
+# reads large — UI notes §1). It reads and writes the live LegacyUpgrades state
+# directly; Main is told when a purchase happens so it can re-apply the new effect
+# to the living generation, and again when the player closes the shop.
 #
 # Drive it from Main.gd:
 #   1. setup(upgrades)        once, after the state exists (builds the cards)
@@ -52,8 +52,9 @@ func setup(upgrades: LegacyUpgrades) -> void:
 
 
 func _ready() -> void:
-	# Dark scrim over the game beneath the shop.
-	color = Color(UiPalette.INK_NAVY, 0.75)
+	# Opaque cream sheet filling the whole screen — this is a full page, not a
+	# translucent card over the game. Main freezes the economy while it is visible.
+	color = UiPalette.CREAM
 	visible = false
 
 
@@ -62,18 +63,20 @@ func _ready() -> void:
 # ---------------------------------------------------------------------------
 
 func _build_ui() -> void:
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(center)
-
-	var panel := PanelContainer.new()
-	panel.add_theme_stylebox_override("panel", UiPalette.make_panel_style())
-	center.add_child(panel)
+	# Fill the screen edge to edge with a margin, then stack the page contents
+	# top-to-bottom. The scrolling card list (added below) takes all the leftover
+	# height, so the page fits any phone without a fixed panel size.
+	var margin := MarginContainer.new()
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_left", 20)
+	margin.add_theme_constant_override("margin_right", 20)
+	margin.add_theme_constant_override("margin_top", 20)
+	margin.add_theme_constant_override("margin_bottom", 20)
+	add_child(margin)
 
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 12)
-	column.custom_minimum_size = Vector2(660, 0)
-	panel.add_child(column)
+	margin.add_child(column)
 
 	# ── Title + wallet ──
 	var title := Label.new()
@@ -93,10 +96,10 @@ func _build_ui() -> void:
 	column.add_child(_wallet_label)
 
 	# ── Scrollable list of upgrade cards (grouped by category) ──
-	# Scrolls so the panel never grows taller than the phone screen, however many
-	# upgrades the catalog grows to hold.
+	# Takes all the leftover height between the wallet readout and the close
+	# button, and scrolls within it however many upgrades the catalog holds.
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(0, 560)
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_RESERVE
 	column.add_child(scroll)
@@ -113,6 +116,10 @@ func _build_ui() -> void:
 			_add_category_heading(list, category)
 			current_category = category
 		_add_upgrade_card(list, definition)
+
+	# Let a swipe that lands on a card surface (not its BUY button) scroll the
+	# list, the same as the property ladder. See UiPalette.allow_scroll_drag_through.
+	UiPalette.allow_scroll_drag_through(list)
 
 	# ── Close button ──
 	var close_button := Button.new()

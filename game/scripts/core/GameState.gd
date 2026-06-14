@@ -7,9 +7,10 @@ class_name GameState
 # same code, no rendering), so nothing here may touch the scene tree.
 
 # v2 added the per-generation spend accumulators and peak net worth that the
-# prestige/estate math reads (Spec §9). v1 saves still load (missing fields
-# default to a clean slate).
-const SAVE_VERSION := 2
+# prestige/estate math reads (Spec §9). v3 added the generation's birth seed cash,
+# excluded from the estate→Legacy conversion. Older saves still load (missing
+# fields default to a clean slate / zero seed).
+const SAVE_VERSION := 3
 
 var tuning: TuningConfig
 var economy: EconomyState
@@ -208,6 +209,8 @@ func to_save_dict() -> Dictionary:
 		# they are sunk history, not derivable from the current holdings.
 		"spent_on_units_this_gen": economy.spent_on_units_this_gen,
 		"spent_on_staff_this_gen": economy.spent_on_staff_this_gen,
+		# Birth seed cash, excluded from the Legacy conversion (see DynastyState).
+		"starting_cash": economy.starting_cash,
 		"properties": props,
 		"wage": {
 			"current_title_index": wage.current_title_index,
@@ -232,6 +235,7 @@ func load_save_dict(data: Dictionary) -> void:
 	ui_buy_mode = int(data.get("buy_mode", 0))
 	economy.spent_on_units_this_gen = float(data.get("spent_on_units_this_gen", 0.0))
 	economy.spent_on_staff_this_gen = float(data.get("spent_on_staff_this_gen", 0.0))
+	economy.starting_cash = float(data.get("starting_cash", 0.0))
 
 	var saved_props: Array = data.get("properties", [])
 	for i in range(mini(saved_props.size(), economy.properties.size())):

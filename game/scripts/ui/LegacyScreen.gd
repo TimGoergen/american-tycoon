@@ -26,14 +26,14 @@ signal purchased(upgrade_id: String)
 signal closed
 
 
-# Type sizes — large for at-a-glance phone reading (UI notes §1). Enlarged 2.2×
-# from the first pass (Tim's call) so the whole page reads big at arm's length.
-const TITLE_SIZE   := 88
-const WALLET_SIZE  := 66
-const CATEGORY_SIZE := 53
-const CARD_NAME_SIZE := 57
-const CARD_BODY_SIZE := 44
-const BUTTON_SIZE  := 48
+# Type sizes — large for at-a-glance phone reading (UI notes §1). Sized big for
+# the full-screen page, then trimmed 15% from that pass (Tim's call).
+const TITLE_SIZE   := 75
+const WALLET_SIZE  := 56
+const CATEGORY_SIZE := 45
+const CARD_NAME_SIZE := 48
+const CARD_BODY_SIZE := 37
+const BUTTON_SIZE  := 41
 
 ## Top inset (in the 1080×1920 design space) that pushes the header row clear of
 ## the phone's front camera cut-out, so the title and Legacy readout aren't hidden.
@@ -138,7 +138,7 @@ func _build_ui() -> void:
 	var close_button := Button.new()
 	close_button.text = "BACK TO THE EMPIRE"
 	close_button.custom_minimum_size = Vector2(0, 158)
-	close_button.add_theme_font_size_override("font_size", 57)
+	close_button.add_theme_font_size_override("font_size", 48)
 	UiPalette.style_button(close_button, false)
 	close_button.pressed.connect(_on_close_pressed)
 	column.add_child(close_button)

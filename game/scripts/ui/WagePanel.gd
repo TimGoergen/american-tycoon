@@ -23,47 +23,57 @@ var _frenzy: FrenzyState
 ## Accumulates held-down time on the clock-in button to pace auto-tap pulses.
 var _hold_accumulator := 0.0
 
-# Brightness feedback on the gold plate has TWO distinct modes, never a per-tap
-# strobe (Tim's call: the old once-per-auto-tap flash outran the bar and looked
-# like a strobe light):
-#   • A single manual tap gives one brief, discrete brighter-gold blink — crisp
-#     click feedback for a deliberate tap.
-#   • Holding the button (auto-tapping) instead shows a slow, smooth "breathing"
-#     pulse: the gold gently brightens and dims on a loop the whole time it is
-#     held, signalling "this is active" without any rapid blinking.
-# Both only ever lighten the SAME gold toward white (a brighter shade, not a
-# different yellow) and touch only the gold plate, so the navy border and label
-# stay put. The button never changes size.
+# Feedback on the gold plate has TWO distinct modes, never a per-tap strobe
+# (Tim's call: the old once-per-auto-tap flash outran the bar and looked like a
+# strobe light):
+#   • A single manual tap gives one brief, discrete brighter-gold blink across the
+#     whole plate — crisp click feedback for a deliberate tap.
+#   • Holding the button (auto-tapping) instead shows a soft highlight band that
+#     glides smoothly side to side across the meter the whole time it is held,
+#     signalling "this is active" with motion rather than any blinking. The band
+#     is drawn by a transparent overlay above the gold fill (see _draw_sweep), so
+#     the navy border and the label stay put and the button never changes size.
 
 ## How long the brighter-gold blink stays on for a single manual tap, in seconds.
 ## Short, so a deliberate tap reads as a crisp blink.
 const FLASH_DURATION := 0.05
 
-## How far the gold is lightened toward white at the peak of a tap blink or the
-## breathing pulse (0 = none, 1 = pure white).
+## How far the gold is lightened toward white at the peak of a tap blink and at the
+## core of the gliding highlight band (0 = none, 1 = pure white).
 const FLASH_LIGHTEN := 0.25
 
-## Seconds for one full breathe-in-and-out of the held pulse. Slow on purpose, so
-## the held state reads as a calm wave rather than a flicker.
+## Seconds for one full left→right→left glide of the held highlight band. Slow on
+## purpose, so the held state reads as a calm sweep rather than a flicker.
 const PULSE_PERIOD := 2.0
 
-## How quickly the breathing pulse ramps in when held and fades out when released,
-## as a smoothing time constant in seconds — small enough to feel responsive,
-## large enough that release eases out instead of snapping off.
+## How quickly the held highlight fades in when pressed and out when released, as a
+## smoothing time constant in seconds — responsive, but easing out instead of
+## snapping off.
 const PULSE_RAMP_TAU := 0.18
+
+## Width of the gliding highlight band as a fraction of the meter's width.
+const SWEEP_WIDTH_FRACTION := 0.4
+
+## Peak opacity of the highlight band at its center (it feathers to 0 at its edges).
+const SWEEP_PEAK_ALPHA := 0.55
+
+## Inset (px) that keeps the highlight band inside the meter's navy frame; matches
+## the frame thickness used in UiPalette.style_gold_progress.
+const SWEEP_FRAME_INSET := 8.0
 
 ## Seconds left in the current manual-tap blink. >0 means the blink is showing.
 var _flash_remaining := 0.0
 
-## Phase of the breathing pulse in seconds (0 = dim baseline), advanced only while
-## the button is held; reset when released so each hold starts a fresh breath.
+## Phase of the held highlight in seconds, advanced only while the button is held;
+## drives the band's side-to-side position. Frozen (not reset) on release so the
+## band fades out where it was rather than snapping back to the left.
 var _pulse_phase := 0.0
 
-## The breathing pulse's current applied strength (0–FLASH_LIGHTEN), eased toward
-## its target each frame so it ramps in and fades out smoothly.
+## Fade envelope for the held highlight (0 = hidden, 1 = full), eased toward its
+## target each frame so the band ramps in when held and fades out when released.
 var _pulse_level := 0.0
 
-# The meter's two gold plates — captured so the blink/pulse can lighten them in
+# The meter's two gold plates — captured so the tap blink can lighten them in
 # place and restore them. Their un-lightened colors are remembered in *_base.
 var _fill_style: StyleBoxFlat
 var _track_style: StyleBoxFlat
@@ -74,6 +84,10 @@ var _wage_meter: ProgressBar
 var _wage_button: Button
 var _context_label: Label
 var _promotion_button: Button
+
+## Transparent overlay above the gold fill (below the label button) on which the
+## gliding highlight band is drawn while the button is held.
+var _sweep_overlay: Control
 
 
 ## Call before adding to the tree.
@@ -102,6 +116,15 @@ func _ready() -> void:
 	_fill_base = _fill_style.bg_color
 	_track_base = _track_style.bg_color
 	add_child(_wage_meter)
+
+	# Highlight overlay: a transparent, mouse-ignoring layer filling the meter, on
+	# which _draw_sweep paints the gliding highlight band while the button is held.
+	# Added before the label button so it sits above the gold fill but below the label.
+	_sweep_overlay = Control.new()
+	_sweep_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_sweep_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_sweep_overlay.draw.connect(_draw_sweep)
+	_wage_meter.add_child(_sweep_overlay)
 
 	# Transparent button overlaying the meter — the gold shows through, only the
 	# label and the click belong to the button. Font is 2× the old size (28→56).
@@ -218,31 +241,58 @@ func _pulse_impact() -> void:
 	_flash_remaining = FLASH_DURATION
 
 
-## Drive the gold plate's brightness each frame from two sources and apply
-## whichever is brighter: a brief discrete blink from a manual tap, and a slow
-## breathing pulse while the button is held. Lightening the SAME gold toward white
-## keeps its hue (a brighter shade, not a different yellow) and touches only the
-## plate, so the navy border and label stay put.
+## Each frame: drive the manual-tap blink on the plate, and advance/fade the held
+## highlight band that _draw_sweep paints.
 func _update_plate_glow(delta: float) -> void:
-	# Manual-tap blink: a discrete on/off shade for FLASH_DURATION, no ramp.
+	# Manual-tap blink: a discrete on/off plate lighten for FLASH_DURATION, no ramp.
 	_flash_remaining = maxf(0.0, _flash_remaining - delta)
 	var blink_amount := FLASH_LIGHTEN if _flash_remaining > 0.0 else 0.0
+	_fill_style.bg_color = _fill_base.lightened(blink_amount)
+	_track_style.bg_color = _track_base.lightened(blink_amount)
 
-	# Held breathing pulse: advance the phase while held (reset on release) and
-	# shape it with a cosine so it eases smoothly between dim and bright.
-	var target_pulse := 0.0
+	# Held highlight: advance its glide phase only while held, and ease its fade
+	# envelope toward shown/hidden so it ramps in on press and out on release.
 	if _wage_button.button_pressed:
 		_pulse_phase += delta
-		# 0.5 − 0.5·cos sweeps 0 → 1 → 0 over one PULSE_PERIOD: one smooth breath.
-		var breath := 0.5 - 0.5 * cos(TAU * _pulse_phase / PULSE_PERIOD)
-		target_pulse = FLASH_LIGHTEN * breath
-	else:
-		_pulse_phase = 0.0
-	# Ease the applied level toward the target so the pulse ramps in when held and
-	# fades out (rather than snapping off) when released.
+	var target := 1.0 if _wage_button.button_pressed else 0.0
 	var ramp := 1.0 - exp(-delta / PULSE_RAMP_TAU)
-	_pulse_level += (target_pulse - _pulse_level) * ramp
+	_pulse_level += (target - _pulse_level) * ramp
+	_sweep_overlay.queue_redraw()
 
-	var lighten := maxf(blink_amount, _pulse_level)
-	_fill_style.bg_color = _fill_base.lightened(lighten)
-	_track_style.bg_color = _track_base.lightened(lighten)
+
+## Paint the gliding highlight band onto the overlay. The band's center sweeps
+## smoothly left → right → left over one PULSE_PERIOD, and its opacity feathers
+## from SWEEP_PEAK_ALPHA at the center to 0 at its edges so it reads as a soft
+## moving light rather than a hard bar. Nothing is drawn while the envelope is ~0.
+func _draw_sweep() -> void:
+	if _pulse_level <= 0.01:
+		return
+	var rect := _sweep_overlay.size
+	# Stay inside the navy frame on all sides.
+	var x_min := SWEEP_FRAME_INSET
+	var x_max := rect.x - SWEEP_FRAME_INSET
+	var top := SWEEP_FRAME_INSET
+	var height := rect.y - SWEEP_FRAME_INSET * 2.0
+	if x_max <= x_min or height <= 0.0:
+		return
+
+	# Sweep the band's center across the inset width: 0.5 − 0.5·cos gives 0→1→0.
+	var travel := 0.5 - 0.5 * cos(TAU * _pulse_phase / PULSE_PERIOD)
+	var center_x := x_min + travel * (x_max - x_min)
+	var band_width := rect.x * SWEEP_WIDTH_FRACTION
+	var highlight := _fill_base.lightened(FLASH_LIGHTEN)
+
+	# Draw the band as feathered vertical slices: alpha peaks at the band's center
+	# and tapers to 0 at its edges, scaled by the fade envelope.
+	var slices := 16
+	var slice_w := band_width / float(slices)
+	for i in range(slices):
+		var t := (float(i) + 0.5) / float(slices)  # 0..1 across the band
+		var feather := 0.5 - 0.5 * cos(t * TAU)    # 0 at edges, 1 at the center
+		highlight.a = feather * SWEEP_PEAK_ALPHA * _pulse_level
+		var x := center_x - band_width * 0.5 + i * slice_w
+		# Clip each slice to the inset frame so nothing spills onto the border.
+		var x_left := clampf(x, x_min, x_max)
+		var x_right := clampf(x + slice_w + 1.0, x_min, x_max)
+		if x_right > x_left:
+			_sweep_overlay.draw_rect(Rect2(x_left, top, x_right - x_left, height), highlight)

@@ -23,31 +23,49 @@ var _frenzy: FrenzyState
 ## Accumulates held-down time on the clock-in button to pace auto-tap pulses.
 var _hold_accumulator := 0.0
 
-# Click impact: every wage tap (manual click OR auto-tap pulse while held) flashes
-# the button between two discrete colors — the gold plate snaps to a brighter gold
-# for a brief fixed moment, then snaps straight back. There is no easing or decay
-# ramp: the plate is only ever the base gold or the brighter gold, never a shade
-# between (Tim's call — a smooth decay read as a pulse). The button never changes
-# size. The flash lightens the gold toward white — a brighter shade of the SAME
-# gold, not a tint toward a different yellow — and touches only the gold plate, so
-# the navy border and label stay put. Held down, it re-arms at the auto-tap
-# cadence, i.e. once per income tick.
+# Brightness feedback on the gold plate has TWO distinct modes, never a per-tap
+# strobe (Tim's call: the old once-per-auto-tap flash outran the bar and looked
+# like a strobe light):
+#   • A single manual tap gives one brief, discrete brighter-gold blink — crisp
+#     click feedback for a deliberate tap.
+#   • Holding the button (auto-tapping) instead shows a slow, smooth "breathing"
+#     pulse: the gold gently brightens and dims on a loop the whole time it is
+#     held, signalling "this is active" without any rapid blinking.
+# Both only ever lighten the SAME gold toward white (a brighter shade, not a
+# different yellow) and touch only the gold plate, so the navy border and label
+# stay put. The button never changes size.
 
-## How long the brighter-gold flash stays on per tap, in seconds. Short, so it
-## reads as a crisp blink rather than a pulse.
+## How long the brighter-gold blink stays on for a single manual tap, in seconds.
+## Short, so a deliberate tap reads as a crisp blink.
 const FLASH_DURATION := 0.05
 
-## How far the gold is lightened toward white during a flash (0 = none, 1 = pure
-## white). Applied as a single discrete shade, never ramped. Kept subtle — a much
-## brighter flash read as a strobe (Tim's call: about a quarter of the old 0.45).
+## How far the gold is lightened toward white at the peak of a tap blink or the
+## breathing pulse (0 = none, 1 = pure white). Kept subtle — a brighter value read
+## as a strobe (Tim's call: about a quarter of the old 0.45).
 const FLASH_LIGHTEN := 0.11
 
-## Seconds left in the current flash. >0 means show the brighter gold; 0 means show
-## the base gold. Counted down in _apply_impact.
+## Seconds for one full breathe-in-and-out of the held pulse. Slow on purpose, so
+## the held state reads as a calm wave rather than a flicker.
+const PULSE_PERIOD := 1.2
+
+## How quickly the breathing pulse ramps in when held and fades out when released,
+## as a smoothing time constant in seconds — small enough to feel responsive,
+## large enough that release eases out instead of snapping off.
+const PULSE_RAMP_TAU := 0.18
+
+## Seconds left in the current manual-tap blink. >0 means the blink is showing.
 var _flash_remaining := 0.0
 
-# The meter's two gold plates — captured so the flash can lighten them in place and
-# restore them. Their unflashed colors are remembered in *_base.
+## Phase of the breathing pulse in seconds (0 = dim baseline), advanced only while
+## the button is held; reset when released so each hold starts a fresh breath.
+var _pulse_phase := 0.0
+
+## The breathing pulse's current applied strength (0–FLASH_LIGHTEN), eased toward
+## its target each frame so it ramps in and fades out smoothly.
+var _pulse_level := 0.0
+
+# The meter's two gold plates — captured so the blink/pulse can lighten them in
+# place and restore them. Their un-lightened colors are remembered in *_base.
 var _fill_style: StyleBoxFlat
 var _track_style: StyleBoxFlat
 var _fill_base: Color
@@ -122,7 +140,7 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_pump_auto_tap(delta)
-	_apply_impact(delta)
+	_update_plate_glow(delta)
 
 	# The wage is paid wage_per_tap × frenzy multiplier at point of payment
 	# (Spec §7), so reflect the boosted per-tap value during a burn (1.0 otherwise).
@@ -191,35 +209,41 @@ func _pump_auto_tap(delta: float) -> void:
 	while _hold_accumulator >= pulse_interval:
 		_hold_accumulator -= pulse_interval
 		wage_hold_tapped.emit()
-		_pulse_impact()  # same visual cue as a manual click, once per income tick
+		# No per-tap blink here: while held, the breathing pulse (see
+		# _update_plate_glow) is the active-state cue instead.
 
 
-## Start a flash: snap the gold to its brighter shade now and arm the countdown
-## that _apply_impact uses to snap it back. Re-arming on every tap keeps held-down
-## auto-taps blinking at the income cadence.
+## Arm a single brief manual-tap blink. The color itself is applied by
+## _update_plate_glow, which combines this blink with the held breathing pulse.
 func _pulse_impact() -> void:
 	_flash_remaining = FLASH_DURATION
-	_set_flashed(true)
 
 
-## Count the flash down and snap the gold back to rest the instant it expires.
-## There is no interpolation — the plate is only ever the base gold or the brighter
-## gold, never a shade between (Tim's call: no transition states).
-func _apply_impact(delta: float) -> void:
-	if _flash_remaining <= 0.0:
-		return
+## Drive the gold plate's brightness each frame from two sources and apply
+## whichever is brighter: a brief discrete blink from a manual tap, and a slow
+## breathing pulse while the button is held. Lightening the SAME gold toward white
+## keeps its hue (a brighter shade, not a different yellow) and touches only the
+## plate, so the navy border and label stay put.
+func _update_plate_glow(delta: float) -> void:
+	# Manual-tap blink: a discrete on/off shade for FLASH_DURATION, no ramp.
 	_flash_remaining = maxf(0.0, _flash_remaining - delta)
-	if _flash_remaining <= 0.0:
-		_set_flashed(false)
+	var blink_amount := FLASH_LIGHTEN if _flash_remaining > 0.0 else 0.0
 
-
-## Swap both gold plates between their base color and the brighter flashed shade.
-## Lightening the SAME gold toward white keeps its hue — a brighter shade, not a
-## different yellow. No scale change (the button never resizes).
-func _set_flashed(on: bool) -> void:
-	if on:
-		_fill_style.bg_color = _fill_base.lightened(FLASH_LIGHTEN)
-		_track_style.bg_color = _track_base.lightened(FLASH_LIGHTEN)
+	# Held breathing pulse: advance the phase while held (reset on release) and
+	# shape it with a cosine so it eases smoothly between dim and bright.
+	var target_pulse := 0.0
+	if _wage_button.button_pressed:
+		_pulse_phase += delta
+		# 0.5 − 0.5·cos sweeps 0 → 1 → 0 over one PULSE_PERIOD: one smooth breath.
+		var breath := 0.5 - 0.5 * cos(TAU * _pulse_phase / PULSE_PERIOD)
+		target_pulse = FLASH_LIGHTEN * breath
 	else:
-		_fill_style.bg_color = _fill_base
-		_track_style.bg_color = _track_base
+		_pulse_phase = 0.0
+	# Ease the applied level toward the target so the pulse ramps in when held and
+	# fades out (rather than snapping off) when released.
+	var ramp := 1.0 - exp(-delta / PULSE_RAMP_TAU)
+	_pulse_level += (target_pulse - _pulse_level) * ramp
+
+	var lighten := maxf(blink_amount, _pulse_level)
+	_fill_style.bg_color = _fill_base.lightened(lighten)
+	_track_style.bg_color = _track_base.lightened(lighten)

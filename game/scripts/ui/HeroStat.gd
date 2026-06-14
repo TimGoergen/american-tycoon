@@ -5,10 +5,10 @@ extends PanelContainer
 # not stub). Cream ticket plate with red frame, navy numerals (Style Guide §8).
 #
 # Layout is edge-pinned rather than stacked, to keep the readable values clear of
-# a phone's top camera cutout (Tim's device):
-#   • the income/sec NUMBER is pinned to the left edge, centered vertically;
-#   • the CASH-on-hand is pinned to the right edge, centered vertically;
-#   • the "INCOME PER SECOND" caption is pinned to the centre of the bottom edge.
+# a phone's top camera cutout (Tim's device). Each value carries a small caption
+# directly beneath it, and the value+caption pair is centered vertically:
+#   • the income/sec NUMBER hugs the left edge, with an "INCOME" caption below it;
+#   • the CASH-on-hand NUMBER hugs the right edge, with a "CASH" caption below it.
 # PanelContainer only fits a single child, so the labels live inside a plain
 # Control ("content") that fills the plate, and we position them by hand each frame
 # (their widths change as the values do) in _layout_labels.
@@ -44,7 +44,8 @@ const FLASH_SECONDS := 0.18
 var _content: Control
 var _income_label: Label
 var _cash_label: Label
-var _caption_label: Label
+var _income_caption: Label
+var _cash_caption: Label
 
 # Frenzy glow: while a burn is active the ticket pulses toward red to signal the
 # accelerated state. Subtle — navy numerals stay readable over the tint.
@@ -73,9 +74,16 @@ func _ready() -> void:
 	_cash_label = _make_label(UiPalette.MONEY_GREEN, CASH_FONT_SIZE, CASH_BOLD)
 	_content.add_child(_cash_label)
 
-	_caption_label = _make_label(UiPalette.NAVY, CAPTION_FONT_SIZE, CAPTION_BOLD)
-	_caption_label.text = "INCOME PER SECOND"
-	_content.add_child(_caption_label)
+	# A small caption sits directly beneath each value (the old single, bottom-
+	# centered "INCOME PER SECOND" caption is gone). Each is colored to match the
+	# number it labels.
+	_income_caption = _make_label(UiPalette.NAVY, CAPTION_FONT_SIZE, CAPTION_BOLD)
+	_income_caption.text = "INCOME"
+	_content.add_child(_income_caption)
+
+	_cash_caption = _make_label(UiPalette.MONEY_GREEN, CAPTION_FONT_SIZE, CAPTION_BOLD)
+	_cash_caption.text = "CASH"
+	_content.add_child(_cash_caption)
 
 
 ## Build a large, faux-bold label in the given color. The bold weight is faked with
@@ -94,7 +102,7 @@ func set_income_per_sec(income_per_sec: float) -> void:
 
 
 func set_cash(cash: float) -> void:
-	_cash_label.text = "Cash: " + Money.of(cash).display()
+	_cash_label.text = Money.of(cash).display()
 
 
 ## Toggle the frenzy glow. Main drives this from the live frenzy state each frame.
@@ -126,23 +134,27 @@ func _process(delta: float) -> void:
 ## widths change, and a pinned label must stay flush to its edge as it does.
 func _layout_labels() -> void:
 	var area := _content.size
+	var caption_gap := 2.0  # space between a value and its caption beneath it
 
-	# Income/sec number: left edge, centered vertically.
+	# Income (left edge): the number with the "INCOME" caption beneath it, the pair
+	# centered vertically as one block and flush to the left.
 	_income_label.size = _income_label.get_minimum_size()
-	_income_label.position = Vector2(EDGE_MARGIN, (area.y - _income_label.size.y) / 2.0)
+	_income_caption.size = _income_caption.get_minimum_size()
+	var income_block_h := _income_label.size.y + caption_gap + _income_caption.size.y
+	var income_top := (area.y - income_block_h) / 2.0
+	_income_label.position = Vector2(EDGE_MARGIN, income_top)
+	_income_caption.position = Vector2(EDGE_MARGIN, income_top + _income_label.size.y + caption_gap)
 
-	# Cash on hand: right edge, centered vertically.
+	# Cash (right edge): the number with the "CASH" caption beneath it, the pair
+	# centered vertically and flush to the right.
 	_cash_label.size = _cash_label.get_minimum_size()
-	_cash_label.position = Vector2(
-		area.x - _cash_label.size.x - EDGE_MARGIN,
-		(area.y - _cash_label.size.y) / 2.0
-	)
-
-	# Caption: centre of the bottom edge.
-	_caption_label.size = _caption_label.get_minimum_size()
-	_caption_label.position = Vector2(
-		(area.x - _caption_label.size.x) / 2.0,
-		area.y - _caption_label.size.y - EDGE_MARGIN
+	_cash_caption.size = _cash_caption.get_minimum_size()
+	var cash_block_h := _cash_label.size.y + caption_gap + _cash_caption.size.y
+	var cash_top := (area.y - cash_block_h) / 2.0
+	_cash_label.position = Vector2(area.x - _cash_label.size.x - EDGE_MARGIN, cash_top)
+	_cash_caption.position = Vector2(
+		area.x - _cash_caption.size.x - EDGE_MARGIN,
+		cash_top + _cash_label.size.y + caption_gap
 	)
 
 

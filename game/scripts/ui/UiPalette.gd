@@ -60,15 +60,21 @@ static func style_progress_bar(bar: ProgressBar, fill_color: Color) -> void:
 ## bar). The dark gold is a darkened MUSTARD_GOLD; it's a deliberate extension of
 ## the §1 nine-color palette for this one meter, pending style-guide blessing.
 static func style_gold_progress(bar: ProgressBar) -> void:
+	# Thick navy frame around the whole meter (Tim's call: a heavier outline).
+	var border_width := 8
 	var track := StyleBoxFlat.new()
 	track.bg_color = MUSTARD_GOLD.darkened(0.45)
 	track.border_color = NAVY
-	track.set_border_width_all(3)
+	track.set_border_width_all(border_width)
 	track.set_corner_radius_all(4)
 
 	var fill := StyleBoxFlat.new()
 	fill.bg_color = MUSTARD_GOLD
 	fill.set_corner_radius_all(4)
+	# Negative expand margins shrink the fill's draw rect inward by the frame
+	# thickness, so the bright-gold fill stays INSIDE the navy outline as it grows
+	# rather than painting over the frame.
+	fill.set_expand_margin_all(-float(border_width))
 
 	bar.add_theme_stylebox_override("background", track)
 	bar.add_theme_stylebox_override("fill", fill)
@@ -78,6 +84,25 @@ static func style_gold_progress(bar: ProgressBar) -> void:
 ## automated" (a soft money-green wash over the cream card, navy border).
 static func make_staffed_style() -> StyleBoxFlat:
 	return _make_plate(CREAM.lerp(MONEY_GREEN, 0.45), NAVY)
+
+
+## Let a swipe that begins on `root` — or on any of its non-button children —
+## fall through to an enclosing ScrollContainer, so the list scrolls when grabbed
+## on a panel surface, not only on the bare background. Buttons are left at their
+## default STOP filter so a tap on a button stays a tap, never a scroll.
+##
+## Godot detail: every Control defaults to MOUSE_FILTER_STOP, which swallows the
+## press so the ScrollContainer never sees the drag begin (this is why a swipe
+## that started on a row used to do nothing). Switching the non-interactive
+## surfaces to PASS lets the unhandled press keep bubbling up the tree to the
+## scroller, which then drives the scroll once the finger passes the deadzone.
+static func allow_scroll_drag_through(root: Control) -> void:
+	if root is BaseButton:
+		return  # leave buttons (and their internals) alone — taps must stay taps
+	root.mouse_filter = Control.MOUSE_FILTER_PASS
+	for child in root.get_children():
+		if child is Control:
+			allow_scroll_drag_through(child as Control)
 
 
 static func _make_plate(bg_color: Color, border_color: Color) -> StyleBoxFlat:

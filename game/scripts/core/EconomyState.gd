@@ -28,6 +28,12 @@ var spent_on_units_this_gen: float = 0.0
 ## Lifetime dollars spent hiring staff this generation (the other half of book value).
 var spent_on_staff_this_gen: float = 0.0
 
+## Cash this generation was seeded with at birth (starting capital + any Trust Fund
+## bonus). Tracked so the estate→Legacy conversion can EXCLUDE granted seed money:
+## you don't earn dynastic Legacy for cash you were simply handed, and early on the
+## seed is far below even a single Legacy point (DynastyState.get_draft_will).
+var starting_cash: float = 0.0
+
 
 func _init(configs: Array, tuning: TuningConfig) -> void:
 	properties = []

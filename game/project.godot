@@ -31,9 +31,9 @@ window/handheld/orientation=1
 [gui]
 
 ; Pixels a touch must travel before a ScrollContainer treats it as a scroll rather
-; than a click. The default (0) means a finger that lands on a button never scrolls
-; the list — so the property ladder couldn't be swiped on the phone. A small
-; threshold lets a drag scroll even when it starts on a row's button.
+; than a click. Works together with UiPalette.allow_scroll_drag_through: the row
+; surfaces pass their presses up to the scroller, and this threshold decides how
+; far the finger must move before such a press becomes a scroll instead of a tap.
 common/default_scroll_deadzone=30
 
 [dotnet]

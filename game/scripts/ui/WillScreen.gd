@@ -20,6 +20,9 @@ extends ColorRect
 ## Player has signed the will and chosen to pass the estate on (end phase 1).
 signal pass_on_confirmed
 
+## Player backed out of the will to keep playing the current generation (phase 1).
+signal cancelled
+
 ## Player dismisses the heir reveal to begin the new generation (end phase 2).
 signal heir_begin_pressed
 
@@ -126,6 +129,18 @@ func _build_phase1(parent: VBoxContainer) -> void:
 	confirm_button.pressed.connect(_on_sign_pressed)
 	_phase1_container.add_child(confirm_button)
 
+	# ── Cancel button ──
+	# Backing out is not a spend/commit action, so it gets the calm mustard style
+	# (red is reserved for "spend/act"). Lets the player close the will and keep
+	# playing the current generation if they'd rather wait to prestige.
+	var cancel_button := Button.new()
+	cancel_button.text = "NOT YET — KEEP PLAYING"
+	cancel_button.custom_minimum_size = Vector2(0, 64)
+	cancel_button.add_theme_font_size_override("font_size", 24)
+	UiPalette.style_button(cancel_button, false)
+	cancel_button.pressed.connect(_on_cancel_pressed)
+	_phase1_container.add_child(cancel_button)
+
 
 # ── Phase 2 builder ───────────────────────────────────────────────────────────
 
@@ -223,6 +238,12 @@ func _on_sign_pressed() -> void:
 	# Do NOT hide here. Main.gd will immediately call show_heir_reveal(),
 	# which transitions the overlay to phase 2 without a flash of the game.
 	pass_on_confirmed.emit()
+
+
+func _on_cancel_pressed() -> void:
+	# Close the will with no state change; the living generation simply resumes.
+	visible = false
+	cancelled.emit()
 
 
 func _on_begin_pressed() -> void:

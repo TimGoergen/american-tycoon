@@ -37,11 +37,14 @@ const ESTATE_LAWYERS  := "estate_lawyers"
 
 
 # ── The catalog ───────────────────────────────────────────────────────────────
-# Cost note: the first prestige typically converts to a few hundred Legacy (the
-# estate→Legacy curve is roughly the square root of the estate's net worth — see
-# EstateWaterfall.legacy_gain). The first-level costs below are set in that range
-# so a first prestige buys ~1–3 of them, exactly as intended. These are starting
-# numbers meant for on-device feel-tuning, not final balance.
+# Cost note: Legacy is intentionally on a SMALL scale so each point feels hard-won
+# and valuable. The estate→Legacy curve (k_legacy × built_estate ^ alpha, with a
+# low k_legacy and a flattened alpha — see tuning.tres / EstateWaterfall) makes the
+# FIRST whole point take real playtime to reach and keeps even a long run in the
+# low tens of Legacy. The single-digit first-level costs below are matched to that
+# scale so a first prestige buys ~2–3 of them and the dynasty starts to snowball.
+# Verified against sim/Sim.gd's dynasty protocol ("speeds up every time"). These
+# are still starting numbers meant for on-device feel-tuning, not final balance.
 const UPGRADES := [
 	{
 		"id": SEED_CAPITAL,
@@ -49,7 +52,7 @@ const UPGRADES := [
 		"category": "Wealth",
 		"description": "Every heir is born into more money.",
 		"max_level": 10,
-		"base_cost": 500,
+		"base_cost": 4,
 		"cost_growth": 1.8,
 		"effect_per_level": 5000.0,   # +$5,000 starting cash per level
 	},
@@ -59,7 +62,7 @@ const UPGRADES := [
 		"category": "Wealth",
 		"description": "The family name itself earns. All property income rises.",
 		"max_level": 12,
-		"base_cost": 800,
+		"base_cost": 6,
 		"cost_growth": 2.0,
 		"effect_per_level": 0.20,     # +20% property income per level
 	},
@@ -69,7 +72,7 @@ const UPGRADES := [
 		"category": "Operations",
 		"description": "Sharper management. Every property cycles faster.",
 		"max_level": 8,
-		"base_cost": 800,
+		"base_cost": 6,
 		"cost_growth": 2.0,
 		"effect_per_level": 0.12,     # +12% cycle speed per level
 	},
@@ -79,7 +82,7 @@ const UPGRADES := [
 		"category": "Operations",
 		"description": "Hardened family retainers work for less. Hiring costs drop.",
 		"max_level": 8,
-		"base_cost": 600,
+		"base_cost": 5,
 		"cost_growth": 1.9,
 		"effect_per_level": 0.08,     # −8% staff hiring cost per level (capped, see getter)
 	},
@@ -89,7 +92,7 @@ const UPGRADES := [
 		"category": "Career",
 		"description": "Doors open faster for old money. Your wage per tap rises.",
 		"max_level": 8,
-		"base_cost": 500,
+		"base_cost": 4,
 		"cost_growth": 1.9,
 		"effect_per_level": 0.40,     # +40% wage per tap per level
 	},
@@ -99,7 +102,7 @@ const UPGRADES := [
 		"category": "Legacy",
 		"description": "Clever paperwork. Each succession yields more Legacy.",
 		"max_level": 6,
-		"base_cost": 1200,
+		"base_cost": 10,
 		"cost_growth": 2.2,
 		"effect_per_level": 0.15,     # +15% Legacy gained at succession per level
 	},

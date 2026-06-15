@@ -28,10 +28,17 @@ Milestone thresholds at counts **20 × 2^k** (20, 40, 80, 160, ...), matching th
 Cost of the next unit when `n` units are owned (0-indexed purchase n+1, in band b):
 
 ```
-unit_cost(n) = floor( BASE_COST_i × Π(over units 1..n+1) r_band(unit) )
+unit_cost(n) = round_nice( BASE_COST_i × Π(over units 1..n) r_band(unit) )
 r_band(b)    = R0_i × BAND_STEP^b
 ```
 
+- **`BASE_COST_i` is the literal sticker price of the first unit** (Tim, 2026-06-14): the
+  product runs over the units *already owned* (units 1..n), so at `n = 0` it is empty and
+  the first unit costs exactly `BASE_COST_i`. Each unit's own ratio is folded in only once
+  it is bought, pricing the next one. (Earlier the product ran to `n+1`, charging `BASE × R0`
+  for the very first unit — e.g. the first ATM read $55 instead of $50.)
+- Prices are snapped to the nearest $5 (`round_nice`) so the player never sees odd
+  numbers; the underlying geometric product is kept raw so the curve still climbs smoothly.
 - `R0_i` per property from config (genre-gentle, ~1.05–1.10 `TBD-SIM`).
 - `BAND_STEP` global (provisional 1.15 `TBD-SIM`).
 - Steepening applies only *after* each milestone is crossed — milestones stay reachable by construction.
@@ -113,12 +120,13 @@ Player-confirmed, always — no aging system. Available once projected Legacy ga
 
 ### 9.2 The estate waterfall (executed at death, itemized on the will screen)
 ```
-estate_gross   = cash + asset_book_value            (asset_book_value = lifetime spent on units + staff this generation)  [provisional valuation — TBD-SIM]
+estate_gross   = cash_earned_this_gen               (the dollars THIS generation earned over its life; GDD Future Features decision 2026-06-14)
 after_credit   = estate_gross − min(estate_gross, outstanding_debt)     (creditors first)
 taxable        = max(0, after_credit − EXEMPTION)
 tax            = floor(taxable × TAX_RATE)
 estate_net     = after_credit − tax
 ```
+- **Gross-estate basis changed 2026-06-14 (GDD Future Features "Lifetime cash earned"):** the gross is now the generation's **lifetime cash earned**, not net-worth-at-death (`cash + asset_book_value`). This rewards earning over a life rather than terminal hoarding, and gives a monotonic, cross-epoch-comparable basis. The per-generation figure feeds the waterfall; the dynasty also keeps a cumulative `lifetime_cash_earned` accumulator as the display/yardstick stat. Everything below the gross is unchanged. (`K_LEGACY`/`ALPHA` re-tuning expected once magnitude shifts — `TBD-SIM`.)
 - `EXEMPTION` base $1M; `TAX_RATE` base 60% — both provisional `TBD-SIM`, deliberately brutal so the loophole tree feels like a jailbreak.
 - **Loopholes** (purchased via Legislative/Executive Assets, persist across generations): two axes — exemption raisers (multiplicative on EXEMPTION) and rate cutters (subtractive on TAX_RATE, floored at LOOPHOLE_RATE_FLOOR ~5%). Catalog = content pass; each loophole = real mechanism, real name, itemized line on the will.
 
@@ -126,6 +134,8 @@ estate_net     = after_credit − tax
 ```
 legacy_gain = floor( K_LEGACY × estate_net ^ ALPHA )      ALPHA = 0.5 provisional TBD-SIM
 ```
+(`estate_net` here is the post-tax net of the §9.2 waterfall, whose gross is now lifetime cash
+earned this generation — not net worth at death. The conversion formula itself is unchanged.)
 Displayed as **brackets** (thresholds where legacy_gain crosses integers / named tiers); advisor announces bracket crossings ("The estate now qualifies for Loyal Household Staff"). Total Legacy is dynastic and never spent down by conversion — Legacy *upgrades* (catalog incl. Loyal Household Staff: staff persist across generations) cost Legacy per the upgrade table (content pass).
 
 ### 9.4 Legacy application — catch-up sprint + residual

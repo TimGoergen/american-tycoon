@@ -38,7 +38,7 @@ extends Resource
 ## Auto-tap pulses per second while the wage ("clock in") button is held down.
 ## This is the BASE rate; the effective rate is meant to be scaled by Legacy
 ## upgrades later (configurable by upgrades — GDD §8.4 loophole/upgrade catalog).
-@export var wage_hold_taps_per_second: float = 5.0  # feel-tune
+@export var wage_hold_taps_per_second: float = 2.5  # feel-tune
 
 ## Frenzy fill per held-rush pulse, as a fraction of a manual tap's fill.
 ## Holding is convenient, so it charges the meter slower than real tapping.

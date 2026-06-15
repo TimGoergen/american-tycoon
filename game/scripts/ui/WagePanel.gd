@@ -52,8 +52,11 @@ const PULSE_PERIOD := 2.0
 ## snapping off.
 const PULSE_RAMP_TAU := 0.18
 
-## Width of the gliding highlight band as a fraction of the meter's width.
-const SWEEP_WIDTH_FRACTION := 0.4
+## Width of the gliding highlight band as a fraction of the GOLD-FILLED width (not
+## the whole meter). Tying it to the fill keeps the band small early on — when only a
+## sliver is gold — instead of a fixed wide band that swamps the whole fill, and lets
+## it grow naturally as progress fills more of the bar.
+const SWEEP_WIDTH_FRACTION := 0.3
 
 ## Peak opacity of the highlight band at its center (it feathers to 0 at its edges).
 ## Near-opaque, so the gliding band is bright and intense rather than a faint sheen.
@@ -204,9 +207,11 @@ func _process(delta: float) -> void:
 		_promotion_button.disabled = _economy.cash < next.tuition
 	else:
 		_apply_wage_fill(_promotion_progress(title, next))
+		# Show taps earned within THIS title, not the dynastic lifetime total, so the
+		# number matches the meter (and an heir starts each rung at 0 / span).
 		_context_label.text = "%s → %s: %d / %d taps + %s tuition" % [
 			title.title_name, next.title_name,
-			_wage.lifetime_taps, next.tap_threshold,
+			_wage.taps_in_current_title(), _wage.taps_required_for_promotion(),
 			Money.of(next.tuition).display()
 		]
 		_promotion_button.visible = false
@@ -219,14 +224,15 @@ func _apply_wage_fill(target: float) -> void:
 	_wage_meter.value = clampf(target, 0.0, 1.0)
 
 
-## Fraction of the way from the current title's tap threshold to the next title's
-## — the bright-gold fill level. lifetime_taps is dynastic and only grows, so this
-## climbs from 0 to 1 across the current rung.
-func _promotion_progress(title: TitleRow, next: TitleRow) -> float:
-	var span := next.tap_threshold - title.tap_threshold
+## Fraction of the way through the current rung — the bright-gold fill level. Driven
+## by taps earned WITHIN the current title (which resets to 0 on each promotion and
+## for each new heir), so the meter shows current-title progress rather than the
+## dynasty's ever-growing lifetime tap count.
+func _promotion_progress(_title: TitleRow, _next: TitleRow) -> float:
+	var span := _wage.taps_required_for_promotion()
 	if span <= 0:
 		return 0.0
-	return clampf(float(_wage.lifetime_taps - title.tap_threshold) / float(span), 0.0, 1.0)
+	return clampf(float(_wage.taps_in_current_title()) / float(span), 0.0, 1.0)
 
 
 ## Holding the clock-in button auto-taps the wage at the configured rate — a
@@ -287,16 +293,29 @@ func _draw_sweep() -> void:
 	var rect := _sweep_overlay.size
 	# Stay inside the navy frame on all sides.
 	var x_min := SWEEP_FRAME_INSET
-	var x_max := rect.x - SWEEP_FRAME_INSET
+	var x_full := rect.x - SWEEP_FRAME_INSET
 	var top := SWEEP_FRAME_INSET
 	var height := rect.y - SWEEP_FRAME_INSET * 2.0
+	# Confine the sweep to the gold-FILLED portion only — its right limit is the edge
+	# of the current fill, so the highlight never glides over the dark unfilled track.
+	# When the meter is empty there is no gold to light, so nothing is drawn.
+	var x_max := x_min + (x_full - x_min) * clampf(_wage_meter.value, 0.0, 1.0)
 	if x_max <= x_min or height <= 0.0:
 		return
 
-	# Sweep the band's center across the inset width: 0.5 − 0.5·cos gives 0→1→0.
+	# Band width scales with the gold-filled width, so it starts small and grows as
+	# progress fills the bar (x_max is the fill edge, x_min the left inset).
+	var band_width := (x_max - x_min) * SWEEP_WIDTH_FRACTION
+	# Keep the ENTIRE band inside the gold fill: the center only travels between half a
+	# band-width in from each end, so the band reverses direction before any part of it
+	# touches an edge. (Otherwise the bright band piled up against the right/fill edge
+	# and read as extra progress.)
+	var half_band := band_width * 0.5
+	var travel_min := x_min + half_band
+	var travel_max := x_max - half_band
+	# Sweep the band's center between those limits: 0.5 − 0.5·cos gives 0→1→0.
 	var travel := 0.5 - 0.5 * cos(TAU * _pulse_phase / PULSE_PERIOD)
-	var center_x := x_min + travel * (x_max - x_min)
-	var band_width := rect.x * SWEEP_WIDTH_FRACTION
+	var center_x := travel_min + travel * (travel_max - travel_min)
 	var highlight := _fill_base.lightened(FLASH_LIGHTEN)
 
 	# Draw the band as feathered vertical slices: alpha peaks at the band's center

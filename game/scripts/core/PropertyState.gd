@@ -86,14 +86,14 @@ func get_max_affordable(available_cash: float, cap: int = 1000) -> int:
 	var running_product := cost_product
 	var owned := units_owned
 	while count < cap:
-		var band := CostCurve.get_band(owned + 1)
-		var ratio := CostCurve.get_ratio(config.r0, band, tuning.band_step)
-		# Match the rounded price the player is actually charged (see CostCurve).
-		var unit_cost := CostCurve.round_nice(config.base_cost * running_product * ratio)
+		# Match the rounded price the player is actually charged (see CostCurve):
+		# the running product BEFORE this unit's ratio, so unit #1 costs base_cost.
+		var unit_cost := CostCurve.round_nice(config.base_cost * running_product)
 		if remaining < unit_cost:
 			break
 		remaining -= unit_cost
-		running_product *= ratio
+		var band := CostCurve.get_band(owned + 1)
+		running_product *= CostCurve.get_ratio(config.r0, band, tuning.band_step)
 		owned += 1
 		count += 1
 	return count

@@ -116,7 +116,13 @@ func _ready() -> void:
 	header.add_child(_name_label)
 
 	_income_label = Label.new()
-	_income_label.add_theme_color_override("font_color", UiPalette.MONEY_GREEN)
+	# Darker green than the standard money-green, plus a same-color outline for faux
+	# weight (Tim's call: the per-cycle payout should read darker and bolder). The
+	# outline is the project-wide bold trick used until real bold fonts arrive in M3.
+	var income_green := UiPalette.MONEY_GREEN.darkened(0.4)
+	_income_label.add_theme_color_override("font_color", income_green)
+	_income_label.add_theme_color_override("font_outline_color", income_green)
+	_income_label.add_theme_constant_override("outline_size", 2)
 	_income_label.add_theme_font_size_override("font_size", 30)
 	header.add_child(_income_label)
 
@@ -247,9 +253,16 @@ func _refresh(delta: float) -> void:
 	_income_label.text = Money.of(_prop.get_income_per_cycle() * _frenzy.get_multiplier()).display() + "/cycle"
 
 	# The tap verb mirrors Spec §4: START an idle cycle, RUSH a running one.
+	# While the button is held the cycle auto-restarts every completion, briefly going
+	# idle between pulses; without this guard the label would flicker START→RUSH each
+	# cycle. So a held button stays "RUSH" for the whole hold and only re-evaluates to
+	# START/RUSH once the player lets go.
 	if _prop.units_owned == 0:
 		_tap_button.text = "—"
 		_tap_button.disabled = true
+	elif _tap_button.button_pressed:
+		_tap_button.text = "RUSH"
+		_tap_button.disabled = false
 	elif _prop.is_cycle_running:
 		_tap_button.text = "RUSH"
 		_tap_button.disabled = false

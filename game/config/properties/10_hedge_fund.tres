@@ -9,5 +9,5 @@ display_name = "Hedge Fund"
 base_cost = 2000000000.0
 r0 = 1.07
 base_income_per_unit = 1000000000.0
-base_cycle_length = 40.0
+base_cycle_length = 54.0
 staffer_name = "Fund Administrator"

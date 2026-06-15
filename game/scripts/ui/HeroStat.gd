@@ -23,10 +23,17 @@ const INCOME_FONT_SIZE := 64
 # Cash on hand reads at the same size as income/sec (Tim's call) — kept tied to
 # INCOME_FONT_SIZE so the two stay matched if that value is ever retuned.
 const CASH_FONT_SIZE := INCOME_FONT_SIZE
-const CAPTION_FONT_SIZE := 30
+# Caption text bumped 10% (30 -> 33) at Tim's request.
+const CAPTION_FONT_SIZE := 33
+# The dynasty/heir name now lives in this panel (it used to be its own header
+# strip). It sits centered between the two edge values, on the same line as their
+# captions, so it reads as one band: "INCOME … NAME … CASH". Sized up 35% from the
+# old 30 (Tim's call) so the heir name carries more weight than the captions.
+const NAME_FONT_SIZE := 41
 const INCOME_BOLD := 3
 const CASH_BOLD := 2
 const CAPTION_BOLD := 2
+const NAME_BOLD := 2
 
 ## Gap kept between a pinned label and the panel edge it hugs.
 const EDGE_MARGIN := 14
@@ -46,6 +53,7 @@ var _income_label: Label
 var _cash_label: Label
 var _income_caption: Label
 var _cash_caption: Label
+var _name_label: Label
 
 # Frenzy glow: while a burn is active the ticket pulses toward red to signal the
 # accelerated state. Subtle — navy numerals stay readable over the tint.
@@ -85,6 +93,12 @@ func _ready() -> void:
 	_cash_caption.text = "CASH"
 	_content.add_child(_cash_caption)
 
+	# The heir/dynasty name, centered between the two edge values and laid out on the
+	# caption line (see _layout_labels). Navy to match the income side; Main feeds it
+	# via set_dynasty_name each frame.
+	_name_label = _make_label(UiPalette.NAVY, NAME_FONT_SIZE, NAME_BOLD)
+	_content.add_child(_name_label)
+
 
 ## Build a large, faux-bold label in the given color. The bold weight is faked with
 ## a same-color outline (no bold font asset exists yet — they arrive in M3).
@@ -102,7 +116,15 @@ func set_income_per_sec(income_per_sec: float) -> void:
 
 
 func set_cash(cash: float) -> void:
-	_cash_label.text = Money.of(cash).display()
+	# The cash balance uses its own fuller formatting (commas to $999,999, cents below
+	# $1,000, "$1.00 M" above) rather than the compact display() costs/income use.
+	_cash_label.text = Money.of(cash).display_cash()
+
+
+## The current heir's full name (e.g. "Wellington Pemberton IX"). Shown UPPERCASE
+## to match the ticket-plate convention the old header used.
+func set_dynasty_name(dynasty_name: String) -> void:
+	_name_label.text = dynasty_name.to_upper()
 
 
 ## Toggle the frenzy glow. Main drives this from the live frenzy state each frame.
@@ -136,25 +158,38 @@ func _layout_labels() -> void:
 	var area := _content.size
 	var caption_gap := 2.0  # space between a value and its caption beneath it
 
-	# Income (left edge): the number with the "INCOME" caption beneath it, the pair
-	# centered vertically as one block and flush to the left.
+	# Captions stay put where the old centered value+caption block placed them; only the
+	# big amounts move up. So we still compute the centered-block top (where the pair used
+	# to sit) to anchor each caption, then nudge the amount to half that distance from the
+	# top of the panel — i.e. twice as close to the top (Tim's call).
+
+	# Income (left edge): caption stays at the centered-block position; amount moves up.
 	_income_label.size = _income_label.get_minimum_size()
 	_income_caption.size = _income_caption.get_minimum_size()
 	var income_block_h := _income_label.size.y + caption_gap + _income_caption.size.y
-	var income_top := (area.y - income_block_h) / 2.0
-	_income_label.position = Vector2(EDGE_MARGIN, income_top)
-	_income_caption.position = Vector2(EDGE_MARGIN, income_top + _income_label.size.y + caption_gap)
+	var income_centered_top := (area.y - income_block_h) / 2.0
+	var income_caption_top := income_centered_top + _income_label.size.y + caption_gap
+	_income_label.position = Vector2(EDGE_MARGIN, income_centered_top / 2.0)
+	_income_caption.position = Vector2(EDGE_MARGIN, income_caption_top)
 
-	# Cash (right edge): the number with the "CASH" caption beneath it, the pair
-	# centered vertically and flush to the right.
+	# Cash (right edge): same treatment.
 	_cash_label.size = _cash_label.get_minimum_size()
 	_cash_caption.size = _cash_caption.get_minimum_size()
 	var cash_block_h := _cash_label.size.y + caption_gap + _cash_caption.size.y
-	var cash_top := (area.y - cash_block_h) / 2.0
-	_cash_label.position = Vector2(area.x - _cash_label.size.x - EDGE_MARGIN, cash_top)
-	_cash_caption.position = Vector2(
-		area.x - _cash_caption.size.x - EDGE_MARGIN,
-		cash_top + _cash_label.size.y + caption_gap
+	var cash_centered_top := (area.y - cash_block_h) / 2.0
+	var cash_caption_top := cash_centered_top + _cash_label.size.y + caption_gap
+	_cash_label.position = Vector2(area.x - _cash_label.size.x - EDGE_MARGIN, cash_centered_top / 2.0)
+	_cash_caption.position = Vector2(area.x - _cash_caption.size.x - EDGE_MARGIN, cash_caption_top)
+
+	# Heir name: horizontally centered across the whole plate, and vertically centered
+	# on the caption line so it sits level with the INCOME / CASH captions. (Income and
+	# cash captions share the same y because both values are the same font size, so
+	# either caption's top works as the reference.)
+	_name_label.size = _name_label.get_minimum_size()
+	var caption_center_y := cash_caption_top + _cash_caption.size.y / 2.0
+	_name_label.position = Vector2(
+		(area.x - _name_label.size.x) / 2.0,
+		caption_center_y - _name_label.size.y / 2.0
 	)
 
 

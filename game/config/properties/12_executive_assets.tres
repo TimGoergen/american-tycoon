@@ -9,5 +9,5 @@ display_name = "Executive Assets"
 base_cost = 100000000000.0
 r0 = 1.07
 base_income_per_unit = 40000000000.0
-base_cycle_length = 60.0
+base_cycle_length = 81.0
 staffer_name = "Chief of Staff"

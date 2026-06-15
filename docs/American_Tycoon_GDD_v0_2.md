@@ -192,7 +192,7 @@ No origin where the first dollar was earned — even bootstraps start with a gov
 
 A **short ritual: one screen, two beats, ~30 seconds.**
 
-1. **The Obituary:** name, years, a deadpan life summary assembled from the generation's actual stats — *"Bartholomew 'Chip' Ashworth-Vanderlyn IV, beloved employer of 11, grew the family fortune from $2.1B to $847B. Hours worked: 3."*
+1. **The Obituary:** name, years, a deadpan life summary assembled from the generation's actual stats — *"Bartholomew 'Chip' Ashworth-Vanderlyn IV, beloved employer of 11, grew the family fortune from $2.1B to $847B. Hours worked: 3."* The headline figure is the generation's **lifetime cash earned** (the never-spent career total that feeds the Legacy conversion — see Future Features "Lifetime cash earned"), not net worth at death.
 2. **The Reading of the Will** — the estate math made legible as a document: gross estate → **creditors first** → estate tax line (**each purchased loophole visibly shrinking it, in ink**) → net to heir → Legacy conversion. Loophole purchases pay off on this screen, every generation: strategic feedback delivered as ceremony.
 
 Then the heir's name reveals, numeral incremented, into the faster run. All obituaries re-readable in the Family Ledger.
@@ -292,6 +292,120 @@ Resolved since v0.1: ~~automation/managers~~ (§6), ~~dynasty identity~~ (§8.2)
 10. **Name generator part-lists.** A fun evening of writing (§8.2).
 11. **Sound & haptics design.** The return-spike delta (§3.1) needs weight; audio direction set, implementation unspecified.
 12. **Frenzy meter tuning.** Layer 3 charge rate, multiplier size, duration.
+
+---
+
+## Future Features (parking lot — not scheduled)
+
+Captured ideas for later development. Nothing here is in current scope; each needs its
+own design pass before it becomes a milestone.
+
+- **Temporary boosts.** Abilities that grant a *very high but very short-lived* increase in
+  income — a brief, dramatic spike the player triggers on demand. Distinct from the Frenzy
+  meter (§5.1/§9), which is an earned, self-charging burst. **Not cash-purchasable and not
+  consumable items with a count:** each boost is unlocked by a *permanent upgrade* that
+  establishes a specific bonus (magnitude + duration) gated by a specific *cooldown*. Once
+  unlocked, the boost is always available, limited only by its cooldown — so the upgrade
+  buys the *capability*, not a stock of charges. Open: where the permanent upgrades live
+  (Legacy/Estate Office shop vs. their own track), the bonus/duration/cooldown values,
+  whether boosts stack with Frenzy and the Legacy multipliers, and the satirical framing
+  (e.g. "energy drink", "insider tip"). (Tim, 2026-06-14.)
+
+- **Alien-contact epochs instead of distinct markets.** A *possible* alternative to the
+  multi-market expansion model (§14 Q8 "Market Two"). Rather than authoring new worlds that
+  each need their own properties, names, and art, keep a single Earth economy and advance it
+  through *epochs*: each new epoch is Earth being contacted by an alien race, which triggers
+  an **order-of-magnitude scale increase** in the economy. The same property ladder and UI
+  carry forward — only the scale shifts — which keeps the interface consistent and avoids the
+  heavy content cost of unique per-market definitions. This is the proposed mechanism for
+  letting numbers climb into absurd ranges (potentially beyond octillion) without rebuilding
+  the game each time.
+
+  *Decisions (Tim, 2026-06-14):* This is an **endless** game, not a narratively complete one.
+  The §10 "Final Dollar" goal — owning all the money on Earth ($103.6T, §14 Q3) — is
+  **repurposed as the trigger for the second epoch** (the alien-contact event), not the
+  ending; each epoch presumably ends with its own "own everything at this scale" line that
+  triggers the next contact. The current top epoch is **allowed to slowly stagnate for now**
+  — no game escalates forever, and a soft ceiling at the frontier is acceptable rather than a
+  hard finish. This direction is preferred over §8/§14 Q8's distinct-markets approach.
+
+  *Per-epoch choice (Tim, 2026-06-14):* Each epoch is more than a scale bump — it introduces a
+  **choice**. On entering a new epoch the player is prompted to pick **one of two modifiers**,
+  and the two options are **drawn randomly from a larger pool** of possibilities. Framed as a
+  choice between **specialization or expansion**. This is the novelty layer that keeps an epoch
+  from being pure ×N multiplication: each era reshapes the run a little, and the random draw
+  gives the endless game build variety and replay interest (a roguelike-style draft on top of
+  the idle economy).
+
+  *Still open:* the per-epoch scale multiplier and pacing; differentiation from the Legacy
+  multipliers (keep them orthogonal — Legacy accelerates within a bloodline, epochs shift the
+  whole era); the satirical framing of the alien-contact beat; the **modifier pool itself**
+  (what's in it, specialization vs. expansion axes, magnitudes); whether chosen modifiers are
+  permanent and **stack across epochs** or apply only to their epoch; whether the unpicked
+  option is ever recoverable; and how the random draw stays fair/interesting (weighting,
+  no-dup rules).
+
+- **Lifetime cash earned as the universal progress metric — RESOLVED 2026-06-14.** Use **total
+  cash earned over a lifetime** (a monotonic, never-spent accumulator, distinct from current
+  spendable cash) as the general yardstick of progress. Because it only ever grows, it stays
+  comparable across epochs no matter how absurd the scale becomes, and it reads on-theme as a
+  career/obituary earnings stat (§8.3).
+
+  **Decision (Tim, 2026-06-14): lifetime-cash-earned becomes the *basis* of the existing Legacy
+  conversion — not a second currency.** There remains exactly **one** spendable prestige
+  currency (Legacy, spent in the Estate Office; §8.4, Mechanics Spec §9.3). Lifetime-earned is
+  the *meter*; Legacy is the *currency* it converts into. This avoids the two-competing-tracks
+  trap. Mechanically:
+  - The **dynasty** holds `lifetime_cash_earned`, a cumulative all-generations accumulator —
+    the cross-epoch yardstick, the §8.3 obituary headline, and the Family Ledger career stat.
+    It only ever grows; spending never reduces it.
+  - Each **generation** tracks `cash_earned_this_gen` (the dollars that generation alone
+    earned). That *per-generation* figure — **not** the cumulative total — is the gross estate
+    fed into the death waterfall. (Per-generation is required: converting the cumulative total
+    at every death would re-bank the whole dynasty's history and Legacy would explode.)
+  - The estate waterfall is otherwise **unchanged**. The only swap is the will's *gross
+    estate*, which becomes `cash_earned_this_gen` instead of net-worth-at-death. Creditors,
+    exemption, estate tax, **loopholes** (§8.4), the `K_LEGACY × x^ALPHA` conversion curve, and
+    the Estate Lawyers yield multiplier all keep working verbatim — so the loophole tree keeps
+    its teeth.
+
+  **Why this basis over net-worth-at-death:** net worth rewards *hoarding* (die holding a big
+  pile) and quietly punishes spending on units/staff right before death; lifetime-earned rewards
+  *earning over a life*, which is what the idle loop actually is. Being monotonic, it stays
+  comparable across order-of-magnitude epoch jumps and through the §10.1 "Engine Stops"
+  stagnation, where net worth freezes and reads awkwardly.
+
+  **Theme note (accepted):** an estate tax literally taxes the *estate* (the pile), so taxing
+  lifetime earnings is conceptually closer to an income tax. Tim accepted this in favor of the
+  gameplay win — and the satire arguably sharpens ("they tax everything you ever earned").
+
+  *Still open:* whether "earned" counts wage income + capital gains together or tracks them
+  separately for the Ledger (§11 distinguishes lifetime wages vs. capital gains); and re-tuning
+  `K_LEGACY` / `ALPHA` once the gross estate changes magnitude (`TBD-SIM`). **Implementation is
+  M2-later — recorded here, not scheduled now.**
+
+- **Balance guardrail: a property must not trivially self-fund its own expansion.** (Tim,
+  2026-06-14.) Observed: buying additional units of a property is *too* affordable from that
+  same property's income — and it gets *easier* the more you own, the opposite of what the
+  ladder intends. Diagnosed cause: a property's income scales **linearly** with units owned
+  (`units × income_per_unit`, Mechanics Spec §3.4), but the next-unit cost grows
+  **geometrically** at only `r0 ≈ 1.07×` per unit (§3.2). At low counts linear `×n` outpaces
+  `1.07^n`, so the *payback period* (next-unit cost ÷ current income) **shrinks** as you stack
+  units — for the ATM it falls from ~6s at 1 unit to ~1s by the end of the 1–19 band — and the
+  ×2 milestone reward at each threshold halves it again. *Worked example (ATM, `base_cost=50`,
+  `r0=1.07`, `income/unit=5`, `cycle=0.54s` → $9.26/sec each): payback ∝ `r0^n / n`, which keeps
+  falling until `n ≈ 1/ln(r0) ≈ 15` units — i.e. almost the whole first band.*
+
+  **Why it matters:** if a property self-funds its own growth, the optimal play collapses to
+  pouring everything into one property, which erases the cross-property allocation decisions the
+  game is built on (§11). The guardrail: *a property's own income should never make its next
+  unit trivially affordable; within a milestone band the payback period should hold flat or
+  rise, never fall.*
+
+  **Lever:** `r0` is the knob (too shallow against linear income). Don't hand-pick a number —
+  define a **target payback period** per property (flat-to-rising across a band) and let the
+  balance simulator (§13 / Mechanics Spec §13) solve `r0` against it, preserving the
+  "milestones stay reachable" guarantee (§3.2). A `TBD-SIM` tuning pass, not scheduled now.
 
 ---
 

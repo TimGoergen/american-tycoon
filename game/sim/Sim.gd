@@ -469,9 +469,12 @@ func _verify_dynasty_save_roundtrip(dynasty: DynastyState) -> void:
 
 	var ok := reloaded.upgrades.available == dynasty.upgrades.available \
 			and reloaded.upgrades.earned_lifetime == dynasty.upgrades.earned_lifetime \
-			and reloaded.generation == dynasty.generation
-	print("Dynasty save round-trip (Legacy to spend %d, generation %d): %s" % [
-		reloaded.upgrades.available, reloaded.generation, "PASS" if ok else "FAIL",
+			and reloaded.generation == dynasty.generation \
+			and reloaded.ancestors.size() == dynasty.ancestors.size() \
+			and reloaded.lifetime_cash_earned == dynasty.lifetime_cash_earned
+	print("Dynasty save round-trip (Legacy to spend %d, generation %d, %d ancestors): %s" % [
+		reloaded.upgrades.available, reloaded.generation, reloaded.ancestors.size(),
+		"PASS" if ok else "FAIL",
 	])
 
 

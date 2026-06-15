@@ -43,6 +43,12 @@ var dynastic_taps: int = 0
 ## spending never reduces it.
 var lifetime_cash_earned: float = 0.0
 
+## One record per deceased generation, oldest first — the Family Ledger (GDD §8.2).
+## Each entry is a Dictionary: { "name": String (e.g. "Wellington Pemberton VIII"),
+## "generation": int, "fortune": float (the life's cash_earned_this_gen — the
+## obituary headline figure), "cause": String (how the generation ended) }.
+var ancestors: Array = []
+
 ## The generation alive right now. All active play happens through this.
 var current: GameState
 
@@ -122,16 +128,27 @@ func can_perform_succession() -> bool:
 # ---------------------------------------------------------------------------
 
 ## Kill the current generation and raise its heir. Banks the estate's Legacy into
-## the spendable wallet, advances the generation counter, carries dynastic Work
-## Ethic forward, and replaces `current` with a fresh generation that already has
-## all purchased upgrade effects applied. Returns the executed will for ceremony.
-func perform_succession() -> Dictionary:
+## the spendable wallet, records the deceased in the Family Ledger, advances the
+## generation counter, carries dynastic Work Ethic forward, and replaces `current`
+## with a fresh generation that already has all purchased upgrade effects applied.
+## `cause` is the deadpan generation-end recorded in the Ledger (GDD §8.2) — the
+## natural-death default, or "Creditors" when the bankruptcy path calls this.
+## Returns the executed will for ceremony.
+func perform_succession(cause: String = "Retired to Palm Beach") -> Dictionary:
 	var will := get_draft_will()
 
 	upgrades.award(int(will["legacy_gain"]))
 	# Roll this life's earnings into the dynasty's monotonic lifetime total before the
 	# generation is replaced (the obituary headline / Family Ledger career stat).
 	lifetime_cash_earned += current.economy.cash_earned_this_gen
+	# Record the deceased in the Family Ledger before the generation counter advances,
+	# so the name/numeral match the life that just ended (not the incoming heir's).
+	ancestors.append({
+		"name": HeirNames.dynasty_name(generation),
+		"generation": generation,
+		"fortune": current.economy.cash_earned_this_gen,
+		"cause": cause,
+	})
 	dynastic_taps = current.wage.lifetime_taps
 	generation += 1
 
@@ -195,6 +212,7 @@ func to_save_dict() -> Dictionary:
 		"generation": generation,
 		"dynastic_taps": dynastic_taps,
 		"lifetime_cash_earned": lifetime_cash_earned,
+		"ancestors": ancestors,
 		"current": current.to_save_dict(),
 	}
 
@@ -212,6 +230,11 @@ func load_save_dict(data: Dictionary) -> void:
 	dynastic_taps = int(data.get("dynastic_taps", 0))
 	# Pre-basis-swap saves have no dynasty-wide earned total; default to 0.0.
 	lifetime_cash_earned = float(data.get("lifetime_cash_earned", 0.0))
+	# Pre-Family-Ledger saves have no ancestor list; default to empty. Duplicate each
+	# entry so the loaded dynasty owns its own dictionaries, not the save's.
+	ancestors = []
+	for record in data.get("ancestors", []):
+		ancestors.append((record as Dictionary).duplicate())
 
 	upgrades = LegacyUpgrades.new()
 	if data.has("upgrades"):

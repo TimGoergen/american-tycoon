@@ -155,6 +155,19 @@ AdCap-style per-property hires — the moment **labor itself becomes something y
 
 ## 8. Origins, Death, Inheritance, Debt
 
+> **SHELVED → post-prestige (Tim, 2026-06-15).** The whole **credit/class system**
+> — origins (§8.1), debt & bankruptcy (§8.5), and the offers system (§8.6) — is
+> shelved for now. Reason: handing the founder *any* early cash (even the $1,000
+> bootstrap, and especially the $200k/$500k loans) flattens the opening grind, which
+> is the most dopamine-rich part of generation one. The **founder now starts at $0**
+> and earns the first dollar by hand. The mechanic is expected to **return as a
+> post-prestige feature**: an heir — already accelerated by Legacy — could be offered
+> origins/credit as *extra options* (more ways to play a run), where an early influx
+> adds choice instead of removing the climb. Death/inheritance/estate-tax (§8.2–8.4)
+> are **NOT** shelved — they shipped in M2. Implementation is fully built and parked
+> on the `shelved/credit-and-class` branch for resurrection; the sections below are
+> the design of record for that future work.
+
 ### 8.1 The Opening (preserved from original flowchart)
 
 First question: **"Do you have rich parents?"** Class origin as character creation.

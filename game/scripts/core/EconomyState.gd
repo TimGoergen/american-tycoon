@@ -16,6 +16,14 @@ var income_this_tick: float = 0.0
 ## Total income paid out since economy creation (for simulator graphs).
 var total_income: float = 0.0
 
+## Dollars this generation has EARNED over its life — property income plus wage
+## taps plus the offline pile. Monotonic: it only ever rises, and spending never
+## reduces it. This is the gross estate the death waterfall now taxes (Spec §9.1,
+## GDD §8.3 decision 2026-06-14), and the obituary headline. Deliberately distinct
+## from `cash`: granted money (loan principal, birth seed, windfalls) is NOT earned
+## and must never be counted here, so it flows through award_cash() instead.
+var cash_earned_this_gen: float = 0.0
+
 ## Total simulated time elapsed in seconds.
 var time_elapsed: float = 0.0
 
@@ -53,6 +61,9 @@ func tick(delta: float, income_multiplier: float = 1.0) -> void:
 		income_this_tick += (prop as PropertyState).tick(delta, income_multiplier)
 	cash += income_this_tick
 	total_income += income_this_tick
+	# Property income is earned money, so it feeds the lifetime-earned accumulator
+	# that the estate waterfall now grosses on (Spec §9.1).
+	cash_earned_this_gen += income_this_tick
 	time_elapsed += delta
 
 
@@ -134,9 +145,20 @@ func get_highest_owned_index() -> int:
 	return highest
 
 
-## Credit cash directly (for starting money, offline pile, events).
+## Credit GRANTED cash — money the player was handed, not earned: birth seed
+## capital, Trust Fund bonus, loan principal, windfall gifts. Does NOT touch
+## cash_earned_this_gen, so granted money can never inflate the estate or Legacy.
 func award_cash(amount: float) -> void:
 	cash += floor(amount)
+
+
+## Credit EARNED cash — money the player worked for outside the property tick:
+## wage taps (the offline pile is credited the same way). Feeds both the spendable
+## balance and the lifetime-earned accumulator the estate waterfall grosses on.
+func award_earned(amount: float) -> void:
+	var credited := floorf(amount)
+	cash += credited
+	cash_earned_this_gen += credited
 
 
 ## Estate "asset book value" — lifetime spent on units + staff this generation

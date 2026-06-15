@@ -6,16 +6,23 @@ extends ColorRect
 # followed by an heir reveal. Ceremony copy, portraits, and art arrive in M3;
 # this M1 build surfaces all the numbers clearly so the math feels real.
 #
-# Two phases live inside one overlay and are swapped in-place:
+# Three phases live inside one overlay and are swapped in-place:
+#   Phase 0 — the obituary (GDD §8.3 beat 1: who died + a deadpan life summary,
+#             headlined by the generation's lifetime earnings)
 #   Phase 1 — the will document (estate waterfall + "SIGN & PASS ON" button)
 #   Phase 2 — heir reveal ("THE ESTATE PASSES TO" + "BEGIN THE NEW RUN" button)
 #
 # Main.gd drives the ceremony:
-#   1. Call show_will(will, dying_name)  → player reads math, clicks confirm
-#   2. Listen for pass_on_confirmed signal
-#   3. Call show_heir_reveal(heir_name, generation) → player clicks begin
-#   4. Listen for heir_begin_pressed signal
+#   1. Call show_obituary(stats)         → player reads the obituary, clicks continue
+#   2. Listen for continue_to_will signal
+#   3. Call show_will(will, dying_name)  → player reads math, clicks confirm
+#   4. Listen for pass_on_confirmed signal
+#   5. Call show_heir_reveal(heir_name, generation) → player clicks begin
+#   6. Listen for heir_begin_pressed signal
 
+
+## Player dismissed the obituary to read the will (end phase 0).
+signal continue_to_will
 
 ## Player has signed the will and chosen to pass the estate on (end phase 1).
 signal pass_on_confirmed
@@ -25,6 +32,15 @@ signal cancelled
 
 ## Player dismisses the heir reveal to begin the new generation (end phase 2).
 signal heir_begin_pressed
+
+
+# ── Phase 0 references (the obituary) ─────────────────────────────────────────
+
+var _phase0_container: VBoxContainer
+
+var _obituary_name_label: Label
+var _obituary_fortune_label: Label
+var _obituary_summary_label: Label
 
 
 # ── Phase 1 references ────────────────────────────────────────────────────────
@@ -68,12 +84,82 @@ func _ready() -> void:
 	outer_column.custom_minimum_size = Vector2(640, 0)
 	panel.add_child(outer_column)
 
+	_build_phase0(outer_column)
 	_build_phase1(outer_column)
 	_build_phase2(outer_column)
 
-	# Both phases start hidden; show_will / show_heir_reveal reveal the right one.
+	# All phases start hidden; the show_* methods reveal exactly one at a time.
+	_phase0_container.visible = false
 	_phase1_container.visible = false
 	_phase2_container.visible = false
+
+
+# ── Phase 0 builder (the obituary) ────────────────────────────────────────────
+
+func _build_phase0(parent: VBoxContainer) -> void:
+	_phase0_container = VBoxContainer.new()
+	_phase0_container.add_theme_constant_override("separation", 10)
+	parent.add_child(_phase0_container)
+
+	# ── Headline ──
+	var headline := Label.new()
+	headline.text = "IN MEMORIAM"
+	headline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	headline.add_theme_color_override("font_color", UiPalette.NAVY)
+	headline.add_theme_font_size_override("font_size", 44)
+	_phase0_container.add_child(headline)
+
+	# ── The deceased's name (populated in show_obituary) ──
+	_obituary_name_label = Label.new()
+	_obituary_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_obituary_name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_obituary_name_label.add_theme_color_override("font_color", UiPalette.NAVY)
+	_obituary_name_label.add_theme_font_size_override("font_size", 40)
+	_phase0_container.add_child(_obituary_name_label)
+
+	var spacer := Control.new()
+	spacer.custom_minimum_size = Vector2(0, 12)
+	_phase0_container.add_child(spacer)
+
+	# ── The headline figure: lifetime earnings, in celebratory money-green ──
+	# This is the obituary's hero number (GDD §8.3) — the dollars this life earned.
+	_obituary_fortune_label = Label.new()
+	_obituary_fortune_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_obituary_fortune_label.add_theme_color_override("font_color", UiPalette.MONEY_GREEN)
+	_obituary_fortune_label.add_theme_font_size_override("font_size", 52)
+	_phase0_container.add_child(_obituary_fortune_label)
+
+	var caption := Label.new()
+	caption.text = "earned in a lifetime of honest work"
+	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	caption.add_theme_color_override("font_color", UiPalette.NAVY)
+	caption.add_theme_font_size_override("font_size", 22)
+	_phase0_container.add_child(caption)
+
+	var spacer2 := Control.new()
+	spacer2.custom_minimum_size = Vector2(0, 12)
+	_phase0_container.add_child(spacer2)
+
+	# ── Deadpan life summary (populated in show_obituary) ──
+	_obituary_summary_label = Label.new()
+	_obituary_summary_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_obituary_summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_obituary_summary_label.add_theme_color_override("font_color", UiPalette.NAVY)
+	_obituary_summary_label.add_theme_font_size_override("font_size", 26)
+	_phase0_container.add_child(_obituary_summary_label)
+
+	var spacer3 := Control.new()
+	spacer3.custom_minimum_size = Vector2(0, 12)
+	_phase0_container.add_child(spacer3)
+
+	# ── Continue button → the will ──
+	var continue_button := Button.new()
+	continue_button.text = "READ THE WILL"
+	continue_button.custom_minimum_size = Vector2(0, 80)
+	continue_button.add_theme_font_size_override("font_size", 30)
+	UiPalette.style_button(continue_button, true)
+	continue_button.pressed.connect(_on_obituary_continue_pressed)
+	_phase0_container.add_child(continue_button)
 
 
 # ── Phase 1 builder ───────────────────────────────────────────────────────────
@@ -189,6 +275,34 @@ func _build_phase2(parent: VBoxContainer) -> void:
 
 # ── Public interface ──────────────────────────────────────────────────────────
 
+## Show phase 0: the obituary for the dying generation (GDD §8.3 beat 1).
+## `stats` keys:
+##   name      — String, the deceased's full dynastic name ("Wellington Pemberton VIII")
+##   fortune   — float, the life's lifetime cash earned (the headline figure)
+##   seed      — float, the cash the generation was born with (the "grew from $X" anchor)
+##   employees — int, how many properties the generation kept staffed (its payroll)
+func show_obituary(stats: Dictionary) -> void:
+	_obituary_name_label.text = String(stats.get("name", ""))
+	_obituary_fortune_label.text = Money.of(float(stats.get("fortune", 0.0))).display()
+
+	# Deadpan summary assembled from the life's real stats. The narrator is a true
+	# believer (GDD §1.2): it credits hard work while reporting "Hours worked: 0" —
+	# only the numbers wink. "employer of N" pluralizes so the grammar stays sincere.
+	var employees := int(stats.get("employees", 0))
+	var employer_clause := "a beloved employer of %d" % employees if employees != 1 else "a beloved employer of 1"
+	var summary := "%s, grew the family fortune from %s to %s. Hours worked: 0." % [
+		employer_clause,
+		Money.of(float(stats.get("seed", 0.0))).display(),
+		Money.of(float(stats.get("fortune", 0.0))).display(),
+	]
+	_obituary_summary_label.text = summary
+
+	_phase0_container.visible = true
+	_phase1_container.visible = false
+	_phase2_container.visible = false
+	visible = true
+
+
 ## Show phase 1: the itemized will for the dying generation.
 ## `will` keys (all floats unless noted):
 ##   estate_gross   — total accumulated wealth
@@ -213,6 +327,7 @@ func show_will(will: Dictionary, dying_dynasty_name: String) -> void:
 	# Legacy is a points integer, not a dollar figure — shown plainly with a + sign.
 	_legacy_value.text   = "+%d" % int(will.legacy_gain)
 
+	_phase0_container.visible = false
 	_phase1_container.visible = true
 	_phase2_container.visible = false
 	visible = true
@@ -226,6 +341,7 @@ func show_heir_reveal(heir_dynasty_name: String, generation: int) -> void:
 	# Deadpan subline: acknowledges the ceremony is perfunctory, which is the joke.
 	_generation_label.text  = "Generation %d — the family office handles the paperwork now." % generation
 
+	_phase0_container.visible = false
 	_phase1_container.visible = false
 	_phase2_container.visible = true
 	# Overlay stays visible; it was already shown during phase 1.
@@ -233,6 +349,12 @@ func show_heir_reveal(heir_dynasty_name: String, generation: int) -> void:
 
 
 # ── Signal handlers ───────────────────────────────────────────────────────────
+
+func _on_obituary_continue_pressed() -> void:
+	# Do NOT hide here. Main.gd will immediately call show_will(), swapping the
+	# overlay from phase 0 to phase 1 without a flash of the game beneath.
+	continue_to_will.emit()
+
 
 func _on_sign_pressed() -> void:
 	# Do NOT hide here. Main.gd will immediately call show_heir_reveal(),

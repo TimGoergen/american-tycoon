@@ -282,6 +282,21 @@ Resolved since v0.1: ~~automation/managers~~ (§6), ~~dynasty identity~~ (§8.2)
 
 ---
 
+## Future Features (parking lot — not scheduled)
+
+Captured ideas for later development. Nothing here is in current scope; each needs its
+own design pass before it becomes a milestone.
+
+- **Temporary boosts / consumables.** Consumable items that grant a *very high but very
+  short-lived* increase in income — a brief, dramatic spike the player triggers on demand.
+  Distinct from the Frenzy meter (§5.1/§9), which is an earned, self-charging burst: these
+  are discrete items with a count. Open: how they're acquired (earned, purchased, event
+  drop, loophole reward?), their magnitude and duration, whether they stack with Frenzy and
+  the Legacy multipliers, and whether they read as satire (e.g. "energy drink", "insider
+  tip"). (Tim, 2026-06-14.)
+
+---
+
 ## 15. Source Artifacts (project knowledge inventory)
 
 | Artifact | Status | Role |

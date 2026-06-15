@@ -116,7 +116,13 @@ func _ready() -> void:
 	header.add_child(_name_label)
 
 	_income_label = Label.new()
-	_income_label.add_theme_color_override("font_color", UiPalette.MONEY_GREEN)
+	# Darker green than the standard money-green, plus a same-color outline for faux
+	# weight (Tim's call: the per-cycle payout should read darker and bolder). The
+	# outline is the project-wide bold trick used until real bold fonts arrive in M3.
+	var income_green := UiPalette.MONEY_GREEN.darkened(0.4)
+	_income_label.add_theme_color_override("font_color", income_green)
+	_income_label.add_theme_color_override("font_outline_color", income_green)
+	_income_label.add_theme_constant_override("outline_size", 2)
 	_income_label.add_theme_font_size_override("font_size", 30)
 	header.add_child(_income_label)
 

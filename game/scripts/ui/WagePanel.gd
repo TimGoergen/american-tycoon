@@ -303,12 +303,19 @@ func _draw_sweep() -> void:
 	if x_max <= x_min or height <= 0.0:
 		return
 
-	# Sweep the band's center across the inset width: 0.5 − 0.5·cos gives 0→1→0.
-	var travel := 0.5 - 0.5 * cos(TAU * _pulse_phase / PULSE_PERIOD)
-	var center_x := x_min + travel * (x_max - x_min)
 	# Band width scales with the gold-filled width, so it starts small and grows as
 	# progress fills the bar (x_max is the fill edge, x_min the left inset).
 	var band_width := (x_max - x_min) * SWEEP_WIDTH_FRACTION
+	# Keep the ENTIRE band inside the gold fill: the center only travels between half a
+	# band-width in from each end, so the band reverses direction before any part of it
+	# touches an edge. (Otherwise the bright band piled up against the right/fill edge
+	# and read as extra progress.)
+	var half_band := band_width * 0.5
+	var travel_min := x_min + half_band
+	var travel_max := x_max - half_band
+	# Sweep the band's center between those limits: 0.5 − 0.5·cos gives 0→1→0.
+	var travel := 0.5 - 0.5 * cos(TAU * _pulse_phase / PULSE_PERIOD)
+	var center_x := travel_min + travel * (travel_max - travel_min)
 	var highlight := _fill_base.lightened(FLASH_LIGHTEN)
 
 	# Draw the band as feathered vertical slices: alpha peaks at the band's center

@@ -298,6 +298,20 @@ own design pass before it becomes a milestone.
   whether boosts stack with Frenzy and the Legacy multipliers, and the satirical framing
   (e.g. "energy drink", "insider tip"). (Tim, 2026-06-14.)
 
+- **Alien-contact epochs instead of distinct markets.** A *possible* alternative to the
+  multi-market expansion model (§14 Q8 "Market Two"). Rather than authoring new worlds that
+  each need their own properties, names, and art, keep a single Earth economy and advance it
+  through *epochs*: each new epoch is Earth being contacted by an alien race, which triggers
+  an **order-of-magnitude scale increase** in the economy. The same property ladder and UI
+  carry forward — only the scale shifts — which keeps the interface consistent and avoids the
+  heavy content cost of unique per-market definitions. This is the proposed mechanism for
+  letting numbers climb into absurd ranges (potentially beyond octillion) without rebuilding
+  the game each time. Open: how it interacts with the §10 "Final Dollar" win condition and
+  the canonical Earth figure (§14 Q3), the per-epoch multiplier and pacing, what (if anything)
+  visibly changes besides scale, and the satirical framing of the alien-contact beat. Tension
+  to resolve: this competes with §8/§14 Q8's distinct-markets direction — pick one.
+  (Tim, 2026-06-14.)
+
 ---
 
 ## 15. Source Artifacts (project knowledge inventory)

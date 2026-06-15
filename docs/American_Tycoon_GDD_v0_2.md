@@ -332,6 +332,19 @@ own design pass before it becomes a milestone.
   option is ever recoverable; and how the random draw stays fair/interesting (weighting,
   no-dup rules).
 
+- **Lifetime cash earned as the universal progress metric.** Use **total cash earned over a
+  lifetime** (a monotonic, never-spent accumulator, distinct from current spendable cash) as
+  the general yardstick of progress. Because it only ever grows, it stays comparable across
+  epochs no matter how absurd the scale becomes, and it reads on-theme as a career/obituary
+  earnings stat (§8.3). Its job in the endless loop: once the frontier epoch stagnates
+  (above), prestige still converts lifetime earnings into **new permanent upgrades to
+  purchase**, so there is always a reason to start another run — the always-available sink
+  that keeps an endless game from dead-ending. *Open / must resolve:* its relationship to the
+  existing **Legacy** currency (§9.3 converts estate-net → Legacy on death). Decide whether
+  lifetime-cash-earned *is* the new basis for the prestige/Legacy conversion, a parallel
+  second currency, or just a display stat — avoid two competing prestige tracks. (Tim,
+  2026-06-14.)
+
 ---
 
 ## 15. Source Artifacts (project knowledge inventory)

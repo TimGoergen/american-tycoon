@@ -8,6 +8,7 @@
 
 - when designing the ui, i want the ui elements to be relatively large for readability
 - i am 49 and my visiion isn't great
+- i generally prefer setting my devices to use 150% text size
 
 ## format considerations
 

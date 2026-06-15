@@ -306,11 +306,22 @@ own design pass before it becomes a milestone.
   carry forward — only the scale shifts — which keeps the interface consistent and avoids the
   heavy content cost of unique per-market definitions. This is the proposed mechanism for
   letting numbers climb into absurd ranges (potentially beyond octillion) without rebuilding
-  the game each time. Open: how it interacts with the §10 "Final Dollar" win condition and
-  the canonical Earth figure (§14 Q3), the per-epoch multiplier and pacing, what (if anything)
-  visibly changes besides scale, and the satirical framing of the alien-contact beat. Tension
-  to resolve: this competes with §8/§14 Q8's distinct-markets direction — pick one.
-  (Tim, 2026-06-14.)
+  the game each time.
+
+  *Decisions (Tim, 2026-06-14):* This is an **endless** game, not a narratively complete one.
+  The §10 "Final Dollar" goal — owning all the money on Earth ($103.6T, §14 Q3) — is
+  **repurposed as the trigger for the second epoch** (the alien-contact event), not the
+  ending; each epoch presumably ends with its own "own everything at this scale" line that
+  triggers the next contact. The current top epoch is **allowed to slowly stagnate for now**
+  — no game escalates forever, and a soft ceiling at the frontier is acceptable rather than a
+  hard finish. This direction is preferred over §8/§14 Q8's distinct-markets approach.
+
+  *Still open:* the per-epoch multiplier and pacing; differentiation from the Legacy
+  multipliers (keep them orthogonal — Legacy accelerates within a bloodline, epochs shift the
+  whole era); the satirical framing of the alien-contact beat; and **what changes besides
+  scale.** (Claude's recommendation: give each epoch one cheap novelty — a new top rung, a
+  modifier, a flavor reskin — so an epoch isn't pure ×N multiplication, the classic idle
+  treadmill. Not yet accepted.)
 
 ---
 

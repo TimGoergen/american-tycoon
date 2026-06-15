@@ -9,5 +9,5 @@ display_name = "Money Laundering"
 base_cost = 850000.0
 r0 = 1.07
 base_income_per_unit = 450000.0
-base_cycle_length = 12.0
+base_cycle_length = 16.2
 staffer_name = "Freshness Consultant"

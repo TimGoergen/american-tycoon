@@ -9,5 +9,5 @@ display_name = "Money Tree"
 base_cost = 350.0
 r0 = 1.07
 base_income_per_unit = 90.0
-base_cycle_length = 1.5
+base_cycle_length = 2.025
 staffer_name = "Botanical Manager"

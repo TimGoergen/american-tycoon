@@ -115,7 +115,9 @@ func set_income_per_sec(income_per_sec: float) -> void:
 
 
 func set_cash(cash: float) -> void:
-	_cash_label.text = Money.of(cash).display()
+	# The cash balance uses its own fuller formatting (commas to $999,999, cents below
+	# $1,000, "$1.00 M" above) rather than the compact display() costs/income use.
+	_cash_label.text = Money.of(cash).display_cash()
 
 
 ## The current heir's full name (e.g. "Wellington Pemberton IX"). Shown UPPERCASE

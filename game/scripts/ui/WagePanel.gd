@@ -52,8 +52,11 @@ const PULSE_PERIOD := 2.0
 ## snapping off.
 const PULSE_RAMP_TAU := 0.18
 
-## Width of the gliding highlight band as a fraction of the meter's width.
-const SWEEP_WIDTH_FRACTION := 0.4
+## Width of the gliding highlight band as a fraction of the GOLD-FILLED width (not
+## the whole meter). Tying it to the fill keeps the band small early on — when only a
+## sliver is gold — instead of a fixed wide band that swamps the whole fill, and lets
+## it grow naturally as progress fills more of the bar.
+const SWEEP_WIDTH_FRACTION := 0.3
 
 ## Peak opacity of the highlight band at its center (it feathers to 0 at its edges).
 ## Near-opaque, so the gliding band is bright and intense rather than a faint sheen.
@@ -303,7 +306,9 @@ func _draw_sweep() -> void:
 	# Sweep the band's center across the inset width: 0.5 − 0.5·cos gives 0→1→0.
 	var travel := 0.5 - 0.5 * cos(TAU * _pulse_phase / PULSE_PERIOD)
 	var center_x := x_min + travel * (x_max - x_min)
-	var band_width := rect.x * SWEEP_WIDTH_FRACTION
+	# Band width scales with the gold-filled width, so it starts small and grows as
+	# progress fills the bar (x_max is the fill edge, x_min the left inset).
+	var band_width := (x_max - x_min) * SWEEP_WIDTH_FRACTION
 	var highlight := _fill_base.lightened(FLASH_LIGHTEN)
 
 	# Draw the band as feathered vertical slices: alpha peaks at the band's center

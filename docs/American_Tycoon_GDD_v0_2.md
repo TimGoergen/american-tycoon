@@ -179,7 +179,7 @@ No origin where the first dollar was earned — even bootstraps start with a gov
 
 A **short ritual: one screen, two beats, ~30 seconds.**
 
-1. **The Obituary:** name, years, a deadpan life summary assembled from the generation's actual stats — *"Bartholomew 'Chip' Ashworth-Vanderlyn IV, beloved employer of 11, grew the family fortune from $2.1B to $847B. Hours worked: 3."*
+1. **The Obituary:** name, years, a deadpan life summary assembled from the generation's actual stats — *"Bartholomew 'Chip' Ashworth-Vanderlyn IV, beloved employer of 11, grew the family fortune from $2.1B to $847B. Hours worked: 3."* The headline figure is the generation's **lifetime cash earned** (the never-spent career total that feeds the Legacy conversion — see Future Features "Lifetime cash earned"), not net worth at death.
 2. **The Reading of the Will** — the estate math made legible as a document: gross estate → **creditors first** → estate tax line (**each purchased loophole visibly shrinking it, in ink**) → net to heir → Legacy conversion. Loophole purchases pay off on this screen, every generation: strategic feedback delivered as ceremony.
 
 Then the heir's name reveals, numeral incremented, into the faster run. All obituaries re-readable in the Family Ledger.
@@ -332,18 +332,44 @@ own design pass before it becomes a milestone.
   option is ever recoverable; and how the random draw stays fair/interesting (weighting,
   no-dup rules).
 
-- **Lifetime cash earned as the universal progress metric.** Use **total cash earned over a
-  lifetime** (a monotonic, never-spent accumulator, distinct from current spendable cash) as
-  the general yardstick of progress. Because it only ever grows, it stays comparable across
-  epochs no matter how absurd the scale becomes, and it reads on-theme as a career/obituary
-  earnings stat (§8.3). Its job in the endless loop: once the frontier epoch stagnates
-  (above), prestige still converts lifetime earnings into **new permanent upgrades to
-  purchase**, so there is always a reason to start another run — the always-available sink
-  that keeps an endless game from dead-ending. *Open / must resolve:* its relationship to the
-  existing **Legacy** currency (§9.3 converts estate-net → Legacy on death). Decide whether
-  lifetime-cash-earned *is* the new basis for the prestige/Legacy conversion, a parallel
-  second currency, or just a display stat — avoid two competing prestige tracks. (Tim,
-  2026-06-14.)
+- **Lifetime cash earned as the universal progress metric — RESOLVED 2026-06-14.** Use **total
+  cash earned over a lifetime** (a monotonic, never-spent accumulator, distinct from current
+  spendable cash) as the general yardstick of progress. Because it only ever grows, it stays
+  comparable across epochs no matter how absurd the scale becomes, and it reads on-theme as a
+  career/obituary earnings stat (§8.3).
+
+  **Decision (Tim, 2026-06-14): lifetime-cash-earned becomes the *basis* of the existing Legacy
+  conversion — not a second currency.** There remains exactly **one** spendable prestige
+  currency (Legacy, spent in the Estate Office; §8.4, Mechanics Spec §9.3). Lifetime-earned is
+  the *meter*; Legacy is the *currency* it converts into. This avoids the two-competing-tracks
+  trap. Mechanically:
+  - The **dynasty** holds `lifetime_cash_earned`, a cumulative all-generations accumulator —
+    the cross-epoch yardstick, the §8.3 obituary headline, and the Family Ledger career stat.
+    It only ever grows; spending never reduces it.
+  - Each **generation** tracks `cash_earned_this_gen` (the dollars that generation alone
+    earned). That *per-generation* figure — **not** the cumulative total — is the gross estate
+    fed into the death waterfall. (Per-generation is required: converting the cumulative total
+    at every death would re-bank the whole dynasty's history and Legacy would explode.)
+  - The estate waterfall is otherwise **unchanged**. The only swap is the will's *gross
+    estate*, which becomes `cash_earned_this_gen` instead of net-worth-at-death. Creditors,
+    exemption, estate tax, **loopholes** (§8.4), the `K_LEGACY × x^ALPHA` conversion curve, and
+    the Estate Lawyers yield multiplier all keep working verbatim — so the loophole tree keeps
+    its teeth.
+
+  **Why this basis over net-worth-at-death:** net worth rewards *hoarding* (die holding a big
+  pile) and quietly punishes spending on units/staff right before death; lifetime-earned rewards
+  *earning over a life*, which is what the idle loop actually is. Being monotonic, it stays
+  comparable across order-of-magnitude epoch jumps and through the §10.1 "Engine Stops"
+  stagnation, where net worth freezes and reads awkwardly.
+
+  **Theme note (accepted):** an estate tax literally taxes the *estate* (the pile), so taxing
+  lifetime earnings is conceptually closer to an income tax. Tim accepted this in favor of the
+  gameplay win — and the satire arguably sharpens ("they tax everything you ever earned").
+
+  *Still open:* whether "earned" counts wage income + capital gains together or tracks them
+  separately for the Ledger (§11 distinguishes lifetime wages vs. capital gains); and re-tuning
+  `K_LEGACY` / `ALPHA` once the gross estate changes magnitude (`TBD-SIM`). **Implementation is
+  M2-later — recorded here, not scheduled now.**
 
 ---
 

@@ -28,10 +28,17 @@ Milestone thresholds at counts **20 × 2^k** (20, 40, 80, 160, ...), matching th
 Cost of the next unit when `n` units are owned (0-indexed purchase n+1, in band b):
 
 ```
-unit_cost(n) = floor( BASE_COST_i × Π(over units 1..n+1) r_band(unit) )
+unit_cost(n) = round_nice( BASE_COST_i × Π(over units 1..n) r_band(unit) )
 r_band(b)    = R0_i × BAND_STEP^b
 ```
 
+- **`BASE_COST_i` is the literal sticker price of the first unit** (Tim, 2026-06-14): the
+  product runs over the units *already owned* (units 1..n), so at `n = 0` it is empty and
+  the first unit costs exactly `BASE_COST_i`. Each unit's own ratio is folded in only once
+  it is bought, pricing the next one. (Earlier the product ran to `n+1`, charging `BASE × R0`
+  for the very first unit — e.g. the first ATM read $55 instead of $50.)
+- Prices are snapped to the nearest $5 (`round_nice`) so the player never sees odd
+  numbers; the underlying geometric product is kept raw so the curve still climbs smoothly.
 - `R0_i` per property from config (genre-gentle, ~1.05–1.10 `TBD-SIM`).
 - `BAND_STEP` global (provisional 1.15 `TBD-SIM`).
 - Steepening applies only *after* each milestone is crossed — milestones stay reachable by construction.

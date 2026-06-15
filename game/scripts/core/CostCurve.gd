@@ -37,18 +37,18 @@ static func round_nice(value: float) -> float:
 
 
 ## Cost to buy the next unit when `units_owned` are already owned.
-## cost_product is the running multiplier accumulated from all prior purchases.
-## Formula: floor(base_cost × cost_product × ratio_for_next_unit)  [Spec §3.2]
+## cost_product is the running multiplier accumulated from all prior purchases
+## (1.0 when nothing is owned yet), so base_cost is the literal sticker price of the
+## very first unit; each unit's ratio is folded into cost_product only AFTER it is
+## bought (see advance_cost_product). Formula: floor(base_cost × cost_product).
 static func get_next_cost(
 		base_cost: float,
-		r0: float,
-		band_step: float,
+		_r0: float,
+		_band_step: float,
 		cost_product: float,
-		units_owned: int
+		_units_owned: int
 ) -> float:
-	var next_band := get_band(units_owned + 1)
-	var ratio := get_ratio(r0, next_band, band_step)
-	return round_nice(base_cost * cost_product * ratio)
+	return round_nice(base_cost * cost_product)
 
 
 ## Return the updated cost_product after purchasing one unit.
@@ -78,10 +78,11 @@ static func get_bulk_cost(
 	var running_product := cost_product
 	var owned := units_owned
 	for _i in range(count):
+		# Price each unit at the running product BEFORE folding in its own ratio, so
+		# the first unit (running_product == 1.0) costs exactly base_cost.
+		total += round_nice(base_cost * running_product)
 		var band := get_band(owned + 1)
-		var ratio := get_ratio(r0, band, band_step)
-		total += round_nice(base_cost * running_product * ratio)
-		running_product *= ratio
+		running_product *= get_ratio(r0, band, band_step)
 		owned += 1
 	return total
 

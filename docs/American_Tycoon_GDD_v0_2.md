@@ -316,12 +316,21 @@ own design pass before it becomes a milestone.
   — no game escalates forever, and a soft ceiling at the frontier is acceptable rather than a
   hard finish. This direction is preferred over §8/§14 Q8's distinct-markets approach.
 
-  *Still open:* the per-epoch multiplier and pacing; differentiation from the Legacy
+  *Per-epoch choice (Tim, 2026-06-14):* Each epoch is more than a scale bump — it introduces a
+  **choice**. On entering a new epoch the player is prompted to pick **one of two modifiers**,
+  and the two options are **drawn randomly from a larger pool** of possibilities. Framed as a
+  choice between **specialization or expansion**. This is the novelty layer that keeps an epoch
+  from being pure ×N multiplication: each era reshapes the run a little, and the random draw
+  gives the endless game build variety and replay interest (a roguelike-style draft on top of
+  the idle economy).
+
+  *Still open:* the per-epoch scale multiplier and pacing; differentiation from the Legacy
   multipliers (keep them orthogonal — Legacy accelerates within a bloodline, epochs shift the
-  whole era); the satirical framing of the alien-contact beat; and **what changes besides
-  scale.** (Claude's recommendation: give each epoch one cheap novelty — a new top rung, a
-  modifier, a flavor reskin — so an epoch isn't pure ×N multiplication, the classic idle
-  treadmill. Not yet accepted.)
+  whole era); the satirical framing of the alien-contact beat; the **modifier pool itself**
+  (what's in it, specialization vs. expansion axes, magnitudes); whether chosen modifiers are
+  permanent and **stack across epochs** or apply only to their epoch; whether the unpicked
+  option is ever recoverable; and how the random draw stays fair/interesting (weighting,
+  no-dup rules).
 
 ---
 

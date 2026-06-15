@@ -83,6 +83,13 @@ extends Resource
 ## Floor for the estate tax rate after loopholes (can never go below this).
 @export var loophole_rate_floor: float = 0.05  # TBD-SIM
 
+# --- Debt & credit offers (Spec §8) ---
+
+## Active-play seconds a player has to pay a due debt payment before defaulting
+## into bankruptcy. Does NOT tick down while away (milestone-triggered, never
+## wall-clock — idling is always safe). First-pass value for feel-tuning.
+@export var debt_grace_seconds: float = 90.0  # TBD-SIM
+
 # --- Legacy / prestige (Spec §9.3–9.4) ---
 
 ## Scaling constant for Legacy gain: legacy = floor(K_LEGACY × estate_net ^ ALPHA).

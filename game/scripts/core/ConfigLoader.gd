@@ -27,6 +27,13 @@ const TITLE_PATHS := [
 	"res://config/titles/03_shift_supervisor.tres",
 ]
 
+const LOAN_PATHS := [
+	"res://config/loans/01_payday_advance.tres",
+	"res://config/loans/02_subprime_line.tres",
+	"res://config/loans/03_prime_credit.tres",
+	"res://config/loans/04_federal_bailout.tres",
+]
+
 
 ## Returns null (with an error pushed) if the tuning file is missing.
 static func load_tuning() -> TuningConfig:
@@ -44,6 +51,11 @@ static func load_property_configs() -> Array:
 ## Returns the wage-ladder TitleRows in rank order, or [] on failure.
 static func load_title_configs() -> Array:
 	return _load_all(TITLE_PATHS)
+
+
+## Returns the LoanTiers in ascending eligibility order, or [] on failure.
+static func load_loan_tiers() -> Array:
+	return _load_all(LOAN_PATHS)
 
 
 static func _load_all(paths: Array) -> Array:

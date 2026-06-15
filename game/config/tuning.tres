@@ -23,6 +23,7 @@ frenzy_pop_floor = 0.15
 estate_exemption_base = 1000000.0
 estate_tax_rate_base = 0.6
 loophole_rate_floor = 0.05
+debt_grace_seconds = 90.0
 k_legacy = 0.01
 alpha_legacy = 0.4
 crash_multiplier = 0.5

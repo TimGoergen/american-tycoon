@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="LoanTier" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/LoanTier.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+tier_name = "Federal Bailout"
+flavor = "Your enterprise has been deemed systemically important. Emergency capital, generous terms — it's in everyone's interest that you succeed."
+eligibility_min_net_worth = 1000000000.0
+eligibility_max_net_worth = 1.0e18
+principal = 5000000000.0
+interest_multiplier = 1.0
+payment_count = 4
+first_trigger_multiple = 2.0
+trigger_step_multiple = 2.0

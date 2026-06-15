@@ -18,6 +18,11 @@ var economy: EconomyState
 var wage: WageState
 var frenzy: FrenzyState
 
+## This generation's debt and its pending credit offer (GDD §8.5–8.6). Driven each
+## tick; a lapsed payment sets debt.defaulted, which Main turns into a bankruptcy.
+var debt: DebtState
+var offers: OfferSystem
+
 ## Highest net worth this generation has reached. The next heir must out-earn
 ## this peak before its Legacy sprint multiplier gives way to the residual
 ## (Spec §9.4). Monotonic — only ever rises within a generation.
@@ -52,11 +57,13 @@ var _wage_earned_since_tick: float = 0.0
 var _bonus_seeded := false
 
 
-func _init(property_configs: Array, titles: Array, p_tuning: TuningConfig) -> void:
+func _init(property_configs: Array, titles: Array, p_tuning: TuningConfig, loan_tiers: Array = []) -> void:
 	tuning = p_tuning
 	economy = EconomyState.new(property_configs, p_tuning)
 	wage = WageState.new(titles)
 	frenzy = FrenzyState.new(p_tuning)
+	debt = DebtState.new(p_tuning.debt_grace_seconds)
+	offers = OfferSystem.new(loan_tiers)
 
 
 ## Advance the whole game by `delta` seconds of active play.
@@ -70,7 +77,13 @@ func _init(property_configs: Array, titles: Array, p_tuning: TuningConfig) -> vo
 func tick(delta: float, extra_property_multiplier: float = 1.0) -> void:
 	frenzy.tick(delta)
 	economy.tick(delta, frenzy.get_multiplier() * extra_property_multiplier)
-	peak_net_worth = maxf(peak_net_worth, economy.get_net_worth())
+	var net_worth := economy.get_net_worth()
+	peak_net_worth = maxf(peak_net_worth, net_worth)
+	# Debt comes due on net-worth milestones, and a new credit offer may roll when
+	# the player climbs into a higher band (GDD §8.5–8.6). Both run off net worth,
+	# never a wall clock, so time away is always safe.
+	debt.tick(net_worth, delta)
+	offers.update(net_worth, debt)
 	_update_displayed_income(delta)
 
 
@@ -175,6 +188,34 @@ func try_claim_promotion() -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Credit — offers and debt (GDD §8.5–8.6)
+# ---------------------------------------------------------------------------
+
+## Accept the pending credit offer: the principal is credited as GRANTED cash (it
+## is borrowed, not earned, so it never feeds the lifetime-earned estate basis) and
+## its repayment schedule is installed. No-op if there is no offer or a loan is
+## already active (one loan at a time). Returns true if a loan was taken.
+func accept_offer() -> bool:
+	if not offers.has_offer() or debt.has_active_loan():
+		return false
+	var tier := offers.accept()
+	economy.award_cash(tier.principal)
+	debt.take_loan(tier)
+	return true
+
+
+## Decline the pending offer — it expires silently (the game never nags).
+func decline_offer() -> void:
+	offers.decline()
+
+
+## Pay the debt payment that is currently due. Returns false if nothing is due or
+## the player can't afford it (no partial payments — Spec §8).
+func pay_due_debt() -> bool:
+	return debt.pay(economy)
+
+
+# ---------------------------------------------------------------------------
 # Offline
 # ---------------------------------------------------------------------------
 
@@ -224,6 +265,9 @@ func to_save_dict() -> Dictionary:
 		},
 		# A frenzy burn does not survive an app close; only the charge does.
 		"frenzy": {"meter": frenzy.meter},
+		# This generation's debt and pending offer (GDD §8.5–8.6).
+		"debt": debt.to_save_dict(),
+		"offers": offers.to_save_dict(),
 	}
 
 
@@ -264,3 +308,8 @@ func load_save_dict(data: Dictionary) -> void:
 
 	var f: Dictionary = data.get("frenzy", {})
 	frenzy.meter = float(f.get("meter", 0.0))
+
+	# Debt and offers — both default to empty for pre-Track-B saves. The offer table
+	# was already injected at construction, so offers can rehydrate its tier by name.
+	debt.load_save_dict(data.get("debt", {}))
+	offers.load_save_dict(data.get("offers", {}))

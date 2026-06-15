@@ -55,6 +55,9 @@ var _tax_value: Label
 var _net_value: Label
 var _legacy_value: Label
 
+# Held so a forced (bankruptcy) will can hide the "keep playing" escape hatch.
+var _cancel_button: Button
+
 
 # ── Phase 2 references ────────────────────────────────────────────────────────
 
@@ -219,13 +222,13 @@ func _build_phase1(parent: VBoxContainer) -> void:
 	# Backing out is not a spend/commit action, so it gets the calm mustard style
 	# (red is reserved for "spend/act"). Lets the player close the will and keep
 	# playing the current generation if they'd rather wait to prestige.
-	var cancel_button := Button.new()
-	cancel_button.text = "NOT YET — KEEP PLAYING"
-	cancel_button.custom_minimum_size = Vector2(0, 64)
-	cancel_button.add_theme_font_size_override("font_size", 24)
-	UiPalette.style_button(cancel_button, false)
-	cancel_button.pressed.connect(_on_cancel_pressed)
-	_phase1_container.add_child(cancel_button)
+	_cancel_button = Button.new()
+	_cancel_button.text = "NOT YET — KEEP PLAYING"
+	_cancel_button.custom_minimum_size = Vector2(0, 64)
+	_cancel_button.add_theme_font_size_override("font_size", 24)
+	UiPalette.style_button(_cancel_button, false)
+	_cancel_button.pressed.connect(_on_cancel_pressed)
+	_phase1_container.add_child(_cancel_button)
 
 
 # ── Phase 2 builder ───────────────────────────────────────────────────────────
@@ -313,7 +316,10 @@ func show_obituary(stats: Dictionary) -> void:
 ##   estate_net     — cash the heir actually receives
 ##   legacy_gain    — integer legacy points awarded (treat as int)
 ## `dying_dynasty_name` — e.g. "Wellington Pemberton VIII"
-func show_will(will: Dictionary, dying_dynasty_name: String) -> void:
+## `allow_cancel` — false for a forced bankruptcy will, which hides the "keep
+## playing" escape (a default cannot be walked back, GDD §8.5).
+func show_will(will: Dictionary, dying_dynasty_name: String, allow_cancel: bool = true) -> void:
+	_cancel_button.visible = allow_cancel
 	_deceased_label.text = "The estate of %s" % dying_dynasty_name
 
 	# Format money amounts; deductions are prefixed with a minus sign so the

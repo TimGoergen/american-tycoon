@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="LoanTier" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/LoanTier.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+tier_name = "Prime Credit Line"
+flavor = "A preferred client deserves preferred terms. Substantial capital at rates we extend only to the truly creditworthy."
+eligibility_min_net_worth = 1000000.0
+eligibility_max_net_worth = 1000000000.0
+principal = 5000000.0
+interest_multiplier = 1.15
+payment_count = 4
+first_trigger_multiple = 2.5
+trigger_step_multiple = 2.5

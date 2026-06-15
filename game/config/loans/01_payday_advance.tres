@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="LoanTier" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/LoanTier.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+tier_name = "Payday Advance"
+flavor = "Short on cash? We believe in your hustle! A small advance to get you started — terms a go-getter like you will barely notice."
+eligibility_min_net_worth = 0.0
+eligibility_max_net_worth = 10000.0
+principal = 1000.0
+interest_multiplier = 1.5
+payment_count = 3
+first_trigger_multiple = 3.0
+trigger_step_multiple = 3.0

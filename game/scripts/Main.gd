@@ -27,10 +27,17 @@ var _welcome_overlay: WelcomeBackOverlay
 var _will_screen: WillScreen
 var _legacy_screen: LegacyScreen
 var _ledger_screen: FamilyLedgerScreen
+var _mail_screen: MailScreen
+var _origin_screen: OriginScreen
 var _buy_mode_button: Button
 var _plan_button: Button
 var _legacy_button: Button
 var _ledger_button: Button
+var _mail_button: Button
+
+## True while the ceremony in progress is a forced bankruptcy (a defaulted debt),
+## so the will records the "Creditors" cause and offers no escape (GDD §8.5).
+var _bankruptcy_pending: bool = false
 var _rows: Array = []
 
 ## Global buy mode — one toggle drives every row's buy button.
@@ -45,13 +52,20 @@ func _ready() -> void:
 	_build_ui()
 	_apply_offline_if_due()
 
+	# A brand-new dynasty meets the origin screen first (GDD §8.1). _process freezes
+	# the economy while it is up, so the founder's opening cash is chosen before any
+	# play. A loaded dynasty has origin_chosen = true and skips straight to the game.
+	if not dynasty.origin_chosen:
+		_origin_screen.show_origin()
+
 
 func _process(delta: float) -> void:
 	# Freeze the economy while a full-screen overlay is up (the succession
 	# ceremony or the upgrade shop): no ticks, no autosave. This keeps the will's
 	# numbers from shifting under the player, avoids half-saving the generation
 	# swap mid-ceremony, and lets the shop spend Legacy against a steady balance.
-	if _will_screen.visible or _legacy_screen.visible or _ledger_screen.visible:
+	if _will_screen.visible or _legacy_screen.visible or _ledger_screen.visible \
+			or _mail_screen.visible or _origin_screen.visible:
 		return
 
 	# Fixed-timestep logic (Spec §2): accumulate render time and tick in
@@ -63,6 +77,12 @@ func _process(delta: float) -> void:
 	while _tick_accumulator >= step:
 		dynasty.tick(step)
 		_tick_accumulator -= step
+
+	# A defaulted debt forces the bankruptcy generation-end (GDD §8.5). Detected
+	# right after ticking; showing the ceremony freezes the economy on the next frame.
+	if game.debt.defaulted:
+		_begin_bankruptcy()
+		return
 
 	_autosave_timer += delta
 	if _autosave_timer >= tuning.autosave_cadence:
@@ -82,6 +102,7 @@ func _process(delta: float) -> void:
 	_update_plan_button()
 	_update_legacy_button()
 	_update_ledger_button()
+	_update_mail_button()
 
 
 func _notification(what: int) -> void:
@@ -99,11 +120,12 @@ func _create_game() -> void:
 	tuning = ConfigLoader.load_tuning()
 	var property_configs := ConfigLoader.load_property_configs()
 	var titles := ConfigLoader.load_title_configs()
+	var loan_tiers := ConfigLoader.load_loan_tiers()
 
 	# Constructing the dynasty also builds generation 1, already seeded with
 	# starting cash by DynastyState. So, unlike the old bare-GameState path, a
 	# fresh game needs no extra award_cash here.
-	dynasty = DynastyState.new(property_configs, titles, tuning)
+	dynasty = DynastyState.new(property_configs, titles, tuning, loan_tiers)
 
 	var save_dict := SaveManager.load_from_file()
 	if not save_dict.is_empty():
@@ -275,6 +297,19 @@ func _build_ui() -> void:
 	_ledger_button.visible = false
 	column.add_child(_ledger_button)
 
+	# Mail: credit offers and debt notices. Hidden when the box is empty (the game
+	# never nags — Principle 5); its label flips to red and shows the grace countdown
+	# when a payment is due, so the one urgent thing is impossible to miss without
+	# the game ever interrupting play. See _update_mail_button.
+	_mail_button = Button.new()
+	_mail_button.custom_minimum_size = Vector2(0, 64)
+	_mail_button.add_theme_font_size_override("font_size", 24)
+	UiPalette.style_button(_mail_button, false)
+	_mail_button.text = "MAIL"
+	_mail_button.pressed.connect(_on_mail_pressed)
+	_mail_button.visible = false
+	column.add_child(_mail_button)
+
 	# The welcome-back overlay sits above everything and starts hidden.
 	_welcome_overlay = WelcomeBackOverlay.new()
 	_welcome_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -306,6 +341,22 @@ func _build_ui() -> void:
 	_ledger_screen.setup()
 	_ledger_screen.closed.connect(_on_family_ledger_closed)
 	add_child(_ledger_screen)
+
+	# The mailbox overlay (offers + debt notices), rebuilt from live state on open.
+	_mail_screen = MailScreen.new()
+	_mail_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_mail_screen.setup()
+	_mail_screen.accept_offer.connect(_on_offer_accepted)
+	_mail_screen.decline_offer.connect(_on_offer_declined)
+	_mail_screen.pay_debt.connect(_on_debt_paid)
+	_mail_screen.closed.connect(_on_mail_closed)
+	add_child(_mail_screen)
+
+	# The origin overlay ("rich parents?"), shown once at the start of a new dynasty.
+	_origin_screen = OriginScreen.new()
+	_origin_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_origin_screen.chosen.connect(_on_origin_chosen)
+	add_child(_origin_screen)
 
 
 # ---------------------------------------------------------------------------
@@ -407,6 +458,90 @@ func _on_family_ledger_closed() -> void:
 	pass
 
 
+# ---------------------------------------------------------------------------
+# Mail — credit offers and debt notices (GDD §8.6)
+# ---------------------------------------------------------------------------
+
+## Reveal the Mail button when something is waiting (an offer or a due payment),
+## and make a due payment unmissable: its label turns urgent and shows the grace
+## countdown. The game still never interrupts play — the player chooses to open it.
+func _update_mail_button() -> void:
+	var due := game.debt.due_amount > 0.0
+	var has_mail := due or game.offers.has_offer()
+	_mail_button.visible = has_mail
+	if not has_mail:
+		return
+	if due:
+		_mail_button.text = "MAIL — PAYMENT DUE (%ds)" % int(ceil(game.debt.grace_remaining))
+		UiPalette.style_button(_mail_button, true)  # red: act now
+	else:
+		_mail_button.text = "MAIL"
+		UiPalette.style_button(_mail_button, false)
+
+
+func _on_mail_pressed() -> void:
+	_open_mail()
+
+
+## (Re)open the mailbox against the current offer/debt state.
+func _open_mail() -> void:
+	_mail_screen.open(
+		game.offers.current_offer,
+		game.debt.due_amount,
+		game.debt.grace_remaining,
+		game.debt.can_pay(game.economy),
+	)
+
+
+## Accepted the pending offer: take the loan, persist, and refresh the mailbox.
+func _on_offer_accepted() -> void:
+	game.accept_offer()
+	SaveManager.save_dict_to_file(dynasty.to_save_dict())
+	_open_mail()
+
+
+## Declined the pending offer: it expires silently; refresh the mailbox.
+func _on_offer_declined() -> void:
+	game.decline_offer()
+	_open_mail()
+
+
+## Paid the due debt payment: persist and refresh the mailbox.
+func _on_debt_paid() -> void:
+	game.pay_due_debt()
+	SaveManager.save_dict_to_file(dynasty.to_save_dict())
+	_open_mail()
+
+
+## Closed the mailbox: persist (offer/debt state may have changed) and resume.
+func _on_mail_closed() -> void:
+	SaveManager.save_dict_to_file(dynasty.to_save_dict())
+
+
+# ---------------------------------------------------------------------------
+# Origins (GDD §8.1) and bankruptcy (GDD §8.5)
+# ---------------------------------------------------------------------------
+
+## The founder picked an origin: seed the opening cash (and any origin debt) onto
+## generation 1, then persist so the screen never shows again for this dynasty.
+func _on_origin_chosen(starting_cash: float, debt_loan: LoanTier) -> void:
+	dynasty.apply_origin(starting_cash, debt_loan)
+	SaveManager.save_dict_to_file(dynasty.to_save_dict())
+
+
+## A debt payment lapsed: open the ceremony on the obituary, flagged as a forced
+## bankruptcy. The will that follows seizes the estate for creditors and offers no
+## escape; the generation is recorded in the Family Ledger as ending in "Creditors".
+func _begin_bankruptcy() -> void:
+	_bankruptcy_pending = true
+	_will_screen.show_obituary({
+		"name": HeirNames.dynasty_name(dynasty.generation),
+		"fortune": dynasty.current.economy.cash_earned_this_gen,
+		"seed": dynasty.current.economy.starting_cash,
+		"employees": _count_staffed_properties(),
+	})
+
+
 ## Player opened the Estate Office: show the upgrade shop. It refreshes itself
 ## against the current Legacy wallet on open.
 func _on_estate_office_pressed() -> void:
@@ -441,10 +576,13 @@ func _on_plan_estate_pressed() -> void:
 	})
 
 
-## Player tapped through the obituary: show the itemized will (ceremony beat 2).
+## Player tapped through the obituary: show the itemized will (ceremony beat 2). A
+## bankruptcy will offers no escape — the default cannot be walked back.
 func _on_continue_to_will() -> void:
 	var will := dynasty.get_draft_will()
-	_will_screen.show_will(will, HeirNames.dynasty_name(dynasty.generation))
+	_will_screen.show_will(
+		will, HeirNames.dynasty_name(dynasty.generation), not _bankruptcy_pending
+	)
 
 
 ## How many of the living generation's properties are staffed — the obituary's
@@ -466,7 +604,10 @@ func _on_will_cancelled() -> void:
 ## Player signed the will: execute the death — bank Legacy, advance the
 ## generation, raise the heir — then reveal who inherits.
 func _on_pass_on_confirmed() -> void:
-	dynasty.perform_succession()
+	# A bankruptcy records "Creditors"; a chosen prestige is a natural death.
+	var cause := "Creditors" if _bankruptcy_pending else "Retired to Palm Beach"
+	dynasty.perform_succession(cause)
+	_bankruptcy_pending = false
 	_will_screen.show_heir_reveal(HeirNames.dynasty_name(dynasty.generation), dynasty.generation)
 
 

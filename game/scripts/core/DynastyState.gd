@@ -24,6 +24,7 @@ var tuning: TuningConfig
 # Held so each new generation is built from the same configs the dynasty started with.
 var _property_configs: Array
 var _title_configs: Array
+var _loan_configs: Array
 
 ## The spendable Legacy wallet and the purchased upgrade sheet (GDD §13). All
 ## prestige value flows through here now: deaths bank Legacy into it, the shop
@@ -49,13 +50,19 @@ var lifetime_cash_earned: float = 0.0
 ## obituary headline figure), "cause": String (how the generation ended) }.
 var ancestors: Array = []
 
+## Whether generation 1's origin ("Do you have rich parents?", GDD §8.1) has been
+## chosen yet. False only on a brand-new dynasty before the player picks; persisted
+## so the origin screen is shown exactly once per dynasty.
+var origin_chosen: bool = false
+
 ## The generation alive right now. All active play happens through this.
 var current: GameState
 
 
-func _init(property_configs: Array, titles: Array, p_tuning: TuningConfig) -> void:
+func _init(property_configs: Array, titles: Array, p_tuning: TuningConfig, loan_tiers: Array = []) -> void:
 	_property_configs = property_configs
 	_title_configs = titles
+	_loan_configs = loan_tiers
 	tuning = p_tuning
 	upgrades = LegacyUpgrades.new()
 	current = _new_generation()
@@ -94,7 +101,9 @@ func get_draft_will() -> Dictionary:
 	# order-of-magnitude epoch jumps. Granted money (birth seed, loan principal) is
 	# excluded by construction — it never entered cash_earned_this_gen.
 	var estate_gross := current.economy.cash_earned_this_gen
-	var outstanding_debt := 0.0  # debt & offers system is a later M2 slice
+	# Creditors are paid first from the estate (GDD §8.5). On a bankruptcy this is
+	# what seizes most of the estate before tax, leaving ~nothing to convert.
+	var outstanding_debt := current.debt.outstanding_balance
 	var will := EstateWaterfall.compute(
 		estate_gross,
 		outstanding_debt,
@@ -165,7 +174,7 @@ func perform_succession(cause: String = "Retired to Palm Beach") -> Dictionary:
 ## purchased upgrade effect (cycle speed, staff cost, wage) applied to its fresh
 ## state. Property income is multiplied at tick time, not seeded as cash.
 func _new_generation() -> GameState:
-	var heir := GameState.new(_property_configs, _title_configs, tuning)
+	var heir := GameState.new(_property_configs, _title_configs, tuning, _loan_configs)
 	# Seed the heir with opening capital + any Trust Fund bonus, and record that
 	# seed so the estate→Legacy conversion can later exclude it (granted money is
 	# not dynastic achievement). award_cash floors the amount, so floor the record
@@ -201,6 +210,24 @@ func refresh_current_generation_effects() -> void:
 
 
 # ---------------------------------------------------------------------------
+# Origins (GDD §8.1 — "Do you have rich parents?")
+# ---------------------------------------------------------------------------
+
+## Apply the founder's chosen origin to the living (generation-1) state: set the
+## opening cash to `starting_cash` and, for the loan origins, install the origin
+## debt. The cash is set directly (not via award_earned) because the founder was
+## handed or lent it — granted money never feeds the lifetime-earned estate basis.
+## `debt_loan` is the origin debt template, or null for the cash-only origins.
+## Marks the origin chosen so the screen is never shown again for this dynasty.
+func apply_origin(starting_cash: float, debt_loan: LoanTier = null) -> void:
+	current.economy.cash = floorf(starting_cash)
+	current.economy.starting_cash = floorf(starting_cash)
+	if debt_loan != null:
+		current.debt.take_loan(debt_loan)
+	origin_chosen = true
+
+
+# ---------------------------------------------------------------------------
 # Save / load (the dynastic block wraps the current generation's save)
 # ---------------------------------------------------------------------------
 
@@ -213,6 +240,7 @@ func to_save_dict() -> Dictionary:
 		"dynastic_taps": dynastic_taps,
 		"lifetime_cash_earned": lifetime_cash_earned,
 		"ancestors": ancestors,
+		"origin_chosen": origin_chosen,
 		"current": current.to_save_dict(),
 	}
 
@@ -245,7 +273,11 @@ func load_save_dict(data: Dictionary) -> void:
 		upgrades.available = carried
 		upgrades.earned_lifetime = carried
 
-	current = GameState.new(_property_configs, _title_configs, tuning)
+	# A loaded dynasty has already chosen its origin (a brand-new one has not). Bare
+	# pre-origin saves default to true so the founder isn't re-prompted on upgrade.
+	origin_chosen = bool(data.get("origin_chosen", true))
+
+	current = GameState.new(_property_configs, _title_configs, tuning, _loan_configs)
 	var current_data: Variant = data.get("current", data)
 	if current_data is Dictionary:
 		current.load_save_dict(current_data)

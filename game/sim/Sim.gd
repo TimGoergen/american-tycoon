@@ -31,6 +31,7 @@ const DYNASTY_SAVE_PATH := "user://sim_dynasty_save.json"
 
 var _property_configs: Array = []
 var _title_configs: Array = []
+var _loan_configs: Array = []
 var _tuning: TuningConfig
 
 
@@ -44,7 +45,7 @@ func _initialize() -> void:
 
 	_print_ladder_magnitude()
 
-	var game := GameState.new(_property_configs, _title_configs, _tuning)
+	var game := GameState.new(_property_configs, _title_configs, _tuning, _loan_configs)
 	game.economy.award_cash(_tuning.m1_starting_cash)
 	print("Starting cash: %s" % Money.of(game.economy.cash).display())
 
@@ -72,7 +73,9 @@ func _load_configs() -> bool:
 	_tuning = ConfigLoader.load_tuning()
 	_property_configs = ConfigLoader.load_property_configs()
 	_title_configs = ConfigLoader.load_title_configs()
-	return _tuning != null and not _property_configs.is_empty() and not _title_configs.is_empty()
+	_loan_configs = ConfigLoader.load_loan_tiers()
+	return _tuning != null and not _property_configs.is_empty() \
+			and not _title_configs.is_empty() and not _loan_configs.is_empty()
 
 
 # ---------------------------------------------------------------------------
@@ -178,7 +181,7 @@ func _run_offline_phase(game: GameState) -> GameState:
 		push_error("Sim: load failed")
 		return null
 
-	var resumed := GameState.new(_property_configs, _title_configs, _tuning)
+	var resumed := GameState.new(_property_configs, _title_configs, _tuning, _loan_configs)
 	resumed.load_save_dict(save_dict)
 
 	# Sanity-check the round trip before trusting the rest of the run.
@@ -295,7 +298,11 @@ func _run_dynasty_protocol() -> void:
 		push_error("Sim: estate waterfall math spot-check failed")
 		return
 
-	var dynasty := DynastyState.new(_property_configs, _title_configs, _tuning)
+	if not _verify_credit_systems():
+		push_error("Sim: credit systems (offers/debt/bankruptcy) check failed")
+		return
+
+	var dynasty := DynastyState.new(_property_configs, _title_configs, _tuning, _loan_configs)
 
 	# The fixed yardstick for "speeds up every time": the founder's (gen 1) peak
 	# net worth. Every later heir should reach THIS SAME position faster than the
@@ -453,6 +460,50 @@ func _verify_waterfall_math() -> bool:
 	return ok
 
 
+## Exercise the credit systems end to end on a throwaway generation (GDD §8.5–8.6):
+## roll an offer, accept it (principal credited, NOT counted as earned), drive net
+## worth up so a payment comes due and pay it, then let the next payment's grace
+## lapse to force a default, and confirm the death waterfall seizes the outstanding
+## balance for creditors before tax. A regression here fails loudly before the phone.
+func _verify_credit_systems() -> bool:
+	var game := GameState.new(_property_configs, _title_configs, _tuning, _loan_configs)
+	game.economy.award_cash(100000.0)  # land in the subprime band, with cash to pay
+
+	# 1) Roll and accept an offer for the current band.
+	game.offers.update(game.economy.get_net_worth(), game.debt)
+	var offer := game.offers.current_offer
+	var had_offer := offer != null
+	var cash_before := game.economy.cash
+	var accepted := game.accept_offer()
+	var got_principal := had_offer and game.economy.cash == cash_before + floorf(offer.principal)
+	var loan_active := game.debt.has_active_loan()
+	var earned_clean := game.economy.cash_earned_this_gen == 0.0  # borrowed ≠ earned
+
+	# 2) Force the first payment due (huge net worth) and pay it in full.
+	game.debt.tick(1.0e12, 0.1)
+	var became_due := game.debt.due_amount > 0.0
+	var balance_before := game.debt.outstanding_balance
+	var paid := game.debt.pay(game.economy)
+	var balance_dropped := game.debt.outstanding_balance < balance_before
+
+	# 3) Force the next payment due, then let its grace window lapse unpaid → default.
+	game.debt.tick(1.0e12, 0.1)
+	game.debt.tick(1.0e12, _tuning.debt_grace_seconds + 1.0)
+	var defaulted := game.debt.defaulted
+
+	# 4) On the resulting bankruptcy, creditors seize the estate before tax.
+	var will := EstateWaterfall.compute(
+		1000.0, game.debt.outstanding_balance,
+		_tuning.estate_exemption_base, _tuning.estate_tax_rate_base
+	)
+	var creditors_first: bool = will["creditors_paid"] == minf(1000.0, game.debt.outstanding_balance)
+
+	var ok := had_offer and accepted and got_principal and loan_active and earned_clean \
+			and became_due and paid and balance_dropped and defaulted and creditors_first
+	print("  Credit systems (offer→accept→pay→default→seize): %s" % ("PASS" if ok else "FAIL"))
+	return ok
+
+
 ## Save the dynasty, reload it into a fresh DynastyState, and confirm the
 ## cross-generation facts survive the round trip (Spec §12 + the M2 save bump).
 func _verify_dynasty_save_roundtrip(dynasty: DynastyState) -> void:
@@ -464,7 +515,7 @@ func _verify_dynasty_save_roundtrip(dynasty: DynastyState) -> void:
 		push_error("Sim: dynasty load failed")
 		return
 
-	var reloaded := DynastyState.new(_property_configs, _title_configs, _tuning)
+	var reloaded := DynastyState.new(_property_configs, _title_configs, _tuning, _loan_configs)
 	reloaded.load_save_dict(data)
 
 	var ok := reloaded.upgrades.available == dynasty.upgrades.available \

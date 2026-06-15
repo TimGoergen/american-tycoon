@@ -371,6 +371,29 @@ own design pass before it becomes a milestone.
   `K_LEGACY` / `ALPHA` once the gross estate changes magnitude (`TBD-SIM`). **Implementation is
   M2-later — recorded here, not scheduled now.**
 
+- **Balance guardrail: a property must not trivially self-fund its own expansion.** (Tim,
+  2026-06-14.) Observed: buying additional units of a property is *too* affordable from that
+  same property's income — and it gets *easier* the more you own, the opposite of what the
+  ladder intends. Diagnosed cause: a property's income scales **linearly** with units owned
+  (`units × income_per_unit`, Mechanics Spec §3.4), but the next-unit cost grows
+  **geometrically** at only `r0 ≈ 1.07×` per unit (§3.2). At low counts linear `×n` outpaces
+  `1.07^n`, so the *payback period* (next-unit cost ÷ current income) **shrinks** as you stack
+  units — for the ATM it falls from ~6s at 1 unit to ~1s by the end of the 1–19 band — and the
+  ×2 milestone reward at each threshold halves it again. *Worked example (ATM, `base_cost=50`,
+  `r0=1.07`, `income/unit=5`, `cycle=0.54s` → $9.26/sec each): payback ∝ `r0^n / n`, which keeps
+  falling until `n ≈ 1/ln(r0) ≈ 15` units — i.e. almost the whole first band.*
+
+  **Why it matters:** if a property self-funds its own growth, the optimal play collapses to
+  pouring everything into one property, which erases the cross-property allocation decisions the
+  game is built on (§11). The guardrail: *a property's own income should never make its next
+  unit trivially affordable; within a milestone band the payback period should hold flat or
+  rise, never fall.*
+
+  **Lever:** `r0` is the knob (too shallow against linear income). Don't hand-pick a number —
+  define a **target payback period** per property (flat-to-rising across a band) and let the
+  balance simulator (§13 / Mechanics Spec §13) solve `r0` against it, preserving the
+  "milestones stay reachable" guarantee (§3.2). A `TBD-SIM` tuning pass, not scheduled now.
+
 ---
 
 ## 15. Source Artifacts (project knowledge inventory)

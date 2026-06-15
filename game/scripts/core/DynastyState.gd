@@ -36,6 +36,13 @@ var generation: int = 1
 ## Lifetime taps across all generations ("Work Ethic"); persists per Spec §5.
 var dynastic_taps: int = 0
 
+## Total dollars EARNED across every generation of the bloodline — a monotonic,
+## never-reset accumulator (GDD §8.3 decision 2026-06-14). It is the cross-epoch
+## yardstick of dynasty progress, the obituary headline, and the Family Ledger
+## career stat. Each death adds the dying generation's cash_earned_this_gen to it;
+## spending never reduces it.
+var lifetime_cash_earned: float = 0.0
+
 ## The generation alive right now. All active play happens through this.
 var current: GameState
 
@@ -75,7 +82,12 @@ func get_legacy_income_multiplier() -> float:
 ## displayed continuously on the Estate Planning tab. Debt is 0 until the
 ## debt/offers slice lands; the waterfall already accepts it as a parameter.
 func get_draft_will() -> Dictionary:
-	var estate_gross := current.economy.get_net_worth()
+	# The gross estate is the dollars this generation EARNED over its life (Spec §9.1,
+	# GDD §8.3 decision 2026-06-14), not net worth at death. Earning over a life is what
+	# the idle loop actually is, and being monotonic it stays comparable across the
+	# order-of-magnitude epoch jumps. Granted money (birth seed, loan principal) is
+	# excluded by construction — it never entered cash_earned_this_gen.
+	var estate_gross := current.economy.cash_earned_this_gen
 	var outstanding_debt := 0.0  # debt & offers system is a later M2 slice
 	var will := EstateWaterfall.compute(
 		estate_gross,
@@ -83,15 +95,12 @@ func get_draft_will() -> Dictionary:
 		tuning.estate_exemption_base,
 		tuning.estate_tax_rate_base
 	)
-	# Legacy is earned only on wealth the generation BUILT: the seed cash every heir
-	# is handed (starting capital + Trust Fund) is excluded, so granted money can
-	# never be converted into Legacy. The seed is far below one point early on, so
-	# this is what makes the first Legacy point take real playtime to reach.
-	var built_estate := maxf(0.0, will["estate_net"] - current.economy.starting_cash)
-	# Base estate→Legacy conversion, then the "Estate Lawyers" upgrade boosts the
-	# yield. Floor after the multiplier so Legacy stays a whole number.
+	# Legacy converts directly from the post-tax net (Spec §9.3); the exemption already
+	# gates small estates. The old seed-cash subtraction is gone — seed money is granted,
+	# so it was never part of the earned gross. The "Estate Lawyers" upgrade then boosts
+	# the yield; floor after the multiplier so Legacy stays a whole number.
 	var base_gain := EstateWaterfall.legacy_gain(
-		built_estate, tuning.k_legacy, tuning.alpha_legacy
+		will["estate_net"], tuning.k_legacy, tuning.alpha_legacy
 	)
 	will["legacy_gain"] = int(floor(float(base_gain) * upgrades.legacy_yield_multiplier()))
 	return will
@@ -120,6 +129,9 @@ func perform_succession() -> Dictionary:
 	var will := get_draft_will()
 
 	upgrades.award(int(will["legacy_gain"]))
+	# Roll this life's earnings into the dynasty's monotonic lifetime total before the
+	# generation is replaced (the obituary headline / Family Ledger career stat).
+	lifetime_cash_earned += current.economy.cash_earned_this_gen
 	dynastic_taps = current.wage.lifetime_taps
 	generation += 1
 
@@ -182,6 +194,7 @@ func to_save_dict() -> Dictionary:
 		"upgrades": upgrades.to_save_dict(),
 		"generation": generation,
 		"dynastic_taps": dynastic_taps,
+		"lifetime_cash_earned": lifetime_cash_earned,
 		"current": current.to_save_dict(),
 	}
 
@@ -197,6 +210,8 @@ func to_save_dict() -> Dictionary:
 func load_save_dict(data: Dictionary) -> void:
 	generation = int(data.get("generation", 1))
 	dynastic_taps = int(data.get("dynastic_taps", 0))
+	# Pre-basis-swap saves have no dynasty-wide earned total; default to 0.0.
+	lifetime_cash_earned = float(data.get("lifetime_cash_earned", 0.0))
 
 	upgrades = LegacyUpgrades.new()
 	if data.has("upgrades"):

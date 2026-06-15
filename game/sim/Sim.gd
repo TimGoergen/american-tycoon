@@ -329,6 +329,9 @@ func _run_dynasty_protocol() -> void:
 				_format_time_to_reference(time_to_founder, previous_time_to_founder),
 			])
 		print("  Peak net worth this life: %s" % Money.of(dynasty.current.peak_net_worth).display())
+		# Gross estate is now LIFETIME CASH EARNED this generation (Spec §9.1), not
+		# net worth at death — so it reads higher than the peak-net-worth line above.
+		print("  Lifetime cash earned this life: %s" % Money.of(dynasty.current.economy.cash_earned_this_gen).display())
 		print("  Estate at death: gross %s -> tax %s -> net %s  ==>  +%d Legacy" % [
 			Money.of(will["estate_gross"]).display(),
 			Money.of(will["tax"]).display(),
@@ -348,6 +351,7 @@ func _run_dynasty_protocol() -> void:
 	print("Dynasty Legacy after %d generations: %d to spend, %d earned over the bloodline" % [
 		DYNASTY_GENERATIONS, dynasty.upgrades.available, dynasty.upgrades.earned_lifetime,
 	])
+	print("Dynasty lifetime cash earned across the bloodline: %s" % Money.of(dynasty.lifetime_cash_earned).display())
 	_verify_dynasty_save_roundtrip(dynasty)
 
 

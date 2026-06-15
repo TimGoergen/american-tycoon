@@ -8,9 +8,10 @@ class_name GameState
 
 # v2 added the per-generation spend accumulators and peak net worth that the
 # prestige/estate math reads (Spec §9). v3 added the generation's birth seed cash,
-# excluded from the estate→Legacy conversion. Older saves still load (missing
-# fields default to a clean slate / zero seed).
-const SAVE_VERSION := 3
+# excluded from the estate→Legacy conversion. v4 added cash_earned_this_gen, the
+# lifetime-earned accumulator that is now the gross estate (Spec §9.1). Older saves
+# still load (missing fields default to a clean slate / zero earned).
+const SAVE_VERSION := 4
 
 var tuning: TuningConfig
 var economy: EconomyState
@@ -104,7 +105,8 @@ func _update_displayed_income(delta: float) -> void:
 func tap_wage() -> void:
 	frenzy.on_tap()
 	var earned := wage.tap_wage(frenzy.get_multiplier())
-	economy.award_cash(earned)
+	# The wage is honest, earned money — it feeds the lifetime-earned estate basis.
+	economy.award_earned(earned)
 	_wage_earned_since_tick += earned
 
 
@@ -115,7 +117,8 @@ func tap_wage() -> void:
 func hold_tap_wage() -> void:
 	frenzy.on_tap(tuning.frenzy_fill_hold_factor)
 	var earned := wage.tap_wage(frenzy.get_multiplier())
-	economy.award_cash(earned)
+	# Held auto-tap earns the wage in full, so it counts as earned money too.
+	economy.award_earned(earned)
 	_wage_earned_since_tick += earned
 
 
@@ -211,6 +214,9 @@ func to_save_dict() -> Dictionary:
 		"spent_on_staff_this_gen": economy.spent_on_staff_this_gen,
 		# Birth seed cash, excluded from the Legacy conversion (see DynastyState).
 		"starting_cash": economy.starting_cash,
+		# Lifetime dollars this generation earned — the gross estate (Spec §9.1).
+		# Saved raw because it is sunk history, not derivable from current holdings.
+		"cash_earned_this_gen": economy.cash_earned_this_gen,
 		"properties": props,
 		"wage": {
 			"current_title_index": wage.current_title_index,
@@ -236,6 +242,10 @@ func load_save_dict(data: Dictionary) -> void:
 	economy.spent_on_units_this_gen = float(data.get("spent_on_units_this_gen", 0.0))
 	economy.spent_on_staff_this_gen = float(data.get("spent_on_staff_this_gen", 0.0))
 	economy.starting_cash = float(data.get("starting_cash", 0.0))
+	# Pre-v4 saves have no earned accumulator; default to 0.0. (A bare backfill from
+	# total_income isn't kept here, so an in-progress old generation simply starts
+	# its earned tally fresh — only matters until its next death.)
+	economy.cash_earned_this_gen = float(data.get("cash_earned_this_gen", 0.0))
 
 	var saved_props: Array = data.get("properties", [])
 	for i in range(mini(saved_props.size(), economy.properties.size())):

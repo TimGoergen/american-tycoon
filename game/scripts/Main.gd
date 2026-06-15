@@ -19,7 +19,6 @@ var tuning: TuningConfig
 var _tick_accumulator := 0.0
 var _autosave_timer := 0.0
 
-var _dynasty_header: DynastyHeader
 var _hero_stat: HeroStat
 var _frenzy_bar: FrenzyBar
 var _wage_panel: WagePanel
@@ -29,6 +28,8 @@ var _legacy_screen: LegacyScreen
 var _buy_mode_button: Button
 var _plan_button: Button
 var _legacy_button: Button
+## Gold "LEGACY: N" balance pinned to the right end of the Estate Office button.
+var _legacy_balance_label: Label
 var _rows: Array = []
 
 ## Global buy mode — one toggle drives every row's buy button.
@@ -74,9 +75,9 @@ func _process(delta: float) -> void:
 	_hero_stat.set_cash(game.economy.cash)
 	_hero_stat.set_frenzy_glow(game.frenzy.get_multiplier() > 1.0)
 
-	# Dynastic identity strip shows the spendable Legacy wallet; the prestige-exit
-	# button and the Estate Office button reflect the live state.
-	_dynasty_header.set_dynasty(HeirNames.dynasty_name(dynasty.generation), dynasty.upgrades.available)
+	# The heir name rides on the hero stat; the prestige-exit button and the Estate
+	# Office button (with its Legacy balance) reflect the live state.
+	_hero_stat.set_dynasty_name(HeirNames.dynasty_name(dynasty.generation))
 	_update_plan_button()
 	_update_legacy_button()
 
@@ -160,10 +161,8 @@ func _build_ui() -> void:
 	column.add_theme_constant_override("separation", 14)
 	margin.add_child(column)
 
-	# Dynastic identity strip at the very top: heir name + total Legacy (GDD §13).
-	_dynasty_header = DynastyHeader.new()
-	column.add_child(_dynasty_header)
-
+	# The hero stat now also carries the heir name (the old top header strip is gone);
+	# Main feeds the name to it each frame in _process.
 	_hero_stat = HeroStat.new()
 	column.add_child(_hero_stat)
 
@@ -193,7 +192,7 @@ func _build_ui() -> void:
 	toggle_line.add_child(toggle_spacer)
 
 	_buy_mode_button = Button.new()
-	_buy_mode_button.custom_minimum_size = Vector2(320, 56)
+	_buy_mode_button.custom_minimum_size = Vector2(UiPalette.ACTION_COLUMN_WIDTH, 56)
 	_buy_mode_button.add_theme_font_size_override("font_size", 24)
 	UiPalette.style_button(_buy_mode_button, false)
 	_buy_mode_button.text = "BUY MODE: " + _buy_mode_caption(_buy_mode)
@@ -255,9 +254,30 @@ func _build_ui() -> void:
 	_legacy_button.add_theme_font_size_override("font_size", 24)
 	UiPalette.style_button(_legacy_button, false)
 	_legacy_button.text = "THE ESTATE OFFICE"
+	# The button's own caption hugs the left; the Legacy balance is pinned to the
+	# right edge by _legacy_balance_label below.
+	_legacy_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	_legacy_button.pressed.connect(_on_estate_office_pressed)
 	_legacy_button.visible = false
 	column.add_child(_legacy_button)
+
+	# The spendable Legacy wallet, in its old "LEGACY: N" gold form, pinned to the
+	# right end of the Estate Office button (it used to live in the top header). It is
+	# only ever seen once that button appears — i.e. from the first prestige onward.
+	# mouse_filter IGNORE so taps still fall through to the button beneath it.
+	_legacy_balance_label = Label.new()
+	_legacy_balance_label.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD)
+	_legacy_balance_label.add_theme_font_size_override("font_size", 24)
+	_legacy_balance_label.add_theme_color_override("font_outline_color", UiPalette.MUSTARD_GOLD)
+	_legacy_balance_label.add_theme_constant_override("outline_size", 2)
+	_legacy_balance_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_legacy_balance_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_legacy_balance_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_legacy_balance_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	# Inset from the right edge by the same content margin the button plate uses,
+	# so the balance sits clear of the navy border.
+	_legacy_balance_label.offset_right = -14
+	_legacy_button.add_child(_legacy_balance_label)
 
 	# The welcome-back overlay sits above everything and starts hidden.
 	_welcome_overlay = WelcomeBackOverlay.new()
@@ -358,9 +378,11 @@ func _update_plan_button() -> void:
 
 ## Reveal the Estate Office button once the dynasty has ever earned Legacy — i.e.
 ## from the first prestige onward. earned_lifetime never falls back to 0, so once
-## shown the button stays for good (even after the wallet is spent down to 0).
+## shown the button stays for good (even after the wallet is spent down to 0). While
+## shown, keep its right-pinned balance in sync with the spendable wallet.
 func _update_legacy_button() -> void:
 	_legacy_button.visible = dynasty.upgrades.earned_lifetime > 0
+	_legacy_balance_label.text = "LEGACY: " + str(dynasty.upgrades.available)
 
 
 ## Player opened the Estate Office: show the upgrade shop. It refreshes itself

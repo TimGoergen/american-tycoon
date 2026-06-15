@@ -215,6 +215,7 @@ func to_save_dict() -> Dictionary:
 		"wage": {
 			"current_title_index": wage.current_title_index,
 			"lifetime_taps": wage.lifetime_taps,
+			"taps_at_title_start": wage.taps_at_title_start,
 		},
 		# A frenzy burn does not survive an app close; only the charge does.
 		"frenzy": {"meter": frenzy.meter},
@@ -251,6 +252,13 @@ func load_save_dict(data: Dictionary) -> void:
 	var w: Dictionary = data.get("wage", {})
 	wage.current_title_index = int(w.get("current_title_index", 0))
 	wage.lifetime_taps = int(w.get("lifetime_taps", 0))
+	# Older saves predate the rung-relative baseline. For those, fall back to the
+	# current title's own tap threshold: under the previous absolute-threshold scheme
+	# that was exactly the lifetime-tap count at which this title began, so the
+	# player's within-title progress carries over unchanged.
+	wage.taps_at_title_start = int(w.get(
+		"taps_at_title_start", wage.get_current_title().tap_threshold
+	))
 
 	var f: Dictionary = data.get("frenzy", {})
 	frenzy.meter = float(f.get("meter", 0.0))

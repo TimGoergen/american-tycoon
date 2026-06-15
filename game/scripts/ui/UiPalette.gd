@@ -23,6 +23,11 @@ const LIGHT_GRAY := Color("#CBCBCB")  # unowned row background
 const MID_GRAY := Color("#9A9A9A")    # unowned borders
 const DARK_GRAY := Color("#6E6E6E")   # unowned start button + portrait circle
 
+## Shared width (px) for the buy-mode toggle and the frenzy TURBO button. Kept equal
+## and defined in one place so the two right-hand controls line up as one column
+## (Tim's call) and can't drift apart when their widths are feel-tuned.
+const ACTION_COLUMN_WIDTH := 280
+
 
 ## Cream plate with a navy border — the standard card/panel (§8).
 static func make_panel_style() -> StyleBoxFlat:

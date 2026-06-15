@@ -41,7 +41,8 @@ func _ready() -> void:
 	add_child(_bar)
 
 	_pop_button = Button.new()
-	_pop_button.custom_minimum_size = Vector2(260, 0)
+	# Same width as the buy-mode toggle, so the two right-hand controls share a column.
+	_pop_button.custom_minimum_size = Vector2(UiPalette.ACTION_COLUMN_WIDTH, 0)
 	_pop_button.add_theme_font_size_override("font_size", 22)
 	UiPalette.style_button(_pop_button, true)  # red: the pop is an act button
 	_pop_button.pressed.connect(func() -> void: pop_requested.emit())
@@ -55,14 +56,15 @@ func _process(delta: float) -> void:
 	if _frenzy.mode == FrenzyState.Mode.BURNING:
 		_set_burn_style(true)
 		var seconds_left := _frenzy.meter * _tuning.frenzy_burn_duration
-		_pop_button.text = "×%.1f — %ds left" % [_frenzy.locked_multiplier, int(seconds_left)]
+		# Multiplier reads "2.4×" (the × trails the number) per Tim's call.
+		_pop_button.text = "%.1f× — %ds left" % [_frenzy.locked_multiplier, int(seconds_left)]
 		_pop_button.disabled = true
 	else:
 		_set_burn_style(false)
 		# Live preview of what a pop right now would lock in.
 		var preview_mult := 1.0 + (_tuning.frenzy_max_multiplier - 1.0) * _frenzy.meter
 		var preview_secs := _frenzy.meter * _tuning.frenzy_burn_duration
-		_pop_button.text = "POP ×%.1f for %ds" % [preview_mult, int(preview_secs)]
+		_pop_button.text = "TURBO %.1f× for %ds" % [preview_mult, int(preview_secs)]
 		_pop_button.disabled = not _frenzy.can_pop()
 
 

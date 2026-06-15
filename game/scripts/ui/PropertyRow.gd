@@ -247,9 +247,16 @@ func _refresh(delta: float) -> void:
 	_income_label.text = Money.of(_prop.get_income_per_cycle() * _frenzy.get_multiplier()).display() + "/cycle"
 
 	# The tap verb mirrors Spec §4: START an idle cycle, RUSH a running one.
+	# While the button is held the cycle auto-restarts every completion, briefly going
+	# idle between pulses; without this guard the label would flicker START→RUSH each
+	# cycle. So a held button stays "RUSH" for the whole hold and only re-evaluates to
+	# START/RUSH once the player lets go.
 	if _prop.units_owned == 0:
 		_tap_button.text = "—"
 		_tap_button.disabled = true
+	elif _tap_button.button_pressed:
+		_tap_button.text = "RUSH"
+		_tap_button.disabled = false
 	elif _prop.is_cycle_running:
 		_tap_button.text = "RUSH"
 		_tap_button.disabled = false

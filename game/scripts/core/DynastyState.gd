@@ -145,6 +145,10 @@ func _new_generation() -> GameState:
 	heir.economy.award_cash(seed_cash)
 	heir.economy.starting_cash = seed_cash
 	heir.wage.lifetime_taps = dynastic_taps
+	# The heir starts back at the first title, so baseline their promotion meter to the
+	# inherited tap count: Work Ethic carries forward as a number, but the heir still
+	# re-climbs the ladder from an empty meter rather than inheriting a full one.
+	heir.wage.taps_at_title_start = dynastic_taps
 	_apply_upgrade_effects(heir)
 	return heir
 

@@ -204,9 +204,11 @@ func _process(delta: float) -> void:
 		_promotion_button.disabled = _economy.cash < next.tuition
 	else:
 		_apply_wage_fill(_promotion_progress(title, next))
+		# Show taps earned within THIS title, not the dynastic lifetime total, so the
+		# number matches the meter (and an heir starts each rung at 0 / span).
 		_context_label.text = "%s → %s: %d / %d taps + %s tuition" % [
 			title.title_name, next.title_name,
-			_wage.lifetime_taps, next.tap_threshold,
+			_wage.taps_in_current_title(), _wage.taps_required_for_promotion(),
 			Money.of(next.tuition).display()
 		]
 		_promotion_button.visible = false
@@ -219,14 +221,15 @@ func _apply_wage_fill(target: float) -> void:
 	_wage_meter.value = clampf(target, 0.0, 1.0)
 
 
-## Fraction of the way from the current title's tap threshold to the next title's
-## — the bright-gold fill level. lifetime_taps is dynastic and only grows, so this
-## climbs from 0 to 1 across the current rung.
-func _promotion_progress(title: TitleRow, next: TitleRow) -> float:
-	var span := next.tap_threshold - title.tap_threshold
+## Fraction of the way through the current rung — the bright-gold fill level. Driven
+## by taps earned WITHIN the current title (which resets to 0 on each promotion and
+## for each new heir), so the meter shows current-title progress rather than the
+## dynasty's ever-growing lifetime tap count.
+func _promotion_progress(_title: TitleRow, _next: TitleRow) -> float:
+	var span := _wage.taps_required_for_promotion()
 	if span <= 0:
 		return 0.0
-	return clampf(float(_wage.lifetime_taps - title.tap_threshold) / float(span), 0.0, 1.0)
+	return clampf(float(_wage.taps_in_current_title()) / float(span), 0.0, 1.0)
 
 
 ## Holding the clock-in button auto-taps the wage at the configured rate — a
@@ -287,9 +290,13 @@ func _draw_sweep() -> void:
 	var rect := _sweep_overlay.size
 	# Stay inside the navy frame on all sides.
 	var x_min := SWEEP_FRAME_INSET
-	var x_max := rect.x - SWEEP_FRAME_INSET
+	var x_full := rect.x - SWEEP_FRAME_INSET
 	var top := SWEEP_FRAME_INSET
 	var height := rect.y - SWEEP_FRAME_INSET * 2.0
+	# Confine the sweep to the gold-FILLED portion only — its right limit is the edge
+	# of the current fill, so the highlight never glides over the dark unfilled track.
+	# When the meter is empty there is no gold to light, so nothing is drawn.
+	var x_max := x_min + (x_full - x_min) * clampf(_wage_meter.value, 0.0, 1.0)
 	if x_max <= x_min or height <= 0.0:
 		return
 

@@ -24,9 +24,15 @@ const INCOME_FONT_SIZE := 64
 # INCOME_FONT_SIZE so the two stay matched if that value is ever retuned.
 const CASH_FONT_SIZE := INCOME_FONT_SIZE
 const CAPTION_FONT_SIZE := 30
+# The dynasty/heir name now lives in this panel (it used to be its own header
+# strip). It sits centered between the two edge values, on the same line as their
+# captions, so it reads as one band: "INCOME … NAME … CASH". Matched to the caption
+# size so it belongs to that row rather than competing with the big numbers.
+const NAME_FONT_SIZE := CAPTION_FONT_SIZE
 const INCOME_BOLD := 3
 const CASH_BOLD := 2
 const CAPTION_BOLD := 2
+const NAME_BOLD := 2
 
 ## Gap kept between a pinned label and the panel edge it hugs.
 const EDGE_MARGIN := 14
@@ -46,6 +52,7 @@ var _income_label: Label
 var _cash_label: Label
 var _income_caption: Label
 var _cash_caption: Label
+var _name_label: Label
 
 # Frenzy glow: while a burn is active the ticket pulses toward red to signal the
 # accelerated state. Subtle — navy numerals stay readable over the tint.
@@ -85,6 +92,12 @@ func _ready() -> void:
 	_cash_caption.text = "CASH"
 	_content.add_child(_cash_caption)
 
+	# The heir/dynasty name, centered between the two edge values and laid out on the
+	# caption line (see _layout_labels). Navy to match the income side; Main feeds it
+	# via set_dynasty_name each frame.
+	_name_label = _make_label(UiPalette.NAVY, NAME_FONT_SIZE, NAME_BOLD)
+	_content.add_child(_name_label)
+
 
 ## Build a large, faux-bold label in the given color. The bold weight is faked with
 ## a same-color outline (no bold font asset exists yet — they arrive in M3).
@@ -103,6 +116,12 @@ func set_income_per_sec(income_per_sec: float) -> void:
 
 func set_cash(cash: float) -> void:
 	_cash_label.text = Money.of(cash).display()
+
+
+## The current heir's full name (e.g. "Wellington Pemberton IX"). Shown UPPERCASE
+## to match the ticket-plate convention the old header used.
+func set_dynasty_name(dynasty_name: String) -> void:
+	_name_label.text = dynasty_name.to_upper()
 
 
 ## Toggle the frenzy glow. Main drives this from the live frenzy state each frame.
@@ -152,9 +171,18 @@ func _layout_labels() -> void:
 	var cash_block_h := _cash_label.size.y + caption_gap + _cash_caption.size.y
 	var cash_top := (area.y - cash_block_h) / 2.0
 	_cash_label.position = Vector2(area.x - _cash_label.size.x - EDGE_MARGIN, cash_top)
-	_cash_caption.position = Vector2(
-		area.x - _cash_caption.size.x - EDGE_MARGIN,
-		cash_top + _cash_label.size.y + caption_gap
+	var cash_caption_top := cash_top + _cash_label.size.y + caption_gap
+	_cash_caption.position = Vector2(area.x - _cash_caption.size.x - EDGE_MARGIN, cash_caption_top)
+
+	# Heir name: horizontally centered across the whole plate, and vertically centered
+	# on the caption line so it sits level with the INCOME / CASH captions. (Income and
+	# cash captions share the same y because both values are the same font size, so
+	# either caption's top works as the reference.)
+	_name_label.size = _name_label.get_minimum_size()
+	var caption_center_y := cash_caption_top + _cash_caption.size.y / 2.0
+	_name_label.position = Vector2(
+		(area.x - _name_label.size.x) / 2.0,
+		caption_center_y - _name_label.size.y / 2.0
 	)
 
 

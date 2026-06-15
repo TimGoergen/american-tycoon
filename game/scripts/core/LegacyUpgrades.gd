@@ -92,14 +92,25 @@ func starting_cash_bonus() -> float:
 
 ## Permanent multiplier on PROPERTY income (Family Fortune). 1.0 with nothing bought.
 ## This is the dynasty's main accelerator now that the automatic Legacy sprint is gone.
+##
+## COMPOUNDING: each level multiplies income by (1 + per_level), so every level is the
+## same RELATIVE jump (e.g. +20%) no matter how deep you are — the Idle-Slayer "there's
+## always a meaningful next upgrade" feel (Tim, 2026-06-15). The geometric Legacy cost in
+## the catalog is what stops you, not a diminishing effect, so the chase never goes flat.
 func property_income_multiplier() -> float:
-	return 1.0 + _per_level(LegacyUpgradeCatalog.FAMILY_FORTUNE) * float(get_level(LegacyUpgradeCatalog.FAMILY_FORTUNE))
+	var per_level := _per_level(LegacyUpgradeCatalog.FAMILY_FORTUNE)
+	var level := get_level(LegacyUpgradeCatalog.FAMILY_FORTUNE)
+	return pow(1.0 + per_level, float(level))
 
 
 ## Multiplier on cycle SPEED (Efficiency Experts). 1.0 = normal; 1.5 = cycles
 ## complete in 2/3 the time. PropertyState divides its cycle length by this.
+## Compounding per level, same rationale as property_income_multiplier (cycle_floor
+## in PropertyState still caps how short a cycle can actually get).
 func cycle_speed_multiplier() -> float:
-	return 1.0 + _per_level(LegacyUpgradeCatalog.EFFICIENCY) * float(get_level(LegacyUpgradeCatalog.EFFICIENCY))
+	var per_level := _per_level(LegacyUpgradeCatalog.EFFICIENCY)
+	var level := get_level(LegacyUpgradeCatalog.EFFICIENCY)
+	return pow(1.0 + per_level, float(level))
 
 
 ## Multiplier on staff HIRING cost (Loyal Staff). Below 1.0 means a discount.
@@ -110,8 +121,11 @@ func staff_cost_multiplier() -> float:
 
 
 ## Multiplier on the wage earned per tap (Old-Money Connections). 1.0 = base wage.
+## Compounding per level, same rationale as property_income_multiplier.
 func wage_multiplier() -> float:
-	return 1.0 + _per_level(LegacyUpgradeCatalog.CONNECTIONS) * float(get_level(LegacyUpgradeCatalog.CONNECTIONS))
+	var per_level := _per_level(LegacyUpgradeCatalog.CONNECTIONS)
+	var level := get_level(LegacyUpgradeCatalog.CONNECTIONS)
+	return pow(1.0 + per_level, float(level))
 
 
 ## Multiplier on Legacy gained at each succession (Estate Lawyers). 1.0 = base yield.

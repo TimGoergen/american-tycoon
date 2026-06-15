@@ -367,8 +367,15 @@ func _on_reset_requested() -> void:
 
 ## Refresh the Plan-the-Estate button: enabled only when dying would convert to
 ## at least 1 Legacy, and labeled with the Legacy it would yield right now.
+##
+## Hidden entirely for a brand-new player who has never earned Legacy AND cannot yet
+## perform a succession — prestige is not a concept worth showing them yet (Tim's
+## call). It appears the moment a first succession would actually yield Legacy (so the
+## first prestige is reachable), and once any Legacy has ever been earned it stays put
+## for good, merely disabling when an heir is not yet ready to pass on.
 func _update_plan_button() -> void:
 	var can_succeed := dynasty.can_perform_succession()
+	_plan_button.visible = dynasty.upgrades.earned_lifetime > 0 or can_succeed
 	_plan_button.disabled = not can_succeed
 	if can_succeed:
 		_plan_button.text = "PLAN THE ESTATE  (+%d Legacy)" % dynasty.projected_legacy_gain()

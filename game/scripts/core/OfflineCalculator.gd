@@ -43,7 +43,9 @@ static func calculate(
 ## paid for by the rate calculation (Spec §2). Unstaffed progress is frozen
 ## while away, so it is left untouched.
 static func apply(economy: EconomyState, result: OfflineResult) -> void:
-	economy.award_cash(result.pile)
+	# The offline pile is property income earned while away, so it counts toward
+	# the lifetime-earned estate basis (award_earned, not award_cash).
+	economy.award_earned(result.pile)
 	for prop in economy.properties:
 		var p := prop as PropertyState
 		if p.is_staffed:

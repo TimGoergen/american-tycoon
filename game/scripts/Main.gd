@@ -26,9 +26,11 @@ var _wage_panel: WagePanel
 var _welcome_overlay: WelcomeBackOverlay
 var _will_screen: WillScreen
 var _legacy_screen: LegacyScreen
+var _ledger_screen: FamilyLedgerScreen
 var _buy_mode_button: Button
 var _plan_button: Button
 var _legacy_button: Button
+var _ledger_button: Button
 var _rows: Array = []
 
 ## Global buy mode — one toggle drives every row's buy button.
@@ -49,7 +51,7 @@ func _process(delta: float) -> void:
 	# ceremony or the upgrade shop): no ticks, no autosave. This keeps the will's
 	# numbers from shifting under the player, avoids half-saving the generation
 	# swap mid-ceremony, and lets the shop spend Legacy against a steady balance.
-	if _will_screen.visible or _legacy_screen.visible:
+	if _will_screen.visible or _legacy_screen.visible or _ledger_screen.visible:
 		return
 
 	# Fixed-timestep logic (Spec §2): accumulate render time and tick in
@@ -79,6 +81,7 @@ func _process(delta: float) -> void:
 	_dynasty_header.set_dynasty(HeirNames.dynasty_name(dynasty.generation), dynasty.upgrades.available)
 	_update_plan_button()
 	_update_legacy_button()
+	_update_ledger_button()
 
 
 func _notification(what: int) -> void:
@@ -259,6 +262,19 @@ func _build_ui() -> void:
 	_legacy_button.visible = false
 	column.add_child(_legacy_button)
 
+	# The Family Ledger: re-read the obituaries of every past generation. Hidden
+	# until the first ancestor exists (nothing to show on generation 1), then shown
+	# for good (see _update_ledger_button). Calm mustard style — it is a reading
+	# page, not a spend/commit action.
+	_ledger_button = Button.new()
+	_ledger_button.custom_minimum_size = Vector2(0, 64)
+	_ledger_button.add_theme_font_size_override("font_size", 24)
+	UiPalette.style_button(_ledger_button, false)
+	_ledger_button.text = "THE FAMILY LEDGER"
+	_ledger_button.pressed.connect(_on_family_ledger_pressed)
+	_ledger_button.visible = false
+	column.add_child(_ledger_button)
+
 	# The welcome-back overlay sits above everything and starts hidden.
 	_welcome_overlay = WelcomeBackOverlay.new()
 	_welcome_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -268,6 +284,7 @@ func _build_ui() -> void:
 	# also above everything and hidden until the player plans the estate.
 	_will_screen = WillScreen.new()
 	_will_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_will_screen.continue_to_will.connect(_on_continue_to_will)
 	_will_screen.pass_on_confirmed.connect(_on_pass_on_confirmed)
 	_will_screen.heir_begin_pressed.connect(_on_heir_begin_pressed)
 	_will_screen.cancelled.connect(_on_will_cancelled)
@@ -281,6 +298,14 @@ func _build_ui() -> void:
 	_legacy_screen.purchased.connect(_on_upgrade_purchased)
 	_legacy_screen.closed.connect(_on_legacy_screen_closed)
 	add_child(_legacy_screen)
+
+	# The Family Ledger overlay, also above everything and hidden until opened.
+	# Its rows are rebuilt from the dynasty's ancestor list each time it opens.
+	_ledger_screen = FamilyLedgerScreen.new()
+	_ledger_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_ledger_screen.setup()
+	_ledger_screen.closed.connect(_on_family_ledger_closed)
+	add_child(_ledger_screen)
 
 
 # ---------------------------------------------------------------------------
@@ -363,6 +388,25 @@ func _update_legacy_button() -> void:
 	_legacy_button.visible = dynasty.upgrades.earned_lifetime > 0
 
 
+## Reveal the Family Ledger button once there is at least one ancestor to read
+## about (nothing to show on generation 1). Once shown, it stays — the ancestor
+## list only ever grows.
+func _update_ledger_button() -> void:
+	_ledger_button.visible = not dynasty.ancestors.is_empty()
+
+
+## Player opened the Family Ledger: populate it from the dynasty's ancestor list
+## and the lifetime-earned total, then show it.
+func _on_family_ledger_pressed() -> void:
+	_ledger_screen.open(dynasty.ancestors, dynasty.lifetime_cash_earned)
+
+
+## Player closed the Family Ledger: nothing to persist (it is read-only), the game
+## simply resumes ticking on the next frame.
+func _on_family_ledger_closed() -> void:
+	pass
+
+
 ## Player opened the Estate Office: show the upgrade shop. It refreshes itself
 ## against the current Legacy wallet on open.
 func _on_estate_office_pressed() -> void:
@@ -382,13 +426,35 @@ func _on_legacy_screen_closed() -> void:
 	SaveManager.save_dict_to_file(dynasty.to_save_dict())
 
 
-## Player opened the estate planner: show the will for the dying generation.
+## Player opened the estate planner: open the ceremony on the obituary (beat 1),
+## assembled from the dying generation's real stats (GDD §8.3). The will follows
+## when the player taps through.
 func _on_plan_estate_pressed() -> void:
 	# Gated defensively even though the button is disabled when this is false.
 	if not dynasty.can_perform_succession():
 		return
+	_will_screen.show_obituary({
+		"name": HeirNames.dynasty_name(dynasty.generation),
+		"fortune": dynasty.current.economy.cash_earned_this_gen,
+		"seed": dynasty.current.economy.starting_cash,
+		"employees": _count_staffed_properties(),
+	})
+
+
+## Player tapped through the obituary: show the itemized will (ceremony beat 2).
+func _on_continue_to_will() -> void:
 	var will := dynasty.get_draft_will()
 	_will_screen.show_will(will, HeirNames.dynasty_name(dynasty.generation))
+
+
+## How many of the living generation's properties are staffed — the obituary's
+## "beloved employer of N" figure (its standing payroll, GDD §8.3).
+func _count_staffed_properties() -> int:
+	var staffed := 0
+	for prop in game.economy.properties:
+		if (prop as PropertyState).is_staffed:
+			staffed += 1
+	return staffed
 
 
 ## Player backed out of the will: it has already hidden itself, so there is

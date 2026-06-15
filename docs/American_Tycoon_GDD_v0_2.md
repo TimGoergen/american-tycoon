@@ -287,13 +287,16 @@ Resolved since v0.1: ~~automation/managers~~ (§6), ~~dynasty identity~~ (§8.2)
 Captured ideas for later development. Nothing here is in current scope; each needs its
 own design pass before it becomes a milestone.
 
-- **Temporary boosts / consumables.** Consumable items that grant a *very high but very
-  short-lived* increase in income — a brief, dramatic spike the player triggers on demand.
-  Distinct from the Frenzy meter (§5.1/§9), which is an earned, self-charging burst: these
-  are discrete items with a count. Open: how they're acquired (earned, purchased, event
-  drop, loophole reward?), their magnitude and duration, whether they stack with Frenzy and
-  the Legacy multipliers, and whether they read as satire (e.g. "energy drink", "insider
-  tip"). (Tim, 2026-06-14.)
+- **Temporary boosts.** Abilities that grant a *very high but very short-lived* increase in
+  income — a brief, dramatic spike the player triggers on demand. Distinct from the Frenzy
+  meter (§5.1/§9), which is an earned, self-charging burst. **Not cash-purchasable and not
+  consumable items with a count:** each boost is unlocked by a *permanent upgrade* that
+  establishes a specific bonus (magnitude + duration) gated by a specific *cooldown*. Once
+  unlocked, the boost is always available, limited only by its cooldown — so the upgrade
+  buys the *capability*, not a stock of charges. Open: where the permanent upgrades live
+  (Legacy/Estate Office shop vs. their own track), the bonus/duration/cooldown values,
+  whether boosts stack with Frenzy and the Legacy multipliers, and the satirical framing
+  (e.g. "energy drink", "insider tip"). (Tim, 2026-06-14.)
 
 ---
 

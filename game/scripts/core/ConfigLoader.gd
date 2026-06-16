@@ -29,10 +29,22 @@ const TITLE_PATHS := [
 
 
 ## Returns null (with an error pushed) if the tuning file is missing.
-static func load_tuning() -> TuningConfig:
-	var tuning := ResourceLoader.load(TUNING_PATH) as TuningConfig
+##
+## By default the dev/balance overrides written by the tuning panel (user://,
+## see TuningOverrides) are layered on top of the baked defaults, so a tuned
+## constant takes effect on the next boot. The balance simulator passes
+## apply_user_overrides=false so it always measures the baked numbers, never a
+## particular device's local tweaks.
+static func load_tuning(apply_user_overrides: bool = true) -> TuningConfig:
+	# Load a fresh copy (CACHE_MODE_IGNORE) rather than the shared cached resource:
+	# we mutate it with overrides below, and those edits must never bleed into a
+	# later baked-defaults load (e.g. the panel reading defaults for comparison).
+	var tuning := ResourceLoader.load(TUNING_PATH, "", ResourceLoader.CACHE_MODE_IGNORE) as TuningConfig
 	if tuning == null:
 		push_error("ConfigLoader: could not load " + TUNING_PATH)
+		return null
+	if apply_user_overrides:
+		TuningOverrides.apply(tuning, TuningOverrides.load())
 	return tuning
 
 

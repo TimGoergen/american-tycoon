@@ -69,7 +69,9 @@ func _initialize() -> void:
 ## Load every config Resource the sim needs (via the same ConfigLoader the
 ## game uses, so the two can never drift). Returns false on any failure.
 func _load_configs() -> bool:
-	_tuning = ConfigLoader.load_tuning()
+	# The sim always measures the baked defaults — never a device's local dev-panel
+	# overrides — so balance results stay reproducible (apply_user_overrides=false).
+	_tuning = ConfigLoader.load_tuning(false)
 	_property_configs = ConfigLoader.load_property_configs()
 	_title_configs = ConfigLoader.load_title_configs()
 	return _tuning != null and not _property_configs.is_empty() and not _title_configs.is_empty()

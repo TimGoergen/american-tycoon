@@ -269,10 +269,20 @@ Sequenced as four playable plateaus — each a legitimate stopping point that is
 |---|---|---|
 | **M1 — The Slice** | Tap wage, buy ladder, cycles/collect, count-milestone speed-ups, bulk-buy UI, income/sec hero stat. Placeholder art. | Dopaminergic on real phone hardware; the return-spike loop verified against a real 3-hour gap |
 | **M2 — The Dynasty** | Death, obituary/will screen, estate tax, Legacy (front-loaded), heir name generator, Family Ledger, origins & debt, offers system | "Speeds up every time" verified across ≥5 generations |
-| **M3 — The Theme** | Art pass (backdrops, heroes, staffers), narrator copy pass, staffing system, offline/welcome-back ritual, rare events, the Ledger | The game is *itself* |
+| **M3 — The Theme** | Art pass (backdrops, heroes, staffers), audio implementation (exotica/muzak per §12), UI polish, narrator copy pass, staffing system, offline/welcome-back ritual, rare events, the Ledger | The game is *itself* |
 | **M4 — The Planet** | Earth target & percentage display, Final Dollar sequence, market two via data pipeline, balance simulator validation of the full week | Earth captured; the Letter arrives |
 
 Headless balance simulator is built during M1–M2, not after.
+
+### Near-term tasks (app shell & tooling — not milestone-gated)
+
+These are needed soon and run independently of the M-milestone narrative; schedule them
+against current work rather than a specific plateau:
+
+- **Start screen** — the app's entry/landing screen.
+- **Settings screen** — player-facing options.
+- **Balance config screen** — a dev-facing tuning panel that reads/writes the `/config`
+  values, so balance can be exercised on-device, not just in the headless simulator.
 
 ---
 
@@ -290,7 +300,7 @@ Resolved since v0.1: ~~automation/managers~~ (§6), ~~dynasty identity~~ (§8.2)
 8. **Market Two design.** Identity, economy size, ladder reskin, modifier (the pipeline's first proof).
 9. **Narrator copy pass.** Voice defined (§1.2); the writing itself is a dedicated effort (obituaries, will lines, staffer cards, event copy, the Letter).
 10. **Name generator part-lists.** A fun evening of writing (§8.2).
-11. **Sound & haptics design.** The return-spike delta (§3.1) needs weight; audio direction set, implementation unspecified.
+11. **Sound & haptics design.** The return-spike delta (§3.1) needs weight; audio direction set, implementation now scheduled into M3 (§13). Remaining open: haptics and per-event sound mapping.
 12. **Frenzy meter tuning.** Layer 3 charge rate, multiplier size, duration.
 
 ---

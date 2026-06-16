@@ -26,6 +26,7 @@ var _welcome_overlay: WelcomeBackOverlay
 var _will_screen: WillScreen
 var _legacy_screen: LegacyScreen
 var _ledger_screen: FamilyLedgerScreen
+var _dev_panel: DevTuningPanel
 var _buy_mode_button: Button
 var _plan_button: Button
 var _legacy_button: Button
@@ -52,7 +53,8 @@ func _process(delta: float) -> void:
 	# ceremony or the upgrade shop): no ticks, no autosave. This keeps the will's
 	# numbers from shifting under the player, avoids half-saving the generation
 	# swap mid-ceremony, and lets the shop spend Legacy against a steady balance.
-	if _will_screen.visible or _legacy_screen.visible or _ledger_screen.visible:
+	if _will_screen.visible or _legacy_screen.visible or _ledger_screen.visible \
+			or _dev_panel.visible:
 		return
 
 	# Fixed-timestep logic (Spec §2): accumulate render time and tick in
@@ -179,16 +181,17 @@ func _build_ui() -> void:
 	var toggle_line := HBoxContainer.new()
 	column.add_child(toggle_line)
 
-	# Temporary play-testing tool: wipe the save and restart from a clean slate.
-	# Sits on the left of the buy-mode toggle for now; it will move into a proper
-	# settings screen later (Tim's note). Red because it is a destructive action.
-	var reset_button := Button.new()
-	reset_button.custom_minimum_size = Vector2(150, 56)
-	reset_button.add_theme_font_size_override("font_size", 20)
-	UiPalette.style_button(reset_button, true)
-	reset_button.text = "RESET"
-	reset_button.pressed.connect(_on_reset_requested)
-	toggle_line.add_child(reset_button)
+	# Dev tools entry: opens the balance tuning panel (GDD §13). Neutral mustard —
+	# it is a tool, not a destructive action; the save-wipe now lives inside the
+	# panel (the old standalone red RESET button folded into it). Sits on the left
+	# of the buy-mode toggle for now; it will move into a settings screen later.
+	var dev_button := Button.new()
+	dev_button.custom_minimum_size = Vector2(150, 56)
+	dev_button.add_theme_font_size_override("font_size", 20)
+	UiPalette.style_button(dev_button, false)
+	dev_button.text = "DEV"
+	dev_button.pressed.connect(_on_dev_pressed)
+	toggle_line.add_child(dev_button)
 
 	var toggle_spacer := Control.new()
 	toggle_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -327,6 +330,18 @@ func _build_ui() -> void:
 	_ledger_screen.closed.connect(_on_family_ledger_closed)
 	add_child(_ledger_screen)
 
+	# The dev tuning panel (GDD §13), above everything and hidden until the DEV
+	# button opens it. Main freezes the economy while it is up, applies its edits
+	# by saving overrides + reloading the scene, and routes its save-wipe action.
+	_dev_panel = DevTuningPanel.new()
+	_dev_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_dev_panel.setup()
+	_dev_panel.apply_requested.connect(_on_dev_apply_requested)
+	_dev_panel.defaults_requested.connect(_on_dev_defaults_requested)
+	_dev_panel.reset_dynasty_requested.connect(_on_dev_reset_dynasty_requested)
+	_dev_panel.closed.connect(_on_dev_closed)
+	add_child(_dev_panel)
+
 
 # ---------------------------------------------------------------------------
 # UI verb handlers — every player action flows through GameState
@@ -379,11 +394,38 @@ func _on_pop_requested() -> void:
 	game.pop_frenzy()
 
 
-## Temporary play-testing reset: delete the save and reload the scene, which
-## re-runs startup with no save present and so begins a fresh run.
-func _on_reset_requested() -> void:
+## Player opened the dev tuning panel: seed it with the live config (baked
+## defaults + any active overrides) for the editor values, plus a pristine baked
+## copy so it can tell which constants are overridden and diff edits on Apply.
+func _on_dev_pressed() -> void:
+	_dev_panel.open(tuning, ConfigLoader.load_tuning(false))
+
+
+## Apply tuning edits: persist the overrides, save the run so no progress is lost,
+## then reload the scene. Startup re-loads tuning with the new overrides layered
+## over the baked defaults — the same proven reload path used after a succession.
+func _on_dev_apply_requested(overrides: Dictionary) -> void:
+	TuningOverrides.save(overrides)
+	SaveManager.save_dict_to_file(dynasty.to_save_dict())
+	get_tree().reload_current_scene()
+
+
+## Discard all overrides and reload on the baked defaults (the run is preserved).
+func _on_dev_defaults_requested() -> void:
+	TuningOverrides.clear()
+	SaveManager.save_dict_to_file(dynasty.to_save_dict())
+	get_tree().reload_current_scene()
+
+
+## The folded-in save-wipe (was the standalone RESET button): delete the save and
+## reload, which re-runs startup with no save present and so begins a fresh run.
+func _on_dev_reset_dynasty_requested() -> void:
 	SaveManager.delete_save_file()
 	get_tree().reload_current_scene()
+
+
+func _on_dev_closed() -> void:
+	pass
 
 
 # ---------------------------------------------------------------------------

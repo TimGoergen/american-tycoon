@@ -36,21 +36,58 @@ signal defaults_requested
 signal reset_dynasty_requested
 
 
-# Large, legible type for phone reading (UI notes §1), but denser than the
-# ceremony screens since this is a long developer list, not a player moment.
-const TITLE_SIZE := 56
-const SUBTITLE_SIZE := 28
-const ROW_LABEL_SIZE := 30
-const ROW_VALUE_SIZE := 30
-const BUTTON_SIZE := 30
+# Large, legible type for phone reading (UI notes §1) — sized up 25% from the first
+# pass for on-device readability (Tim). Still denser than the ceremony screens, since
+# this is a long developer list, not a player moment.
+const TITLE_SIZE := 70
+const SUBTITLE_SIZE := 35
+const ROW_LABEL_SIZE := 38
+const ROW_DESC_SIZE := 28
+const ROW_VALUE_SIZE := 38
+const BUTTON_SIZE := 38
 
 ## Top inset (in the 1080×1920 design space) clearing the phone camera cut-out,
 ## matching the other full-screen overlays.
 const CAMERA_CUTOUT_INSET := 130
 
 ## Fixed width (px) of the value editor column, so the constant names line up.
-const VALUE_COLUMN_WIDTH := 360
-const ROW_HEIGHT := 64
+const VALUE_COLUMN_WIDTH := 400
+## Minimum height (px) of a value editor — a comfortable thumb target.
+const VALUE_HEIGHT := 72
+
+## One concise, plain-language description per tuning constant, shown beneath its
+## name so the panel is legible without cross-referencing TuningConfig.gd. Keyed by
+## the constant's exact variable name. When a new constant is added to TuningConfig,
+## add its description here too; anything missing simply shows no description.
+const DESCRIPTIONS := {
+	"logic_hz": "Logic ticks per second (fixed timestep).",
+	"m1_starting_cash": "Cash a fresh founder starts with (intentionally $0).",
+	"band_step": "How much steeper the cost curve gets at each milestone band.",
+	"cycle_floor": "Fastest a cycle can become from milestone speed-ups (seconds).",
+	"rush_pct": "Cycle fraction one rush-tap advances.",
+	"hold_rush_per_second": "Auto-rush pulses per second while holding a property.",
+	"wage_hold_taps_per_second": "Auto wage-taps per second while holding Clock In.",
+	"frenzy_fill_hold_factor": "Frenzy charge from a held-rush pulse vs a real tap.",
+	"offline_efficiency": "Offline income rate vs live play (0–1).",
+	"offline_cap_seconds": "Longest offline accrual window (seconds; 14400 = 4h).",
+	"frenzy_max_multiplier": "Peak income multiplier during a frenzy burn.",
+	"frenzy_burn_duration": "How long a full frenzy burn lasts (seconds).",
+	"frenzy_fill_per_tap": "Meter fill added per tap (fraction of the full bar).",
+	"frenzy_decay_per_second": "Meter decay per idle second (fraction of full bar).",
+	"frenzy_idle_grace": "Idle seconds before the meter begins to decay.",
+	"frenzy_pop_floor": "Minimum charge needed to trigger a frenzy.",
+	"estate_exemption_base": "Estate-tax-free amount at death ($).",
+	"estate_tax_rate_base": "Estate tax rate before loopholes (0–1).",
+	"loophole_rate_floor": "Lowest the estate tax can fall via loopholes.",
+	"k_legacy": "Legacy payout scale: legacy = K × estate_net ^ alpha.",
+	"alpha_legacy": "Legacy curve exponent (0.5 = square-root compression).",
+	"crash_multiplier": "Income multiplier during a Market Crash event.",
+	"crash_duration_minutes": "Market Crash length (active minutes).",
+	"audit_settle_rate": "Audit settlement cost as a fraction of net worth.",
+	"audit_threshold": "Legislative Assets needed to void an audit.",
+	"earth_economy_target": "Total money on Earth; capture it to win ($).",
+	"autosave_cadence": "Seconds between autosaves.",
+}
 
 
 # One LineEdit per constant, keyed by constant name, read back on Apply.
@@ -117,7 +154,7 @@ func _build_chrome() -> void:
 	column.add_child(scroll)
 
 	_list = VBoxContainer.new()
-	_list.add_theme_constant_override("separation", 6)
+	_list.add_theme_constant_override("separation", 14)
 	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(_list)
 
@@ -192,9 +229,9 @@ func open(effective_tuning: TuningConfig, baked_tuning: TuningConfig) -> void:
 	visible = true
 
 
-## One constant row: name on the left, an editable value on the right. A row whose
-## current value differs from the baked default is tinted gold and marked, so an
-## active override is obvious at a glance.
+## One constant row: the name and a concise description stacked on the left, an
+## editable value on the right. A row whose current value differs from the baked
+## default is tinted gold and marked, so an active override is obvious at a glance.
 func _add_constant_row(name: String, type: int, current_value: Variant, baked_value: Variant) -> void:
 	_types[name] = type
 	_baked[name] = baked_value
@@ -202,22 +239,38 @@ func _add_constant_row(name: String, type: int, current_value: Variant, baked_va
 
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
-	row.custom_minimum_size = Vector2(0, ROW_HEIGHT)
 	_list.add_child(row)
+
+	# Name (top) + description (beneath) share the left column; the editor sits to
+	# their right, vertically centered against the stacked text.
+	var text_column := VBoxContainer.new()
+	text_column.add_theme_constant_override("separation", 2)
+	text_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text_column.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(text_column)
 
 	var label := Label.new()
 	label.text = ("● " if is_overridden else "") + name
-	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.add_theme_color_override(
 		"font_color", UiPalette.MUSTARD_GOLD if is_overridden else UiPalette.NAVY)
 	label.add_theme_font_size_override("font_size", ROW_LABEL_SIZE)
-	row.add_child(label)
+	text_column.add_child(label)
+
+	var description: String = DESCRIPTIONS.get(name, "")
+	if description != "":
+		var desc_label := Label.new()
+		desc_label.text = description
+		desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		# Muted navy so the description reads as secondary to the constant's name.
+		desc_label.add_theme_color_override("font_color", Color(UiPalette.NAVY, 0.7))
+		desc_label.add_theme_font_size_override("font_size", ROW_DESC_SIZE)
+		text_column.add_child(desc_label)
 
 	var edit := LineEdit.new()
 	edit.text = _format_value(current_value)
-	edit.custom_minimum_size = Vector2(VALUE_COLUMN_WIDTH, ROW_HEIGHT)
+	edit.custom_minimum_size = Vector2(VALUE_COLUMN_WIDTH, VALUE_HEIGHT)
 	edit.alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	edit.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	edit.add_theme_font_size_override("font_size", ROW_VALUE_SIZE)
 	# Decimal numeric keypad on the phone — every tuning constant is a number.
 	edit.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_NUMBER_DECIMAL

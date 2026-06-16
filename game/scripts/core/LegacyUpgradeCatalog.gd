@@ -37,14 +37,23 @@ const ESTATE_LAWYERS  := "estate_lawyers"
 
 
 # ── The catalog ───────────────────────────────────────────────────────────────
-# Cost note: Legacy is intentionally on a SMALL scale so each point feels hard-won
-# and valuable. The estate→Legacy curve (k_legacy × built_estate ^ alpha, with a
-# low k_legacy and a flattened alpha — see tuning.tres / EstateWaterfall) makes the
-# FIRST whole point take real playtime to reach and keeps even a long run in the
-# low tens of Legacy. The single-digit first-level costs below are matched to that
-# scale so a first prestige buys ~2–3 of them and the dynasty starts to snowball.
-# Verified against sim/Sim.gd's dynasty protocol ("speeds up every time"). These
-# are still starting numbers meant for on-device feel-tuning, not final balance.
+# Cost note: Legacy is on a SMALL scale so each point feels hard-won. The estate→Legacy
+# curve (k_legacy × estate_net ^ alpha — see tuning.tres / EstateWaterfall, tuned
+# 2026-06-15 so a first prestige yields ~10–16 Legacy) keeps yields modest, and the
+# single-digit first-level costs below are matched to it so a first prestige buys ~1–2
+# upgrades the player can feel.
+#
+# Effect model (set 2026-06-15, modeled on Idle Slayer): the three core accelerators —
+# Family Fortune (income), Efficiency (cycle speed), Connections (wage) — COMPOUND, so
+# each level is the same relative jump no matter how deep you are (the getters in
+# LegacyUpgrades.gd raise (1 + effect_per_level) to the level). Their caps are raised to
+# 30 — effectively endless, since the geometric `cost_growth` below is the real brake, so
+# there is always a meaningful next level to chase. The other three (Trust Fund flat
+# dollars, Loyal Staff discount, Estate Lawyers Legacy-yield) stay additive and modestly
+# capped on purpose: compounding a discount heads to free, and compounding the Legacy
+# yield would run the whole prestige loop away.
+# Verified against sim/Sim.gd's dynasty protocol ("speeds up every time"). Still starting
+# numbers meant for on-device feel-tuning, not final balance.
 const UPGRADES := [
 	{
 		"id": SEED_CAPITAL,
@@ -61,20 +70,20 @@ const UPGRADES := [
 		"name": "Family Fortune",
 		"category": "Wealth",
 		"description": "The family name itself earns. All property income rises.",
-		"max_level": 12,
+		"max_level": 30,              # effectively endless: geometric cost is the real brake
 		"base_cost": 6,
 		"cost_growth": 2.0,
-		"effect_per_level": 0.20,     # +20% property income per level
+		"effect_per_level": 0.20,     # COMPOUNDING: ×1.20 income per level (see LegacyUpgrades getter)
 	},
 	{
 		"id": EFFICIENCY,
 		"name": "Efficiency Experts",
 		"category": "Operations",
 		"description": "Sharper management. Every property cycles faster.",
-		"max_level": 8,
+		"max_level": 30,              # effectively endless: geometric cost is the real brake
 		"base_cost": 6,
 		"cost_growth": 2.0,
-		"effect_per_level": 0.12,     # +12% cycle speed per level
+		"effect_per_level": 0.12,     # COMPOUNDING: ×1.12 cycle speed per level (see LegacyUpgrades getter)
 	},
 	{
 		"id": LOYAL_STAFF,
@@ -91,10 +100,10 @@ const UPGRADES := [
 		"name": "Old-Money Connections",
 		"category": "Career",
 		"description": "Doors open faster for old money. Your wage per tap rises.",
-		"max_level": 8,
+		"max_level": 30,              # effectively endless: geometric cost is the real brake
 		"base_cost": 4,
 		"cost_growth": 1.9,
-		"effect_per_level": 0.40,     # +40% wage per tap per level
+		"effect_per_level": 0.40,     # COMPOUNDING: ×1.40 wage per tap per level (see LegacyUpgrades getter)
 	},
 	{
 		"id": ESTATE_LAWYERS,
@@ -148,18 +157,22 @@ static func describe_effect(id: String, level: int) -> String:
 		return ""
 	var per_level := float(definition["effect_per_level"])
 
+	# The three compounding accelerators show their TOTAL multiplier at this level
+	# (e.g. "×6.19 property income"), since (1 + per_level) ^ level is what the
+	# LegacyUpgrades getters actually apply. The additive upgrades keep the "+X%" /
+	# "+$X" wording, which reads true for their linear formula.
 	match id:
 		SEED_CAPITAL:
 			var bonus := per_level * float(shown_level)
 			return "+%s starting cash" % Money.of(bonus).display()
 		FAMILY_FORTUNE:
-			return "+%d%% property income" % int(round(per_level * 100.0 * float(shown_level)))
+			return "×%.2f property income" % pow(1.0 + per_level, float(shown_level))
 		EFFICIENCY:
-			return "+%d%% cycle speed" % int(round(per_level * 100.0 * float(shown_level)))
+			return "×%.2f cycle speed" % pow(1.0 + per_level, float(shown_level))
 		LOYAL_STAFF:
 			return "−%d%% staff hiring cost" % int(round(per_level * 100.0 * float(shown_level)))
 		CONNECTIONS:
-			return "+%d%% wage per tap" % int(round(per_level * 100.0 * float(shown_level)))
+			return "×%.2f wage per tap" % pow(1.0 + per_level, float(shown_level))
 		ESTATE_LAWYERS:
 			return "+%d%% Legacy per succession" % int(round(per_level * 100.0 * float(shown_level)))
 	return ""

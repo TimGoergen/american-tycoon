@@ -34,3 +34,44 @@ Note for later: this makes the single-generation economy much hotter (the dynast
 sim blows past the $103.6T Earth target within a few generations). That is the
 prestige constants' job to calibrate (`k_legacy`, `k_sprint`, etc. — all still
 TBD-SIM placeholders), not the property ladder's. Flag for a prestige tuning pass.
+
+## 2026-06-15 — Prestige/Legacy constant pass (Step 1 of 2)
+
+Goal (Tim's three criteria, modeled on Idle Slayer's prestige feel): every reset
+scales up; first prestige funds 1–2 felt-but-safe upgrades (target 10–16 Legacy);
+always another upgrade to chase. This step tunes the estate→Legacy *conversion*;
+the catalog-ceiling work (criterion 3) is Step 2.
+
+| Date | Constant | Old | New | Reason |
+|---|---|---|---|---|
+| 2026-06-15 | k_legacy | 0.01 | 0.005 | Solve gen-1 yield to Tim's 10–16 target. Sim gen-1 net $5.5M → +11 Legacy (was +4). |
+| 2026-06-15 | alpha_legacy | 0.4 | 0.5 | Un-flatten the curve so bigger runs pay off visibly (criterion 1). ×10 cash now → ×3.16 Legacy (was ×2.5). |
+
+Sim evidence (6-gen dynasty, after change): first-prestige Legacy 11; per-succession
+Legacy now 11/13/29/44/88/123 (was 4/4/8/8/10/14); lifetime cash earned climbs every
+generation (12.1M→911.5M) instead of flat-stepping. Residual gen-6 wobble (+2.2s) is
+mostly the sim's cheapest-first greedy buyer plus the still-unraised catalog ceilings.
+
+## 2026-06-15 — Prestige catalog: compounding accelerators + raised caps (Step 2 of 2)
+
+Criterion 3 ("always another upgrade to chase that has meaningful feel") can't be solved
+by the conversion constants — it's the catalog. Two coupled changes (Tim chose the
+compounding model over additive-with-raised-caps):
+
+- **Effect model → compounding** for the three core accelerators (Family Fortune income,
+  Efficiency cycle speed, Connections wage). `LegacyUpgrades` getters now apply
+  `(1 + effect_per_level) ^ level` instead of `1 + effect_per_level × level`, so every
+  level is the same RELATIVE jump no matter how deep — the Idle-Slayer feel. The other
+  three upgrades stay additive on purpose (compounding a discount → free hiring;
+  compounding the Legacy-yield → runaway loop).
+- **Caps raised 8–12 → 30** on those three lines (effectively endless; geometric
+  `cost_growth` is the real brake, so there's always a meaningful next level).
+- `describe_effect` updated so the three compounding cards show their true total
+  multiplier ("×6.19 property income") instead of a now-wrong additive percentage.
+
+Sim evidence (6-gen dynasty, after Steps 1+2): time-to-founder-peak now strictly shrinks
+every generation — 176 → 116 → 106 → 70.8 → 60.9 s (the earlier gen-6 wobble is gone);
+property income mult compounds 1.00→1.20→1.44→1.73; lifetime cash earned climbs and
+accelerates 12.1M → 84.8M → 865.9M → 3.1B; first prestige still 11 Legacy. Save
+round-trip PASS, no script errors. Economy stays well under the $103.6T Earth target over
+6 gens (no compounding runaway). Still first-pass values for on-device feel-tuning.

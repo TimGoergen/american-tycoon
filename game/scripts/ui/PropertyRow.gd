@@ -57,6 +57,14 @@ const RUSH_CATCHUP_TAU := 0.12
 ## every frame (the same approach FrenzyBar uses for its burn-color swap).
 var _showing_held_rush := false
 
+# Both action buttons lay their two pieces of text out the same way: a left-aligned
+# label and a right-aligned label sharing one vertically-centered row (Tim 2026-06-17).
+# The buy button shows "BUY ×N" on the left and the cost on the right; the hire button
+# shows the verb/staffer on the left and the cost/tier on the right. The font is sized
+# to fill this fixed row height — see _add_split_button_labels.
+const BUTTON_ROW_HEIGHT := 80
+const BUTTON_LABEL_FONT_SIZE := 34
+
 var _manager_circle: ManagerCircle
 var _name_label: Label
 var _income_label: Label
@@ -65,7 +73,11 @@ var _cycle_bar: ProgressBar
 var _milestone_bar: ProgressBar
 var _milestone_label: Label
 var _buy_button: Button
+var _buy_caption_label: Label
+var _buy_cost_label: Label
 var _hire_button: Button
+var _hire_left_label: Label
+var _hire_cost_label: Label
 
 ## Which hire-button look is currently applied, so the stylebox is only rebuilt when
 ## the state flips, not every frame. -1 = not yet applied, 0 = action (HIRE/UPGRADE,
@@ -183,16 +195,22 @@ func _ready() -> void:
 	_buy_button = Button.new()
 	_buy_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_buy_button.size_flags_stretch_ratio = 2.0  # buy gets twice the hire button's width
-	_buy_button.add_theme_font_size_override("font_size", 22)
+	_buy_button.custom_minimum_size = Vector2(0, BUTTON_ROW_HEIGHT)
 	UiPalette.style_button(_buy_button, true)  # red: buying is a spend action (§8)
 	_buy_button.pressed.connect(func() -> void: buy_requested.emit(prop_index, _buy_mode))
+	var buy_labels := _add_split_button_labels(_buy_button)
+	_buy_caption_label = buy_labels[0]
+	_buy_cost_label = buy_labels[1]
 	button_line.add_child(_buy_button)
 
 	_hire_button = Button.new()
 	_hire_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_hire_button.add_theme_font_size_override("font_size", 20)
+	_hire_button.custom_minimum_size = Vector2(0, BUTTON_ROW_HEIGHT)
 	UiPalette.style_button(_hire_button, false)
 	_hire_button.pressed.connect(func() -> void: hire_requested.emit(prop_index))
+	var hire_labels := _add_split_button_labels(_hire_button)
+	_hire_left_label = hire_labels[0]
+	_hire_cost_label = hire_labels[1]
 	button_line.add_child(_hire_button)
 
 	# Let a swipe that lands anywhere on the row (the panel, labels, or progress
@@ -380,10 +398,11 @@ func _refresh_hire_button() -> void:
 	if tier >= 1 and tier >= max_tier:
 		# Fully staffed for this epoch — nothing to upgrade until the next first contact.
 		_apply_hire_styling(true)
-		_hire_button.text = "%s\nTIER %d" % [
-			EpochCatalog.staffer_name(tier, prop_index).to_upper(), tier
-		]
+		_hire_left_label.text = EpochCatalog.staffer_name(tier, prop_index).to_upper()
+		_hire_cost_label.text = "TIER %d" % tier
 		_hire_button.disabled = true
+		# The faint-green staffed plate keeps full navy text, matching style_button's look.
+		_set_split_label_color(_hire_left_label, _hire_cost_label, UiPalette.NAVY)
 		return
 
 	# Otherwise a tier is available to buy: tier 1 (HIRE) from unstaffed, or the next
@@ -392,9 +411,13 @@ func _refresh_hire_button() -> void:
 	var next_tier := tier + 1
 	var cost := _economy.get_staff_cost(prop_index, next_tier)
 	var verb := "HIRE" if tier == 0 else "UPGRADE"
-	_hire_button.text = "%s\n%s" % [verb, Money.of(cost).display()]
+	_hire_left_label.text = verb
+	_hire_cost_label.text = Money.of(cost).display()
 	# A property with no units can't be staffed yet — a staffer needs something to run.
 	_hire_button.disabled = _economy.cash < cost or _prop.units_owned == 0
+	# Navy text on the live mustard plate, dimmed to match the disabled cream plate.
+	var hire_color := Color(UiPalette.NAVY, 0.45) if _hire_button.disabled else UiPalette.NAVY
+	_set_split_label_color(_hire_left_label, _hire_cost_label, hire_color)
 
 
 ## Swap the hire button between the normal action look (HIRE/UPGRADE) and the faint-
@@ -411,6 +434,53 @@ func _apply_hire_styling(staffed: bool) -> void:
 		_hire_button.add_theme_color_override("font_disabled_color", UiPalette.NAVY)
 	else:
 		UiPalette.style_button(_hire_button, false)
+
+
+## Overlay an action button with two labels — one left-aligned, one right-aligned —
+## sharing a single vertically-centered row that fills the button's fixed height. A
+## Button only draws one centered string, so to put the count on the left and the cost
+## on the right we add our own labels on top of it. The overlay ignores the mouse so
+## taps still reach the button underneath. Returns [left_label, right_label].
+func _add_split_button_labels(button: Button) -> Array:
+	# Fill the button, inset by the plate's content margin so the text clears the border.
+	var overlay := MarginContainer.new()
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.add_theme_constant_override("margin_left", 12)
+	overlay.add_theme_constant_override("margin_right", 12)
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	button.add_child(overlay)
+
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.add_child(row)
+
+	var left := Label.new()
+	left.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	left.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left.size_flags_vertical = Control.SIZE_FILL
+	left.clip_text = true  # if the two strings ever collide, the caption yields, never the cost
+	left.add_theme_font_size_override("font_size", BUTTON_LABEL_FONT_SIZE)
+	left.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(left)
+
+	var right := Label.new()
+	right.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	right.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	right.size_flags_vertical = Control.SIZE_FILL
+	right.add_theme_font_size_override("font_size", BUTTON_LABEL_FONT_SIZE)
+	right.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(right)
+
+	return [left, right]
+
+
+## Tint both of a split button's labels the one color. The overlay labels aren't the
+## button's own text, so they don't follow its font_color/disabled theme overrides —
+## we set their color to match the button's current state by hand.
+func _set_split_label_color(left: Label, right: Label, color: Color) -> void:
+	left.add_theme_color_override("font_color", color)
+	right.add_theme_color_override("font_color", color)
 
 
 ## Update the buy button's caption, cost, and enabled state for the
@@ -435,10 +505,23 @@ func _refresh_buy_button() -> void:
 	if count <= 0:
 		# MAX mode with nothing affordable yet: show the next single unit's cost so
 		# the player can see how close they are, instead of a blank "—".
-		_buy_button.text = "MAX\n%s" % Money.of(_prop.get_bulk_cost(1)).display()
+		_buy_caption_label.text = "MAX"
+		_buy_cost_label.text = Money.of(_prop.get_bulk_cost(1)).display()
 		_buy_button.disabled = true
+		_set_buy_label_colors()
 		return
 
 	var cost := _prop.get_bulk_cost(count)
-	_buy_button.text = "%s\n%s" % [caption, Money.of(cost).display()]
+	_buy_caption_label.text = caption
+	_buy_cost_label.text = Money.of(cost).display()
 	_buy_button.disabled = _economy.cash < cost
+	_set_buy_label_colors()
+
+
+## Color the buy button's labels to match its state: the action pale-gold when live,
+## or the dimmed navy of style_button's disabled plate when it can't be afforded.
+func _set_buy_label_colors() -> void:
+	if _buy_button.disabled:
+		_set_split_label_color(_buy_caption_label, _buy_cost_label, Color(UiPalette.NAVY, 0.45))
+	else:
+		_set_split_label_color(_buy_caption_label, _buy_cost_label, UiPalette.PALE_GOLD)

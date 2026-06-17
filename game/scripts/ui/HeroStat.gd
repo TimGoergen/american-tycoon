@@ -50,9 +50,8 @@ const FLASH_SECONDS := 0.18
 
 # Income readout throttle (Tim, 2026-06-16): the income/sec figure was repainting every
 # frame, changing so fast it was unreadable. We now hold each shown value for a short
-# interval and only repaint a few times a second — roughly a third as often as the cash
-# readout updates — so the number settles long enough to actually read. The underlying
-# value is still smoothed in GameState; this only slows how often the eye sees a change.
+# interval and repaint a few times a second so the number settles long enough to read.
+# (Responsiveness is governed by GameState.BONUS_INCOME_TAU, not this cadence.)
 const INCOME_REFRESH_INTERVAL := 0.33
 var _pending_income_per_sec := 0.0
 var _income_refresh_accumulator := INCOME_REFRESH_INTERVAL  # repaint on the very first frame

@@ -48,10 +48,12 @@ var displayed_income_per_sec: float = 0.0
 ## headline can never fall below the guaranteed staffed income.
 var _smoothed_bonus_per_sec: float = 0.0
 
-## Time constant (seconds) for the bonus average. Deliberately longer than a "live"
-## readout: individual cycle payouts arrive as spikes, and a longer window averages
-## those spikes (and the quiet gaps between them) into a steady bonus reading.
-const BONUS_INCOME_TAU := 4.0
+## Time constant (seconds) for the bonus average. Long enough to average the lumpy
+## cycle-payout spikes (and the quiet gaps between them) into a steady bonus reading,
+## but short enough that the headline still responds promptly to what the player is
+## doing. Lowered 4.0 → 1.0 (Tim, 2026-06-17): at 4 s the number felt laggy/sluggish to
+## react; 1 s keeps it readable while chasing reality much faster.
+const BONUS_INCOME_TAU := 1.0
 
 # Wage earned since the last tick (taps fire between ticks); folded into the
 # bonus average on the next tick, then cleared.

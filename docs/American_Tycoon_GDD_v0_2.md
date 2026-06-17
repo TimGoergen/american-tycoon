@@ -28,7 +28,7 @@ The designer's cardinal sin in idle games: **too long between meaningful upgrade
 
 ## 1. High Concept
 
-An idle/incremental game about the American Dream of making money. The player purchases income-generating "properties" to buy more income-generating properties, across generations of a wealthy dynasty, until the family has captured **every dollar in circulation on Earth** — at which point the game reveals that Earth was merely the first market, and the dynasty relocates to a larger economy.
+An idle/incremental game about the American Dream of making money. The player purchases income-generating "properties" to buy more income-generating properties, across generations of a wealthy dynasty, until the family has captured **every dollar in circulation on Earth** — at which point the game reveals that Earth was merely the first economy, and **first contact** with an alien civilization opens a market orders of magnitude larger (§6.2).
 
 ### 1.1 Thesis
 
@@ -61,9 +61,9 @@ The satire lives in the mechanics, not the writing. In America, success is defin
 
 1. **The Run (a lifetime).** Buy the ladder, ATM → Executive Assets. Ends in death/retirement — or bankruptcy.
 2. **The Dynasty (prestige).** Estate passes to an heir, minus creditors and estate tax. Post-tax remainder converts to permanent dynastic advantage. Loopholes purchased via political assets erode the tax across generations.
-3. **The Planet (meta-prestige).** A dynasty captures all money in circulation. The game does not end — Earth is stamped *saturated market* and the family relocates to a larger economy. A game about wanting all the money cannot, by definition, end.
+3. **The Epoch (alien contact).** A generation captures the entire current economy (Earth's whole value, ~$103.6T). The game does not end — instead Earth makes **first contact** with an alien civilization, which opens a market orders of magnitude larger and a new alien-tech staffer tier for every property (§6.2). A game about wanting all the money cannot, by definition, end; it just keeps finding bigger economies to consume.
 
-**Planets are markets, not sci-fi.** Emerging markets, with onboarding paperwork.
+**Contact is the scale engine, not sci-fi spectacle.** The aliens are flavor and magnitude bands on a single dollar economy — capitalism ran out of Earth, so it opened the galaxy as a market. *(This replaces the earlier "relocate to a distinct new market" idea — see Future Features.)*
 
 ### 3.1 The Session Loop (the emotional heart — added v0.2)
 
@@ -125,21 +125,53 @@ Clicking is always the best per-second action — but *what clicking is* evolves
 The early game must *feel* faster on every timescale:
 
 - **Within a run — punctuated, visible acceleration.** Ownership-count milestones: own 10 of a property → cycle time halves; 25 → halves again; etc. Properties visibly spin from labored crawl to blur — speed as *displayed motion*, not just bigger numbers. Early cost/income curves tuned so purchase cadence quickens in the opening minutes. Step-function acceleration feels like speeding up; smooth exponential growth paradoxically feels static.
-- **Across generations — front-loaded Legacy.** Prestige bonuses disproportionately multiply the *early ladder*. Each heir tears through tiers the grandfather crawled across; run 1's first hour is run 5's first ninety seconds. Compounding advantage rendered as game-feel — the player experiences the unfairness from the privileged side. Garnish: each generation auto-skips ceremonies it has outgrown (the family office handles paperwork now).
+- **Across generations — front-loaded Legacy, reaching deeper epochs.** Prestige bonuses disproportionately multiply the *early ladder*. Each heir tears through tiers the grandfather crawled across; run 1's first hour is run 5's first ninety seconds. Legacy is also **how the dynasty punches further into the epoch ladder** (§6.2): a juiced-up heir consumes Earth's economy fast enough to reach civilizations the founder never contacted, and per-staffer retention (§6.3) lets the heir start with alien staff already in place. Compounding advantage rendered as game-feel — the player experiences the unfairness from the privileged side. Garnish: each generation auto-skips ceremonies it has outgrown (the family office handles paperwork now).
 - **Per property — the arc completes in automation.** Crawl → spin → blur → *someone else's problem* (§6).
 
 ---
 
-## 6. Staffing & Automation (added v0.2)
+## 6. Staffing & Automation (rewritten v0.3 — epoch-keyed staffing)
 
-AdCap-style per-property hires — the moment **labor itself becomes something you purchase**.
+Staffing is the moment **labor itself becomes something you purchase** — and in this game that purchase is no longer a one-time on/off switch. It is a **tiered upgrade track keyed to alien epochs** (see §6.2). Each property's staffer can be hired, then *upgraded* tier by tier as Earth makes contact with successive alien civilizations, with each tier a large income multiplier justified in-fiction by that civilization's technology ("the Luminari run your ATMs on coherent light now").
 
-- **One-time hire per property;** once staffed, cycles run and collect automatically, forever.
-- Hire costs tuned to land just as manual collection turns from engaging to tedious (tedium-relief dopamine pop).
-- Tapping remains strictly additive (§5, Layer 2).
-- **Named staffers in 50s ad style:** the gleaming ATM technician, the NFT community manager — up to the **Lobbyist** (Legislative Assets) and **Chief of Staff** (Executive Assets), because at that altitude even owning the government is delegated.
-- **The quiet ratio:** each staffer's card shows one-time hire cost beside lifetime revenue generated — two numbers drifting apart by ten orders of magnitude, no commentary. The labor-vs-capital argument as a stat line.
-- **Dynasty interaction:** Legacy upgrade — *Loyal Household Staff* — lets staff persist across generations (possibly tiered: junior staff reset, senior staff persist). Inherited servants are dynastic infrastructure, front-loading each heir's acceleration (§5.1).
+This is the diegetic engine behind the game's absurd scale: capitalism ran out of Earth, so it opened the galaxy as a market.
+
+### 6.1 Per-property staff tiers
+
+- **Hire, then upgrade.** Tier 0 = unstaffed (you collect by hand). Tier 1 = an Earth staffer: cycles now run and collect automatically, forever — automation behaves exactly as the old one-time hire did. Tiers 2+ replace that staffer with an alien-tech version that multiplies *that property's* income.
+- **You can only reach a tier whose epoch you've reached this run** (§6.2). The next-tier upgrade is gated by contact, not just by cash.
+- **The multiplier is honest.** A staffer's tier multiplier is applied at the point of payment alongside frenzy and Legacy, so it shows up in the on-screen income/sec — no hidden math.
+- **Hire/upgrade cost climbs with tier** (alien talent costs more): the base hire cost is multiplied by a per-tier factor.
+- **Tapping remains strictly additive** (§5, Layer 2) — an automated, alien-staffed empire rewards an active thumb but never demands one.
+- **Named staffers in 50s-ad style, re-skinned per epoch.** Earth: the gleaming *ATM Technician*, the *NFT Community Manager*, up to the **Lobbyist** (Legislative Assets) and **Chief of Staff** (Executive Assets) — at that altitude even owning the government is delegated. Each later epoch renames the whole roster in its own flavor (the ATM Technician becomes the Luminari *Photon Teller*, then the Geth *Autonomous Teller Unit*, then the Mycelium *Spore-Cash Node*).
+
+### 6.2 Epochs & First Contact
+
+Earth runs on **one currency — the dollar.** Alien civilizations are *flavor, magnitude bands, and a staff-tier gate*, never a second money type.
+
+- **Epochs are reached within a run by consuming the entire current economy.** Each epoch has a total economic value; Earth's is the existing Earth target (~$103.6T — "buy the Earth", §10). Once a generation has *earned* that whole value, contact with the next civilization fires and the next, orders-of-magnitude-larger epoch opens. The threshold ladder *is* the scale justification: "you ran out of Earth to buy, so the galaxy opens."
+- **First Contact is a beat,** not just a number crossing: it names the civilization, its home world and tech, and declares new markets open. Each contact also unlocks the next staffer tier for every property.
+- **v1 epoch ladder** (Earth + 5 alien epochs shipped; more can be added as data rows):
+
+  | Tier | Civilization | Economy vs. Earth | Staffer income ×| Flavor |
+  |---|---|---|---|---|
+  | 1 | **Earth** | 1× (~$103.6T) | 1× | The honest starting grind; tier 1 just turns on automation. |
+  | 2 | **Luminari Collective** (Solaria Prime, *Photons*) | 1,000× | 15× | Energy/light beings — money now moves at light speed. |
+  | 3 | **Geth-Sentinel Grid** (Rannoch-01, *Logic Nodes*) | 1,000,000× | 250× | Cybernetic collective — finance run entirely by machines. |
+  | 4 | **Mycelium Unity** (Spore-Deep, *Spores*) | 1,000,000,000× | 5,000× | Fungal hive-mind — money that literally spreads and self-replicates. |
+  | 5 | **Quartzite Conglomerate** (Geode-7, *Prisms*) | 1,000,000,000,000× | 90,000× | Crystalloid — wealth crystallized, harder than diamond and just as cold. |
+  | 6 | **Chronophage Enclave** (Tempus, *Seconds*) | 1,000,000,000,000,000× | 1,600,000× | Time-eaters — they sell you time itself, by the second, at a ruinous markup. |
+
+  Arc: energy → automation → proliferation → crystallization → time, each a different flavor of "the aliens make your money machine inhuman." *(Economy scales, income and hire multipliers are first-pass values in `EpochCatalog.gd`, for on-device feel-tuning; the dynasty sim verifies "speeds up every time" still holds with them. More civilizations can be added as data rows — `docs/alien_civilizations.md` holds 100.)*
+
+### 6.3 Dynasty interaction — staff retention
+
+- **Staff reset on prestige by default.** A new founder starts unstaffed, at the beginning of Earth (§8). Prestige is *how a juiced-up heir punches deeper into the epoch ladder than the last life did* (§5.1).
+- **Every staffer is individually retainable via a Legacy upgrade.** Spend Legacy to keep a specific property's staffer at its tier across the reset, so the heir's empire starts pre-staffed exactly where you chose to invest. Buying retention again raises the retained tier. Inherited staff are dynastic infrastructure, front-loading each heir's acceleration. *(This is distinct from the existing "Loyal Staff" Legacy upgrade, which only discounts hire cost.)*
+
+### 6.4 Deferred satire — "the quiet ratio"
+
+A future staffer-card stat: one-time hire cost beside lifetime revenue generated — two numbers drifting apart by ten orders of magnitude, no commentary. The labor-vs-capital argument as a stat line. No longer the centerpiece now that staffing is a tiered track; tracked as a polish-phase addition.
 
 ---
 
@@ -226,7 +258,7 @@ Legislative & Executive Assets unlock estate-tax erosion: raised exemptions, dyn
 
 ## 10. Win Condition — The Final Dollar (expanded v0.2)
 
-- **Per-planet win:** capture all money in circulation. Earth target ≈ global broad money, ~$100T class (*candidate canonical figure: $103.6T* — confirm). The percentage is watchable throughout.
+- **Per-epoch win:** capture all money in the current economy. Earth target ≈ global broad money, ~$100T class (*candidate canonical figure: $103.6T* — confirm). The percentage is watchable throughout. **This capture is also the first-contact trigger** (§6.2): consuming Earth's whole economy is what opens the next epoch, so the Final Dollar is a *gateway*, not an ending (§3 loop 3).
 - **Pacing: ~1 week of rhythmic daily play** to capture Earth. First death inside the first session (~30–45 min); 12–20 generations total, shortening as Legacy compounds.
 
 ### 10.1 The Final Dollar Sequence (four beats)
@@ -234,9 +266,9 @@ Legislative & Executive Assets unlock estate-tax erosion: raised exemptions, dyn
 1. **The Parade.** Counter ticks to 100.000000%; the game's biggest celebration — ticker tape, brass band, sash and trophy in peak 50s-Americana. Narrator at maximum sincere wattage: *"Through grit, gumption, and good old-fashioned elbow grease, you've earned every last dollar on Earth!"* No irony anywhere.
 2. **The Commemorative Ledger.** An award-certificate stat screen, presented as a high score: *Dollars in circulation: $103.6T. Yours: $103.6T. Everyone else's: $0.00.* The last line sits in celebratory gold leaf, unremarked. The game thinks it's bragging.
 3. **The Engine Stops.** Behind the confetti: **income/sec = $0.** No one is left to pay you. Cycles spin and dispense nothing; the muzak winds down like a record losing power. The game never comments — the math tells the truth while the voice celebrates. Total victory and total stagnation are the same state; the player feels the anti-pillar (§0.1) *as the win condition*. (The one beat with editorial teeth — permitted because no *words* break sincerity.)
-4. **The Letter.** Into the silence, mail: a cheerful relocation prospectus. *"Earth Market Status: SATURATED. Congratulations! An exciting opportunity awaits the discerning dynasty..."* The next market's bigger number restarts the loop: it gives you someone to take it from. Prestige conversion, new backdrop, the game breathes again.
+4. **First Contact.** Into the silence, a transmission: Earth's saturation has been *noticed*. A cheerful prospectus from the first alien civilization (the Luminari Collective, §6.2) arrives — *"Earth Market Status: SATURATED. Congratulations! An exciting opportunity awaits the discerning dynasty..."* A new, orders-of-magnitude-larger economy opens, every property gains an alien staffer tier, and the loop restarts with someone new to take it from. The bigger number gives the engine fuel again; new flavor, the game breathes. *(The earlier framing called this "relocating to the next planet/market"; it is now alien contact on a single dollar economy — §6.2.)*
 
-**v1.0 scope:** Earth complete + the Final Dollar sequence + **1–2 follow-on markets ready** (the planet pipeline must be cheap — §2).
+**v1.0 scope:** Earth complete + the Final Dollar / first-contact sequence + **the first 1–2 alien epochs ready** (`EpochCatalog.gd` already defines Earth + 3; epochs are cheap data rows, not unique markets — §6.2).
 
 ---
 
@@ -269,8 +301,8 @@ Sequenced as four playable plateaus — each a legitimate stopping point that is
 |---|---|---|
 | **M1 — The Slice** | Tap wage, buy ladder, cycles/collect, count-milestone speed-ups, bulk-buy UI, income/sec hero stat. Placeholder art. | Dopaminergic on real phone hardware; the return-spike loop verified against a real 3-hour gap |
 | **M2 — The Dynasty** | Death, obituary/will screen, estate tax, Legacy (front-loaded), heir name generator, Family Ledger, origins & debt, offers system | "Speeds up every time" verified across ≥5 generations |
-| **M3 — The Theme** | Art pass (backdrops, heroes, staffers), audio implementation (exotica/muzak per §12), UI polish, narrator copy pass, staffing system, offline/welcome-back ritual, rare events, the Ledger | The game is *itself* |
-| **M4 — The Planet** | Earth target & percentage display, Final Dollar sequence, market two via data pipeline, balance simulator validation of the full week | Earth captured; the Letter arrives |
+| **M3 — The Theme** | Art pass (backdrops, heroes, staffers incl. per-epoch reskins §6.1), audio implementation (exotica/muzak per §12), UI polish, narrator copy pass, epoch-keyed staffing UI & first-contact beat (§6), offline/welcome-back ritual, rare events, the Ledger | The game is *itself* |
+| **M4 — The Epoch** | Earth target & percentage display, Final Dollar / first-contact sequence, epoch progression beyond Earth (alien contact, §6.2), balance simulator validation of the full week | Earth captured; first contact made |
 
 Headless balance simulator is built during M1–M2, not after.
 
@@ -290,14 +322,14 @@ against current work rather than a specific plateau:
 
 Resolved since v0.1: ~~automation/managers~~ (§6), ~~dynasty identity~~ (§8.2), ~~demo tier~~ (deleted — no monetization), Legacy's primary function (~~#2~~, §5.1: front-loaded early-ladder multipliers + staff persistence; full upgrade catalog still open).
 
-1. **Legacy upgrade catalog.** Beyond early-ladder multipliers and Loyal Household Staff — full list and costs.
+1. **Legacy upgrade catalog.** Beyond early-ladder multipliers and per-staffer retention (§6.3) — full list and costs.
 2. **Achievement design.** Bootstrapped, trillionaire-shift, debt-free Earth, etc. Achievements are a satire delivery channel; full pass needed.
 3. **Canonical Earth figure.** Confirm $103.6T or choose another ~$100T-class number.
 4. **Prestige currency name.** Legacy / Pedigree / Old Money / other.
 5. **Sheet1 curves.** Confirm accelerating-multiplier design and tune against §3.2 pacing via the simulator.
 6. **Ladder refresh.** Keep NFTs as period artifact or update rungs for 2026?
 7. **Loan offer table.** Tiers, terms, cadence (§8.6).
-8. **Market Two design.** Identity, economy size, ladder reskin, modifier (the pipeline's first proof).
+8. ~~**Market Two design.**~~ **Superseded (2026-06-16)** by the epoch model (§6.2): there are no distinct markets — Earth advances through alien-contact epochs on one dollar economy. Remaining epoch open questions live in the Future Features "per-epoch modifier draft" note.
 9. **Narrator copy pass.** Voice defined (§1.2); the writing itself is a dedicated effort (obituaries, will lines, staffer cards, event copy, the Letter).
 10. **Name generator part-lists.** A fun evening of writing (§8.2).
 11. **Sound & haptics design.** The return-spike delta (§3.1) needs weight; audio direction set, implementation now scheduled into M3 (§13). Remaining open: haptics and per-event sound mapping.
@@ -321,25 +353,30 @@ own design pass before it becomes a milestone.
   whether boosts stack with Frenzy and the Legacy multipliers, and the satirical framing
   (e.g. "energy drink", "insider tip"). (Tim, 2026-06-14.)
 
-- **Alien-contact epochs instead of distinct markets.** A *possible* alternative to the
-  multi-market expansion model (§14 Q8 "Market Two"). Rather than authoring new worlds that
-  each need their own properties, names, and art, keep a single Earth economy and advance it
-  through *epochs*: each new epoch is Earth being contacted by an alien race, which triggers
-  an **order-of-magnitude scale increase** in the economy. The same property ladder and UI
-  carry forward — only the scale shifts — which keeps the interface consistent and avoids the
-  heavy content cost of unique per-market definitions. This is the proposed mechanism for
-  letting numbers climb into absurd ranges (potentially beyond octillion) without rebuilding
+- **Alien-contact epochs instead of distinct markets — ADOPTED & IN BUILD (2026-06-16).** This
+  was a *possible* alternative to the multi-market expansion model (§14 Q8 "Market Two"); it is
+  now the **chosen direction** and the core scale mechanism is **implemented** (epoch-keyed
+  staffing, Phase 1 headless core — `EpochCatalog.gd` / `EpochState.gd`). The design of record
+  now lives in **§6.2 (Epochs & First Contact)**; this entry is kept for the history and for the
+  one piece still parked (the per-epoch modifier draft, below). Core mechanism, now built:
+  rather than authoring new worlds that each need their own properties, names, and art, keep a
+  single Earth dollar economy and advance it through *epochs* — each epoch is Earth being
+  contacted by an alien race, which opens a market orders of magnitude larger and a new alien
+  staffer tier for every property. The same property ladder and UI carry forward — only the
+  scale shifts — which keeps the interface consistent and avoids the heavy content cost of
+  unique per-market definitions. This is how numbers climb into absurd ranges without rebuilding
   the game each time.
 
-  *Decisions (Tim, 2026-06-14):* This is an **endless** game, not a narratively complete one.
-  The §10 "Final Dollar" goal — owning all the money on Earth ($103.6T, §14 Q3) — is
-  **repurposed as the trigger for the second epoch** (the alien-contact event), not the
-  ending; each epoch presumably ends with its own "own everything at this scale" line that
-  triggers the next contact. The current top epoch is **allowed to slowly stagnate for now**
-  — no game escalates forever, and a soft ceiling at the frontier is acceptable rather than a
-  hard finish. This direction is preferred over §8/§14 Q8's distinct-markets approach.
+  *Decisions (Tim, 2026-06-14, all carried into §6.2):* This is an **endless** game, not a
+  narratively complete one. The §10 "Final Dollar" goal — owning all the money on Earth
+  ($103.6T, §14 Q3) — is **repurposed as the trigger for the second epoch** (first contact),
+  not the ending; each epoch ends with its own "own everything at this scale" line that triggers
+  the next contact. The current top epoch is **allowed to slowly stagnate for now** — a soft
+  ceiling at the frontier is acceptable rather than a hard finish. This direction is preferred
+  over §8/§14 Q8's distinct-markets approach (Q8 is now superseded).
 
-  *Per-epoch choice (Tim, 2026-06-14):* Each epoch is more than a scale bump — it introduces a
+  *STILL PARKED — Per-epoch choice (Tim, 2026-06-14):* The one part of this idea **not** in the
+  current build. Each epoch could be more than a scale bump — it introduces a
   **choice**. On entering a new epoch the player is prompted to pick **one of two modifiers**,
   and the two options are **drawn randomly from a larger pool** of possibilities. Framed as a
   choice between **specialization or expansion**. This is the novelty layer that keeps an epoch

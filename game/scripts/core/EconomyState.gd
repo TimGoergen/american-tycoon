@@ -84,19 +84,31 @@ func try_buy(prop_index: int, count: int) -> bool:
 	return true
 
 
-## Try to hire a staffer for the property at `prop_index`.
-## Returns true on success; false if can't afford or already staffed.
-func try_hire(prop_index: int) -> bool:
+## Try to hire OR upgrade the staffer for the property at `prop_index`, advancing it
+## one tier. `max_tier` is the highest tier currently unlocked (the generation's reached
+## epoch — GameState passes EpochState.current_tier). Returns true on success; false if
+## already at the highest unlocked/defined tier or the player can't afford the next one.
+func try_hire(prop_index: int, max_tier: int) -> bool:
 	var prop := properties[prop_index] as PropertyState
-	if prop.is_staffed:
+	var next_tier := prop.staff_tier + 1
+	if next_tier > max_tier or next_tier > EpochCatalog.tier_count():
 		return false
-	var cost := prop.get_staff_cost()
+	var cost := get_staff_cost(prop_index, next_tier)
 	if cash < cost:
 		return false
 	cash -= cost
 	spent_on_staff_this_gen += cost
-	prop.hire_staff()
+	prop.set_staff_tier(next_tier, EpochCatalog.staff_income_multiplier(next_tier))
 	return true
+
+
+## Cost to hire/upgrade the staffer at `prop_index` to `tier`: the property's base hire
+## cost (band-1 curve × the Legacy discount) scaled by that tier's alien-talent premium,
+## rounded to a clean number to match purchase prices.
+func get_staff_cost(prop_index: int, tier: int) -> float:
+	var prop := properties[prop_index] as PropertyState
+	var base_cost := prop.get_staff_cost()
+	return CostCurve.round_nice(base_cost * EpochCatalog.hire_cost_multiplier(tier))
 
 
 ## Layer 2 start verb: tap on an idle, unstaffed property.
@@ -134,15 +146,24 @@ func get_staffed_income_per_sec() -> float:
 	return total
 
 
-## Highest property index the player owns at least one unit of, or -1 if they own
-## none. Drives the Main screen's ladder: only owned rungs and the next rung up are
-## shown, so the list grows as the player climbs instead of dumping all 12 at once.
-func get_highest_owned_index() -> int:
-	var highest := -1
+## Index of the CHEAPEST property the player owns none of and cannot yet afford one
+## unit of, or -1 if there is no such property. Drives the Main screen's ladder
+## "peek": on top of every owned rung and every rung the player can already afford,
+## exactly this one unaffordable rung is shown (grayed) so the player always sees the
+## next thing to save toward — but nothing further. (Cost compared at the price of a
+## single unit, matching what the buy button charges in ×1 mode.)
+func get_cheapest_unaffordable_unowned_index() -> int:
+	var best := -1
+	var best_cost := INF
 	for i in range(properties.size()):
-		if (properties[i] as PropertyState).units_owned > 0:
-			highest = i
-	return highest
+		var p := properties[i] as PropertyState
+		if p.units_owned > 0:
+			continue
+		var unit_cost := p.get_bulk_cost(1)
+		if cash < unit_cost and unit_cost < best_cost:
+			best_cost = unit_cost
+			best = i
+	return best
 
 
 ## Credit GRANTED cash — money the player was handed, not earned: birth seed

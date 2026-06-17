@@ -81,7 +81,7 @@ Milestone progress slider per property: min = last milestone, max = next (recove
 
 ## 6. Staffing & Offline (merged system)
 
-- **Hire:** one-time cost `STAFF_COST_i` per property (provisional: 50× current unit cost at band 1 `TBD-SIM`); once staffed, the property auto-starts and auto-collects its cycles forever. Tap-rush remains additive on staffed properties.
+- **Hire / upgrade (epoch-keyed, updated 2026-06-16):** staffing is a **per-property tier track**, not a one-time switch (GDD §6). `staff_tier` per property: `0` = unstaffed, `1` = Earth staffer (auto-start + auto-collect forever — the old "hired" behavior), `2+` = the alien staffer unlocked once the run reaches that epoch (§6.2). Each tier carries `staff_income_multiplier` (Earth = 1.0; alien tiers are large jumps), applied at point of payment alongside frenzy/Legacy. Hire/upgrade cost = base `STAFF_COST_i` (provisional 50× band-1 unit cost `TBD-SIM`) × the tier's `hire_cost_multiplier`. You can only reach a tier whose epoch the run has reached. Tap-rush remains additive at any tier ≥ 1. Data table: `EpochCatalog.gd`; state: `EpochState.gd`.
 - **Offline accrual draws from staffed properties only:**
 ```
 offline_rate  = Σ(staffed i) income_per_sec(i) × OFFLINE_EFF
@@ -136,7 +136,7 @@ legacy_gain = floor( K_LEGACY × estate_net ^ ALPHA )      ALPHA = 0.5 provision
 ```
 (`estate_net` here is the post-tax net of the §9.2 waterfall, whose gross is now lifetime cash
 earned this generation — not net worth at death. The conversion formula itself is unchanged.)
-Displayed as **brackets** (thresholds where legacy_gain crosses integers / named tiers); advisor announces bracket crossings ("The estate now qualifies for Loyal Household Staff"). Total Legacy is dynastic and never spent down by conversion — Legacy *upgrades* (catalog incl. Loyal Household Staff: staff persist across generations) cost Legacy per the upgrade table (content pass).
+Displayed as **brackets** (thresholds where legacy_gain crosses integers / named tiers); advisor announces bracket crossings. Total Legacy is dynastic and never spent down by conversion — Legacy *upgrades* cost Legacy per the upgrade table (content pass). The catalog includes **per-staffer retention** (GDD §6.3): spend Legacy to keep a specific property's staffer at its tier across the prestige reset, so the heir starts pre-staffed there. *(This is distinct from the existing "Loyal Staff" upgrade, which only discounts hire cost. Staff otherwise reset on prestige.)*
 
 ### 9.4 Legacy application — catch-up sprint + residual
 ```
@@ -158,8 +158,8 @@ RESIDUAL_MULT = 1 + K_RES × brackets_attained          (permanent, after sprint
 ## 11. Data Schemas (config-driven content) `[ENG]`
 
 Godot Resources (the 2022 ScriptableObject pattern, ported):
-- **PropertyConfig:** id, name, BASE_COST, R0, base income_per_unit, base cycle_length, STAFF_COST rule, staffer name/card, hero art ref.
-- **PlanetConfig:** id, name, economy_target, property set (refs + overrides), starting backdrops, modifiers.
+- **PropertyConfig:** id, name, BASE_COST, R0, base income_per_unit, base cycle_length, STAFF_COST rule, hero art ref. *(The per-property staffer name now lives in `EpochCatalog.gd` indexed by tier+property — the `.tres` `staffer_name` field is vestigial as of 2026-06-16.)*
+- ~~**PlanetConfig**~~ — **superseded** by the epoch model (GDD §6.2): there are no distinct planet/market configs; epochs are rows in `EpochCatalog.gd` (civilization, economy_scale, staff multipliers) over one Earth-dollar economy.
 - **LoanTier / TitleRow / LoopholeRow / LegacyUpgradeRow / EventDef:** per §§5–10.
 - Earth's PropertyConfig values = GDD §4 table; R0 column = the one config value not recoverable from 2022 artifacts (the missing PropertyTypeConfigSO asset) — set provisionally and tune.
 
@@ -205,4 +205,4 @@ Main (ladder, wage button, frenzy bar, income/sec hero stat, backdrop) · The Le
 4. Earth canonical figure ($103.6T) — confirm.
 5. Family Office upgrade ladder (cap/efficiency steps).
 6. Heir-status pressure thresholds & copy.
-7. Planet/Market Two config — pipeline proof, M4.
+7. ~~Planet/Market Two config~~ — superseded by epochs (`EpochCatalog.gd`); flesh out more alien epochs/rows, M3–M4.

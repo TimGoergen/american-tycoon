@@ -21,6 +21,10 @@ var prop_index: int = -1
 var _prop: PropertyState
 var _economy: EconomyState
 var _frenzy: FrenzyState
+## The generation's reached epoch — the highest staffer tier any property may be hired
+## or upgraded to right now. Read live so the hire button unlocks the moment a new
+## civilization is contacted (EpochState.current_tier).
+var _epoch: EpochState
 var _buy_mode: BuyMode = BuyMode.ONE
 
 ## Accumulates held-down time on the tap button to pace auto-rush pulses.
@@ -63,9 +67,10 @@ var _milestone_label: Label
 var _buy_button: Button
 var _hire_button: Button
 
-## Set once when the property becomes staffed, so the faint-green restyle is applied
-## a single time rather than every frame (staffing is permanent).
-var _hire_staffed_styled := false
+## Which hire-button look is currently applied, so the stylebox is only rebuilt when
+## the state flips, not every frame. -1 = not yet applied, 0 = action (HIRE/UPGRADE,
+## normal mustard), 1 = fully-staffed-for-now (faint green, disabled).
+var _hire_style_applied := -1
 
 ## Tracks which ownership look is currently applied so the panel/start-button
 ## styleboxes are only rebuilt when ownership flips, not every frame.
@@ -74,11 +79,12 @@ var _ownership_style_applied := -1
 
 
 ## Call before adding to the tree.
-func setup(p_index: int, prop: PropertyState, economy: EconomyState, frenzy: FrenzyState) -> void:
+func setup(p_index: int, prop: PropertyState, economy: EconomyState, frenzy: FrenzyState, epoch: EpochState) -> void:
 	prop_index = p_index
 	_prop = prop
 	_economy = economy
 	_frenzy = frenzy
+	_epoch = epoch
 
 
 func _ready() -> void:
@@ -227,12 +233,15 @@ func _pump_held_rush(delta: float) -> void:
 
 
 func _refresh(delta: float) -> void:
-	# Ladder visibility: show only owned rungs plus the next rung up. A row is shown
-	# if the player owns at least one unit of it, or it is the next property above the
-	# highest they own (the one available to buy). Everything higher stays hidden until
-	# a purchase unlocks it. An invisible child takes no space in the VBox, so the list
-	# grows downward as the player climbs.
-	visible = _prop.units_owned > 0 or prop_index == _economy.get_highest_owned_index() + 1
+	# Ladder visibility (Tim, 2026-06-16): show every rung the player owns, plus every
+	# rung they can already afford one unit of (buy button live), plus exactly the
+	# single cheapest rung they cannot yet afford (grayed, a peek at what's next).
+	# Everything beyond that one peek stays hidden. An invisible child takes no space in
+	# the VBox, so the list grows as the player's reach grows.
+	var can_afford_one := _economy.cash >= _prop.get_bulk_cost(1)
+	visible = _prop.units_owned > 0 \
+			or can_afford_one \
+			or prop_index == _economy.get_cheapest_unaffordable_unowned_index()
 
 	var config := _prop.config as PropertyConfig
 	_name_label.text = "%s  ×%d" % [config.display_name, _prop.units_owned]
@@ -244,8 +253,12 @@ func _refresh(delta: float) -> void:
 
 	# Keep the portrait circle square and as tall as this top section: its height is
 	# already stretched to the section by the layout, so we just match the width to it.
+	# The staffer's NAME now comes from EpochCatalog by the property's current tier (the
+	# alien re-skin), not the vestigial .tres field, so the portrait initial tracks the
+	# tier (e.g. Earth "ATM Technician" → Luminari "Photon Teller").
 	_manager_circle.custom_minimum_size.x = _manager_circle.size.y
-	_manager_circle.set_state(_prop.is_staffed, config.manager_portrait, config.staffer_name, owned)
+	var staffer := EpochCatalog.staffer_name(_prop.staff_tier, prop_index)
+	_manager_circle.set_state(_prop.is_staffed, config.manager_portrait, staffer, owned)
 	# Show the cash paid out each time the bar fills (per cycle), so the figure on
 	# screen matches what the player actually receives on a completion. During a
 	# frenzy burn that payout is multiplied at point of payment (Spec §7), so the
@@ -307,23 +320,7 @@ func _refresh(delta: float) -> void:
 	_milestone_label.text = "%d / %d" % [_prop.units_owned, next_milestone]
 
 	_refresh_buy_button()
-
-	var cash := _economy.cash
-	if _prop.is_staffed:
-		_hire_button.text = "STAFFED"
-		_hire_button.disabled = true
-		if not _hire_staffed_styled:
-			# Staffing is permanent; recolor the button a faint green once to signal
-			# the property is automated (instead of the default disabled cream).
-			var staffed_style := UiPalette.make_staffed_style()
-			_hire_button.add_theme_stylebox_override("disabled", staffed_style)
-			_hire_button.add_theme_stylebox_override("normal", staffed_style)
-			_hire_button.add_theme_color_override("font_disabled_color", UiPalette.NAVY)
-			_hire_staffed_styled = true
-	else:
-		var staff_cost := _prop.get_staff_cost()
-		_hire_button.text = "HIRE\n%s" % Money.of(staff_cost).display()
-		_hire_button.disabled = cash < staff_cost
+	_refresh_hire_button()
 
 
 ## Swap the cycle bar's fill between its normal green and a brighter green. Only on
@@ -351,6 +348,53 @@ func _apply_ownership_styling(owned: bool) -> void:
 	else:
 		add_theme_stylebox_override("panel", UiPalette.make_unowned_panel_style())
 		UiPalette.style_unowned_button(_tap_button)
+
+
+## Update the hire/upgrade/staffed button for the property's current staff tier and the
+## reached epoch (the alien-staffing track, GDD §6). Three states:
+##   • tier 0 → HIRE the Earth staffer (tier 1).
+##   • a higher tier is unlocked by the reached epoch → UPGRADE to the next alien tier.
+##   • staffed at the best tier this epoch allows → show the staffer name + tier,
+##     disabled and faint green, until the next first contact unlocks a better tier.
+func _refresh_hire_button() -> void:
+	var tier := _prop.staff_tier
+	# Highest tier hireable right now: the reached epoch, capped at the defined epochs.
+	var max_tier := mini(_epoch.current_tier, EpochCatalog.tier_count())
+
+	if tier >= 1 and tier >= max_tier:
+		# Fully staffed for this epoch — nothing to upgrade until the next first contact.
+		_apply_hire_styling(true)
+		_hire_button.text = "%s\nTIER %d" % [
+			EpochCatalog.staffer_name(tier, prop_index).to_upper(), tier
+		]
+		_hire_button.disabled = true
+		return
+
+	# Otherwise a tier is available to buy: tier 1 (HIRE) from unstaffed, or the next
+	# alien tier (UPGRADE) on an already-staffed property after a fresh contact.
+	_apply_hire_styling(false)
+	var next_tier := tier + 1
+	var cost := _economy.get_staff_cost(prop_index, next_tier)
+	var verb := "HIRE" if tier == 0 else "UPGRADE"
+	_hire_button.text = "%s\n%s" % [verb, Money.of(cost).display()]
+	# A property with no units can't be staffed yet — a staffer needs something to run.
+	_hire_button.disabled = _economy.cash < cost or _prop.units_owned == 0
+
+
+## Swap the hire button between the normal action look (HIRE/UPGRADE) and the faint-
+## green "staffed for now" look. Only rebuilds the stylebox when the state flips.
+func _apply_hire_styling(staffed: bool) -> void:
+	var want := 1 if staffed else 0
+	if want == _hire_style_applied:
+		return
+	_hire_style_applied = want
+	if staffed:
+		var staffed_style := UiPalette.make_staffed_style()
+		_hire_button.add_theme_stylebox_override("disabled", staffed_style)
+		_hire_button.add_theme_stylebox_override("normal", staffed_style)
+		_hire_button.add_theme_color_override("font_disabled_color", UiPalette.NAVY)
+	else:
+		UiPalette.style_button(_hire_button, false)
 
 
 ## Update the buy button's caption, cost, and enabled state for the

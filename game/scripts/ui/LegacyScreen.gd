@@ -22,6 +22,10 @@ extends ColorRect
 ## A purchase just succeeded for this upgrade id. Main re-applies effects + saves.
 signal purchased(upgrade_id: String)
 
+## The player asked to retain (buy one more tier of) a property's staffer (GDD §6.3).
+## Main spends the Legacy, records it, then re-feeds the entries.
+signal retain_requested(property_index: int)
+
 ## The player closed the shop and wants to return to the game.
 signal closed
 
@@ -48,6 +52,11 @@ var _wallet_label: Label
 # Per-upgrade live controls, keyed by upgrade id, so refresh() can update each
 # card in place after a purchase without rebuilding the whole panel.
 var _cards: Dictionary = {}
+
+# Host for the dynamic "Household Staff" retention rows. Unlike the upgrade cards, these
+# depend on the living generation's current staff, so they are rebuilt each open from a
+# snapshot Main passes to set_retention_entries (rather than built once here).
+var _staff_list: VBoxContainer
 
 
 ## Store the state and build the (static) card layout once.
@@ -129,6 +138,22 @@ func _build_ui() -> void:
 			_add_category_heading(list, category)
 			current_category = category
 		_add_upgrade_card(list, definition)
+
+	# ── Household Staff (GDD §6.3): per-property staffer retention across prestige ──
+	# The rows are dynamic (they depend on the living generation's current staff), so
+	# here we lay out only the heading + host; set_retention_entries fills the host.
+	_add_category_heading(list, "Household Staff")
+	var staff_hint := Label.new()
+	staff_hint.text = "Keep a staffer's tier when you pass on (staff reset otherwise)."
+	staff_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	staff_hint.add_theme_color_override("font_color", UiPalette.NAVY)
+	staff_hint.add_theme_font_size_override("font_size", CARD_BODY_SIZE)
+	list.add_child(staff_hint)
+
+	_staff_list = VBoxContainer.new()
+	_staff_list.add_theme_constant_override("separation", 10)
+	_staff_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_child(_staff_list)
 
 	# Let a swipe that lands on a card surface (not its BUY button) scroll the
 	# list, the same as the property ladder. See UiPalette.allow_scroll_drag_through.
@@ -216,6 +241,82 @@ func _add_upgrade_card(parent: VBoxContainer, definition: Dictionary) -> void:
 		"effect_label": effect_label,
 		"buy_button": buy_button,
 	}
+
+
+# ---------------------------------------------------------------------------
+# Household Staff retention rows (dynamic)
+# ---------------------------------------------------------------------------
+
+## Rebuild the Household Staff rows from Main's snapshot of the living generation's
+## staff vs. the dynasty's retained tiers. Each entry is a Dictionary:
+##   { index, property_name, staffer_name, current_tier, retained_tier, cost, can_afford }
+## cost < 0 means there is nothing to buy (unstaffed, or already fully retained).
+func set_retention_entries(entries: Array) -> void:
+	for child in _staff_list.get_children():
+		child.queue_free()
+
+	if entries.is_empty():
+		var none := Label.new()
+		none.text = "No staff to retain yet — hire and upgrade staffers first."
+		none.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		none.add_theme_color_override("font_color", UiPalette.NAVY)
+		none.add_theme_font_size_override("font_size", CARD_BODY_SIZE)
+		_staff_list.add_child(none)
+		return
+
+	for entry in entries:
+		_add_retention_row(entry as Dictionary)
+	# Newly-created rows need the scroll-drag-through filter applied too (the one-time
+	# call in _build_ui only covered the static controls).
+	UiPalette.allow_scroll_drag_through(_staff_list)
+
+
+## One Household Staff card: property + current staffer on top, the now/retained tiers
+## and a RETAIN button (or "RETAINED" when fully retained / unstaffed) beneath.
+func _add_retention_row(entry: Dictionary) -> void:
+	var index := int(entry["index"])
+
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", UiPalette.make_panel_style())
+	_staff_list.add_child(card)
+
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 6)
+	card.add_child(col)
+
+	var name_label := Label.new()
+	name_label.text = "%s — %s" % [String(entry["property_name"]), String(entry["staffer_name"])]
+	name_label.add_theme_color_override("font_color", UiPalette.NAVY)
+	name_label.add_theme_font_size_override("font_size", CARD_NAME_SIZE)
+	col.add_child(name_label)
+
+	var bottom := HBoxContainer.new()
+	bottom.add_theme_constant_override("separation", 10)
+	col.add_child(bottom)
+
+	var status := Label.new()
+	status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	status.text = "Now tier %d  ·  Retained tier %d" % [
+		int(entry["current_tier"]), int(entry["retained_tier"])
+	]
+	status.add_theme_color_override("font_color", UiPalette.MONEY_GREEN)
+	status.add_theme_font_size_override("font_size", CARD_BODY_SIZE)
+	bottom.add_child(status)
+
+	var button := Button.new()
+	button.custom_minimum_size = Vector2(440, 123)
+	button.add_theme_font_size_override("font_size", BUTTON_SIZE)
+	UiPalette.style_button(button, true)  # red: spends Legacy
+	var cost := int(entry["cost"])
+	if cost < 0:
+		# Nothing to buy: either unstaffed, or already retained at the live tier.
+		button.text = "RETAINED"
+		button.disabled = true
+	else:
+		button.text = "RETAIN TIER %d\n%d Legacy" % [int(entry["retained_tier"]) + 1, cost]
+		button.disabled = not bool(entry["can_afford"])
+		button.pressed.connect(func() -> void: retain_requested.emit(index))
+	bottom.add_child(button)
 
 
 # ---------------------------------------------------------------------------

@@ -84,19 +84,31 @@ func try_buy(prop_index: int, count: int) -> bool:
 	return true
 
 
-## Try to hire a staffer for the property at `prop_index`.
-## Returns true on success; false if can't afford or already staffed.
-func try_hire(prop_index: int) -> bool:
+## Try to hire OR upgrade the staffer for the property at `prop_index`, advancing it
+## one tier. `max_tier` is the highest tier currently unlocked (the generation's reached
+## epoch — GameState passes EpochState.current_tier). Returns true on success; false if
+## already at the highest unlocked/defined tier or the player can't afford the next one.
+func try_hire(prop_index: int, max_tier: int) -> bool:
 	var prop := properties[prop_index] as PropertyState
-	if prop.is_staffed:
+	var next_tier := prop.staff_tier + 1
+	if next_tier > max_tier or next_tier > EpochCatalog.tier_count():
 		return false
-	var cost := prop.get_staff_cost()
+	var cost := get_staff_cost(prop_index, next_tier)
 	if cash < cost:
 		return false
 	cash -= cost
 	spent_on_staff_this_gen += cost
-	prop.hire_staff()
+	prop.set_staff_tier(next_tier, EpochCatalog.staff_income_multiplier(next_tier))
 	return true
+
+
+## Cost to hire/upgrade the staffer at `prop_index` to `tier`: the property's base hire
+## cost (band-1 curve × the Legacy discount) scaled by that tier's alien-talent premium,
+## rounded to a clean number to match purchase prices.
+func get_staff_cost(prop_index: int, tier: int) -> float:
+	var prop := properties[prop_index] as PropertyState
+	var base_cost := prop.get_staff_cost()
+	return CostCurve.round_nice(base_cost * EpochCatalog.hire_cost_multiplier(tier))
 
 
 ## Layer 2 start verb: tap on an idle, unstaffed property.

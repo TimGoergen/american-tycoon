@@ -9,14 +9,21 @@ class_name GameState
 # v2 added the per-generation spend accumulators and peak net worth that the
 # prestige/estate math reads (Spec §9). v3 added the generation's birth seed cash,
 # excluded from the estate→Legacy conversion. v4 added cash_earned_this_gen, the
-# lifetime-earned accumulator that is now the gross estate (Spec §9.1). Older saves
-# still load (missing fields default to a clean slate / zero earned).
-const SAVE_VERSION := 4
+# lifetime-earned accumulator that is now the gross estate (Spec §9.1). v5 replaced the
+# per-property is_staffed bool with a staff_tier int and added the run's reached epoch
+# (the alien-staffing system). Older saves still load (missing fields default to a clean
+# slate / zero earned; a v4 is_staffed:true becomes staff_tier 1).
+const SAVE_VERSION := 5
 
 var tuning: TuningConfig
 var economy: EconomyState
 var wage: WageState
 var frenzy: FrenzyState
+
+## Which alien epoch this generation has reached (1 = Earth). Gates the staff tier a
+## property can be hired/upgraded to, and advances as the generation earns enough to
+## "consume" the current economy (EpochState).
+var epoch: EpochState
 
 ## Highest net worth this generation has reached. The next heir must out-earn
 ## this peak before its Legacy sprint multiplier gives way to the residual
@@ -57,6 +64,7 @@ func _init(property_configs: Array, titles: Array, p_tuning: TuningConfig) -> vo
 	economy = EconomyState.new(property_configs, p_tuning)
 	wage = WageState.new(titles)
 	frenzy = FrenzyState.new(p_tuning)
+	epoch = EpochState.new(p_tuning)
 
 
 ## Advance the whole game by `delta` seconds of active play.
@@ -71,6 +79,9 @@ func tick(delta: float, extra_property_multiplier: float = 1.0) -> void:
 	frenzy.tick(delta)
 	economy.tick(delta, frenzy.get_multiplier() * extra_property_multiplier)
 	peak_net_worth = maxf(peak_net_worth, economy.get_net_worth())
+	# Advance the alien epoch if this generation has now earned enough to consume the
+	# current economy. Reads the same lifetime-earned tally the estate waterfall uses.
+	epoch.update(economy.cash_earned_this_gen)
 	_update_displayed_income(delta)
 
 
@@ -156,9 +167,10 @@ func try_buy(prop_index: int, count: int) -> bool:
 	return economy.try_buy(prop_index, count)
 
 
-## Hire the staffer for a property. Returns false if unaffordable or staffed.
+## Hire or upgrade a property's staffer one tier, capped at the epoch reached this run.
+## Returns false if unaffordable or already at the highest unlocked/defined tier.
 func try_hire(prop_index: int) -> bool:
-	return economy.try_hire(prop_index)
+	return economy.try_hire(prop_index, epoch.current_tier)
 
 
 ## Claim the next wage-ladder title if the tap threshold is met and tuition
@@ -198,7 +210,10 @@ func to_save_dict() -> Dictionary:
 		var p := prop as PropertyState
 		props.append({
 			"units_owned": p.units_owned,
-			"is_staffed": p.is_staffed,
+			# v5: the staffer TIER (0 none, 1 Earth, 2+ alien). The multiplier is not
+			# saved — it is re-derived from the tier via EpochCatalog on load, so the two
+			# can never drift (same principle as recomputing cost_product from purchases).
+			"staff_tier": p.staff_tier,
 			"cycle_progress": p.cycle_progress,
 			"is_cycle_running": p.is_cycle_running,
 		})
@@ -208,6 +223,8 @@ func to_save_dict() -> Dictionary:
 		"cash": economy.cash,
 		"peak_net_worth": peak_net_worth,
 		"buy_mode": ui_buy_mode,
+		# Which alien epoch this run has reached (1 = Earth).
+		"epoch_tier": epoch.current_tier,
 		# Per-generation book-value accumulators (Spec §9.2). Saved raw because
 		# they are sunk history, not derivable from the current holdings.
 		"spent_on_units_this_gen": economy.spent_on_units_this_gen,
@@ -248,13 +265,20 @@ func load_save_dict(data: Dictionary) -> void:
 	# its earned tally fresh — only matters until its next death.)
 	economy.cash_earned_this_gen = float(data.get("cash_earned_this_gen", 0.0))
 
+	# Reached epoch (pre-v5 saves default to Earth/tier 1).
+	epoch.restore(int(data.get("epoch_tier", 1)))
+
 	var saved_props: Array = data.get("properties", [])
 	for i in range(mini(saved_props.size(), economy.properties.size())):
 		var sp: Dictionary = saved_props[i]
 		var prop := economy.properties[i] as PropertyState
+		# v5 stores staff_tier; a pre-v5 save only has the is_staffed bool, which maps to
+		# tier 1 (the Earth staffer) when true. The tier's multiplier is re-derived here.
+		var staff_tier := int(sp.get("staff_tier", 1 if bool(sp.get("is_staffed", false)) else 0))
 		prop.restore(
 			int(sp.get("units_owned", 0)),
-			bool(sp.get("is_staffed", false)),
+			staff_tier,
+			EpochCatalog.staff_income_multiplier(staff_tier),
 			float(sp.get("cycle_progress", 0.0)),
 			bool(sp.get("is_cycle_running", false))
 		)

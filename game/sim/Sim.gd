@@ -434,23 +434,27 @@ func _format_time_to_reference(time_to_reference: float, previous_time: float) -
 
 
 ## One hand-computable case through the waterfall, so a future formula change
-## that breaks the math fails loudly here (Spec §9.2–9.3):
-##   gross $2.0M, no debt, exemption $1.0M, rate 60%
-##     -> taxable $1.0M -> tax $600k -> net $1.4M
-##     -> legacy = floor(K_LEGACY × 1.4M^0.5)  (with default K_LEGACY=1, =1183)
+## that breaks the math fails loudly here (Spec §9.2–9.3). Uses a $2B gross so the
+## log-compressed Legacy curve (reworked 2026-06-17) returns a meaningful non-zero:
+##   gross $2.0B, no debt, exemption $1.0M, rate 60%
+##     -> after-credit $2.0B -> taxable $1.999B -> tax $1.1994B -> net $800.6M
+##     -> legacy = floor(K_LEGACY × log10(net / $1M) ^ ALPHA)
 func _verify_waterfall_math() -> bool:
-	var will := EstateWaterfall.compute(2_000_000.0, 0.0, 1_000_000.0, 0.6)
+	var will := EstateWaterfall.compute(2_000_000_000.0, 0.0, 1_000_000.0, 0.6)
 	# Typed bool: Dictionary lookups are Variants, so := would infer Variant here.
-	var ok: bool = will["taxable"] == 1_000_000.0 \
-			and will["tax"] == 600_000.0 \
-			and will["estate_net"] == 1_400_000.0
-	var expected_legacy := int(floor(_tuning.k_legacy * pow(1_400_000.0, _tuning.alpha_legacy)))
-	var legacy := EstateWaterfall.legacy_gain(
-		will["estate_net"], _tuning.k_legacy, _tuning.alpha_legacy
-	)
+	var ok: bool = will["taxable"] == 1_999_000_000.0 \
+			and will["tax"] == 1_199_400_000.0 \
+			and will["estate_net"] == 800_600_000.0
+	# Independently recompute the log-curve Legacy and compare to the function's output.
+	var net: float = will["estate_net"]
+	var expected_legacy := 0
+	if net > EstateWaterfall.LEGACY_BASE:
+		var decades := log(net / EstateWaterfall.LEGACY_BASE) / log(10.0)
+		expected_legacy = int(floor(_tuning.k_legacy * pow(decades, _tuning.alpha_legacy)))
+	var legacy := EstateWaterfall.legacy_gain(net, _tuning.k_legacy, _tuning.alpha_legacy)
 	ok = ok and legacy == expected_legacy
 	print("  Waterfall spot-check: net %s, +%d Legacy ... %s" % [
-		Money.of(will["estate_net"]).display(), legacy, "PASS" if ok else "FAIL",
+		Money.of(net).display(), legacy, "PASS" if ok else "FAIL",
 	])
 	return ok
 

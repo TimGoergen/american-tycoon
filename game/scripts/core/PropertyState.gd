@@ -56,6 +56,19 @@ var cycle_speed_multiplier: float = 1.0
 ## (1.0 = full price, below 1.0 = a discount). Applied in get_staff_cost.
 var staff_cost_multiplier: float = 1.0
 
+## Dynasty-wide rush-strength multiplier from the Legacy "Strong-Arm Tactics" upgrade
+## (1.0 = base). Scales how far one rush-tap advances the cycle. Set by DynastyState.
+var rush_power_multiplier: float = 1.0
+
+## Dynasty-wide auto-rush SPEED multiplier from the Legacy auto-click upgrade (1.0 =
+## base). The held-rush pulse RATE in PropertyRow is multiplied by this. Set by DynastyState.
+var auto_rush_speed_multiplier: float = 1.0
+
+## Dynasty-wide property-income multiplier (the Legacy "Family Fortune" upgrade), mirrored
+## here for DISPLAY only so the row's per-cycle figure reflects it (the live tick applies
+## the same factor at point of payment via the global multiplier). Set by DynastyState.
+var legacy_income_multiplier: float = 1.0
+
 ## How many milestone bands have been crossed. Used to know which reward fires next.
 var _milestones_crossed: int = 0
 
@@ -160,6 +173,14 @@ func _effective_cycle_length() -> float:
 	return cycle_length / cycle_speed_multiplier
 
 
+## Public accessor for the effective (sped-up) cycle length, so the UI can size its
+## smooth cycle-progress bar against the SAME length the logic completes on. Without
+## this the bar measured against the raw cycle_length and never fully filled once the
+## Efficiency upgrade shortened the real cycle (Tim 2026-06-17).
+func get_effective_cycle_length() -> float:
+	return _effective_cycle_length()
+
+
 ## One-time hire cost: 50× the unit cost at band 1 (Spec §6).
 ## Computed fresh each call so it tracks the current cost curve.
 func get_staff_cost() -> float:
@@ -261,7 +282,9 @@ func rush_cycle() -> void:
 	if not is_cycle_running:
 		return
 	var effective_length := _effective_cycle_length()
-	cycle_progress = minf(cycle_progress + tuning.rush_pct * effective_length, effective_length)
+	# The Legacy "Strong-Arm Tactics" upgrade makes each rush advance the cycle further.
+	var rush_fraction := tuning.rush_pct * rush_power_multiplier
+	cycle_progress = minf(cycle_progress + rush_fraction * effective_length, effective_length)
 
 
 # ---------------------------------------------------------------------------
@@ -285,9 +308,17 @@ func get_income_per_sec() -> float:
 func get_income_per_cycle() -> float:
 	if units_owned == 0:
 		return 0.0
-	# Includes the staffer-tier multiplier — it is part of what the property actually
-	# pays on each completion (frenzy/event multipliers still apply on top, at payment).
-	return floor(units_owned * income_per_unit * staff_income_multiplier)
+	# Includes the staffer-tier multiplier AND the dynasty Family Fortune multiplier, so
+	# the displayed figure tracks a Legacy income upgrade (which the live tick also applies
+	# at payment). Frenzy/event multipliers still apply on top, at payment.
+	return floor(units_owned * income_per_unit * staff_income_multiplier * legacy_income_multiplier)
+
+
+## Cash a SINGLE unit of this property would pay per cycle right now (Family Fortune
+## included). Shown grayed on a rung the player owns none of yet, so they can see what
+## the next tier is worth before buying in (Tim 2026-06-17).
+func get_single_unit_income_per_cycle() -> float:
+	return floor(income_per_unit * staff_income_multiplier * legacy_income_multiplier)
 
 
 ## Current milestone band (how many bands have been crossed).

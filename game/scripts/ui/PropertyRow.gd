@@ -259,11 +259,15 @@ func _refresh(delta: float) -> void:
 	_manager_circle.custom_minimum_size.x = _manager_circle.size.y
 	var staffer := EpochCatalog.staffer_name(_prop.staff_tier, prop_index)
 	_manager_circle.set_state(_prop.is_staffed, config.manager_portrait, staffer, owned)
-	# Show the cash paid out each time the bar fills (per cycle), so the figure on
-	# screen matches what the player actually receives on a completion. During a
-	# frenzy burn that payout is multiplied at point of payment (Spec §7), so the
-	# readout lights up while the burn is active (multiplier is 1.0 when no burn).
-	_income_label.text = Money.of(_prop.get_income_per_cycle() * _frenzy.get_multiplier()).display() + "/cycle"
+	# Income readout. For an OWNED rung: the cash paid each time the bar fills (per cycle),
+	# lit by the live frenzy multiplier so it matches what the player actually receives.
+	# For an UNOWNED rung: the per-cycle value of a SINGLE unit, drawn dark gray (see
+	# _apply_ownership_styling), so the player can see what the next tier is worth before
+	# buying in (Tim 2026-06-17).
+	if owned:
+		_income_label.text = Money.of(_prop.get_income_per_cycle() * _frenzy.get_multiplier()).display() + "/cycle"
+	else:
+		_income_label.text = Money.of(_prop.get_single_unit_income_per_cycle()).display() + "/cycle"
 
 	# The tap verb mirrors Spec §4: START an idle cycle, RUSH a running one.
 	# While the button is held the cycle auto-restarts every completion, briefly going
@@ -283,8 +287,13 @@ func _refresh(delta: float) -> void:
 		_tap_button.text = "START"
 		_tap_button.disabled = false
 
-	# Smooth, constant-velocity cycle bar (see _displayed_cycle_fraction above).
-	var true_fraction := _prop.cycle_progress / _prop.cycle_length if _prop.cycle_length > 0.0 else 0.0
+	# Smooth, constant-velocity cycle bar (see _displayed_cycle_fraction above). Measured
+	# against the EFFECTIVE (sped-up) cycle length so the bar still fills all the way to the
+	# right once the Legacy "Efficiency Experts" upgrade shortens the real cycle — it just
+	# fills faster (Tim 2026-06-17). Measuring against the raw length capped the fill at
+	# 1 / cycle_speed_multiplier, so it stopped short of the right edge.
+	var effective_length := _prop.get_effective_cycle_length()
+	var true_fraction := _prop.cycle_progress / effective_length if effective_length > 0.0 else 0.0
 	if not _prop.is_cycle_running or _prop.units_owned == 0:
 		# Idle or empty: nothing is advancing, so just mirror the true value exactly.
 		_displayed_cycle_fraction = true_fraction
@@ -297,7 +306,7 @@ func _refresh(delta: float) -> void:
 		# ahead of that prediction — a rush, or several per second while the rush
 		# button is held — ease the bar UP toward it instead of snapping, so a held
 		# rush reads as smooth acceleration rather than a stutter of discrete jumps.
-		var advanced := _displayed_cycle_fraction + delta / _prop.cycle_length
+		var advanced := _displayed_cycle_fraction + delta / effective_length
 		if true_fraction > advanced:
 			var catchup := 1.0 - exp(-delta / RUSH_CATCHUP_TAU)
 			_displayed_cycle_fraction = clampf(lerpf(advanced, true_fraction, catchup), 0.0, 1.0)
@@ -345,9 +354,16 @@ func _apply_ownership_styling(owned: bool) -> void:
 	if owned:
 		add_theme_stylebox_override("panel", UiPalette.make_panel_style())
 		UiPalette.style_button(_tap_button, false)
+		# Owned: the bold dark-money-green per-cycle payout.
+		var income_green := UiPalette.MONEY_GREEN.darkened(0.4)
+		_income_label.add_theme_color_override("font_color", income_green)
+		_income_label.add_theme_color_override("font_outline_color", income_green)
 	else:
 		add_theme_stylebox_override("panel", UiPalette.make_unowned_panel_style())
 		UiPalette.style_unowned_button(_tap_button)
+		# Unowned: a drab dark-gray single-unit preview, matching the locked row look.
+		_income_label.add_theme_color_override("font_color", UiPalette.DARK_GRAY)
+		_income_label.add_theme_color_override("font_outline_color", UiPalette.DARK_GRAY)
 
 
 ## Update the hire/upgrade/staffed button for the property's current staff tier and the

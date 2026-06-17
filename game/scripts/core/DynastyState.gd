@@ -233,11 +233,21 @@ func _apply_retained_staff(heir: GameState) -> void:
 func _apply_upgrade_effects(game: GameState) -> void:
 	var cycle_speed := upgrades.cycle_speed_multiplier()
 	var staff_cost := upgrades.staff_cost_multiplier()
+	var rush_power := upgrades.rush_power_multiplier()
+	var auto_speed := upgrades.auto_click_speed_multiplier()
+	var income_mult := upgrades.property_income_multiplier()
 	for prop in game.economy.properties:
 		var p := prop as PropertyState
 		p.set_cycle_speed_multiplier(cycle_speed)
 		p.staff_cost_multiplier = staff_cost
+		p.rush_power_multiplier = rush_power
+		p.auto_rush_speed_multiplier = auto_speed
+		# Display mirror of Family Fortune, so the row's per-cycle figure reflects it
+		# (the live tick already applies the same factor at payment via tick()).
+		p.legacy_income_multiplier = income_mult
 	game.wage.wage_multiplier = upgrades.wage_multiplier()
+	game.wage.auto_tap_speed_multiplier = auto_speed
+	game.wage.auto_tap_power_multiplier = upgrades.auto_click_power_multiplier()
 
 
 ## Re-apply upgrade effects to the LIVING generation. Called after a purchase so a

@@ -29,10 +29,11 @@ var _hold_accumulator := 0.0
 #   • A single manual tap gives one brief, discrete brighter-gold blink across the
 #     whole plate — crisp click feedback for a deliberate tap.
 #   • Holding the button (auto-tapping) instead shows a soft highlight band that
-#     glides smoothly side to side across the meter the whole time it is held,
-#     signalling "this is active" with motion rather than any blinking. The band
-#     is drawn by a transparent overlay above the gold fill (see _draw_sweep), so
-#     the navy border and the label stay put and the button never changes size.
+#     sweeps left → right across the meter and fades out before reaching the fill
+#     edge, then repeats from the left (Tim 2026-06-17 — a one-directional shimmer,
+#     not the old back-and-forth glide). The band is drawn by a transparent overlay
+#     above the gold fill (see _draw_sweep), so the navy border and the label stay
+#     put and the button never changes size.
 
 ## How long the brighter-gold blink stays on for a single manual tap, in seconds.
 ## Short, so a deliberate tap reads as a crisp blink.
@@ -43,9 +44,13 @@ const FLASH_DURATION := 0.05
 ## held sweep reads as a bright, intense band of light.
 const FLASH_LIGHTEN := 0.45
 
-## Seconds for one full left→right→left glide of the held highlight band. Slow on
-## purpose, so the held state reads as a calm sweep rather than a flicker.
-const PULSE_PERIOD := 2.0
+## Seconds for one left→right sweep of the held highlight band (it then repeats from
+## the left). Slow on purpose, so the held state reads as a calm shimmer, not a flicker.
+const PULSE_PERIOD := 1.6
+
+## Fraction of the sweep at which the band begins fading out, so it disappears before
+## reaching the right (fill) edge rather than piling up against it.
+const SWEEP_FADE_START := 0.6
 
 ## How quickly the held highlight fades in when pressed and out when released, as a
 ## smoothing time constant in seconds — responsive, but easing out instead of
@@ -164,10 +169,11 @@ func _ready() -> void:
 		_spawn_income_float(_current_tap_income()))
 	_wage_meter.add_child(_wage_button)
 
-	# Compact context line (not enlarged): which title you hold and what's next.
+	# Context line: which title you hold and what's next. Bumped 50% (20→30) for
+	# readability (Tim, 2026-06-17).
 	_context_label = Label.new()
 	_context_label.add_theme_color_override("font_color", UiPalette.NAVY)
-	_context_label.add_theme_font_size_override("font_size", 20)
+	_context_label.add_theme_font_size_override("font_size", 30)
 	_context_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(_context_label)
 
@@ -182,10 +188,11 @@ func _process(delta: float) -> void:
 	_pump_auto_tap(delta)
 	_update_plate_glow(delta)
 
-	# The wage is paid wage_per_tap × frenzy multiplier at point of payment
-	# (Spec §7), so reflect the boosted per-tap value during a burn (1.0 otherwise).
+	# The wage is paid wage_per_tap × frenzy × the Old-Money Connections Legacy multiplier
+	# at point of payment (Spec §7), so the label reflects the burn AND the upgrade — it
+	# used to omit the Legacy multiplier and read low after a Connections purchase (Tim).
 	var title := _wage.get_current_title()
-	var wage_per_tap := title.wage_per_tap * _frenzy.get_multiplier()
+	var wage_per_tap := title.wage_per_tap * _frenzy.get_multiplier() * _wage.wage_multiplier
 	_wage_button.text = "CLOCK IN\n%s / tap" % Money.of(wage_per_tap).display()
 
 	var next := _wage.get_next_title()
@@ -244,7 +251,8 @@ func _pump_auto_tap(delta: float) -> void:
 	if not _wage_button.button_pressed:
 		_hold_accumulator = 0.0
 		return
-	var rate := _tuning.wage_hold_taps_per_second
+	# The Legacy auto-click SPEED upgrade scales the held auto-tap rate.
+	var rate := _tuning.wage_hold_taps_per_second * _wage.auto_tap_speed_multiplier
 	if rate <= 0.0:
 		return
 	_hold_accumulator += delta
@@ -254,8 +262,9 @@ func _pump_auto_tap(delta: float) -> void:
 		wage_hold_tapped.emit()
 		# No per-tap blink here: the gliding highlight (see _update_plate_glow) is
 		# the held-state cue. But each held pulse still earns income, so it gets the
-		# same floating "+income" indicator a manual tap does.
-		_spawn_income_float(_current_tap_income())
+		# same floating "+income" indicator a manual tap does — including the auto-click
+		# POWER bonus, which only held taps receive.
+		_spawn_income_float(_current_tap_income() * _wage.auto_tap_power_multiplier)
 
 
 ## Arm a single brief manual-tap blink. The color itself is applied on the plate by
@@ -306,16 +315,15 @@ func _draw_sweep() -> void:
 	# Band width scales with the gold-filled width, so it starts small and grows as
 	# progress fills the bar (x_max is the fill edge, x_min the left inset).
 	var band_width := (x_max - x_min) * SWEEP_WIDTH_FRACTION
-	# Keep the ENTIRE band inside the gold fill: the center only travels between half a
-	# band-width in from each end, so the band reverses direction before any part of it
-	# touches an edge. (Otherwise the bright band piled up against the right/fill edge
-	# and read as extra progress.)
-	var half_band := band_width * 0.5
-	var travel_min := x_min + half_band
-	var travel_max := x_max - half_band
-	# Sweep the band's center between those limits: 0.5 − 0.5·cos gives 0→1→0.
-	var travel := 0.5 - 0.5 * cos(TAU * _pulse_phase / PULSE_PERIOD)
-	var center_x := travel_min + travel * (travel_max - travel_min)
+	# One-directional shimmer (Tim 2026-06-17): travel is a 0→1 sawtooth, so the band's
+	# center moves left → right only and then jumps back to the left to repeat. Its
+	# opacity fades to 0 over the final stretch (see fade), so it vanishes before the
+	# fill edge instead of the old back-and-forth glide that reversed at the end.
+	var travel := fmod(_pulse_phase / PULSE_PERIOD, 1.0)
+	var center_x := x_min + travel * (x_max - x_min)
+	var fade := 1.0
+	if travel > SWEEP_FADE_START:
+		fade = clampf(1.0 - (travel - SWEEP_FADE_START) / (1.0 - SWEEP_FADE_START), 0.0, 1.0)
 	var highlight := _fill_base.lightened(FLASH_LIGHTEN)
 
 	# Draw the band as feathered vertical slices: alpha peaks at the band's center
@@ -325,7 +333,7 @@ func _draw_sweep() -> void:
 	for i in range(slices):
 		var t := (float(i) + 0.5) / float(slices)  # 0..1 across the band
 		var feather := 0.5 - 0.5 * cos(t * TAU)    # 0 at edges, 1 at the center
-		highlight.a = feather * SWEEP_PEAK_ALPHA * _pulse_level
+		highlight.a = feather * SWEEP_PEAK_ALPHA * _pulse_level * fade
 		var x := center_x - band_width * 0.5 + i * slice_w
 		# Clip each slice to the inset frame so nothing spills onto the border.
 		var x_left := clampf(x, x_min, x_max)

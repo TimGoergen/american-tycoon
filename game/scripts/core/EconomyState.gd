@@ -102,13 +102,25 @@ func try_hire(prop_index: int, max_tier: int) -> bool:
 	return true
 
 
-## Cost to hire/upgrade the staffer at `prop_index` to `tier`: the property's base hire
-## cost (band-1 curve × the Legacy discount) scaled by that tier's alien-talent premium,
-## rounded to a clean number to match purchase prices.
+## Cost to hire/upgrade the staffer at `prop_index` to `tier`.
+##
+## Tier 1 (the Earth staffer) keeps its small, property-scaled cost (band-1 curve × the
+## Legacy discount). Tiers 2+ (alien staff) are instead anchored to the TARGET epoch's
+## whole economy — earth_economy_target × that epoch's economy_scale — so they cost
+## roughly economy_scale (×1000) more each epoch (Tim 2026-06-17). That way you cannot
+## afford the next epoch's staff the instant you make contact; you must earn into the
+## new economy first (and any cash saved by skipping a previous epoch's upgrades carries
+## straight over, letting you afford some immediately). Rounded to match purchase prices.
 func get_staff_cost(prop_index: int, tier: int) -> float:
 	var prop := properties[prop_index] as PropertyState
-	var base_cost := prop.get_staff_cost()
-	return CostCurve.round_nice(base_cost * EpochCatalog.hire_cost_multiplier(tier))
+	if tier <= 1:
+		return prop.get_staff_cost()  # already includes the Legacy discount + rounding
+	# Tuning lives on the PropertyState (EconomyState has no direct handle to it).
+	var tuning := prop.tuning
+	var epoch_economy := tuning.earth_economy_target * EpochCatalog.economy_scale(tier)
+	var fraction := tuning.staff_cost_fraction \
+			* pow(tuning.staff_cost_property_growth, float(prop_index))
+	return CostCurve.round_nice(epoch_economy * fraction * prop.staff_cost_multiplier)
 
 
 ## Layer 2 start verb: tap on an idle, unstaffed property.

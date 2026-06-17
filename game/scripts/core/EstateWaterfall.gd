@@ -48,14 +48,30 @@ static func compute(
 # §9.3 — Legacy conversion (root function)
 # ---------------------------------------------------------------------------
 
+## Dollars below which an estate converts to no Legacy at all. The log curve is measured
+## in orders of magnitude ABOVE this floor, so the floor sets BOTH ends of the balance:
+## low enough ($1k) that a first prestige still yields a handful of Legacy (and the sim's
+## modest estates convert at all), yet because the curve is logarithmic a real
+## trillion-dollar run still only mints tens of Legacy, not the thousands the old power
+## curve produced.
+const LEGACY_BASE := 1_000.0
+
 ## Convert an estate's post-tax net into dynastic Legacy points.
-## legacy_gain = floor(K_LEGACY × estate_net ^ ALPHA). The ^0.5 (default ALPHA)
-## compresses huge estates so a single monster generation can't trivialize the
-## dynasty curve. Legacy is never spent down by this conversion — it accumulates.
+##
+## legacy_gain = floor(K_LEGACY × log10(estate_net / LEGACY_BASE) ^ ALPHA).
+##
+## Reworked 2026-06-17 from a plain power curve. A power curve calibrated for the sim's
+## tiny estates minted absurd Legacy at real scale (a single 20T run gave ~16k —
+## enough to buy out the whole shop). Measuring the estate in ORDERS OF MAGNITUDE above
+## the floor compresses the entire range into a sane handful of Legacy: each additional
+## 10× of estate adds only a little (≈ $1B→18, $8T→49, $1Q→72 at the default tuning),
+## and nothing converts below the floor. Legacy never spends down by this — it accumulates.
 static func legacy_gain(estate_net: float, k_legacy: float, alpha: float) -> int:
-	if estate_net <= 0.0:
+	if estate_net <= LEGACY_BASE:
 		return 0
-	return int(floor(k_legacy * pow(estate_net, alpha)))
+	# log10(x) = ln(x) / ln(10); GDScript's log() is the natural log.
+	var decades := log(estate_net / LEGACY_BASE) / log(10.0)
+	return int(floor(k_legacy * pow(decades, alpha)))
 
 # §9.4 note: Legacy is no longer applied as an automatic sprint/residual income
 # multiplier. The prestige reward is now a spendable currency — the player buys

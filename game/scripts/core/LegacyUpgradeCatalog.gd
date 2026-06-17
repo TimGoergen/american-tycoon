@@ -34,6 +34,9 @@ const EFFICIENCY      := "efficiency"
 const LOYAL_STAFF     := "loyal_staff"
 const CONNECTIONS     := "connections"
 const ESTATE_LAWYERS  := "estate_lawyers"
+const AUTO_CLICK_SPEED := "auto_click_speed"
+const AUTO_CLICK_POWER := "auto_click_power"
+const RUSH_POWER       := "rush_power"
 
 
 # ── The catalog ───────────────────────────────────────────────────────────────
@@ -115,6 +118,36 @@ const UPGRADES := [
 		"cost_growth": 2.2,
 		"effect_per_level": 0.15,     # +15% Legacy gained at succession per level
 	},
+	{
+		"id": AUTO_CLICK_SPEED,
+		"name": "Restless Hands",
+		"category": "Labor",
+		"description": "Hold to work faster. Auto-tapping and auto-rushing speed up.",
+		"max_level": 30,              # effectively endless: geometric cost is the real brake
+		"base_cost": 5,
+		"cost_growth": 1.9,
+		"effect_per_level": 0.15,     # COMPOUNDING: ×1.15 held auto-tap/rush rate per level
+	},
+	{
+		"id": AUTO_CLICK_POWER,
+		"name": "Piecework Bonus",
+		"category": "Labor",
+		"description": "Every held auto-tap of Clock In pays out more.",
+		"max_level": 30,              # effectively endless: geometric cost is the real brake
+		"base_cost": 5,
+		"cost_growth": 1.9,
+		"effect_per_level": 0.25,     # COMPOUNDING: ×1.25 wage per HELD auto-tap per level
+	},
+	{
+		"id": RUSH_POWER,
+		"name": "Strong-Arm Tactics",
+		"category": "Operations",
+		"description": "Lean on it. Each rush-tap drives a property's cycle further.",
+		"max_level": 30,              # effectively endless: geometric cost is the real brake
+		"base_cost": 6,
+		"cost_growth": 2.0,
+		"effect_per_level": 0.20,     # COMPOUNDING: ×1.20 rush advance per level
+	},
 ]
 
 
@@ -175,4 +208,10 @@ static func describe_effect(id: String, level: int) -> String:
 			return "×%.2f wage per tap" % pow(1.0 + per_level, float(shown_level))
 		ESTATE_LAWYERS:
 			return "+%d%% Legacy per succession" % int(round(per_level * 100.0 * float(shown_level)))
+		AUTO_CLICK_SPEED:
+			return "×%.2f auto-tap / auto-rush speed" % pow(1.0 + per_level, float(shown_level))
+		AUTO_CLICK_POWER:
+			return "×%.2f wage per held auto-tap" % pow(1.0 + per_level, float(shown_level))
+		RUSH_POWER:
+			return "×%.2f rush advance" % pow(1.0 + per_level, float(shown_level))
 	return ""

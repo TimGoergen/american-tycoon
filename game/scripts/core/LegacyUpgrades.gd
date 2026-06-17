@@ -133,6 +133,30 @@ func legacy_yield_multiplier() -> float:
 	return 1.0 + _per_level(LegacyUpgradeCatalog.ESTATE_LAWYERS) * float(get_level(LegacyUpgradeCatalog.ESTATE_LAWYERS))
 
 
+## Multiplier on held auto-tap / auto-rush SPEED (Restless Hands). Compounding, same
+## rationale as property_income_multiplier. 1.0 with nothing bought.
+func auto_click_speed_multiplier() -> float:
+	var per_level := _per_level(LegacyUpgradeCatalog.AUTO_CLICK_SPEED)
+	var level := get_level(LegacyUpgradeCatalog.AUTO_CLICK_SPEED)
+	return pow(1.0 + per_level, float(level))
+
+
+## Multiplier on the wage earned per HELD auto-tap (Piecework Bonus). Compounding. 1.0
+## with nothing bought. Applied only to held auto-taps, not manual taps (GameState).
+func auto_click_power_multiplier() -> float:
+	var per_level := _per_level(LegacyUpgradeCatalog.AUTO_CLICK_POWER)
+	var level := get_level(LegacyUpgradeCatalog.AUTO_CLICK_POWER)
+	return pow(1.0 + per_level, float(level))
+
+
+## Multiplier on how far one rush-tap advances a cycle (Strong-Arm Tactics). Compounding.
+## 1.0 with nothing bought. PropertyState scales rush_pct by this.
+func rush_power_multiplier() -> float:
+	var per_level := _per_level(LegacyUpgradeCatalog.RUSH_POWER)
+	var level := get_level(LegacyUpgradeCatalog.RUSH_POWER)
+	return pow(1.0 + per_level, float(level))
+
+
 ## The catalog's per-level magnitude for an upgrade (0.0 if unknown).
 func _per_level(id: String) -> float:
 	var definition := LegacyUpgradeCatalog.get_definition(id)

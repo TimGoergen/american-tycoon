@@ -46,6 +46,17 @@ extends Resource
 
 # --- Staffing & offline (Spec §6) ---
 
+## Alien staff (tier 2+) cost as a fraction of the TARGET epoch's whole economy
+## (earth_economy_target × that epoch's economy_scale). Anchoring to the epoch economy
+## — not the property's tiny Earth base cost — is what makes alien staff cost ~1000×
+## more each epoch, so you cannot afford the next epoch's staff the instant you arrive
+## (Tim 2026-06-17). The Earth staffer (tier 1) keeps its small property-scaled cost.
+@export var staff_cost_fraction: float = 0.001  # feel-tune
+
+## Per-property growth of that fraction: cheaper rungs (ATM) get the base fraction, each
+## higher rung multiplies by this, so pricier properties cost proportionally more to staff.
+@export var staff_cost_property_growth: float = 1.4  # feel-tune
+
 ## Offline income efficiency vs. live play (0–1).
 @export var offline_efficiency: float = 0.5  # TBD-SIM
 
@@ -85,11 +96,16 @@ extends Resource
 
 # --- Legacy / prestige (Spec §9.3–9.4) ---
 
-## Scaling constant for Legacy gain: legacy = floor(K_LEGACY × estate_net ^ ALPHA).
-@export var k_legacy: float = 1.0  # TBD-SIM
+## Scale for Legacy gain on the LOG-compressed curve (see EstateWaterfall.legacy_gain,
+## reworked 2026-06-17): legacy = floor(K_LEGACY × log10(estate_net / floor) ^ ALPHA),
+## where the floor is EstateWaterfall.LEGACY_BASE. A plain power curve minted absurd
+## Legacy at real trillion-dollar scale (a 20T run gave ~16k); the log keeps the whole
+## range to a sane handful (≈ $1B→18, $8T→49 at the defaults).
+@export var k_legacy: float = 0.5  # feel-tune
 
-## Exponent for Legacy gain curve (0.5 = square-root compression).
-@export var alpha_legacy: float = 0.5  # TBD-SIM
+## Exponent on the log-decades term of the Legacy curve (shapes how fast Legacy grows
+## with each order of magnitude of estate).
+@export var alpha_legacy: float = 2.0  # feel-tune
 
 # Note: the old k_sprint / beta_sprint / k_residual constants were removed when
 # Legacy became a spendable upgrade currency. Per-level upgrade magnitudes and

@@ -81,7 +81,7 @@ Milestone progress slider per property: min = last milestone, max = next (recove
 
 ## 6. Staffing & Offline (merged system)
 
-- **Hire / upgrade (epoch-keyed, updated 2026-06-16):** staffing is a **per-property tier track**, not a one-time switch (GDD §6). `staff_tier` per property: `0` = unstaffed, `1` = Earth staffer (auto-start + auto-collect forever — the old "hired" behavior), `2+` = the alien staffer unlocked once the run reaches that epoch (§6.2). Each tier carries `staff_income_multiplier` (Earth = 1.0; alien tiers are large jumps), applied at point of payment alongside frenzy/Legacy. Hire/upgrade cost = base `STAFF_COST_i` (provisional 50× band-1 unit cost `TBD-SIM`) × the tier's `hire_cost_multiplier`. You can only reach a tier whose epoch the run has reached. Tap-rush remains additive at any tier ≥ 1. Data table: `EpochCatalog.gd`; state: `EpochState.gd`.
+- **Hire / upgrade (epoch-keyed, updated 2026-06-16):** staffing is a **per-property tier track**, not a one-time switch (GDD §6). `staff_tier` per property: `0` = unstaffed, `1` = Earth staffer (auto-start + auto-collect forever — the old "hired" behavior), `2+` = the alien staffer unlocked once the run reaches that epoch (§6.2). Each tier carries `staff_income_multiplier` (Earth = 1.0; alien tiers are large jumps), applied at point of payment alongside frenzy/Legacy. **Cost (reworked 2026-06-17):** the Earth staffer (tier 1) keeps its small property-scaled cost (≈50× band-1 unit cost × Legacy discount); **alien tiers (2+) are anchored to the target epoch's whole economy** — `earth_economy_target × economy_scale(tier) × staff_cost_fraction × growth^property_index` — so they cost ~1000× more each epoch and you cannot afford the next epoch's staff the instant you make contact (you must earn into the new economy; saved cash carries over). You can only reach a tier whose epoch the run has reached. Tap-rush remains additive at any tier ≥ 1. Data table: `EpochCatalog.gd`; state: `EpochState.gd`.
 - **Offline accrual draws from staffed properties only:**
 ```
 offline_rate  = Σ(staffed i) income_per_sec(i) × OFFLINE_EFF
@@ -132,10 +132,13 @@ estate_net     = after_credit − tax
 
 ### 9.3 Legacy conversion (root function, bracket display)
 ```
-legacy_gain = floor( K_LEGACY × estate_net ^ ALPHA )      ALPHA = 0.5 provisional TBD-SIM
+legacy_gain = floor( K_LEGACY × log10(estate_net / LEGACY_BASE) ^ ALPHA )   K=0.5 ALPHA=2 LEGACY_BASE=$1k
 ```
-(`estate_net` here is the post-tax net of the §9.2 waterfall, whose gross is now lifetime cash
-earned this generation — not net worth at death. The conversion formula itself is unchanged.)
+(`estate_net` here is the post-tax net of the §9.2 waterfall, whose gross is lifetime cash earned
+this generation — not net worth at death. **Reworked 2026-06-17 from a plain power curve:** the old
+`K × estate_net ^ 0.5` minted absurd Legacy at real trillion-dollar scale — a single 20T run gave
+~16k, enough to buy out the whole shop. The log curve compresses the whole range to a sane handful
+— ≈ $1B→18, $8T→49, $1Q→72 — and nothing converts below the `LEGACY_BASE` floor.)
 Displayed as **brackets** (thresholds where legacy_gain crosses integers / named tiers); advisor announces bracket crossings. Total Legacy is dynastic and never spent down by conversion — Legacy *upgrades* cost Legacy per the upgrade table (content pass). The catalog includes **per-staffer retention** (GDD §6.3): spend Legacy to keep a specific property's staffer at its tier across the prestige reset, so the heir starts pre-staffed there. *(This is distinct from the existing "Loyal Staff" upgrade, which only discounts hire cost. Staff otherwise reset on prestige.)*
 
 ### 9.4 Legacy application — catch-up sprint + residual
@@ -180,7 +183,7 @@ Godot Resources (the 2022 ScriptableObject pattern, ported):
 | FRENZY_FILL / DECAY / IDLE_GRACE / POP_FLOOR | 0.4%/tap / 0.5%/s / 5 s / 15% | feel-tune M1 |
 | EXEMPTION base / TAX_RATE base | $1M / 60% | TBD-SIM |
 | LOOPHOLE_RATE_FLOOR | 5% | TBD-SIM |
-| K_LEGACY / ALPHA | tune / 0.5 | TBD-SIM |
+| K_LEGACY / ALPHA / LEGACY_BASE (log curve) | 0.5 / 2 / $1k | feel-tune |
 | K_SPRINT / BETA / K_RES | tune / 0.5 / tune | TBD-SIM |
 | CRASH_MULT / CRASH_DUR | 0.5 / 10 active-min | TBD-SIM |
 | AUDIT_SETTLE / AUDIT_THRESHOLD | 8% net worth / N units | TBD-SIM |

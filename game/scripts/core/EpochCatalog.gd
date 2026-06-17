@@ -35,9 +35,10 @@ class_name EpochCatalog
 #                        Earth = 1; consuming `earth_target × economy_scale` dollars of
 #                        lifetime earnings advances OUT of this epoch into the next.
 #   staff_income_multiplier — income multiplier a property gets while staffed at this tier
-#   hire_cost_multiplier    — multiplies the base hire cost when hiring/upgrading to this
-#                             tier (alien talent costs more)
+#   contact_line       — the narrator's first-contact line (empty for Earth)
 #   staffer_names      — the staffer title shown per property, indexed 0–11 in GDD §4 order
+# (Alien staff cost is no longer a per-epoch multiplier; it is derived from economy_scale
+#  × earth_economy_target in EconomyState.get_staff_cost — see TuningConfig.staff_cost_*.)
 const EPOCHS := [
 	{
 		"tier": 1,
@@ -46,7 +47,6 @@ const EPOCHS := [
 		"currency_flavor": "Dollars",
 		"economy_scale": 1.0,
 		"staff_income_multiplier": 1.0,
-		"hire_cost_multiplier": 1.0,
 		# Earth is where every run begins — there is no contact beat for it.
 		"contact_line": "",
 		# Earth staffers — these mirror the staffer_name in each property's .tres so the
@@ -65,7 +65,6 @@ const EPOCHS := [
 		"currency_flavor": "Photons",
 		"economy_scale": 1_000.0,
 		"staff_income_multiplier": 15.0,
-		"hire_cost_multiplier": 20.0,
 		"contact_line": "You bought the Earth. The Luminari Collective noticed. " \
 			+ "Now your money moves at the speed of light — and so does everyone else's.",
 		# Energy/light beings — money now moves at the speed of light.
@@ -83,7 +82,6 @@ const EPOCHS := [
 		"currency_flavor": "Logic Nodes",
 		"economy_scale": 1_000_000.0,
 		"staff_income_multiplier": 250.0,
-		"hire_cost_multiplier": 500.0,
 		"contact_line": "The Geth-Sentinel Grid comes online. Every trade, every fund, " \
 			+ "every hustle — handed to machines that never sleep, never quit, never ask why.",
 		# Cybernetic collective — finance run entirely by machines.
@@ -101,7 +99,6 @@ const EPOCHS := [
 		"currency_flavor": "Spores",
 		"economy_scale": 1_000_000_000.0,
 		"staff_income_multiplier": 5_000.0,
-		"hire_cost_multiplier": 12_000.0,
 		"contact_line": "The Mycelium Unity spreads into your holdings. Money that grows " \
 			+ "itself now — branching through the dark, feeding on everything it touches.",
 		# Fungal hive-mind — money that literally spreads and self-replicates.
@@ -119,7 +116,6 @@ const EPOCHS := [
 		"currency_flavor": "Prisms",
 		"economy_scale": 1_000_000_000_000.0,
 		"staff_income_multiplier": 90_000.0,
-		"hire_cost_multiplier": 280_000.0,
 		"contact_line": "The Quartzite Conglomerate refracts your fortune. Wealth, " \
 			+ "crystallized — harder than diamond, and just as cold.",
 		# Crystalloid life — capital made permanent, faceted, light bent to its will.
@@ -137,7 +133,6 @@ const EPOCHS := [
 		"currency_flavor": "Seconds",
 		"economy_scale": 1_000_000_000_000_000.0,
 		"staff_income_multiplier": 1_600_000.0,
-		"hire_cost_multiplier": 6_500_000.0,
 		"contact_line": "The Chronophage Enclave opens the quarter. They sell you time " \
 			+ "itself, by the second — at a markup you will never live long enough to repay.",
 		# Time-eaters — they trade in stolen moments; your money compounds across hours
@@ -182,12 +177,14 @@ static func staff_income_multiplier(tier: int) -> float:
 	return float(epoch["staff_income_multiplier"])
 
 
-## Multiplier on the base hire cost when hiring/upgrading a staffer to this tier.
-static func hire_cost_multiplier(tier: int) -> float:
+## This epoch's total economic value as a MULTIPLE of Earth's economy (Earth = 1).
+## Staff cost for an alien tier is anchored to this (× earth_economy_target), and the
+## first-contact beat shows the jump between consecutive epochs.
+static func economy_scale(tier: int) -> float:
 	var epoch := get_epoch(tier)
 	if epoch.is_empty():
 		return 1.0
-	return float(epoch["hire_cost_multiplier"])
+	return float(epoch["economy_scale"])
 
 
 ## The staffer's title for a given property at a given tier (e.g. "Photon Teller").

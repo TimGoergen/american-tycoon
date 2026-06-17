@@ -68,6 +68,8 @@ const DESCRIPTIONS := {
 	"hold_rush_per_second": "Auto-rush pulses per second while holding a property.",
 	"wage_hold_taps_per_second": "Auto wage-taps per second while holding Clock In.",
 	"frenzy_fill_hold_factor": "Frenzy charge from a held-rush pulse vs a real tap.",
+	"staff_cost_fraction": "Alien staff cost as a fraction of that epoch's whole economy.",
+	"staff_cost_property_growth": "How much pricier each higher rung's staff is.",
 	"offline_efficiency": "Offline income rate vs live play (0–1).",
 	"offline_cap_seconds": "Longest offline accrual window (seconds; 14400 = 4h).",
 	"frenzy_max_multiplier": "Peak income multiplier during a frenzy burn.",
@@ -79,8 +81,8 @@ const DESCRIPTIONS := {
 	"estate_exemption_base": "Estate-tax-free amount at death ($).",
 	"estate_tax_rate_base": "Estate tax rate before loopholes (0–1).",
 	"loophole_rate_floor": "Lowest the estate tax can fall via loopholes.",
-	"k_legacy": "Legacy payout scale: legacy = K × estate_net ^ alpha.",
-	"alpha_legacy": "Legacy curve exponent (0.5 = square-root compression).",
+	"k_legacy": "Legacy payout scale on the log curve (K × log10(net/floor) ^ alpha).",
+	"alpha_legacy": "Legacy curve exponent over orders of magnitude of estate.",
 	"crash_multiplier": "Income multiplier during a Market Crash event.",
 	"crash_duration_minutes": "Market Crash length (active minutes).",
 	"audit_settle_rate": "Audit settlement cost as a fraction of net worth.",
@@ -178,7 +180,7 @@ func _build_chrome() -> void:
 	column.add_child(bottom_buttons)
 
 	# Red because it wipes the save — the one destructive action on this panel.
-	_reset_dynasty_button = _make_button("RESET DYNASTY", true)
+	_reset_dynasty_button = _make_button("RESET GAME", true)
 	_reset_dynasty_button.pressed.connect(_on_reset_dynasty_pressed)
 	bottom_buttons.add_child(_reset_dynasty_button)
 
@@ -336,4 +338,4 @@ func _on_close_pressed() -> void:
 func _disarm_reset() -> void:
 	_reset_armed = false
 	if _reset_dynasty_button != null:
-		_reset_dynasty_button.text = "RESET DYNASTY"
+		_reset_dynasty_button.text = "RESET GAME"

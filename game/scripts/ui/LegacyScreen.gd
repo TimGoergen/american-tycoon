@@ -43,6 +43,12 @@ const BUTTON_SIZE  := 41
 ## the phone's front camera cut-out, so the title and Legacy readout aren't hidden.
 const CAMERA_CUTOUT_INSET := 130
 
+## Hold-to-buy pacing (Tim, 2026-06-17): a quick tap buys one level; holding a buy
+## button keeps buying at a calm cadence so the player can watch the wallet/effect and
+## release when they want to stop. The initial delay keeps a tap from auto-repeating.
+const HOLD_INITIAL_DELAY := 0.45
+const HOLD_REPEAT_INTERVAL := 0.35
+
 # The live upgrade/wallet state this shop reads and spends from.
 var _upgrades: LegacyUpgrades
 
@@ -57,6 +63,12 @@ var _cards: Dictionary = {}
 # depend on the living generation's current staff, so they are rebuilt each open from a
 # snapshot Main passes to set_retention_entries (rather than built once here).
 var _staff_list: VBoxContainer
+
+# Hold-to-buy state: which upgrade's buy button is currently held (""=none), and the
+# timer toward the next auto-repeat purchase. See _process and _on_buy_down/up.
+var _held_buy_id := ""
+var _hold_elapsed := 0.0
+var _hold_repeating := false
 
 
 ## Store the state and build the (static) card layout once.
@@ -232,8 +244,10 @@ func _add_upgrade_card(parent: VBoxContainer, definition: Dictionary) -> void:
 	buy_button.custom_minimum_size = Vector2(440, 123)
 	buy_button.add_theme_font_size_override("font_size", BUTTON_SIZE)
 	UiPalette.style_button(buy_button, true)  # red: this is a spend action
-	# bind(id) passes which upgrade this button buys to the shared handler.
-	buy_button.pressed.connect(_on_buy_pressed.bind(id))
+	# Press buys one level immediately; holding then auto-repeats slowly until release
+	# (see _process). bind(id) passes which upgrade this button buys.
+	buy_button.button_down.connect(_on_buy_down.bind(id))
+	buy_button.button_up.connect(_on_buy_up)
 	bottom_row.add_child(buy_button)
 
 	_cards[id] = {
@@ -358,12 +372,44 @@ func refresh() -> void:
 # Buttons
 # ---------------------------------------------------------------------------
 
-func _on_buy_pressed(id: String) -> void:
-	if _upgrades.buy(id):
-		refresh()           # update the wallet and this card immediately
-		purchased.emit(id)  # let Main re-apply the effect to the living generation
+## Press: buy one level now, and arm the hold so continuing to hold auto-repeats.
+func _on_buy_down(id: String) -> void:
+	_held_buy_id = id
+	_hold_elapsed = 0.0
+	_hold_repeating = false
+	_attempt_buy(id)
+
+
+## Release: stop any auto-repeat.
+func _on_buy_up() -> void:
+	_held_buy_id = ""
+
+
+## While a buy button is held, keep purchasing on a calm cadence (after an initial delay)
+## until the player releases or the upgrade can no longer be bought (maxed / unaffordable).
+func _process(delta: float) -> void:
+	if _held_buy_id == "":
+		return
+	_hold_elapsed += delta
+	var threshold := HOLD_REPEAT_INTERVAL if _hold_repeating else HOLD_INITIAL_DELAY
+	if _hold_elapsed >= threshold:
+		_hold_elapsed = 0.0
+		_hold_repeating = true
+		if not _attempt_buy(_held_buy_id):
+			_held_buy_id = ""  # nothing left to buy — stop repeating
+
+
+## Buy one level of an upgrade, refresh the shop, and notify Main. Returns whether the
+## purchase actually went through (false when maxed or unaffordable).
+func _attempt_buy(id: String) -> bool:
+	if not _upgrades.buy(id):
+		return false
+	refresh()           # update the wallet and this card immediately
+	purchased.emit(id)  # let Main re-apply the effect to the living generation
+	return true
 
 
 func _on_close_pressed() -> void:
+	_held_buy_id = ""
 	visible = false
 	closed.emit()

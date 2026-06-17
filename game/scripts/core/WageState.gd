@@ -26,6 +26,15 @@ var taps_at_title_start: int = 0
 ## the wage earned per tap on top of the frenzy multiplier.
 var wage_multiplier: float = 1.0
 
+## Dynasty-wide auto-tap SPEED multiplier from the Legacy auto-click upgrade (1.0 = base).
+## WagePanel multiplies the held "clock in" auto-tap RATE by this. Set by DynastyState.
+var auto_tap_speed_multiplier: float = 1.0
+
+## Dynasty-wide auto-tap POWER multiplier from the Legacy auto-click upgrade (1.0 = base).
+## Each HELD auto-tap (not a manual tap) earns this much extra, on top of wage_multiplier.
+## Applied in GameState.hold_tap_wage. Set by DynastyState.
+var auto_tap_power_multiplier: float = 1.0
+
 
 func _init(p_titles: Array) -> void:
 	titles = p_titles

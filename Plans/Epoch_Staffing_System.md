@@ -104,11 +104,18 @@ property), epochs (within run), Legacy (across runs).
 
 ## 6. Phasing (each phase headless-verified before the next)
 1. ✅ **Epoch core + staff-tier refactor** — `EpochCatalog`, `EpochState`, `PropertyState` tier,
-   income threading, save bump (v4→v5), sim. No UI. *DONE 2026-06-16, commit d7e6b23
-   (`EpochTest.gd` 22 checks PASS; dynasty sim still "speeds up every time").*
-2. **Legacy staff retention** — per-property retained tier + carry-forward in `_new_generation` + sim. *← NEXT*
-3. **UI** — staffer cards/upgrade, first-contact screen, epoch indicator.
-4. **Content** — flesh out more epochs/aliens + narrator copy pass.
+   income threading, save bump (v4→v5), sim. No UI. *DONE 2026-06-16, commit d7e6b23.*
+2. ✅ **Legacy staff retention** — `StaffRetention.gd` (per-property retained tier + geometric
+   Legacy cost), `DynastyState.buy_staff_retention` + `_apply_retained_staff` carry-forward in
+   `_new_generation`, dynasty save round-trip. *DONE 2026-06-16; EpochTest §6 (11 checks) PASS.*
+3. ✅ **UI** — tiered HIRE/UPGRADE/STAFFED button on `PropertyRow` (epoch-gated), epoch banner
+   under the hero stat, `FirstContactOverlay`, and a Household Staff retention section in the
+   Estate Office (`LegacyScreen`). Income readout throttled and the property-ladder visibility
+   rule (owned ∪ affordable ∪ cheapest-unaffordable) landed alongside. *DONE 2026-06-16; Main
+   scene headless smoke test PASS.*
+4. ✅ **Content** — epochs extended to 6 (added Quartzite Conglomerate + Chronophage Enclave),
+   full 12-staffer rosters + narrator contact lines for every alien epoch; EpochTest §7 content
+   integrity check added. *DONE 2026-06-16.*
 
 ## 7. GDD impact — DONE 2026-06-16
 GDD §6 (Staffing & Automation) **rewritten** as epoch-keyed staffing with subsections §6.1 (staff

@@ -30,6 +30,11 @@ var _title_configs: Array
 ## spends it, and the dynasty reads its effect getters when raising each heir.
 var upgrades: LegacyUpgrades
 
+## Per-property retained staffer tiers (GDD §6.3). Staff reset on prestige by default;
+## this is the Legacy-bought exception that carries a chosen property's staffer tier
+## into every future heir. Spends from the same Legacy wallet as `upgrades`.
+var staff_retention: StaffRetention
+
 ## Which generation is alive, 1-based — the Roman-numeral suffix (Wellington IX).
 var generation: int = 1
 
@@ -58,6 +63,7 @@ func _init(property_configs: Array, titles: Array, p_tuning: TuningConfig) -> vo
 	_title_configs = titles
 	tuning = p_tuning
 	upgrades = LegacyUpgrades.new()
+	staff_retention = StaffRetention.new()
 	current = _new_generation()
 
 
@@ -77,6 +83,29 @@ func tick(delta: float) -> void:
 ## acceleration is something the player chooses to buy, not an automatic bonus.
 func get_legacy_income_multiplier() -> float:
 	return upgrades.property_income_multiplier()
+
+
+# ---------------------------------------------------------------------------
+# Per-staffer retention (GDD §6.3) — the Legacy-bought exception to the
+# "staff reset on prestige" default.
+# ---------------------------------------------------------------------------
+
+## Buy one more tier of retention for a property's staffer, spending Legacy from the
+## wallet. You can only retain UP TO the tier the living generation's staffer actually
+## holds right now ("you can only will what you have"). Returns true on success; false
+## if there is nothing higher to retain or the player can't afford the next tier.
+func buy_staff_retention(property_index: int) -> bool:
+	var prop := current.economy.properties[property_index] as PropertyState
+	var next_tier := staff_retention.next_retention_tier(property_index)
+	# Can't retain a tier higher than the staffer currently is in this life.
+	if next_tier > prop.staff_tier:
+		return false
+	var cost := staff_retention.cost_for_tier(next_tier)
+	if upgrades.available < cost:
+		return false
+	upgrades.available -= cost
+	staff_retention.set_retained_tier(property_index, next_tier)
+	return true
 
 
 # ---------------------------------------------------------------------------
@@ -179,7 +208,22 @@ func _new_generation() -> GameState:
 	# re-climbs the ladder from an empty meter rather than inheriting a full one.
 	heir.wage.taps_at_title_start = dynastic_taps
 	_apply_upgrade_effects(heir)
+	_apply_retained_staff(heir)
 	return heir
+
+
+## Seed an heir with any staffers the dynasty has paid (in Legacy) to retain (GDD §6.3).
+## Units do NOT carry over — only the staffer tier — so the heir is born with the
+## staffer in place but no properties yet; the first unit they buy auto-cycles at the
+## retained tier's multiplier. A retained tier can sit above the heir's current epoch:
+## that is the whole point of prestige — willing an heir alien staff before it has
+## earned its way back to that epoch.
+func _apply_retained_staff(heir: GameState) -> void:
+	for property_index in staff_retention.retained_tiers:
+		var tier := staff_retention.get_retained_tier(property_index)
+		if tier >= 1:
+			var prop := heir.economy.properties[property_index] as PropertyState
+			prop.set_staff_tier(tier, EpochCatalog.staff_income_multiplier(tier))
 
 
 ## Apply the purchased per-generation upgrade effects to a generation's state:
@@ -213,6 +257,7 @@ func refresh_current_generation_effects() -> void:
 func to_save_dict() -> Dictionary:
 	return {
 		"upgrades": upgrades.to_save_dict(),
+		"staff_retention": staff_retention.to_save_dict(),
 		"generation": generation,
 		"dynastic_taps": dynastic_taps,
 		"lifetime_cash_earned": lifetime_cash_earned,
@@ -239,6 +284,11 @@ func load_save_dict(data: Dictionary) -> void:
 	ancestors = []
 	for record in data.get("ancestors", []):
 		ancestors.append((record as Dictionary).duplicate())
+
+	# Per-staffer retention (GDD §6.3); pre-retention saves default to nothing retained.
+	staff_retention = StaffRetention.new()
+	if data.has("staff_retention"):
+		staff_retention.load_save_dict(data["staff_retention"])
 
 	upgrades = LegacyUpgrades.new()
 	if data.has("upgrades"):

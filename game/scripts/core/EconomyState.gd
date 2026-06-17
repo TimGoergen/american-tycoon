@@ -146,15 +146,24 @@ func get_staffed_income_per_sec() -> float:
 	return total
 
 
-## Highest property index the player owns at least one unit of, or -1 if they own
-## none. Drives the Main screen's ladder: only owned rungs and the next rung up are
-## shown, so the list grows as the player climbs instead of dumping all 12 at once.
-func get_highest_owned_index() -> int:
-	var highest := -1
+## Index of the CHEAPEST property the player owns none of and cannot yet afford one
+## unit of, or -1 if there is no such property. Drives the Main screen's ladder
+## "peek": on top of every owned rung and every rung the player can already afford,
+## exactly this one unaffordable rung is shown (grayed) so the player always sees the
+## next thing to save toward — but nothing further. (Cost compared at the price of a
+## single unit, matching what the buy button charges in ×1 mode.)
+func get_cheapest_unaffordable_unowned_index() -> int:
+	var best := -1
+	var best_cost := INF
 	for i in range(properties.size()):
-		if (properties[i] as PropertyState).units_owned > 0:
-			highest = i
-	return highest
+		var p := properties[i] as PropertyState
+		if p.units_owned > 0:
+			continue
+		var unit_cost := p.get_bulk_cost(1)
+		if cash < unit_cost and unit_cost < best_cost:
+			best_cost = unit_cost
+			best = i
+	return best
 
 
 ## Credit GRANTED cash — money the player was handed, not earned: birth seed

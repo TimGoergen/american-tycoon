@@ -20,7 +20,8 @@ class_name EpochCatalog
 # NOT stored here — it is sourced from TuningConfig.earth_economy_target and scaled by
 # `economy_scale` so the win/contact threshold has a single source of truth.
 #
-# v1 ships Earth + 3 alien races (Plans doc §8). Numbers are first-pass, meant for
+# v1 ships Earth + 5 alien races (Plans doc §8 named the first 3; Quartzite and
+# Chronophage were added in Phase 4). Numbers are first-pass, meant for
 # on-device feel-tuning, not final balance; the dynasty sim verifies "speeds up every
 # time" still holds with them.
 
@@ -46,6 +47,8 @@ const EPOCHS := [
 		"economy_scale": 1.0,
 		"staff_income_multiplier": 1.0,
 		"hire_cost_multiplier": 1.0,
+		# Earth is where every run begins — there is no contact beat for it.
+		"contact_line": "",
 		# Earth staffers — these mirror the staffer_name in each property's .tres so the
 		# tier system has one authoritative table; the .tres field is now vestigial.
 		"staffer_names": [
@@ -63,6 +66,8 @@ const EPOCHS := [
 		"economy_scale": 1_000.0,
 		"staff_income_multiplier": 15.0,
 		"hire_cost_multiplier": 20.0,
+		"contact_line": "You bought the Earth. The Luminari Collective noticed. " \
+			+ "Now your money moves at the speed of light — and so does everyone else's.",
 		# Energy/light beings — money now moves at the speed of light.
 		"staffer_names": [
 			"Photon Teller", "Solar Cultivator", "Lumen Curator",
@@ -79,6 +84,8 @@ const EPOCHS := [
 		"economy_scale": 1_000_000.0,
 		"staff_income_multiplier": 250.0,
 		"hire_cost_multiplier": 500.0,
+		"contact_line": "The Geth-Sentinel Grid comes online. Every trade, every fund, " \
+			+ "every hustle — handed to machines that never sleep, never quit, never ask why.",
 		# Cybernetic collective — finance run entirely by machines.
 		"staffer_names": [
 			"Autonomous Teller Unit", "Cultivation Algorithm", "Mint Subroutine",
@@ -95,12 +102,51 @@ const EPOCHS := [
 		"economy_scale": 1_000_000_000.0,
 		"staff_income_multiplier": 5_000.0,
 		"hire_cost_multiplier": 12_000.0,
+		"contact_line": "The Mycelium Unity spreads into your holdings. Money that grows " \
+			+ "itself now — branching through the dark, feeding on everything it touches.",
 		# Fungal hive-mind — money that literally spreads and self-replicates.
 		"staffer_names": [
 			"Spore-Cash Node", "Mycelial Grove-Tender", "Fungal Token Bloom",
 			"Rhizome Financier", "Spore-Drift Network", "Decomposition Specialist",
 			"Hyphae Trader", "Overgrowth Developer", "Mycelial Downline",
 			"Spore Cloud Fund", "Root-Network Lobbyist", "Hive-Mind Chief of Staff",
+		],
+	},
+	{
+		"tier": 5,
+		"civilization": "Quartzite Conglomerate",
+		"home_planet": "Geode-7",
+		"currency_flavor": "Prisms",
+		"economy_scale": 1_000_000_000_000.0,
+		"staff_income_multiplier": 90_000.0,
+		"hire_cost_multiplier": 280_000.0,
+		"contact_line": "The Quartzite Conglomerate refracts your fortune. Wealth, " \
+			+ "crystallized — harder than diamond, and just as cold.",
+		# Crystalloid life — capital made permanent, faceted, light bent to its will.
+		"staffer_names": [
+			"Prism Teller", "Crystal Cultivator", "Geode Curator",
+			"Refraction Auditor", "Lattice Courier", "Facet Cleaner",
+			"Quartz Day-Trader", "Geode Flipper", "Prism Recruiter",
+			"Crystalline Fund Manager", "Bedrock Lobbyist", "Diamond Chief of Staff",
+		],
+	},
+	{
+		"tier": 6,
+		"civilization": "Chronophage Enclave",
+		"home_planet": "Tempus",
+		"currency_flavor": "Seconds",
+		"economy_scale": 1_000_000_000_000_000.0,
+		"staff_income_multiplier": 1_600_000.0,
+		"hire_cost_multiplier": 6_500_000.0,
+		"contact_line": "The Chronophage Enclave opens the quarter. They sell you time " \
+			+ "itself, by the second — at a markup you will never live long enough to repay.",
+		# Time-eaters — they trade in stolen moments; your money compounds across hours
+		# that were taken from someone else.
+		"staffer_names": [
+			"Second-Hand Teller", "Chrono Cultivator", "Moment Curator",
+			"Hourglass Auditor", "Timeline Courier", "Era Cleaner",
+			"Microsecond Day-Trader", "Era Flipper", "Tomorrow Recruiter",
+			"Temporal Fund Manager", "Eternity Lobbyist", "Time-Lord Chief of Staff",
 		],
 	},
 ]
@@ -160,3 +206,10 @@ static func staffer_name(tier: int, property_index: int) -> String:
 static func civilization(tier: int) -> String:
 	var epoch := get_epoch(tier)
 	return String(epoch.get("civilization", "")) if not epoch.is_empty() else ""
+
+
+## The narrator's first-contact line for a tier (shown on the FirstContactOverlay).
+## Empty for Earth (tier 1), which has no contact beat.
+static func contact_line(tier: int) -> String:
+	var epoch := get_epoch(tier)
+	return String(epoch.get("contact_line", "")) if not epoch.is_empty() else ""

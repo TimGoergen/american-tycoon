@@ -48,6 +48,15 @@ const PANEL_MIN_HEIGHT := 190
 const FLASH_BRIGHTNESS := 1.18
 const FLASH_SECONDS := 0.18
 
+# Income readout throttle (Tim, 2026-06-16): the income/sec figure was repainting every
+# frame, changing so fast it was unreadable. We now hold each shown value for a short
+# interval and only repaint a few times a second — roughly a third as often as the cash
+# readout updates — so the number settles long enough to actually read. The underlying
+# value is still smoothed in GameState; this only slows how often the eye sees a change.
+const INCOME_REFRESH_INTERVAL := 0.33
+var _pending_income_per_sec := 0.0
+var _income_refresh_accumulator := INCOME_REFRESH_INTERVAL  # repaint on the very first frame
+
 var _content: Control
 var _income_label: Label
 var _cash_label: Label
@@ -111,8 +120,10 @@ func _make_label(color: Color, font_size: int, outline: int) -> Label:
 	return label
 
 
+## Record the latest income/sec. The label itself only repaints on the throttled
+## cadence in _process, so the displayed number stays still long enough to read.
 func set_income_per_sec(income_per_sec: float) -> void:
-	_income_label.text = Money.of(income_per_sec).display() + "/s"
+	_pending_income_per_sec = income_per_sec
 
 
 func set_cash(cash: float) -> void:
@@ -140,6 +151,13 @@ func flash_purchase() -> void:
 
 func _process(delta: float) -> void:
 	_layout_labels()
+
+	# Throttled income repaint: only update the visible number a few times a second so
+	# it reads as a steady figure rather than a blur (see INCOME_REFRESH_INTERVAL).
+	_income_refresh_accumulator += delta
+	if _income_refresh_accumulator >= INCOME_REFRESH_INTERVAL:
+		_income_refresh_accumulator = 0.0
+		_income_label.text = Money.of(_pending_income_per_sec).display() + "/s"
 
 	# Frenzy glow: pulse the ticket background between cream and a soft red while
 	# a burn is active; snap back to plain cream the moment it ends.

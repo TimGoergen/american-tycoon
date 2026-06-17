@@ -78,7 +78,7 @@ The art never winks. Every scheme is advertised the way a 1955 agency would sell
 
 Format: portrait bust in a circular cream medallion on navy card; name plate (slab serif) + role. Faces: simplified flat-vector 50s-ad people — dot eyes, confident smiles, period hair; skin tones from a warm limited ramp added to §1 when first needed. Same halftone, same double frame.
 
-**Epoch reskins (updated 2026-06-16):** staffing is now an epoch-keyed *tier track* (GDD §6.1), so each property's staffer is **reskinned per epoch** — Earth's ATM Technician becomes the Luminari *Photon Teller*, the Geth *Autonomous Teller Unit*, the Mycelium *Spore-Cash Node*, etc. Plan the asset bill accordingly: ~12 staffers × the number of shipped epochs (v1 = Earth + 3 aliens = ~48 cards), each carrying its civilization's visual flavor over the same medallion frame. The **quiet ratio** stat pair (hire cost vs. lifetime revenue) is now a *deferred* satirical addition (GDD §6.4), not a required element of the card.
+**Epoch reskins (updated 2026-06-16):** staffing is now an epoch-keyed *tier track* (GDD §6.1), so each property's staffer is **reskinned per epoch** — Earth's ATM Technician becomes the Luminari *Photon Teller*, the Geth *Autonomous Teller Unit*, the Mycelium *Spore-Cash Node*, etc. Plan the asset bill accordingly: ~12 staffers × the number of shipped epochs (v1 = Earth + 5 aliens = ~72 cards), each carrying its civilization's visual flavor over the same medallion frame. The **quiet ratio** stat pair (hire cost vs. lifetime revenue) is now a *deferred* satirical addition (GDD §6.4), not a required element of the card.
 
 ## 7. Backdrops (raster pipeline, M3)
 

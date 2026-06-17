@@ -151,7 +151,7 @@ Earth runs on **one currency — the dollar.** Alien civilizations are *flavor, 
 
 - **Epochs are reached within a run by consuming the entire current economy.** Each epoch has a total economic value; Earth's is the existing Earth target (~$103.6T — "buy the Earth", §10). Once a generation has *earned* that whole value, contact with the next civilization fires and the next, orders-of-magnitude-larger epoch opens. The threshold ladder *is* the scale justification: "you ran out of Earth to buy, so the galaxy opens."
 - **First Contact is a beat,** not just a number crossing: it names the civilization, its home world and tech, and declares new markets open. Each contact also unlocks the next staffer tier for every property.
-- **v1 epoch ladder** (more civilizations added later — `docs/alien_civilizations.md` holds 100):
+- **v1 epoch ladder** (Earth + 5 alien epochs shipped; more can be added as data rows):
 
   | Tier | Civilization | Economy vs. Earth | Staffer income ×| Flavor |
   |---|---|---|---|---|
@@ -159,8 +159,10 @@ Earth runs on **one currency — the dollar.** Alien civilizations are *flavor, 
   | 2 | **Luminari Collective** (Solaria Prime, *Photons*) | 1,000× | 15× | Energy/light beings — money now moves at light speed. |
   | 3 | **Geth-Sentinel Grid** (Rannoch-01, *Logic Nodes*) | 1,000,000× | 250× | Cybernetic collective — finance run entirely by machines. |
   | 4 | **Mycelium Unity** (Spore-Deep, *Spores*) | 1,000,000,000× | 5,000× | Fungal hive-mind — money that literally spreads and self-replicates. |
+  | 5 | **Quartzite Conglomerate** (Geode-7, *Prisms*) | 1,000,000,000,000× | 90,000× | Crystalloid — wealth crystallized, harder than diamond and just as cold. |
+  | 6 | **Chronophage Enclave** (Tempus, *Seconds*) | 1,000,000,000,000,000× | 1,600,000× | Time-eaters — they sell you time itself, by the second, at a ruinous markup. |
 
-  Arc: energy → automation → proliferation, each a different flavor of "the aliens make your money machine inhuman." *(Economy scales, income and hire multipliers are first-pass values in `EpochCatalog.gd`, for on-device feel-tuning; the dynasty sim verifies "speeds up every time" still holds with them.)*
+  Arc: energy → automation → proliferation → crystallization → time, each a different flavor of "the aliens make your money machine inhuman." *(Economy scales, income and hire multipliers are first-pass values in `EpochCatalog.gd`, for on-device feel-tuning; the dynasty sim verifies "speeds up every time" still holds with them. More civilizations can be added as data rows — `docs/alien_civilizations.md` holds 100.)*
 
 ### 6.3 Dynasty interaction — staff retention
 

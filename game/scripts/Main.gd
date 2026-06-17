@@ -20,6 +20,10 @@ var _tick_accumulator := 0.0
 var _autosave_timer := 0.0
 
 var _hero_stat: HeroStat
+## Small banner under the hero stat naming the civilization Earth is currently trading
+## with (the reached epoch). Updates the moment a first contact advances the epoch.
+var _epoch_label: Label
+var _first_contact_overlay: FirstContactOverlay
 var _frenzy_bar: FrenzyBar
 var _wage_panel: WagePanel
 var _welcome_overlay: WelcomeBackOverlay
@@ -54,7 +58,7 @@ func _process(delta: float) -> void:
 	# numbers from shifting under the player, avoids half-saving the generation
 	# swap mid-ceremony, and lets the shop spend Legacy against a steady balance.
 	if _will_screen.visible or _legacy_screen.visible or _ledger_screen.visible \
-			or _dev_panel.visible:
+			or _dev_panel.visible or _first_contact_overlay.visible:
 		return
 
 	# Fixed-timestep logic (Spec §2): accumulate render time and tick in
@@ -82,6 +86,7 @@ func _process(delta: float) -> void:
 	# The heir name rides on the hero stat; the prestige-exit button and the Estate
 	# Office button (with its Legacy balance) reflect the live state.
 	_hero_stat.set_dynasty_name(HeirNames.dynasty_name(dynasty.generation))
+	_update_epoch_label()
 	_update_plan_button()
 	_update_legacy_button()
 	_update_ledger_button()
@@ -171,6 +176,15 @@ func _build_ui() -> void:
 	_hero_stat = HeroStat.new()
 	column.add_child(_hero_stat)
 
+	# Epoch banner: which alien civilization Earth is currently trading with (GDD §6.2).
+	# Centered, navy, modest weight — it sits quietly under the hero stat and changes on
+	# first contact. Main keeps its text in sync each frame in _update_epoch_label.
+	_epoch_label = Label.new()
+	_epoch_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_epoch_label.add_theme_color_override("font_color", UiPalette.NAVY)
+	_epoch_label.add_theme_font_size_override("font_size", 26)
+	column.add_child(_epoch_label)
+
 	_frenzy_bar = FrenzyBar.new()
 	_frenzy_bar.setup(game.frenzy, tuning)
 	_frenzy_bar.pop_requested.connect(_on_pop_requested)
@@ -223,7 +237,7 @@ func _build_ui() -> void:
 
 	for i in range(game.economy.properties.size()):
 		var row := PropertyRow.new()
-		row.setup(i, game.economy.properties[i] as PropertyState, game.economy, game.frenzy)
+		row.setup(i, game.economy.properties[i] as PropertyState, game.economy, game.frenzy, game.epoch)
 		row.buy_requested.connect(_on_buy_requested)
 		row.tap_requested.connect(_on_tap_requested)
 		row.hold_rush_requested.connect(_on_hold_rush_requested)
@@ -303,6 +317,15 @@ func _build_ui() -> void:
 	_welcome_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_welcome_overlay)
 
+	# The first-contact overlay (GDD §6.2): shown when a generation consumes the current
+	# economy and reaches the next alien epoch. Main freezes the economy while it is up so
+	# the beat lands. EpochState.contact_made fires it; it is rebuilt with the generation
+	# on each scene reload, so its connection always points at the living epoch state.
+	_first_contact_overlay = FirstContactOverlay.new()
+	_first_contact_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(_first_contact_overlay)
+	game.epoch.contact_made.connect(_on_contact_made)
+
 	# The succession ceremony overlay (the Reading of the Will + heir reveal),
 	# also above everything and hidden until the player plans the estate.
 	_will_screen = WillScreen.new()
@@ -319,6 +342,7 @@ func _build_ui() -> void:
 	_legacy_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_legacy_screen.setup(dynasty.upgrades)
 	_legacy_screen.purchased.connect(_on_upgrade_purchased)
+	_legacy_screen.retain_requested.connect(_on_retain_requested)
 	_legacy_screen.closed.connect(_on_legacy_screen_closed)
 	add_child(_legacy_screen)
 
@@ -450,6 +474,21 @@ func _update_plan_button() -> void:
 		_plan_button.text = "PLAN THE ESTATE"
 
 
+## Keep the epoch banner in sync with the civilization Earth is currently trading with.
+func _update_epoch_label() -> void:
+	var tier := game.epoch.current_tier
+	if tier <= 1:
+		_epoch_label.text = "EARTH"
+	else:
+		_epoch_label.text = "TRADING WITH: " + EpochCatalog.civilization(tier).to_upper()
+
+
+## First contact: a new epoch was reached this tick. Show the beat (Main's _process
+## guard freezes the economy while it is up).
+func _on_contact_made(new_tier: int) -> void:
+	_first_contact_overlay.show_contact(new_tier)
+
+
 ## Reveal the Estate Office button once the dynasty has ever earned Legacy — i.e.
 ## from the first prestige onward. earned_lifetime never falls back to 0, so once
 ## shown the button stays for good (even after the wallet is spent down to 0). While
@@ -478,10 +517,51 @@ func _on_family_ledger_closed() -> void:
 	pass
 
 
-## Player opened the Estate Office: show the upgrade shop. It refreshes itself
-## against the current Legacy wallet on open.
+## Player opened the Estate Office: feed the shop a fresh Household Staff snapshot
+## (which depends on the living generation's staff), then show it. The upgrade cards
+## refresh themselves against the current Legacy wallet inside open().
 func _on_estate_office_pressed() -> void:
+	_legacy_screen.set_retention_entries(_build_retention_entries())
 	_legacy_screen.open()
+
+
+## Snapshot of the living generation's staff vs. the dynasty's retained tiers, for the
+## Estate Office's Household Staff section (GDD §6.3). Lists only properties that have a
+## staffer now or a retained one — i.e. the actual household worth willing to an heir.
+func _build_retention_entries() -> Array:
+	var entries: Array = []
+	for i in range(game.economy.properties.size()):
+		var prop := game.economy.properties[i] as PropertyState
+		var current_tier := prop.staff_tier
+		var retained_tier := dynasty.staff_retention.get_retained_tier(i)
+		if current_tier < 1 and retained_tier < 1:
+			continue
+		# You can only retain up to the staffer's live tier; -1 means nothing to buy.
+		var next_tier := retained_tier + 1
+		var cost := -1
+		var can_afford := false
+		if next_tier <= current_tier:
+			cost = dynasty.staff_retention.cost_for_tier(next_tier)
+			can_afford = dynasty.upgrades.available >= cost
+		entries.append({
+			"index": i,
+			"property_name": (prop.config as PropertyConfig).display_name,
+			"staffer_name": EpochCatalog.staffer_name(maxi(current_tier, retained_tier), i),
+			"current_tier": current_tier,
+			"retained_tier": retained_tier,
+			"cost": cost,
+			"can_afford": can_afford,
+		})
+	return entries
+
+
+## Player bought a tier of staffer retention in the Estate Office. Spend the Legacy,
+## refresh the shop (wallet, upgrade cards, and the staff rows), and persist.
+func _on_retain_requested(property_index: int) -> void:
+	if dynasty.buy_staff_retention(property_index):
+		_legacy_screen.refresh()
+		_legacy_screen.set_retention_entries(_build_retention_entries())
+		SaveManager.save_dict_to_file(dynasty.to_save_dict())
 
 
 ## An upgrade was just bought in the shop. Apply its effect to the living

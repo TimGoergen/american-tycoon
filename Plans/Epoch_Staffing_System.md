@@ -1,7 +1,9 @@
 # Epoch-Based Staffing System — Design Plan
 
-**Status:** proposed, awaiting Tim's review (drafted 2026-06-16)
-**Supersedes:** GDD §6 ("Staffing & Automation") — see "GDD impact" below.
+**Status:** approved & in build. Phase 1 (headless core) DONE 2026-06-16 (commit d7e6b23 on
+`feature/epoch-staffing`, off `release`). GDD §6 rewrite DONE 2026-06-16 (now the design of
+record — see "GDD impact" below). NEXT: Phase 2 (Legacy per-staffer retention).
+**Supersedes:** GDD §6 ("Staffing & Automation") — now rewritten to match; see "GDD impact" below.
 
 ---
 
@@ -101,16 +103,22 @@ property), epochs (within run), Legacy (across runs).
   stat for a staffer card, but no longer the centerpiece; track separately.
 
 ## 6. Phasing (each phase headless-verified before the next)
-1. **Epoch core + staff-tier refactor** — `EpochCatalog`, `EpochState`, `PropertyState` tier,
-   income threading, save bump, sim. No UI. *Verifiable headless.*
-2. **Legacy staff retention** — catalog entry + carry-forward in `_new_generation` + sim.
+1. ✅ **Epoch core + staff-tier refactor** — `EpochCatalog`, `EpochState`, `PropertyState` tier,
+   income threading, save bump (v4→v5), sim. No UI. *DONE 2026-06-16, commit d7e6b23
+   (`EpochTest.gd` 22 checks PASS; dynasty sim still "speeds up every time").*
+2. **Legacy staff retention** — per-property retained tier + carry-forward in `_new_generation` + sim. *← NEXT*
 3. **UI** — staffer cards/upgrade, first-contact screen, epoch indicator.
 4. **Content** — flesh out more epochs/aliens + narrator copy pass.
 
-## 7. GDD impact
-Rewrites §6 (Staffing & Automation) and adds an "Epochs / First Contact" section; touches §3 (the
-absurd-scale justification) and §5.1 (Legacy as the engine that reaches new epochs). I'll draft the
-GDD edit once the plan is approved.
+## 7. GDD impact — DONE 2026-06-16
+GDD §6 (Staffing & Automation) **rewritten** as epoch-keyed staffing with subsections §6.1 (staff
+tiers), §6.2 (Epochs & First Contact, incl. the v1 epoch table from `EpochCatalog.gd`), §6.3
+(per-staffer retention), §6.4 (deferred "quiet ratio"). Also reconciled: §3 loop 3 (now "The Epoch"
+/ alien contact instead of distinct markets), §5.1 (Legacy reaches deeper epochs), the Future
+Features "alien-contact epochs" entry (marked ADOPTED & IN BUILD; only the per-epoch modifier draft
+stays parked), §14 Q8 "Market Two" (superseded), §13 milestones (M3/M4). Mechanics Spec §6 (tiered
+hire), Legacy retention line, PropertyConfig/PlanetConfig notes, and the Art Style Guide §6 staffer
+cards (per-epoch reskins, ~48-card asset bill) updated to match.
 
 ## 8. Resolved decisions (Tim, 2026-06-16)
 1. **Epoch trigger:** consume the entire current economy (reach the epoch's total economic value).

@@ -19,7 +19,8 @@ extends PanelContainer
 
 # Type sizes (art direction, not game tuning). Large for at-a-glance reading; the
 # matching-color outline fakes a bold weight until real bold fonts arrive in M3.
-const INCOME_FONT_SIZE := 64
+# Bumped 5% (64 -> 67) at Tim's request so the headline amounts read a touch larger.
+const INCOME_FONT_SIZE := 67
 # Cash on hand reads at the same size as income/sec (Tim's call) — kept tied to
 # INCOME_FONT_SIZE so the two stay matched if that value is ever retuned.
 const CASH_FONT_SIZE := INCOME_FONT_SIZE
@@ -38,8 +39,13 @@ const NAME_BOLD := 2
 ## Gap kept between a pinned label and the panel edge it hugs.
 const EDGE_MARGIN := 14
 ## Panel height — tall enough that the vertically-centered values clear the caption
-## pinned along the bottom edge.
-const PANEL_MIN_HEIGHT := 190
+## pinned along the bottom edge. Reduced 10% (190 -> 171) at Tim's request: the trim
+## comes out of the empty space below the captions, and the label layout is frozen at
+## the original height (LABEL_LAYOUT_HEIGHT) so NO text moves.
+const PANEL_MIN_HEIGHT := 171
+## Height the labels are laid out against. Held at the original 190 so the numerals and
+## captions keep their exact positions even though the plate outline is now shorter.
+const LABEL_LAYOUT_HEIGHT := 190
 
 # The brightness flash briefly lifts the whole panel toward white and eases back.
 # Multiplying modulate (rather than tinting the background) keeps the hue exactly
@@ -181,10 +187,12 @@ func _layout_labels() -> void:
 	# top of the panel — i.e. twice as close to the top (Tim's call).
 
 	# Income (left edge): caption stays at the centered-block position; amount moves up.
+	# Vertical math uses LABEL_LAYOUT_HEIGHT (the original plate height), not the live
+	# area.y, so shrinking the plate leaves every label exactly where it was.
 	_income_label.size = _income_label.get_minimum_size()
 	_income_caption.size = _income_caption.get_minimum_size()
 	var income_block_h := _income_label.size.y + caption_gap + _income_caption.size.y
-	var income_centered_top := (area.y - income_block_h) / 2.0
+	var income_centered_top := (LABEL_LAYOUT_HEIGHT - income_block_h) / 2.0
 	var income_caption_top := income_centered_top + _income_label.size.y + caption_gap
 	_income_label.position = Vector2(EDGE_MARGIN, income_centered_top / 2.0)
 	_income_caption.position = Vector2(EDGE_MARGIN, income_caption_top)
@@ -193,20 +201,21 @@ func _layout_labels() -> void:
 	_cash_label.size = _cash_label.get_minimum_size()
 	_cash_caption.size = _cash_caption.get_minimum_size()
 	var cash_block_h := _cash_label.size.y + caption_gap + _cash_caption.size.y
-	var cash_centered_top := (area.y - cash_block_h) / 2.0
+	var cash_centered_top := (LABEL_LAYOUT_HEIGHT - cash_block_h) / 2.0
 	var cash_caption_top := cash_centered_top + _cash_label.size.y + caption_gap
 	_cash_label.position = Vector2(area.x - _cash_label.size.x - EDGE_MARGIN, cash_centered_top / 2.0)
 	_cash_caption.position = Vector2(area.x - _cash_caption.size.x - EDGE_MARGIN, cash_caption_top)
 
-	# Heir name: horizontally centered across the whole plate, and vertically centered
-	# on the caption line so it sits level with the INCOME / CASH captions. (Income and
-	# cash captions share the same y because both values are the same font size, so
-	# either caption's top works as the reference.)
+	# Heir name: horizontally centered across the whole plate, and BOTTOM-aligned with the
+	# INCOME / CASH captions (Tim, 2026-06-21) so all three labels share one baseline — the
+	# taller name (it's a larger font) now grows upward only, not below the captions.
+	# (Income and cash captions share the same y because both values are the same font size,
+	# so either caption's bottom is the baseline.)
 	_name_label.size = _name_label.get_minimum_size()
-	var caption_center_y := cash_caption_top + _cash_caption.size.y / 2.0
+	var caption_baseline_y := cash_caption_top + _cash_caption.size.y
 	_name_label.position = Vector2(
 		(area.x - _name_label.size.x) / 2.0,
-		caption_center_y - _name_label.size.y / 2.0
+		caption_baseline_y - _name_label.size.y
 	)
 
 

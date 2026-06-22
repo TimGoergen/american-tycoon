@@ -103,8 +103,25 @@ From the original `AmericanTycoon_PropertyTypeConfig.xlsx`, Sheet2. **Not one ru
 | 11 | Legislative Assets | $1.30T | $12,800 | 1,024 | $13.1M |
 | 12 | Executive Assets | $14.27T | $25,600 | 2,048 | $52.4M |
 
+> **Cycle-time rework — moderate stretch (Tim, 2026-06-21, post-vacation roadmap).** The
+> table's cycle column above is the *original intent* (doubling 0.4s → 2048s ≈ 34min) and is
+> **not** what the build shipped: the live `.tres` configs top out at only **~81s** (a much
+> flatter curve). Playing the game on vacation, Tim felt the back-tier payoff was missing —
+> nothing takes long enough that leaving and returning to a fat pile feels earned. **Decision:
+> a *moderate* stretch** — lengthen the curve so each tier's cycle is *considerably* longer
+> than the last, with the top tier landing around **a few minutes** at base (target ~180–300s,
+> `TBD-SIM`), then milestone speed-ups (§5.1) and staffing (§6) compress it the way AdVenture
+> Capitalist's hours-long top business collapses to seconds once maxed. Early tiers stay
+> short (sub-second to seconds) so the opening reads as an active clicker. This is a deliberate
+> middle path: longer than today's 81s ceiling, far short of AdCap's literal 10-hour extreme.
+> The §4 table cycle column and the `.tres` values will be reset to the agreed curve in the
+> tuning pass; until then both are provisional. (AdCap reference for calibration: 10 tiers,
+> 0.6s → ~36,864s base.)
+
 **Structural notes:**
-- Costs ×11/tier; income ×2; cycles double (0.4s → 34min). Per-property **leveling with income multipliers** required (Sheet1's curves).
+- Costs ×11/tier; income ×2; cycle times stretch tier-over-tier per the moderate-stretch
+  rework above (`TBD-SIM`, was "double 0.4s → 34min"). Per-property **leveling with income
+  multipliers** required (Sheet1's curves).
 - Collect-cycle model — the substrate for tap-to-rush (§5) and count-milestone speed-ups (§5.1).
 - Sheet1's **accelerating cost curves** (per-level multiplier +0.02–0.03/level) create soft per-property ceilings — retroactively justified by §11 decision cadence: real allocation choices (deepen this tier vs. save for the next) recur constantly, where fixed multipliers collapse into "buy whatever's affordable."
 - NFTs timestamps the design to 2021–22; anachronism partially protected by art direction. *Open: refresh individual rungs?*
@@ -127,6 +144,36 @@ The early game must *feel* faster on every timescale:
 - **Within a run — punctuated, visible acceleration.** Ownership-count milestones: own 10 of a property → cycle time halves; 25 → halves again; etc. Properties visibly spin from labored crawl to blur — speed as *displayed motion*, not just bigger numbers. Early cost/income curves tuned so purchase cadence quickens in the opening minutes. Step-function acceleration feels like speeding up; smooth exponential growth paradoxically feels static.
 - **Across generations — front-loaded Legacy, reaching deeper epochs.** Prestige bonuses disproportionately multiply the *early ladder*. Each heir tears through tiers the grandfather crawled across; run 1's first hour is run 5's first ninety seconds. Legacy is also **how the dynasty punches further into the epoch ladder** (§6.2): a juiced-up heir consumes Earth's economy fast enough to reach civilizations the founder never contacted, and per-staffer retention (§6.3) lets the heir start with alien staff already in place. Compounding advantage rendered as game-feel — the player experiences the unfairness from the privileged side. Garnish: each generation auto-skips ceremonies it has outgrown (the family office handles paperwork now).
 - **Per property — the arc completes in automation.** Crawl → spin → blur → *someone else's problem* (§6).
+
+### 5.5 Minigames (added 2026-06-21, post-vacation roadmap)
+
+Playing the game on vacation, Tim wanted **more energy at transitions** — the moments
+between screens shouldn't be dead air. Minigames serve two distinct roles:
+
+1. **Transition energy.** Short, optional bursts of interaction layered onto big
+   transitions (succession/prestige, epoch first-contact) so the seams of the game feel
+   alive instead of loading-screen flat.
+2. **The prestige legacy minigame — a bonus multiplier.** At prestige, a minigame grants a
+   **multiplier on the Legacy awarded** for that run. The existing legacy formula
+   (Mechanics Spec §9.3) still computes the **base** award; a good minigame performance
+   multiplies it **above 100%**. *(Decision, Tim 2026-06-21: this **reverses** the original
+   vacation note, which framed it as "percentage of the whole you keep, not a multiplier."
+   We went with an upside multiplier — playing can only ever *gain* you legacy, never feel
+   like you lost some you "should" have had. The loss-aversion framing was rejected as
+   un-fun for a reward moment.)*
+
+**Player setting (not forced):** a minigame toggle in options. **Default: mandatory** (you
+play the minigame on prestige) until the player opts out; **opting out banks a default
+multiplier** (provisional 1.0× — no bonus, no penalty, `TBD-SIM`), so a player who finds it
+tedious on repeat runs is never punished, only forgoes the upside.
+
+**Minigame ideas Tim likes (first-pass):**
+- **Match-3.** More crystals matched → higher bonus multiplier.
+- **Physics / balance.** The longer you keep it balanced → higher bonus multiplier.
+
+Whether the *same* minigame is reused for transitions and for the legacy bonus, or
+different minigames per context, is open (§14). This is net-new design — there is no
+minigame code or detailed spec yet; a build plan will live in the Plans folder.
 
 ---
 
@@ -334,6 +381,15 @@ Resolved since v0.1: ~~automation/managers~~ (§6), ~~dynasty identity~~ (§8.2)
 10. **Name generator part-lists.** A fun evening of writing (§8.2).
 11. **Sound & haptics design.** The return-spike delta (§3.1) needs weight; audio direction set, implementation now scheduled into M3 (§13). Remaining open: haptics and per-event sound mapping.
 12. **Frenzy meter tuning.** Layer 3 charge rate, multiplier size, duration.
+13. **Cycle-time curve (post-vacation rework, §4).** Target top-tier base cycle (180s? 300s?)
+    and the per-tier growth factor; resolve via the balance simulator. Also: does milestone
+    cadence stay at 20/40/80… (§5.1, Spec §3.1) or move toward AdCap's 25/50/100/200/300/400
+    so there are more "feel the speed-up" beats across the now-longer cycles?
+14. **Minigames (now adopted, §5.5).** Which minigame(s) ship first; whether the transition
+    minigame and the legacy-bonus minigame are the same game or different; the legacy bonus
+    multiplier's balanced range (e.g. 1.0×–2.0×) and whether `K_LEGACY`/`ALPHA` need re-tuning
+    once a multiplier rides on top (the log curve was already reworked once to avoid runaway
+    Legacy — Spec §9.3); the opt-out default value (1.0× vs. a modest baseline).
 
 ---
 

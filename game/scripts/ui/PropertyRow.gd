@@ -194,7 +194,7 @@ func _ready() -> void:
 
 	_buy_button = Button.new()
 	_buy_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_buy_button.size_flags_stretch_ratio = 2.0  # buy gets twice the hire button's width
+	# Buy and hire each take half the panel width (default stretch ratio 1.0 on both).
 	_buy_button.custom_minimum_size = Vector2(0, BUTTON_ROW_HEIGHT)
 	UiPalette.style_button(_buy_button, true)  # red: buying is a spend action (§8)
 	_buy_button.pressed.connect(func() -> void: buy_requested.emit(prop_index, _buy_mode))

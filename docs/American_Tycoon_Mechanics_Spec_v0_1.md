@@ -53,6 +53,17 @@ else:                               income_per_unit ×= 2   (income mode)
 ```
 `CYCLE_FLOOR = 1.0s` (provisional `TBD-SIM`). Every property follows the arc *first it gets faster, then it gets richer*; conversion point is emergent per property (ATM converts almost immediately; political assets accelerate visibly for most of the game).
 
+**Base cycle-length rework — moderate stretch (Tim, 2026-06-21, post-vacation roadmap).** The
+shipped `.tres` base `cycle_length` values are too flat (top tier ~81s) — the back-tier "leave
+it, return to a big pile" payoff is missing. New direction: stretch base cycles so each tier is
+*considerably* longer than the last, top tier ~**180–300s** at base (`TBD-SIM`), then §3.3
+milestones + §6 staffing compress them (the AdCap "long base, collapses when maxed" shape). This
+is a *moderate* stretch — longer than 81s, far short of GDD §4's original 2048s intent and AdCap's
+~36,864s extreme. **Open (feeds the simulator pass):** the exact top-tier target and per-tier
+growth factor; whether the milestone cadence stays 20/40/80… (§3.1) or moves toward AdCap's
+25/50/100/200/300/400 to give more speed-up beats across the longer cycles. Resets the GDD §4
+cycle column and `BASE_*` cycle values in `game/config/properties/*.tres`.
+
 ### 3.4 Income
 ```
 income_per_cycle(i) = floor( units_i × income_per_unit_i )   [2022 formula, preserved]
@@ -139,6 +150,19 @@ this generation — not net worth at death. **Reworked 2026-06-17 from a plain p
 `K × estate_net ^ 0.5` minted absurd Legacy at real trillion-dollar scale — a single 20T run gave
 ~16k, enough to buy out the whole shop. The log curve compresses the whole range to a sane handful
 — ≈ $1B→18, $8T→49, $1Q→72 — and nothing converts below the `LEGACY_BASE` floor.)
+**Prestige minigame multiplier (added 2026-06-21, GDD §5.5).** A prestige minigame applies a
+multiplier **on top** of the converted award:
+```
+legacy_awarded = floor( legacy_gain × MINIGAME_MULT )    MINIGAME_MULT ≥ 1.0
+```
+`legacy_gain` (the log curve above) is the **base**; `MINIGAME_MULT` is the player's minigame
+result, ranging `[1.0, MINIGAME_MULT_MAX]` (range `TBD-SIM`; candidate cap ~2.0×). It is an
+**upside-only multiplier** — never below 1.0, so playing can only gain Legacy, never feel like a
+loss (GDD §5.5 rationale). Governed by a **player setting** (default mandatory; opting out banks
+`MINIGAME_MULT_OPTOUT`, provisional 1.0× = no bonus, `TBD-SIM`). **Re-tuning note:** because this
+rides on top of the already-compressed log curve, `K_LEGACY`/`ALPHA` may need a pass so a maxed
+multiplier doesn't reintroduce runaway Legacy (`TBD-SIM`).
+
 Displayed as **brackets** (thresholds where legacy_gain crosses integers / named tiers); advisor announces bracket crossings. Total Legacy is dynastic and never spent down by conversion — Legacy *upgrades* cost Legacy per the upgrade table (content pass). The catalog includes **per-staffer retention** (GDD §6.3): spend Legacy to keep a specific property's staffer at its tier across the prestige reset, so the heir starts pre-staffed there. *(This is distinct from the existing "Loyal Staff" upgrade, which only discounts hire cost. Staff otherwise reset on prestige.)*
 
 ### 9.4 Legacy application — catch-up sprint + residual
@@ -184,6 +208,7 @@ Godot Resources (the 2022 ScriptableObject pattern, ported):
 | EXEMPTION base / TAX_RATE base | $1M / 60% | TBD-SIM |
 | LOOPHOLE_RATE_FLOOR | 5% | TBD-SIM |
 | K_LEGACY / ALPHA / LEGACY_BASE (log curve) | 0.5 / 2 / $1k | feel-tune |
+| MINIGAME_MULT_MAX / MINIGAME_MULT_OPTOUT | ~2.0× / 1.0× | TBD-SIM |
 | K_SPRINT / BETA / K_RES | tune / 0.5 / tune | TBD-SIM |
 | CRASH_MULT / CRASH_DUR | 0.5 / 10 active-min | TBD-SIM |
 | AUDIT_SETTLE / AUDIT_THRESHOLD | 8% net worth / N units | TBD-SIM |

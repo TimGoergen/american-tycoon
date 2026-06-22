@@ -96,6 +96,24 @@ Art Style Guide.
   but sometimes labels + data belong **packed on a single row** to use real estate
   better. Decide per element, not by reflex.
 
+### Chunkier UI pass — global Theme + targeted (Tim, 2026-06-21, post-vacation roadmap)
+
+Playing on vacation, Tim wanted the UI **chunkier overall**: larger text, slightly larger
+panels, and a deliberate look at button/label sizing and arrangement. **Decision: global
+theme + targeted pass.**
+
+- **Centralize sizing in a real Godot `Theme` resource.** Today base sizes are scattered as
+  hardcoded constants in scripts — e.g. `PropertyRow.gd` (`BUTTON_ROW_HEIGHT := 80`,
+  `BUTTON_LABEL_FONT_SIZE := 34`, name/income 30px, tap button 22px, bar heights 26/18px) and
+  `UiPalette.gd` (StyleBoxes built by hand, `set_content_margin_all(10)`). There is **no
+  central Theme**. Create one (default font size, default `Button` minimum size, panel content
+  margins) so the readability bar above is set in one place, not chased across files.
+- **Then a targeted layout pass on the property row** (the densest surface): bump fonts and
+  heights, re-examine the `separation` overrides (6/8/10/12px) and bar heights for the larger
+  scale, and confirm panels feel a notch roomier.
+- **Base sizes (to define in the Theme, `TBD` exact values):** default body font, default
+  button min-height, panel content margin. Pin these once and let screens inherit.
+
 ---
 
 ## 2. Opinions & issues — by screen / element
@@ -147,6 +165,10 @@ Art Style Guide.
   default disabled cream, so automated properties read at a glance.
 
 ### Buy-mode toggle & buy buttons
+- **Buy / hire split 50/50 (Tim, 2026-06-21) — DONE.** The buy and hire buttons now each take
+  half the property panel width. Previously the buy button was twice as wide
+  (`size_flags_stretch_ratio = 2.0`); that override was removed so both `SIZE_EXPAND_FILL`
+  buttons share equally. `PropertyRow.gd`.
 - **Show the next-unit cost when unaffordable (Tim, 2026-06-13).** When the buy button has
   nothing affordable (MAX mode with insufficient cash), show the cost of the next single
   unit instead of a blank "—", so the player sees how close they are. (×1/×10/×100 already

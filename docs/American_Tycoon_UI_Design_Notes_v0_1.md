@@ -248,3 +248,50 @@ theme + targeted pass.**
 ## 6. Open questions / decisions to make later
 
 -
+
+---
+
+## 7. Navigation — bottom tab bar (proposed, Tim 2026-06-22)
+
+Replace the single stacked Main screen with a **bottom tab bar** (pinned to the screen
+bottom, thumb-reachable) switching between four tabs. Reason: more real estate per screen
+and far better readability — each surface does one job instead of cramming the ladder,
+prestige buttons, and the Estate Office onto one scroll. Fits §1b (large, thumb-friendly)
+and the §11 "clean face" UX. **This also realizes the already-designed "Estate Planning
+tab" (Mechanics Spec §9.1 / §14).**
+
+**The four tabs:**
+1. **Property** — the income engine: hero income/cash stat, TURBO/frenzy, the property
+   ladder, the wage button. The default/home tab.
+2. **Estate Planning** — the live draft will (Spec §9.1) + "Plan the Estate" prestige
+   action + the Estate Office (Legacy upgrade shop). Consolidates today's PLAN THE ESTATE
+   and THE ESTATE OFFICE buttons.
+3. **Settings** — finally a real home for player options: the minigame opt-out (today only
+   a checkbox on the minigame screen), and later audio/haptics toggles, dev-panel access,
+   etc. (Settings was previously deferred to M3 / §13 near-term — the tab bar gives it a
+   place now.)
+4. **Family Ledger** — the ancestor history (today a button → overlay).
+
+**Presentation:**
+- **Icons, not words** — each tab is an **intuitive SVG symbol** (e.g. building/ladder for
+  Property, a will/quill or estate gate for Estate Planning, a gear for Settings, a
+  family-tree/book for Family Ledger). Icons must be large and legible (§1b); placeholder
+  glyphs until the art pass. SVG so they scale crisply.
+- Pinned to the bottom; the active tab is clearly indicated (fill/underline/color).
+
+**Open questions (resolve when we build it):**
+- **Persistent chrome vs. per-tab:** does the income/sec hero stat (and the wage button)
+  stay always-visible across all tabs, or live only on the Property tab? (Leaning: hero
+  stat persistent on top — it's the heartbeat; wage button likely Property-only.)
+- **How the existing full-screen overlays fit:** Will ceremony, First Contact, Welcome
+  Back, and the minigame are *modal beats* that should still take over the whole screen
+  (above the tab bar), not become tabs. The tab bar is for the persistent surfaces.
+- **Icon set / source** — commission vs. an open icon set; must read at a glance.
+- **Does the dev panel get a Settings entry** (vs. the current DEV button on Property)?
+- Tab bar height + icon size against §1b; reserve space so it never overlaps content.
+
+**Implementation note (surfaced for §5):** this is a real restructure of `Main.gd`'s
+`_build_ui` (today one stacked column). A `TabContainer` (Godot built-in, tabs can be
+bottom-aligned and icon-only) or a custom bottom bar + swapped content panels. The four
+content areas already exist as scenes/overlays; the work is hosting them in tabs and
+moving the prestige/ledger buttons into their tabs.

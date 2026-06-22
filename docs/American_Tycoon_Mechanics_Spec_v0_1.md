@@ -235,6 +235,8 @@ Godot Resources (the 2022 ScriptableObject pattern, ported):
 
 Main (ladder, wage button, frenzy bar, income/sec hero stat, backdrop) · The Ledger · Estate Planning (draft will) · Family Ledger · Mail · Welcome Back (two beats) · Obituary/Will ceremony · Origin flow · Final Dollar sequence (4 beats) · Settings. Navigation map: M1 contains Main only; others land with their milestones.
 
+**Navigation — bottom tab bar (proposed 2026-06-22, UI Notes §7):** the persistent surfaces become four bottom-pinned, icon-only (SVG) tabs — **Property** (ladder/wage/frenzy/hero), **Estate Planning** (draft will + prestige + Estate Office), **Settings** (minigame opt-out, later audio/haptics/dev), **Family Ledger**. Modal beats (Will ceremony, First Contact, Welcome Back, the minigame) still take over the full screen above the bar, not as tabs.
+
 ## 15. Open Items (content pass / later decisions)
 
 1. Estate valuation rule (book value vs. alternatives) — validate in simulator (§9.2).

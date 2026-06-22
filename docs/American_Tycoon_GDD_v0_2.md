@@ -366,9 +366,14 @@ These are needed soon and run independently of the M-milestone narrative; schedu
 against current work rather than a specific plateau:
 
 - **Start screen** — the app's entry/landing screen.
-- **Settings screen** — player-facing options.
+- **Settings screen** — player-facing options. *(Now folds into the proposed bottom tab
+  bar as the Settings tab — UI Notes §7.)*
 - **Balance config screen** — a dev-facing tuning panel that reads/writes the `/config`
   values, so balance can be exercised on-device, not just in the headless simulator.
+- **Bottom tab bar navigation (proposed 2026-06-22, UI Notes §7).** Four icon-only (SVG)
+  bottom-pinned tabs — Property / Estate Planning / Settings / Family Ledger — replacing
+  the single stacked Main screen for readability. Realizes the already-designed Estate
+  Planning tab (Spec §9.1). Modal beats stay full-screen above the bar.
 
 ---
 

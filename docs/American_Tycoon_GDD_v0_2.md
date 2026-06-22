@@ -154,33 +154,46 @@ The early game must *feel* faster on every timescale:
 - **Across generations — front-loaded Legacy, reaching deeper epochs.** Prestige bonuses disproportionately multiply the *early ladder*. Each heir tears through tiers the grandfather crawled across; run 1's first hour is run 5's first ninety seconds. Legacy is also **how the dynasty punches further into the epoch ladder** (§6.2): a juiced-up heir consumes Earth's economy fast enough to reach civilizations the founder never contacted, and per-staffer retention (§6.3) lets the heir start with alien staff already in place. Compounding advantage rendered as game-feel — the player experiences the unfairness from the privileged side. Garnish: each generation auto-skips ceremonies it has outgrown (the family office handles paperwork now).
 - **Per property — the arc completes in automation.** Crawl → spin → blur → *someone else's problem* (§6).
 
-### 5.5 Minigames (added 2026-06-21, post-vacation roadmap)
+### 5.5 Minigames (added 2026-06-21; reframed as a FRAMEWORK 2026-06-22)
 
-Playing the game on vacation, Tim wanted **more energy at transitions** — the moments
-between screens shouldn't be dead air. Minigames serve two distinct roles:
+Playing the game on vacation, Tim wanted **more energy at transitions** — the seams between
+screens shouldn't be dead air. This grew (Tim, 2026-06-22) into a **minigame framework**:
 
-1. **Transition energy.** Short, optional bursts of interaction layered onto big
-   transitions (succession/prestige, epoch first-contact) so the seams of the game feel
-   alive instead of loading-screen flat.
-2. **The prestige legacy minigame — how much you KEEP (built; match-3).** At prestige a
-   match-3 sets what fraction of the run's base Legacy (Mechanics Spec §9.3) is banked:
-   `legacy_awarded = floor(base × mult)`. The multiplier rises from the **keep floor**
-   (a poor round, 0.5 = keep half) up to **1.0 "full inheritance"**, then into an
-   **extra-high bonus** up to **+25%** for an exceptional round (raised +5%/level by the
-   **Family Reputation** Legacy upgrade). *(Design history: the vacation note said
-   "% kept", then 2026-06-21 flipped to an upside-only multiplier, then 2026-06-22 flipped
-   **back** to "% kept" — but with the extra-high bonus on top. So a bad round now does
-   lose Legacy; the stakes are what make the minigame matter.)*
+- **A library of 3–5 distinct minigame TYPES** (match-3 is the first; others TBD — e.g. a
+  timing/precision bar, catch-the-falling-money, a memory/sequence game, physics/balance).
+- **Random selection at every site:** each time a minigame fires, the type is chosen **at
+  random**, so the player doesn't know which they'll get — variety and surprise.
+- **One universal outcome spectrum for ALL minigames:** performance maps to roughly
+  **0.5× → 1.25×** of what's possible — the keep-floor → full → extra-high-bonus model the
+  prestige game already uses. Worst/skip ≈ 0.5×; a "full" result = 1.0×; a great result
+  reaches the bonus cap (0.25 base, raised by the **Family Reputation** upgrade). Each
+  minigame type produces a normalized performance in [0,1]; the framework maps that to the
+  multiplier, so all types share one reward curve.
+
+**Usage sites (each rolls a random minigame type):**
+1. **Prestige / succession — multiplier on Legacy (BUILT).** See the match-3 below.
+2. **Epoch change / First Contact — head-start bonus (planned).** Performance grants a
+   modest opening advantage in the new epoch (reward TBD: entry income boost / starting
+   cash / first-staffer discount). Theme: *negotiating the alien trade deal*.
+3. **Welcome-back / offline return — multiplier on the offline pile (planned).** *(Watch:
+   welcome-back is the most FREQUENT transition and the genre intends a frictionless return
+   — a mandatory minigame each open, with a 0.5× downside, may feel punishing. Tune cadence
+   / lean on the opt-out; flagged for feel-testing.)*
 
 **Player setting:** a persisted toggle (`GameState.ui_minigame_enabled`). **Default:
-mandatory.** **Opting out — or tapping Skip — banks the keep floor** (the worst result, not
-a safe 100%), so skipping has a real cost; the only way to keep your full inheritance (and
-chase the bonus) is to play. A per-round Skip is always available.
+mandatory.** **Opting out — or tapping Skip — banks the keep floor** (the worst result, not a
+safe 100%), so skipping has a real cost. A per-round Skip is always available.
 
-**Built 2026-06-22 (match-3):** drag a gem toward a neighbor to swap; matches flash with a
-size badge, clear, and survivors + new gems fall in. A live spectrum bar shows the kept
-fraction (red→gold below full, green at full, teal into the bonus) with the Legacy amount
-and any bonus called out. (Physics/balance idea + transition minigames remain deferred.)
+**Built 2026-06-22 — match-3 type (the first of the library):** drag a gem to swap; matches
+flash with a size badge, clear, and survivors + new gems fall in; a live spectrum bar shows
+the kept fraction (red→gold→green→teal) with the Legacy amount + bonus. Currently wired only
+to the prestige site; the framework refactor (random type selection + the other two sites)
+is the next build.
+
+**Build phasing:** (1) **framework** — a host that picks a random minigame type and maps its
+[0,1] performance to the universal multiplier; refactor match-3 into the first type; route
+prestige through it (no behavior change). (2) **add 2–4 more types** so the random draw has
+variety. (3) **wire the First Contact and Welcome-back sites** with their rewards.
 
 ---
 
@@ -299,6 +312,10 @@ Legislative & Executive Assets unlock estate-tax erosion: raised exemptions, dyn
 ---
 
 ## 9. Rare Events (added v0.2)
+
+> **SHELVED — uncertain (Tim, 2026-06-22).** Tim isn't sure he wants this idea at all, so it
+> is parked: not in current scope and not to be proactively recommended. The design below is
+> kept for reference if he decides to revisit it. Nothing is built.
 
 **Cadence: roughly once per generation or two** — events function as *dynastic memory* (the Crash of '52 that gutted Bartholomew III's estate). Hard rule: **events hit capital, never the player's verbs.** The tap always works; the purr is preserved; events reprice the world occasionally.
 

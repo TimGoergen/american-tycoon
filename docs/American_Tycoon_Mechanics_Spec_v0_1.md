@@ -154,18 +154,23 @@ this generation — not net worth at death. **Reworked 2026-06-17 from a plain p
 `K × estate_net ^ 0.5` minted absurd Legacy at real trillion-dollar scale — a single 20T run gave
 ~16k, enough to buy out the whole shop. The log curve compresses the whole range to a sane handful
 — ≈ $1B→18, $8T→49, $1Q→72 — and nothing converts below the `LEGACY_BASE` floor.)
-**Prestige minigame multiplier (added 2026-06-21, GDD §5.5).** A prestige minigame applies a
-multiplier **on top** of the converted award:
+**Prestige minigame multiplier (GDD §5.5; built 2026-06-22 as match-3).** The prestige
+minigame scales how much of the converted award is **kept**:
 ```
-legacy_awarded = floor( legacy_gain × MINIGAME_MULT )    MINIGAME_MULT ≥ 1.0
+legacy_awarded = floor( legacy_gain × MINIGAME_MULT )
+MINIGAME_MULT = keep_floor          at score 0   (also what Skip / opt-out banks)
+              → 1.0 (full)          at score ≥ minigame_full_score
+              → 1.0 + bonus_max     at score ≥ minigame_extra_score
+bonus_max = LegacyUpgrades.minigame_bonus_max()  = 0.25 + 0.05 × Family Reputation level
 ```
-`legacy_gain` (the log curve above) is the **base**; `MINIGAME_MULT` is the player's minigame
-result, ranging `[1.0, MINIGAME_MULT_MAX]` (range `TBD-SIM`; candidate cap ~2.0×). It is an
-**upside-only multiplier** — never below 1.0, so playing can only gain Legacy, never feel like a
-loss (GDD §5.5 rationale). Governed by a **player setting** (default mandatory; opting out banks
-`MINIGAME_MULT_OPTOUT`, provisional 1.0× = no bonus, `TBD-SIM`). **Re-tuning note:** because this
-rides on top of the already-compressed log curve, `K_LEGACY`/`ALPHA` may need a pass so a maxed
-multiplier doesn't reintroduce runaway Legacy (`TBD-SIM`).
+`legacy_gain` (the log curve above, × Estate Lawyers yield) is the **base**. Unlike the
+2026-06-21 first pass, this is **NOT upside-only** — a poor round (or a skip) keeps less than
+the base (floor 0.5 = half), which is what gives the minigame stakes; a great round overfills
+into the extra-high bonus. Tuning: `minigame_keep_floor` 0.5, `minigame_full_score` 100,
+`minigame_extra_score` 200, `minigame_duration_seconds` 30 (all `TBD-SIM`, dev-panel editable);
+the extra bonus cap is the Family Reputation upgrade (LegacyUpgradeCatalog). Governed by the
+persisted `GameState.ui_minigame_enabled` (default mandatory). Applied in
+`DynastyState.perform_succession(cause, minigame_multiplier)`, floored, clamped ≥ 0.
 
 Displayed as **brackets** (thresholds where legacy_gain crosses integers / named tiers); advisor announces bracket crossings. Total Legacy is dynastic and never spent down by conversion — Legacy *upgrades* cost Legacy per the upgrade table (content pass). The catalog includes **per-staffer retention** (GDD §6.3): spend Legacy to keep a specific property's staffer at its tier across the prestige reset, so the heir starts pre-staffed there. *(This is distinct from the existing "Loyal Staff" upgrade, which only discounts hire cost. Staff otherwise reset on prestige.)*
 
@@ -212,7 +217,8 @@ Godot Resources (the 2022 ScriptableObject pattern, ported):
 | EXEMPTION base / TAX_RATE base | $1M / 60% | TBD-SIM |
 | LOOPHOLE_RATE_FLOOR | 5% | TBD-SIM |
 | K_LEGACY / ALPHA / LEGACY_BASE (log curve) | 0.5 / 2 / $1k | feel-tune |
-| MINIGAME_MULT_MAX / MINIGAME_MULT_OPTOUT | ~2.0× / 1.0× | TBD-SIM |
+| minigame keep_floor / full_score / extra_score / duration | 0.5 / 100 / 200 / 30s | TBD-SIM |
+| minigame extra bonus cap (Family Reputation) | 0.25 + 0.05/level | TBD-SIM |
 | K_SPRINT / BETA / K_RES | tune / 0.5 / tune | TBD-SIM |
 | CRASH_MULT / CRASH_DUR | 0.5 / 10 active-min | TBD-SIM |
 | AUDIT_SETTLE / AUDIT_THRESHOLD | 8% net worth / N units | TBD-SIM |

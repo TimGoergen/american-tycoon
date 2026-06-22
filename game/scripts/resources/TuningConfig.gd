@@ -112,20 +112,23 @@ extends Resource
 # costs now live in LegacyUpgradeCatalog.gd, not here.
 
 # --- Prestige minigame (GDD §5.5, Spec §9.3) ---
-# At prestige the player plays a match-3 minigame whose score grants an upside-only
-# multiplier on the Legacy earned: legacy_awarded = floor(base_legacy × minigame_mult),
-# minigame_mult in [minigame_mult_optout, minigame_mult_max].
+# At prestige the player plays a match-3 whose score sets how much of the run's base
+# Legacy they KEEP: legacy_awarded = floor(base_legacy × mult). The multiplier rises
+# from minigame_keep_floor (score 0) → 1.0 "full" (score ≥ minigame_full_score) → up to
+# 1.0 + bonus (score ≥ minigame_extra_score), where the extra-high bonus cap comes from
+# LegacyUpgrades.minigame_bonus_max() (0.25 base, +5%/level via Family Reputation).
 
-## Multiplier earned by a perfect minigame (score ≥ target). The cap on the Legacy boost.
-@export var minigame_mult_max: float = 2.0  # feel-tune
+## Fraction of the base Legacy kept on the WORST result (score 0) — also what a skip /
+## minigame-off banks. Below 1.0, so a poor round (or opting out) loses Legacy.
+@export var minigame_keep_floor: float = 0.5  # feel-tune
 
-## Multiplier banked when the player skips / has the minigame turned off. 1.0 = no bonus,
-## no penalty (the minigame is pure upside, never a loss).
-@export var minigame_mult_optout: float = 1.0
+## Gems cleared to keep the FULL base Legacy (multiplier exactly 1.0). The multiplier
+## scales linearly from the floor (score 0) up to 1.0 at this score.
+@export var minigame_full_score: float = 100.0  # feel-tune
 
-## Score (gems cleared) that earns the full minigame_mult_max; the multiplier scales
-## linearly from optout (score 0) to max (score ≥ this).
-@export var minigame_score_target: float = 100.0  # feel-tune
+## Gems cleared to reach the MAX extra-high bonus (multiplier 1.0 + bonus_max). Between
+## full_score and this, the multiplier scales linearly from 1.0 into the bonus.
+@export var minigame_extra_score: float = 200.0  # feel-tune
 
 ## How long one minigame round lasts, in seconds.
 @export var minigame_duration_seconds: float = 30.0  # feel-tune

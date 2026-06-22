@@ -162,27 +162,25 @@ between screens shouldn't be dead air. Minigames serve two distinct roles:
 1. **Transition energy.** Short, optional bursts of interaction layered onto big
    transitions (succession/prestige, epoch first-contact) so the seams of the game feel
    alive instead of loading-screen flat.
-2. **The prestige legacy minigame — a bonus multiplier.** At prestige, a minigame grants a
-   **multiplier on the Legacy awarded** for that run. The existing legacy formula
-   (Mechanics Spec §9.3) still computes the **base** award; a good minigame performance
-   multiplies it **above 100%**. *(Decision, Tim 2026-06-21: this **reverses** the original
-   vacation note, which framed it as "percentage of the whole you keep, not a multiplier."
-   We went with an upside multiplier — playing can only ever *gain* you legacy, never feel
-   like you lost some you "should" have had. The loss-aversion framing was rejected as
-   un-fun for a reward moment.)*
+2. **The prestige legacy minigame — how much you KEEP (built; match-3).** At prestige a
+   match-3 sets what fraction of the run's base Legacy (Mechanics Spec §9.3) is banked:
+   `legacy_awarded = floor(base × mult)`. The multiplier rises from the **keep floor**
+   (a poor round, 0.5 = keep half) up to **1.0 "full inheritance"**, then into an
+   **extra-high bonus** up to **+25%** for an exceptional round (raised +5%/level by the
+   **Family Reputation** Legacy upgrade). *(Design history: the vacation note said
+   "% kept", then 2026-06-21 flipped to an upside-only multiplier, then 2026-06-22 flipped
+   **back** to "% kept" — but with the extra-high bonus on top. So a bad round now does
+   lose Legacy; the stakes are what make the minigame matter.)*
 
-**Player setting (not forced):** a minigame toggle in options. **Default: mandatory** (you
-play the minigame on prestige) until the player opts out; **opting out banks a default
-multiplier** (provisional 1.0× — no bonus, no penalty, `TBD-SIM`), so a player who finds it
-tedious on repeat runs is never punished, only forgoes the upside.
+**Player setting:** a persisted toggle (`GameState.ui_minigame_enabled`). **Default:
+mandatory.** **Opting out — or tapping Skip — banks the keep floor** (the worst result, not
+a safe 100%), so skipping has a real cost; the only way to keep your full inheritance (and
+chase the bonus) is to play. A per-round Skip is always available.
 
-**Minigame ideas Tim likes (first-pass):**
-- **Match-3.** More crystals matched → higher bonus multiplier.
-- **Physics / balance.** The longer you keep it balanced → higher bonus multiplier.
-
-Whether the *same* minigame is reused for transitions and for the legacy bonus, or
-different minigames per context, is open (§14). This is net-new design — there is no
-minigame code or detailed spec yet; a build plan will live in the Plans folder.
+**Built 2026-06-22 (match-3):** drag a gem toward a neighbor to swap; matches flash with a
+size badge, clear, and survivors + new gems fall in. A live spectrum bar shows the kept
+fraction (red→gold below full, green at full, teal into the bonus) with the Legacy amount
+and any bonus called out. (Physics/balance idea + transition minigames remain deferred.)
 
 ---
 
@@ -394,17 +392,18 @@ Resolved since v0.1: ~~automation/managers~~ (§6), ~~dynasty identity~~ (§8.2)
     half (tiers 7–12) stretched to a 180s top, income-neutral; milestone cadence switched to AdCap
     25/50/100/200/300/400 (§4 note, Spec §3.1/§3.3). **New follow-up:** the cadence runs the
     economy ~38% slower — a prestige/cost re-tuning pass is open (Spec §15 item 8).
-14. **Minigames (§5.5).** **Prestige legacy-bonus minigame BUILT 2026-06-22:** a **match-3**
+14. **Minigames (§5.5).** **Prestige legacy minigame BUILT & iterated 2026-06-22:** a **match-3**
     (`MatchThreeBoard.gd` headless logic + `MinigameScreen.gd`) played mid-succession (after the
-    will, before the heir reveal); score → upside-only multiplier `[minigame_mult_optout 1.0,
-    minigame_mult_max 2.0]` applied in `DynastyState.perform_succession`; player opt-out persisted
-    in `GameState.ui_minigame_enabled` (default on; per-round Skip = 1.0×). **Still open:**
-    transition minigames (deferred); on-device feel-tune of duration/score-target/cap; whether
-    `K_LEGACY`/`ALPHA` need adjusting now a multiplier rides on top. **Animation added 2026-06-22:**
-    `MatchThreeBoard.resolve_swap` records the resolution as steps (match groups, clears, falls,
-    spawns); `MinigameScreen` animates them — swap slide, match flash + size badge, gems shrink
-    away, survivors + new gems fall in (no full-grid regen). A board test asserts applying the
-    recorded steps reproduces the final grid, so the animation can't desync from the logic.
+    will, before the heir reveal). **Drag** a gem to swap; matches flash with a size badge, clear,
+    and survivors + new gems **fall** in (`resolve_swap` records steps; a board test asserts
+    applying them reproduces the final grid, so the animation can't desync). Score sets the
+    **kept fraction** of base Legacy: `minigame_keep_floor` 0.5 (also what Skip/opt-out banks) →
+    **1.0 full** at `minigame_full_score` → up to **+bonus** at `minigame_extra_score`, bonus cap =
+    `LegacyUpgrades.minigame_bonus_max()` (0.25 base, +5%/level via the **Family Reputation**
+    upgrade). A live spectrum bar (red→gold→green→teal) + Legacy-with-bonus readout shows it.
+    Applied in `DynastyState.perform_succession`; setting persisted in `GameState.ui_minigame_enabled`.
+    **Still open:** transition minigames (deferred); on-device feel-tune of floor / full / extra
+    scores / duration / bonus magnitudes.
 
 ---
 

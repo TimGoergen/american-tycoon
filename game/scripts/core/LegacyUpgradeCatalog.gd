@@ -37,6 +37,7 @@ const ESTATE_LAWYERS  := "estate_lawyers"
 const AUTO_CLICK_SPEED := "auto_click_speed"
 const AUTO_CLICK_POWER := "auto_click_power"
 const RUSH_POWER       := "rush_power"
+const MINIGAME_BONUS   := "minigame_bonus"
 
 
 # ── The catalog ───────────────────────────────────────────────────────────────
@@ -117,6 +118,18 @@ const UPGRADES := [
 		"base_cost": 10,
 		"cost_growth": 2.2,
 		"effect_per_level": 0.15,     # +15% Legacy gained at succession per level
+	},
+	{
+		"id": MINIGAME_BONUS,
+		"name": "Family Reputation",
+		"category": "Legacy",
+		"description": "A name worth showing off. A great inheritance minigame pays a bigger bonus.",
+		"max_level": 10,
+		"base_cost": 8,
+		"cost_growth": 2.0,
+		# +5% to the minigame's extra-high bonus CAP per level, on top of the 0.25 base
+		# (see LegacyUpgrades.minigame_bonus_max). Additive: a steady, ownable climb.
+		"effect_per_level": 0.05,
 	},
 	{
 		"id": AUTO_CLICK_SPEED,
@@ -208,6 +221,9 @@ static func describe_effect(id: String, level: int) -> String:
 			return "×%.2f wage per tap" % pow(1.0 + per_level, float(shown_level))
 		ESTATE_LAWYERS:
 			return "+%d%% Legacy per succession" % int(round(per_level * 100.0 * float(shown_level)))
+		MINIGAME_BONUS:
+			# Total cap = the 0.25 base + 5%/level (kept in sync with LegacyUpgrades).
+			return "up to +%d%% inheritance bonus" % int(round(25.0 + per_level * 100.0 * float(shown_level)))
 		AUTO_CLICK_SPEED:
 			return "×%.2f auto-tap / auto-rush speed" % pow(1.0 + per_level, float(shown_level))
 		AUTO_CLICK_POWER:

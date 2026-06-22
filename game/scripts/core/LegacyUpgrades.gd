@@ -157,6 +157,18 @@ func rush_power_multiplier() -> float:
 	return pow(1.0 + per_level, float(level))
 
 
+## The maximum EXTRA-HIGH bonus the prestige minigame can pay, as a fraction above full
+## (GDD §5.5). 0.25 base (a perfect round keeps +25%), raised +5%/level by Family
+## Reputation. Additive — a steady, ownable climb. MinigameScreen reads this to size its
+## extra-high zone and cap the multiplier.
+const MINIGAME_BONUS_BASE := 0.25
+
+func minigame_bonus_max() -> float:
+	var per_level := _per_level(LegacyUpgradeCatalog.MINIGAME_BONUS)
+	var level := get_level(LegacyUpgradeCatalog.MINIGAME_BONUS)
+	return MINIGAME_BONUS_BASE + per_level * float(level)
+
+
 ## The catalog's per-level magnitude for an upgrade (0.0 if unknown).
 func _per_level(id: String) -> float:
 	var definition := LegacyUpgradeCatalog.get_definition(id)

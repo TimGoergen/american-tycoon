@@ -2,23 +2,26 @@ class_name MinigameScreen
 extends ColorRect
 
 # The prestige minigame (GDD §5.5): a quick match-3 played during succession. The
-# player's score grants an UPSIDE-ONLY multiplier on the Legacy earned that run
-# (legacy_awarded = floor(base_legacy × mult), mult in [optout, max]). It can never
-# lose you Legacy — skipping or running out the clock with 0 score just banks 1.0×.
+# player's score sets how much of the run's base Legacy they KEEP:
+#   legacy_awarded = floor(base_legacy × mult)
+# where mult rises from the keep floor (a poor round, score 0) → 1.0 "full" (score ≥
+# minigame_full_score) → up to 1.0 + bonus_max "extra-high" (score ≥ minigame_extra_score).
+# The extra-high bonus cap (0.25 base) is raised by the Family Reputation Legacy upgrade.
+# Skipping / having the minigame off banks the keep floor — opting out is the worst
+# result, so the minigame genuinely matters.
 #
-# Gems are free-positioned nodes on a board layer (not a GridContainer) so the
-# resolution can be ANIMATED: the swap slides, matches flash with a size badge, matched
-# gems shrink away, and survivors + new gems fall into the gaps. The board math (and the
-# step-by-step resolution script the animation replays) lives in the headless
+# Gems are free-positioned nodes on a board layer (not a GridContainer) so the resolution
+# can be ANIMATED, and are moved by DRAGGING one toward a neighbor. The board math (and
+# the step-by-step resolution script the animation replays) lives in the headless
 # MatchThreeBoard; this file is presentation + input only.
 #
 # Two phases inside the one overlay:
-#   PLAY   — the board, a countdown, a running score, and a Skip button.
-#   RESULT — the earned multiplier and the boosted Legacy, then Continue.
+#   PLAY   — the board, a countdown, and a "Legacy kept" spectrum indicator.
+#   RESULT — the final multiplier and the kept/boosted Legacy, then Continue.
 
-## Emitted when the round ends (Continue tapped, or Skip). `multiplier` is applied to
-## the run's Legacy by Main; `opt_out` is true if the player asked to auto-skip the
-## minigame on future prestiges (Main persists it to GameState.ui_minigame_enabled).
+## Emitted when the round ends (Continue tapped, or Skip). `multiplier` is applied to the
+## run's Legacy by Main; `opt_out` is true if the player asked to auto-skip the minigame
+## on future prestiges (Main persists it to GameState.ui_minigame_enabled).
 signal finished(multiplier: float, opt_out: bool)
 
 const Board = preload("res://scripts/core/MatchThreeBoard.gd")
@@ -32,6 +35,9 @@ const GEM_COLORS := 5
 const CELL_SIZE := 96
 const GAP := 8
 const PITCH := CELL_SIZE + GAP
+
+## How far a press must move before it counts as a drag-swap (rather than a stray tap).
+const DRAG_THRESHOLD := CELL_SIZE * 0.4
 
 # Animation durations (seconds). Tuned short so a full cascade still feels snappy.
 const SWAP_TIME := 0.16
@@ -54,21 +60,25 @@ var _tuning: TuningConfig
 
 var _board
 var _base_legacy: int = 0
+var _bonus_max: float = 0.25  # max extra-high bonus this run (from Family Reputation)
 var _seconds_left: float = 0.0
 var _playing: bool = false
 var _animating: bool = false  # input is locked while a swap/cascade plays out
 var _opt_out: bool = false
 var _shown_score: int = 0     # score revealed so far (climbs as each cascade clears)
 
-## The currently selected cell for a swap (-1 = nothing selected yet).
-var _sel_row: int = -1
-var _sel_col: int = -1
+# Drag-to-swap state.
+var _dragging: bool = false
+var _drag_row: int = -1
+var _drag_col: int = -1
+var _drag_press_pos: Vector2 = Vector2.ZERO
 
 # UI nodes.
 var _play_view: Control
 var _result_view: Control
 var _timer_label: Label
-var _score_label: Label
+var _keep_label: Label
+var _keep_bar: Control
 var _board_area: Control
 ## _gem_nodes[row][col] -> the gem Control currently shown at that cell (or null mid-clear).
 var _gem_nodes: Array = []
@@ -109,40 +119,40 @@ func _ready() -> void:
 
 func _build_play_view() -> Control:
 	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 14)
+	column.add_theme_constant_override("separation", 12)
 
 	var title := _make_label("GROW THE INHERITANCE", UiPalette.FONT_HEADLINE, UiPalette.NAVY)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(title)
 
 	var subtitle := _make_label(
-		"Match 3+ to clear them — the more you clear, the bigger the bonus.",
+		"Drag a gem to match 3+. Fill the bar to keep your whole inheritance — overfill for a bonus.",
 		UiPalette.FONT_LABEL, UiPalette.NAVY
 	)
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(subtitle)
 
-	# Status row: time left on the left, score on the right.
-	var status := HBoxContainer.new()
-	status.add_theme_constant_override("separation", 20)
-	column.add_child(status)
-
 	_timer_label = _make_label("0:30", UiPalette.FONT_SUBHEAD, UiPalette.KETCHUP_RED)
-	_timer_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	status.add_child(_timer_label)
+	_timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	column.add_child(_timer_label)
 
-	_score_label = _make_label("Cleared: 0", UiPalette.FONT_SUBHEAD, UiPalette.MONEY_GREEN)
-	_score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_score_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	status.add_child(_score_label)
+	# The "Legacy kept" readout: a worded amount above a spectrum bar that fills as the
+	# score rises (red → gold below full, green at full, teal into the extra-high bonus).
+	_keep_label = _make_label("", UiPalette.FONT_SUBHEAD, UiPalette.MONEY_GREEN)
+	_keep_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	column.add_child(_keep_label)
+
+	var board_width := GRID_WIDTH * PITCH - GAP
+	_keep_bar = Control.new()
+	_keep_bar.custom_minimum_size = Vector2(board_width, 34)
+	_keep_bar.draw.connect(_draw_keep_bar)
+	column.add_child(_keep_bar)
 
 	# The gem board: a fixed-size canvas of free-positioned gem nodes. clip_contents so
-	# gems spawned above the top edge are hidden until they fall into view. Taps are read
+	# gems spawned above the top edge are hidden until they fall into view. Drags are read
 	# here via gui_input and mapped to a cell, so individual gems need no input handling.
 	_board_area = Control.new()
-	_board_area.custom_minimum_size = Vector2(
-		GRID_WIDTH * PITCH - GAP, GRID_HEIGHT * PITCH - GAP
-	)
+	_board_area.custom_minimum_size = Vector2(board_width, GRID_HEIGHT * PITCH - GAP)
 	_board_area.clip_contents = true
 	_board_area.mouse_filter = Control.MOUSE_FILTER_STOP
 	_board_area.gui_input.connect(_on_board_input)
@@ -150,11 +160,11 @@ func _build_play_view() -> Control:
 	board_center.add_child(_board_area)
 	column.add_child(board_center)
 
-	# Skip: bank the flat opt-out multiplier (no bonus) and leave immediately.
+	# Skip: bank the keep floor (the worst result) and leave immediately.
 	var skip_button := Button.new()
 	skip_button.custom_minimum_size = Vector2(0, 72)
 	UiPalette.style_button(skip_button, false)
-	skip_button.text = "SKIP (no bonus)"
+	skip_button.text = "SKIP (keep the minimum)"
 	skip_button.pressed.connect(_on_skip_pressed)
 	column.add_child(skip_button)
 
@@ -174,15 +184,15 @@ func _build_result_view() -> Control:
 	column.add_theme_constant_override("separation", 16)
 	column.visible = false
 
-	var heading := _make_label("INHERITANCE SECURED", UiPalette.FONT_HEADLINE, UiPalette.NAVY)
+	var heading := _make_label("THE INHERITANCE", UiPalette.FONT_HEADLINE, UiPalette.NAVY)
 	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(heading)
 
-	_result_mult_label = _make_label("×1.0 bonus", UiPalette.FONT_DISPLAY, UiPalette.MUSTARD_GOLD)
+	_result_mult_label = _make_label("", UiPalette.FONT_DISPLAY, UiPalette.MUSTARD_GOLD)
 	_result_mult_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(_result_mult_label)
 
-	_result_legacy_label = _make_label("+0 Legacy", UiPalette.FONT_SUBHEAD, UiPalette.MONEY_GREEN)
+	_result_legacy_label = _make_label("", UiPalette.FONT_SUBHEAD, UiPalette.MONEY_GREEN)
 	_result_legacy_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(_result_legacy_label)
 
@@ -215,12 +225,12 @@ func _cell_pos(row: int, col: int) -> Vector2:
 
 ## Build a gem visual for the given color: a colored, navy-bordered plate with the
 ## color's symbol centered. Pivot is centered so flash/clear scaling looks right. The
-## color id is stored in meta so the selection highlight can rebuild the same plate.
+## color id is stored in meta so the drag highlight can rebuild the same plate.
 func _make_gem(color_id: int) -> Control:
 	var gem := Panel.new()
 	gem.size = Vector2(CELL_SIZE, CELL_SIZE)
 	gem.pivot_offset = Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
-	gem.mouse_filter = Control.MOUSE_FILTER_IGNORE  # the board area handles taps
+	gem.mouse_filter = Control.MOUSE_FILTER_IGNORE  # the board area handles input
 	gem.set_meta("color", color_id)
 
 	var label := Label.new()
@@ -237,14 +247,15 @@ func _make_gem(color_id: int) -> Control:
 	return gem
 
 
-## (Re)apply a gem's plate: its color fill, with a bold cream border when selected.
-func _style_gem(gem: Control, selected: bool) -> void:
+## (Re)apply a gem's plate: its color fill, with a bold cream border while it's the gem
+## being dragged.
+func _style_gem(gem: Control, active: bool) -> void:
 	var color_id: int = gem.get_meta("color")
 	var box := StyleBoxFlat.new()
-	box.bg_color = (GEM_FILL[color_id] as Color).lightened(0.25) if selected else GEM_FILL[color_id]
+	box.bg_color = (GEM_FILL[color_id] as Color).lightened(0.25) if active else GEM_FILL[color_id]
 	box.set_corner_radius_all(10)
-	box.border_color = UiPalette.CREAM if selected else UiPalette.INK_NAVY
-	box.set_border_width_all(5 if selected else 2)
+	box.border_color = UiPalette.CREAM if active else UiPalette.INK_NAVY
+	box.set_border_width_all(5 if active else 2)
 	gem.add_theme_stylebox_override("panel", box)
 
 
@@ -252,17 +263,19 @@ func _style_gem(gem: Control, selected: bool) -> void:
 # Round lifecycle
 # ---------------------------------------------------------------------------
 
-## Start a round. `base_legacy` is the run's pre-minigame Legacy (from the will), used
-## only to show the boosted total on the result screen. Main shows this, then reads the
-## `finished` multiplier to bank the boosted Legacy.
-func start_game(base_legacy: int) -> void:
+## Start a round. `base_legacy` is the run's pre-minigame Legacy (from the will);
+## `bonus_max` is the max extra-high bonus fraction (from the Family Reputation upgrade).
+## Main shows this, then reads the `finished` multiplier to bank the kept Legacy.
+func start_game(base_legacy: int, bonus_max: float) -> void:
 	_base_legacy = base_legacy
+	_bonus_max = maxf(0.0, bonus_max)
 	_board = Board.new(GRID_WIDTH, GRID_HEIGHT, GEM_COLORS)
 	_seconds_left = _tuning.minigame_duration_seconds
-	_sel_row = -1
-	_sel_col = -1
 	_opt_out = false
 	_animating = false
+	_dragging = false
+	_drag_row = -1
+	_drag_col = -1
 	_shown_score = 0
 	if _opt_out_check != null:
 		_opt_out_check.button_pressed = false
@@ -296,66 +309,74 @@ func _process(delta: float) -> void:
 	if not _playing or _animating:
 		return
 	_seconds_left = maxf(0.0, _seconds_left - delta)
-	_update_status()
+	_timer_label.text = "0:%02d" % int(ceil(_seconds_left))
 	if _seconds_left <= 0.0:
 		_end_round()
 
 
-func _update_status() -> void:
-	var whole := int(ceil(_seconds_left))
-	_timer_label.text = "0:%02d" % whole
-	_score_label.text = "Cleared: %d" % _shown_score
-
-
 # ---------------------------------------------------------------------------
-# Input — tap a gem, then tap an adjacent gem to swap
+# Input — drag a gem toward a neighbor to swap them
 # ---------------------------------------------------------------------------
 
 func _on_board_input(event: InputEvent) -> void:
 	if not _playing or _animating:
 		return
-	if event is InputEventMouseButton and event.pressed \
-			and event.button_index == MOUSE_BUTTON_LEFT:
-		var local: Vector2 = event.position
-		var col := int(local.x / PITCH)
-		var row := int(local.y / PITCH)
-		if row >= 0 and row < GRID_HEIGHT and col >= 0 and col < GRID_WIDTH:
-			_on_cell_tapped(row, col)
+
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			_begin_drag(event.position)
+		else:
+			_cancel_drag()
+	elif event is InputEventMouseMotion and _dragging:
+		_continue_drag(event.position)
 
 
-func _on_cell_tapped(row: int, col: int) -> void:
-	if _sel_row < 0:
-		# First pick — select it.
-		_select(row, col)
+func _begin_drag(local: Vector2) -> void:
+	var col := int(local.x / PITCH)
+	var row := int(local.y / PITCH)
+	if row < 0 or row >= GRID_HEIGHT or col < 0 or col >= GRID_WIDTH:
 		return
-
-	if row == _sel_row and col == _sel_col:
-		_deselect()  # tapped the same gem — cancel the selection
-		return
-
-	if _board.is_adjacent(_sel_row, _sel_col, row, col):
-		var from_row := _sel_row
-		var from_col := _sel_col
-		_deselect()
-		var result: Dictionary = _board.resolve_swap(from_row, from_col, row, col)
-		_play_resolution(result)
-	else:
-		# Not adjacent — treat the new tap as a fresh selection.
-		_deselect()
-		_select(row, col)
-
-
-func _select(row: int, col: int) -> void:
-	_sel_row = row
-	_sel_col = col
+	_dragging = true
+	_drag_row = row
+	_drag_col = col
+	_drag_press_pos = local
 	_style_gem(_gem_nodes[row][col], true)
 
 
-func _deselect() -> void:
-	if _sel_row >= 0:
-		_style_gem(_gem_nodes[_sel_row][_sel_col], false)
-	_sel_row = -1
-	_sel_col = -1
+## Once the finger/cursor has moved far enough, swap the held gem with the neighbor in
+## the dominant drag direction (the swap itself decides whether it makes a match).
+func _continue_drag(local: Vector2) -> void:
+	var delta := local - _drag_press_pos
+	if delta.length() < DRAG_THRESHOLD:
+		return
+	var d_col := 0
+	var d_row := 0
+	if absf(delta.x) > absf(delta.y):
+		d_col = 1 if delta.x > 0.0 else -1
+	else:
+		d_row = 1 if delta.y > 0.0 else -1
+	var target_row := _drag_row + d_row
+	var target_col := _drag_col + d_col
+
+	_style_gem(_gem_nodes[_drag_row][_drag_col], false)
+	var from_row := _drag_row
+	var from_col := _drag_col
+	_dragging = false
+	_drag_row = -1
+	_drag_col = -1
+
+	if target_row < 0 or target_row >= GRID_HEIGHT or target_col < 0 or target_col >= GRID_WIDTH:
+		return
+	var result: Dictionary = _board.resolve_swap(from_row, from_col, target_row, target_col)
+	_play_resolution(result)
+
+
+func _cancel_drag() -> void:
+	if _dragging and _drag_row >= 0:
+		_style_gem(_gem_nodes[_drag_row][_drag_col], false)
+	_dragging = false
+	_drag_row = -1
+	_drag_col = -1
 
 
 # ---------------------------------------------------------------------------
@@ -424,7 +445,7 @@ func _animate_step(step: Dictionary) -> void:
 			gem.queue_free()
 		_gem_nodes[cell[0]][cell[1]] = null
 
-	# Reveal this cascade's points now that its gems are gone.
+	# Reveal this cascade's points now that its gems are gone (the keep bar climbs).
 	_shown_score += step["cleared"].size()
 	_update_status()
 
@@ -499,41 +520,105 @@ func _spawn_match_badge(group: Array) -> void:
 
 
 # ---------------------------------------------------------------------------
+# The "Legacy kept" indicator
+# ---------------------------------------------------------------------------
+
+## Score → keep multiplier. Below minigame_full_score it scales from the keep floor up to
+## 1.0 (keep everything); above it, into the extra-high bonus up to 1.0 + bonus_max.
+func _multiplier_for_score(score: int) -> float:
+	var floor_mult := _tuning.minigame_keep_floor
+	var full := maxf(1.0, _tuning.minigame_full_score)
+	if score < full:
+		return floor_mult + (1.0 - floor_mult) * clampf(float(score) / full, 0.0, 1.0)
+	var extra_span := maxf(1.0, _tuning.minigame_extra_score - full)
+	var into_extra := clampf((float(score) - full) / extra_span, 0.0, 1.0)
+	return 1.0 + _bonus_max * into_extra
+
+
+## Color for a multiplier: red→gold below full (low→medium), green at full (high), then
+## green→teal into the extra-high bonus.
+func _keep_color(mult: float) -> Color:
+	if mult < 1.0:
+		var floor_mult := _tuning.minigame_keep_floor
+		var t := clampf((mult - floor_mult) / maxf(0.0001, 1.0 - floor_mult), 0.0, 1.0)
+		return UiPalette.KETCHUP_RED.lerp(UiPalette.MUSTARD_GOLD, t)
+	var into_extra := clampf((mult - 1.0) / maxf(0.0001, _bonus_max), 0.0, 1.0)
+	return UiPalette.MONEY_GREEN.lerp(UiPalette.ATOMIC_TEAL, into_extra)
+
+
+func _update_status() -> void:
+	var mult := _multiplier_for_score(_shown_score)
+	var kept := int(floor(float(_base_legacy) * mult))
+	if mult > 1.0:
+		var bonus := kept - _base_legacy
+		_keep_label.text = "%d Legacy  (+%d bonus)" % [kept, bonus]
+		_keep_label.add_theme_color_override("font_color", UiPalette.ATOMIC_TEAL)
+	elif kept >= _base_legacy:
+		_keep_label.text = "%d Legacy  (full)" % kept
+		_keep_label.add_theme_color_override("font_color", UiPalette.MONEY_GREEN)
+	else:
+		_keep_label.text = "%d of %d Legacy" % [kept, _base_legacy]
+		_keep_label.add_theme_color_override("font_color", _keep_color(mult))
+	_keep_bar.queue_redraw()
+
+
+## Draw the spectrum bar: a navy track, a colored fill to the current multiplier, and a
+## cream tick at the "full inheritance" (×1.0) mark so the player sees the keep line.
+func _draw_keep_bar() -> void:
+	var w := _keep_bar.size.x
+	var h := _keep_bar.size.y
+	if w <= 0.0 or h <= 0.0:
+		return
+	var floor_mult := _tuning.minigame_keep_floor
+	var span := maxf(0.0001, (1.0 + _bonus_max) - floor_mult)
+	var mult := _multiplier_for_score(_shown_score)
+	var fill_frac := clampf((mult - floor_mult) / span, 0.0, 1.0)
+	var full_x := ((1.0 - floor_mult) / span) * w
+
+	_keep_bar.draw_rect(Rect2(0, 0, w, h), UiPalette.INK_NAVY)
+	_keep_bar.draw_rect(Rect2(0, 0, fill_frac * w, h), _keep_color(mult))
+	# The "full inheritance" line — left of it you're losing Legacy, right of it is bonus.
+	_keep_bar.draw_rect(Rect2(full_x - 2.0, 0, 4.0, h), UiPalette.CREAM)
+	_keep_bar.draw_rect(Rect2(0, 0, w, h), UiPalette.NAVY, false, 2.0)
+
+
+# ---------------------------------------------------------------------------
 # Ending
 # ---------------------------------------------------------------------------
 
-## Score → multiplier: scales linearly from optout (score 0) to max (score ≥ target).
-func _multiplier_for_score(score: int) -> float:
-	var span := _tuning.minigame_mult_max - _tuning.minigame_mult_optout
-	var progress := clampf(float(score) / maxf(1.0, _tuning.minigame_score_target), 0.0, 1.0)
-	return _tuning.minigame_mult_optout + span * progress
-
-
-## Time ran out — compute the multiplier, show the result phase.
+## Time ran out — show the result phase with the final multiplier.
 func _end_round() -> void:
 	_playing = false
 	_show_result(_multiplier_for_score(_board.score))
 
 
 func _show_result(mult: float) -> void:
-	var boosted := int(floor(float(_base_legacy) * mult))
-	var bonus := boosted - _base_legacy
-	_result_mult_label.text = "×%.2f bonus" % mult
-	if bonus > 0:
-		_result_legacy_label.text = "+%d Legacy  (%d base +%d bonus)" % [boosted, _base_legacy, bonus]
+	var kept := int(floor(float(_base_legacy) * mult))
+	if mult > 1.0:
+		var bonus := kept - _base_legacy
+		_result_mult_label.text = "+%d%% BONUS" % int(round((mult - 1.0) * 100.0))
+		_result_mult_label.add_theme_color_override("font_color", UiPalette.ATOMIC_TEAL)
+		_result_legacy_label.text = "+%d Legacy  (%d base +%d bonus)" % [kept, _base_legacy, bonus]
+	elif kept >= _base_legacy:
+		_result_mult_label.text = "FULL INHERITANCE"
+		_result_mult_label.add_theme_color_override("font_color", UiPalette.MONEY_GREEN)
+		_result_legacy_label.text = "+%d Legacy" % kept
 	else:
-		_result_legacy_label.text = "+%d Legacy" % boosted
+		_result_mult_label.text = "KEPT %d%%" % int(round(mult * 100.0))
+		_result_mult_label.add_theme_color_override("font_color", _keep_color(mult))
+		_result_legacy_label.text = "+%d Legacy  (of %d)" % [kept, _base_legacy]
+
 	_play_view.visible = false
 	_result_view.visible = true
 	visible = true
 
 
-## Skip: no bonus this round (flat opt-out multiplier), leave immediately. Honors the
-## "skip on future prestiges" checkbox if the player ticked it before skipping.
+## Skip: bank the keep floor (the worst result), leave immediately. Honors the "skip on
+## future prestiges" checkbox if the player ticked it before skipping.
 func _on_skip_pressed() -> void:
 	_playing = false
 	visible = false
-	finished.emit(_tuning.minigame_mult_optout, _opt_out)
+	finished.emit(_tuning.minigame_keep_floor, _opt_out)
 
 
 func _on_continue_pressed() -> void:

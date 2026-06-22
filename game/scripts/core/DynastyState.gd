@@ -169,12 +169,12 @@ func perform_succession(
 ) -> Dictionary:
 	var will := get_draft_will()
 
-	# The prestige minigame (GDD §5.5) grants an upside-only multiplier on the Legacy
-	# earned. The will (get_draft_will) shows the deterministic base; the minigame then
-	# boosts what is actually banked. Clamped to ≥1.0 so it can only ever help, and
-	# floored like the base conversion. The boosted total is stashed on the returned will
-	# so the ceremony can show it. The bankruptcy path calls with the default 1.0×.
-	var awarded := int(floor(float(will["legacy_gain"]) * maxf(1.0, minigame_multiplier)))
+	# The prestige minigame (GDD §5.5) sets how much of the run's Legacy is KEPT: the
+	# will (get_draft_will) is the deterministic base, and the minigame multiplier scales
+	# what is actually banked — below 1.0 for a poor round (or a skip), above 1.0 into the
+	# extra-high bonus for a great one. Clamped to ≥0 only (never negative), floored like
+	# the base conversion. The bankruptcy path calls with the default 1.0× (full).
+	var awarded := int(floor(float(will["legacy_gain"]) * maxf(0.0, minigame_multiplier)))
 	will["legacy_awarded"] = awarded
 	will["minigame_multiplier"] = minigame_multiplier
 	upgrades.award(awarded)

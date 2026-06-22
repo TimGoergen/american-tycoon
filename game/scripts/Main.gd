@@ -639,9 +639,13 @@ func _on_will_cancelled() -> void:
 ## finalize immediately at the flat opt-out multiplier.
 func _on_pass_on_confirmed() -> void:
 	if game.ui_minigame_enabled:
-		_minigame_screen.start_game(dynasty.projected_legacy_gain())
+		# The minigame's extra-high bonus cap depends on the Family Reputation upgrade.
+		_minigame_screen.start_game(
+			dynasty.projected_legacy_gain(), dynasty.upgrades.minigame_bonus_max()
+		)
 	else:
-		_finalize_succession(tuning.minigame_mult_optout)
+		# Opting out banks the keep floor — skipping is the worst result (GDD §5.5).
+		_finalize_succession(tuning.minigame_keep_floor)
 
 
 ## The minigame ended: persist the player's "skip future minigames" choice, then

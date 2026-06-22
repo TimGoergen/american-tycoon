@@ -238,7 +238,15 @@ Main (ladder, wage button, frenzy bar, income/sec hero stat, backdrop) · The Le
 5. Family Office upgrade ladder (cap/efficiency steps).
 6. Heir-status pressure thresholds & copy.
 7. ~~Planet/Market Two config~~ — superseded by epochs (`EpochCatalog.gd`); flesh out more alien epochs/rows, M3–M4.
-8. **Pacing re-tune after the AdCap milestone cadence (§3.1, opened 2026-06-22).** The
-   25/50/100/200/300/400 cadence runs the economy ~38% slower than the old `20×2^k`. Re-tune
-   cost (`R0`/`BAND_STEP`) and/or the Legacy conversion (`K_LEGACY`/`ALPHA`) in the simulator to
-   bring absolute week-length/pacing back to target; the cycle stretch itself is income-neutral.
+8. **Pacing re-tune after the AdCap milestone cadence (§3.1) — PARTIALLY ADDRESSED 2026-06-22.**
+   The 25/50/100/200/300/400 cadence ran the economy ~38% slower than `20×2^k`. Re-tune pass:
+   **`BAND_STEP` 1.15 → 1.10** (cheaper high-band units; affects only band 1+/25+ units, so it
+   does NOT touch the early self-funding guardrail). Sim result: gen-1 peak $9.2M → **$11.1M**
+   (baseline $12.1M, ~8% under), top income/sec $55M → **$68M/s**, 6-gen Legacy 42 → 46
+   (baseline 51); dynasty still "speeds up every time", no band-wall. `K_LEGACY` was probed at
+   0.65 and **reverted** — extra Legacy didn't lift the wealth trajectory (the sim's greedy
+   upgrade-buyer spent it ineffectively) and it disturbs the tuned prestige feel; per-generation
+   income, not Legacy quantity, is the bottleneck. **Residual:** the 6-gen wealth trajectory
+   still trails baseline (~$101M vs $195M at gen 6) because the cadence's lost milestone
+   generosity compounds; closing it fully would mean reverting the cadence or deeper cost cuts
+   that distort the curve. Accepted as "most of the gap closed"; revisit if on-device feel needs it.

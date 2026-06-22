@@ -123,8 +123,9 @@ From the original `AmericanTycoon_PropertyTypeConfig.xlsx`, Sheet2. **Not one ru
 > measured):** this is *less* generous early than `20×2^k` (e.g. at 80 units: old gave 3
 > doublings, AdCap gives 2), so the economy came out **~38% slower** (sim top income/sec
 > $88.8M/s → $55M/s; 6-gen Legacy 51 → 42; dynasty still "speeds up every time", no band-wall).
-> **Open follow-up:** a prestige/cost re-tuning pass to bring absolute pacing back up
-> (`TBD-SIM`), since the cadence change is the cause, not the cycle stretch.
+> **Re-tune (2026-06-22):** `band_step` 1.15 → 1.10 recovered most of it — gen-1 peak back to
+> $11.1M (~8% under baseline), income/sec ~$68M/s, Legacy 46. A residual 6-gen trajectory gap
+> remains (the cadence's lost generosity compounds); accepted for now. See Mechanics Spec §15 #8.
 
 **Structural notes:**
 - Costs ×11/tier; income ×2; cycle times stretch tier-over-tier per the moderate-stretch

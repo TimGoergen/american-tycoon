@@ -63,7 +63,7 @@ var _showing_held_rush := false
 # shows the verb/staffer on the left and the cost/tier on the right. The font is sized
 # to fill this fixed row height — see _add_split_button_labels.
 const BUTTON_ROW_HEIGHT := 80
-const BUTTON_LABEL_FONT_SIZE := 34
+const BUTTON_LABEL_FONT_SIZE := UiPalette.FONT_BUTTON
 
 var _manager_circle: ManagerCircle
 var _name_label: Label
@@ -129,7 +129,7 @@ func _ready() -> void:
 
 	_name_label = Label.new()
 	_name_label.add_theme_color_override("font_color", UiPalette.NAVY)
-	_name_label.add_theme_font_size_override("font_size", 30)
+	_name_label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
 	_name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(_name_label)
 
@@ -141,7 +141,7 @@ func _ready() -> void:
 	_income_label.add_theme_color_override("font_color", income_green)
 	_income_label.add_theme_color_override("font_outline_color", income_green)
 	_income_label.add_theme_constant_override("outline_size", 2)
-	_income_label.add_theme_font_size_override("font_size", 30)
+	_income_label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
 	header.add_child(_income_label)
 
 	# Cycle line: the tap verb button + live cycle progress (Style Guide §9:
@@ -152,7 +152,7 @@ func _ready() -> void:
 
 	_tap_button = Button.new()
 	_tap_button.custom_minimum_size = Vector2(150, 0)
-	_tap_button.add_theme_font_size_override("font_size", 22)
+	_tap_button.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
 	UiPalette.style_button(_tap_button, false)
 	_tap_button.pressed.connect(func() -> void: tap_requested.emit(prop_index))
 	cycle_line.add_child(_tap_button)
@@ -183,7 +183,7 @@ func _ready() -> void:
 
 	_milestone_label = Label.new()
 	_milestone_label.add_theme_color_override("font_color", UiPalette.NAVY)
-	_milestone_label.add_theme_font_size_override("font_size", 22)
+	_milestone_label.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
 	milestone_line.add_child(_milestone_label)
 
 	# Buy / hire buttons (bulk-buy is mandatory — GDD §3.1). The buy button's

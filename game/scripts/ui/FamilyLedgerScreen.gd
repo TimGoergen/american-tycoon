@@ -26,10 +26,10 @@ signal closed
 
 # Type sizes — large for at-a-glance phone reading (UI notes §1), matching the
 # trimmed scale LegacyScreen settled on.
-const TITLE_SIZE := 75
-const TOTAL_SIZE := 56
-const NAME_SIZE := 48
-const BODY_SIZE := 37
+const TITLE_SIZE := UiPalette.FONT_PAGE_TITLE
+const TOTAL_SIZE := UiPalette.FONT_DISPLAY
+const NAME_SIZE := UiPalette.FONT_HEADLINE
+const BODY_SIZE := UiPalette.FONT_CARD_BODY
 
 ## Top inset (in the 1080×1920 design space) that clears the phone's camera
 ## cut-out, so the header is never hidden behind it. Matches LegacyScreen.
@@ -112,7 +112,7 @@ func _build_chrome() -> void:
 	var close_button := Button.new()
 	close_button.text = "BACK TO THE EMPIRE"
 	close_button.custom_minimum_size = Vector2(0, 158)
-	close_button.add_theme_font_size_override("font_size", 48)
+	close_button.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
 	UiPalette.style_button(close_button, false)
 	close_button.pressed.connect(_on_close_pressed)
 	column.add_child(close_button)

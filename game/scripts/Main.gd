@@ -154,6 +154,10 @@ func _apply_offline_if_due() -> void:
 # ---------------------------------------------------------------------------
 
 func _build_ui() -> void:
+	# The app-wide theme rides on the root and cascades to every control below,
+	# including the overlays added later in this method (UiPalette.make_app_theme).
+	theme = UiPalette.make_app_theme()
+
 	var background := ColorRect.new()
 	background.color = UiPalette.CREAM
 	background.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -182,7 +186,7 @@ func _build_ui() -> void:
 	_epoch_label = Label.new()
 	_epoch_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_epoch_label.add_theme_color_override("font_color", UiPalette.NAVY)
-	_epoch_label.add_theme_font_size_override("font_size", 26)
+	_epoch_label.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
 	column.add_child(_epoch_label)
 
 	# The action row (Tim, 2026-06-21): the TURBO button (its background is the frenzy
@@ -206,7 +210,7 @@ func _build_ui() -> void:
 	var dev_button := Button.new()
 	dev_button.custom_minimum_size = Vector2(0, 56)
 	dev_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	dev_button.add_theme_font_size_override("font_size", 20)
+	dev_button.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
 	UiPalette.style_button(dev_button, false)
 	dev_button.text = "DEV"
 	dev_button.pressed.connect(_on_dev_pressed)
@@ -217,7 +221,7 @@ func _build_ui() -> void:
 	_buy_mode_button = Button.new()
 	_buy_mode_button.custom_minimum_size = Vector2(0, 56)
 	_buy_mode_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_buy_mode_button.add_theme_font_size_override("font_size", 24)
+	_buy_mode_button.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
 	UiPalette.style_button(_buy_mode_button, false)
 	_buy_mode_button.text = "BUY MODE: " + _buy_mode_caption(_buy_mode)
 	_buy_mode_button.pressed.connect(_on_buy_mode_toggled)
@@ -263,7 +267,7 @@ func _build_ui() -> void:
 	# label then previews the Legacy gain — see _update_plan_button.
 	_plan_button = Button.new()
 	_plan_button.custom_minimum_size = Vector2(0, 72)
-	_plan_button.add_theme_font_size_override("font_size", 26)
+	_plan_button.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
 	UiPalette.style_button(_plan_button, true)
 	_plan_button.text = "PLAN THE ESTATE"
 	_plan_button.pressed.connect(_on_plan_estate_pressed)
@@ -275,7 +279,7 @@ func _build_ui() -> void:
 	# (see _update_legacy_button). Gold styling marks it as the prestige reward.
 	_legacy_button = Button.new()
 	_legacy_button.custom_minimum_size = Vector2(0, 64)
-	_legacy_button.add_theme_font_size_override("font_size", 24)
+	_legacy_button.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
 	UiPalette.style_button(_legacy_button, false)
 	_legacy_button.text = "THE ESTATE OFFICE"
 	# The button's own caption hugs the left; the Legacy balance is pinned to the
@@ -291,7 +295,7 @@ func _build_ui() -> void:
 	# mouse_filter IGNORE so taps still fall through to the button beneath it.
 	_legacy_balance_label = Label.new()
 	_legacy_balance_label.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD)
-	_legacy_balance_label.add_theme_font_size_override("font_size", 24)
+	_legacy_balance_label.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
 	_legacy_balance_label.add_theme_color_override("font_outline_color", UiPalette.MUSTARD_GOLD)
 	_legacy_balance_label.add_theme_constant_override("outline_size", 2)
 	_legacy_balance_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -309,7 +313,7 @@ func _build_ui() -> void:
 	# page, not a spend/commit action.
 	_ledger_button = Button.new()
 	_ledger_button.custom_minimum_size = Vector2(0, 64)
-	_ledger_button.add_theme_font_size_override("font_size", 24)
+	_ledger_button.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
 	UiPalette.style_button(_ledger_button, false)
 	_ledger_button.text = "THE FAMILY LEDGER"
 	_ledger_button.pressed.connect(_on_family_ledger_pressed)

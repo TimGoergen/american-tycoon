@@ -47,7 +47,7 @@ func _ready() -> void:
 	_eyebrow_label.text = "◄  INCOMING TRANSMISSION  ►"
 	_eyebrow_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_eyebrow_label.add_theme_color_override("font_color", UiPalette.KETCHUP_RED)
-	_eyebrow_label.add_theme_font_size_override("font_size", 30)
+	_eyebrow_label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
 	column.add_child(_eyebrow_label)
 
 	var headline := Label.new()
@@ -57,7 +57,7 @@ func _ready() -> void:
 	headline.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD)
 	headline.add_theme_color_override("font_outline_color", UiPalette.MUSTARD_GOLD)
 	headline.add_theme_constant_override("outline_size", 3)
-	headline.add_theme_font_size_override("font_size", 52)
+	headline.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
 	column.add_child(headline)
 
 	# The civilization Earth has just reached — the big name on the card.
@@ -68,20 +68,20 @@ func _ready() -> void:
 	_civ_label.add_theme_color_override("font_color", UiPalette.NAVY)
 	_civ_label.add_theme_color_override("font_outline_color", UiPalette.NAVY)
 	_civ_label.add_theme_constant_override("outline_size", 2)
-	_civ_label.add_theme_font_size_override("font_size", 60)
+	_civ_label.add_theme_font_size_override("font_size", UiPalette.FONT_DISPLAY)
 	column.add_child(_civ_label)
 
 	# Home world + their currency (flavor only — Earth stays on dollars).
 	_planet_label = Label.new()
 	_planet_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_planet_label.add_theme_color_override("font_color", UiPalette.NAVY)
-	_planet_label.add_theme_font_size_override("font_size", 28)
+	_planet_label.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
 	column.add_child(_planet_label)
 
 	_flavor_label = Label.new()
 	_flavor_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_flavor_label.add_theme_color_override("font_color", UiPalette.MONEY_GREEN.darkened(0.2))
-	_flavor_label.add_theme_font_size_override("font_size", 26)
+	_flavor_label.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
 	column.add_child(_flavor_label)
 
 	# The headline payoff: how many times larger the new market is. Big and gold, so the
@@ -91,7 +91,7 @@ func _ready() -> void:
 	_market_label.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD)
 	_market_label.add_theme_color_override("font_outline_color", UiPalette.MUSTARD_GOLD)
 	_market_label.add_theme_constant_override("outline_size", 2)
-	_market_label.add_theme_font_size_override("font_size", 44)
+	_market_label.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
 	column.add_child(_market_label)
 
 	# The narrator's contact line.
@@ -100,7 +100,7 @@ func _ready() -> void:
 	_narration_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_narration_label.custom_minimum_size = Vector2(760, 0)
 	_narration_label.add_theme_color_override("font_color", UiPalette.NAVY)
-	_narration_label.add_theme_font_size_override("font_size", 30)
+	_narration_label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
 	column.add_child(_narration_label)
 
 	var note := Label.new()
@@ -109,13 +109,13 @@ func _ready() -> void:
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	note.custom_minimum_size = Vector2(760, 0)
 	note.add_theme_color_override("font_color", UiPalette.NAVY)
-	note.add_theme_font_size_override("font_size", 24)
+	note.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
 	column.add_child(note)
 
 	var proceed_button := Button.new()
 	proceed_button.text = "ANSWER THE CALL"
 	proceed_button.custom_minimum_size = Vector2(0, 96)
-	proceed_button.add_theme_font_size_override("font_size", 34)
+	proceed_button.add_theme_font_size_override("font_size", UiPalette.FONT_BUTTON)
 	UiPalette.style_button(proceed_button, true)
 	proceed_button.pressed.connect(_on_proceed_pressed)
 	column.add_child(proceed_button)

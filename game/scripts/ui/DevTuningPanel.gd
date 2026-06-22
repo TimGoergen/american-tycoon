@@ -39,12 +39,12 @@ signal reset_dynasty_requested
 # Large, legible type for phone reading (UI notes §1) — sized up 25% from the first
 # pass for on-device readability (Tim). Still denser than the ceremony screens, since
 # this is a long developer list, not a player moment.
-const TITLE_SIZE := 70
-const SUBTITLE_SIZE := 35
-const ROW_LABEL_SIZE := 38
-const ROW_DESC_SIZE := 28
-const ROW_VALUE_SIZE := 38
-const BUTTON_SIZE := 38
+const TITLE_SIZE := UiPalette.FONT_PAGE_TITLE
+const SUBTITLE_SIZE := UiPalette.FONT_CARD_BODY
+const ROW_LABEL_SIZE := UiPalette.FONT_SUBHEAD
+const ROW_DESC_SIZE := UiPalette.FONT_LABEL
+const ROW_VALUE_SIZE := UiPalette.FONT_SUBHEAD
+const BUTTON_SIZE := UiPalette.FONT_SUBHEAD
 
 ## Top inset (in the 1080×1920 design space) clearing the phone camera cut-out,
 ## matching the other full-screen overlays.

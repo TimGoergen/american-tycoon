@@ -106,7 +106,7 @@ func _build_phase0(parent: VBoxContainer) -> void:
 	headline.text = "IN MEMORIAM"
 	headline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	headline.add_theme_color_override("font_color", UiPalette.NAVY)
-	headline.add_theme_font_size_override("font_size", 44)
+	headline.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
 	_phase0_container.add_child(headline)
 
 	# ── The deceased's name (populated in show_obituary) ──
@@ -114,7 +114,7 @@ func _build_phase0(parent: VBoxContainer) -> void:
 	_obituary_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_obituary_name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_obituary_name_label.add_theme_color_override("font_color", UiPalette.NAVY)
-	_obituary_name_label.add_theme_font_size_override("font_size", 40)
+	_obituary_name_label.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
 	_phase0_container.add_child(_obituary_name_label)
 
 	var spacer := Control.new()
@@ -126,14 +126,14 @@ func _build_phase0(parent: VBoxContainer) -> void:
 	_obituary_fortune_label = Label.new()
 	_obituary_fortune_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_obituary_fortune_label.add_theme_color_override("font_color", UiPalette.MONEY_GREEN)
-	_obituary_fortune_label.add_theme_font_size_override("font_size", 52)
+	_obituary_fortune_label.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
 	_phase0_container.add_child(_obituary_fortune_label)
 
 	var caption := Label.new()
 	caption.text = "earned in a lifetime of honest work"
 	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	caption.add_theme_color_override("font_color", UiPalette.NAVY)
-	caption.add_theme_font_size_override("font_size", 22)
+	caption.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
 	_phase0_container.add_child(caption)
 
 	var spacer2 := Control.new()
@@ -145,7 +145,7 @@ func _build_phase0(parent: VBoxContainer) -> void:
 	_obituary_summary_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_obituary_summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_obituary_summary_label.add_theme_color_override("font_color", UiPalette.NAVY)
-	_obituary_summary_label.add_theme_font_size_override("font_size", 26)
+	_obituary_summary_label.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
 	_phase0_container.add_child(_obituary_summary_label)
 
 	var spacer3 := Control.new()
@@ -156,7 +156,7 @@ func _build_phase0(parent: VBoxContainer) -> void:
 	var continue_button := Button.new()
 	continue_button.text = "READ THE WILL"
 	continue_button.custom_minimum_size = Vector2(0, 80)
-	continue_button.add_theme_font_size_override("font_size", 30)
+	continue_button.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
 	UiPalette.style_button(continue_button, true)
 	continue_button.pressed.connect(_on_obituary_continue_pressed)
 	_phase0_container.add_child(continue_button)
@@ -174,14 +174,14 @@ func _build_phase1(parent: VBoxContainer) -> void:
 	headline.text = "THE READING OF THE WILL"
 	headline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	headline.add_theme_color_override("font_color", UiPalette.NAVY)
-	headline.add_theme_font_size_override("font_size", 44)
+	headline.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
 	_phase1_container.add_child(headline)
 
 	# ── Deceased subline (populated in show_will) ──
 	_deceased_label = Label.new()
 	_deceased_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_deceased_label.add_theme_color_override("font_color", UiPalette.NAVY)
-	_deceased_label.add_theme_font_size_override("font_size", 26)
+	_deceased_label.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
 	_phase1_container.add_child(_deceased_label)
 
 	# Visual separator between the header block and the document rows.
@@ -191,16 +191,16 @@ func _build_phase1(parent: VBoxContainer) -> void:
 
 	# ── Itemized estate rows ──
 	# Each row is an HBoxContainer: description on the left, value right-aligned.
-	_gross_value    = _add_document_row(_phase1_container, "Gross estate:",    UiPalette.NAVY,        30)
-	_creditors_value = _add_document_row(_phase1_container, "Creditors paid:",  UiPalette.NAVY,        30)
-	_subtotal_value = _add_document_row(_phase1_container, "Subtotal:",         UiPalette.NAVY,        30)
-	_tax_value      = _add_document_row(_phase1_container, "Estate tax:",       UiPalette.KETCHUP_RED, 30)
+	_gross_value    = _add_document_row(_phase1_container, "Gross estate:",    UiPalette.NAVY,        UiPalette.FONT_BODY)
+	_creditors_value = _add_document_row(_phase1_container, "Creditors paid:",  UiPalette.NAVY,        UiPalette.FONT_BODY)
+	_subtotal_value = _add_document_row(_phase1_container, "Subtotal:",         UiPalette.NAVY,        UiPalette.FONT_BODY)
+	_tax_value      = _add_document_row(_phase1_container, "Estate tax:",       UiPalette.KETCHUP_RED, UiPalette.FONT_BODY)
 
 	# The "Net to heir" line is emphasized — larger text and money-green so the
 	# player immediately sees what they're actually passing down.
 	_add_divider(_phase1_container)
-	_net_value      = _add_document_row(_phase1_container, "── Net to heir:",   UiPalette.MONEY_GREEN, 40)
-	_legacy_value   = _add_document_row(_phase1_container, "Converts to Legacy:", UiPalette.MONEY_GREEN, 30)
+	_net_value      = _add_document_row(_phase1_container, "── Net to heir:",   UiPalette.MONEY_GREEN, UiPalette.FONT_SUBHEAD)
+	_legacy_value   = _add_document_row(_phase1_container, "Converts to Legacy:", UiPalette.MONEY_GREEN, UiPalette.FONT_BODY)
 
 	var spacer2 := Control.new()
 	spacer2.custom_minimum_size = Vector2(0, 12)
@@ -210,7 +210,7 @@ func _build_phase1(parent: VBoxContainer) -> void:
 	var confirm_button := Button.new()
 	confirm_button.text = "SIGN & PASS ON"
 	confirm_button.custom_minimum_size = Vector2(0, 80)
-	confirm_button.add_theme_font_size_override("font_size", 30)
+	confirm_button.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
 	UiPalette.style_button(confirm_button, true)
 	confirm_button.pressed.connect(_on_sign_pressed)
 	_phase1_container.add_child(confirm_button)
@@ -222,7 +222,7 @@ func _build_phase1(parent: VBoxContainer) -> void:
 	var cancel_button := Button.new()
 	cancel_button.text = "NOT YET — KEEP PLAYING"
 	cancel_button.custom_minimum_size = Vector2(0, 64)
-	cancel_button.add_theme_font_size_override("font_size", 24)
+	cancel_button.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
 	UiPalette.style_button(cancel_button, false)
 	cancel_button.pressed.connect(_on_cancel_pressed)
 	_phase1_container.add_child(cancel_button)
@@ -240,7 +240,7 @@ func _build_phase2(parent: VBoxContainer) -> void:
 	headline.text = "THE ESTATE PASSES TO"
 	headline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	headline.add_theme_color_override("font_color", UiPalette.NAVY)
-	headline.add_theme_font_size_override("font_size", 44)
+	headline.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
 	_phase2_container.add_child(headline)
 
 	# ── Heir name (populated in show_heir_reveal) ──
@@ -249,14 +249,14 @@ func _build_phase2(parent: VBoxContainer) -> void:
 	_heir_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_heir_name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_heir_name_label.add_theme_color_override("font_color", UiPalette.NAVY)
-	_heir_name_label.add_theme_font_size_override("font_size", 56)
+	_heir_name_label.add_theme_font_size_override("font_size", UiPalette.FONT_DISPLAY)
 	_phase2_container.add_child(_heir_name_label)
 
 	# ── Generation / deadpan subline ──
 	_generation_label = Label.new()
 	_generation_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_generation_label.add_theme_color_override("font_color", UiPalette.NAVY)
-	_generation_label.add_theme_font_size_override("font_size", 26)
+	_generation_label.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
 	_phase2_container.add_child(_generation_label)
 
 	var spacer := Control.new()
@@ -267,7 +267,7 @@ func _build_phase2(parent: VBoxContainer) -> void:
 	var begin_button := Button.new()
 	begin_button.text = "BEGIN THE NEW RUN"
 	begin_button.custom_minimum_size = Vector2(0, 80)
-	begin_button.add_theme_font_size_override("font_size", 30)
+	begin_button.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
 	UiPalette.style_button(begin_button, true)
 	begin_button.pressed.connect(_on_begin_pressed)
 	_phase2_container.add_child(begin_button)

@@ -23,6 +23,38 @@ const LIGHT_GRAY := Color("#CBCBCB")  # unowned row background
 const MID_GRAY := Color("#9A9A9A")    # unowned borders
 const DARK_GRAY := Color("#6E6E6E")   # unowned start button + portrait circle
 
+# ---------------------------------------------------------------------------
+# Type scale — the single source of truth for UI font sizes (Tim's "chunkier UI"
+# pass, 2026-06-21). Named semantic tiers replace the ~24 scattered magic numbers.
+# The pass RAISES THE FLOOR (nothing below FONT_SMALL) so small text reads clearly
+# at arm's length (§1b: Tim's vision), while the big tuned numbers stay put. These
+# are referenced both by make_app_theme() (defaults) and by per-element overrides
+# where a control needs a specific tier.
+# ---------------------------------------------------------------------------
+const FONT_PAGE_TITLE := 76   # full-screen page titles (Estate Office, Family Ledger, dev panel)
+const FONT_HERO := 67         # the income / cash hero numbers
+const FONT_DISPLAY := 60      # big secondary displays & names (wallet, heir name, civ name, wage)
+const FONT_HEADLINE := 52     # section headlines, emphasized card lines
+const FONT_SUBHEAD := 41      # sub-headers, ancestor names, dev-row labels
+const FONT_CARD_BODY := 37    # card body text and detail lines
+const FONT_BUTTON := 34       # standard action-button labels (buy / hire / proceed)
+const FONT_BODY := 32         # body text and captions
+const FONT_LABEL := 28        # secondary labels
+const FONT_SMALL := 26        # the smallest text allowed — the readability floor
+
+## The app-wide Theme: a chunky default font size plus per-control-type defaults, so
+## any control that does NOT override its own size still reads large (the §1b
+## readability bar). Assigned on the Main root (see Main._build_ui) so it cascades to
+## every descendant, including the overlays. Per-element sizes still win where a
+## control sets a specific tier via the FONT_* constants above.
+static func make_app_theme() -> Theme:
+	var theme := Theme.new()
+	theme.default_font_size = FONT_BODY            # backstop for anything un-themed
+	theme.set_font_size("font_size", "Button", FONT_BUTTON)
+	theme.set_font_size("font_size", "Label", FONT_BODY)
+	return theme
+
+
 ## Cream plate with a navy border — the standard card/panel (§8).
 static func make_panel_style() -> StyleBoxFlat:
 	return _make_plate(CREAM, NAVY)
@@ -146,5 +178,7 @@ static func _make_plate(bg_color: Color, border_color: Color) -> StyleBoxFlat:
 	style.border_color = border_color
 	style.set_border_width_all(3)
 	style.set_corner_radius_all(4)
-	style.set_content_margin_all(10)
+	# Content padding bumped 10 -> 12 (Tim's "panels a bit larger" pass, 2026-06-21).
+	# _make_plate backs both panels and buttons, so this roomies up both at once.
+	style.set_content_margin_all(12)
 	return style

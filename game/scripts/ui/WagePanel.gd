@@ -75,7 +75,7 @@ const SWEEP_FRAME_INSET := 8.0
 ## They originate at the button's vertical center, INCOME_FLOAT_RIGHT_FRACTION of
 ## the width in from the right edge (± INCOME_FLOAT_ORIGIN_JITTER px of random
 ## spread), then float up while swaying gently side to side and fading out.
-const INCOME_FLOAT_FONT_SIZE := 40
+const INCOME_FLOAT_FONT_SIZE := UiPalette.FONT_SUBHEAD
 const INCOME_FLOAT_DURATION := 0.9
 const INCOME_FLOAT_RISE_FRACTION := 0.7    # how far up it travels (× button height)
 const INCOME_FLOAT_RIGHT_FRACTION := 0.15  # origin distance in from the right edge
@@ -152,7 +152,7 @@ func _ready() -> void:
 	# label and the click belong to the button. Font is 2× the old size (28→56).
 	_wage_button = Button.new()
 	_wage_button.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_wage_button.add_theme_font_size_override("font_size", 56)
+	_wage_button.add_theme_font_size_override("font_size", UiPalette.FONT_DISPLAY)
 	_wage_button.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
 	_wage_button.add_theme_stylebox_override("hover", StyleBoxEmpty.new())
 	_wage_button.add_theme_stylebox_override("pressed", StyleBoxEmpty.new())
@@ -173,12 +173,12 @@ func _ready() -> void:
 	# readability (Tim, 2026-06-17).
 	_context_label = Label.new()
 	_context_label.add_theme_color_override("font_color", UiPalette.NAVY)
-	_context_label.add_theme_font_size_override("font_size", 30)
+	_context_label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
 	_context_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(_context_label)
 
 	_promotion_button = Button.new()
-	_promotion_button.add_theme_font_size_override("font_size", 22)
+	_promotion_button.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
 	UiPalette.style_button(_promotion_button, true)  # tuition is a spend action
 	_promotion_button.pressed.connect(func() -> void: promotion_requested.emit())
 	add_child(_promotion_button)

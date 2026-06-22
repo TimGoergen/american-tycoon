@@ -19,18 +19,18 @@ extends PanelContainer
 
 # Type sizes (art direction, not game tuning). Large for at-a-glance reading; the
 # matching-color outline fakes a bold weight until real bold fonts arrive in M3.
-# Bumped 5% (64 -> 67) at Tim's request so the headline amounts read a touch larger.
-const INCOME_FONT_SIZE := 67
+# Uses UiPalette.FONT_HERO so the headline amounts read a touch larger.
+const INCOME_FONT_SIZE := UiPalette.FONT_HERO
 # Cash on hand reads at the same size as income/sec (Tim's call) — kept tied to
 # INCOME_FONT_SIZE so the two stay matched if that value is ever retuned.
 const CASH_FONT_SIZE := INCOME_FONT_SIZE
-# Caption text bumped 10% (30 -> 33) at Tim's request.
-const CAPTION_FONT_SIZE := 33
+# Caption text uses UiPalette.FONT_BODY at Tim's request.
+const CAPTION_FONT_SIZE := UiPalette.FONT_BODY
 # The dynasty/heir name now lives in this panel (it used to be its own header
 # strip). It sits centered between the two edge values, on the same line as their
-# captions, so it reads as one band: "INCOME … NAME … CASH". Sized up 35% from the
-# old 30 (Tim's call) so the heir name carries more weight than the captions.
-const NAME_FONT_SIZE := 41
+# captions, so it reads as one band: "INCOME … NAME … CASH". Uses UiPalette.FONT_SUBHEAD
+# (Tim's call) so the heir name carries more weight than the captions.
+const NAME_FONT_SIZE := UiPalette.FONT_SUBHEAD
 const INCOME_BOLD := 3
 const CASH_BOLD := 2
 const CAPTION_BOLD := 2

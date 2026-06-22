@@ -251,7 +251,19 @@ theme + targeted pass.**
 
 ---
 
-## 7. Navigation — bottom tab bar (proposed, Tim 2026-06-22)
+## 7. Navigation — bottom tab bar (FIRST CUT BUILT 2026-06-22)
+
+> **Built:** a custom bottom tab bar (four equal icon `Button`s, `Main._build_tab_bar`)
+> over a shared content slot (`_tab_content`); `_show_tab` toggles which panel is visible
+> and refreshes ledger/settings on entry. Hero stat + epoch banner are **pinned above**
+> the tabs; **tabs don't freeze the economy** (only modal overlays do). Tabs: **Property**
+> (`_build_property_tab` — action row + ladder + wage), **Estate Planning**
+> (`_build_estate_tab` — Plan the Estate + Estate Office, which still opens the shop modal),
+> **Settings** (`_build_settings_tab` — minigame toggle + DEV), **Family Ledger**
+> (`FamilyLedgerScreen` refactored from overlay → embedded content). Placeholder SVG icons
+> in `game/art/icons/`. **Still to do:** real icon art; embed the live draft will in the
+> Estate tab; possibly embed the Estate Office shop rather than open it modally; on-device
+> layout pass. (Original proposal below.)
 
 Replace the single stacked Main screen with a **bottom tab bar** (pinned to the screen
 bottom, thumb-reachable) switching between four tabs. Reason: more real estate per screen

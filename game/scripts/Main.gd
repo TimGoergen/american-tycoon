@@ -37,8 +37,19 @@ var _plan_button: Button
 var _legacy_button: Button
 ## Gold "LEGACY: N" balance pinned to the right end of the Estate Office button.
 var _legacy_balance_label: Label
-var _ledger_button: Button
 var _rows: Array = []
+
+# Bottom tab bar (UI Notes §7). The four surfaces share one content slot; one is
+# visible at a time, switched by the icon buttons pinned along the bottom.
+const TAB_PROPERTY := 0
+const TAB_ESTATE := 1
+const TAB_SETTINGS := 2
+const TAB_LEDGER := 3
+var _tab_content: Control
+var _tab_panels: Array = []   # the four content Controls, indexed by TAB_*
+var _tab_buttons: Array = []  # the four bottom icon Buttons, indexed by TAB_*
+var _active_tab: int = TAB_PROPERTY
+var _minigame_check: CheckBox  # the Settings-tab "play the minigame" toggle
 
 ## Global buy mode — one toggle drives every row's buy button.
 var _buy_mode: PropertyRow.BuyMode = PropertyRow.BuyMode.ONE
@@ -54,11 +65,12 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	# Freeze the economy while a full-screen overlay is up (the succession
-	# ceremony or the upgrade shop): no ticks, no autosave. This keeps the will's
-	# numbers from shifting under the player, avoids half-saving the generation
-	# swap mid-ceremony, and lets the shop spend Legacy against a steady balance.
-	if _will_screen.visible or _legacy_screen.visible or _ledger_screen.visible \
+	# Freeze the economy while a full-screen MODAL overlay is up (the succession
+	# ceremony, the upgrade shop, the minigame, etc.): no ticks, no autosave. This keeps
+	# the will's numbers steady, avoids half-saving the generation swap mid-ceremony, and
+	# lets the shop spend Legacy against a steady balance. NOTE: switching TABS does NOT
+	# freeze — an idle game keeps earning no matter which tab you're reading.
+	if _will_screen.visible or _legacy_screen.visible \
 			or _dev_panel.visible or _first_contact_overlay.visible \
 			or _minigame_screen.visible:
 		return
@@ -91,7 +103,6 @@ func _process(delta: float) -> void:
 	_update_epoch_label()
 	_update_plan_button()
 	_update_legacy_button()
-	_update_ledger_button()
 
 
 func _notification(what: int) -> void:
@@ -174,153 +185,40 @@ func _build_ui() -> void:
 	add_child(margin)
 
 	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 14)
+	column.add_theme_constant_override("separation", 10)
 	margin.add_child(column)
 
-	# The hero stat now also carries the heir name (the old top header strip is gone);
-	# Main feeds the name to it each frame in _process.
+	# Pinned across every tab (UI Notes §7): the income/cash hero stat (the heartbeat)
+	# and the epoch banner just under it. Main feeds both each frame in _process.
 	_hero_stat = HeroStat.new()
 	column.add_child(_hero_stat)
 
-	# Epoch banner: which alien civilization Earth is currently trading with (GDD §6.2).
-	# Centered, navy, modest weight — it sits quietly under the hero stat and changes on
-	# first contact. Main keeps its text in sync each frame in _update_epoch_label.
 	_epoch_label = Label.new()
 	_epoch_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_epoch_label.add_theme_color_override("font_color", UiPalette.NAVY)
 	_epoch_label.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
 	column.add_child(_epoch_label)
 
-	# The action row (Tim, 2026-06-21): the TURBO button (its background is the frenzy
-	# meter) takes the left half of the row; the DEV and buy-mode buttons split the
-	# right half, 25% each. Stretch ratios 2 : 1 : 1 give that 50/25/25 split.
-	var action_row := HBoxContainer.new()
-	action_row.add_theme_constant_override("separation", 10)
-	column.add_child(action_row)
+	# Tab content: the four surfaces stacked in one slot, one visible at a time. It
+	# expands so the bottom tab bar pins beneath it. Switching tabs never pauses the
+	# economy (idle game) — only the modal overlays freeze it (see _process).
+	_tab_content = Control.new()
+	_tab_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_tab_content.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	column.add_child(_tab_content)
 
-	_frenzy_bar = FrenzyBar.new()
-	_frenzy_bar.setup(game.frenzy, tuning)
-	_frenzy_bar.pop_requested.connect(_on_pop_requested)
-	_frenzy_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_frenzy_bar.size_flags_stretch_ratio = 2.0  # half the row; DEV + buy split the other half
-	action_row.add_child(_frenzy_bar)
+	# The Family Ledger tab IS the (now embedded) FamilyLedgerScreen; the other three
+	# are built below. All four fill the content slot; _show_tab toggles visibility.
+	_ledger_screen = FamilyLedgerScreen.new()
+	_ledger_screen.setup()
+	_tab_panels = [
+		_build_property_tab(), _build_estate_tab(), _build_settings_tab(), _ledger_screen,
+	]
+	for panel in _tab_panels:
+		(panel as Control).set_anchors_preset(Control.PRESET_FULL_RECT)
+		_tab_content.add_child(panel)
 
-	# Dev tools entry: opens the balance tuning panel (GDD §13). Neutral mustard —
-	# it is a tool, not a destructive action; the save-wipe now lives inside the
-	# panel (the old standalone red RESET button folded into it). Will move into a
-	# settings screen later. 25% of the row (default stretch ratio 1.0).
-	var dev_button := Button.new()
-	dev_button.custom_minimum_size = Vector2(0, 56)
-	dev_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	dev_button.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
-	UiPalette.style_button(dev_button, false)
-	dev_button.text = "DEV"
-	dev_button.pressed.connect(_on_dev_pressed)
-	action_row.add_child(dev_button)
-
-	# Global buy-mode toggle: one button cycles ×1 → ×10 → UPGRADE → MAX and every
-	# row's buy button follows it (GDD §3.1 bulk-buy requirement). 25% of the row.
-	_buy_mode_button = Button.new()
-	_buy_mode_button.custom_minimum_size = Vector2(0, 56)
-	_buy_mode_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_buy_mode_button.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
-	UiPalette.style_button(_buy_mode_button, false)
-	_buy_mode_button.text = "BUY MODE: " + _buy_mode_caption(_buy_mode)
-	_buy_mode_button.pressed.connect(_on_buy_mode_toggled)
-	action_row.add_child(_buy_mode_button)
-
-	# The property ladder: 12 rows in a vertical scroll (GDD §2: a vertical
-	# ladder scrolled upward as you ascend).
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	# Reserve the vertical scrollbar's width permanently so the rows never reflow when
-	# it appears or disappears (Godot 4.4+ RESERVE: the space is always held, but the
-	# bar itself only shows when there's something to scroll).
-	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_RESERVE
-	column.add_child(scroll)
-
-	var ladder := VBoxContainer.new()
-	ladder.add_theme_constant_override("separation", 10)
-	ladder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(ladder)
-
-	for i in range(game.economy.properties.size()):
-		var row := PropertyRow.new()
-		row.setup(i, game.economy.properties[i] as PropertyState, game.economy, game.frenzy, game.epoch)
-		row.buy_requested.connect(_on_buy_requested)
-		row.tap_requested.connect(_on_tap_requested)
-		row.hold_rush_requested.connect(_on_hold_rush_requested)
-		row.hire_requested.connect(_on_hire_requested)
-		row.set_buy_mode(_buy_mode)  # apply the restored buy-mode preference
-		ladder.add_child(row)
-		_rows.append(row)
-
-	_wage_panel = WagePanel.new()
-	_wage_panel.setup(game.wage, game.economy, tuning, game.frenzy)
-	_wage_panel.wage_tapped.connect(_on_wage_tapped)
-	_wage_panel.wage_hold_tapped.connect(_on_wage_hold_tapped)
-	_wage_panel.promotion_requested.connect(_on_promotion_requested)
-	column.add_child(_wage_panel)
-
-	# The prestige exit: plan the estate, pass on, and raise a faster heir. Red
-	# because it is the big commit action (§8). It stays disabled until dying
-	# would actually grow the dynasty (dynasty.can_perform_succession()), and its
-	# label then previews the Legacy gain — see _update_plan_button.
-	_plan_button = Button.new()
-	_plan_button.custom_minimum_size = Vector2(0, 72)
-	_plan_button.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
-	UiPalette.style_button(_plan_button, true)
-	_plan_button.text = "PLAN THE ESTATE"
-	_plan_button.pressed.connect(_on_plan_estate_pressed)
-	column.add_child(_plan_button)
-
-	# The Estate Office: enter the Legacy upgrade shop to spend banked Legacy. It
-	# is hidden until the player's first prestige — there is nothing to spend and
-	# no shop to enter before then — and revealed for good once Legacy is earned
-	# (see _update_legacy_button). Gold styling marks it as the prestige reward.
-	_legacy_button = Button.new()
-	_legacy_button.custom_minimum_size = Vector2(0, 64)
-	_legacy_button.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
-	UiPalette.style_button(_legacy_button, false)
-	_legacy_button.text = "THE ESTATE OFFICE"
-	# The button's own caption hugs the left; the Legacy balance is pinned to the
-	# right edge by _legacy_balance_label below.
-	_legacy_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	_legacy_button.pressed.connect(_on_estate_office_pressed)
-	_legacy_button.visible = false
-	column.add_child(_legacy_button)
-
-	# The spendable Legacy wallet, in its old "LEGACY: N" gold form, pinned to the
-	# right end of the Estate Office button (it used to live in the top header). It is
-	# only ever seen once that button appears — i.e. from the first prestige onward.
-	# mouse_filter IGNORE so taps still fall through to the button beneath it.
-	_legacy_balance_label = Label.new()
-	_legacy_balance_label.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD)
-	_legacy_balance_label.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
-	_legacy_balance_label.add_theme_color_override("font_outline_color", UiPalette.MUSTARD_GOLD)
-	_legacy_balance_label.add_theme_constant_override("outline_size", 2)
-	_legacy_balance_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_legacy_balance_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_legacy_balance_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_legacy_balance_label.set_anchors_preset(Control.PRESET_FULL_RECT)
-	# Inset from the right edge by the same content margin the button plate uses,
-	# so the balance sits clear of the navy border.
-	_legacy_balance_label.offset_right = -14
-	_legacy_button.add_child(_legacy_balance_label)
-
-	# The Family Ledger: re-read the obituaries of every past generation. Hidden
-	# until the first ancestor exists (nothing to show on generation 1), then shown
-	# for good (see _update_ledger_button). Calm mustard style — it is a reading
-	# page, not a spend/commit action.
-	_ledger_button = Button.new()
-	_ledger_button.custom_minimum_size = Vector2(0, 64)
-	_ledger_button.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
-	UiPalette.style_button(_ledger_button, false)
-	_ledger_button.text = "THE FAMILY LEDGER"
-	_ledger_button.pressed.connect(_on_family_ledger_pressed)
-	_ledger_button.visible = false
-	column.add_child(_ledger_button)
+	_build_tab_bar(column)
 
 	# The welcome-back overlay sits above everything and starts hidden.
 	_welcome_overlay = WelcomeBackOverlay.new()
@@ -356,14 +254,6 @@ func _build_ui() -> void:
 	_legacy_screen.closed.connect(_on_legacy_screen_closed)
 	add_child(_legacy_screen)
 
-	# The Family Ledger overlay, also above everything and hidden until opened.
-	# Its rows are rebuilt from the dynasty's ancestor list each time it opens.
-	_ledger_screen = FamilyLedgerScreen.new()
-	_ledger_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_ledger_screen.setup()
-	_ledger_screen.closed.connect(_on_family_ledger_closed)
-	add_child(_ledger_screen)
-
 	# The dev tuning panel (GDD §13), above everything and hidden until the DEV
 	# button opens it. Main freezes the economy while it is up, applies its edits
 	# by saving overrides + reloading the scene, and routes its save-wipe action.
@@ -384,6 +274,221 @@ func _build_ui() -> void:
 	_minigame_screen.setup(tuning)
 	_minigame_screen.finished.connect(_on_minigame_finished)
 	add_child(_minigame_screen)
+
+	_show_tab(TAB_PROPERTY)
+
+
+# ---------------------------------------------------------------------------
+# Tab construction & switching (UI Notes §7)
+# ---------------------------------------------------------------------------
+
+## Property tab: the income engine — the TURBO/frenzy + buy-mode action row, the
+## scrolling property ladder, and the wage button.
+func _build_property_tab() -> Control:
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 10)
+
+	# Action row: the TURBO button (its background is the frenzy meter) takes the larger
+	# share; the buy-mode toggle takes the rest.
+	var action_row := HBoxContainer.new()
+	action_row.add_theme_constant_override("separation", 10)
+	v.add_child(action_row)
+
+	_frenzy_bar = FrenzyBar.new()
+	_frenzy_bar.setup(game.frenzy, tuning)
+	_frenzy_bar.pop_requested.connect(_on_pop_requested)
+	_frenzy_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_frenzy_bar.size_flags_stretch_ratio = 2.0  # TURBO ~2/3, buy-mode ~1/3
+	action_row.add_child(_frenzy_bar)
+
+	# Global buy-mode toggle: one button cycles ×1 → ×10 → ×100 → MAX; every row follows.
+	_buy_mode_button = Button.new()
+	_buy_mode_button.custom_minimum_size = Vector2(0, 56)
+	_buy_mode_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_buy_mode_button.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
+	UiPalette.style_button(_buy_mode_button, false)
+	_buy_mode_button.text = "BUY MODE: " + _buy_mode_caption(_buy_mode)
+	_buy_mode_button.pressed.connect(_on_buy_mode_toggled)
+	action_row.add_child(_buy_mode_button)
+
+	# The property ladder: 12 rows in a vertical scroll (GDD §2).
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_RESERVE
+	v.add_child(scroll)
+
+	var ladder := VBoxContainer.new()
+	ladder.add_theme_constant_override("separation", 10)
+	ladder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(ladder)
+
+	for i in range(game.economy.properties.size()):
+		var row := PropertyRow.new()
+		row.setup(i, game.economy.properties[i] as PropertyState, game.economy, game.frenzy, game.epoch)
+		row.buy_requested.connect(_on_buy_requested)
+		row.tap_requested.connect(_on_tap_requested)
+		row.hold_rush_requested.connect(_on_hold_rush_requested)
+		row.hire_requested.connect(_on_hire_requested)
+		row.set_buy_mode(_buy_mode)
+		ladder.add_child(row)
+		_rows.append(row)
+
+	_wage_panel = WagePanel.new()
+	_wage_panel.setup(game.wage, game.economy, tuning, game.frenzy)
+	_wage_panel.wage_tapped.connect(_on_wage_tapped)
+	_wage_panel.wage_hold_tapped.connect(_on_wage_hold_tapped)
+	_wage_panel.promotion_requested.connect(_on_promotion_requested)
+	v.add_child(_wage_panel)
+
+	return v
+
+
+## Estate Planning tab: the prestige hub — plan the estate (succession) and open the
+## Estate Office (Legacy upgrade shop). Both controls keep their existing visibility
+## rules; _update_plan_button / _update_legacy_button drive them each frame.
+func _build_estate_tab() -> Control:
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 12)
+
+	var heading := Label.new()
+	heading.text = "ESTATE PLANNING"
+	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	heading.add_theme_color_override("font_color", UiPalette.NAVY)
+	heading.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
+	v.add_child(heading)
+
+	# The prestige exit: plan the estate, pass on, raise a faster heir. Red = big commit.
+	_plan_button = Button.new()
+	_plan_button.custom_minimum_size = Vector2(0, 72)
+	_plan_button.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
+	UiPalette.style_button(_plan_button, true)
+	_plan_button.text = "PLAN THE ESTATE"
+	_plan_button.pressed.connect(_on_plan_estate_pressed)
+	v.add_child(_plan_button)
+
+	# The Estate Office: open the Legacy upgrade shop (a modal). Hidden until the first
+	# prestige has ever earned Legacy. The Legacy balance is pinned to its right edge.
+	_legacy_button = Button.new()
+	_legacy_button.custom_minimum_size = Vector2(0, 64)
+	_legacy_button.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
+	UiPalette.style_button(_legacy_button, false)
+	_legacy_button.text = "THE ESTATE OFFICE"
+	_legacy_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_legacy_button.pressed.connect(_on_estate_office_pressed)
+	_legacy_button.visible = false
+	v.add_child(_legacy_button)
+
+	_legacy_balance_label = Label.new()
+	_legacy_balance_label.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD)
+	_legacy_balance_label.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
+	_legacy_balance_label.add_theme_color_override("font_outline_color", UiPalette.MUSTARD_GOLD)
+	_legacy_balance_label.add_theme_constant_override("outline_size", 2)
+	_legacy_balance_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_legacy_balance_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_legacy_balance_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_legacy_balance_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_legacy_balance_label.offset_right = -14
+	_legacy_button.add_child(_legacy_balance_label)
+
+	var hint := Label.new()
+	hint.text = "Pass on to convert this life's fortune into Legacy, then spend it on permanent dynasty upgrades."
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.add_theme_color_override("font_color", UiPalette.NAVY)
+	hint.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
+	v.add_child(hint)
+
+	var spacer := Control.new()
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	v.add_child(spacer)
+	return v
+
+
+## Settings tab: player options. Today the prestige-minigame toggle and the dev panel
+## entry; later, audio / haptics. (Was previously a deferred standalone screen.)
+func _build_settings_tab() -> Control:
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 16)
+
+	var heading := Label.new()
+	heading.text = "SETTINGS"
+	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	heading.add_theme_color_override("font_color", UiPalette.NAVY)
+	heading.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
+	v.add_child(heading)
+
+	# Prestige minigame toggle — the persistent home for the opt-out (GameState).
+	_minigame_check = CheckBox.new()
+	_minigame_check.text = "Play the prestige minigame"
+	_minigame_check.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
+	_minigame_check.add_theme_color_override("font_color", UiPalette.NAVY)
+	_minigame_check.button_pressed = game.ui_minigame_enabled
+	_minigame_check.toggled.connect(func(on: bool) -> void: game.ui_minigame_enabled = on)
+	v.add_child(_minigame_check)
+
+	# Dev tools entry: the balance tuning panel (GDD §13). Moved here from the action row.
+	var dev_button := Button.new()
+	dev_button.custom_minimum_size = Vector2(0, 64)
+	dev_button.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
+	UiPalette.style_button(dev_button, false)
+	dev_button.text = "DEV — BALANCE TUNING"
+	dev_button.pressed.connect(_on_dev_pressed)
+	v.add_child(dev_button)
+
+	var spacer := Control.new()
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	v.add_child(spacer)
+	return v
+
+
+## Build the bottom tab bar: four equal icon buttons pinned along the bottom.
+func _build_tab_bar(column: VBoxContainer) -> void:
+	var bar := HBoxContainer.new()
+	bar.add_theme_constant_override("separation", 6)
+	column.add_child(bar)
+
+	var icons := [
+		"res://art/icons/tab_property.svg",
+		"res://art/icons/tab_estate.svg",
+		"res://art/icons/tab_settings.svg",
+		"res://art/icons/tab_ledger.svg",
+	]
+	_tab_buttons = []
+	for i in range(icons.size()):
+		var b := Button.new()
+		b.custom_minimum_size = Vector2(0, 76)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.icon = load(icons[i])
+		b.expand_icon = false
+		b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		b.pressed.connect(_show_tab.bind(i))
+		bar.add_child(b)
+		_tab_buttons.append(b)
+
+
+## Switch to tab `index`: show its panel, hide the rest, restyle the bar, and refresh
+## the Family Ledger / Settings content that depends on live state when entered.
+func _show_tab(index: int) -> void:
+	_active_tab = index
+	for i in range(_tab_panels.size()):
+		(_tab_panels[i] as Control).visible = (i == index)
+		_style_tab_button(_tab_buttons[i] as Button, i == index)
+	if index == TAB_LEDGER:
+		_ledger_screen.refresh(dynasty.ancestors, dynasty.lifetime_cash_earned)
+	elif index == TAB_SETTINGS and _minigame_check != null:
+		_minigame_check.button_pressed = game.ui_minigame_enabled
+
+
+## The active tab button reads as a mustard plate; the rest as plain cream plates.
+func _style_tab_button(button: Button, active: bool) -> void:
+	if active:
+		UiPalette.style_button(button, false)  # mustard = selected
+	else:
+		var flat := UiPalette.make_panel_style()
+		button.add_theme_stylebox_override("normal", flat)
+		button.add_theme_stylebox_override("hover", flat)
+		button.add_theme_stylebox_override("pressed", flat)
 
 
 # ---------------------------------------------------------------------------
@@ -517,23 +622,8 @@ func _update_legacy_button() -> void:
 	_legacy_balance_label.text = "LEGACY: " + str(dynasty.upgrades.available)
 
 
-## Reveal the Family Ledger button once there is at least one ancestor to read
-## about (nothing to show on generation 1). Once shown, it stays — the ancestor
-## list only ever grows.
-func _update_ledger_button() -> void:
-	_ledger_button.visible = not dynasty.ancestors.is_empty()
-
-
-## Player opened the Family Ledger: populate it from the dynasty's ancestor list
-## and the lifetime-earned total, then show it.
-func _on_family_ledger_pressed() -> void:
-	_ledger_screen.open(dynasty.ancestors, dynasty.lifetime_cash_earned)
-
-
-## Player closed the Family Ledger: nothing to persist (it is read-only), the game
-## simply resumes ticking on the next frame.
-func _on_family_ledger_closed() -> void:
-	pass
+## The Family Ledger is now a tab (UI Notes §7), refreshed on entry by _show_tab —
+## no Main-screen button to reveal.
 
 
 ## Player opened the Estate Office: feed the shop a fresh Household Staff snapshot

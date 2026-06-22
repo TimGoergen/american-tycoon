@@ -1,58 +1,38 @@
 class_name FamilyLedgerScreen
-extends ColorRect
+extends Control
 
-# "The Family Ledger" (GDD §8.2) — a full-screen page listing every deceased
-# generation of the dynasty: each ancestor's name and Roman numeral, the fortune
-# they earned in their lifetime, and the deadpan cause of their generation's end
-# ("Retired to Palm Beach" / "Creditors"). Opened from the Main screen by a button
-# that appears once the first ancestor exists.
+# "The Family Ledger" (GDD §8.2) — lists every deceased generation of the dynasty:
+# each ancestor's name and Roman numeral, the fortune they earned in their lifetime,
+# and the deadpan cause of their generation's end ("Retired to Palm Beach" / "Creditors").
 #
-# Same full-page convention as LegacyScreen: an opaque cream sheet that fills the
-# screen while open (Main freezes the economy behind it), large legible type (Tim
-# reads large — UI notes §1), a scrolling list, and a big CLOSE button.
+# This is the content of the **Family Ledger tab** (UI Notes §7) — it is embedded in the
+# bottom tab bar, not a modal overlay, so there is no scrim or close button and the
+# economy keeps ticking behind it (an idle game never pauses for a read-only page).
 #
 # Drive it from Main.gd:
 #   1. setup()                       once, to build the static page chrome
-#   2. open(ancestors, lifetime)     to (re)populate the list and show the page
-#   3. listen for closed             resume the game
+#   2. refresh(ancestors, lifetime)  to (re)populate the list (call on entering the tab)
 #
-# Unlike LegacyScreen (a fixed catalog built once), the ancestor list grows every
-# generation, so open() rebuilds the rows from the passed array each time.
+# The ancestor list grows every generation, so refresh() rebuilds the rows each time.
 
 
-## The player closed the ledger and wants to return to the game.
-signal closed
-
-
-# Type sizes — large for at-a-glance phone reading (UI notes §1), matching the
-# trimmed scale LegacyScreen settled on.
+# Type sizes — large for at-a-glance phone reading (UI notes §1).
 const TITLE_SIZE := UiPalette.FONT_PAGE_TITLE
 const TOTAL_SIZE := UiPalette.FONT_DISPLAY
 const NAME_SIZE := UiPalette.FONT_HEADLINE
 const BODY_SIZE := UiPalette.FONT_CARD_BODY
 
-## Top inset (in the 1080×1920 design space) that clears the phone's camera
-## cut-out, so the header is never hidden behind it. Matches LegacyScreen.
-const CAMERA_CUTOUT_INSET := 130
-
 
 # The dynasty-wide lifetime-earned readout pinned to the header.
 var _total_label: Label
 
-# The container the ancestor rows are rebuilt into on every open().
+# The container the ancestor rows are rebuilt into on every refresh().
 var _list: VBoxContainer
 
 
-## Build the static page chrome once (header, scroll frame, close button).
+## Build the static page chrome once (header + scroll frame).
 func setup() -> void:
 	_build_chrome()
-
-
-func _ready() -> void:
-	# Opaque cream sheet filling the whole screen — a full page, not a translucent
-	# card over the game. Main freezes the economy while it is visible.
-	color = UiPalette.CREAM
-	visible = false
 
 
 # ---------------------------------------------------------------------------
@@ -60,13 +40,14 @@ func _ready() -> void:
 # ---------------------------------------------------------------------------
 
 func _build_chrome() -> void:
+	set_anchors_preset(Control.PRESET_FULL_RECT)
+
 	var margin := MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	margin.add_theme_constant_override("margin_left", 20)
-	margin.add_theme_constant_override("margin_right", 20)
-	# Extra top inset clears the phone's camera cut-out (see CAMERA_CUTOUT_INSET).
-	margin.add_theme_constant_override("margin_top", CAMERA_CUTOUT_INSET)
-	margin.add_theme_constant_override("margin_bottom", 20)
+	margin.add_theme_constant_override("margin_left", 8)
+	margin.add_theme_constant_override("margin_right", 8)
+	margin.add_theme_constant_override("margin_top", 8)
+	margin.add_theme_constant_override("margin_bottom", 8)
 	add_child(margin)
 
 	var column := VBoxContainer.new()
@@ -108,34 +89,22 @@ func _build_chrome() -> void:
 	# Let a swipe that lands on a card scroll the list, as elsewhere.
 	UiPalette.allow_scroll_drag_through(_list)
 
-	# ── Close button ──
-	var close_button := Button.new()
-	close_button.text = "BACK TO THE EMPIRE"
-	close_button.custom_minimum_size = Vector2(0, 158)
-	close_button.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
-	UiPalette.style_button(close_button, false)
-	close_button.pressed.connect(_on_close_pressed)
-	column.add_child(close_button)
-
 
 # ---------------------------------------------------------------------------
-# Showing / populating
+# Populating
 # ---------------------------------------------------------------------------
 
-## Rebuild the ancestor rows from `ancestors` (oldest first, founder at top — a
-## lineage reads chronologically) and show the page. `lifetime_total` is the
-## dynasty-wide cash-earned sum shown in the header.
-func open(ancestors: Array, lifetime_total: float) -> void:
+## Rebuild the ancestor rows from `ancestors` (oldest first, founder at top — a lineage
+## reads chronologically). `lifetime_total` is the dynasty-wide cash-earned sum shown in
+## the header. Call when the tab is opened, so it reflects the latest succession.
+func refresh(ancestors: Array, lifetime_total: float) -> void:
 	_total_label.text = "Dynasty total: %s" % Money.of(lifetime_total).display()
 
-	# Clear the previous rows — the list grows each generation, so it is rebuilt
-	# fresh on every open rather than appended to.
+	# The list grows each generation, so rebuild it fresh rather than appending.
 	for child in _list.get_children():
 		child.queue_free()
 
 	if ancestors.is_empty():
-		# Defensive: the open button only appears once an ancestor exists, but show
-		# a calm placeholder rather than a blank page if it is ever opened empty.
 		var empty := Label.new()
 		empty.text = "No ancestors yet. The dynasty begins with you."
 		empty.add_theme_color_override("font_color", UiPalette.NAVY)
@@ -144,8 +113,6 @@ func open(ancestors: Array, lifetime_total: float) -> void:
 	else:
 		for record in ancestors:
 			_add_ancestor_row(record as Dictionary)
-
-	visible = true
 
 
 ## One ancestor card: name + numeral on top, then "Earned $X · {cause}" beneath.
@@ -175,12 +142,3 @@ func _add_ancestor_row(record: Dictionary) -> void:
 	detail.add_theme_color_override("font_color", UiPalette.MONEY_GREEN)
 	detail.add_theme_font_size_override("font_size", BODY_SIZE)
 	card_column.add_child(detail)
-
-
-# ---------------------------------------------------------------------------
-# Buttons
-# ---------------------------------------------------------------------------
-
-func _on_close_pressed() -> void:
-	visible = false
-	closed.emit()

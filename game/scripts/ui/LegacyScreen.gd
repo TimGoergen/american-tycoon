@@ -93,7 +93,7 @@ func _build_ui() -> void:
 	# ── Header: "The Estate Office" then the Legacy wallet, STACKED (not side-by-side,
 	# which overflowed the tab width at large type). ──
 	var title := Label.new()
-	title.text = "The Estate Office"
+	title.text = "Estate Planning"
 	title.add_theme_color_override("font_color", UiPalette.NAVY)
 	title.add_theme_font_size_override("font_size", TITLE_SIZE)
 	column.add_child(title)
@@ -112,13 +112,22 @@ func _build_ui() -> void:
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_RESERVE
+	# AUTO (not RESERVE): the scrollbar overlays the right inset rather than reserving a
+	# one-sided gutter that pushed cards off the right edge. The MarginContainer below then
+	# gives every card outline the SAME margin on the left and right.
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	column.add_child(scroll)
+
+	var list_margin := MarginContainer.new()
+	list_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list_margin.add_theme_constant_override("margin_left", 12)
+	list_margin.add_theme_constant_override("margin_right", 12)
+	scroll.add_child(list_margin)
 
 	var list := VBoxContainer.new()
 	list.add_theme_constant_override("separation", 10)
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(list)
+	list_margin.add_child(list)
 
 	var current_category := ""
 	for definition in LegacyUpgradeCatalog.all():

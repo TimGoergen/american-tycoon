@@ -380,7 +380,11 @@ func _build_settings_tab() -> Control:
 	_minigame_check = CheckBox.new()
 	_minigame_check.text = "Play the prestige minigame"
 	_minigame_check.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
-	_minigame_check.add_theme_color_override("font_color", UiPalette.NAVY)
+	# Navy text in every state — the default theme's checked/hover/pressed colors are a
+	# pale near-white that was unreadable on the cream tab (Tim, 2026-06-22).
+	for state in ["font_color", "font_pressed_color", "font_hover_color",
+			"font_focus_color", "font_hover_pressed_color", "font_disabled_color"]:
+		_minigame_check.add_theme_color_override(state, UiPalette.NAVY)
 	_minigame_check.button_pressed = game.ui_minigame_enabled
 	_minigame_check.toggled.connect(func(on: bool) -> void: game.ui_minigame_enabled = on)
 	v.add_child(_minigame_check)

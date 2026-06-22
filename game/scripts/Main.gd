@@ -43,8 +43,8 @@ var _rows: Array = []
 # visible at a time, switched by the icon buttons pinned along the bottom.
 const TAB_PROPERTY := 0
 const TAB_ESTATE := 1
-const TAB_SETTINGS := 2
-const TAB_LEDGER := 3
+const TAB_LEDGER := 2
+const TAB_SETTINGS := 3
 var _tab_content: Control
 var _tab_panels: Array = []   # the four content Controls, indexed by TAB_*
 var _tab_buttons: Array = []  # the four bottom icon Buttons, indexed by TAB_*
@@ -212,7 +212,7 @@ func _build_ui() -> void:
 	_ledger_screen = FamilyLedgerScreen.new()
 	_ledger_screen.setup()
 	_tab_panels = [
-		_build_property_tab(), _build_estate_tab(), _build_settings_tab(), _ledger_screen,
+		_build_property_tab(), _build_estate_tab(), _ledger_screen, _build_settings_tab(),
 	]
 	for panel in _tab_panels:
 		(panel as Control).set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -451,13 +451,13 @@ func _build_tab_bar(column: VBoxContainer) -> void:
 	var icons := [
 		"res://art/icons/tab_property.svg",
 		"res://art/icons/tab_estate.svg",
-		"res://art/icons/tab_settings.svg",
 		"res://art/icons/tab_ledger.svg",
+		"res://art/icons/tab_settings.svg",
 	]
 	_tab_buttons = []
 	for i in range(icons.size()):
 		var b := Button.new()
-		b.custom_minimum_size = Vector2(0, 76)
+		b.custom_minimum_size = Vector2(0, 114)  # 50% taller (UI feedback 2026-06-22)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.icon = load(icons[i])
 		b.expand_icon = false

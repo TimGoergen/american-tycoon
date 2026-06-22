@@ -16,9 +16,11 @@ extends Control
 # The ancestor list grows every generation, so refresh() rebuilds the rows each time.
 
 
-# Type sizes — large for at-a-glance phone reading (UI notes §1).
-const TITLE_SIZE := UiPalette.FONT_PAGE_TITLE
-const TOTAL_SIZE := UiPalette.FONT_DISPLAY
+# Type sizes — large for at-a-glance phone reading (UI notes §1), but the title/total
+# are a notch smaller than the old full-screen-overlay sizes: as an embedded tab the
+# header must fit the tab width, and FONT_PAGE_TITLE/DISPLAY side-by-side overflowed.
+const TITLE_SIZE := UiPalette.FONT_HEADLINE
+const TOTAL_SIZE := UiPalette.FONT_SUBHEAD
 const NAME_SIZE := UiPalette.FONT_HEADLINE
 const BODY_SIZE := UiPalette.FONT_CARD_BODY
 
@@ -54,25 +56,21 @@ func _build_chrome() -> void:
 	column.add_theme_constant_override("separation", 12)
 	margin.add_child(column)
 
-	# ── Header row: title pinned left, dynasty lifetime-earned readout pinned right ──
-	var header_row := HBoxContainer.new()
-	column.add_child(header_row)
-
+	# ── Header: title then dynasty lifetime-earned readout, STACKED (not side-by-side).
+	# Side-by-side at large type overflowed the tab's right edge; stacking each on its own
+	# line keeps both within the tab width. Both wrap as a final safety net.
 	var title := Label.new()
 	title.text = "The Family Ledger"
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	title.add_theme_color_override("font_color", UiPalette.NAVY)
 	title.add_theme_font_size_override("font_size", TITLE_SIZE)
-	header_row.add_child(title)
+	column.add_child(title)
 
 	_total_label = Label.new()
-	_total_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_total_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_total_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_total_label.add_theme_color_override("font_color", UiPalette.MONEY_GREEN)
 	_total_label.add_theme_font_size_override("font_size", TOTAL_SIZE)
-	header_row.add_child(_total_label)
+	column.add_child(_total_label)
 
 	# ── Scrollable list of ancestor rows ──
 	var scroll := ScrollContainer.new()

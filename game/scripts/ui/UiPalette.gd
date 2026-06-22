@@ -23,12 +23,6 @@ const LIGHT_GRAY := Color("#CBCBCB")  # unowned row background
 const MID_GRAY := Color("#9A9A9A")    # unowned borders
 const DARK_GRAY := Color("#6E6E6E")   # unowned start button + portrait circle
 
-## Shared width (px) for the buy-mode toggle and the frenzy TURBO button. Kept equal
-## and defined in one place so the two right-hand controls line up as one column
-## (Tim's call) and can't drift apart when their widths are feel-tuned.
-const ACTION_COLUMN_WIDTH := 280
-
-
 ## Cream plate with a navy border — the standard card/panel (§8).
 static func make_panel_style() -> StyleBoxFlat:
 	return _make_plate(CREAM, NAVY)
@@ -86,29 +80,39 @@ static func style_progress_bar(bar: ProgressBar, fill_color: Color) -> void:
 	bar.add_theme_stylebox_override("fill", fill)
 
 
-## Dark-gold plate with a bright-gold fill — the "clock in" wage button doubles
-## as a promotion-progress meter (UI notes §2: dark gold background, bright gold
-## bar). The dark gold is a darkened MUSTARD_GOLD; it's a deliberate extension of
-## the §1 nine-color palette for this one meter, pending style-guide blessing.
-static func style_gold_progress(bar: ProgressBar) -> void:
-	# Thick navy frame around the whole meter (Tim's call: a heavier outline).
-	var border_width := 8
+## A progress meter framed as a button surface: a colored track inside a navy
+## frame, with the fill inset so it grows INSIDE the frame instead of painting over
+## it. Used wherever a meter doubles as a button background — the wage "clock in"
+## meter (§2) and the frenzy TURBO button. `border_width` defaults to the standard
+## 3px plate frame so a meter-button lines up with the ordinary buttons beside it;
+## the wage meter overrides it heavier.
+static func style_framed_progress(
+		bar: ProgressBar, fill_color: Color, track_color: Color, border_width: int = 3
+) -> void:
 	var track := StyleBoxFlat.new()
-	track.bg_color = MUSTARD_GOLD.darkened(0.45)
+	track.bg_color = track_color
 	track.border_color = NAVY
 	track.set_border_width_all(border_width)
 	track.set_corner_radius_all(4)
 
 	var fill := StyleBoxFlat.new()
-	fill.bg_color = MUSTARD_GOLD
+	fill.bg_color = fill_color
 	fill.set_corner_radius_all(4)
 	# Negative expand margins shrink the fill's draw rect inward by the frame
-	# thickness, so the bright-gold fill stays INSIDE the navy outline as it grows
-	# rather than painting over the frame.
+	# thickness, so the fill stays INSIDE the navy outline as it grows rather than
+	# painting over the frame.
 	fill.set_expand_margin_all(-float(border_width))
 
 	bar.add_theme_stylebox_override("background", track)
 	bar.add_theme_stylebox_override("fill", fill)
+
+
+## Dark-gold plate with a bright-gold fill — the "clock in" wage button doubles
+## as a promotion-progress meter (UI notes §2: dark gold background, bright gold
+## bar), with the heavier navy frame Tim called for. The dark gold is a darkened
+## MUSTARD_GOLD; a deliberate extension of the §1 palette for this meter.
+static func style_gold_progress(bar: ProgressBar) -> void:
+	style_framed_progress(bar, MUSTARD_GOLD, MUSTARD_GOLD.darkened(0.45), 8)
 
 
 ## Faint-green plate for a staffed property's hire button — signals "this one is

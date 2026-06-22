@@ -185,39 +185,43 @@ func _build_ui() -> void:
 	_epoch_label.add_theme_font_size_override("font_size", 26)
 	column.add_child(_epoch_label)
 
+	# The action row (Tim, 2026-06-21): the TURBO button (its background is the frenzy
+	# meter) takes the left half of the row; the DEV and buy-mode buttons split the
+	# right half, 25% each. Stretch ratios 2 : 1 : 1 give that 50/25/25 split.
+	var action_row := HBoxContainer.new()
+	action_row.add_theme_constant_override("separation", 10)
+	column.add_child(action_row)
+
 	_frenzy_bar = FrenzyBar.new()
 	_frenzy_bar.setup(game.frenzy, tuning)
 	_frenzy_bar.pop_requested.connect(_on_pop_requested)
-	column.add_child(_frenzy_bar)
-
-	# Global buy-mode toggle: one button cycles ×1 → ×10 → UPGRADE → MAX
-	# and every row's buy button follows it (GDD §3.1 bulk-buy requirement).
-	var toggle_line := HBoxContainer.new()
-	column.add_child(toggle_line)
+	_frenzy_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_frenzy_bar.size_flags_stretch_ratio = 2.0  # half the row; DEV + buy split the other half
+	action_row.add_child(_frenzy_bar)
 
 	# Dev tools entry: opens the balance tuning panel (GDD §13). Neutral mustard —
 	# it is a tool, not a destructive action; the save-wipe now lives inside the
-	# panel (the old standalone red RESET button folded into it). Sits on the left
-	# of the buy-mode toggle for now; it will move into a settings screen later.
+	# panel (the old standalone red RESET button folded into it). Will move into a
+	# settings screen later. 25% of the row (default stretch ratio 1.0).
 	var dev_button := Button.new()
-	dev_button.custom_minimum_size = Vector2(150, 56)
+	dev_button.custom_minimum_size = Vector2(0, 56)
+	dev_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	dev_button.add_theme_font_size_override("font_size", 20)
 	UiPalette.style_button(dev_button, false)
 	dev_button.text = "DEV"
 	dev_button.pressed.connect(_on_dev_pressed)
-	toggle_line.add_child(dev_button)
+	action_row.add_child(dev_button)
 
-	var toggle_spacer := Control.new()
-	toggle_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	toggle_line.add_child(toggle_spacer)
-
+	# Global buy-mode toggle: one button cycles ×1 → ×10 → UPGRADE → MAX and every
+	# row's buy button follows it (GDD §3.1 bulk-buy requirement). 25% of the row.
 	_buy_mode_button = Button.new()
-	_buy_mode_button.custom_minimum_size = Vector2(UiPalette.ACTION_COLUMN_WIDTH, 56)
+	_buy_mode_button.custom_minimum_size = Vector2(0, 56)
+	_buy_mode_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_buy_mode_button.add_theme_font_size_override("font_size", 24)
 	UiPalette.style_button(_buy_mode_button, false)
 	_buy_mode_button.text = "BUY MODE: " + _buy_mode_caption(_buy_mode)
 	_buy_mode_button.pressed.connect(_on_buy_mode_toggled)
-	toggle_line.add_child(_buy_mode_button)
+	action_row.add_child(_buy_mode_button)
 
 	# The property ladder: 12 rows in a vertical scroll (GDD §2: a vertical
 	# ladder scrolled upward as you ascend).

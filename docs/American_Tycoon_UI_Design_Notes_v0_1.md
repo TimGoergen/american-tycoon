@@ -147,7 +147,16 @@ theme + targeted pass.**
   accelerated state. Snaps back to plain cream when the burn ends.
 
 ### Frenzy bar
--
+- **TURBO button = the meter (Tim, 2026-06-21) — DONE.** The separate frenzy progress bar is
+  gone; the frenzy meter is now the **background of the TURBO button** (mustard fill while
+  charging, red while burning), with a transparent label button on top — the same "meter as
+  button background" pattern the wage clock-in button uses (now shared via
+  `UiPalette.style_framed_progress`). The TURBO label is **horizontally centered**.
+- **Action row layout (Tim, 2026-06-21) — DONE.** TURBO, DEV, and the buy-mode toggle now share
+  **one row**: TURBO takes the **left half** (50%), DEV and buy-mode take **25% each**
+  (HBox stretch ratios 2 : 1 : 1). `Main.gd` / `FrenzyBar.gd`.
+  - *Watch on the chunkier-UI pass:* at 25% width on a narrow portrait screen the
+    "BUY MODE: ×100" caption may clip — revisit font size or shorten the caption then.
 
 ### Property ladder / property row
 - **Hold START/RUSH to auto-repeat.** Click-and-hold on the start/rush button should

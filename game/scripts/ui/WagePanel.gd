@@ -193,6 +193,12 @@ func _process(delta: float) -> void:
 	# used to omit the Legacy multiplier and read low after a Connections purchase (Tim).
 	var title := _wage.get_current_title()
 	var wage_per_tap := title.wage_per_tap * _frenzy.get_multiplier() * _wage.wage_multiplier
+	# While the button is HELD, each auto-tap also gets the auto-click POWER bonus
+	# (GameState.hold_tap_wage), so show the higher held rate then — otherwise the label
+	# read low and the player earned more than it claimed (Tim, 2026-06-22). Manual taps
+	# don't get the bonus, so the base rate is shown when not held.
+	if _wage_button.button_pressed:
+		wage_per_tap *= _wage.auto_tap_power_multiplier
 	_wage_button.text = "CLOCK IN\n%s / tap" % Money.of(wage_per_tap).display()
 
 	var next := _wage.get_next_title()

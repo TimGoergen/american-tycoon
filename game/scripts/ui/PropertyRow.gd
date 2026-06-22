@@ -338,13 +338,20 @@ func _refresh(delta: float) -> void:
 	var rush_held := _tap_button.button_pressed and _prop.units_owned > 0
 	_set_cycle_highlight(rush_held)
 
-	# Milestone slider runs from the last crossed milestone to the next one.
+	# Milestone slider runs from the last crossed milestone to the next one. Past the
+	# final milestone (400) there is no next, so the bar reads full and the label maxed.
 	var next_milestone := _prop.get_next_milestone_count()
-	var last_milestone := next_milestone / 2 if _prop.units_owned >= 20 else 0
-	_milestone_bar.min_value = last_milestone
-	_milestone_bar.max_value = next_milestone
-	_milestone_bar.value = _prop.units_owned
-	_milestone_label.text = "%d / %d" % [_prop.units_owned, next_milestone]
+	var last_milestone := _prop.get_last_milestone_count()
+	if next_milestone <= 0:
+		_milestone_bar.min_value = 0
+		_milestone_bar.max_value = maxi(last_milestone, 1)
+		_milestone_bar.value = maxi(last_milestone, 1)
+		_milestone_label.text = "%d / MAX" % _prop.units_owned
+	else:
+		_milestone_bar.min_value = last_milestone
+		_milestone_bar.max_value = next_milestone
+		_milestone_bar.value = _prop.units_owned
+		_milestone_label.text = "%d / %d" % [_prop.units_owned, next_milestone]
 
 	_refresh_buy_button()
 	_refresh_hire_button()

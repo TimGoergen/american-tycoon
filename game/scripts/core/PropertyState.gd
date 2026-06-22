@@ -326,12 +326,16 @@ func get_milestone_band() -> int:
 	return CostCurve.get_band(max(units_owned, 1))
 
 
-## The unit count at which the next milestone will be crossed.
+## The unit count at which the next milestone will be crossed, or 0 once the final
+## milestone (400) has been passed (this property can no longer earn a milestone beat).
 func get_next_milestone_count() -> int:
-	var threshold := 20
-	while threshold <= units_owned:
-		threshold *= 2
-	return threshold
+	return CostCurve.next_milestone_count(units_owned)
+
+
+## The most recently crossed milestone count (0 before the first), the lower bound of
+## the milestone progress slider.
+func get_last_milestone_count() -> int:
+	return CostCurve.last_milestone_count(units_owned)
 
 
 # ---------------------------------------------------------------------------
@@ -354,7 +358,8 @@ func _collect(income_multiplier: float = 1.0) -> float:
 
 ## Check whether a milestone has been crossed and apply the adaptive reward.
 func _check_milestone() -> void:
-	# Milestones at 20 × 2^k. After each purchase, see if units_owned crossed one.
+	# Milestones at 25/50/100/200/300/400 (CostCurve.MILESTONE_THRESHOLDS). After each
+	# purchase, see how many bands units_owned now spans and pay any newly-crossed ones.
 	var expected_milestones := CostCurve.get_band(max(units_owned, 1))
 	while _milestones_crossed < expected_milestones:
 		_apply_milestone_reward()

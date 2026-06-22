@@ -4,21 +4,45 @@ class_name CostCurve
 # cost curve from Mechanics Spec §3.2. No state is stored here; callers
 # (PropertyState) maintain the running cost_product.
 
-# Milestone thresholds: 20, 40, 80, 160, ... (Spec §3.1: 20 × 2^k).
+# Milestone thresholds (Spec §3.1, AdVenture-Capitalist cadence adopted 2026-06-21):
+# 25, 50, 100, 200, 300, 400 — then no more. Six fixed milestones, after which a
+# property gets no further speed-up/income beat (it has "maxed out"). This both
+# drives the milestone REWARD (PropertyState._apply_milestone_reward) and the cost
+# curve's steepening band (get_ratio), so the cost ratio likewise caps at band 6.
+const MILESTONE_THRESHOLDS: Array[int] = [25, 50, 100, 200, 300, 400]
 
 
 ## Return the milestone band for the unit at position `unit_index` (1-based).
-## Band 0: units 1–19. Band 1: units 20–39. Band 2: units 40–79. Etc.
+## Band 0: units 1–24. Band 1: 25–49. Band 2: 50–99. … Band 6: 400+ (the cap).
 static func get_band(unit_index: int) -> int:
-	# Counted with an integer threshold walk instead of log() — floating-point
-	# log ratios mis-round exactly at the power-of-two thresholds (e.g. at 160
-	# units, log(8)/log(2) evaluates to 2.9999999999999996 and truncates wrong).
 	var band := 0
-	var threshold := 20
-	while unit_index >= threshold:
-		band += 1
-		threshold *= 2
+	for threshold in MILESTONE_THRESHOLDS:
+		if unit_index >= threshold:
+			band += 1
+		else:
+			break
 	return band
+
+
+## The next milestone count above `units_owned`, or 0 if the final milestone (400)
+## has already been passed (no further milestones remain).
+static func next_milestone_count(units_owned: int) -> int:
+	for threshold in MILESTONE_THRESHOLDS:
+		if threshold > units_owned:
+			return threshold
+	return 0
+
+
+## The highest milestone count at or below `units_owned`, or 0 if none reached yet.
+## Used as the lower bound of the per-property milestone progress slider.
+static func last_milestone_count(units_owned: int) -> int:
+	var last := 0
+	for threshold in MILESTONE_THRESHOLDS:
+		if threshold <= units_owned:
+			last = threshold
+		else:
+			break
+	return last
 
 
 ## Per-unit ratio for band b: r0 × band_step^b.
@@ -88,10 +112,7 @@ static func get_bulk_cost(
 
 
 ## How many more units to buy to reach the next milestone threshold.
-## Returns 0 if already exactly on a milestone (shouldn't happen in practice).
+## Returns 0 once the final milestone (400) has been passed — nothing left to reach.
 static func units_to_next_milestone(units_owned: int) -> int:
-	# Thresholds: 20, 40, 80, 160, ...
-	var threshold := 20
-	while threshold <= units_owned:
-		threshold *= 2
-	return threshold - units_owned
+	var next := next_milestone_count(units_owned)
+	return next - units_owned if next > 0 else 0

@@ -22,7 +22,14 @@
 ## 3. Properties — Cost, Milestones, Income
 
 ### 3.1 Ownership-count milestones
-Milestone thresholds at counts **20 × 2^k** (20, 40, 80, 160, ...), matching the 2022 code's recovered tier spacing. Units 1–19 are band 0; 20–39 band 1; 40–79 band 2; etc.
+Milestone thresholds at **25, 50, 100, 200, 300, 400** (AdVenture-Capitalist cadence, adopted
+2026-06-22; was `20 × 2^k`). Six fixed milestones, then the property is **maxed** — no further
+beat past 400. Band 0: units 1–24; band 1: 25–49; band 2: 50–99; band 3: 100–199; band 4:
+200–299; band 5: 300–399; band 6: 400+ (the cap). `CostCurve.MILESTONE_THRESHOLDS` is the single
+source; it drives both the milestone reward (§3.3) and the cost-curve band (§3.2), so the cost
+ratio likewise caps at band 6. **Tradeoff (sim-measured):** this is *less* generous early than
+`20×2^k` (at 80 units: old = 3 doublings, AdCap = 2), so the economy runs **~38% slower** — a
+prestige/cost re-tune is the open follow-up (§15).
 
 ### 3.2 Cost curve — piecewise ratio, stepped at bands
 Cost of the next unit when `n` units are owned (0-indexed purchase n+1, in band b):
@@ -53,16 +60,13 @@ else:                               income_per_unit ×= 2   (income mode)
 ```
 `CYCLE_FLOOR = 1.0s` (provisional `TBD-SIM`). Every property follows the arc *first it gets faster, then it gets richer*; conversion point is emergent per property (ATM converts almost immediately; political assets accelerate visibly for most of the game).
 
-**Base cycle-length rework — moderate stretch (Tim, 2026-06-21, post-vacation roadmap).** The
-shipped `.tres` base `cycle_length` values are too flat (top tier ~81s) — the back-tier "leave
-it, return to a big pile" payoff is missing. New direction: stretch base cycles so each tier is
-*considerably* longer than the last, top tier ~**180–300s** at base (`TBD-SIM`), then §3.3
-milestones + §6 staffing compress them (the AdCap "long base, collapses when maxed" shape). This
-is a *moderate* stretch — longer than 81s, far short of GDD §4's original 2048s intent and AdCap's
-~36,864s extreme. **Open (feeds the simulator pass):** the exact top-tier target and per-tier
-growth factor; whether the milestone cadence stays 20/40/80… (§3.1) or moves toward AdCap's
-25/50/100/200/300/400 to give more speed-up beats across the longer cycles. Resets the GDD §4
-cycle column and `BASE_*` cycle values in `game/config/properties/*.tres`.
+**Base cycle-length rework — IMPLEMENTED 2026-06-22 (moderate stretch, back half only).** Tiers
+**1–6 unchanged**; tiers **7–12 stretched** ~1.5×/tier to a **180s** top (Day Trading 24 ·
+Flipping 36 · MLM 54 · Hedge Fund 81 · Legislative 121 · Executive 180). **Income-neutral:** each
+stretched tier's `base_income_per_unit` was scaled up by the same factor as its `base_cycle_length`,
+so base income/sec (= income_per_cycle / cycle_length) is unchanged — only the cadence changes
+(longer waits, bigger lump sums, more speed-up halvings before the 1s floor). The fix is purely in
+`game/config/properties/07..12*.tres`; no formula change. (GDD §4's cycle column is now historical.)
 
 ### 3.4 Income
 ```
@@ -234,3 +238,7 @@ Main (ladder, wage button, frenzy bar, income/sec hero stat, backdrop) · The Le
 5. Family Office upgrade ladder (cap/efficiency steps).
 6. Heir-status pressure thresholds & copy.
 7. ~~Planet/Market Two config~~ — superseded by epochs (`EpochCatalog.gd`); flesh out more alien epochs/rows, M3–M4.
+8. **Pacing re-tune after the AdCap milestone cadence (§3.1, opened 2026-06-22).** The
+   25/50/100/200/300/400 cadence runs the economy ~38% slower than the old `20×2^k`. Re-tune
+   cost (`R0`/`BAND_STEP`) and/or the Legacy conversion (`K_LEGACY`/`ALPHA`) in the simulator to
+   bring absolute week-length/pacing back to target; the cycle stretch itself is income-neutral.

@@ -103,20 +103,28 @@ From the original `AmericanTycoon_PropertyTypeConfig.xlsx`, Sheet2. **Not one ru
 | 11 | Legislative Assets | $1.30T | $12,800 | 1,024 | $13.1M |
 | 12 | Executive Assets | $14.27T | $25,600 | 2,048 | $52.4M |
 
-> **Cycle-time rework — moderate stretch (Tim, 2026-06-21, post-vacation roadmap).** The
-> table's cycle column above is the *original intent* (doubling 0.4s → 2048s ≈ 34min) and is
-> **not** what the build shipped: the live `.tres` configs top out at only **~81s** (a much
-> flatter curve). Playing the game on vacation, Tim felt the back-tier payoff was missing —
-> nothing takes long enough that leaving and returning to a fat pile feels earned. **Decision:
-> a *moderate* stretch** — lengthen the curve so each tier's cycle is *considerably* longer
-> than the last, with the top tier landing around **a few minutes** at base (target ~180–300s,
-> `TBD-SIM`), then milestone speed-ups (§5.1) and staffing (§6) compress it the way AdVenture
-> Capitalist's hours-long top business collapses to seconds once maxed. Early tiers stay
-> short (sub-second to seconds) so the opening reads as an active clicker. This is a deliberate
-> middle path: longer than today's 81s ceiling, far short of AdCap's literal 10-hour extreme.
-> The §4 table cycle column and the `.tres` values will be reset to the agreed curve in the
-> tuning pass; until then both are provisional. (AdCap reference for calibration: 10 tiers,
-> 0.6s → ~36,864s base.)
+> **Cycle-time rework — IMPLEMENTED 2026-06-22 (moderate stretch, back half only).** The
+> table's cycle column above is the *original intent* (doubling 0.4s → 2048s) and never shipped;
+> the live build had flattened to a ~81s top with a badly tapering back half (top tiers only
+> ~1.2× longer than the one below). Playing on vacation, Tim wanted the back-tier "leave it,
+> come back to a fat pile" payoff back. **Shipped:** tiers **1–6 unchanged** (the tuned early
+> game), tiers **7–12 stretched** to a clean ~1.5×/tier curve topping out at **180s (~3 min)**:
+> Day Trading 24s · Flipping 36s · MLM 54s · Hedge Fund 81s · Legislative 121s · Executive
+> 180s. **Income-neutral:** each stretched tier's `base_income_per_unit` was scaled up by the
+> same factor as its cycle, so base income/sec is unchanged — only the *rhythm* changes (longer
+> waits → bigger lump-sum payouts, and more visible speed-up beats as the longer cycle halves
+> more times before the 1s floor). Milestones + staffing compress it the way AdCap's long top
+> business collapses once maxed. (`.tres` values updated; this table's cycle column is now
+> historical — see the configs for live values.)
+>
+> **Milestone cadence — switched to AdCap 25/50/100/200/300/400 (Tim, 2026-06-22).** Replaces
+> the old `20 × 2^k` (unbounded) with AdVenture Capitalist's six fixed milestones, after which a
+> property is maxed (no further beat). `CostCurve.MILESTONE_THRESHOLDS`. **Known tradeoff (sim-
+> measured):** this is *less* generous early than `20×2^k` (e.g. at 80 units: old gave 3
+> doublings, AdCap gives 2), so the economy came out **~38% slower** (sim top income/sec
+> $88.8M/s → $55M/s; 6-gen Legacy 51 → 42; dynasty still "speeds up every time", no band-wall).
+> **Open follow-up:** a prestige/cost re-tuning pass to bring absolute pacing back up
+> (`TBD-SIM`), since the cadence change is the cause, not the cycle stretch.
 
 **Structural notes:**
 - Costs ×11/tier; income ×2; cycle times stretch tier-over-tier per the moderate-stretch
@@ -381,10 +389,10 @@ Resolved since v0.1: ~~automation/managers~~ (§6), ~~dynasty identity~~ (§8.2)
 10. **Name generator part-lists.** A fun evening of writing (§8.2).
 11. **Sound & haptics design.** The return-spike delta (§3.1) needs weight; audio direction set, implementation now scheduled into M3 (§13). Remaining open: haptics and per-event sound mapping.
 12. **Frenzy meter tuning.** Layer 3 charge rate, multiplier size, duration.
-13. **Cycle-time curve (post-vacation rework, §4).** Target top-tier base cycle (180s? 300s?)
-    and the per-tier growth factor; resolve via the balance simulator. Also: does milestone
-    cadence stay at 20/40/80… (§5.1, Spec §3.1) or move toward AdCap's 25/50/100/200/300/400
-    so there are more "feel the speed-up" beats across the now-longer cycles?
+13. ~~**Cycle-time curve (post-vacation rework, §4).**~~ **RESOLVED & shipped 2026-06-22:** back
+    half (tiers 7–12) stretched to a 180s top, income-neutral; milestone cadence switched to AdCap
+    25/50/100/200/300/400 (§4 note, Spec §3.1/§3.3). **New follow-up:** the cadence runs the
+    economy ~38% slower — a prestige/cost re-tuning pass is open (Spec §15 item 8).
 14. **Minigames (now adopted, §5.5).** Which minigame(s) ship first; whether the transition
     minigame and the legacy-bonus minigame are the same game or different; the legacy bonus
     multiplier's balanced range (e.g. 1.0×–2.0×) and whether `K_LEGACY`/`ALPHA` need re-tuning

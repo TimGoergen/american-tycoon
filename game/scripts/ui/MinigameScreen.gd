@@ -20,6 +20,9 @@ signal finished(multiplier: float, opt_out: bool)
 const MINIGAME_TYPES := [
 	preload("res://scripts/ui/MatchThreeMinigame.gd"),
 	preload("res://scripts/ui/TimingBarMinigame.gd"),
+	preload("res://scripts/ui/CatchMoneyMinigame.gd"),
+	preload("res://scripts/ui/MemoryMinigame.gd"),
+	preload("res://scripts/ui/BalanceMinigame.gd"),
 ]
 
 var _tuning: TuningConfig

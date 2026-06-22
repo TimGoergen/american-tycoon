@@ -400,8 +400,11 @@ Resolved since v0.1: ~~automation/managers~~ (§6), ~~dynasty identity~~ (§8.2)
     minigame_mult_max 2.0]` applied in `DynastyState.perform_succession`; player opt-out persisted
     in `GameState.ui_minigame_enabled` (default on; per-round Skip = 1.0×). **Still open:**
     transition minigames (deferred); on-device feel-tune of duration/score-target/cap; whether
-    `K_LEGACY`/`ALPHA` need adjusting now a multiplier rides on top; minigame visual polish
-    (instant grid refresh, no slide animation yet).
+    `K_LEGACY`/`ALPHA` need adjusting now a multiplier rides on top. **Animation added 2026-06-22:**
+    `MatchThreeBoard.resolve_swap` records the resolution as steps (match groups, clears, falls,
+    spawns); `MinigameScreen` animates them — swap slide, match flash + size badge, gems shrink
+    away, survivors + new gems fall in (no full-grid regen). A board test asserts applying the
+    recorded steps reproduces the final grid, so the animation can't desync from the logic.
 
 ---
 

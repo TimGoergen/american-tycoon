@@ -23,6 +23,7 @@ func _init() -> void:
 	_test_swap_no_match_unchanged()
 	_test_known_swap_scores()
 	_test_grid_stays_valid_after_random_swaps()
+	_test_resolve_swap_steps_reproduce_grid()
 
 	print("")
 	if _failures == 0:
@@ -243,3 +244,75 @@ func _grid_is_valid(board) -> bool:
 			if color < 0 or color >= board.num_colors:
 				return false
 	return true
+
+
+## The animation contract: applying a resolve_swap result's recorded steps
+## (clear → falls → spawns) to the post-swap grid must reproduce the board's final grid
+## exactly. If this holds, the animated screen and the headless board can never desync.
+func _test_resolve_swap_steps_reproduce_grid() -> void:
+	var w := 6
+	var h := 6
+	var colors := 5
+	var base := Board.new(w, h, colors, 4242)
+	var original: Array = base.grid.duplicate(true)
+
+	# Find an adjacent pair whose swap is valid (creates a match), probing on throwaway
+	# copies so the search itself doesn't disturb the board we measure.
+	var found := false
+	var pa := [0, 0]
+	var pb := [0, 0]
+	for r in range(h):
+		for c in range(w):
+			for nb in [[r, c + 1], [r + 1, c]]:
+				if nb[0] >= h or nb[1] >= w:
+					continue
+				var probe := Board.new(w, h, colors, 1)
+				probe.grid = original.duplicate(true)
+				if probe.try_swap(r, c, nb[0], nb[1]) > 0:
+					pa = [r, c]
+					pb = nb
+					found = true
+					break
+			if found:
+				break
+		if found:
+			break
+	_check(found, "found a valid swap to resolve")
+	if not found:
+		return
+
+	var real := Board.new(w, h, colors, 7)
+	real.grid = original.duplicate(true)
+
+	# Reconstruct the resolution by hand on `sim`, starting from the post-swap grid.
+	var sim: Array = original.duplicate(true)
+	var tmp: int = sim[pa[0]][pa[1]]
+	sim[pa[0]][pa[1]] = sim[pb[0]][pb[1]]
+	sim[pb[0]][pb[1]] = tmp
+
+	var result: Dictionary = real.resolve_swap(pa[0], pa[1], pb[0], pb[1])
+	_check(result["valid"], "resolve_swap reports valid")
+
+	var sum_cleared := 0
+	for step in result["steps"]:
+		for cell in step["cleared"]:
+			sim[cell[0]][cell[1]] = -1
+		sum_cleared += step["cleared"].size()
+		# Falls: capture every source first, then write targets (handles fall-into-vacated).
+		var captured: Array = []
+		for f in step["falls"]:
+			captured.append([f["to_r"], f["col"], sim[f["from_r"]][f["col"]]])
+		for f in step["falls"]:
+			sim[f["from_r"]][f["col"]] = -1
+		for e in captured:
+			sim[e[0]][e[1]] = e[2]
+		for s in step["spawns"]:
+			sim[s["to_r"]][s["col"]] = s["color"]
+
+	var reproduced := true
+	for r in range(h):
+		for c in range(w):
+			if sim[r][c] != real.grid[r][c]:
+				reproduced = false
+	_check(reproduced, "applying recorded steps reproduces the final grid")
+	_check(sum_cleared == int(result["cleared_total"]), "step clears sum to cleared_total")

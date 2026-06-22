@@ -72,28 +72,72 @@ func is_adjacent(r1: int, c1: int, r2: int, c2: int) -> bool:
 # The swap action
 # ---------------------------------------------------------------------------
 
-## Attempt to swap two adjacent cells.
-##  - If the swap produces at least one match (3+ of the same color in a row or
-##    column), keep the swap and resolve every match: clear matched cells, collapse
-##    columns downward (gravity), refill empties from the top, and repeat for as long
-##    as new matches keep appearing (cascades). The total number of gems cleared across
-##    ALL cascade steps is added to `score` and returned (always > 0 in this case).
-##  - If the swap produces no match, the board is left unchanged and 0 is returned.
-##  - If the cells aren't adjacent / in bounds, nothing changes and 0 is returned.
+## Attempt to swap two adjacent cells (the headless convenience form). Returns the
+## number of gems cleared (0 if the swap makes no match or the cells aren't adjacent).
+## Implemented on top of resolve_swap so there is one resolution path.
 func try_swap(r1: int, c1: int, r2: int, c2: int) -> int:
+	return int(resolve_swap(r1, c1, r2, c2)["cleared_total"])
+
+
+## Resolve a swap AND record every cascade as an animation step, so a UI can play the
+## resolution out (flash the match, clear it, drop survivors, spawn new gems) instead of
+## snapping to the final grid. The board still ends in the final stable state, identical
+## to try_swap. Returns:
+## {
+##   "valid": bool,                  # did the swap create at least one match?
+##   "swap": { "a": [r1,c1], "b": [r2,c2] },   # the swapped cells (for the swap tween)
+##   "cleared_total": int,           # gems cleared (also added to score); 0 if invalid
+##   "steps": Array,                 # [] if invalid; one entry per cascade iteration:
+##     {
+##       "matches": Array,           #   groups: each an Array of [row,col] forming one
+##                                   #     3+ line (lets the UI show match size / shape)
+##       "cleared": Array,           #   flat, de-duplicated [row,col] cells removed
+##       "falls":   Array,           #   { "col", "from_r", "to_r" } survivors that dropped
+##       "spawns":  Array,           #   { "col", "to_r", "color" } new gems filling the top
+##     }
+## }
+## Invariant the UI relies on: applying every step's clear→falls→spawns to the
+## post-swap grid reproduces the board's final `grid` exactly.
+func resolve_swap(r1: int, c1: int, r2: int, c2: int) -> Dictionary:
+	var result := {
+		"valid": false,
+		"swap": {"a": [r1, c1], "b": [r2, c2]},
+		"cleared_total": 0,
+		"steps": [],
+	}
 	if not is_adjacent(r1, c1, r2, c2):
-		return 0
+		return result
 
 	_swap_cells(r1, c1, r2, c2)
 
 	# Only a swap that creates at least one match is legal; otherwise undo it.
-	if _find_matched_cells().is_empty():
+	if _find_match_groups().is_empty():
 		_swap_cells(r1, c1, r2, c2)  # swap back — board is exactly as it started
-		return 0
+		return result
 
-	var total_cleared := _resolve_until_stable()
+	result["valid"] = true
+	var steps: Array = []
+	var total_cleared := 0
+	# Each loop is one cascade: find the matches now on the board, clear+collapse+refill,
+	# record what moved. Repeat until no matches remain.
+	while true:
+		var groups := _find_match_groups()
+		if groups.is_empty():
+			break
+		var cleared := _union_cells(groups)
+		total_cleared += cleared.size()
+		var moves := _clear_collapse_refill_recorded(cleared)
+		steps.append({
+			"matches": groups,
+			"cleared": cleared,
+			"falls": moves["falls"],
+			"spawns": moves["spawns"],
+		})
+
 	score += total_cleared
-	return total_cleared
+	result["steps"] = steps
+	result["cleared_total"] = total_cleared
+	return result
 
 
 # ---------------------------------------------------------------------------
@@ -154,19 +198,13 @@ func _pick_color_without_match(
 	return _rng.randi_range(0, num_colors - 1)
 
 
-## Return the set of cells that are part of any current match (3+ same color in a row
-## or column), as an Array of [row, col] pairs with no duplicates. Empty if the board
-## has no matches. A cell is included once even if it sits at the crossing of both a
-## horizontal and a vertical match.
-func _find_matched_cells() -> Array:
-	# We mark matched cells in a parallel boolean grid first, so a cell counted by both
-	# a horizontal and a vertical run is recorded only once, then collect them at the end.
-	var matched := []
-	for row in range(height):
-		var marks: Array = []
-		marks.resize(width)
-		marks.fill(false)
-		matched.append(marks)
+## Return every current match as a list of GROUPS, where each group is one maximal line
+## (3+ same color, horizontal or vertical) as an Array of [row, col]. A cell at the
+## crossing of a horizontal and a vertical match appears in both groups; the caller
+## de-duplicates with _union_cells when it needs the flat set of cleared cells. Empty if
+## the board has no matches. Keeping groups (not just cells) lets the UI show match size.
+func _find_match_groups() -> Array:
+	var groups: Array = []
 
 	# Horizontal runs: scan each row for stretches of 3+ equal colors.
 	for row in range(height):
@@ -176,8 +214,10 @@ func _find_matched_cells() -> Array:
 			while run_end + 1 < width and grid[row][run_end + 1] == grid[row][run_start]:
 				run_end += 1
 			if run_end - run_start + 1 >= 3:
+				var group: Array = []
 				for col in range(run_start, run_end + 1):
-					matched[row][col] = true
+					group.append([row, col])
+				groups.append(group)
 			run_start = run_end + 1
 
 	# Vertical runs: scan each column for stretches of 3+ equal colors.
@@ -188,54 +228,64 @@ func _find_matched_cells() -> Array:
 			while run_end + 1 < height and grid[run_end + 1][col] == grid[run_start][col]:
 				run_end += 1
 			if run_end - run_start + 1 >= 3:
+				var group: Array = []
 				for row in range(run_start, run_end + 1):
-					matched[row][col] = true
+					group.append([row, col])
+				groups.append(group)
 			run_start = run_end + 1
 
+	return groups
+
+
+## Flatten match groups into a de-duplicated set of [row, col] cells (a crossing cell
+## belongs to two groups but is cleared once).
+func _union_cells(groups: Array) -> Array:
+	var seen := {}
 	var cells: Array = []
-	for row in range(height):
-		for col in range(width):
-			if matched[row][col]:
-				cells.append([row, col])
+	for group in groups:
+		for cell in group:
+			var key: int = cell[0] * width + cell[1]
+			if not seen.has(key):
+				seen[key] = true
+				cells.append(cell)
 	return cells
 
 
-## Resolve the board to a stable state: repeatedly clear all current matches, apply
-## gravity, and refill from the top, until no matches remain. Returns the total number
-## of gems cleared across every cascade step.
-func _resolve_until_stable() -> int:
-	var total_cleared := 0
-	while true:
-		var matched_cells := _find_matched_cells()
-		if matched_cells.is_empty():
-			break
-		total_cleared += matched_cells.size()
-		_clear_and_collapse_and_refill(matched_cells)
-	return total_cleared
-
-
-## Clear the given matched cells, collapse each column downward so surviving gems fall
-## into the gaps (gravity pulls toward higher row indices), then refill the now-empty
-## cells at the TOP of each column with fresh random colors.
-func _clear_and_collapse_and_refill(matched_cells: Array) -> void:
-	# Step 1: mark every matched cell empty.
-	for cell in matched_cells:
+## Clear the given cells, collapse each column downward (gravity → higher row indices),
+## and refill the emptied TOP slots with fresh random colors — recording what moved so a
+## UI can animate it. Returns { "falls": [...], "spawns": [...] } where falls lists the
+## survivors that changed row and spawns lists the new top gems. The grid ends collapsed.
+func _clear_collapse_refill_recorded(cleared: Array) -> Dictionary:
+	for cell in cleared:
 		grid[cell[0]][cell[1]] = _EMPTY
 
-	# Steps 2 & 3 happen column by column. For each column we keep the surviving
-	# (non-empty) colors in order, then rebuild the column from the bottom up: the
-	# survivors sit at the bottom and any remaining top slots get new random colors.
+	var falls: Array = []
+	var spawns: Array = []
+
 	for col in range(width):
-		var survivors: Array = []
+		# Original rows of the survivors in this column, top to bottom.
+		var survivor_rows: Array = []
 		for row in range(height):
 			if grid[row][col] != _EMPTY:
-				survivors.append(grid[row][col])
+				survivor_rows.append(row)
+		var empty_count := height - survivor_rows.size()
 
-		var empty_count := height - survivors.size()
-
-		# Fill the top `empty_count` rows with new random colors...
+		# Build the column fresh: new gems fill the top `empty_count` rows, survivors drop
+		# beneath them keeping order. Write into a temp first so reads of grid stay valid.
+		var new_col: Array = []
+		new_col.resize(height)
 		for row in range(empty_count):
-			grid[row][col] = _rng.randi_range(0, num_colors - 1)
-		# ...then drop the survivors into the rows beneath them, preserving their order.
-		for i in range(survivors.size()):
-			grid[empty_count + i][col] = survivors[i]
+			var color := _rng.randi_range(0, num_colors - 1)
+			new_col[row] = color
+			spawns.append({"col": col, "to_r": row, "color": color})
+		for i in range(survivor_rows.size()):
+			var from_r: int = survivor_rows[i]
+			var to_r: int = empty_count + i
+			new_col[to_r] = grid[from_r][col]
+			if from_r != to_r:
+				falls.append({"col": col, "from_r": from_r, "to_r": to_r})
+
+		for row in range(height):
+			grid[row][col] = new_col[row]
+
+	return {"falls": falls, "spawns": spawns}

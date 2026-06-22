@@ -42,6 +42,11 @@ const FONT_BODY := 32         # body text and captions
 const FONT_LABEL := 28        # secondary labels
 const FONT_SMALL := 26        # the smallest text allowed — the readability floor
 
+## Corner radius (px, 1080-wide design space) for UI that hugs the phone's rounded screen
+## corners — the income panel's top corners and the outer bottom corners of the edge tab
+## buttons — so they nest inside the Pixel's screen curve instead of squaring into it.
+const SCREEN_CORNER_RADIUS := 44
+
 ## The app-wide Theme: a chunky default font size plus per-control-type defaults, so
 ## any control that does NOT override its own size still reads large (the §1b
 ## readability bar). Assigned on the Main root (see Main._build_ui) so it cascades to

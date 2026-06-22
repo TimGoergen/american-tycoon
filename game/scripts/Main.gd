@@ -379,12 +379,21 @@ func _build_settings_tab() -> Control:
 	# Prestige minigame toggle — the persistent home for the opt-out (GameState).
 	_minigame_check = CheckBox.new()
 	_minigame_check.text = "Play the prestige minigame"
-	_minigame_check.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
+	# 40% larger than FONT_BODY (32 -> 45) at Tim's request.
+	_minigame_check.add_theme_font_size_override("font_size", 45)
 	# Navy text in every state — the default theme's checked/hover/pressed colors are a
 	# pale near-white that was unreadable on the cream tab (Tim, 2026-06-22).
 	for state in ["font_color", "font_pressed_color", "font_hover_color",
 			"font_focus_color", "font_hover_pressed_color", "font_disabled_color"]:
 		_minigame_check.add_theme_color_override(state, UiPalette.NAVY)
+	# Custom check glyphs sized (~44px) to match the larger label, so the box is as tall
+	# as the text instead of the tiny default icon.
+	_minigame_check.add_theme_icon_override(
+		"checked", load("res://art/icons/checkbox_checked.svg")
+	)
+	_minigame_check.add_theme_icon_override(
+		"unchecked", load("res://art/icons/checkbox_unchecked.svg")
+	)
 	_minigame_check.button_pressed = game.ui_minigame_enabled
 	_minigame_check.toggled.connect(func(on: bool) -> void: game.ui_minigame_enabled = on)
 	v.add_child(_minigame_check)
@@ -435,7 +444,7 @@ func _show_tab(index: int) -> void:
 	_active_tab = index
 	for i in range(_tab_panels.size()):
 		(_tab_panels[i] as Control).visible = (i == index)
-		_style_tab_button(_tab_buttons[i] as Button, i == index)
+		_style_tab_button(_tab_buttons[i] as Button, i == index, i)
 	if index == TAB_ESTATE:
 		_legacy_screen.set_retention_entries(_build_retention_entries())
 		_legacy_screen.refresh()
@@ -445,15 +454,24 @@ func _show_tab(index: int) -> void:
 		_minigame_check.button_pressed = game.ui_minigame_enabled
 
 
-## The active tab button reads as a mustard plate; the rest as plain cream plates.
-func _style_tab_button(button: Button, active: bool) -> void:
-	if active:
-		UiPalette.style_button(button, false)  # mustard = selected
-	else:
-		var flat := UiPalette.make_panel_style()
-		button.add_theme_stylebox_override("normal", flat)
-		button.add_theme_stylebox_override("hover", flat)
-		button.add_theme_stylebox_override("pressed", flat)
+## The active tab button reads as a mustard plate; the rest as plain cream plates. The
+## leftmost and rightmost tabs round their OUTER bottom corner to nest inside the phone's
+## bottom screen corners (the Property tab's bottom-left, the Settings tab's bottom-right).
+func _style_tab_button(button: Button, active: bool, index: int) -> void:
+	var box := StyleBoxFlat.new()
+	box.bg_color = UiPalette.MUSTARD_GOLD if active else UiPalette.CREAM
+	box.border_color = UiPalette.NAVY
+	box.set_border_width_all(3)
+	box.set_corner_radius_all(4)
+	box.set_content_margin_all(12)
+	if index == 0:
+		box.corner_radius_bottom_left = UiPalette.SCREEN_CORNER_RADIUS
+	elif index == _tab_buttons.size() - 1:
+		box.corner_radius_bottom_right = UiPalette.SCREEN_CORNER_RADIUS
+	button.add_theme_stylebox_override("normal", box)
+	button.add_theme_stylebox_override("hover", box)
+	button.add_theme_stylebox_override("pressed", box)
+	button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 
 
 # ---------------------------------------------------------------------------

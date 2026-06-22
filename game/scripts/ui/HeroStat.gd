@@ -81,6 +81,10 @@ var _glow_time := 0.0
 func _ready() -> void:
 	var style := UiPalette.make_panel_style()
 	style.border_color = UiPalette.KETCHUP_RED  # the red ticket frame (§8)
+	# Round the TOP corners to nest inside the phone's rounded screen corners (Tim,
+	# 2026-06-22); the bottom corners keep the standard small radius.
+	style.corner_radius_top_left = UiPalette.SCREEN_CORNER_RADIUS
+	style.corner_radius_top_right = UiPalette.SCREEN_CORNER_RADIUS
 	add_theme_stylebox_override("panel", style)
 	_panel_style = style  # kept so the frenzy glow can pulse its background
 

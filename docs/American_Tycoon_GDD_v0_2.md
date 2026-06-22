@@ -394,11 +394,14 @@ Resolved since v0.1: ~~automation/managers~~ (§6), ~~dynasty identity~~ (§8.2)
     half (tiers 7–12) stretched to a 180s top, income-neutral; milestone cadence switched to AdCap
     25/50/100/200/300/400 (§4 note, Spec §3.1/§3.3). **New follow-up:** the cadence runs the
     economy ~38% slower — a prestige/cost re-tuning pass is open (Spec §15 item 8).
-14. **Minigames (now adopted, §5.5).** Which minigame(s) ship first; whether the transition
-    minigame and the legacy-bonus minigame are the same game or different; the legacy bonus
-    multiplier's balanced range (e.g. 1.0×–2.0×) and whether `K_LEGACY`/`ALPHA` need re-tuning
-    once a multiplier rides on top (the log curve was already reworked once to avoid runaway
-    Legacy — Spec §9.3); the opt-out default value (1.0× vs. a modest baseline).
+14. **Minigames (§5.5).** **Prestige legacy-bonus minigame BUILT 2026-06-22:** a **match-3**
+    (`MatchThreeBoard.gd` headless logic + `MinigameScreen.gd`) played mid-succession (after the
+    will, before the heir reveal); score → upside-only multiplier `[minigame_mult_optout 1.0,
+    minigame_mult_max 2.0]` applied in `DynastyState.perform_succession`; player opt-out persisted
+    in `GameState.ui_minigame_enabled` (default on; per-round Skip = 1.0×). **Still open:**
+    transition minigames (deferred); on-device feel-tune of duration/score-target/cap; whether
+    `K_LEGACY`/`ALPHA` need adjusting now a multiplier rides on top; minigame visual polish
+    (instant grid refresh, no slide animation yet).
 
 ---
 

@@ -31,6 +31,7 @@ var _will_screen: WillScreen
 var _legacy_screen: LegacyScreen
 var _ledger_screen: FamilyLedgerScreen
 var _dev_panel: DevTuningPanel
+var _minigame_screen: MinigameScreen
 var _buy_mode_button: Button
 var _plan_button: Button
 var _legacy_button: Button
@@ -58,7 +59,8 @@ func _process(delta: float) -> void:
 	# numbers from shifting under the player, avoids half-saving the generation
 	# swap mid-ceremony, and lets the shop spend Legacy against a steady balance.
 	if _will_screen.visible or _legacy_screen.visible or _ledger_screen.visible \
-			or _dev_panel.visible or _first_contact_overlay.visible:
+			or _dev_panel.visible or _first_contact_overlay.visible \
+			or _minigame_screen.visible:
 		return
 
 	# Fixed-timestep logic (Spec §2): accumulate render time and tick in
@@ -374,6 +376,15 @@ func _build_ui() -> void:
 	_dev_panel.closed.connect(_on_dev_closed)
 	add_child(_dev_panel)
 
+	# The prestige minigame (GDD §5.5): a match-3 played mid-succession (after the will,
+	# before the heir reveal) whose score grants an upside-only multiplier on the run's
+	# Legacy. Main freezes the economy while it is up and reads the multiplier back.
+	_minigame_screen = MinigameScreen.new()
+	_minigame_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_minigame_screen.setup(tuning)
+	_minigame_screen.finished.connect(_on_minigame_finished)
+	add_child(_minigame_screen)
+
 
 # ---------------------------------------------------------------------------
 # UI verb handlers — every player action flows through GameState
@@ -622,10 +633,28 @@ func _on_will_cancelled() -> void:
 	pass
 
 
-## Player signed the will: execute the death — bank Legacy, advance the
-## generation, raise the heir — then reveal who inherits.
+## Player signed the will. If the prestige minigame is on (GDD §5.5), it runs now to
+## set the Legacy multiplier (seeded with the base gain for its result display); the
+## will stays up behind the minigame's scrim, so the economy stays frozen. Otherwise we
+## finalize immediately at the flat opt-out multiplier.
 func _on_pass_on_confirmed() -> void:
-	dynasty.perform_succession()
+	if game.ui_minigame_enabled:
+		_minigame_screen.start_game(dynasty.projected_legacy_gain())
+	else:
+		_finalize_succession(tuning.minigame_mult_optout)
+
+
+## The minigame ended: persist the player's "skip future minigames" choice, then
+## finalize the succession with the multiplier it produced.
+func _on_minigame_finished(multiplier: float, opt_out: bool) -> void:
+	game.ui_minigame_enabled = not opt_out
+	_finalize_succession(multiplier)
+
+
+## Execute the death with the given Legacy multiplier — bank (boosted) Legacy, advance
+## the generation, raise the heir — then reveal who inherits.
+func _finalize_succession(multiplier: float) -> void:
+	dynasty.perform_succession("Retired to Palm Beach", multiplier)
 	_will_screen.show_heir_reveal(HeirNames.dynasty_name(dynasty.generation), dynasty.generation)
 
 

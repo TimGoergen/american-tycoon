@@ -163,10 +163,21 @@ func can_perform_succession() -> bool:
 ## `cause` is the deadpan generation-end recorded in the Ledger (GDD §8.2) — the
 ## natural-death default, or "Creditors" when the bankruptcy path calls this.
 ## Returns the executed will for ceremony.
-func perform_succession(cause: String = "Retired to Palm Beach") -> Dictionary:
+func perform_succession(
+		cause: String = "Retired to Palm Beach",
+		minigame_multiplier: float = 1.0
+) -> Dictionary:
 	var will := get_draft_will()
 
-	upgrades.award(int(will["legacy_gain"]))
+	# The prestige minigame (GDD §5.5) grants an upside-only multiplier on the Legacy
+	# earned. The will (get_draft_will) shows the deterministic base; the minigame then
+	# boosts what is actually banked. Clamped to ≥1.0 so it can only ever help, and
+	# floored like the base conversion. The boosted total is stashed on the returned will
+	# so the ceremony can show it. The bankruptcy path calls with the default 1.0×.
+	var awarded := int(floor(float(will["legacy_gain"]) * maxf(1.0, minigame_multiplier)))
+	will["legacy_awarded"] = awarded
+	will["minigame_multiplier"] = minigame_multiplier
+	upgrades.award(awarded)
 	# Roll this life's earnings into the dynasty's monotonic lifetime total before the
 	# generation is replaced (the obituary headline / Family Ledger career stat).
 	lifetime_cash_earned += current.economy.cash_earned_this_gen

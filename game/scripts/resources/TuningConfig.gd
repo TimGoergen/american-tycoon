@@ -111,6 +111,25 @@ extends Resource
 # Legacy became a spendable upgrade currency. Per-level upgrade magnitudes and
 # costs now live in LegacyUpgradeCatalog.gd, not here.
 
+# --- Prestige minigame (GDD §5.5, Spec §9.3) ---
+# At prestige the player plays a match-3 minigame whose score grants an upside-only
+# multiplier on the Legacy earned: legacy_awarded = floor(base_legacy × minigame_mult),
+# minigame_mult in [minigame_mult_optout, minigame_mult_max].
+
+## Multiplier earned by a perfect minigame (score ≥ target). The cap on the Legacy boost.
+@export var minigame_mult_max: float = 2.0  # feel-tune
+
+## Multiplier banked when the player skips / has the minigame turned off. 1.0 = no bonus,
+## no penalty (the minigame is pure upside, never a loss).
+@export var minigame_mult_optout: float = 1.0
+
+## Score (gems cleared) that earns the full minigame_mult_max; the multiplier scales
+## linearly from optout (score 0) to max (score ≥ this).
+@export var minigame_score_target: float = 100.0  # feel-tune
+
+## How long one minigame round lasts, in seconds.
+@export var minigame_duration_seconds: float = 30.0  # feel-tune
+
 # --- Events (Spec §10) ---
 
 ## Income multiplier during a Market Crash event.

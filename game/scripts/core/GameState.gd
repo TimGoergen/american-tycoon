@@ -35,6 +35,11 @@ var peak_net_worth: float = 0.0
 ## model never reads it.
 var ui_buy_mode: int = 0
 
+## UI preference: whether the prestige minigame is played (true) or auto-skipped for a
+## flat 1.0× Legacy multiplier (false). Defaults to on (the minigame is mandatory until
+## the player opts out — GDD §5.5). Persisted in the save like ui_buy_mode.
+var ui_minigame_enabled: bool = true
+
 ## The headline income/sec shown on the hero panel. It is built as a guaranteed
 ## floor plus a bonus: it never reads below the guaranteed staffed income (what
 ## idle play keeps earning), and on top of that it adds a smoothed average of the
@@ -227,6 +232,7 @@ func to_save_dict() -> Dictionary:
 		"cash": economy.cash,
 		"peak_net_worth": peak_net_worth,
 		"buy_mode": ui_buy_mode,
+		"minigame_enabled": ui_minigame_enabled,
 		# Which alien epoch this run has reached (1 = Earth).
 		"epoch_tier": epoch.current_tier,
 		# Per-generation book-value accumulators (Spec §9.2). Saved raw because
@@ -261,6 +267,8 @@ func load_save_dict(data: Dictionary) -> void:
 	economy.cash = float(data.get("cash", 0.0))
 	peak_net_worth = float(data.get("peak_net_worth", 0.0))
 	ui_buy_mode = int(data.get("buy_mode", 0))
+	# Pre-minigame saves have no flag; default to enabled (mandatory until opted out).
+	ui_minigame_enabled = bool(data.get("minigame_enabled", true))
 	economy.spent_on_units_this_gen = float(data.get("spent_on_units_this_gen", 0.0))
 	economy.spent_on_staff_this_gen = float(data.get("spent_on_staff_this_gen", 0.0))
 	economy.starting_cash = float(data.get("starting_cash", 0.0))

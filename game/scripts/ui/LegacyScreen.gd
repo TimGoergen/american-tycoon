@@ -213,6 +213,9 @@ func _add_upgrade_card(parent: VBoxContainer, definition: Dictionary) -> void:
 
 	var effect_label := Label.new()
 	effect_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# Wrap so a long effect string (e.g. "×2.96 auto-tap / auto-rush speed") can't force
+	# the card's minimum width past the tab and push the panel off the right edge.
+	effect_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	effect_label.add_theme_color_override("font_color", UiPalette.MONEY_GREEN)
 	effect_label.add_theme_font_size_override("font_size", CARD_BODY_SIZE)
 	bottom_row.add_child(effect_label)
@@ -287,6 +290,7 @@ func _add_retention_row(entry: Dictionary) -> void:
 
 	var status := Label.new()
 	status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	status.text = "Now tier %d  ·  Retained tier %d" % [
 		int(entry["current_tier"]), int(entry["retained_tier"])
 	]

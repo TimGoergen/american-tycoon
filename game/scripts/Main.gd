@@ -34,9 +34,6 @@ var _dev_panel: DevTuningPanel
 var _minigame_screen: MinigameScreen
 var _buy_mode_button: Button
 var _plan_button: Button
-var _legacy_button: Button
-## Gold "LEGACY: N" balance pinned to the right end of the Estate Office button.
-var _legacy_balance_label: Label
 var _rows: Array = []
 
 # Bottom tab bar (UI Notes §7). The four surfaces share one content slot; one is
@@ -70,8 +67,7 @@ func _process(delta: float) -> void:
 	# the will's numbers steady, avoids half-saving the generation swap mid-ceremony, and
 	# lets the shop spend Legacy against a steady balance. NOTE: switching TABS does NOT
 	# freeze — an idle game keeps earning no matter which tab you're reading.
-	if _will_screen.visible or _legacy_screen.visible \
-			or _dev_panel.visible or _first_contact_overlay.visible \
+	if _will_screen.visible or _dev_panel.visible or _first_contact_overlay.visible \
 			or _minigame_screen.visible:
 		return
 
@@ -102,7 +98,6 @@ func _process(delta: float) -> void:
 	_hero_stat.set_dynasty_name(HeirNames.dynasty_name(dynasty.generation))
 	_update_epoch_label()
 	_update_plan_button()
-	_update_legacy_button()
 
 
 func _notification(what: int) -> void:
@@ -244,16 +239,6 @@ func _build_ui() -> void:
 	_will_screen.cancelled.connect(_on_will_cancelled)
 	add_child(_will_screen)
 
-	# The Legacy upgrade shop overlay, also above everything and hidden until the
-	# player opens the Estate Office. It reads/writes the dynasty's upgrade state.
-	_legacy_screen = LegacyScreen.new()
-	_legacy_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_legacy_screen.setup(dynasty.upgrades)
-	_legacy_screen.purchased.connect(_on_upgrade_purchased)
-	_legacy_screen.retain_requested.connect(_on_retain_requested)
-	_legacy_screen.closed.connect(_on_legacy_screen_closed)
-	add_child(_legacy_screen)
-
 	# The dev tuning panel (GDD §13), above everything and hidden until the DEV
 	# button opens it. Main freezes the economy while it is up, applies its edits
 	# by saving overrides + reloading the scene, and routes its save-wipe action.
@@ -344,19 +329,13 @@ func _build_property_tab() -> Control:
 	return v
 
 
-## Estate Planning tab: the prestige hub — plan the estate (succession) and open the
-## Estate Office (Legacy upgrade shop). Both controls keep their existing visibility
-## rules; _update_plan_button / _update_legacy_button drive them each frame.
+## Estate Planning tab: the prestige hub — the "Plan the Estate" succession action on
+## top, with the Estate Office (Legacy upgrade shop) embedded directly beneath it (no
+## modal). _update_plan_button drives the plan button each frame; _show_tab refreshes the
+## office on entry.
 func _build_estate_tab() -> Control:
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 12)
-
-	var heading := Label.new()
-	heading.text = "ESTATE PLANNING"
-	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	heading.add_theme_color_override("font_color", UiPalette.NAVY)
-	heading.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
-	v.add_child(heading)
+	v.add_theme_constant_override("separation", 10)
 
 	# The prestige exit: plan the estate, pass on, raise a faster heir. Red = big commit.
 	_plan_button = Button.new()
@@ -367,41 +346,20 @@ func _build_estate_tab() -> Control:
 	_plan_button.pressed.connect(_on_plan_estate_pressed)
 	v.add_child(_plan_button)
 
-	# The Estate Office: open the Legacy upgrade shop (a modal). Hidden until the first
-	# prestige has ever earned Legacy. The Legacy balance is pinned to its right edge.
-	_legacy_button = Button.new()
-	_legacy_button.custom_minimum_size = Vector2(0, 64)
-	_legacy_button.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
-	UiPalette.style_button(_legacy_button, false)
-	_legacy_button.text = "THE ESTATE OFFICE"
-	_legacy_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	_legacy_button.pressed.connect(_on_estate_office_pressed)
-	_legacy_button.visible = false
-	v.add_child(_legacy_button)
+	# The Estate Office (Legacy upgrade shop + staff retention) now lives right here on the
+	# tab, not behind a modal button. It fills the rest of the tab and reads/writes the
+	# live upgrade state; _show_tab refreshes it on entry, and purchases re-apply effects.
+	_legacy_screen = LegacyScreen.new()
+	_legacy_screen.setup(dynasty.upgrades)
+	_legacy_screen.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_legacy_screen.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_legacy_screen.purchased.connect(_on_upgrade_purchased)
+	_legacy_screen.retain_requested.connect(_on_retain_requested)
+	v.add_child(_legacy_screen)
+	# Populate once now so the cards aren't blank on first view.
+	_legacy_screen.set_retention_entries(_build_retention_entries())
+	_legacy_screen.refresh()
 
-	_legacy_balance_label = Label.new()
-	_legacy_balance_label.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD)
-	_legacy_balance_label.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
-	_legacy_balance_label.add_theme_color_override("font_outline_color", UiPalette.MUSTARD_GOLD)
-	_legacy_balance_label.add_theme_constant_override("outline_size", 2)
-	_legacy_balance_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_legacy_balance_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_legacy_balance_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_legacy_balance_label.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_legacy_balance_label.offset_right = -14
-	_legacy_button.add_child(_legacy_balance_label)
-
-	var hint := Label.new()
-	hint.text = "Pass on to convert this life's fortune into Legacy, then spend it on permanent dynasty upgrades."
-	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hint.add_theme_color_override("font_color", UiPalette.NAVY)
-	hint.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
-	v.add_child(hint)
-
-	var spacer := Control.new()
-	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	v.add_child(spacer)
 	return v
 
 
@@ -474,7 +432,10 @@ func _show_tab(index: int) -> void:
 	for i in range(_tab_panels.size()):
 		(_tab_panels[i] as Control).visible = (i == index)
 		_style_tab_button(_tab_buttons[i] as Button, i == index)
-	if index == TAB_LEDGER:
+	if index == TAB_ESTATE:
+		_legacy_screen.set_retention_entries(_build_retention_entries())
+		_legacy_screen.refresh()
+	elif index == TAB_LEDGER:
 		_ledger_screen.refresh(dynasty.ancestors, dynasty.lifetime_cash_earned)
 	elif index == TAB_SETTINGS and _minigame_check != null:
 		_minigame_check.button_pressed = game.ui_minigame_enabled
@@ -613,25 +574,8 @@ func _on_contact_made(new_tier: int) -> void:
 	_first_contact_overlay.show_contact(new_tier)
 
 
-## Reveal the Estate Office button once the dynasty has ever earned Legacy — i.e.
-## from the first prestige onward. earned_lifetime never falls back to 0, so once
-## shown the button stays for good (even after the wallet is spent down to 0). While
-## shown, keep its right-pinned balance in sync with the spendable wallet.
-func _update_legacy_button() -> void:
-	_legacy_button.visible = dynasty.upgrades.earned_lifetime > 0
-	_legacy_balance_label.text = "LEGACY: " + str(dynasty.upgrades.available)
-
-
 ## The Family Ledger is now a tab (UI Notes §7), refreshed on entry by _show_tab —
 ## no Main-screen button to reveal.
-
-
-## Player opened the Estate Office: feed the shop a fresh Household Staff snapshot
-## (which depends on the living generation's staff), then show it. The upgrade cards
-## refresh themselves against the current Legacy wallet inside open().
-func _on_estate_office_pressed() -> void:
-	_legacy_screen.set_retention_entries(_build_retention_entries())
-	_legacy_screen.open()
 
 
 ## Snapshot of the living generation's staff vs. the dynasty's retained tiers, for the
@@ -678,11 +622,6 @@ func _on_retain_requested(property_index: int) -> void:
 ## mid-life) and persist, so a purchase is never lost to a crash before autosave.
 func _on_upgrade_purchased(_upgrade_id: String) -> void:
 	dynasty.refresh_current_generation_effects()
-	SaveManager.save_dict_to_file(dynasty.to_save_dict())
-
-
-## Player closed the shop: persist and let the game resume on the next frame.
-func _on_legacy_screen_closed() -> void:
 	SaveManager.save_dict_to_file(dynasty.to_save_dict())
 
 

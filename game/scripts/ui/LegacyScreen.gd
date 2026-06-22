@@ -1,22 +1,20 @@
 class_name LegacyScreen
-extends ColorRect
+extends Control
 
-# "The Estate Office" — the Legacy upgrade shop (GDD §13 / the M2 prestige
-# reward). Opened from the Main screen by a button that only appears once the
-# player has prestiged at least once. Here the player spends banked Legacy on the
-# permanent, dynasty-wide upgrades defined in LegacyUpgradeCatalog.
+# "The Estate Office" — the Legacy upgrade shop (GDD §13 / the M2 prestige reward).
+# Here the player spends banked Legacy on the permanent, dynasty-wide upgrades defined in
+# LegacyUpgradeCatalog, plus per-staffer retention (GDD §6.3).
 #
-# This is a FULL-SCREEN page: an opaque cream sheet that fills the whole screen
-# while open (Main freezes the economy behind it), with large legible type (Tim
-# reads large — UI notes §1). It reads and writes the live LegacyUpgrades state
-# directly; Main is told when a purchase happens so it can re-apply the new effect
-# to the living generation, and again when the player closes the shop.
+# This is the LOWER part of the Estate Planning tab (UI Notes §7) — embedded content, not
+# a modal. There is no scrim or close button; switching away is just switching tabs, and
+# the economy keeps ticking (Legacy is a prestige currency, unaffected by the per-second
+# tick). It reads/writes the live LegacyUpgrades state directly; Main is told when a
+# purchase happens so it can re-apply the new effect to the living generation.
 #
 # Drive it from Main.gd:
-#   1. setup(upgrades)        once, after the state exists (builds the cards)
-#   2. open()                 to show it (refreshes every card first)
-#   3. listen for purchased   re-apply effects to the living generation
-#   4. listen for closed      resume the game
+#   1. setup(upgrades)            once, after the state exists (builds the cards)
+#   2. refresh() + set_retention_entries(...)   on entering the Estate tab
+#   3. listen for purchased / retain_requested  re-apply effects / spend Legacy
 
 
 ## A purchase just succeeded for this upgrade id. Main re-applies effects + saves.
@@ -26,22 +24,15 @@ signal purchased(upgrade_id: String)
 ## Main spends the Legacy, records it, then re-feeds the entries.
 signal retain_requested(property_index: int)
 
-## The player closed the shop and wants to return to the game.
-signal closed
 
-
-# Type sizes — large for at-a-glance phone reading (UI notes §1). Sized big for
-# the full-screen page, then trimmed 15% from that pass (Tim's call).
-const TITLE_SIZE   := UiPalette.FONT_PAGE_TITLE
-const WALLET_SIZE  := UiPalette.FONT_DISPLAY
+# Type sizes — large for at-a-glance phone reading (UI notes §1). The title/wallet are a
+# notch smaller than the old full-screen sizes so the stacked header fits the tab width.
+const TITLE_SIZE   := UiPalette.FONT_HEADLINE
+const WALLET_SIZE  := UiPalette.FONT_SUBHEAD
 const CATEGORY_SIZE := UiPalette.FONT_HEADLINE
 const CARD_NAME_SIZE := UiPalette.FONT_HEADLINE
 const CARD_BODY_SIZE := UiPalette.FONT_CARD_BODY
 const BUTTON_SIZE  := UiPalette.FONT_SUBHEAD
-
-## Top inset (in the 1080×1920 design space) that pushes the header row clear of
-## the phone's front camera cut-out, so the title and Legacy readout aren't hidden.
-const CAMERA_CUTOUT_INSET := 130
 
 ## Hold-to-buy pacing (Tim, 2026-06-17): a quick tap buys one level; holding a buy
 ## button keeps buying at a calm cadence so the player can watch the wallet/effect and
@@ -77,57 +68,43 @@ func setup(upgrades: LegacyUpgrades) -> void:
 	_build_ui()
 
 
-func _ready() -> void:
-	# Opaque cream sheet filling the whole screen — this is a full page, not a
-	# translucent card over the game. Main freezes the economy while it is visible.
-	color = UiPalette.CREAM
-	visible = false
-
-
 # ---------------------------------------------------------------------------
 # Layout
 # ---------------------------------------------------------------------------
 
 func _build_ui() -> void:
-	# Fill the screen edge to edge with a margin, then stack the page contents
-	# top-to-bottom. The scrolling card list (added below) takes all the leftover
-	# height, so the page fits any phone without a fixed panel size.
+	set_anchors_preset(Control.PRESET_FULL_RECT)
+
+	# Fill the tab area with a small margin, then stack the contents top-to-bottom. The
+	# scrolling card list takes all the leftover height. No camera-cutout inset here —
+	# the pinned hero stat above the tabs already clears it.
 	var margin := MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	margin.add_theme_constant_override("margin_left", 20)
-	margin.add_theme_constant_override("margin_right", 20)
-	# Extra top inset clears the phone's camera cut-out (see CAMERA_CUTOUT_INSET).
-	margin.add_theme_constant_override("margin_top", CAMERA_CUTOUT_INSET)
-	margin.add_theme_constant_override("margin_bottom", 20)
+	margin.add_theme_constant_override("margin_left", 8)
+	margin.add_theme_constant_override("margin_right", 8)
+	margin.add_theme_constant_override("margin_top", 8)
+	margin.add_theme_constant_override("margin_bottom", 8)
 	add_child(margin)
 
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 12)
 	margin.add_child(column)
 
-	# ── Header row: "Estate Planning" pinned left, Legacy readout pinned right ──
-	var header_row := HBoxContainer.new()
-	column.add_child(header_row)
-
+	# ── Header: "The Estate Office" then the Legacy wallet, STACKED (not side-by-side,
+	# which overflowed the tab width at large type). ──
 	var title := Label.new()
-	title.text = "Estate Planning"
-	# Expand fill pushes the title to the left edge and the wallet to the right.
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title.text = "The Estate Office"
 	title.add_theme_color_override("font_color", UiPalette.NAVY)
 	title.add_theme_font_size_override("font_size", TITLE_SIZE)
-	header_row.add_child(title)
+	column.add_child(title)
 
 	_wallet_label = Label.new()
-	_wallet_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_wallet_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_wallet_label.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD)
 	# Faux-bold via a same-color outline, matching the project's plate aesthetic.
 	_wallet_label.add_theme_color_override("font_outline_color", UiPalette.MUSTARD_GOLD)
 	_wallet_label.add_theme_constant_override("outline_size", 4)
 	_wallet_label.add_theme_font_size_override("font_size", WALLET_SIZE)
-	header_row.add_child(_wallet_label)
+	column.add_child(_wallet_label)
 
 	# ── Scrollable list of upgrade cards (grouped by category) ──
 	# Takes all the leftover height between the wallet readout and the close
@@ -170,15 +147,6 @@ func _build_ui() -> void:
 	# Let a swipe that lands on a card surface (not its BUY button) scroll the
 	# list, the same as the property ladder. See UiPalette.allow_scroll_drag_through.
 	UiPalette.allow_scroll_drag_through(list)
-
-	# ── Close button ──
-	var close_button := Button.new()
-	close_button.text = "BACK TO THE EMPIRE"
-	close_button.custom_minimum_size = Vector2(0, 158)
-	close_button.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
-	UiPalette.style_button(close_button, false)
-	close_button.pressed.connect(_on_close_pressed)
-	column.add_child(close_button)
 
 
 ## A section heading between groups of cards ("Wealth", "Operations", …).
@@ -337,12 +305,6 @@ func _add_retention_row(entry: Dictionary) -> void:
 # Showing / refreshing
 # ---------------------------------------------------------------------------
 
-## Show the shop, refreshing every card against the current wallet first.
-func open() -> void:
-	refresh()
-	visible = true
-
-
 ## Re-read the live state and update the wallet readout and every card.
 func refresh() -> void:
 	# Short label so it fits beside the large title on the header row.
@@ -407,9 +369,3 @@ func _attempt_buy(id: String) -> bool:
 	refresh()           # update the wallet and this card immediately
 	purchased.emit(id)  # let Main re-apply the effect to the living generation
 	return true
-
-
-func _on_close_pressed() -> void:
-	_held_buy_id = ""
-	visible = false
-	closed.emit()

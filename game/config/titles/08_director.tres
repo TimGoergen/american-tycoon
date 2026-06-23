@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-title_name = "Shift Supervisor"
-wage_per_tap = 25.0
-tap_threshold = 75
-tuition = 50.0
+title_name = "Director"
+wage_per_tap = 800.0
+tap_threshold = 3175
+tuition = 1600.0

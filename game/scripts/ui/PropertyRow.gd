@@ -118,10 +118,12 @@ func _ready() -> void:
 	column.add_theme_constant_override("separation", 6)
 	add_child(column)
 
-	# Top of the row: a round manager-portrait slot on the left, and to its right a
-	# section holding the title and the cycle progress bar. The circle is sized in
-	# _refresh to be a square as tall as that whole section (title + progress bar
-	# combined), so it reads as one portrait spanning both lines.
+	# Top of the row: a round manager-portrait slot on the left, and to its right a section
+	# holding the name, the cycle progress bar, AND the milestone (inventory count) bar. The
+	# circle is sized in _refresh to be a square as tall as that whole section (all three
+	# lines), so it reads as one tall portrait spanning them — and the milestone bar, now in
+	# that section, lines up with the cycle bar's width instead of running the full row (Tim,
+	# 2026-06-22).
 	var top_row := HBoxContainer.new()
 	top_row.add_theme_constant_override("separation", 12)
 	column.add_child(top_row)
@@ -172,11 +174,12 @@ func _ready() -> void:
 	UiPalette.style_progress_bar(_cycle_bar, UiPalette.MONEY_GREEN)
 	top_section.add_child(_cycle_bar)
 
-	# Milestone slider: min = last milestone, max = next (Spec §3.5 — "the
-	# pile can push me over 40" is part of the return spike).
+	# Milestone slider: min = last milestone, max = next (Spec §3.5 — "the pile can push me
+	# over 40" is part of the return spike). Lives in top_section (right of the portrait) so it
+	# shares the cycle bar's width and the portrait spans it too (Tim, 2026-06-22).
 	var milestone_line := HBoxContainer.new()
 	milestone_line.add_theme_constant_override("separation", 10)
-	column.add_child(milestone_line)
+	top_section.add_child(milestone_line)
 
 	_milestone_bar = ProgressBar.new()
 	_milestone_bar.show_percentage = false

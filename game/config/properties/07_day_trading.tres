@@ -11,5 +11,4 @@ r0 = 1.07
 base_income_per_unit = 3333333.0
 base_cycle_length = 24.0
 staffer_name = "Portfolio Analyst"
-# Day Trading — alarm-ticker red
 accent_color = Color(0.710, 0.251, 0.165, 1)

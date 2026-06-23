@@ -36,7 +36,7 @@ func _ready() -> void:
 	# The shared standard button height, matching the buy-mode button sharing its row.
 	custom_minimum_size = Vector2(0, UiPalette.STANDARD_BUTTON_HEIGHT)
 	size_flags_vertical = Control.SIZE_FILL
-	UiPalette.style_framed_progress(self, UiPalette.MUSTARD_GOLD, UiPalette.ATOMIC_TEAL)
+	UiPalette.style_framed_progress(self, UiPalette.MUSTARD_GOLD, UiPalette.PROGRESS_TRACK_GRAY)
 
 	# Transparent button overlaying the meter: the gold/red fill shows through, and
 	# only the TURBO label and the tap belong to the button. Empty styleboxes (with a
@@ -91,4 +91,4 @@ func _set_burn_style(burning: bool) -> void:
 		return
 	_showing_burn_style = burning
 	var fill := UiPalette.KETCHUP_RED if burning else UiPalette.MUSTARD_GOLD
-	UiPalette.style_framed_progress(self, fill, UiPalette.ATOMIC_TEAL)
+	UiPalette.style_framed_progress(self, fill, UiPalette.PROGRESS_TRACK_GRAY)

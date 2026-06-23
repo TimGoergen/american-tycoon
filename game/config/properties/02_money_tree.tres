@@ -11,5 +11,4 @@ r0 = 1.07
 base_income_per_unit = 90.0
 base_cycle_length = 2.025
 staffer_name = "Botanical Manager"
-# Money Tree — money green
 accent_color = Color(0.310, 0.510, 0.345, 1)

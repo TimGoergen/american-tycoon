@@ -27,6 +27,10 @@ const DARK_GRAY := Color("#6E6E6E")   # unowned start button + portrait circle
 ## button, behind its restart icon (the start/rush control, GDD §5 / Tim 2026-06-22).
 const SILVER := Color("#C7CBD1")
 
+## Semi-dark gray track behind every progress meter's fill (Tim, 2026-06-22): replaced the
+## bright atomic-teal track, which read too loud behind the cycle / milestone / TURBO fills.
+const PROGRESS_TRACK_GRAY := Color("#5A5F66")
+
 # ---------------------------------------------------------------------------
 # Type scale — the single source of truth for UI font sizes (Tim's "chunkier UI"
 # pass, 2026-06-21). Named semantic tiers replace the ~24 scattered magic numbers.
@@ -59,6 +63,39 @@ const STANDARD_BUTTON_HEIGHT := 99
 ## A larger radius (paired with the bigger top/bottom screen margins in Main) lands the
 ## visible curve in the flat area inside the bezel.
 const SCREEN_CORNER_RADIUS := 80
+
+## Black-frame inset (px, 1080-wide design space) of the cream viewing area from the physical
+## screen edges — the width of the black "viewing area" border on the sides and top/bottom.
+## Shared by the Main screen and the full-screen overlays so they all frame identically.
+const SCREEN_BEZEL_SIDE := 9
+const SCREEN_BEZEL_TOP_BOTTOM := 20
+
+## Universal inner margin (px) between screen content and the cream viewing-area border, so no
+## element ever crowds the edge. Applied once as the viewing area's content margin.
+const UNIVERSAL_CONTENT_MARGIN := 16
+
+## The cream rounded "viewing area" plate: cream fill, thin black outline, rounded corners that
+## follow the phone screen, and the universal inner content margin. The framed background for
+## the Main screen and the full-screen overlays (e.g. the dev panel) alike.
+static func make_screen_panel_style() -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = CREAM
+	style.set_corner_radius_all(SCREEN_CORNER_RADIUS)
+	style.border_color = Color.BLACK
+	style.set_border_width_all(2)
+	style.set_content_margin_all(UNIVERSAL_CONTENT_MARGIN)
+	return style
+
+
+## Inset `control` from its (full-screen) parent by the screen bezel, so the black parent shows
+## through as the frame around it. Sets full-rect anchors first, then pulls each edge inward.
+static func apply_screen_bezel(control: Control) -> void:
+	control.set_anchors_preset(Control.PRESET_FULL_RECT)
+	control.offset_left = SCREEN_BEZEL_SIDE
+	control.offset_right = -SCREEN_BEZEL_SIDE
+	control.offset_top = SCREEN_BEZEL_TOP_BOTTOM
+	control.offset_bottom = -SCREEN_BEZEL_TOP_BOTTOM
+
 
 ## The app-wide Theme: a chunky default font size plus per-control-type defaults, so
 ## any control that does NOT override its own size still reads large (the §1b
@@ -119,7 +156,7 @@ static func style_unowned_button(button: Button) -> void:
 ## Teal track with a fill in the given color (§8: sliders and meters).
 static func style_progress_bar(bar: ProgressBar, fill_color: Color) -> void:
 	var track := StyleBoxFlat.new()
-	track.bg_color = ATOMIC_TEAL
+	track.bg_color = PROGRESS_TRACK_GRAY
 	track.set_corner_radius_all(3)
 
 	var fill := StyleBoxFlat.new()

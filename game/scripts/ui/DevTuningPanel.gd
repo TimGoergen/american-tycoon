@@ -112,9 +112,9 @@ func setup() -> void:
 
 
 func _ready() -> void:
-	# Opaque cream sheet over the whole screen; Main freezes the economy while it
-	# is visible (same convention as the other full-page overlays).
-	color = UiPalette.CREAM
+	# Black field framing a cream rounded viewing area that matches the main game (Tim,
+	# 2026-06-22). Main freezes the economy while it is visible (the full-page convention).
+	color = Color.BLACK
 	visible = false
 
 
@@ -123,17 +123,16 @@ func _ready() -> void:
 # ---------------------------------------------------------------------------
 
 func _build_chrome() -> void:
-	var margin := MarginContainer.new()
-	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	margin.add_theme_constant_override("margin_left", 20)
-	margin.add_theme_constant_override("margin_right", 20)
-	margin.add_theme_constant_override("margin_top", CAMERA_CUTOUT_INSET)
-	margin.add_theme_constant_override("margin_bottom", 20)
-	add_child(margin)
+	# The cream rounded viewing area, framed by the black field — the same shared frame the
+	# main game uses (UiPalette), so the panel sits in an identical bezel and rounded plate.
+	var viewing_area := PanelContainer.new()
+	UiPalette.apply_screen_bezel(viewing_area)
+	viewing_area.add_theme_stylebox_override("panel", UiPalette.make_screen_panel_style())
+	add_child(viewing_area)
 
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 10)
-	margin.add_child(column)
+	viewing_area.add_child(column)
 
 	var title := Label.new()
 	title.text = "Dev Tuning"

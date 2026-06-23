@@ -43,18 +43,9 @@ const TAB_ESTATE := 1
 const TAB_LEDGER := 2
 const TAB_SETTINGS := 3
 
-## Black-frame inset (px, 1080-wide design space) of the cream viewing area from the
-## physical screen edges — the width of the black "viewing area" border on the sides and
-## on the top/bottom (Tim, 2026-06-22). Larger top/bottom keeps the frame clear of the
-## camera cutout and the phone's curved corners.
-const SCREEN_BEZEL_SIDE := 9
-const SCREEN_BEZEL_TOP_BOTTOM := 20
-
-## Universal inner margin (px) between the screen content and the cream viewing-area border,
-## applied at one point (the viewing area's content margin) so it insets EVERY tab and pinned
-## element uniformly — no element ever crowds the edge (Tim, 2026-06-22: the Estate list's
-## breathing room, applied everywhere).
-const UNIVERSAL_CONTENT_MARGIN := 16
+# The screen-frame constants (bezel + universal content margin) live in UiPalette now, so the
+# Main screen and the full-screen overlays all frame identically (UiPalette.apply_screen_bezel
+# / make_screen_panel_style).
 var _tab_content: Control
 var _tab_panels: Array = []   # the four content Controls, indexed by TAB_*
 var _tab_buttons: Array = []  # the four bottom icon Buttons, indexed by TAB_*
@@ -196,23 +187,12 @@ func _build_ui() -> void:
 	black_field.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(black_field)
 
-	# The cream viewing area: a rounded-rect inset from the screen edges so black frames it,
-	# with a thin black outline sitting 2px off the screen elements (the panel's 2px content
-	# margin is that gap). Anchored full-rect, then pulled in by the bezel via its offsets.
+	# The cream viewing area: the shared rounded-rect frame (UiPalette) — inset from the screen
+	# edges by the bezel so black frames it, with the universal inner margin so no element
+	# crowds the border. The full-screen overlays use the same helper, so all framing matches.
 	var viewing_area := PanelContainer.new()
-	viewing_area.set_anchors_preset(Control.PRESET_FULL_RECT)
-	viewing_area.offset_left = SCREEN_BEZEL_SIDE
-	viewing_area.offset_right = -SCREEN_BEZEL_SIDE
-	viewing_area.offset_top = SCREEN_BEZEL_TOP_BOTTOM
-	viewing_area.offset_bottom = -SCREEN_BEZEL_TOP_BOTTOM
-	var screen_style := StyleBoxFlat.new()
-	screen_style.bg_color = UiPalette.CREAM
-	screen_style.set_corner_radius_all(UiPalette.SCREEN_CORNER_RADIUS)
-	screen_style.border_color = Color.BLACK
-	screen_style.set_border_width_all(2)
-	# One universal inner margin insets every tab and pinned element off the border at once.
-	screen_style.set_content_margin_all(UNIVERSAL_CONTENT_MARGIN)
-	viewing_area.add_theme_stylebox_override("panel", screen_style)
+	UiPalette.apply_screen_bezel(viewing_area)
+	viewing_area.add_theme_stylebox_override("panel", UiPalette.make_screen_panel_style())
 	add_child(viewing_area)
 
 	var column := VBoxContainer.new()

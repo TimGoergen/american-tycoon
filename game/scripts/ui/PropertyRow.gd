@@ -52,9 +52,13 @@ var _displayed_cycle_fraction := 0.0
 ## cycle completes and restarts, so a drop tells us to snap the bar back to zero.
 var _last_true_cycle_fraction := 0.0
 
-## While the player holds the rush button, the cycle bar fills in a brighter green
-## to signal the active push. How far the green is lightened toward white (0 = none).
-const HELD_RUSH_LIGHTEN := 0.35
+## While the player holds the rush button, the cycle bar fills in a deeper, more vivid
+## green to signal the active push (Tim, 2026-06-23 — was a lighter tint, now darker and
+## more saturated so the push reads as "leaning in" rather than washing out).
+## HELD_RUSH_DARKEN pulls the green toward black; HELD_RUSH_SATURATE scales its HSV
+## saturation (1.0 = unchanged) so the deeper green still reads as green, not gray.
+const HELD_RUSH_DARKEN := 0.18
+const HELD_RUSH_SATURATE := 1.4
 
 ## Time constant (seconds) for the cycle bar to ease up to a rush-jumped target.
 ## A rush jumps the true progress forward in a discrete step (and held rushes fire
@@ -420,7 +424,10 @@ func _set_cycle_color(rush_no_longer_option: bool, rush_held: bool) -> void:
 	if want == 2:
 		fill = UiPalette.CYCLE_BLUE
 	elif want == 1:
-		fill = UiPalette.MONEY_GREEN.lightened(HELD_RUSH_LIGHTEN)
+		# Deeper, more saturated green for the active push. Color has no "saturate"
+		# helper, so we nudge the HSV saturation by hand after darkening.
+		fill = UiPalette.MONEY_GREEN.darkened(HELD_RUSH_DARKEN)
+		fill.s = minf(fill.s * HELD_RUSH_SATURATE, 1.0)
 	UiPalette.style_progress_bar(_cycle_bar, fill)
 
 

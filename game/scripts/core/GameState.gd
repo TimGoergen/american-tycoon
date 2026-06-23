@@ -32,8 +32,9 @@ var peak_net_worth: float = 0.0
 
 ## UI preference: the player's selected global buy mode (a PropertyRow.BuyMode int).
 ## Stored here only so it persists in the save file across sessions; the headless
-## model never reads it.
-var ui_buy_mode: int = 0
+## model never reads it. Defaults to 3 = MAX (Tim, 2026-06-23 — a fresh game should
+## start in buy-max). The literal avoids a UI-class dependency from this headless file.
+var ui_buy_mode: int = 3
 
 ## UI preference: whether the prestige minigame is played (true) or auto-skipped for a
 ## flat 1.0× Legacy multiplier (false). Defaults to on (the minigame is mandatory until
@@ -266,7 +267,7 @@ func load_save_dict(data: Dictionary) -> void:
 
 	economy.cash = float(data.get("cash", 0.0))
 	peak_net_worth = float(data.get("peak_net_worth", 0.0))
-	ui_buy_mode = int(data.get("buy_mode", 0))
+	ui_buy_mode = int(data.get("buy_mode", 3))  # 3 = MAX; matches the fresh-game default
 	# Pre-minigame saves have no flag; default to enabled (mandatory until opted out).
 	ui_minigame_enabled = bool(data.get("minigame_enabled", true))
 	economy.spent_on_units_this_gen = float(data.get("spent_on_units_this_gen", 0.0))

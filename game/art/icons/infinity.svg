@@ -1,1 +1,42 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 48 48"><path d="M24 24 C18 14 10 14 10 24 C10 34 18 34 24 24 C30 14 38 14 38 24 C38 34 30 34 24 24 Z" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linejoin="round"/></svg>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="96"
+   height="96"
+   viewBox="0 0 48 48"
+   version="1.1"
+   id="svg1"
+   sodipodi:docname="infinity.svg"
+   inkscape:version="1.4.4 (dcaf3e7, 2026-05-05)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs1" />
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="8.40625"
+     inkscape:cx="48"
+     inkscape:cy="48"
+     inkscape:window-width="1920"
+     inkscape:window-height="1009"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg1" />
+  <path
+     d="M 23.643122,24 C 15.928263,14.374919 5.6417842,14.374919 5.6417842,24 c 0,9.625081 10.2864788,9.625081 18.0013378,0 7.71486,-9.625081 18.001338,-9.625081 18.001338,0 0,9.625081 -10.286478,9.625081 -18.001338,0 z"
+     fill="none"
+     stroke="#FFFFFF"
+     stroke-width="5.56238"
+     stroke-linejoin="round"
+     id="path1"
+     style="fill:none;fill-opacity:1;stroke:#000000;stroke-opacity:1" />
+</svg>

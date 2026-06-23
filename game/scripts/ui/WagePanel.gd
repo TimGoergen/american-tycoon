@@ -107,6 +107,12 @@ var _wage_button: Button
 var _context_label: Label
 var _promotion_button: Button
 
+# The clock-in button's three-part content laid over the meter (Tim, 2026-06-22): a mail-cart
+# icon on the left, "CLOCK IN" centered, and the live per-tap earnings "+$x" on the right.
+var _wage_icon: TextureRect
+var _wage_title_label: Label
+var _wage_amount_label: Label
+
 ## Transparent overlay above the gold fill (below the label button) on which the
 ## gliding highlight band is drawn while the button is held.
 var _sweep_overlay: Control
@@ -126,7 +132,8 @@ func _ready() -> void:
 	# The meter is the button background; its bright-gold fill shows promotion
 	# progress. It ignores the mouse so the Button on top handles every tap.
 	_wage_meter = ProgressBar.new()
-	_wage_meter.custom_minimum_size = Vector2(0, 170)  # tall: the primary tap target
+	# Taller (170 -> 230) so the bigger three-part content has room to breathe (Tim, 2026-06-22).
+	_wage_meter.custom_minimum_size = Vector2(0, 230)  # tall: the primary tap target
 	_wage_meter.min_value = 0.0
 	_wage_meter.max_value = 1.0
 	_wage_meter.show_percentage = false
@@ -169,6 +176,52 @@ func _ready() -> void:
 		_spawn_income_float(_current_tap_income()))
 	_wage_meter.add_child(_wage_button)
 
+	# The button's content, laid over the meter in three parts (Tim, 2026-06-22). It is added
+	# AFTER the button so it draws on top, and ignores the mouse so taps fall through to the
+	# button beneath. A Button only draws one centered string, so the icon + two labels live
+	# here instead of as button text.
+	var content := MarginContainer.new()
+	content.set_anchors_preset(Control.PRESET_FULL_RECT)
+	content.add_theme_constant_override("margin_left", 24)
+	content.add_theme_constant_override("margin_right", 24)
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_wage_meter.add_child(content)
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 16)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_child(row)
+
+	# Left: the "office worker pushing a mail cart" icon, tinted navy to match the labels.
+	_wage_icon = TextureRect.new()
+	_wage_icon.texture = preload("res://art/icons/mail_cart.svg")
+	_wage_icon.custom_minimum_size = Vector2(180, 0)
+	_wage_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_wage_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_wage_icon.modulate = UiPalette.NAVY
+	_wage_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(_wage_icon)
+
+	# Center: the big "CLOCK IN" label, taking the slack between the icon and the amount.
+	_wage_title_label = Label.new()
+	_wage_title_label.text = "CLOCK IN"
+	_wage_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_wage_title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_wage_title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_wage_title_label.add_theme_font_size_override("font_size", UiPalette.FONT_PAGE_TITLE)
+	_wage_title_label.add_theme_color_override("font_color", UiPalette.NAVY)
+	_wage_title_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(_wage_title_label)
+
+	# Right: the live per-tap earnings, e.g. "+$4.20" (set each frame in _process).
+	_wage_amount_label = Label.new()
+	_wage_amount_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_wage_amount_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_wage_amount_label.add_theme_font_size_override("font_size", UiPalette.FONT_DISPLAY)
+	_wage_amount_label.add_theme_color_override("font_color", UiPalette.NAVY)
+	_wage_amount_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(_wage_amount_label)
+
 	# Context line: which title you hold and what's next. Bumped 50% (20→30) for
 	# readability (Tim, 2026-06-17).
 	_context_label = Label.new()
@@ -207,7 +260,7 @@ func _process(delta: float) -> void:
 	# don't get the bonus, so the base rate is shown when not held.
 	if _wage_button.button_pressed:
 		wage_per_tap *= _wage.auto_tap_power_multiplier
-	_wage_button.text = "CLOCK IN\n%s / tap" % Money.of(wage_per_tap).display()
+	_wage_amount_label.text = "+%s" % Money.of(wage_per_tap).display()
 
 	var next := _wage.get_next_title()
 	if next == null:

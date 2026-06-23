@@ -55,6 +55,13 @@ var _tab_buttons: Array = []  # the four bottom icon Buttons, indexed by TAB_*
 var _active_tab: int = TAB_PROPERTY
 var _minigame_check: CheckBox  # the Settings-tab "play the minigame" toggle
 
+## Red-dot badge on the Estate tab button: shown when the current run has earned claimable
+## Legacy (a succession right now would yield ≥1), and cleared the moment the player opens
+## the Estate tab. It returns the next time the run earns claimable Legacy (e.g. after a
+## succession resets the run back to zero).
+var _estate_badge: Panel
+var _estate_badge_dismissed := false
+
 ## Global buy mode — one toggle drives every row's buy button.
 var _buy_mode: PropertyRow.BuyMode = PropertyRow.BuyMode.ONE
 
@@ -105,6 +112,7 @@ func _process(delta: float) -> void:
 	_hero_stat.set_dynasty_name(HeirNames.dynasty_name(dynasty.generation))
 	_update_epoch_label()
 	_update_plan_button()
+	_update_estate_badge()
 
 
 func _notification(what: int) -> void:
@@ -457,12 +465,53 @@ func _build_tab_bar(column: VBoxContainer) -> void:
 		b.pressed.connect(_show_tab.bind(i))
 		bar.add_child(b)
 		_tab_buttons.append(b)
+		# The Estate tab carries the "you have Legacy to claim" red-dot badge.
+		if i == TAB_ESTATE:
+			_estate_badge = _make_estate_badge(b)
+
+
+## Build the Estate tab's red-dot badge: a small red circle pinned to the button's top-right
+## corner, hidden until there is claimable Legacy. mouse-ignoring so it never eats a tab tap.
+func _make_estate_badge(button: Button) -> Panel:
+	var dot := Panel.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = UiPalette.KETCHUP_RED
+	style.set_corner_radius_all(13)        # half the 26px box → a full circle
+	style.border_color = UiPalette.CREAM   # a cream ring so it reads on the navy/mustard plate
+	style.set_border_width_all(3)
+	dot.add_theme_stylebox_override("panel", style)
+	# Pin a 26×26 dot 6px from the button's top-right corner.
+	dot.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	dot.offset_left = -32
+	dot.offset_top = 8
+	dot.offset_right = -6
+	dot.offset_bottom = 34
+	dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dot.visible = false
+	button.add_child(dot)
+	return dot
+
+
+## Show the Estate badge while the run has claimable Legacy and the player has not yet opened
+## the Estate tab; hide it otherwise. When nothing is claimable we also clear the "seen" flag,
+## so the badge can light up again the next time the run earns Legacy (e.g. after a succession).
+func _update_estate_badge() -> void:
+	if _estate_badge == null:
+		return
+	if not dynasty.can_perform_succession():
+		_estate_badge_dismissed = false
+		_estate_badge.visible = false
+		return
+	_estate_badge.visible = not _estate_badge_dismissed
 
 
 ## Switch to tab `index`: show its panel, hide the rest, restyle the bar, and refresh
 ## the Family Ledger / Settings content that depends on live state when entered.
 func _show_tab(index: int) -> void:
 	_active_tab = index
+	# Opening the Estate tab acknowledges the claimable-Legacy badge.
+	if index == TAB_ESTATE:
+		_estate_badge_dismissed = true
 	for i in range(_tab_panels.size()):
 		(_tab_panels[i] as Control).visible = (i == index)
 		_style_tab_button(_tab_buttons[i] as Button, i == index, i)

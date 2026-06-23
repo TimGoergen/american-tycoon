@@ -30,6 +30,14 @@ var _buy_mode: BuyMode = BuyMode.ONE
 ## Accumulates held-down time on the tap button to pace auto-rush pulses.
 var _hold_accumulator := 0.0
 
+## Hold-to-buy pacing on the BUY button (Tim, 2026-06-22), mirroring the Estate shop: a
+## quick tap buys once; holding auto-repeats after a short initial delay so the player can
+## watch the cost climb and release when they want to stop.
+const BUY_HOLD_INITIAL_DELAY := 0.45
+const BUY_HOLD_REPEAT_INTERVAL := 0.35
+var _buy_hold_accumulator := 0.0
+var _buy_hold_repeating := false
+
 # The cycle progress bar is driven by our own smooth, per-frame prediction rather
 # than the raw logic value. Logic ticks at LOGIC_HZ (10 Hz) while rendering runs
 # every frame (~60 Hz), so reading cycle_progress directly makes the bar lurch in
@@ -238,6 +246,7 @@ func set_buy_mode(mode: BuyMode) -> void:
 func _process(delta: float) -> void:
 	_refresh(delta)
 	_pump_held_rush(delta)
+	_pump_held_buy(delta)
 
 
 ## Holding the start/rush button continually drives the property at the tuning
@@ -261,6 +270,24 @@ func _pump_held_rush(delta: float) -> void:
 			# Idle: the held pulse starts the cycle. Signals are synchronous, so
 			# the property is running by the next pulse/frame and rushes follow.
 			tap_requested.emit(prop_index)
+
+
+## Holding the BUY button keeps purchasing on a calm cadence (hold-to-buy). A quick tap is
+## handled by the button's own `pressed` signal (one purchase); this only adds the repeats
+## while it stays held. Unaffordable pulses are skipped (the buy button disables itself), so
+## a held button simply idles once the player runs out of cash rather than spamming failures.
+func _pump_held_buy(delta: float) -> void:
+	if not _buy_button.button_pressed:
+		_buy_hold_accumulator = 0.0
+		_buy_hold_repeating = false
+		return
+	_buy_hold_accumulator += delta
+	var threshold := BUY_HOLD_REPEAT_INTERVAL if _buy_hold_repeating else BUY_HOLD_INITIAL_DELAY
+	if _buy_hold_accumulator >= threshold:
+		_buy_hold_accumulator = 0.0
+		_buy_hold_repeating = true
+		if not _buy_button.disabled:
+			buy_requested.emit(prop_index, _buy_mode)
 
 
 func _refresh(delta: float) -> void:

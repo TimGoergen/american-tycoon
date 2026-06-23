@@ -188,6 +188,10 @@ func _add_upgrade_card(parent: VBoxContainer, definition: Dictionary) -> void:
 	var name_label := Label.new()
 	name_label.text = String(definition["name"])
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# Wrap so a long upgrade name can't set a minimum width wider than the card — which the
+	# (horizontally non-scrolling) ScrollContainer would otherwise demand, pushing the whole
+	# shop off the right edge (Tim, 2026-06-22).
+	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	name_label.add_theme_color_override("font_color", UiPalette.NAVY)
 	name_label.add_theme_font_size_override("font_size", CARD_NAME_SIZE)
 	top_row.add_child(name_label)
@@ -221,7 +225,9 @@ func _add_upgrade_card(parent: VBoxContainer, definition: Dictionary) -> void:
 	bottom_row.add_child(effect_label)
 
 	var buy_button := Button.new()
-	buy_button.custom_minimum_size = Vector2(440, 123)
+	# A flexible width (was a fixed 440, wide enough to overflow the framed viewport): the
+	# button hugs its own cost text while the effect label beside it takes the slack.
+	buy_button.custom_minimum_size = Vector2(240, 123)
 	buy_button.add_theme_font_size_override("font_size", BUTTON_SIZE)
 	UiPalette.style_button(buy_button, true)  # red: this is a spend action
 	# Press buys one level immediately; holding then auto-repeats slowly until release
@@ -280,6 +286,8 @@ func _add_retention_row(entry: Dictionary) -> void:
 
 	var name_label := Label.new()
 	name_label.text = "%s — %s" % [String(entry["property_name"]), String(entry["staffer_name"])]
+	# Wrap so a long property+staffer name can't force the card wider than the viewport.
+	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	name_label.add_theme_color_override("font_color", UiPalette.NAVY)
 	name_label.add_theme_font_size_override("font_size", CARD_NAME_SIZE)
 	col.add_child(name_label)
@@ -299,7 +307,9 @@ func _add_retention_row(entry: Dictionary) -> void:
 	bottom.add_child(status)
 
 	var button := Button.new()
-	button.custom_minimum_size = Vector2(440, 123)
+	# Flexible width (was a fixed 440 that overflowed the framed viewport), matching the
+	# upgrade cards' RETAIN/BUY buttons.
+	button.custom_minimum_size = Vector2(240, 123)
 	button.add_theme_font_size_override("font_size", BUTTON_SIZE)
 	UiPalette.style_button(button, true)  # red: spends Legacy
 	var cost := int(entry["cost"])

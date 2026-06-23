@@ -132,8 +132,9 @@ func _ready() -> void:
 	# The meter is the button background; its bright-gold fill shows promotion
 	# progress. It ignores the mouse so the Button on top handles every tap.
 	_wage_meter = ProgressBar.new()
-	# Taller (170 -> 230) so the bigger three-part content has room to breathe (Tim, 2026-06-22).
-	_wage_meter.custom_minimum_size = Vector2(0, 230)  # tall: the primary tap target
+	# Shortened 230 -> 196 to make room for the taller tab bar while staying the big primary
+	# tap target (Tim, 2026-06-22).
+	_wage_meter.custom_minimum_size = Vector2(0, 196)
 	_wage_meter.min_value = 0.0
 	_wage_meter.max_value = 1.0
 	_wage_meter.show_percentage = false

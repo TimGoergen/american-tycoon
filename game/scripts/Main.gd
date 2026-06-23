@@ -457,7 +457,7 @@ func _build_tab_bar(column: VBoxContainer) -> void:
 	_tab_buttons = []
 	for i in range(icons.size()):
 		var b := Button.new()
-		b.custom_minimum_size = Vector2(0, 114)  # 50% taller (UI feedback 2026-06-22)
+		b.custom_minimum_size = Vector2(0, 148)  # 30% taller again (114 -> 148, Tim 2026-06-22)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.icon = load(icons[i])
 		b.expand_icon = false

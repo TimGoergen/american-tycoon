@@ -78,12 +78,10 @@ func _build_ui() -> void:
 	# Fill the tab area with a small margin, then stack the contents top-to-bottom. The
 	# scrolling card list takes all the leftover height. No camera-cutout inset here —
 	# the pinned hero stat above the tabs already clears it.
+	# No outer margin here: the screen-wide universal content margin (Main) already insets the
+	# whole Estate tab off the border, so adding more would doubly inset this one screen.
 	var margin := MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	margin.add_theme_constant_override("margin_left", 8)
-	margin.add_theme_constant_override("margin_right", 8)
-	margin.add_theme_constant_override("margin_top", 8)
-	margin.add_theme_constant_override("margin_bottom", 8)
 	add_child(margin)
 
 	var column := VBoxContainer.new()

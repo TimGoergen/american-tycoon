@@ -49,6 +49,12 @@ const TAB_SETTINGS := 3
 ## camera cutout and the phone's curved corners.
 const SCREEN_BEZEL_SIDE := 9
 const SCREEN_BEZEL_TOP_BOTTOM := 20
+
+## Universal inner margin (px) between the screen content and the cream viewing-area border,
+## applied at one point (the viewing area's content margin) so it insets EVERY tab and pinned
+## element uniformly — no element ever crowds the edge (Tim, 2026-06-22: the Estate list's
+## breathing room, applied everywhere).
+const UNIVERSAL_CONTENT_MARGIN := 16
 var _tab_content: Control
 var _tab_panels: Array = []   # the four content Controls, indexed by TAB_*
 var _tab_buttons: Array = []  # the four bottom icon Buttons, indexed by TAB_*
@@ -204,7 +210,8 @@ func _build_ui() -> void:
 	screen_style.set_corner_radius_all(UiPalette.SCREEN_CORNER_RADIUS)
 	screen_style.border_color = Color.BLACK
 	screen_style.set_border_width_all(2)
-	screen_style.set_content_margin_all(2)  # the 2px gap between elements and the black frame
+	# One universal inner margin insets every tab and pinned element off the border at once.
+	screen_style.set_content_margin_all(UNIVERSAL_CONTENT_MARGIN)
 	viewing_area.add_theme_stylebox_override("panel", screen_style)
 	add_child(viewing_area)
 

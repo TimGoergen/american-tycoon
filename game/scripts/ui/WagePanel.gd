@@ -250,17 +250,15 @@ func _process(delta: float) -> void:
 	_pump_auto_tap(delta)
 	_update_plate_glow(delta)
 
-	# The wage is paid wage_per_tap × frenzy × the Old-Money Connections Legacy multiplier
-	# at point of payment (Spec §7), so the label reflects the burn AND the upgrade — it
-	# used to omit the Legacy multiplier and read low after a Connections purchase (Tim).
+	# The headline rate always reflects BOTH wage Legacy upgrades — Old-Money Connections
+	# (wage_multiplier) and the auto-click POWER bonus (auto_tap_power_multiplier) — on top of
+	# the live frenzy multiplier (Spec §7). The power bonus used to be folded in only while the
+	# button was held, so at rest the amount read as if that Legacy upgrade weren't owned (Tim,
+	# 2026-06-22). The clock-in's primary mode is holding it (auto-tapping), so this full
+	# held/auto-tap rate is the canonical figure; a single manual tap still pays the base rate.
 	var title := _wage.get_current_title()
-	var wage_per_tap := title.wage_per_tap * _frenzy.get_multiplier() * _wage.wage_multiplier
-	# While the button is HELD, each auto-tap also gets the auto-click POWER bonus
-	# (GameState.hold_tap_wage), so show the higher held rate then — otherwise the label
-	# read low and the player earned more than it claimed (Tim, 2026-06-22). Manual taps
-	# don't get the bonus, so the base rate is shown when not held.
-	if _wage_button.button_pressed:
-		wage_per_tap *= _wage.auto_tap_power_multiplier
+	var wage_per_tap := title.wage_per_tap * _frenzy.get_multiplier() \
+			* _wage.wage_multiplier * _wage.auto_tap_power_multiplier
 	_wage_amount_label.text = "+%s" % Money.of(wage_per_tap).display()
 
 	var next := _wage.get_next_title()

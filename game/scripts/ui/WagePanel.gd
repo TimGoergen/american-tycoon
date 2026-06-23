@@ -177,6 +177,12 @@ func _ready() -> void:
 	# the big CLOCK IN button reads clearly at arm's length.
 	_context_label.add_theme_font_size_override("font_size", int(UiPalette.FONT_BODY * 1.5))
 	_context_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# Wrap instead of forcing width. Without this, the full one-line text is the label's
+	# MINIMUM width, which at 48px exceeds the screen and inflates the whole Property tab
+	# column past the viewport — pushing everything off the right edge (Tim, 2026-06-22).
+	# Wrapping caps the minimum width at the longest single word, so the column fits.
+	_context_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_context_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	add_child(_context_label)
 
 	_promotion_button = Button.new()

@@ -417,9 +417,10 @@ func _build_settings_tab() -> Control:
 	# Dev tools entry: the balance tuning panel (GDD §13). Moved here from the action row.
 	var dev_button := Button.new()
 	dev_button.custom_minimum_size = Vector2(0, UiPalette.STANDARD_BUTTON_HEIGHT)
-	dev_button.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
+	# 40% above FONT_SMALL (26 -> 36) at Tim's request (2026-06-22).
+	dev_button.add_theme_font_size_override("font_size", int(UiPalette.FONT_SMALL * 1.4))
 	UiPalette.style_button(dev_button, false)
-	dev_button.text = "DEV — BALANCE TUNING"
+	dev_button.text = "BALANCE TUNING"
 	dev_button.pressed.connect(_on_dev_pressed)
 	v.add_child(dev_button)
 

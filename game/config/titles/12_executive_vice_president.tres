@@ -6,5 +6,5 @@
 script = ExtResource("1")
 title_name = "Executive Vice President"
 wage_per_tap = 12800.0
-tap_threshold = 51175
+tap_threshold = 825
 tuition = 25600.0

@@ -6,5 +6,5 @@
 script = ExtResource("1")
 title_name = "Chief Operating Officer"
 wage_per_tap = 204800.0
-tap_threshold = 819175
+tap_threshold = 1425
 tuition = 409600.0

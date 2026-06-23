@@ -6,5 +6,5 @@
 script = ExtResource("1")
 title_name = "Tycoon"
 wage_per_tap = 26214400.0
-tap_threshold = 104857575
+tap_threshold = 2860
 tuition = 52428800.0

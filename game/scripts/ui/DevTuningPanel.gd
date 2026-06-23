@@ -55,6 +55,10 @@ const VALUE_COLUMN_WIDTH := 400
 ## Minimum height (px) of a value editor — a comfortable thumb target.
 const VALUE_HEIGHT := 72
 
+## Vertical breathing room above the title and below the footer buttons (Tim, 2026-06-22):
+## pulls both in from the screen edges. The scrollable list (which expands) shrinks to fit.
+const EDGE_SPACE := 48
+
 ## One concise, plain-language description per tuning constant, shown beneath its
 ## name so the panel is legible without cross-referencing TuningConfig.gd. Keyed by
 ## the constant's exact variable name. When a new constant is added to TuningConfig,
@@ -134,6 +138,11 @@ func _build_chrome() -> void:
 	column.add_theme_constant_override("separation", 10)
 	viewing_area.add_child(column)
 
+	# Push the title down from the top edge (the scroll list below shrinks to fill the rest).
+	var top_space := Control.new()
+	top_space.custom_minimum_size = Vector2(0, EDGE_SPACE)
+	column.add_child(top_space)
+
 	var title := Label.new()
 	title.text = "Dev Tuning"
 	title.add_theme_color_override("font_color", UiPalette.NAVY)
@@ -186,6 +195,11 @@ func _build_chrome() -> void:
 	var close_button := _make_button("CLOSE", false)
 	close_button.pressed.connect(_on_close_pressed)
 	bottom_buttons.add_child(close_button)
+
+	# Lift the footer buttons up off the bottom edge (the scroll list shrinks to make room).
+	var bottom_space := Control.new()
+	bottom_space.custom_minimum_size = Vector2(0, EDGE_SPACE)
+	column.add_child(bottom_space)
 
 
 ## A footer button sized for thumbs (UI notes §1), expanding to share its row.

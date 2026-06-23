@@ -23,6 +23,10 @@ var _rng := RandomNumberGenerator.new()
 var _area: Control
 
 
+func display_name() -> String:
+	return "Catch the Money"
+
+
 func begin(_tuning: TuningConfig) -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_rng.randomize()

@@ -32,6 +32,7 @@ var _legacy_screen: LegacyScreen
 var _ledger_screen: FamilyLedgerScreen
 var _dev_panel: DevTuningPanel
 var _minigame_screen: MinigameScreen
+var _minigame_review_screen: MinigameReviewScreen
 var _buy_mode_button: Button
 var _plan_button: Button
 var _rows: Array = []
@@ -79,7 +80,7 @@ func _process(delta: float) -> void:
 	# lets the shop spend Legacy against a steady balance. NOTE: switching TABS does NOT
 	# freeze — an idle game keeps earning no matter which tab you're reading.
 	if _will_screen.visible or _dev_panel.visible or _first_contact_overlay.visible \
-			or _minigame_screen.visible:
+			or _minigame_screen.visible or _minigame_review_screen.visible:
 		return
 
 	# Fixed-timestep logic (Spec §2): accumulate render time and tick in
@@ -276,6 +277,14 @@ func _build_ui() -> void:
 	_minigame_screen.finished.connect(_on_minigame_finished)
 	add_child(_minigame_screen)
 
+	# The Minigame Tuning review screen (Settings): a full-screen list that opens any minigame
+	# in isolation for testing. It owns its own minigame host, so review play never touches the
+	# run; Main freezes the economy while it is up, just like the other modal overlays.
+	_minigame_review_screen = MinigameReviewScreen.new()
+	_minigame_review_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_minigame_review_screen.setup(tuning)
+	add_child(_minigame_review_screen)
+
 	_show_tab(TAB_PROPERTY)
 
 
@@ -423,6 +432,16 @@ func _build_settings_tab() -> Control:
 	dev_button.text = "BALANCE TUNING"
 	dev_button.pressed.connect(_on_dev_pressed)
 	v.add_child(dev_button)
+
+	# Minigame review tool: opens the full-screen list of every minigame so they can each be
+	# played and reviewed on demand (GDD §5.5), independent of a real prestige.
+	var minigame_tuning_button := Button.new()
+	minigame_tuning_button.custom_minimum_size = Vector2(0, UiPalette.STANDARD_BUTTON_HEIGHT)
+	minigame_tuning_button.add_theme_font_size_override("font_size", int(UiPalette.FONT_SMALL * 1.4))
+	UiPalette.style_button(minigame_tuning_button, false)
+	minigame_tuning_button.text = "MINIGAME TUNING"
+	minigame_tuning_button.pressed.connect(_on_minigame_tuning_pressed)
+	v.add_child(minigame_tuning_button)
 
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -588,6 +607,12 @@ func _on_pop_requested() -> void:
 ## copy so it can tell which constants are overridden and diff edits on Apply.
 func _on_dev_pressed() -> void:
 	_dev_panel.open(tuning, ConfigLoader.load_tuning(false))
+
+
+## Open the Minigame Tuning review screen (Settings). The economy freezes while it is up
+## (see _process), just like the other full-screen overlays.
+func _on_minigame_tuning_pressed() -> void:
+	_minigame_review_screen.open()
 
 
 ## Apply tuning edits: persist the overrides, save the run so no progress is lost,

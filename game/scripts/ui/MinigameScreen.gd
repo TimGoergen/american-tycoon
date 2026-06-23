@@ -15,6 +15,11 @@ extends ColorRect
 ## Legacy by Main; `opt_out` true if the player asked to auto-skip future minigames.
 signal finished(multiplier: float, opt_out: bool)
 
+## Emitted only in review mode (Settings → Minigame Tuning) when the player taps the Back
+## button to abandon the round and return to the review list. Carries no result — review
+## play never affects the run's Legacy.
+signal back_pressed
+
 # The minigame library — the host draws one at random each round so the player doesn't know
 # which they'll get. Add new types here (Phase 2).
 const MINIGAME_TYPES := [
@@ -32,6 +37,13 @@ var _seconds_left: float = 0.0
 var _playing: bool = false
 var _opt_out: bool = false
 var _active_minigame: Minigame
+
+## Review mode (Settings → Minigame Tuning): a Back button is shown so a tester can bail
+## out at any time. False for the real prestige round, where there is no Back.
+var _review_mode: bool = false
+## The Back buttons (one per view), shown only in review mode. Tracked so start_game can
+## flip their visibility for the chosen mode.
+var _back_buttons: Array = []
 
 var _play_view: Control
 var _result_view: Control
@@ -75,6 +87,8 @@ func _ready() -> void:
 func _build_play_view() -> Control:
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 12)
+
+	_add_back_button(column)
 
 	var title := _make_label("GROW THE INHERITANCE", UiPalette.FONT_HEADLINE, UiPalette.NAVY)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -127,6 +141,8 @@ func _build_result_view() -> Control:
 	column.add_theme_constant_override("separation", 16)
 	column.visible = false
 
+	_add_back_button(column)
+
 	var heading := _make_label("THE INHERITANCE", UiPalette.FONT_HEADLINE, UiPalette.NAVY)
 	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(heading)
@@ -149,6 +165,27 @@ func _build_result_view() -> Control:
 	return column
 
 
+## Add a left-aligned Back button to the top of a view's column. Hidden by default; only
+## review mode (start_game's review_mode flag) makes it visible. A short HBox keeps it from
+## stretching the full width — it sits in the top-left like a typical "back" affordance.
+func _add_back_button(column: VBoxContainer) -> void:
+	var row := HBoxContainer.new()
+	var back := Button.new()
+	back.text = "← BACK"
+	back.custom_minimum_size = Vector2(0, 72)
+	back.add_theme_font_size_override("font_size", UiPalette.FONT_BUTTON)
+	UiPalette.style_button(back, false)
+	back.visible = false
+	back.pressed.connect(_on_back_pressed)
+	row.add_child(back)
+	# A spacer eats the rest of the row so the button keeps its natural width on the left.
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(spacer)
+	_back_buttons.append(back)
+	column.add_child(row)
+
+
 func _make_label(text: String, font_size: int, color: Color) -> Label:
 	var label := Label.new()
 	label.text = text
@@ -162,8 +199,12 @@ func _make_label(text: String, font_size: int, color: Color) -> Label:
 # ---------------------------------------------------------------------------
 
 ## Start a round. `base_legacy` is the run's pre-minigame Legacy; `bonus_max` is the max
-## extra-high bonus fraction (Family Reputation). Picks a random minigame type.
-func start_game(base_legacy: int, bonus_max: float) -> void:
+## extra-high bonus fraction (Family Reputation). Normally picks a random minigame type;
+## the review screen passes a specific `forced_type` and sets `review_mode` so a Back
+## button appears. Prestige play leaves both at their defaults (random type, no Back).
+func start_game(
+		base_legacy: int, bonus_max: float, forced_type: Script = null, review_mode: bool = false
+) -> void:
 	_base_legacy = base_legacy
 	_bonus_max = maxf(0.0, bonus_max)
 	_seconds_left = _tuning.minigame_duration_seconds
@@ -171,9 +212,14 @@ func start_game(base_legacy: int, bonus_max: float) -> void:
 	if _opt_out_check != null:
 		_opt_out_check.button_pressed = false
 
+	_review_mode = review_mode
+	for back in _back_buttons:
+		(back as Button).visible = review_mode
+
 	for child in _play_area.get_children():
 		child.queue_free()
-	var type_script: Script = MINIGAME_TYPES[randi() % MINIGAME_TYPES.size()]
+	var type_script: Script = forced_type if forced_type != null \
+			else MINIGAME_TYPES[randi() % MINIGAME_TYPES.size()]
 	_active_minigame = type_script.new()
 	_active_minigame.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_play_area.add_child(_active_minigame)
@@ -293,6 +339,14 @@ func _show_result(mult: float) -> void:
 	_play_view.visible = false
 	_result_view.visible = true
 	visible = true
+
+
+## Back (review mode only): abandon the round and return to the review list. No result is
+## emitted — reviewing a minigame never touches the run's Legacy.
+func _on_back_pressed() -> void:
+	_playing = false
+	visible = false
+	back_pressed.emit()
 
 
 ## Skip: bank the keep floor (the worst result), leave immediately.

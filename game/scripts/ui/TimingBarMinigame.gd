@@ -30,6 +30,10 @@ var _bar: Control
 var _locks_label: Label
 
 
+func display_name() -> String:
+	return "Timing Bar"
+
+
 func begin(_tuning: TuningConfig) -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_marker_pos = 0.0

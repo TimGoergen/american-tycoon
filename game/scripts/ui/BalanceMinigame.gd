@@ -28,6 +28,10 @@ var _rng := RandomNumberGenerator.new()
 var _bar: Control
 
 
+func display_name() -> String:
+	return "Balance the Books"
+
+
 func begin(_tuning: TuningConfig) -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_rng.randomize()

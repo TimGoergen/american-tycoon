@@ -57,6 +57,10 @@ var _board_area: Control
 var _gem_nodes: Array = []
 
 
+func display_name() -> String:
+	return "Match Three"
+
+
 func begin(_tuning: TuningConfig) -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_board = Board.new(GRID_WIDTH, GRID_HEIGHT, GEM_COLORS)

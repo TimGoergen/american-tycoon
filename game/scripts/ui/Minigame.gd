@@ -26,3 +26,9 @@ func get_performance() -> float:
 ## isn't charged to the player. Most types never block.
 func is_busy() -> bool:
 	return false
+
+## A short, human-readable name for this minigame type. The random prestige draw doesn't
+## need it, but the Minigame Tuning review screen (Settings) lists every type by name so
+## they can each be opened and tested. Override in each type.
+func display_name() -> String:
+	return "Minigame"

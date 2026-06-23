@@ -26,6 +26,10 @@ var _pads: Array = []  # the four pad Panels (index = pad id)
 var _status_label: Label
 
 
+func display_name() -> String:
+	return "Memory Match"
+
+
 func begin(_tuning: TuningConfig) -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_rng.randomize()

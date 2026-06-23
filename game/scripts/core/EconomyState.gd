@@ -178,6 +178,18 @@ func get_cheapest_unaffordable_unowned_index() -> int:
 	return best
 
 
+## Index of the HIGHEST property the player owns at least one unit of, or -1 if they own
+## nothing. Higher index = pricier, later-tier property, so this is the player's top rung.
+## Drives the portrait button's rush rule (GDD §6): once a property is automated (staffed)
+## its rush is disabled — except this single top property, which always stays hands-on.
+func get_highest_owned_index() -> int:
+	var highest := -1
+	for i in range(properties.size()):
+		if (properties[i] as PropertyState).units_owned > 0:
+			highest = i
+	return highest
+
+
 ## Credit GRANTED cash — money the player was handed, not earned: birth seed
 ## capital, Trust Fund bonus, loan principal, windfall gifts. Does NOT touch
 ## cash_earned_this_gen, so granted money can never inflate the estate or Legacy.

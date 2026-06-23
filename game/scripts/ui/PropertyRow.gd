@@ -64,11 +64,12 @@ var _showing_held_rush := false
 # to fill this fixed row height — see _add_split_button_labels.
 const BUTTON_ROW_HEIGHT := 80
 const BUTTON_LABEL_FONT_SIZE := UiPalette.FONT_BUTTON
+## Side length of the headshot icon that stands in for the word "HIRE"/"UPGRADE".
+const HIRE_ICON_SIZE := 56
 
 var _manager_circle: ManagerCircle
 var _name_label: Label
 var _income_label: Label
-var _tap_button: Button
 var _cycle_bar: ProgressBar
 var _milestone_bar: ProgressBar
 var _milestone_label: Label
@@ -78,6 +79,9 @@ var _buy_cost_label: Label
 var _hire_button: Button
 var _hire_left_label: Label
 var _hire_cost_label: Label
+## Small headshot icon shown on the hire button in place of the word "HIRE"/"UPGRADE"
+## (Tim, 2026-06-22); hidden in the fully-staffed state, where the staffer name shows.
+var _hire_icon: TextureRect
 
 ## Which hire-button look is currently applied, so the stylebox is only rebuilt when
 ## the state flips, not every frame. -1 = not yet applied, 0 = action (HIRE/UPGRADE,
@@ -116,6 +120,9 @@ func _ready() -> void:
 
 	_manager_circle = ManagerCircle.new()
 	_manager_circle.size_flags_vertical = Control.SIZE_FILL  # stretch to the section's height
+	# The portrait IS the start/rush control now (the old START button is gone): a single tap
+	# starts an idle cycle (or rushes a running one); holding it auto-rushes (see _pump_held_rush).
+	_manager_circle.pressed.connect(func() -> void: tap_requested.emit(prop_index))
 	top_row.add_child(_manager_circle)
 
 	var top_section := VBoxContainer.new()
@@ -144,19 +151,9 @@ func _ready() -> void:
 	_income_label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
 	header.add_child(_income_label)
 
-	# Cycle line: the tap verb button + live cycle progress (Style Guide §9:
-	# the "spin" is the real cycle progress; placeholder bar until hero art).
-	var cycle_line := HBoxContainer.new()
-	cycle_line.add_theme_constant_override("separation", 10)
-	top_section.add_child(cycle_line)
-
-	_tap_button = Button.new()
-	_tap_button.custom_minimum_size = Vector2(150, 0)
-	_tap_button.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
-	UiPalette.style_button(_tap_button, false)
-	_tap_button.pressed.connect(func() -> void: tap_requested.emit(prop_index))
-	cycle_line.add_child(_tap_button)
-
+	# Cycle line: live cycle progress (Style Guide §9: the "spin" is the real cycle
+	# progress; placeholder bar until hero art). The old START/RUSH button is gone — the
+	# portrait circle on the left is now the start/rush control (see ManagerCircle).
 	_cycle_bar = ProgressBar.new()
 	_cycle_bar.min_value = 0.0
 	_cycle_bar.max_value = 1.0
@@ -165,7 +162,7 @@ func _ready() -> void:
 	_cycle_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_cycle_bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	UiPalette.style_progress_bar(_cycle_bar, UiPalette.MONEY_GREEN)
-	cycle_line.add_child(_cycle_bar)
+	top_section.add_child(_cycle_bar)
 
 	# Milestone slider: min = last milestone, max = next (Spec §3.5 — "the
 	# pile can push me over 40" is part of the return spike).
@@ -211,6 +208,20 @@ func _ready() -> void:
 	var hire_labels := _add_split_button_labels(_hire_button)
 	_hire_left_label = hire_labels[0]
 	_hire_cost_label = hire_labels[1]
+
+	# Headshot icon at the left of the hire button, standing in for the "HIRE"/"UPGRADE"
+	# word (Tim, 2026-06-22). Reuses the white-authored headshot, tinted navy to match the
+	# plate's text; hidden in the fully-staffed state (where the staffer name is shown).
+	_hire_icon = TextureRect.new()
+	_hire_icon.texture = ManagerCircle.HEADSHOT_TEX
+	_hire_icon.custom_minimum_size = Vector2(HIRE_ICON_SIZE, HIRE_ICON_SIZE)
+	_hire_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_hire_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_hire_icon.modulate = UiPalette.NAVY
+	_hire_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var hire_row := _hire_left_label.get_parent() as HBoxContainer
+	hire_row.add_child(_hire_icon)
+	hire_row.move_child(_hire_icon, 0)  # sit it before the (now empty) left label
 	button_line.add_child(_hire_button)
 
 	# Let a swipe that lands anywhere on the row (the panel, labels, or progress
@@ -235,7 +246,9 @@ func _process(delta: float) -> void:
 ## same accumulator, so a quick tap accrues no pulse and stays a plain single
 ## action (which still fires on release via the button's pressed signal).
 func _pump_held_rush(delta: float) -> void:
-	if not _tap_button.button_pressed or _prop.units_owned == 0:
+	# is_held() is false whenever the portrait button is disabled (a locked rung, or an
+	# automated property that is not the player's top one), so those simply never auto-rush.
+	if not _manager_circle.is_held() or _prop.units_owned == 0:
 		_hold_accumulator = 0.0
 		return
 	_hold_accumulator += delta
@@ -269,14 +282,28 @@ func _refresh(delta: float) -> void:
 	var owned := _prop.units_owned > 0
 	_apply_ownership_styling(owned)
 
-	# Keep the portrait circle square and as tall as this top section: its height is
-	# already stretched to the section by the layout, so we just match the width to it.
-	# The staffer's NAME now comes from EpochCatalog by the property's current tier (the
-	# alien re-skin), not the vestigial .tres field, so the portrait initial tracks the
-	# tier (e.g. Earth "ATM Technician" → Luminari "Photon Teller").
+	# Keep the portrait circle square and as tall as this top section: its height is already
+	# stretched to the section by the layout, so we just match the width to it.
 	_manager_circle.custom_minimum_size.x = _manager_circle.size.y
-	var staffer := EpochCatalog.staffer_name(_prop.staff_tier, prop_index)
-	_manager_circle.set_state(_prop.is_staffed, config.manager_portrait, staffer, owned)
+
+	# The portrait is the start/rush control (ManagerCircle). Decide its look and whether it
+	# accepts input this frame:
+	#   • LOCKED   — no units owned yet (drab, inert).
+	#   • STAFFED  — automated; shows the property accent + staffer headshot. Interactive ONLY
+	#                if it is the player's single highest-owned property — rush stays hands-on
+	#                there, while every other automated property runs itself hands-off (GDD §6).
+	#   • UNSTAFFED — owned but not automated; silver restart plate, always interactive.
+	# The infinity icon shows whenever an interactive portrait is actively held (being rushed).
+	var staffed := _prop.is_staffed
+	var is_highest_owned := _economy.get_highest_owned_index() == prop_index
+	var interactive := owned and (not staffed or is_highest_owned)
+	var portrait_mode := ManagerCircle.PortraitMode.LOCKED
+	if owned:
+		portrait_mode = ManagerCircle.PortraitMode.STAFFED if staffed else ManagerCircle.PortraitMode.UNSTAFFED
+	var show_rush_icon := interactive and _manager_circle.is_held()
+	_manager_circle.set_state(
+		portrait_mode, config.accent_color, config.manager_portrait, show_rush_icon, interactive
+	)
 	# Income readout. For an OWNED rung: the cash paid each time the bar fills (per cycle),
 	# lit by the live frenzy multiplier so it matches what the player actually receives.
 	# For an UNOWNED rung: the per-cycle value of a SINGLE unit, drawn dark gray (see
@@ -286,24 +313,6 @@ func _refresh(delta: float) -> void:
 		_income_label.text = Money.of(_prop.get_income_per_cycle() * _frenzy.get_multiplier()).display() + "/cycle"
 	else:
 		_income_label.text = Money.of(_prop.get_single_unit_income_per_cycle()).display() + "/cycle"
-
-	# The tap verb mirrors Spec §4: START an idle cycle, RUSH a running one.
-	# While the button is held the cycle auto-restarts every completion, briefly going
-	# idle between pulses; without this guard the label would flicker START→RUSH each
-	# cycle. So a held button stays "RUSH" for the whole hold and only re-evaluates to
-	# START/RUSH once the player lets go.
-	if _prop.units_owned == 0:
-		_tap_button.text = "—"
-		_tap_button.disabled = true
-	elif _tap_button.button_pressed:
-		_tap_button.text = "RUSH"
-		_tap_button.disabled = false
-	elif _prop.is_cycle_running:
-		_tap_button.text = "RUSH"
-		_tap_button.disabled = false
-	else:
-		_tap_button.text = "START"
-		_tap_button.disabled = false
 
 	# Smooth, constant-velocity cycle bar (see _displayed_cycle_fraction above). Measured
 	# against the EFFECTIVE (sped-up) cycle length so the bar still fills all the way to the
@@ -335,7 +344,7 @@ func _refresh(delta: float) -> void:
 
 	# Brighter green while the rush button is held — a live cue that the player's
 	# holding is actively driving this property's cycle.
-	var rush_held := _tap_button.button_pressed and _prop.units_owned > 0
+	var rush_held := _manager_circle.is_held() and _prop.units_owned > 0
 	_set_cycle_highlight(rush_held)
 
 	# Milestone slider runs from the last crossed milestone to the next one. Past the
@@ -368,9 +377,9 @@ func _set_cycle_highlight(active: bool) -> void:
 	UiPalette.style_progress_bar(_cycle_bar, fill)
 
 
-## Swap the row's panel background and START button between the normal cream look
-## (owned) and the drab gray "locked" look (no units owned yet). Only rebuilds the
-## styleboxes when the state actually flips, not every frame.
+## Swap the row's panel background between the normal cream look (owned) and the drab gray
+## "locked" look (no units owned yet). Only rebuilds the styleboxes when the state actually
+## flips, not every frame. (The portrait button's own look is set live by ManagerCircle.)
 func _apply_ownership_styling(owned: bool) -> void:
 	var want := 0 if owned else 1
 	if want == _ownership_style_applied:
@@ -378,14 +387,12 @@ func _apply_ownership_styling(owned: bool) -> void:
 	_ownership_style_applied = want
 	if owned:
 		add_theme_stylebox_override("panel", UiPalette.make_panel_style())
-		UiPalette.style_button(_tap_button, false)
 		# Owned: the bold dark-money-green per-cycle payout.
 		var income_green := UiPalette.MONEY_GREEN.darkened(0.4)
 		_income_label.add_theme_color_override("font_color", income_green)
 		_income_label.add_theme_color_override("font_outline_color", income_green)
 	else:
 		add_theme_stylebox_override("panel", UiPalette.make_unowned_panel_style())
-		UiPalette.style_unowned_button(_tap_button)
 		# Unowned: a drab dark-gray single-unit preview, matching the locked row look.
 		_income_label.add_theme_color_override("font_color", UiPalette.DARK_GRAY)
 		_income_label.add_theme_color_override("font_outline_color", UiPalette.DARK_GRAY)
@@ -404,7 +411,9 @@ func _refresh_hire_button() -> void:
 
 	if tier >= 1 and tier >= max_tier:
 		# Fully staffed for this epoch — nothing to upgrade until the next first contact.
+		# The headshot icon yields to the staffer's NAME in this state.
 		_apply_hire_styling(true)
+		_hire_icon.visible = false
 		_hire_left_label.text = EpochCatalog.staffer_name(tier, prop_index).to_upper()
 		_hire_cost_label.text = "TIER %d" % tier
 		_hire_button.disabled = true
@@ -413,18 +422,22 @@ func _refresh_hire_button() -> void:
 		return
 
 	# Otherwise a tier is available to buy: tier 1 (HIRE) from unstaffed, or the next
-	# alien tier (UPGRADE) on an already-staffed property after a fresh contact.
+	# alien tier (UPGRADE) on an already-staffed property after a fresh contact. The headshot
+	# icon stands in for the verb (Tim, 2026-06-22), so the left label is blanked and the cost
+	# sits on the right.
 	_apply_hire_styling(false)
 	var next_tier := tier + 1
 	var cost := _economy.get_staff_cost(prop_index, next_tier)
-	var verb := "HIRE" if tier == 0 else "UPGRADE"
-	_hire_left_label.text = verb
+	_hire_icon.visible = true
+	_hire_left_label.text = ""
 	_hire_cost_label.text = Money.of(cost).display()
 	# A property with no units can't be staffed yet — a staffer needs something to run.
 	_hire_button.disabled = _economy.cash < cost or _prop.units_owned == 0
-	# Navy text on the live mustard plate, dimmed to match the disabled cream plate.
+	# Navy on the live mustard plate, dimmed to match the disabled cream plate — applied to
+	# both the cost label and the headshot icon so they read as one.
 	var hire_color := Color(UiPalette.NAVY, 0.45) if _hire_button.disabled else UiPalette.NAVY
 	_set_split_label_color(_hire_left_label, _hire_cost_label, hire_color)
+	_hire_icon.modulate = hire_color
 
 
 ## Swap the hire button between the normal action look (HIRE/UPGRADE) and the faint-

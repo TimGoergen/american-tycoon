@@ -23,6 +23,10 @@ const LIGHT_GRAY := Color("#CBCBCB")  # unowned row background
 const MID_GRAY := Color("#9A9A9A")    # unowned borders
 const DARK_GRAY := Color("#6E6E6E")   # unowned start button + portrait circle
 
+## Cool metallic silver — the background of an owned-but-unstaffed property's portrait
+## button, behind its restart icon (the start/rush control, GDD §5 / Tim 2026-06-22).
+const SILVER := Color("#C7CBD1")
+
 # ---------------------------------------------------------------------------
 # Type scale — the single source of truth for UI font sizes (Tim's "chunkier UI"
 # pass, 2026-06-21). Named semantic tiers replace the ~24 scattered magic numbers.

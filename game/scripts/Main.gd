@@ -47,8 +47,8 @@ const TAB_SETTINGS := 3
 ## physical screen edges — the width of the black "viewing area" border on the sides and
 ## on the top/bottom (Tim, 2026-06-22). Larger top/bottom keeps the frame clear of the
 ## camera cutout and the phone's curved corners.
-const SCREEN_BEZEL_SIDE := 18
-const SCREEN_BEZEL_TOP_BOTTOM := 40
+const SCREEN_BEZEL_SIDE := 9
+const SCREEN_BEZEL_TOP_BOTTOM := 20
 var _tab_content: Control
 var _tab_panels: Array = []   # the four content Controls, indexed by TAB_*
 var _tab_buttons: Array = []  # the four bottom icon Buttons, indexed by TAB_*

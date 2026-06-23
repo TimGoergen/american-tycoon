@@ -27,9 +27,16 @@ const DARK_GRAY := Color("#6E6E6E")   # unowned start button + portrait circle
 ## button, behind its restart icon (the start/rush control, GDD §5 / Tim 2026-06-22).
 const SILVER := Color("#C7CBD1")
 
-## Semi-dark gray track behind every progress meter's fill (Tim, 2026-06-22): replaced the
-## bright atomic-teal track, which read too loud behind the cycle / milestone / TURBO fills.
-const PROGRESS_TRACK_GRAY := Color("#5A5F66")
+## Light gray track behind every progress meter's fill (Tim, 2026-06-23): lightened from the
+## former semi-dark slate so the empty part of each bar reads as a soft, quiet background
+## rather than a heavy band competing with the colored fill.
+const PROGRESS_TRACK_GRAY := Color("#B6BAC0")
+
+## Calm muted blue for a property's cycle bar once it is staffed and running itself
+## hands-off — rush is no longer an option, so the bar drops its active green and reads
+## as a steady, automated meter. Tuned to the same muted value as MONEY_GREEN so the two
+## states sit in the same family. (Tim, 2026-06-23.)
+const CYCLE_BLUE := Color("#5E86B8")
 
 # ---------------------------------------------------------------------------
 # Type scale — the single source of truth for UI font sizes (Tim's "chunkier UI"

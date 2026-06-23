@@ -61,9 +61,13 @@ const HELD_RUSH_LIGHTEN := 0.35
 ## several times a second); easing toward that target instead of snapping to it
 ## makes a held rush read as smooth acceleration rather than a stutter of jumps.
 const RUSH_CATCHUP_TAU := 0.12
-## Tracks the current fill color so we only rebuild the stylebox on a change, not
-## every frame (the same approach FrenzyBar uses for its burn-color swap).
-var _showing_held_rush := false
+## Which cycle-bar fill look is currently applied, so we only rebuild the stylebox on a
+## change, not every frame (the same approach FrenzyBar uses for its burn-color swap):
+##   0 = normal green (idle/running, rush available)
+##   1 = brighter green (rush button held)
+##   2 = calm blue (staffed and running itself — rush is no longer an option)
+## -1 = not yet applied.
+var _cycle_color_applied := -1
 
 # Both action buttons lay their two pieces of text out the same way: a left-aligned
 # label and a right-aligned label sharing one vertically-centered row (Tim 2026-06-17).
@@ -372,10 +376,13 @@ func _refresh(delta: float) -> void:
 	_last_true_cycle_fraction = true_fraction
 	_cycle_bar.value = _displayed_cycle_fraction
 
-	# Brighter green while the rush button is held — a live cue that the player's
-	# holding is actively driving this property's cycle.
+	# Cycle-bar fill color. Once a property is staffed and running itself hands-off, rush
+	# is no longer an option (only the player's single highest-owned property stays
+	# rushable — see `interactive` above), so the bar drops its active green for a calm
+	# blue. Otherwise it stays green, brightening while the rush button is actively held.
+	var rush_no_longer_option := staffed and not interactive
 	var rush_held := _manager_circle.is_held() and _prop.units_owned > 0
-	_set_cycle_highlight(rush_held)
+	_set_cycle_color(rush_no_longer_option, rush_held)
 
 	# Milestone slider runs from the last crossed milestone to the next one. Past the
 	# final milestone (400) there is no next, so the bar reads full and the label maxed.
@@ -396,14 +403,24 @@ func _refresh(delta: float) -> void:
 	_refresh_hire_button()
 
 
-## Swap the cycle bar's fill between its normal green and a brighter green. Only on
-## change — rebuilding the stylebox every frame would be wasteful (same pattern as
-## FrenzyBar's burn-color swap).
-func _set_cycle_highlight(active: bool) -> void:
-	if active == _showing_held_rush:
+## Pick the cycle bar's fill: calm blue once the property is automated and rush is no
+## longer an option, otherwise the active green (brightened while the rush button is held).
+## Only rebuilds the stylebox on a change — doing it every frame would be wasteful (same
+## pattern as FrenzyBar's burn-color swap).
+func _set_cycle_color(rush_no_longer_option: bool, rush_held: bool) -> void:
+	var want := 0
+	if rush_no_longer_option:
+		want = 2
+	elif rush_held:
+		want = 1
+	if want == _cycle_color_applied:
 		return
-	_showing_held_rush = active
-	var fill := UiPalette.MONEY_GREEN.lightened(HELD_RUSH_LIGHTEN) if active else UiPalette.MONEY_GREEN
+	_cycle_color_applied = want
+	var fill := UiPalette.MONEY_GREEN
+	if want == 2:
+		fill = UiPalette.CYCLE_BLUE
+	elif want == 1:
+		fill = UiPalette.MONEY_GREEN.lightened(HELD_RUSH_LIGHTEN)
 	UiPalette.style_progress_bar(_cycle_bar, fill)
 
 

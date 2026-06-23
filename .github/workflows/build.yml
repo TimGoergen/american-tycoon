@@ -3,12 +3,14 @@
 # Cloned from the proven Critter Quitters pipeline (same Godot version, same
 # runner quirks and workarounds — see the inline comments carried over).
 #
-# Triggered on pushes to `release` and `main` only, plus manual runs. Feature
-# branches (feature/**) do NOT build — branch them off `release`, iterate freely,
-# then merge back to `release` when you want a build on the phone. `release`
-# merges to `main` once it is a stable, coherent body of work.
-# Produces a Windows installer (.exe via Inno Setup) and a signed Android APK,
-# then creates a GitHub pre-release tagged with the short commit SHA (main only).
+# Triggered on pushes to `main` and any feature branch (feature/**), plus manual
+# runs. Every push to a feature branch produces a signed Android APK and ships it
+# to the phone via Firebase App Distribution — so you can test work-in-progress on
+# the device without merging. Merge feature branches into `main` (the stable
+# default branch) when the work is ready; only `main` produces the FULL release:
+# Windows installer (.exe via Inno Setup) + a tagged GitHub pre-release, in
+# addition to the Firebase APK. Do not commit directly to `main` — land changes
+# there via merges from feature branches.
 #
 # Required GitHub Secrets (Settings > Secrets and variables > Actions):
 #   ANDROID_KEYSTORE_BASE64      — base64-encoded keystore file
@@ -26,7 +28,7 @@ name: Build & Deploy
 
 on:
   push:
-    branches: [release, main]   # only these build; feature/** branches stay quiet
+    branches: [main, 'feature/**']   # main = full release; feature/** = Firebase APK only
 
   workflow_dispatch:
 

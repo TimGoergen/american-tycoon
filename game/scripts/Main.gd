@@ -519,7 +519,7 @@ func _style_tab_button(button: Button, active: bool, index: int) -> void:
 	var box := StyleBoxFlat.new()
 	box.bg_color = UiPalette.MUSTARD_GOLD if active else UiPalette.CREAM
 	box.border_color = UiPalette.NAVY
-	box.set_border_width_all(3)
+	box.set_border_width_all(12)  # outline +300% (3 -> 12) at Tim's request (2026-06-23)
 	box.set_corner_radius_all(4)
 	box.set_content_margin_all(12)
 	if index == 0:

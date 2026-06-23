@@ -81,6 +81,7 @@ var _glow_time := 0.0
 func _ready() -> void:
 	var style := UiPalette.make_panel_style()
 	style.border_color = UiPalette.KETCHUP_RED  # the red ticket frame (§8)
+	style.set_border_width_all(12)  # outline +300% (3 -> 12) at Tim's request (2026-06-23)
 	# Round the TOP corners to nest inside the phone's rounded screen corners (Tim,
 	# 2026-06-22); the bottom corners keep the standard small radius.
 	style.corner_radius_top_left = UiPalette.SCREEN_CORNER_RADIUS

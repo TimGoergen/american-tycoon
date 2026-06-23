@@ -6,5 +6,5 @@
 script = ExtResource("1")
 title_name = "Director"
 wage_per_tap = 800.0
-tap_threshold = 385
+tap_threshold = 70
 tuition = 1600.0

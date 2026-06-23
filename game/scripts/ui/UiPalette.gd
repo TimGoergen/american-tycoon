@@ -45,7 +45,11 @@ const FONT_SMALL := 26        # the smallest text allowed — the readability fl
 ## Corner radius (px, 1080-wide design space) for UI that hugs the phone's rounded screen
 ## corners — the income panel's top corners and the outer bottom corners of the edge tab
 ## buttons — so they nest inside the Pixel's screen curve instead of squaring into it.
-const SCREEN_CORNER_RADIUS := 44
+## Bumped 44 -> 80 (Tim, 2026-06-22): on the Pixel 10 Pro XL the old radius was too tight
+## to read — the panel ran into the screen's own curved corner before its rounding showed.
+## A larger radius (paired with the bigger top/bottom screen margins in Main) lands the
+## visible curve in the flat area inside the bezel.
+const SCREEN_CORNER_RADIUS := 80
 
 ## The app-wide Theme: a chunky default font size plus per-control-type defaults, so
 ## any control that does NOT override its own size still reads large (the §1b

@@ -173,7 +173,9 @@ func _ready() -> void:
 	# readability (Tim, 2026-06-17).
 	_context_label = Label.new()
 	_context_label.add_theme_color_override("font_color", UiPalette.NAVY)
-	_context_label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
+	# Sized 50% above FONT_BODY (32 -> 48) at Tim's request (2026-06-22) so the line under
+	# the big CLOCK IN button reads clearly at arm's length.
+	_context_label.add_theme_font_size_override("font_size", int(UiPalette.FONT_BODY * 1.5))
 	_context_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(_context_label)
 

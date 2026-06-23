@@ -171,12 +171,16 @@ func _build_ui() -> void:
 	background.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(background)
 
+	# Top/bottom margins are larger than the sides (Tim, 2026-06-22): on the Pixel 10 Pro
+	# XL the hero panel and bottom tab bar otherwise run into the screen's curved corners,
+	# so their own rounding (SCREEN_CORNER_RADIUS) was hidden behind the bezel. Pulling the
+	# top and bottom edges inward seats those rounded corners in the visible flat area.
 	var margin := MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
 	margin.add_theme_constant_override("margin_left", 20)
 	margin.add_theme_constant_override("margin_right", 20)
-	margin.add_theme_constant_override("margin_top", 20)
-	margin.add_theme_constant_override("margin_bottom", 20)
+	margin.add_theme_constant_override("margin_top", 56)
+	margin.add_theme_constant_override("margin_bottom", 56)
 	add_child(margin)
 
 	var column := VBoxContainer.new()

@@ -42,6 +42,13 @@ const TAB_PROPERTY := 0
 const TAB_ESTATE := 1
 const TAB_LEDGER := 2
 const TAB_SETTINGS := 3
+
+## Black-frame inset (px, 1080-wide design space) of the cream viewing area from the
+## physical screen edges — the width of the black "viewing area" border on the sides and
+## on the top/bottom (Tim, 2026-06-22). Larger top/bottom keeps the frame clear of the
+## camera cutout and the phone's curved corners.
+const SCREEN_BEZEL_SIDE := 18
+const SCREEN_BEZEL_TOP_BOTTOM := 40
 var _tab_content: Control
 var _tab_panels: Array = []   # the four content Controls, indexed by TAB_*
 var _tab_buttons: Array = []  # the four bottom icon Buttons, indexed by TAB_*
@@ -166,26 +173,36 @@ func _build_ui() -> void:
 	# including the overlays added later in this method (UiPalette.make_app_theme).
 	theme = UiPalette.make_app_theme()
 
-	var background := ColorRect.new()
-	background.color = UiPalette.CREAM
-	background.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(background)
+	# Outermost: solid black fills the whole physical screen, framing the game as a rounded
+	# "viewing area" (Tim, 2026-06-22). The cream play-field is a rounded-corner panel inset
+	# from the edges (SCREEN_BEZEL_*), so the black showing around it reads as a defining
+	# border that follows the phone's rounded screen shape.
+	var black_field := ColorRect.new()
+	black_field.color = Color.BLACK
+	black_field.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(black_field)
 
-	# Top/bottom margins are larger than the sides (Tim, 2026-06-22): on the Pixel 10 Pro
-	# XL the hero panel and bottom tab bar otherwise run into the screen's curved corners,
-	# so their own rounding (SCREEN_CORNER_RADIUS) was hidden behind the bezel. Pulling the
-	# top and bottom edges inward seats those rounded corners in the visible flat area.
-	var margin := MarginContainer.new()
-	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	margin.add_theme_constant_override("margin_left", 20)
-	margin.add_theme_constant_override("margin_right", 20)
-	margin.add_theme_constant_override("margin_top", 56)
-	margin.add_theme_constant_override("margin_bottom", 56)
-	add_child(margin)
+	# The cream viewing area: a rounded-rect inset from the screen edges so black frames it,
+	# with a thin black outline sitting 2px off the screen elements (the panel's 2px content
+	# margin is that gap). Anchored full-rect, then pulled in by the bezel via its offsets.
+	var viewing_area := PanelContainer.new()
+	viewing_area.set_anchors_preset(Control.PRESET_FULL_RECT)
+	viewing_area.offset_left = SCREEN_BEZEL_SIDE
+	viewing_area.offset_right = -SCREEN_BEZEL_SIDE
+	viewing_area.offset_top = SCREEN_BEZEL_TOP_BOTTOM
+	viewing_area.offset_bottom = -SCREEN_BEZEL_TOP_BOTTOM
+	var screen_style := StyleBoxFlat.new()
+	screen_style.bg_color = UiPalette.CREAM
+	screen_style.set_corner_radius_all(UiPalette.SCREEN_CORNER_RADIUS)
+	screen_style.border_color = Color.BLACK
+	screen_style.set_border_width_all(2)
+	screen_style.set_content_margin_all(2)  # the 2px gap between elements and the black frame
+	viewing_area.add_theme_stylebox_override("panel", screen_style)
+	add_child(viewing_area)
 
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 10)
-	margin.add_child(column)
+	viewing_area.add_child(column)
 
 	# Pinned across every tab (UI Notes §7): the income/cash hero stat (the heartbeat)
 	# and the epoch banner just under it. Main feeds both each frame in _process.
@@ -292,7 +309,7 @@ func _build_property_tab() -> Control:
 
 	# Global buy-mode toggle: one button cycles ×1 → ×10 → ×100 → MAX; every row follows.
 	_buy_mode_button = Button.new()
-	_buy_mode_button.custom_minimum_size = Vector2(0, 56)
+	_buy_mode_button.custom_minimum_size = Vector2(0, UiPalette.STANDARD_BUTTON_HEIGHT)
 	_buy_mode_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_buy_mode_button.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
 	UiPalette.style_button(_buy_mode_button, false)
@@ -343,7 +360,7 @@ func _build_estate_tab() -> Control:
 
 	# The prestige exit: plan the estate, pass on, raise a faster heir. Red = big commit.
 	_plan_button = Button.new()
-	_plan_button.custom_minimum_size = Vector2(0, 72)
+	_plan_button.custom_minimum_size = Vector2(0, UiPalette.STANDARD_BUTTON_HEIGHT)
 	_plan_button.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
 	UiPalette.style_button(_plan_button, true)
 	_plan_button.text = "PLAN THE ESTATE"
@@ -404,7 +421,7 @@ func _build_settings_tab() -> Control:
 
 	# Dev tools entry: the balance tuning panel (GDD §13). Moved here from the action row.
 	var dev_button := Button.new()
-	dev_button.custom_minimum_size = Vector2(0, 64)
+	dev_button.custom_minimum_size = Vector2(0, UiPalette.STANDARD_BUTTON_HEIGHT)
 	dev_button.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
 	UiPalette.style_button(dev_button, false)
 	dev_button.text = "DEV — BALANCE TUNING"

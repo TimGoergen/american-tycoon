@@ -42,6 +42,11 @@ const FONT_BODY := 32         # body text and captions
 const FONT_LABEL := 28        # secondary labels
 const FONT_SMALL := 26        # the smallest text allowed — the readability floor
 
+## The one standard action-button height used across the game's primary buttons (Tim,
+## 2026-06-22). Set to 160% of the average of the four buttons it replaces — turbo (56),
+## buy-mode (56), Plan the Estate (72), and DEV tuning (64): average 62 × 1.6 ≈ 99.
+const STANDARD_BUTTON_HEIGHT := 99
+
 ## Corner radius (px, 1080-wide design space) for UI that hugs the phone's rounded screen
 ## corners — the income panel's top corners and the outer bottom corners of the edge tab
 ## buttons — so they nest inside the Pixel's screen curve instead of squaring into it.

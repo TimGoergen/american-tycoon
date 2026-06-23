@@ -30,3 +30,10 @@ extends Resource
 ## once the property is staffed. Authored as a circular PNG (transparent corners).
 ## Null until art lands in M3 — the circle then falls back to a lettered placeholder.
 @export var manager_portrait: Texture2D = null
+
+## Accent color for this property — the background tint shown behind the staffer's
+## portrait once the property is staffed (a per-property color, GDD §5.5 / Tim 2026-06-22).
+## A deliberate, sanctioned extension beyond the Art Style Guide's 9-color palette: with
+## 12 properties there are not enough palette colors to give each a unique hue, so this
+## 12-color property palette is its own small, documented exception.
+@export var accent_color: Color = Color("#7DA87B")

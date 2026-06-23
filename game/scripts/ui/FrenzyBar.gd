@@ -33,8 +33,8 @@ func _ready() -> void:
 	min_value = 0.0
 	max_value = 1.0
 	show_percentage = false
-	# 56px tall to line up with the DEV / buy-mode buttons sharing its row.
-	custom_minimum_size = Vector2(0, 56)
+	# The shared standard button height, matching the buy-mode button sharing its row.
+	custom_minimum_size = Vector2(0, UiPalette.STANDARD_BUTTON_HEIGHT)
 	size_flags_vertical = Control.SIZE_FILL
 	UiPalette.style_framed_progress(self, UiPalette.MUSTARD_GOLD, UiPalette.ATOMIC_TEAL)
 

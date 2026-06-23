@@ -11,3 +11,5 @@ r0 = 1.07
 base_income_per_unit = 10755555556.0
 base_cycle_length = 121.0
 staffer_name = "Lobbyist"
+# Legislative Assets — mustard gold
+accent_color = Color(0.722, 0.553, 0.224, 1)

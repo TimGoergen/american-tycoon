@@ -230,7 +230,9 @@ func _process(delta: float) -> void:
 		_apply_wage_fill(_promotion_progress(title, next))
 		# Show taps earned within THIS title, not the dynastic lifetime total, so the
 		# number matches the meter (and an heir starts each rung at 0 / span).
-		_context_label.text = "%s → %s: %d / %d taps + %s tuition" % [
+		# Two lines (Tim, 2026-06-22): the title-to-title progression on top, the
+		# taps/tuition requirement beneath it.
+		_context_label.text = "%s → %s\n%d / %d taps + %s tuition" % [
 			title.title_name, next.title_name,
 			_wage.taps_in_current_title(), _wage.taps_required_for_promotion(),
 			Money.of(next.tuition).display()

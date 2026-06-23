@@ -11,3 +11,5 @@ r0 = 1.07
 base_income_per_unit = 24242424.0
 base_cycle_length = 36.0
 staffer_name = "Property Manager"
+# Flipping Houses — terracotta brick
+accent_color = Color(0.671, 0.388, 0.290, 1)

@@ -11,3 +11,5 @@ r0 = 1.07
 base_income_per_unit = 88888888889.0
 base_cycle_length = 180.0
 staffer_name = "Chief of Staff"
+# Executive Assets — regal burgundy
+accent_color = Color(0.451, 0.180, 0.243, 1)

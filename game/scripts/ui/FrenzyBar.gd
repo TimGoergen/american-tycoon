@@ -55,12 +55,12 @@ func _ready() -> void:
 	_button.add_theme_stylebox_override("hover", label_padding)
 	_button.add_theme_stylebox_override("pressed", label_padding)
 	_button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-	_button.add_theme_color_override("font_color", UiPalette.NAVY)
-	_button.add_theme_color_override("font_hover_color", UiPalette.NAVY)
-	_button.add_theme_color_override("font_pressed_color", UiPalette.INK_NAVY)
-	# Disabled is the common state (can't pop until charged) — keep the label dark and
-	# readable rather than the default greyed-out wash.
-	_button.add_theme_color_override("font_disabled_color", UiPalette.NAVY)
+	# White TURBO label in every state (Tim, 2026-06-23). Disabled is the common state
+	# (can't pop until charged), so it too stays white rather than the default greyed wash.
+	_button.add_theme_color_override("font_color", Color.WHITE)
+	_button.add_theme_color_override("font_hover_color", Color.WHITE)
+	_button.add_theme_color_override("font_pressed_color", Color.WHITE)
+	_button.add_theme_color_override("font_disabled_color", Color.WHITE)
 	_button.pressed.connect(func() -> void: pop_requested.emit())
 	add_child(_button)
 

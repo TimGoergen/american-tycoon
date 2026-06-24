@@ -61,19 +61,20 @@ func setup(tuning: TuningConfig) -> void:
 
 
 func _ready() -> void:
-	color = Color(UiPalette.INK_NAVY, 0.92)  # near-opaque scrim — the minigame owns the screen
+	# Black field framing a cream rounded viewing area, identical to the main game and the dev
+	# panel (Tim, 2026-06-23). The minigame fills the whole window inside that border rather
+	# than sitting as a small centered card. The two views share one slot that fills the frame,
+	# so the play area stretches to full screen.
+	color = Color.BLACK
 	visible = false
 
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(center)
-
-	var panel := PanelContainer.new()
-	panel.add_theme_stylebox_override("panel", UiPalette.make_panel_style())
-	center.add_child(panel)
+	var viewing_area := PanelContainer.new()
+	UiPalette.apply_screen_bezel(viewing_area)
+	viewing_area.add_theme_stylebox_override("panel", UiPalette.make_screen_panel_style())
+	add_child(viewing_area)
 
 	var slot := MarginContainer.new()
-	panel.add_child(slot)
+	viewing_area.add_child(slot)
 	_play_view = _build_play_view()
 	slot.add_child(_play_view)
 	_result_view = _build_result_view()

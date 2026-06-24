@@ -30,7 +30,9 @@ func setup(tuning: TuningConfig) -> void:
 
 
 func _ready() -> void:
-	color = Color(UiPalette.INK_NAVY, 0.92)  # near-opaque scrim — this owns the screen
+	# Black field framing the cream rounded viewing area, matching the main game (Tim,
+	# 2026-06-23). The reviewed minigame (_player) draws its own identical frame on top.
+	color = Color.BLACK
 	visible = false
 
 	_list_view = _build_list_view()
@@ -59,23 +61,19 @@ func open() -> void:
 # ---------------------------------------------------------------------------
 
 func _build_list_view() -> Control:
+	# The cream rounded viewing area, framed by the black field — the same shared frame the
+	# main game uses, so the list page sits in an identical bezel and rounded plate.
+	var viewing_area := PanelContainer.new()
+	UiPalette.apply_screen_bezel(viewing_area)
+	viewing_area.add_theme_stylebox_override("panel", UiPalette.make_screen_panel_style())
+
+	# The list of buttons is centered within that full-screen frame.
 	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-
-	var panel := PanelContainer.new()
-	panel.add_theme_stylebox_override("panel", UiPalette.make_panel_style())
-	center.add_child(panel)
-
-	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 24)
-	margin.add_theme_constant_override("margin_right", 24)
-	margin.add_theme_constant_override("margin_top", 24)
-	margin.add_theme_constant_override("margin_bottom", 24)
-	panel.add_child(margin)
+	viewing_area.add_child(center)
 
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 14)
-	margin.add_child(column)
+	center.add_child(column)
 
 	var heading := Label.new()
 	heading.text = "MINIGAME TUNING"
@@ -119,7 +117,7 @@ func _build_list_view() -> Control:
 	close_button.pressed.connect(_on_close_pressed)
 	column.add_child(close_button)
 
-	return center
+	return viewing_area
 
 
 # ---------------------------------------------------------------------------

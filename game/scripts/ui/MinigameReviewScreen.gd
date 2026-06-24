@@ -126,7 +126,11 @@ func _build_list_view() -> Control:
 
 func _on_type_pressed(type_script: Script) -> void:
 	_list_view.visible = false
-	_player.start_game(SAMPLE_BASE_LEGACY, SAMPLE_BONUS_MAX, type_script, true)
+	# Review play always shows the prestige/Legacy framing with sample numbers; it never
+	# banks anything, so the reward context is purely cosmetic here.
+	_player.start_game(
+		MinigameScreen.legacy_reward(SAMPLE_BASE_LEGACY), SAMPLE_BONUS_MAX, type_script, true
+	)
 
 
 func _return_to_list() -> void:

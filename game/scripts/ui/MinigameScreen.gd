@@ -5,14 +5,18 @@ extends ColorRect
 # and converts its performance (0..1) into the universal outcome multiplier shared by every
 # minigame: 0.5x (keep floor / skip) -> 1.0x (full) -> up to 1.0 + bonus_max (extra-high,
 # bonus cap from the Family Reputation upgrade). The host owns everything common — the
-# countdown, the live "Legacy kept" spectrum bar, the result, and the skip/opt-out — so all
+# countdown, the live "kept" spectrum bar, the result, and the skip/opt-out — so all
 # types behave identically; a type owns only its gameplay (see Minigame).
 #
-# Currently wired to the prestige/succession site (Legacy). Phase 3 adds the First Contact
-# and Welcome-back sites; the reward labels would generalize then.
+# The host is REWARD-AGNOSTIC: it only produces a multiplier (see `finished`) and shows a
+# configurable reward noun, so the same minigames scale Legacy at the prestige site and the
+# cash pile at the welcome-back site. The caller describes the reward via a context built by
+# `legacy_reward` / `offline_pile_reward` (or `make_reward`) and passed to `start_game`.
 
-## Emitted when the round ends (Continue or Skip). `multiplier` is applied to the run's
-## Legacy by Main; `opt_out` true if the player asked to auto-skip future minigames.
+## Emitted when the round ends (Continue or Skip). `multiplier` is the universal outcome
+## multiplier (~0.5x .. 1.25x); the CALLER decides what it scales (the run's Legacy at
+## prestige, the offline pile at welcome-back). `opt_out` true if the player asked to
+## auto-skip future minigames.
 signal finished(multiplier: float, opt_out: bool)
 
 ## Emitted only in review mode (Settings → Minigame Tuning) when the player taps the Back
@@ -30,9 +34,9 @@ const MINIGAME_TYPES := [
 	preload("res://scripts/ui/BalanceMinigame.gd"),
 ]
 
-## The default purpose blurb shown in the play view's top section outside review mode. Phase 3
-## (First Contact / Welcome-back sites) will pass its own line ("Fight for the alien bonus",
-## etc.) through start_game; prestige uses this one.
+## The default purpose blurb shown in the play view's top section outside review mode. Each
+## site passes its own line through its reward context (see `make_reward`); this is the
+## prestige default, used when a reward omits a purpose.
 const DEFAULT_PURPOSE := "Grow the inheritance"
 
 ## The centered panel that frames every minigame: 95% of the screen wide, 70% tall, with a
@@ -46,7 +50,15 @@ const PANEL_HEIGHT_FRACTION := 0.84
 const PANEL_BORDER_WIDTH := 8
 
 var _tuning: TuningConfig
-var _base_legacy: int = 0
+## The pre-minigame base reward being scaled (Legacy count at prestige, cash pile at
+## welcome-back). Kept as a float so it can hold either a small Legacy count or a large
+## cash pile; the display formats it per `_format_as_money`.
+var _base_amount: float = 0.0
+## How the host words the reward: the singular noun (e.g. "Legacy") for plain counts, the
+## result-screen heading, and whether amounts are formatted as dollars instead of a count.
+var _reward_noun: String = "Legacy"
+var _result_heading: String = "THE INHERITANCE"
+var _format_as_money: bool = false
 var _bonus_max: float = 0.25
 var _seconds_left: float = 0.0
 var _playing: bool = false
@@ -70,8 +82,9 @@ var _timer_label: Label
 var _keep_label: Label
 var _keep_bar: Control
 var _play_area: Control
+var _result_heading_label: Label
 var _result_mult_label: Label
-var _result_legacy_label: Label
+var _result_amount_label: Label
 var _opt_out_check: CheckBox
 
 
@@ -180,7 +193,7 @@ func _build_play_view() -> Control:
 	column.add_child(skip_button)
 
 	_opt_out_check = CheckBox.new()
-	_opt_out_check.text = "Skip minigames on future prestiges"
+	_opt_out_check.text = "Skip minigames from now on"
 	_opt_out_check.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
 	for state in ["font_color", "font_pressed_color", "font_hover_color",
 			"font_focus_color", "font_hover_pressed_color", "font_disabled_color"]:
@@ -198,17 +211,19 @@ func _build_result_view() -> Control:
 
 	_add_back_button(column)
 
-	var heading := _make_label("THE INHERITANCE", UiPalette.FONT_HEADLINE, UiPalette.NAVY)
-	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	column.add_child(heading)
+	# The heading names what was won ("THE INHERITANCE" / "THE OVERNIGHT HAUL"); start_game
+	# sets it per site from the reward context.
+	_result_heading_label = _make_label("THE INHERITANCE", UiPalette.FONT_HEADLINE, UiPalette.NAVY)
+	_result_heading_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	column.add_child(_result_heading_label)
 
 	_result_mult_label = _make_label("", UiPalette.FONT_DISPLAY, UiPalette.MUSTARD_GOLD)
 	_result_mult_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(_result_mult_label)
 
-	_result_legacy_label = _make_label("", UiPalette.FONT_SUBHEAD, UiPalette.MONEY_GREEN)
-	_result_legacy_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	column.add_child(_result_legacy_label)
+	_result_amount_label = _make_label("", UiPalette.FONT_SUBHEAD, UiPalette.MONEY_GREEN)
+	_result_amount_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	column.add_child(_result_amount_label)
 
 	var continue_button := Button.new()
 	continue_button.custom_minimum_size = Vector2(0, 80)
@@ -253,20 +268,56 @@ func _make_label(text: String, font_size: int, color: Color) -> Label:
 # Round lifecycle
 # ---------------------------------------------------------------------------
 
-## Start a round. `base_legacy` is the run's pre-minigame Legacy; `bonus_max` is the max
-## extra-high bonus fraction (Family Reputation). Normally picks a random minigame type;
-## the review screen passes a specific `forced_type` and sets `review_mode` so a Back
-## button appears. Prestige play leaves both at their defaults (random type, no Back).
+## Describe a round's reward for the host's DISPLAY only. The outcome math (the multiplier)
+## is universal; these fields just control wording/formatting so the same minigames can scale
+## Legacy at prestige and the cash pile at welcome-back. `base` is the pre-minigame amount,
+## `noun` the singular reward word for plain counts ("Legacy"), `heading` the result-screen
+## title, `purpose` the play-view blurb, and `format_as_money` formats amounts as dollars.
+static func make_reward(
+		base: float, noun: String, heading: String, purpose: String, format_as_money: bool
+) -> Dictionary:
+	return {
+		"base": base, "noun": noun, "heading": heading,
+		"purpose": purpose, "as_money": format_as_money,
+	}
+
+
+## The prestige/succession round: scales the heir's Legacy (a plain count).
+static func legacy_reward(base_legacy: int) -> Dictionary:
+	return make_reward(float(base_legacy), "Legacy", "THE INHERITANCE", DEFAULT_PURPOSE, false)
+
+
+## The welcome-back round (GDD §5.5 site 3): scales the overnight cash pile (money).
+static func offline_pile_reward(pile: float) -> Dictionary:
+	return make_reward(
+		pile, "", "THE OVERNIGHT HAUL", "Make the most of your time away", true
+	)
+
+
+## Start a round. `reward` is a context from `make_reward` (or one of the named builders)
+## describing what is being scaled and how to show it; `bonus_max` is the max extra-high
+## bonus fraction (Family Reputation). Normally picks a random minigame type; the review
+## screen passes a specific `forced_type` and sets `review_mode` so a Back button appears.
+## Live play leaves both at their defaults (random type, no Back).
 func start_game(
-		base_legacy: int, bonus_max: float, forced_type: Script = null, review_mode: bool = false,
-		purpose: String = DEFAULT_PURPOSE
+		reward: Dictionary, bonus_max: float, forced_type: Script = null, review_mode: bool = false
 ) -> void:
-	_base_legacy = base_legacy
+	_base_amount = float(reward.get("base", 0.0))
+	_reward_noun = String(reward.get("noun", "Legacy"))
+	_result_heading = String(reward.get("heading", "THE INHERITANCE"))
+	_format_as_money = bool(reward.get("as_money", false))
+	var purpose := String(reward.get("purpose", DEFAULT_PURPOSE))
+
 	_bonus_max = maxf(0.0, bonus_max)
 	_seconds_left = _tuning.minigame_duration_seconds
 	_opt_out = false
 	if _opt_out_check != null:
 		_opt_out_check.button_pressed = false
+
+	# The result heading names what was won; set it before the round so the result view is
+	# already correct when it appears.
+	if _result_heading_label != null:
+		_result_heading_label.text = _result_heading
 
 	_review_mode = review_mode
 	# Top section: the Back button in the tuner, the purpose blurb in a live round — never both.
@@ -340,17 +391,25 @@ func _keep_color(mult: float) -> Color:
 	return UiPalette.MONEY_GREEN.lerp(UiPalette.ATOMIC_TEAL, into_extra)
 
 
+## Format an amount the way this round's reward wants it: as dollars (the cash pile) or as a
+## plain count of the reward noun (e.g. "12 Legacy"). Counts floor to whole units.
+func _format_amount(amount: float) -> String:
+	if _format_as_money:
+		return Money.of(amount).display()
+	return "%d %s" % [int(floor(amount)), _reward_noun]
+
+
 func _update_status() -> void:
 	var mult := _multiplier_for_performance(_current_performance())
-	var kept := int(floor(float(_base_legacy) * mult))
+	var kept := _base_amount * mult
 	if mult > 1.0:
-		_keep_label.text = "%d Legacy  (+%d bonus)" % [kept, kept - _base_legacy]
+		_keep_label.text = "%s  (+%s bonus)" % [_format_amount(kept), _format_amount(kept - _base_amount)]
 		_keep_label.add_theme_color_override("font_color", UiPalette.ATOMIC_TEAL)
-	elif kept >= _base_legacy:
-		_keep_label.text = "%d Legacy  (full)" % kept
+	elif mult >= 1.0:
+		_keep_label.text = "%s  (full)" % _format_amount(kept)
 		_keep_label.add_theme_color_override("font_color", UiPalette.MONEY_GREEN)
 	else:
-		_keep_label.text = "%d of %d Legacy" % [kept, _base_legacy]
+		_keep_label.text = "%s of %s" % [_format_amount(kept), _format_amount(_base_amount)]
 		_keep_label.add_theme_color_override("font_color", _keep_color(mult))
 	_keep_bar.queue_redraw()
 
@@ -383,19 +442,20 @@ func _end_round() -> void:
 
 
 func _show_result(mult: float) -> void:
-	var kept := int(floor(float(_base_legacy) * mult))
+	var kept := _base_amount * mult
 	if mult > 1.0:
 		_result_mult_label.text = "+%d%% BONUS" % int(round((mult - 1.0) * 100.0))
 		_result_mult_label.add_theme_color_override("font_color", UiPalette.ATOMIC_TEAL)
-		_result_legacy_label.text = "+%d Legacy  (%d base +%d bonus)" % [kept, _base_legacy, kept - _base_legacy]
-	elif kept >= _base_legacy:
-		_result_mult_label.text = "FULL INHERITANCE"
+		_result_amount_label.text = "+%s  (%s +%s bonus)" % \
+				[_format_amount(kept), _format_amount(_base_amount), _format_amount(kept - _base_amount)]
+	elif mult >= 1.0:
+		_result_mult_label.text = "FULL"
 		_result_mult_label.add_theme_color_override("font_color", UiPalette.MONEY_GREEN)
-		_result_legacy_label.text = "+%d Legacy" % kept
+		_result_amount_label.text = "+%s" % _format_amount(kept)
 	else:
 		_result_mult_label.text = "KEPT %d%%" % int(round(mult * 100.0))
 		_result_mult_label.add_theme_color_override("font_color", _keep_color(mult))
-		_result_legacy_label.text = "+%d Legacy  (of %d)" % [kept, _base_legacy]
+		_result_amount_label.text = "+%s  (of %s)" % [_format_amount(kept), _format_amount(_base_amount)]
 
 	_play_view.visible = false
 	_result_view.visible = true

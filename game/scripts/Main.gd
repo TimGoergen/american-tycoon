@@ -66,6 +66,16 @@ var _buy_mode: PropertyRow.BuyMode = PropertyRow.BuyMode.ONE
 ## Wall-clock seconds since the loaded save was written (0 on a fresh run).
 var _elapsed_since_save := 0.0
 
+# Which site launched the currently-running minigame, so _on_minigame_finished knows what its
+# multiplier scales (GDD §5.5). One host serves both sites; only one runs at a time.
+enum MinigameSite { NONE, SUCCESSION, WELCOME_BACK }
+var _minigame_site: int = MinigameSite.NONE
+## The offline pile awaiting the welcome-back minigame's verdict. The base pile is already
+## banked when the minigame starts; on finish we credit the +/- delta and show the welcome
+## screen with the final, post-minigame haul.
+var _pending_offline_pile: float = 0.0
+var _pending_offline_hours: float = 0.0
+
 
 func _ready() -> void:
 	_create_game()
@@ -166,8 +176,24 @@ func _apply_offline_if_due() -> void:
 	# the dynasty layer); folding Legacy into offline accrual is a later refinement.
 	var offline := game.apply_offline(_elapsed_since_save)
 	# The ritual only plays when a pile actually accrued (staffed income).
-	if offline.pile > 0.0:
-		_welcome_overlay.show_pile(offline.pile, offline.elapsed_seconds / 3600.0)
+	if offline.pile <= 0.0:
+		return
+	var hours_away := offline.elapsed_seconds / 3600.0
+
+	# Welcome-back minigame (GDD §5.5 site 3): when minigames are on, a round scales the
+	# overnight pile before the welcome screen shows it. The base pile is already banked by
+	# apply_offline; the minigame credits only the difference on finish, so the welcome
+	# screen can present the final, post-minigame haul. With minigames off, show the base pile.
+	if game.ui_minigame_enabled:
+		_pending_offline_pile = offline.pile
+		_pending_offline_hours = hours_away
+		_minigame_site = MinigameSite.WELCOME_BACK
+		_minigame_screen.start_game(
+			MinigameScreen.offline_pile_reward(offline.pile),
+			dynasty.upgrades.minigame_bonus_max()
+		)
+	else:
+		_welcome_overlay.show_pile(offline.pile, hours_away)
 
 
 # ---------------------------------------------------------------------------
@@ -401,9 +427,10 @@ func _build_settings_tab() -> Control:
 	heading.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
 	v.add_child(heading)
 
-	# Prestige minigame toggle — the persistent home for the opt-out (GameState).
+	# Transition minigame toggle — the persistent home for the opt-out (GameState). Governs
+	# every site that rolls a minigame (prestige and welcome-back), not just prestige.
 	_minigame_check = CheckBox.new()
-	_minigame_check.text = "Play the prestige minigame"
+	_minigame_check.text = "Play transition minigames"
 	# 40% larger than FONT_BODY (32 -> 45) at Tim's request.
 	_minigame_check.add_theme_font_size_override("font_size", 45)
 	# Navy text in every state — the default theme's checked/hover/pressed colors are a
@@ -774,19 +801,41 @@ func _on_will_cancelled() -> void:
 func _on_pass_on_confirmed() -> void:
 	if game.ui_minigame_enabled:
 		# The minigame's extra-high bonus cap depends on the Family Reputation upgrade.
+		_minigame_site = MinigameSite.SUCCESSION
 		_minigame_screen.start_game(
-			dynasty.projected_legacy_gain(), dynasty.upgrades.minigame_bonus_max()
+			MinigameScreen.legacy_reward(dynasty.projected_legacy_gain()),
+			dynasty.upgrades.minigame_bonus_max()
 		)
 	else:
 		# Opting out banks the keep floor — skipping is the worst result (GDD §5.5).
 		_finalize_succession(tuning.minigame_keep_floor)
 
 
-## The minigame ended: persist the player's "skip future minigames" choice, then
-## finalize the succession with the multiplier it produced.
+## The minigame ended: persist the player's "skip future minigames" choice, then apply its
+## multiplier at whichever site launched it (GDD §5.5). One host serves both sites, so we
+## read _minigame_site to decide; clearing it first keeps a stray re-entry from double-firing.
 func _on_minigame_finished(multiplier: float, opt_out: bool) -> void:
 	game.ui_minigame_enabled = not opt_out
-	_finalize_succession(multiplier)
+	var site := _minigame_site
+	_minigame_site = MinigameSite.NONE
+	match site:
+		MinigameSite.WELCOME_BACK:
+			_finish_welcome_back_minigame(multiplier)
+		_:
+			# SUCCESSION (and any unexpected NONE) finalize the death with the multiplier.
+			_finalize_succession(multiplier)
+
+
+## The welcome-back minigame produced `multiplier`: the base pile was already banked, so we
+## credit only the delta (a bonus when >1.0, a clawback when <1.0) and then show the welcome
+## screen with the final haul. The delta is offline property income like the rest of the pile,
+## so it is credited as EARNED (counts toward the estate basis), matching the base pile.
+func _finish_welcome_back_minigame(multiplier: float) -> void:
+	var final_pile := _pending_offline_pile * multiplier
+	game.economy.award_earned(_pending_offline_pile * (multiplier - 1.0))
+	_welcome_overlay.show_pile(final_pile, _pending_offline_hours)
+	_pending_offline_pile = 0.0
+	_pending_offline_hours = 0.0
 
 
 ## Execute the death with the given Legacy multiplier — bank (boosted) Legacy, advance

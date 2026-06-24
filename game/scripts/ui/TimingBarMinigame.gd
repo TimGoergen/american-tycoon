@@ -21,6 +21,8 @@ const ZONE_HALF_MIN := ZONE_HALF * 0.5
 ## Marker sweep speed (bar-fractions per second) and how much it ramps each lock.
 const BASE_SPEED := 0.9
 const SPEED_RAMP := 1.06
+## Seconds a click-feedback line lingers before it has fully faded out.
+const CLICK_MARK_FADE := 2.0
 
 var _marker_pos: float = 0.0
 var _marker_dir: float = 1.0
@@ -31,6 +33,9 @@ var _running: bool = false
 var _flash: float = 0.0       # brief cream highlight after a successful lock, decays in _process
 var _miss_flash: float = 0.0  # brief red highlight after a missed click, decays in _process
 var _zone_center: float = 0.5  # current center of the gold zone (bar fraction); jumps each lock
+## Pulsing white lines left where each click landed; each is {pos, age} and fades over
+## CLICK_MARK_FADE seconds so the player can see exactly where their taps were perceived.
+var _click_marks: Array = []
 var _rng := RandomNumberGenerator.new()
 
 var _bar: Control
@@ -96,6 +101,10 @@ func _process(delta: float) -> void:
 		return
 	_flash = maxf(0.0, _flash - delta * 4.0)
 	_miss_flash = maxf(0.0, _miss_flash - delta * 4.0)
+	# Age the click-feedback lines and drop any that have fully faded.
+	for mark in _click_marks:
+		mark["age"] += delta
+	_click_marks = _click_marks.filter(func(m: Dictionary) -> bool: return m["age"] < CLICK_MARK_FADE)
 	_marker_pos += _marker_dir * _marker_speed * delta
 	if _marker_pos >= 1.0:
 		_marker_pos = 1.0
@@ -110,6 +119,9 @@ func _process(delta: float) -> void:
 func _on_lock() -> void:
 	if not _running:
 		return
+	# Drop a fading white line wherever the marker was at the moment of the click — hit or miss —
+	# so the player gets clear feedback on exactly where their tap was perceived.
+	_click_marks.append({"pos": _marker_pos, "age": 0.0})
 	var half := _current_zone_half()
 	var distance := absf(_marker_pos - _zone_center)
 	if distance > half:
@@ -165,6 +177,14 @@ func _draw_bar() -> void:
 	var zone_x := (_zone_center - half) * w
 	var zone_w := (half * 2.0) * w
 	_bar.draw_rect(Rect2(zone_x, 0, zone_w, h), UiPalette.MUSTARD_GOLD)
+	# Click-feedback lines: a white line at each recorded click, pulsing as it fades over
+	# CLICK_MARK_FADE seconds (alpha falls with age; the pulse keeps it lively while visible).
+	for mark in _click_marks:
+		var life := 1.0 - clampf(float(mark["age"]) / CLICK_MARK_FADE, 0.0, 1.0)
+		var pulse := 0.55 + 0.45 * absf(sin(float(mark["age"]) * PI * 3.0))
+		var line_color := Color(1.0, 1.0, 1.0, life * pulse)
+		var cx := float(mark["pos"]) * w
+		_bar.draw_rect(Rect2(cx - 2.0, 0, 4.0, h), line_color)
 	# Marker (a thick vertical bar): cream, briefly brightened after a hit or reddened on a miss.
 	var marker_color := UiPalette.CREAM.lightened(_flash * 0.6).lerp(UiPalette.KETCHUP_RED, _miss_flash)
 	var mx := _marker_pos * w

@@ -2,8 +2,9 @@ class_name CatchMoneyMinigame
 extends Minigame
 
 # "Catch the Money" minigame TYPE (GDD §5.5) — a reaction game. Coins fall from the top;
-# tap one to catch it. Performance = coins caught / TARGET_COINS (missed coins fall past),
-# so you must keep catching. Ends when all TARGET_COINS have dropped.
+# tap one to catch it. Performance = net score / TARGET_COINS, where a catch is +1 and a coin
+# that falls past the bottom is -0.5 (so misses actively cost you). Ends when all TARGET_COINS
+# have dropped.
 #
 # Owns only its gameplay; the host owns countdown / spectrum / result / multiplier.
 
@@ -19,8 +20,11 @@ const START_COIN_SIZE := COIN_SIZE * 1.5
 const SHRINK_FACTOR := 0.95
 ## Floor on the spawn size so coins never become untappably tiny for low-vision players (§1b).
 const MIN_COIN_SIZE := COIN_SIZE * 0.5
+## A coin that falls past the bottom costs this fraction of a catch (Tim: "half as many points").
+const MISS_PENALTY := 0.5
 
 var _caught: int = 0
+var _missed: int = 0
 var _spawned: int = 0
 var _spawn_timer: float = 0.0
 var _running: bool = false
@@ -61,7 +65,9 @@ func begin(_tuning: TuningConfig) -> void:
 
 
 func get_performance() -> float:
-	return clampf(float(_caught) / float(TARGET_COINS), 0.0, 1.0)
+	# Net score = catches minus half a point per coin that slipped past the bottom.
+	var net := float(_caught) - MISS_PENALTY * float(_missed)
+	return clampf(net / float(TARGET_COINS), 0.0, 1.0)
 
 
 func _process(delta: float) -> void:
@@ -78,10 +84,11 @@ func _process(delta: float) -> void:
 			_spawn_timer = 0.0
 			_spawn_coin(area_size.x)
 
-	# Fall; a coin past the bottom is a miss (freed, but it still counted as spawned).
+	# Fall; a coin past the bottom is a miss — it costs points (see get_performance) and is freed.
 	for coin in _coins.duplicate():
 		coin.position.y += FALL_SPEED * delta
 		if coin.position.y > area_size.y:
+			_missed += 1
 			_coins.erase(coin)
 			coin.queue_free()
 

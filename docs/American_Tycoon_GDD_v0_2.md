@@ -172,13 +172,22 @@ screens shouldn't be dead air. This grew (Tim, 2026-06-22) into a **minigame fra
 
 **Usage sites (each rolls a random minigame type):**
 1. **Prestige / succession — multiplier on Legacy (BUILT).** See the match-3 below.
-2. **Epoch change / First Contact — head-start bonus (planned).** Performance grants a
-   modest opening advantage in the new epoch (reward TBD: entry income boost / starting
-   cash / first-staffer discount). Theme: *negotiating the alien trade deal*.
-3. **Welcome-back / offline return — multiplier on the offline pile (planned).** *(Watch:
-   welcome-back is the most FREQUENT transition and the genre intends a frictionless return
-   — a mandatory minigame each open, with a 0.5× downside, may feel punishing. Tune cadence
-   / lean on the opt-out; flagged for feel-testing.)*
+2. **Epoch change / First Contact — reward = a NEW PROPERTY TYPE (design pending, Tim
+   2026-06-24).** Theme: *negotiating the alien trade deal*. Tim chose this over the earlier
+   TBD options (entry income boost / starting cash / first-staffer discount): winning the
+   negotiation should open a genuinely new *kind* of business in the bigger market, not just
+   hand out cash. **This breaks the universal 0.5×→1.25× multiplier model** (a property is
+   unlocked or not — performance has to scale something else, e.g. the new property's starting
+   units / a head-start discount on it), and the property ladder is currently 12 fixed Earth
+   configs, so epoch-gated alien property *types* are a content + systems feature, not "wiring."
+   **NOT built; needs its own design pass.** The First Contact minigame hook is therefore left
+   unwired for now (firing a minigame that grants nothing would be worse than none).
+3. **Welcome-back / offline return — multiplier on the offline pile (BUILT 2026-06-24).** A
+   round scales the overnight pile: the base pile is banked on resume, the minigame credits the
+   +/- delta (earned income), then the welcome screen shows the final haul. *(Watch: welcome-back
+   is the most FREQUENT transition and the genre intends a frictionless return — a mandatory
+   minigame each open, with a 0.5× downside, may feel punishing. Tune cadence / lean on the
+   opt-out; flagged for feel-testing.)*
 
 **Player setting:** a persisted toggle (`GameState.ui_minigame_enabled`). **Default:
 mandatory.** **Opting out — or tapping Skip — banks the keep floor** (the worst result, not a
@@ -193,7 +202,9 @@ is the next build.
 **Build phasing:** (1) **framework** — a host that picks a random minigame type and maps its
 [0,1] performance to the universal multiplier; refactor match-3 into the first type; route
 prestige through it (no behavior change). (2) **add 2–4 more types** so the random draw has
-variety. (3) **wire the First Contact and Welcome-back sites** with their rewards.
+variety. (3) **wire the First Contact and Welcome-back sites** with their rewards —
+**welcome-back DONE 2026-06-24** (host generalized to be reward-agnostic; pile multiplier
+wired); **First Contact deferred** pending the "new property type" design (site 2 above).
 
 ---
 

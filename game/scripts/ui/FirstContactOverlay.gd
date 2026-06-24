@@ -46,21 +46,23 @@ var _reveal_tween: Tween = null
 
 
 func _ready() -> void:
-	color = Color(UiPalette.INK_NAVY, 0.85)  # a heavier scrim than welcome-back — this is a big beat
+	# Black field framing a cream rounded viewing area — the same full-screen frame the main
+	# game and dev panel use (Tim, 2026-06-23), so every full-window screen matches.
+	color = Color.BLACK
 	visible = false
 
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(center)
+	var viewing_area := PanelContainer.new()
+	UiPalette.apply_screen_bezel(viewing_area)
+	viewing_area.add_theme_stylebox_override("panel", UiPalette.make_screen_panel_style())
+	add_child(viewing_area)
 
-	var panel := PanelContainer.new()
-	panel.add_theme_stylebox_override("panel", UiPalette.make_panel_style())
-	center.add_child(panel)
+	var center := CenterContainer.new()
+	viewing_area.add_child(center)
 
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 16)
 	column.custom_minimum_size = Vector2(760, 0)
-	panel.add_child(column)
+	center.add_child(column)
 
 	# Eyebrow: a blinking "incoming transmission" line so the screen reads as a live event
 	# breaking in, not a quiet notice (Tim 2026-06-17). Its alpha pulses in _process; the

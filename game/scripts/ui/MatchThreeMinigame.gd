@@ -4,7 +4,9 @@ extends Minigame
 # The match-3 minigame TYPE (GDD §5.5) — the first entry in the minigame library. Drag a
 # gem toward a neighbor to swap; matches flash with a size badge, clear, and survivors +
 # new gems fall into the gaps (resolution steps replayed from MatchThreeBoard, which a
-# board test proves can't desync). Performance = gems cleared / PERFECT_SCORE.
+# board test proves can't desync). Each game picks one or two TARGET gem types; matching those
+# scores points (a running count is shown per type) while matching the wrong type costs you
+# half. Points are credited gem-by-gem as each cascade clears on screen — see get_performance.
 #
 # This control owns ONLY the board gameplay. The host (MinigameScreen) owns the countdown,
 # the spectrum bar, the result, and the multiplier — see Minigame for the contract.
@@ -15,8 +17,22 @@ const GRID_WIDTH := 6
 const GRID_HEIGHT := 6
 const GEM_COLORS := 5
 
-## Gems cleared that counts as a perfect game (performance 1.0 -> the host's max multiplier).
-const PERFECT_SCORE := 200.0
+# --- Target-gem challenge (Tim's minigame v2) --------------------------------
+# Each game randomly picks one or two TARGET gem types. Matching a target scores a point;
+# matching the WRONG type costs you half a point. There are no quotas — the header just shows
+# how many of each target you've matched so far. More matches = a better result, with wrong
+# matches dragging it back down (so a strong early count is not "banked" — you can still lose
+# it to later mistakes).
+
+## How many gem types are targets this game (chosen at random within this range).
+const MIN_TARGET_TYPES := 1
+const MAX_TARGET_TYPES := 2
+## A cleared wrong-type gem subtracts this fraction of one target match (Tim: "lose half").
+const WRONG_TYPE_PENALTY := 0.5
+
+## Net target matches (target matches minus the wrong-type penalty) that count as a perfect game
+## (performance 1.0 -> the host's max multiplier). Partial play scales linearly toward it.
+const PERFECT_TARGET_MATCHES := 30.0
 
 ## A square cell, generously sized for thumb taps and low-vision readability (§1b),
 ## plus the gap between cells. PITCH is the cell-to-cell pixel stride.
@@ -45,6 +61,18 @@ const GEM_TEXT := [
 
 var _board
 var _animating: bool = false
+var _rng := RandomNumberGenerator.new()
+
+# Target-gem challenge state.
+## The target gem types this game (1-2 color ids): matching these scores, others cost you.
+var _target_types: Array = []
+## color_id -> how many of that target type have been matched so far. Shown live (no quota),
+## credited gem-by-gem as each cascade clears on screen.
+var _target_cleared: Dictionary = {}
+## How many WRONG-type gems have been cleared (each costs WRONG_TYPE_PENALTY of one match).
+var _wrong_cleared: int = 0
+## color_id -> the running "symbol  count" Label in the target header, refreshed as we go.
+var _target_labels: Dictionary = {}
 
 # Drag-to-swap state.
 var _dragging: bool = false
@@ -57,16 +85,26 @@ var _board_area: Control
 var _gem_nodes: Array = []
 
 
+func display_name() -> String:
+	return "Match Three"
+
+
 func begin(_tuning: TuningConfig) -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
+	_rng.randomize()
 	_board = Board.new(GRID_WIDTH, GRID_HEIGHT, GEM_COLORS)
+	_choose_target_types()
 
 	var intro := Label.new()
-	intro.text = "Drag a gem to match 3+ — the more you clear, the better."
+	intro.text = "Match the target gems for points — wrong matches cost you."
 	intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	intro.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
 	intro.add_theme_color_override("font_color", UiPalette.NAVY)
+
+	# The target header sits directly above the grid: each target gem's symbol next to a running
+	# count of how many of it you've matched (Tim's minigame v2 target challenge — no quotas).
+	var target_header := _build_target_header()
 
 	_board_area = Control.new()
 	_board_area.custom_minimum_size = Vector2(GRID_WIDTH * PITCH - GAP, GRID_HEIGHT * PITCH - GAP)
@@ -75,22 +113,91 @@ func begin(_tuning: TuningConfig) -> void:
 	_board_area.gui_input.connect(_on_board_input)
 
 	var board_center := CenterContainer.new()
+	board_center.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	board_center.add_child(_board_area)
 
 	var column := VBoxContainer.new()
 	column.set_anchors_preset(Control.PRESET_FULL_RECT)
 	column.add_theme_constant_override("separation", 12)
 	column.add_child(intro)
+	column.add_child(target_header)
 	column.add_child(board_center)
 	add_child(column)
 
 	_build_initial_gems()
 
 
+## Pick one or two target gem types, then seed their match counts.
+func _choose_target_types() -> void:
+	var available: Array = range(GEM_COLORS)
+	available.shuffle()
+	var count := _rng.randi_range(MIN_TARGET_TYPES, MAX_TARGET_TYPES)
+	for i in range(count):
+		var color_id: int = available[i]
+		_target_types.append(color_id)
+		_target_cleared[color_id] = 0
+
+
+## Build the target header row: one chip per target type showing its colored symbol and a
+## live count Label (just the running number matched — no quota), refreshed by
+## _update_target_display as gems clear.
+func _build_target_header() -> Control:
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 24)
+
+	for color_id in _target_types:
+		var chip := HBoxContainer.new()
+		chip.add_theme_constant_override("separation", 8)
+
+		var symbol := Label.new()
+		symbol.text = GEM_SYMBOL[color_id]
+		symbol.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
+		symbol.add_theme_color_override("font_color", GEM_FILL[color_id])
+		# A dark outline so a pale gem symbol (e.g. gold) still reads against the cream panel.
+		symbol.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
+		symbol.add_theme_constant_override("outline_size", 4)
+		chip.add_child(symbol)
+
+		var count_label := Label.new()
+		count_label.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
+		count_label.add_theme_color_override("font_color", UiPalette.NAVY)
+		chip.add_child(count_label)
+		_target_labels[color_id] = count_label
+
+		row.add_child(chip)
+
+	_update_target_display()
+	return row
+
+
 func get_performance() -> float:
 	if _board == null:
 		return 0.0
-	return clampf(float(_board.score) / PERFECT_SCORE, 0.0, 1.0)
+	# Net matches = every target-type gem matched, minus the wrong-type penalty. There is no
+	# quota to "bank" — later wrong matches still pull the net (and thus the result) back down.
+	# Scaled linearly toward PERFECT_TARGET_MATCHES (= performance 1.0, the host's max bonus).
+	var target_total := 0
+	for color_id in _target_types:
+		target_total += _target_cleared[color_id]
+	var net := float(target_total) - WRONG_TYPE_PENALTY * float(_wrong_cleared)
+	return clampf(net / PERFECT_TARGET_MATCHES, 0.0, 1.0)
+
+
+## Record one cleared gem against the target challenge: a target type advances its count; any
+## other type is a wrong match (penalized in get_performance).
+func _credit_cleared_gem(color_id: int) -> void:
+	if _target_cleared.has(color_id):
+		_target_cleared[color_id] += 1
+	else:
+		_wrong_cleared += 1
+
+
+## Refresh each target type's running match count (just the number — no quota).
+func _update_target_display() -> void:
+	for color_id in _target_labels:
+		var label: Label = _target_labels[color_id]
+		label.text = str(_target_cleared[color_id])
 
 
 func is_busy() -> bool:
@@ -261,11 +368,16 @@ func _animate_step(step: Dictionary) -> void:
 			clear.tween_property(gem, "scale", Vector2.ZERO, CLEAR_TIME)
 			clear.tween_property(gem, "modulate:a", 0.0, CLEAR_TIME)
 	await clear.finished
+	# Award the cleared gems NOW, as they vanish on screen — not all at once when the move was
+	# made. A cascade chain therefore credits its points step by step as each match resolves,
+	# and the host's spectrum bar climbs in time with the animation (Tim's minigame v2).
 	for cell in step["cleared"]:
 		var gem: Control = _gem_nodes[cell[0]][cell[1]]
 		if gem != null:
+			_credit_cleared_gem(int(gem.get_meta("color")))
 			gem.queue_free()
 		_gem_nodes[cell[0]][cell[1]] = null
+	_update_target_display()
 
 	var drop := create_tween().set_parallel(true)
 	_apply_falls(step["falls"], drop)

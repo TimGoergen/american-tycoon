@@ -65,24 +65,25 @@ var _generation_label: Label
 
 
 func _ready() -> void:
-	# Dark scrim covers the game screen beneath the ceremony.
-	color = Color(UiPalette.INK_NAVY, 0.75)
+	# Black field framing a cream rounded viewing area — the same full-screen frame the main
+	# game and dev panel use (Tim, 2026-06-23), so every full-window screen matches.
+	color = Color.BLACK
 	visible = false
 
-	# A single CenterContainer positions the panel in the middle of the screen.
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(center)
+	var viewing_area := PanelContainer.new()
+	UiPalette.apply_screen_bezel(viewing_area)
+	viewing_area.add_theme_stylebox_override("panel", UiPalette.make_screen_panel_style())
+	add_child(viewing_area)
 
-	var panel := PanelContainer.new()
-	panel.add_theme_stylebox_override("panel", UiPalette.make_panel_style())
-	center.add_child(panel)
+	# A CenterContainer positions the ceremony content in the middle of the framed page.
+	var center := CenterContainer.new()
+	viewing_area.add_child(center)
 
 	# The outer column holds padding and switches between the two phase containers.
 	var outer_column := VBoxContainer.new()
 	outer_column.add_theme_constant_override("separation", 0)
 	outer_column.custom_minimum_size = Vector2(640, 0)
-	panel.add_child(outer_column)
+	center.add_child(outer_column)
 
 	_build_phase0(outer_column)
 	_build_phase1(outer_column)

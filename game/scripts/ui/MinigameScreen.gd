@@ -39,9 +39,11 @@ const DEFAULT_PURPOSE := "Grow the inheritance"
 ## moderately thick black outline (Tim's minigame v2 layout, 2026-06-23). These are anchor
 ## fractions of the full-screen scrim — the panel stays centered and scales with the screen.
 const PANEL_WIDTH_FRACTION := 0.95
-const PANEL_HEIGHT_FRACTION := 0.70
-## Thickness of that black outline.
-const PANEL_BORDER_WIDTH := 6
+const PANEL_HEIGHT_FRACTION := 0.84
+## Thickness of that black outline. It is the ONLY thing setting the card apart from the cream
+## background behind it (same fill), so it is deliberately thick and well above the 2px screen
+## bezel frame.
+const PANEL_BORDER_WIDTH := 8
 
 var _tuning: TuningConfig
 var _base_legacy: int = 0
@@ -78,14 +80,20 @@ func setup(tuning: TuningConfig) -> void:
 
 
 func _ready() -> void:
-	# A dimmed black scrim covers the whole screen (freezing whatever sits behind, e.g. the will),
-	# and the minigame itself lives in a single cream PANEL centered on top — 95% of the screen
-	# wide, 70% tall, with a moderately thick black outline (Tim's minigame v2 layout,
-	# 2026-06-23). This replaces the old full-bleed framing: every minigame now reads as one
-	# centered card, the same shape from the tuner and from a live prestige.
-	color = Color(0.0, 0.0, 0.0, 0.85)
+	# A black field hugs the screen edge and frames a cream rounded viewing area — the same
+	# bezel every other full-screen screen uses (Tim, 2026-06-23). The minigame's own card then
+	# floats centered on top of that cream background; because the card's fill is the SAME cream,
+	# it is set apart only by its thick black outline. (95% of the screen wide, 84% tall.)
+	color = Color.BLACK
 	visible = false
 
+	# The framed cream background — the black border at the screen edge plus the light-tan plate.
+	var background := PanelContainer.new()
+	UiPalette.apply_screen_bezel(background)
+	background.add_theme_stylebox_override("panel", UiPalette.make_screen_panel_style())
+	add_child(background)
+
+	# The game card itself, centered on top of that background with its own thick outline.
 	var panel := PanelContainer.new()
 	panel.add_theme_stylebox_override("panel", _make_panel_style())
 	# Center the panel by anchor fractions so it scales with the screen and stays centered.

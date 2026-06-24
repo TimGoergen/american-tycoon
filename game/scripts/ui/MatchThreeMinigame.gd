@@ -4,7 +4,9 @@ extends Minigame
 # The match-3 minigame TYPE (GDD §5.5) — the first entry in the minigame library. Drag a
 # gem toward a neighbor to swap; matches flash with a size badge, clear, and survivors +
 # new gems fall into the gaps (resolution steps replayed from MatchThreeBoard, which a
-# board test proves can't desync). Performance = gems cleared / PERFECT_SCORE.
+# board test proves can't desync). Each game sets quotas on one or two required gem types;
+# performance comes from meeting those quotas (with a penalty for clearing the wrong type)
+# and is credited gem-by-gem as each cascade clears on screen — see get_performance.
 #
 # This control owns ONLY the board gameplay. The host (MinigameScreen) owns the countdown,
 # the spectrum bar, the result, and the multiplier — see Minigame for the contract.
@@ -15,8 +17,26 @@ const GRID_WIDTH := 6
 const GRID_HEIGHT := 6
 const GEM_COLORS := 5
 
-## Gems cleared that counts as a perfect game (performance 1.0 -> the host's max multiplier).
-const PERFECT_SCORE := 200.0
+# --- Quota challenge (Tim's minigame v2) -------------------------------------
+# Each game randomly picks one or two gem types and assigns each a quota. Clearing the
+# required types fills the quota; clearing the WRONG type costs you half as much. Meeting
+# every quota earns "full inheritance"; clearing extra required gems beyond quota is the
+# stretch goal that pushes into the bonus band.
+
+## How many gem types are required this game (chosen at random within this range).
+const MIN_REQUIRED_TYPES := 1
+const MAX_REQUIRED_TYPES := 2
+## The per-type quota is chosen at random in this range.
+const QUOTA_MIN := 6
+const QUOTA_MAX := 10
+## A cleared wrong-type gem subtracts this fraction of one required clear (Tim: "lose half").
+const WRONG_TYPE_PENALTY := 0.5
+
+## Performance the player reaches by exactly meeting every quota. It corresponds to the host's
+## "full inheritance" point (1.0x) at default tuning (keep_floor 0.5, bonus 0.25 -> full at
+## ~0.67); clearing a second quota's worth of required gems as the stretch goal fills the rest
+## of the bar up to 1.0 (the max bonus). Anchored as a constant for readability.
+const FULL_QUOTA_PERFORMANCE := 0.67
 
 ## A square cell, generously sized for thumb taps and low-vision readability (§1b),
 ## plus the gap between cells. PITCH is the cell-to-cell pixel stride.
@@ -45,6 +65,18 @@ const GEM_TEXT := [
 
 var _board
 var _animating: bool = false
+var _rng := RandomNumberGenerator.new()
+
+# Quota challenge state.
+## color_id -> quota for the required types this game.
+var _quotas: Dictionary = {}
+## color_id -> how many of that required type have been cleared so far (can exceed the quota:
+## the overflow is the stretch goal). Earned incrementally as each cascade clears on screen.
+var _required_cleared: Dictionary = {}
+## How many WRONG-type gems have been cleared (each costs WRONG_TYPE_PENALTY of one clear).
+var _wrong_cleared: int = 0
+## color_id -> the "symbol  cleared/quota" Label in the requirement header, refreshed as we go.
+var _quota_labels: Dictionary = {}
 
 # Drag-to-swap state.
 var _dragging: bool = false
@@ -63,14 +95,20 @@ func display_name() -> String:
 
 func begin(_tuning: TuningConfig) -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
+	_rng.randomize()
 	_board = Board.new(GRID_WIDTH, GRID_HEIGHT, GEM_COLORS)
+	_choose_quotas()
 
 	var intro := Label.new()
-	intro.text = "Drag a gem to match 3+ — the more you clear, the better."
+	intro.text = "Clear the required gems to meet each quota. Wrong matches cost you."
 	intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	intro.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
 	intro.add_theme_color_override("font_color", UiPalette.NAVY)
+
+	# The requirement header sits directly above the grid: each required gem's symbol next to
+	# its running "cleared / quota" tally (Tim's minigame v2 quota challenge).
+	var requirement_header := _build_requirement_header()
 
 	_board_area = Control.new()
 	_board_area.custom_minimum_size = Vector2(GRID_WIDTH * PITCH - GAP, GRID_HEIGHT * PITCH - GAP)
@@ -79,22 +117,111 @@ func begin(_tuning: TuningConfig) -> void:
 	_board_area.gui_input.connect(_on_board_input)
 
 	var board_center := CenterContainer.new()
+	board_center.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	board_center.add_child(_board_area)
 
 	var column := VBoxContainer.new()
 	column.set_anchors_preset(Control.PRESET_FULL_RECT)
 	column.add_theme_constant_override("separation", 12)
 	column.add_child(intro)
+	column.add_child(requirement_header)
 	column.add_child(board_center)
 	add_child(column)
 
 	_build_initial_gems()
 
 
+## Pick one or two required gem types and a quota for each, then seed the per-type tallies.
+func _choose_quotas() -> void:
+	var available: Array = range(GEM_COLORS)
+	available.shuffle()
+	var count := _rng.randi_range(MIN_REQUIRED_TYPES, MAX_REQUIRED_TYPES)
+	for i in range(count):
+		var color_id: int = available[i]
+		_quotas[color_id] = _rng.randi_range(QUOTA_MIN, QUOTA_MAX)
+		_required_cleared[color_id] = 0
+
+
+## Build the "REQUIRED" header row: one chip per required type showing its colored symbol and a
+## live tally Label (refreshed by _update_quota_display as gems clear).
+func _build_requirement_header() -> Control:
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 24)
+
+	for color_id in _quotas:
+		var chip := HBoxContainer.new()
+		chip.add_theme_constant_override("separation", 8)
+
+		var symbol := Label.new()
+		symbol.text = GEM_SYMBOL[color_id]
+		symbol.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
+		symbol.add_theme_color_override("font_color", GEM_FILL[color_id])
+		# A dark outline so a pale gem symbol (e.g. gold) still reads against the cream panel.
+		symbol.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
+		symbol.add_theme_constant_override("outline_size", 4)
+		chip.add_child(symbol)
+
+		var tally := Label.new()
+		tally.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
+		tally.add_theme_color_override("font_color", UiPalette.NAVY)
+		chip.add_child(tally)
+		_quota_labels[color_id] = tally
+
+		row.add_child(chip)
+
+	_update_quota_display()
+	return row
+
+
 func get_performance() -> float:
 	if _board == null:
 		return 0.0
-	return clampf(float(_board.score) / PERFECT_SCORE, 0.0, 1.0)
+	# Net effort = required gems cleared (capped per type at quota + one quota's worth of stretch)
+	# minus the wrong-type penalty. Meeting every quota reaches FULL_QUOTA_PERFORMANCE ("full
+	# inheritance"); clearing a full extra quota of required gems fills the rest of the bar.
+	var quota_total := 0
+	var required_progress := 0.0   # fraction of the combined quota met (0..1)
+	var stretch_progress := 0.0    # fraction of the stretch (a second quota's worth) earned (0..1)
+	for color_id in _quotas:
+		var quota: int = _quotas[color_id]
+		quota_total += quota
+		var cleared: int = _required_cleared[color_id]
+		required_progress += float(mini(cleared, quota))
+		stretch_progress += float(clampi(cleared - quota, 0, quota))
+
+	if quota_total <= 0:
+		return 0.0
+	# The wrong-type penalty eats into the required progress before it is normalized.
+	var penalty := WRONG_TYPE_PENALTY * float(_wrong_cleared)
+	var net_required := maxf(0.0, required_progress - penalty)
+	var required_frac := clampf(net_required / float(quota_total), 0.0, 1.0)
+	var stretch_frac := clampf(stretch_progress / float(quota_total), 0.0, 1.0)
+
+	var performance := FULL_QUOTA_PERFORMANCE * required_frac
+	performance += (1.0 - FULL_QUOTA_PERFORMANCE) * stretch_frac
+	return clampf(performance, 0.0, 1.0)
+
+
+## Record one cleared gem against the quota challenge: a required type advances its tally
+## (overflow counts toward the stretch goal); any other type is a wrong match.
+func _credit_cleared_gem(color_id: int) -> void:
+	if _quotas.has(color_id):
+		_required_cleared[color_id] += 1
+	else:
+		_wrong_cleared += 1
+
+
+## Refresh each required type's "cleared / quota" tally (turns green once its quota is met).
+func _update_quota_display() -> void:
+	for color_id in _quota_labels:
+		var quota: int = _quotas[color_id]
+		var cleared: int = _required_cleared[color_id]
+		var label: Label = _quota_labels[color_id]
+		label.text = "%d / %d" % [cleared, quota]
+		var met := cleared >= quota
+		label.add_theme_color_override("font_color",
+				UiPalette.MONEY_GREEN if met else UiPalette.NAVY)
 
 
 func is_busy() -> bool:
@@ -265,11 +392,16 @@ func _animate_step(step: Dictionary) -> void:
 			clear.tween_property(gem, "scale", Vector2.ZERO, CLEAR_TIME)
 			clear.tween_property(gem, "modulate:a", 0.0, CLEAR_TIME)
 	await clear.finished
+	# Award the cleared gems NOW, as they vanish on screen — not all at once when the move was
+	# made. A cascade chain therefore credits its points step by step as each match resolves,
+	# and the host's spectrum bar climbs in time with the animation (Tim's minigame v2).
 	for cell in step["cleared"]:
 		var gem: Control = _gem_nodes[cell[0]][cell[1]]
 		if gem != null:
+			_credit_cleared_gem(int(gem.get_meta("color")))
 			gem.queue_free()
 		_gem_nodes[cell[0]][cell[1]] = null
+	_update_quota_display()
 
 	var drop := create_tween().set_parallel(true)
 	_apply_falls(step["falls"], drop)

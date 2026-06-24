@@ -13,12 +13,21 @@ const TARGET_COINS := 18
 const SPAWN_INTERVAL := 0.55
 const FALL_SPEED := 340.0
 const COIN_SIZE := 96
+## Coins start half-again as big as the base size, then shrink as the player catches them.
+const START_COIN_SIZE := COIN_SIZE * 1.5
+## Each catch makes every future coin this fraction of the last one's size (5% smaller).
+const SHRINK_FACTOR := 0.95
+## Floor on the spawn size so coins never become untappably tiny for low-vision players (§1b).
+const MIN_COIN_SIZE := COIN_SIZE * 0.5
 
 var _caught: int = 0
 var _spawned: int = 0
 var _spawn_timer: float = 0.0
 var _running: bool = false
 var _coins: Array = []  # live coin Buttons
+## Current spawn size: starts large and shrinks 5% per catch (compounding). Coins already
+## in flight keep the size they spawned at; only this next-spawn value changes.
+var _spawn_size: float = START_COIN_SIZE
 var _rng := RandomNumberGenerator.new()
 var _area: Control
 
@@ -86,12 +95,13 @@ func _spawn_coin(area_width: float) -> void:
 	_spawned += 1
 	var coin := Button.new()
 	coin.text = "$"
-	coin.custom_minimum_size = Vector2(COIN_SIZE, COIN_SIZE)
-	coin.size = Vector2(COIN_SIZE, COIN_SIZE)
-	coin.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
+	coin.custom_minimum_size = Vector2(_spawn_size, _spawn_size)
+	coin.size = Vector2(_spawn_size, _spawn_size)
+	# Scale the glyph with the coin so the "$" keeps filling it as the coin shrinks.
+	coin.add_theme_font_size_override("font_size", int(UiPalette.FONT_HEADLINE * _spawn_size / COIN_SIZE))
 	UiPalette.style_button(coin, false)  # mustard coin
-	var max_x: float = maxf(0.0, area_width - COIN_SIZE)
-	coin.position = Vector2(_rng.randf_range(0.0, max_x), -COIN_SIZE)
+	var max_x: float = maxf(0.0, area_width - _spawn_size)
+	coin.position = Vector2(_rng.randf_range(0.0, max_x), -_spawn_size)
 	coin.pressed.connect(_on_coin_caught.bind(coin))
 	_area.add_child(coin)
 	_coins.append(coin)
@@ -101,5 +111,7 @@ func _on_coin_caught(coin: Button) -> void:
 	if not _running or not _coins.has(coin):
 		return
 	_caught += 1
+	# Every catch makes the NEXT spawn 5% smaller (compounding), down to the readable floor.
+	_spawn_size = maxf(MIN_COIN_SIZE, _spawn_size * SHRINK_FACTOR)
 	_coins.erase(coin)
 	coin.queue_free()

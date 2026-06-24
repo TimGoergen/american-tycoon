@@ -30,6 +30,19 @@ const MINIGAME_TYPES := [
 	preload("res://scripts/ui/BalanceMinigame.gd"),
 ]
 
+## The default purpose blurb shown in the play view's top section outside review mode. Phase 3
+## (First Contact / Welcome-back sites) will pass its own line ("Fight for the alien bonus",
+## etc.) through start_game; prestige uses this one.
+const DEFAULT_PURPOSE := "Grow the inheritance"
+
+## The centered panel that frames every minigame: 95% of the screen wide, 70% tall, with a
+## moderately thick black outline (Tim's minigame v2 layout, 2026-06-23). These are anchor
+## fractions of the full-screen scrim — the panel stays centered and scales with the screen.
+const PANEL_WIDTH_FRACTION := 0.95
+const PANEL_HEIGHT_FRACTION := 0.70
+## Thickness of that black outline.
+const PANEL_BORDER_WIDTH := 6
+
 var _tuning: TuningConfig
 var _base_legacy: int = 0
 var _bonus_max: float = 0.25
@@ -37,6 +50,7 @@ var _seconds_left: float = 0.0
 var _playing: bool = false
 var _opt_out: bool = false
 var _active_minigame: Minigame
+var _purpose: String = DEFAULT_PURPOSE
 
 ## Review mode (Settings → Minigame Tuning): a Back button is shown so a tester can bail
 ## out at any time. False for the real prestige round, where there is no Back.
@@ -44,6 +58,9 @@ var _review_mode: bool = false
 ## The Back buttons (one per view), shown only in review mode. Tracked so start_game can
 ## flip their visibility for the chosen mode.
 var _back_buttons: Array = []
+## The play view's centered "purpose" blurb (e.g. "Grow the inheritance"), shown ONLY outside
+## review mode — in the tuner the top section is just the Back button instead.
+var _purpose_label: Label
 
 var _play_view: Control
 var _result_view: Control
@@ -61,24 +78,49 @@ func setup(tuning: TuningConfig) -> void:
 
 
 func _ready() -> void:
-	# Black field framing a cream rounded viewing area, identical to the main game and the dev
-	# panel (Tim, 2026-06-23). The minigame fills the whole window inside that border rather
-	# than sitting as a small centered card. The two views share one slot that fills the frame,
-	# so the play area stretches to full screen.
-	color = Color.BLACK
+	# A dimmed black scrim covers the whole screen (freezing whatever sits behind, e.g. the will),
+	# and the minigame itself lives in a single cream PANEL centered on top — 95% of the screen
+	# wide, 70% tall, with a moderately thick black outline (Tim's minigame v2 layout,
+	# 2026-06-23). This replaces the old full-bleed framing: every minigame now reads as one
+	# centered card, the same shape from the tuner and from a live prestige.
+	color = Color(0.0, 0.0, 0.0, 0.85)
 	visible = false
 
-	var viewing_area := PanelContainer.new()
-	UiPalette.apply_screen_bezel(viewing_area)
-	viewing_area.add_theme_stylebox_override("panel", UiPalette.make_screen_panel_style())
-	add_child(viewing_area)
+	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", _make_panel_style())
+	# Center the panel by anchor fractions so it scales with the screen and stays centered.
+	var half_w := PANEL_WIDTH_FRACTION / 2.0
+	var half_h := PANEL_HEIGHT_FRACTION / 2.0
+	panel.anchor_left = 0.5 - half_w
+	panel.anchor_right = 0.5 + half_w
+	panel.anchor_top = 0.5 - half_h
+	panel.anchor_bottom = 0.5 + half_h
+	panel.offset_left = 0.0
+	panel.offset_right = 0.0
+	panel.offset_top = 0.0
+	panel.offset_bottom = 0.0
+	add_child(panel)
 
+	# The two views (play / result) share one slot that fills the panel, so the play area
+	# stretches to fill the card.
 	var slot := MarginContainer.new()
-	viewing_area.add_child(slot)
+	panel.add_child(slot)
 	_play_view = _build_play_view()
 	slot.add_child(_play_view)
 	_result_view = _build_result_view()
 	slot.add_child(_result_view)
+
+
+## The cream card that frames every minigame: cream fill, a moderately thick black outline, and
+## the universal inner content margin so nothing crowds the edge.
+func _make_panel_style() -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = UiPalette.CREAM
+	style.set_corner_radius_all(24)
+	style.border_color = Color.BLACK
+	style.set_border_width_all(PANEL_BORDER_WIDTH)
+	style.set_content_margin_all(UiPalette.UNIVERSAL_CONTENT_MARGIN)
+	return style
 
 
 # ---------------------------------------------------------------------------
@@ -89,11 +131,13 @@ func _build_play_view() -> Control:
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 12)
 
+	# The top section is context-dependent: in the tuner it is a left-aligned Back button; in a
+	# live round it is a centered blurb naming the minigame's purpose. start_game toggles which.
 	_add_back_button(column)
-
-	var title := _make_label("GROW THE INHERITANCE", UiPalette.FONT_HEADLINE, UiPalette.NAVY)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	column.add_child(title)
+	_purpose_label = _make_label(_purpose, UiPalette.FONT_HEADLINE, UiPalette.NAVY)
+	_purpose_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_purpose_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(_purpose_label)
 
 	_timer_label = _make_label("0:30", UiPalette.FONT_SUBHEAD, UiPalette.KETCHUP_RED)
 	_timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -111,9 +155,11 @@ func _build_play_view() -> Control:
 	_keep_bar.draw.connect(_draw_keep_bar)
 	column.add_child(_keep_bar)
 
-	# The chosen minigame TYPE fills this area each round.
+	# The chosen minigame TYPE fills this area each round. A modest minimum keeps it from
+	# collapsing; the expand flags make it take all the room left inside the centered panel
+	# after the top section, timer, spectrum bar, and skip controls.
 	_play_area = Control.new()
-	_play_area.custom_minimum_size = Vector2(620, 620)
+	_play_area.custom_minimum_size = Vector2(0, 400)
 	_play_area.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_play_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	column.add_child(_play_area)
@@ -204,7 +250,8 @@ func _make_label(text: String, font_size: int, color: Color) -> Label:
 ## the review screen passes a specific `forced_type` and sets `review_mode` so a Back
 ## button appears. Prestige play leaves both at their defaults (random type, no Back).
 func start_game(
-		base_legacy: int, bonus_max: float, forced_type: Script = null, review_mode: bool = false
+		base_legacy: int, bonus_max: float, forced_type: Script = null, review_mode: bool = false,
+		purpose: String = DEFAULT_PURPOSE
 ) -> void:
 	_base_legacy = base_legacy
 	_bonus_max = maxf(0.0, bonus_max)
@@ -214,8 +261,13 @@ func start_game(
 		_opt_out_check.button_pressed = false
 
 	_review_mode = review_mode
+	# Top section: the Back button in the tuner, the purpose blurb in a live round — never both.
 	for back in _back_buttons:
 		(back as Button).visible = review_mode
+	if _purpose_label != null:
+		_purpose = purpose
+		_purpose_label.text = purpose
+		_purpose_label.visible = not review_mode
 
 	for child in _play_area.get_children():
 		child.queue_free()

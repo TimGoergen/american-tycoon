@@ -92,6 +92,10 @@ func try_swap(r1: int, c1: int, r2: int, c2: int) -> int:
 ##       "matches": Array,           #   groups: each an Array of [row,col] forming one
 ##                                   #     3+ line (lets the UI show match size / shape)
 ##       "cleared": Array,           #   flat, de-duplicated [row,col] cells removed
+##       "cleared_colors": Array,    #   the color id of each entry in "cleared" (same order),
+##                                   #     captured before the cell is emptied — lets a scoring UI
+##                                   #     know WHICH gem types a cascade cleared without re-reading
+##                                   #     the (already collapsed) grid
 ##       "falls":   Array,           #   { "col", "from_r", "to_r" } survivors that dropped
 ##       "spawns":  Array,           #   { "col", "to_r", "color" } new gems filling the top
 ##     }
@@ -126,10 +130,16 @@ func resolve_swap(r1: int, c1: int, r2: int, c2: int) -> Dictionary:
 			break
 		var cleared := _union_cells(groups)
 		total_cleared += cleared.size()
+		# Capture the color of every cell about to be cleared BEFORE collapse empties it, so a
+		# scoring UI can tell which gem types this cascade removed (the grid is overwritten next).
+		var cleared_colors: Array = []
+		for cell in cleared:
+			cleared_colors.append(grid[cell[0]][cell[1]])
 		var moves := _clear_collapse_refill_recorded(cleared)
 		steps.append({
 			"matches": groups,
 			"cleared": cleared,
+			"cleared_colors": cleared_colors,
 			"falls": moves["falls"],
 			"spawns": moves["spawns"],
 		})

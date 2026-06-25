@@ -85,6 +85,9 @@ var _play_area: Control
 var _result_heading_label: Label
 var _result_mult_label: Label
 var _result_amount_label: Label
+## A type-specific line on the result screen ("Scored 1,240 points", "Caught 14 of 18"), so the
+## paused result clearly reflects the game just played. Hidden when the type provides none.
+var _result_summary_label: Label
 var _opt_out_check: CheckBox
 
 
@@ -225,6 +228,12 @@ func _build_result_view() -> Control:
 	_result_amount_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(_result_amount_label)
 
+	# How the player did at the game itself (set per round from the type's result_summary).
+	_result_summary_label = _make_label("", UiPalette.FONT_LABEL, UiPalette.NAVY)
+	_result_summary_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_result_summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(_result_summary_label)
+
 	var continue_button := Button.new()
 	continue_button.custom_minimum_size = Vector2(0, 80)
 	UiPalette.style_button(continue_button, true)
@@ -334,6 +343,10 @@ func start_game(
 			else MINIGAME_TYPES[randi() % MINIGAME_TYPES.size()]
 	_active_minigame = type_script.new()
 	_active_minigame.set_anchors_preset(Control.PRESET_FULL_RECT)
+	# Tell the type where this round's outcome curve sits (floor + bonus cap) BEFORE it begins, so
+	# a type that aligns its scoring to the shared "full" line (match-3) can read it. See Minigame.
+	_active_minigame.outcome_keep_floor = _tuning.minigame_keep_floor
+	_active_minigame.outcome_bonus_max = _bonus_max
 	_play_area.add_child(_active_minigame)
 	_active_minigame.completed.connect(_on_minigame_completed)
 	_active_minigame.begin(_tuning)
@@ -456,6 +469,11 @@ func _show_result(mult: float) -> void:
 		_result_mult_label.text = "KEPT %d%%" % int(round(mult * 100.0))
 		_result_mult_label.add_theme_color_override("font_color", _keep_color(mult))
 		_result_amount_label.text = "+%s  (of %s)" % [_format_amount(kept), _format_amount(_base_amount)]
+
+	# The type's own summary of how the round was played (empty for types that provide none).
+	var summary := _active_minigame.result_summary() if _active_minigame != null else ""
+	_result_summary_label.text = summary
+	_result_summary_label.visible = summary != ""
 
 	_play_view.visible = false
 	_result_view.visible = true

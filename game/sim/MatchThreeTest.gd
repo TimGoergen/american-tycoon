@@ -294,7 +294,16 @@ func _test_resolve_swap_steps_reproduce_grid() -> void:
 	_check(result["valid"], "resolve_swap reports valid")
 
 	var sum_cleared := 0
+	var colors_ok := true
 	for step in result["steps"]:
+		# cleared_colors must run parallel to cleared (same length) and hold the color that each
+		# cleared cell had at clear time — a scoring UI relies on this pairing.
+		if step["cleared_colors"].size() != step["cleared"].size():
+			colors_ok = false
+		for i in range(step["cleared"].size()):
+			var cell: Array = step["cleared"][i]
+			if step["cleared_colors"][i] != sim[cell[0]][cell[1]]:
+				colors_ok = false
 		for cell in step["cleared"]:
 			sim[cell[0]][cell[1]] = -1
 		sum_cleared += step["cleared"].size()
@@ -316,3 +325,4 @@ func _test_resolve_swap_steps_reproduce_grid() -> void:
 				reproduced = false
 	_check(reproduced, "applying recorded steps reproduces the final grid")
 	_check(sum_cleared == int(result["cleared_total"]), "step clears sum to cleared_total")
+	_check(colors_ok, "cleared_colors run parallel to cleared and match the pre-clear grid")

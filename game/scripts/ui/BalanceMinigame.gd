@@ -99,6 +99,10 @@ func get_performance() -> float:
 	return clampf(_time_in_zone / _total_round_seconds, 0.0, 1.0)
 
 
+func result_summary() -> String:
+	return "In the zone %d%% of the time" % int(round(get_performance() * 100.0))
+
+
 func _process(delta: float) -> void:
 	if not _running:
 		return

@@ -4,9 +4,20 @@ extends Minigame
 # The match-3 minigame TYPE (GDD §5.5) — the first entry in the minigame library. Drag a
 # gem toward a neighbor to swap; matches flash with a size badge, clear, and survivors +
 # new gems fall into the gaps (resolution steps replayed from MatchThreeBoard, which a
-# board test proves can't desync). Each game picks one or two TARGET gem types; matching those
-# scores points (a running count is shown per type) while matching the wrong type costs you
-# half. Points are credited gem-by-gem as each cascade clears on screen — see get_performance.
+# board test proves can't desync).
+#
+# Scoring (Tim's minigame v3, 2026-06-24) — you can never LOSE points, only earn them:
+#   * Every match scores. A bigger match scores more PER gem (a 4- or 5-line is worth more
+#     than a plain 3), so going for longer lines pays off.
+#   * A single swap that cascades (one match drops gems into another) earns a rising COMBO
+#     multiplier on each successive cascade step.
+#   * Each round one or two gem types are flagged as BONUS types. If a swap clears ANY bonus-type
+#     gem, the ENTIRE swap's earnings (its first match and every combo step) are multiplied
+#     ×10. So chasing the bonus gems is how you reach the top of the score range.
+#   * Calibration (Tim): playing the whole round on ordinary (non-bonus) matches lands you at
+#     ~100% (the host's "full" line, keep all your Legacy). Regularly landing bonus matches
+#     pushes you up into the extra-high bonus band toward the maximum. See get_performance,
+#     which maps the running score onto the host's curve so this holds at any bonus cap.
 #
 # This control owns ONLY the board gameplay. The host (MinigameScreen) owns the countdown,
 # the spectrum bar, the result, and the multiplier — see Minigame for the contract.
@@ -17,22 +28,28 @@ const GRID_WIDTH := 6
 const GRID_HEIGHT := 6
 const GEM_COLORS := 5
 
-# --- Target-gem challenge (Tim's minigame v2) --------------------------------
-# Each game randomly picks one or two TARGET gem types. Matching a target scores a point;
-# matching the WRONG type costs you half a point. There are no quotas — the header just shows
-# how many of each target you've matched so far. More matches = a better result, with wrong
-# matches dragging it back down (so a strong early count is not "banked" — you can still lose
-# it to later mistakes).
+# --- Bonus-type scoring (Tim's minigame v3) ----------------------------------
+## How many gem types are flagged as BONUS this game (chosen at random within this range).
+const MIN_BONUS_TYPES := 1
+const MAX_BONUS_TYPES := 2
 
-## How many gem types are targets this game (chosen at random within this range).
-const MIN_TARGET_TYPES := 1
-const MAX_TARGET_TYPES := 2
-## A cleared wrong-type gem subtracts this fraction of one target match (Tim: "lose half").
-const WRONG_TYPE_PENALTY := 0.5
+## Base points for each gem in a match.
+const POINTS_PER_GEM := 10.0
+## Larger matches pay more PER gem: a group of n gems is worth POINTS_PER_GEM × n × (1 + this ×
+## (n - 3)). So a 3-line is ×1, a 4-line ×1.5, a 5-line ×2 — bigger lines are worth chasing.
+const SIZE_BONUS := 0.5
+## Combo: each successive cascade step in ONE swap multiplies that step's points by
+## 1 + COMBO_BONUS × step_index (step 0 = ×1, step 1 = ×2, step 2 = ×3 …). Rewards chain setups.
+const COMBO_BONUS := 1.0
+## If a swap clears any bonus-type gem, its whole earnings are multiplied by this (Tim: "10x").
+const BONUS_MULTIPLIER := 10.0
 
-## Net target matches (target matches minus the wrong-type penalty) that count as a perfect game
-## (performance 1.0 -> the host's max multiplier). Partial play scales linearly toward it.
-const PERFECT_TARGET_MATCHES := 30.0
+## Score that maps to the host's "full" (1.0x) line — roughly a whole round of ordinary,
+## non-bonus matches (Tim: "regular non-bonus play = ~100%"). Feel-tune.
+const SCORE_FULL := 1000.0
+## Score that maps to performance 1.0 (the host's max extra-high bonus) — roughly a whole round
+## of bonus (×10) matching. Feel-tune.
+const SCORE_MAX := 10000.0
 
 ## A square cell, generously sized for thumb taps and low-vision readability (§1b),
 ## plus the gap between cells. PITCH is the cell-to-cell pixel stride.
@@ -63,16 +80,16 @@ var _board
 var _animating: bool = false
 var _rng := RandomNumberGenerator.new()
 
-# Target-gem challenge state.
-## The target gem types this game (1-2 color ids): matching these scores, others cost you.
-var _target_types: Array = []
-## color_id -> how many of that target type have been matched so far. Shown live (no quota),
-## credited gem-by-gem as each cascade clears on screen.
-var _target_cleared: Dictionary = {}
-## How many WRONG-type gems have been cleared (each costs WRONG_TYPE_PENALTY of one match).
-var _wrong_cleared: int = 0
-## color_id -> the running "symbol  count" Label in the target header, refreshed as we go.
-var _target_labels: Dictionary = {}
+# Bonus-type scoring state.
+## The bonus gem types this game (1-2 color ids): clearing any of these in a swap multiplies
+## that whole swap's earnings ×10.
+var _bonus_types: Array = []
+## Total points earned so far (only ever rises — there is no way to lose points).
+var _score: float = 0.0
+## Whether any bonus (×10) swap has landed this round — used in the result summary.
+var _bonus_landed: bool = false
+## The live "Score: N" readout above the grid.
+var _score_label: Label
 
 # Drag-to-swap state.
 var _dragging: bool = false
@@ -93,18 +110,18 @@ func begin(_tuning: TuningConfig) -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_rng.randomize()
 	_board = Board.new(GRID_WIDTH, GRID_HEIGHT, GEM_COLORS)
-	_choose_target_types()
+	_choose_bonus_types()
 
 	var intro := Label.new()
-	intro.text = "Match the target gems for points — wrong matches cost you."
+	intro.text = "Match gems to score. Match the BONUS gems for 10× a swap!"
 	intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	intro.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
 	intro.add_theme_color_override("font_color", UiPalette.NAVY)
 
-	# The target header sits directly above the grid: each target gem's symbol next to a running
-	# count of how many of it you've matched (Tim's minigame v2 target challenge — no quotas).
-	var target_header := _build_target_header()
+	# The header sits directly above the grid: which gem types are BONUS this round (their colored
+	# symbols), plus a live running score.
+	var header := _build_header()
 
 	_board_area = Control.new()
 	_board_area.custom_minimum_size = Vector2(GRID_WIDTH * PITCH - GAP, GRID_HEIGHT * PITCH - GAP)
@@ -120,36 +137,37 @@ func begin(_tuning: TuningConfig) -> void:
 	column.set_anchors_preset(Control.PRESET_FULL_RECT)
 	column.add_theme_constant_override("separation", 12)
 	column.add_child(intro)
-	column.add_child(target_header)
+	column.add_child(header)
 	column.add_child(board_center)
 	add_child(column)
 
 	_build_initial_gems()
 
 
-## Pick one or two target gem types, then seed their match counts.
-func _choose_target_types() -> void:
+## Pick one or two BONUS gem types for this round (random, distinct color ids).
+func _choose_bonus_types() -> void:
 	var available: Array = range(GEM_COLORS)
 	available.shuffle()
-	var count := _rng.randi_range(MIN_TARGET_TYPES, MAX_TARGET_TYPES)
+	var count := _rng.randi_range(MIN_BONUS_TYPES, MAX_BONUS_TYPES)
 	for i in range(count):
-		var color_id: int = available[i]
-		_target_types.append(color_id)
-		_target_cleared[color_id] = 0
+		_bonus_types.append(available[i])
 
 
-## Build the target header row: one chip per target type showing its colored symbol and a
-## live count Label (just the running number matched — no quota), refreshed by
-## _update_target_display as gems clear.
-func _build_target_header() -> Control:
+## Build the header above the grid: a "BONUS" tag with this round's bonus gem symbol(s), then a
+## live running score readout (refreshed as cascades resolve by _update_score_display).
+func _build_header() -> Control:
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 24)
+	row.add_theme_constant_override("separation", 16)
 
-	for color_id in _target_types:
-		var chip := HBoxContainer.new()
-		chip.add_theme_constant_override("separation", 8)
+	var bonus_tag := Label.new()
+	bonus_tag.text = "BONUS:"
+	bonus_tag.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
+	bonus_tag.add_theme_color_override("font_color", UiPalette.NAVY)
+	row.add_child(bonus_tag)
 
+	# One colored symbol per bonus gem type, so the player knows at a glance which gems pay ×10.
+	for color_id in _bonus_types:
 		var symbol := Label.new()
 		symbol.text = GEM_SYMBOL[color_id]
 		symbol.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
@@ -157,47 +175,52 @@ func _build_target_header() -> Control:
 		# A dark outline so a pale gem symbol (e.g. gold) still reads against the cream panel.
 		symbol.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
 		symbol.add_theme_constant_override("outline_size", 4)
-		chip.add_child(symbol)
+		row.add_child(symbol)
 
-		var count_label := Label.new()
-		count_label.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
-		count_label.add_theme_color_override("font_color", UiPalette.NAVY)
-		chip.add_child(count_label)
-		_target_labels[color_id] = count_label
+	# A spacer pushes the score readout to the right end of the header row.
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(spacer)
 
-		row.add_child(chip)
+	_score_label = Label.new()
+	_score_label.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
+	_score_label.add_theme_color_override("font_color", UiPalette.MONEY_GREEN)
+	row.add_child(_score_label)
+	_update_score_display()
 
-	_update_target_display()
 	return row
 
 
 func get_performance() -> float:
 	if _board == null:
 		return 0.0
-	# Net matches = every target-type gem matched, minus the wrong-type penalty. There is no
-	# quota to "bank" — later wrong matches still pull the net (and thus the result) back down.
-	# Scaled linearly toward PERFECT_TARGET_MATCHES (= performance 1.0, the host's max bonus).
-	var target_total := 0
-	for color_id in _target_types:
-		target_total += _target_cleared[color_id]
-	var net := float(target_total) - WRONG_TYPE_PENALTY * float(_wrong_cleared)
-	return clampf(net / PERFECT_TARGET_MATCHES, 0.0, 1.0)
+	# Map the running score onto the host's outcome curve with a two-segment curve so Tim's
+	# calibration holds at ANY bonus cap:
+	#   * 0 .. SCORE_FULL  -> performance 0 .. the host's "full" line (a whole round of ordinary,
+	#                         non-bonus matches lands right at full = keep 100%).
+	#   * SCORE_FULL .. SCORE_MAX -> the full line .. performance 1.0 (bonus ×10 matching climbs
+	#                         into the extra-high band toward the maximum).
+	var full_line := _full_line_performance()
+	if _score <= SCORE_FULL:
+		return full_line * clampf(_score / SCORE_FULL, 0.0, 1.0)
+	var into_bonus := clampf((_score - SCORE_FULL) / (SCORE_MAX - SCORE_FULL), 0.0, 1.0)
+	return full_line + (1.0 - full_line) * into_bonus
 
 
-## Record one cleared gem against the target challenge: a target type advances its count; any
-## other type is a wrong match (penalized in get_performance).
-func _credit_cleared_gem(color_id: int) -> void:
-	if _target_cleared.has(color_id):
-		_target_cleared[color_id] += 1
-	else:
-		_wrong_cleared += 1
+## The performance value at which the host's curve hits exactly 1.0x ("full"), derived from the
+## outcome curve the host set before begin(). Anchoring our score-to-performance mapping here is
+## what makes "regular non-bonus play = full" true whether the site's bonus cap is 0.25 or 1.0.
+func _full_line_performance() -> float:
+	var span := (1.0 - outcome_keep_floor) + outcome_bonus_max
+	if span <= 0.0:
+		return 1.0
+	return (1.0 - outcome_keep_floor) / span
 
 
-## Refresh each target type's running match count (just the number — no quota).
-func _update_target_display() -> void:
-	for color_id in _target_labels:
-		var label: Label = _target_labels[color_id]
-		label.text = str(_target_cleared[color_id])
+## Refresh the live score readout.
+func _update_score_display() -> void:
+	if _score_label != null:
+		_score_label.text = "Score: %d" % int(round(_score))
 
 
 func is_busy() -> bool:
@@ -345,13 +368,55 @@ func _play_resolution(result: Dictionary) -> void:
 	_gem_nodes[a[0]][a[1]] = node_b
 	_gem_nodes[b[0]][b[1]] = node_a
 
-	for step in result["steps"]:
-		await _animate_step(step)
+	# Score the whole swap up front from the recorded steps (deterministic), including the ×10
+	# bonus decision, but AWARD it step by step as each cascade clears on screen — so the score
+	# readout and the host's spectrum bar climb in time with the animation.
+	var scoring := _score_swap(result)
+	var bonus_hit: bool = scoring["bonus_hit"]
+	var step_points: Array = scoring["step_points"]
+	if bonus_hit:
+		_bonus_landed = true
+
+	for i in range(result["steps"].size()):
+		await _animate_step(result["steps"][i], float(step_points[i]), bonus_hit)
 
 	_animating = false
 
 
-func _animate_step(step: Dictionary) -> void:
+## Compute a swap's earnings from the board's recorded resolution steps. Returns the points to
+## award for each cascade step (already including any ×10 bonus) plus whether the bonus applied:
+##   { "step_points": Array[float], "bonus_hit": bool }
+## A swap earns the ×10 bonus if ANY gem it clears (in any cascade step) is a bonus type.
+func _score_swap(result: Dictionary) -> Dictionary:
+	var steps: Array = result["steps"]
+
+	# Bonus check: did this swap clear any bonus-type gem anywhere in its cascade?
+	var bonus_hit := false
+	for step in steps:
+		for color_id in step["cleared_colors"]:
+			if _bonus_types.has(color_id):
+				bonus_hit = true
+				break
+		if bonus_hit:
+			break
+
+	var bonus_factor := BONUS_MULTIPLIER if bonus_hit else 1.0
+	var step_points: Array = []
+	for i in range(steps.size()):
+		var step: Dictionary = steps[i]
+		# Combo: each successive cascade step in this swap multiplies its points (step 0 = ×1).
+		var combo_multiplier := 1.0 + COMBO_BONUS * float(i)
+		var raw := 0.0
+		for group in step["matches"]:
+			var n: int = (group as Array).size()
+			# Bigger lines score more per gem (see SIZE_BONUS).
+			raw += POINTS_PER_GEM * float(n) * (1.0 + SIZE_BONUS * float(n - 3))
+		step_points.append(raw * combo_multiplier * bonus_factor)
+
+	return {"step_points": step_points, "bonus_hit": bonus_hit}
+
+
+func _animate_step(step: Dictionary, points: float, bonus_hit: bool) -> void:
 	for group in step["matches"]:
 		_spawn_match_badge(group)
 	var flash := create_tween().set_parallel(true)
@@ -368,16 +433,18 @@ func _animate_step(step: Dictionary) -> void:
 			clear.tween_property(gem, "scale", Vector2.ZERO, CLEAR_TIME)
 			clear.tween_property(gem, "modulate:a", 0.0, CLEAR_TIME)
 	await clear.finished
-	# Award the cleared gems NOW, as they vanish on screen — not all at once when the move was
-	# made. A cascade chain therefore credits its points step by step as each match resolves,
-	# and the host's spectrum bar climbs in time with the animation (Tim's minigame v2).
+	# Free the cleared gems and award this cascade step's points NOW, as the gems vanish — so the
+	# score (and the host's spectrum bar) climbs step by step through a cascade. A bonus step pops
+	# a gold "×10" so the player sees why a bonus swap paid off.
 	for cell in step["cleared"]:
 		var gem: Control = _gem_nodes[cell[0]][cell[1]]
 		if gem != null:
-			_credit_cleared_gem(int(gem.get_meta("color")))
 			gem.queue_free()
 		_gem_nodes[cell[0]][cell[1]] = null
-	_update_target_display()
+	_score += points
+	_update_score_display()
+	if bonus_hit:
+		_spawn_bonus_popup(step["cleared"])
 
 	var drop := create_tween().set_parallel(true)
 	_apply_falls(step["falls"], drop)
@@ -440,3 +507,39 @@ func _spawn_match_badge(group: Array) -> void:
 	tween.tween_property(badge, "position:y", badge.position.y - 36.0, FLASH_TIME + CLEAR_TIME)
 	tween.tween_property(badge, "modulate:a", 0.0, FLASH_TIME + CLEAR_TIME)
 	tween.chain().tween_callback(badge.queue_free)
+
+
+## Pop a gold "×10" over a bonus swap's cleared gems, so the player sees the bonus pay off. It
+## rises and fades like the match badge, but bigger and gold to read as the special reward.
+func _spawn_bonus_popup(cleared: Array) -> void:
+	if cleared.is_empty():
+		return
+	var sum := Vector2.ZERO
+	for cell in cleared:
+		sum += _cell_pos(cell[0], cell[1])
+	var center: Vector2 = sum / float(cleared.size()) + Vector2(CELL_SIZE, CELL_SIZE) / 2.0
+
+	var popup := Label.new()
+	popup.text = "×10"
+	popup.add_theme_font_size_override("font_size", UiPalette.FONT_DISPLAY)
+	popup.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD)
+	popup.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
+	popup.add_theme_constant_override("outline_size", 8)
+	popup.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	popup.position = center - Vector2(CELL_SIZE, CELL_SIZE / 2.0)
+	popup.size = Vector2(CELL_SIZE * 2.0, CELL_SIZE)
+	popup.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	popup.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_board_area.add_child(popup)
+
+	var tween := create_tween().set_parallel(true)
+	tween.tween_property(popup, "position:y", popup.position.y - 56.0, 0.7)
+	tween.tween_property(popup, "modulate:a", 0.0, 0.7)
+	tween.chain().tween_callback(popup.queue_free)
+
+
+func result_summary() -> String:
+	var line := "Scored %d points" % int(round(_score))
+	if _bonus_landed:
+		line += " — bonus matches landed!"
+	return line

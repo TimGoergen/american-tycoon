@@ -96,6 +96,10 @@ func get_performance() -> float:
 	return clampf(_accuracy_sum / float(TARGET_LOCKS), 0.0, 1.0)
 
 
+func result_summary() -> String:
+	return "Locked %d of %d" % [_locks, TARGET_LOCKS]
+
+
 func _process(delta: float) -> void:
 	if not _running:
 		return

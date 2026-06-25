@@ -78,6 +78,10 @@ func get_performance() -> float:
 	return clampf(float(_rounds_done) / float(TARGET_ROUNDS), 0.0, 1.0)
 
 
+func result_summary() -> String:
+	return "Recalled %d of %d rounds" % [_rounds_done, TARGET_ROUNDS]
+
+
 func _style_pad(pad: Panel, pad_id: int, lit: bool) -> void:
 	var box := StyleBoxFlat.new()
 	var base: Color = PAD_COLORS[pad_id]

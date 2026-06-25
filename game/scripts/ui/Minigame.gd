@@ -13,6 +13,15 @@ extends Control
 ## ends on its countdown; whichever happens first wins, using the final performance.
 signal completed(performance: float)
 
+## The host's outcome curve, set by the host BEFORE begin() so a type that wants to align its
+## internal scoring to where the shared "full" (1.0x) line falls can read it. `keep_floor` is
+## the multiplier at performance 0; `bonus_max` is the extra-high bonus above 1.0x at
+## performance 1.0. The 1.0x "full" line therefore sits at performance
+## (1 - keep_floor) / ((1 - keep_floor) + bonus_max). Most types ignore these; match-3 uses
+## them so "regular non-bonus play = exactly full" holds regardless of the site's bonus cap.
+var outcome_keep_floor: float = 0.5
+var outcome_bonus_max: float = 0.25
+
 ## Start play. The host calls this once, after adding this control to the play area.
 func begin(tuning: TuningConfig) -> void:
 	pass
@@ -32,3 +41,10 @@ func is_busy() -> bool:
 ## they can each be opened and tested. Override in each type.
 func display_name() -> String:
 	return "Minigame"
+
+## A short line summarizing how the player DID this round (e.g. "Scored 1,240 points",
+## "Caught 14 of 18"), shown on the host's result screen beneath the multiplier so the paused
+## result clearly reflects the game just played. Default empty -> the host shows only the
+## multiplier/amount. Override in each type.
+func result_summary() -> String:
+	return ""

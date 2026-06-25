@@ -70,6 +70,10 @@ func get_performance() -> float:
 	return clampf(net / float(TARGET_COINS), 0.0, 1.0)
 
 
+func result_summary() -> String:
+	return "Caught %d of %d" % [_caught, TARGET_COINS]
+
+
 func _process(delta: float) -> void:
 	if not _running or _area == null:
 		return

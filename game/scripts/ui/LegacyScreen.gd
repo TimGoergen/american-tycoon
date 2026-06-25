@@ -55,6 +55,15 @@ var _cards: Dictionary = {}
 # snapshot Main passes to set_retention_entries (rather than built once here).
 var _staff_list: VBoxContainer
 
+# Each estate-planning category is a collapsible, color-themed section (Tim, 2026-06-24).
+# Keyed by category name → { "button": Button header, "body": VBoxContainer, "expanded": bool }.
+# All sections start collapsed; the header-row Collapse-All / Expand-All buttons drive them all.
+var _sections: Dictionary = {}
+
+# The Household Staff section's accent color, remembered so the retention rows rebuilt later by
+# set_retention_entries carry the same themed border as the cards built up-front.
+var _staff_accent: Color = UiPalette.MONEY_GREEN
+
 # Hold-to-buy state: which upgrade's buy button is currently held (""=none), and the
 # timer toward the next auto-repeat purchase. See _process and _on_buy_down/up.
 var _held_buy_id := ""
@@ -88,13 +97,27 @@ func _build_ui() -> void:
 	column.add_theme_constant_override("separation", 12)
 	margin.add_child(column)
 
-	# ── Header: "The Estate Office" then the Legacy wallet, STACKED (not side-by-side,
-	# which overflowed the tab width at large type). ──
+	# ── Header row: the "Estate Planning" title plus the Collapse-All / Expand-All controls
+	# (Tim, 2026-06-24), which open or close every category section at once. The Legacy wallet
+	# sits on its own line beneath (side-by-side overflowed the tab width at large type). ──
+	var header_row := HBoxContainer.new()
+	header_row.add_theme_constant_override("separation", 10)
+	column.add_child(header_row)
+
 	var title := Label.new()
 	title.text = "Estate Planning"
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title.add_theme_color_override("font_color", UiPalette.NAVY)
 	title.add_theme_font_size_override("font_size", TITLE_SIZE)
-	column.add_child(title)
+	header_row.add_child(title)
+
+	var collapse_all_button := _make_bulk_button("COLLAPSE ALL")
+	collapse_all_button.pressed.connect(set_all_collapsed.bind(true))
+	header_row.add_child(collapse_all_button)
+
+	var expand_all_button := _make_bulk_button("EXPAND ALL")
+	expand_all_button.pressed.connect(set_all_collapsed.bind(false))
+	header_row.add_child(expand_all_button)
 
 	_wallet_label = Label.new()
 	_wallet_label.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD)
@@ -127,52 +150,244 @@ func _build_ui() -> void:
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	list_margin.add_child(list)
 
-	var current_category := ""
+	# Group the upgrades by category, preserving each category's first-appearance order, so every
+	# category becomes ONE collapsible section even though the catalog interleaves them (e.g.
+	# Operations reappears after Labor). Each section is themed with the category's accent color.
+	# As we group, also collect each category's upgrade ids in one array. The collapsed-section
+	# header badge (the "+x affordable" count) needs that id list to ask the live state how many
+	# of the category's upgrades the player can buy right now.
+	var ordered_categories: Array = []
+	var by_category: Dictionary = {}
+	var ids_by_category: Dictionary = {}
 	for definition in LegacyUpgradeCatalog.all():
 		var category := String(definition["category"])
-		if category != current_category:
-			_add_category_heading(list, category)
-			current_category = category
-		_add_upgrade_card(list, definition)
+		if not by_category.has(category):
+			by_category[category] = []
+			ids_by_category[category] = []
+			ordered_categories.append(category)
+		(by_category[category] as Array).append(definition)
+		(ids_by_category[category] as Array).append(String(definition["id"]))
+
+	for category in ordered_categories:
+		var category_name := String(category)
+		var accent := _category_color(category_name)
+		var body := _add_collapsible_section(list, category_name, accent, ids_by_category[category])
+		for definition in by_category[category]:
+			_add_upgrade_card(body, definition as Dictionary, accent)
 
 	# ── Household Staff (GDD §6.3): per-property staffer retention across prestige ──
-	# The rows are dynamic (they depend on the living generation's current staff), so
-	# here we lay out only the heading + host; set_retention_entries fills the host.
-	_add_category_heading(list, "Household Staff")
+	# Its own themed, collapsible section. The rows are dynamic (they depend on the living
+	# generation's current staff), so here we lay out only the hint + host; set_retention_entries
+	# fills the host later, tinting each row with this section's accent (_staff_accent).
+	# Household Staff has no catalog upgrade ids (its rows are dynamic retention rows, not
+	# catalog upgrades), so it gets an empty id list and therefore never shows an affordable badge.
+	_staff_accent = _category_color("Household Staff")
+	var staff_body := _add_collapsible_section(list, "Household Staff", _staff_accent, [])
 	var staff_hint := Label.new()
 	staff_hint.text = "Keep a staffer's tier when you pass on (staff reset otherwise)."
 	staff_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	staff_hint.add_theme_color_override("font_color", UiPalette.NAVY)
 	staff_hint.add_theme_font_size_override("font_size", CARD_BODY_SIZE)
-	list.add_child(staff_hint)
+	staff_body.add_child(staff_hint)
 
 	_staff_list = VBoxContainer.new()
 	_staff_list.add_theme_constant_override("separation", 10)
 	_staff_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	list.add_child(_staff_list)
+	staff_body.add_child(_staff_list)
 
 	# Let a swipe that lands on a card surface (not its BUY button) scroll the
 	# list, the same as the property ladder. See UiPalette.allow_scroll_drag_through.
 	UiPalette.allow_scroll_drag_through(list)
 
 
-## A section heading between groups of cards ("Wealth", "Operations", …).
-func _add_category_heading(parent: VBoxContainer, category: String) -> void:
-	var heading := Label.new()
-	heading.text = category.to_upper()
-	heading.add_theme_color_override("font_color", UiPalette.KETCHUP_RED)
-	heading.add_theme_font_size_override("font_size", CATEGORY_SIZE)
-	parent.add_child(heading)
+## The unique accent color for each estate-planning category (Tim, 2026-06-24). All are drawn
+## from the §1 palette so the screen stays inside the house style; one per category so the
+## sections read as distinct at a glance.
+func _category_color(category: String) -> Color:
+	match category:
+		"Wealth":
+			return UiPalette.MUSTARD_GOLD
+		"Operations":
+			return UiPalette.CYCLE_BLUE
+		"Career":
+			return UiPalette.ATOMIC_TEAL
+		"Legacy":
+			return UiPalette.KETCHUP_RED
+		"Labor":
+			return UiPalette.BRICK
+		"Household Staff":
+			return UiPalette.MONEY_GREEN
+	return UiPalette.NAVY
+
+
+## Build one collapsible, color-themed category section into `parent`: a full-width header
+## button (filled with the category's accent color) that toggles a body container holding the
+## cards. Every section starts COLLAPSED (Tim, 2026-06-24). Returns the body for the caller to
+## fill with cards. `upgrade_ids` is this category's catalog upgrade ids (empty for Household
+## Staff), used to count how many are currently affordable for the collapsed-section badge.
+func _add_collapsible_section(parent: VBoxContainer, category: String, accent: Color, upgrade_ids: Array) -> VBoxContainer:
+	var header := Button.new()
+	header.custom_minimum_size = Vector2(0, 96)
+	header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_theme_font_size_override("font_size", CATEGORY_SIZE)
+	# Caret + name read from the left like a typical section/disclosure header.
+	header.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	var text_color := _readable_on(accent)
+	header.add_theme_stylebox_override("normal", _make_section_plate(accent))
+	header.add_theme_stylebox_override("hover", _make_section_plate(accent))
+	header.add_theme_stylebox_override("pressed", _make_section_plate(accent.darkened(0.15)))
+	header.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		header.add_theme_color_override(state, text_color)
+	header.pressed.connect(_toggle_section.bind(category))
+	parent.add_child(header)
+
+	# Right-aligned "+x affordable" badge (Tim, 2026-06-24). When the section is COLLAPSED, this
+	# tells the player at a glance how many of the category's upgrades they can buy right now (x
+	# may be 0 — meaning there are upgrades left, but none affordable). It is hidden while the
+	# section is expanded (the buy buttons are visible then) and hidden entirely once every
+	# upgrade in the category is maxed. A child of the header Button, ignoring mouse input so a
+	# tap anywhere still toggles the section. _update_section_count fills in the text.
+	var count_label := Label.new()
+	count_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Pin to the header's right edge, vertically centered, with a small inset off the border.
+	count_label.set_anchors_preset(Control.PRESET_RIGHT_WIDE)
+	count_label.offset_left = -160
+	count_label.offset_right = -16
+	count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	count_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	count_label.add_theme_color_override("font_color", text_color)
+	count_label.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
+	header.add_child(count_label)
+
+	var body := VBoxContainer.new()
+	body.add_theme_constant_override("separation", 10)
+	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.visible = false   # collapsed by default
+	parent.add_child(body)
+
+	_sections[category] = {
+		"button": header,
+		"body": body,
+		"expanded": false,
+		"upgrade_ids": upgrade_ids,
+		"count_label": count_label,
+	}
+	_update_section_header(category)
+	_update_section_count(category)
+	return body
+
+
+## Pick a label color that reads on `color`: navy on light accents, cream on dark ones.
+func _readable_on(color: Color) -> Color:
+	return UiPalette.NAVY if color.get_luminance() > 0.5 else UiPalette.CREAM
+
+
+## A colored plate (category accent fill, navy border) for a section header button.
+func _make_section_plate(color: Color) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = color
+	style.border_color = UiPalette.NAVY
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(4)
+	style.set_content_margin_all(12)
+	return style
+
+
+## A card plate themed to its category: cream fill with the accent color as a slightly heavier
+## border, so each card visibly belongs to its (color-coded) section.
+func _make_accent_card_style(color: Color) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = UiPalette.CREAM
+	style.border_color = color
+	style.set_border_width_all(4)
+	style.set_corner_radius_all(4)
+	style.set_content_margin_all(12)
+	return style
+
+
+## A compact header-row utility button (Collapse All / Expand All), styled as a standard
+## (non-spend) button so it never reads as a buy action.
+func _make_bulk_button(text: String) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.custom_minimum_size = Vector2(0, 72)
+	button.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
+	UiPalette.style_button(button, false)
+	return button
+
+
+## Flip one category section between expanded and collapsed (its header was tapped).
+func _toggle_section(category: String) -> void:
+	var section: Dictionary = _sections[category]
+	section["expanded"] = not bool(section["expanded"])
+	(section["body"] as Control).visible = bool(section["expanded"])
+	_update_section_header(category)
+	_update_section_count(category)
+
+
+## Expand or collapse every category at once (the header-row Collapse-All / Expand-All).
+func set_all_collapsed(collapsed: bool) -> void:
+	for category in _sections:
+		var section: Dictionary = _sections[category]
+		section["expanded"] = not collapsed
+		(section["body"] as Control).visible = not collapsed
+		_update_section_header(String(category))
+		_update_section_count(String(category))
+
+
+## Refresh a section header's caret + name to match its expanded state. "+" invites a tap to
+## open a collapsed section; "-" shows it is already open.
+func _update_section_header(category: String) -> void:
+	var section: Dictionary = _sections[category]
+	var marker := "-" if bool(section["expanded"]) else "+"
+	(section["button"] as Button).text = "%s  %s" % [marker, category.to_upper()]
+
+
+## Refresh a collapsed section header's right-aligned "+x affordable" badge (Tim, 2026-06-24).
+## Rules:
+##   • Hidden entirely (empty text) when EVERY upgrade in the category is maxed — there is nothing
+##     left to consider, so no badge.
+##   • Hidden while the section is EXPANDED — the buy buttons themselves are visible then.
+##   • Otherwise (collapsed, with at least one non-maxed upgrade) shows "+x", where x is how many
+##     of the category's upgrades are affordable AND not maxed right now. x may be 0 ("+0"): there
+##     are upgrades to buy, just none the player can afford yet.
+## Household Staff (and any category with no catalog ids) never shows a badge.
+func _update_section_count(category: String) -> void:
+	var section: Dictionary = _sections[category]
+	var label := section["count_label"] as Label
+
+	# May run during _build_ui before setup() supplies the live state; nothing to count yet.
+	if _upgrades == null:
+		label.text = ""
+		return
+
+	var upgrade_ids: Array = section["upgrade_ids"]
+	var non_maxed_count := 0
+	var affordable_count := 0
+	for id in upgrade_ids:
+		var upgrade_id := String(id)
+		if _upgrades.is_maxed(upgrade_id):
+			continue
+		non_maxed_count += 1
+		if _upgrades.can_buy(upgrade_id):
+			affordable_count += 1
+
+	if non_maxed_count == 0 or bool(section["expanded"]):
+		label.text = ""
+	else:
+		label.text = "+%d" % affordable_count
 
 
 ## One upgrade card: name + level on top, description, then effect + a BUY button
 ## that shows the next level's cost. The live labels/button are stored in _cards
 ## so refresh() can update them after a purchase.
-func _add_upgrade_card(parent: VBoxContainer, definition: Dictionary) -> void:
+func _add_upgrade_card(parent: VBoxContainer, definition: Dictionary, accent: Color) -> void:
 	var id := String(definition["id"])
 
 	var card := PanelContainer.new()
-	card.add_theme_stylebox_override("panel", UiPalette.make_panel_style())
+	# Cream card with its category's accent as the border, so it reads as part of that section.
+	card.add_theme_stylebox_override("panel", _make_accent_card_style(accent))
 	parent.add_child(card)
 
 	var card_column := VBoxContainer.new()
@@ -275,7 +490,8 @@ func _add_retention_row(entry: Dictionary) -> void:
 	var index := int(entry["index"])
 
 	var card := PanelContainer.new()
-	card.add_theme_stylebox_override("panel", UiPalette.make_panel_style())
+	# Match the Household Staff section's accent border, like the upgrade cards above.
+	card.add_theme_stylebox_override("panel", _make_accent_card_style(_staff_accent))
 	_staff_list.add_child(card)
 
 	var col := VBoxContainer.new()
@@ -349,6 +565,10 @@ func refresh() -> void:
 			buy_button.text = "BUY  %d" % cost
 			# Greyed out (but still readable) when the player can't afford it.
 			buy_button.disabled = not _upgrades.can_buy(id)
+
+	# Update every collapsed section's "+x affordable" badge to match the new wallet/levels.
+	for category in _sections:
+		_update_section_count(String(category))
 
 
 # ---------------------------------------------------------------------------

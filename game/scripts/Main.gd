@@ -50,6 +50,11 @@ const TAB_ESTATE := 1
 const TAB_LEDGER := 2
 const TAB_SETTINGS := 3
 
+## On-screen size of each bottom-tab glyph. 40% larger than the 81px native SVG (Tim,
+## 2026-06-24). A Button renders its `icon` at the texture's native size with no way to scale
+## it UP, so we let the icon expand and cap it here at this width (icons are square).
+const TAB_ICON_SIZE := 113
+
 # The screen-frame constants (bezel + universal content margin) live in UiPalette now, so the
 # Main screen and the full-screen overlays all frame identically (UiPalette.apply_screen_bezel
 # / make_screen_panel_style).
@@ -502,7 +507,10 @@ func _build_tab_bar(column: VBoxContainer) -> void:
 		b.custom_minimum_size = Vector2(0, 185)  # 25% taller again (148 -> 185, Tim 2026-06-23)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.icon = load(icons[i])
-		b.expand_icon = false
+		# Let the icon scale up from its 81px native size and cap it at TAB_ICON_SIZE (40%
+		# larger). expand_icon grows it to fill the button; icon_max_width holds it at the target.
+		b.expand_icon = true
+		b.add_theme_constant_override("icon_max_width", TAB_ICON_SIZE)
 		b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		b.pressed.connect(_show_tab.bind(i))
 		bar.add_child(b)

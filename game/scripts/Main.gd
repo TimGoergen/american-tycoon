@@ -19,6 +19,12 @@ var tuning: TuningConfig
 var _tick_accumulator := 0.0
 var _autosave_timer := 0.0
 
+## The income/sec panel is refreshed on a calm fixed cadence (not every render frame) so the
+## number is easy to read and never flickers (Tim, 2026-06-24). The value itself is already
+## stable; this just keeps the on-screen text from re-rendering 60×/second.
+const INCOME_DISPLAY_INTERVAL := 0.1
+var _income_display_timer := INCOME_DISPLAY_INTERVAL  # refresh on the very first frame
+
 var _hero_stat: HeroStat
 ## Small banner under the hero stat naming the civilization Earth is currently trading
 ## with (the reached epoch). Updates the moment a first contact advances the epoch.
@@ -76,6 +82,12 @@ var _minigame_site: int = MinigameSite.NONE
 var _pending_offline_pile: float = 0.0
 var _pending_offline_hours: float = 0.0
 
+## The welcome-back minigame's outcome range is fixed at 50%–200% of the overnight pile,
+## independent of the Family Reputation upgrade (Tim, 2026-06-24). The host's floor is
+## tuning.minigame_keep_floor (0.5 = 50%); pairing it with this bonus cap of 1.0 puts the top
+## of the range at 1.0 + 1.0 = 200%. The host's spectrum bar then visualizes the whole span.
+const WELCOME_BACK_BONUS_MAX := 1.0
+
 
 func _ready() -> void:
 	_create_game()
@@ -108,10 +120,14 @@ func _process(delta: float) -> void:
 		_autosave_timer = 0.0
 		SaveManager.save_dict_to_file(dynasty.to_save_dict())
 
-	# Headline income/sec: the guaranteed staffed floor plus a smoothed bonus from
-	# active play (rushes, wage taps, frenzy). Built in GameState so it never reads
-	# below the income staffed properties keep earning hands-off.
-	_hero_stat.set_income_per_sec(game.displayed_income_per_sec)
+	# Headline income/sec: a STABLE, theoretical rate computed from current assets (not a
+	# measurement of recent cash inflow, which swung wildly between lumpy cycle payouts).
+	# Refreshed on a calm 100 ms cadence so the panel never flickers (Tim, 2026-06-24).
+	_income_display_timer += delta
+	if _income_display_timer >= INCOME_DISPLAY_INTERVAL:
+		_income_display_timer = 0.0
+		_hero_stat.set_income_per_sec(game.displayed_income_per_sec)
+	# Cash keeps updating every frame so the balance still counts up smoothly.
 	_hero_stat.set_cash(game.economy.cash)
 	_hero_stat.set_frenzy_glow(game.frenzy.get_multiplier() > 1.0)
 
@@ -180,20 +196,13 @@ func _apply_offline_if_due() -> void:
 		return
 	var hours_away := offline.elapsed_seconds / 3600.0
 
-	# Welcome-back minigame (GDD §5.5 site 3): when minigames are on, a round scales the
-	# overnight pile before the welcome screen shows it. The base pile is already banked by
-	# apply_offline; the minigame credits only the difference on finish, so the welcome
-	# screen can present the final, post-minigame haul. With minigames off, show the base pile.
-	if game.ui_minigame_enabled:
-		_pending_offline_pile = offline.pile
-		_pending_offline_hours = hours_away
-		_minigame_site = MinigameSite.WELCOME_BACK
-		_minigame_screen.start_game(
-			MinigameScreen.offline_pile_reward(offline.pile),
-			dynasty.upgrades.minigame_bonus_max()
-		)
-	else:
-		_welcome_overlay.show_pile(offline.pile, hours_away)
+	# The game always opens directly to the welcome-back screen (Tim, 2026-06-24) — never
+	# straight into a minigame. The base pile is already banked by apply_offline, so PUT IT TO
+	# WORK simply dismisses. When transition minigames are on, the screen also offers RISK IT ON
+	# A MINIGAME?, handled by _on_welcome_risk_pressed, which scales the pile we stash here.
+	_pending_offline_pile = offline.pile
+	_pending_offline_hours = hours_away
+	_welcome_overlay.show_pile(offline.pile, hours_away, game.ui_minigame_enabled)
 
 
 # ---------------------------------------------------------------------------
@@ -261,6 +270,7 @@ func _build_ui() -> void:
 	# The welcome-back overlay sits above everything and starts hidden.
 	_welcome_overlay = WelcomeBackOverlay.new()
 	_welcome_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_welcome_overlay.risk_pressed.connect(_on_welcome_risk_pressed)
 	add_child(_welcome_overlay)
 
 	# The first-contact overlay (GDD §6.2): shown when a generation consumes the current
@@ -510,16 +520,17 @@ func _make_estate_badge(button: Button) -> Panel:
 	var dot := Panel.new()
 	var style := StyleBoxFlat.new()
 	style.bg_color = UiPalette.KETCHUP_RED
-	style.set_corner_radius_all(13)        # half the 26px box → a full circle
+	style.set_corner_radius_all(20)        # half the 39px box → a full circle
 	style.border_color = UiPalette.CREAM   # a cream ring so it reads on the navy/mustard plate
-	style.set_border_width_all(3)
+	style.set_border_width_all(4)
 	dot.add_theme_stylebox_override("panel", style)
-	# Pin a 26×26 dot 6px from the button's top-right corner.
+	# Pin a 39×39 dot (50% larger than the old 26px) well inside the button's top-right corner,
+	# clear of the 12px tab outline it used to overlap (Tim, 2026-06-24).
 	dot.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	dot.offset_left = -32
-	dot.offset_top = 8
-	dot.offset_right = -6
-	dot.offset_bottom = 34
+	dot.offset_left = -59
+	dot.offset_top = 20
+	dot.offset_right = -20
+	dot.offset_bottom = 59
 	dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	dot.visible = false
 	button.add_child(dot)
@@ -686,9 +697,9 @@ func _update_plan_button() -> void:
 	_plan_button.visible = dynasty.upgrades.earned_lifetime > 0 or can_succeed
 	_plan_button.disabled = not can_succeed
 	if can_succeed:
-		_plan_button.text = "PLAN THE ESTATE  (+%d Legacy)" % dynasty.projected_legacy_gain()
+		_plan_button.text = "PASS THE TORCH  (+%d Legacy)" % dynasty.projected_legacy_gain()
 	else:
-		_plan_button.text = "PLAN THE ESTATE"
+		_plan_button.text = "PASS THE TORCH"
 
 
 ## Keep the epoch banner in sync with the civilization Earth is currently trading with.
@@ -826,14 +837,27 @@ func _on_minigame_finished(multiplier: float, opt_out: bool) -> void:
 			_finalize_succession(multiplier)
 
 
+## Player chose to gamble the overnight pile (the RISK IT button on the welcome screen). The
+## base pile is already banked; this round scales it across a fixed 50%–200% range
+## (WELCOME_BACK_BONUS_MAX, not the upgrade-driven cap), and _finish_welcome_back_minigame
+## credits the +/- delta before re-showing the welcome screen with the final haul.
+func _on_welcome_risk_pressed() -> void:
+	_minigame_site = MinigameSite.WELCOME_BACK
+	_minigame_screen.start_game(
+		MinigameScreen.offline_pile_reward(_pending_offline_pile),
+		WELCOME_BACK_BONUS_MAX
+	)
+
+
 ## The welcome-back minigame produced `multiplier`: the base pile was already banked, so we
 ## credit only the delta (a bonus when >1.0, a clawback when <1.0) and then show the welcome
-## screen with the final haul. The delta is offline property income like the rest of the pile,
-## so it is credited as EARNED (counts toward the estate basis), matching the base pile.
+## screen with the final haul (no RISK button this time — the roll is spent). The delta is
+## offline property income like the rest of the pile, so it is credited as EARNED (counts
+## toward the estate basis), matching the base pile.
 func _finish_welcome_back_minigame(multiplier: float) -> void:
 	var final_pile := _pending_offline_pile * multiplier
 	game.economy.award_earned(_pending_offline_pile * (multiplier - 1.0))
-	_welcome_overlay.show_pile(final_pile, _pending_offline_hours)
+	_welcome_overlay.show_pile(final_pile, _pending_offline_hours, false)
 	_pending_offline_pile = 0.0
 	_pending_offline_hours = 0.0
 

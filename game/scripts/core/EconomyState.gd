@@ -158,6 +158,30 @@ func get_staffed_income_per_sec() -> float:
 	return total
 
 
+## The THEORETICAL passive income/sec from current assets — the figure shown on the hero
+## panel (Tim, 2026-06-24). For each STAFFED (auto-cycling) property it is the per-cycle
+## payout — units × per-unit income × the staffer-tier multiplier × the permanent Legacy
+## "Family Fortune" multiplier — divided by the effective cycle duration, summed across
+## properties. That is exactly the image's `Σ (Base Payout × Multipliers) / Cycle Duration`.
+##
+## It is a pure function of the holdings, NOT a measurement of recent cash inflow, so it is
+## rock-steady: it changes only when the player buys units, hires/upgrades staff, crosses a
+## milestone, or a permanent multiplier changes — never from the lumpy timing of payouts.
+## Unstaffed properties are excluded (they only pay when tapped, so they earn nothing
+## passively), and the temporary frenzy/event multiplier is excluded so the headline reads
+## the dependable rate rather than spiking during a burn.
+func get_passive_income_per_sec() -> float:
+	var total := 0.0
+	for prop in properties:
+		var p := prop as PropertyState
+		# get_income_per_cycle already folds in the staff-tier and Family Fortune multipliers
+		# the live tick pays on; dividing by the effective (sped-up) cycle length turns that
+		# per-cycle payout into a per-second rate.
+		if p.is_staffed:
+			total += p.get_income_per_cycle() / p.get_effective_cycle_length()
+	return total
+
+
 ## Index of the CHEAPEST property the player owns none of and cannot yet afford one
 ## unit of, or -1 if there is no such property. Drives the Main screen's ladder
 ## "peek": on top of every owned rung and every rung the player can already afford,

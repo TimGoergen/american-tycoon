@@ -41,30 +41,13 @@ var ui_buy_mode: int = 3
 ## the player opts out — GDD §5.5). Persisted in the save like ui_buy_mode.
 var ui_minigame_enabled: bool = true
 
-## The headline income/sec shown on the hero panel. It is built as a guaranteed
-## floor plus a bonus: it never reads below the guaranteed staffed income (what
-## idle play keeps earning), and on top of that it adds a smoothed average of the
-## extra the player is currently generating through their own inputs — manual
-## taps, rushes, wage clicks, and frenzy. Display-only.
+## The headline income/sec shown on the hero panel. A STABLE, THEORETICAL rate computed from
+## the player's current assets (see EconomyState.get_passive_income_per_sec): the sum over
+## staffed properties of (per-cycle payout × multipliers) ÷ cycle duration. It is NOT a
+## measurement of recent cash inflow — that swung wildly frame to frame between the lumpy
+## cycle payouts, which read as random noise (Tim, 2026-06-24). This figure only moves when
+## the holdings, staffing, or a permanent income multiplier change. Display-only.
 var displayed_income_per_sec: float = 0.0
-
-## Smoothed bonus rate ($/sec) earned ABOVE the guaranteed staffed floor. Tracked
-## as a true average, so it can dip negative between the lumpy spikes of cycle
-## payouts; it is clamped to 0 only when added to the floor for display, so the
-## headline can never fall below the guaranteed staffed income.
-var _smoothed_bonus_per_sec: float = 0.0
-
-## Time constant (seconds) for the bonus average. Long enough to average the lumpy
-## cycle-payout spikes (and the quiet gaps between them) into a steady bonus reading,
-## but short enough that the headline still responds promptly to what the player is
-## doing. Lowered 4.0 → 1.0 (Tim, 2026-06-17): at 4 s the number felt laggy/sluggish to
-## react; 1 s keeps it readable while chasing reality much faster.
-const BONUS_INCOME_TAU := 1.0
-
-# Wage earned since the last tick (taps fire between ticks); folded into the
-# bonus average on the next tick, then cleared.
-var _wage_earned_since_tick: float = 0.0
-var _bonus_seeded := false
 
 
 func _init(property_configs: Array, titles: Array, p_tuning: TuningConfig) -> void:
@@ -90,30 +73,15 @@ func tick(delta: float, extra_property_multiplier: float = 1.0) -> void:
 	# Advance the alien epoch if this generation has now earned enough to consume the
 	# current economy. Reads the same lifetime-earned tally the estate waterfall uses.
 	epoch.update(economy.cash_earned_this_gen)
-	_update_displayed_income(delta)
+	_update_displayed_income()
 
 
-## Recompute the headline income/sec as "guaranteed staffed floor + smoothed bonus".
-## The bonus is the average amount this tick's ACTUAL inflow (property completions +
-## wage taps, frenzy included) ran above the guaranteed staffed rate. Because staffed
-## payouts arrive in lumps, the raw bonus swings positive on a payout and negative in
-## the gaps; we average it (allowing negatives so the swings cancel) and then clamp to
-## 0 at display time, so the headline sits at the floor when idle and lifts smoothly
-## above it while the player is actively earning extra.
-func _update_displayed_income(delta: float) -> void:
-	if delta <= 0.0:
-		return
-	var guaranteed := economy.get_staffed_income_per_sec()
-	var inflow := economy.income_this_tick + _wage_earned_since_tick
-	_wage_earned_since_tick = 0.0
-	var bonus_instantaneous := inflow / delta - guaranteed
-	if not _bonus_seeded:
-		# Start with no bonus so a freshly loaded game reads exactly the floor.
-		_smoothed_bonus_per_sec = 0.0
-		_bonus_seeded = true
-	var alpha := 1.0 - exp(-delta / BONUS_INCOME_TAU)
-	_smoothed_bonus_per_sec += (bonus_instantaneous - _smoothed_bonus_per_sec) * alpha
-	displayed_income_per_sec = guaranteed + maxf(_smoothed_bonus_per_sec, 0.0)
+## Recompute the headline income/sec as the theoretical passive rate from current assets.
+## A pure function of the holdings — no smoothing, no inflow measurement — so it is rock
+## steady and only moves when the player buys, upgrades, staffs, or a permanent multiplier
+## changes (Tim, 2026-06-24, replacing the old smoothed-inflow average that read as noise).
+func _update_displayed_income() -> void:
+	displayed_income_per_sec = economy.get_passive_income_per_sec()
 
 
 # ---------------------------------------------------------------------------
@@ -126,7 +94,6 @@ func tap_wage() -> void:
 	var earned := wage.tap_wage(frenzy.get_multiplier())
 	# The wage is honest, earned money — it feeds the lifetime-earned estate basis.
 	economy.award_earned(earned)
-	_wage_earned_since_tick += earned
 
 
 ## Layer 1 auto-tap: one held "clock in" pulse. Earns the wage in full (it is
@@ -140,7 +107,6 @@ func hold_tap_wage() -> void:
 	var earned := floorf(wage.tap_wage(frenzy.get_multiplier()) * wage.auto_tap_power_multiplier)
 	# Held auto-tap earns the wage in full, so it counts as earned money too.
 	economy.award_earned(earned)
-	_wage_earned_since_tick += earned
 
 
 ## Layer 2: tap a property. Starts the cycle if idle, rushes it if running.

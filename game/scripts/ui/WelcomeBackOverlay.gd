@@ -6,9 +6,13 @@ extends ColorRect
 # straight into the spending spree. Ceremony copy arrives in M3.
 
 signal dismissed
+## Player chose to gamble the overnight pile on a minigame instead of banking it as-is.
+signal risk_pressed
 
 var _pile_label: Label
 var _away_label: Label
+var _spend_button: Button
+var _risk_button: Button
 
 
 func _ready() -> void:
@@ -27,7 +31,7 @@ func _ready() -> void:
 
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 16)
-	column.custom_minimum_size = Vector2(640, 0)
+	column.custom_minimum_size = Vector2(760, 0)
 	center.add_child(column)
 
 	var headline := Label.new()
@@ -56,22 +60,49 @@ func _ready() -> void:
 	worked.add_theme_font_size_override("font_size", 26)
 	column.add_child(worked)
 
-	var spend_button := Button.new()
-	spend_button.text = "PUT IT TO WORK"
-	spend_button.custom_minimum_size = Vector2(0, 80)
-	spend_button.add_theme_font_size_override("font_size", 30)
-	UiPalette.style_button(spend_button, true)
-	spend_button.pressed.connect(_on_spend_pressed)
-	column.add_child(spend_button)
+	# Two choices on one row (Tim, 2026-06-24): take the overnight pile as-is, or gamble it on a
+	# minigame that can swing the haul anywhere from 50% to 200%. The RISK button only appears
+	# when transition minigames are enabled (show_pile's allow_risk) and never on the
+	# post-minigame result screen — you get one roll.
+	var button_row := HBoxContainer.new()
+	button_row.add_theme_constant_override("separation", 12)
+	column.add_child(button_row)
+
+	_spend_button = Button.new()
+	_spend_button.text = "PUT IT TO WORK"
+	_spend_button.custom_minimum_size = Vector2(0, 96)
+	_spend_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_spend_button.add_theme_font_size_override("font_size", 28)
+	UiPalette.style_button(_spend_button, true)
+	_spend_button.pressed.connect(_on_spend_pressed)
+	button_row.add_child(_spend_button)
+
+	_risk_button = Button.new()
+	_risk_button.text = "RISK IT ON A MINIGAME?"
+	_risk_button.custom_minimum_size = Vector2(0, 96)
+	_risk_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_risk_button.add_theme_font_size_override("font_size", 28)
+	# The label is long; wrap it onto two lines rather than clipping at narrow widths.
+	_risk_button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	UiPalette.style_button(_risk_button, false)
+	_risk_button.pressed.connect(_on_risk_pressed)
+	button_row.add_child(_risk_button)
 
 
-## Show the overlay for a banked pile.
-func show_pile(pile: float, hours_away: float) -> void:
+## Show the overlay for a banked pile. `allow_risk` reveals the RISK IT button — true on the
+## initial welcome (when transition minigames are on), false on the post-minigame result.
+func show_pile(pile: float, hours_away: float, allow_risk: bool = false) -> void:
 	_pile_label.text = Money.of(pile).display()
 	_away_label.text = "You were away %.1f hours." % hours_away
+	_risk_button.visible = allow_risk
 	visible = true
 
 
 func _on_spend_pressed() -> void:
 	visible = false
 	dismissed.emit()
+
+
+func _on_risk_pressed() -> void:
+	visible = false
+	risk_pressed.emit()

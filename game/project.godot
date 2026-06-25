@@ -28,17 +28,13 @@ window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 window/handheld/orientation=1
 
-[gui]
-
-; Pixels a touch must travel before a ScrollContainer treats it as a scroll rather
-; than a click. Works together with UiPalette.allow_scroll_drag_through: the row
-; surfaces pass their presses up to the scroller, and this threshold decides how
-; far the finger must move before such a press becomes a scroll instead of a tap.
-common/default_scroll_deadzone=30
-
 [dotnet]
 
 project/assembly_name="American Tycoon"
+
+[gui]
+
+common/default_scroll_deadzone=30
 
 [rendering]
 

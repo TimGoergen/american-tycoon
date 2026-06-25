@@ -30,7 +30,6 @@ const GEN_PLAY_SECONDS := 180.0        # fixed active play per generation, so es
 const DYNASTY_SAVE_PATH := "user://sim_dynasty_save.json"
 
 var _property_configs: Array = []
-var _title_configs: Array = []
 var _tuning: TuningConfig
 
 
@@ -44,7 +43,7 @@ func _initialize() -> void:
 
 	_print_ladder_magnitude()
 
-	var game := GameState.new(_property_configs, _title_configs, _tuning)
+	var game := GameState.new(_property_configs, _tuning)
 	game.economy.award_cash(_tuning.m1_starting_cash)
 	print("Starting cash: %s" % Money.of(game.economy.cash).display())
 
@@ -73,8 +72,7 @@ func _load_configs() -> bool:
 	# overrides — so balance results stay reproducible (apply_user_overrides=false).
 	_tuning = ConfigLoader.load_tuning(false)
 	_property_configs = ConfigLoader.load_property_configs()
-	_title_configs = ConfigLoader.load_title_configs()
-	return _tuning != null and not _property_configs.is_empty() and not _title_configs.is_empty()
+	return _tuning != null and not _property_configs.is_empty()
 
 
 # ---------------------------------------------------------------------------
@@ -93,11 +91,8 @@ func _run_active_phase(game: GameState) -> void:
 	while sim_time < ACTIVE_SECONDS:
 		# Wage taps (Layer 1) — also the early frenzy filler.
 		if sim_time >= next_wage_tap:
-			game.tap_wage()
+			game.tap_wage()  # the clock-in level rises on its own as clicks accrue
 			next_wage_tap += WAGE_TAP_PERIOD
-
-		# Claim a promotion the moment it's unlocked and affordable.
-		game.try_claim_promotion()
 
 		# Pop frenzy greedily. (A real player would charge higher first; the
 		# greedy policy just proves the state machine cycles correctly.)
@@ -125,8 +120,8 @@ func _run_active_phase(game: GameState) -> void:
 			])
 			next_report += REPORT_INTERVAL
 
-	print("Frenzy pops this session: %d | final title: %s" % [
-		frenzy_pops, game.wage.get_current_title().title_name
+	print("Frenzy pops this session: %d | final clock-in level: %d" % [
+		frenzy_pops, game.wage.level
 	])
 
 
@@ -180,7 +175,7 @@ func _run_offline_phase(game: GameState) -> GameState:
 		push_error("Sim: load failed")
 		return null
 
-	var resumed := GameState.new(_property_configs, _title_configs, _tuning)
+	var resumed := GameState.new(_property_configs, _tuning)
 	resumed.load_save_dict(save_dict)
 
 	# Sanity-check the round trip before trusting the rest of the run.
@@ -297,7 +292,7 @@ func _run_dynasty_protocol() -> void:
 		push_error("Sim: estate waterfall math spot-check failed")
 		return
 
-	var dynasty := DynastyState.new(_property_configs, _title_configs, _tuning)
+	var dynasty := DynastyState.new(_property_configs, _tuning)
 
 	# The fixed yardstick for "speeds up every time": the founder's (gen 1) peak
 	# net worth. Every later heir should reach THIS SAME position faster than the
@@ -397,10 +392,9 @@ func _play_generation(dynasty: DynastyState, seconds: float, reference_target: f
 		var game := dynasty.current
 
 		if sim_time >= next_wage_tap:
-			game.tap_wage()
+			game.tap_wage()  # the clock-in level rises on its own as clicks accrue
 			next_wage_tap += WAGE_TAP_PERIOD
 
-		game.try_claim_promotion()
 		game.pop_frenzy()
 		_greedy_buy_spree(game)
 
@@ -470,7 +464,7 @@ func _verify_dynasty_save_roundtrip(dynasty: DynastyState) -> void:
 		push_error("Sim: dynasty load failed")
 		return
 
-	var reloaded := DynastyState.new(_property_configs, _title_configs, _tuning)
+	var reloaded := DynastyState.new(_property_configs, _tuning)
 	reloaded.load_save_dict(data)
 
 	var ok := reloaded.upgrades.available == dynasty.upgrades.available \

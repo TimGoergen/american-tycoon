@@ -21,17 +21,16 @@ func _initialize() -> void:
 
 	var tuning := ConfigLoader.load_tuning(false)
 	var property_configs := ConfigLoader.load_property_configs()
-	var title_configs := ConfigLoader.load_title_configs()
-	if tuning == null or property_configs.is_empty() or title_configs.is_empty():
+	if tuning == null or property_configs.is_empty():
 		print("FAILED to load configs")
 		quit(1)
 		return
 
 	_test_thresholds(tuning)
-	_test_epoch_advances(property_configs, title_configs, tuning)
-	_test_staff_tier_income(property_configs, title_configs, tuning)
-	_test_save_round_trip(property_configs, title_configs, tuning)
-	_test_staff_retention(property_configs, title_configs, tuning)
+	_test_epoch_advances(property_configs, tuning)
+	_test_staff_tier_income(property_configs, tuning)
+	_test_save_round_trip(property_configs, tuning)
+	_test_staff_retention(property_configs, tuning)
 	_test_epoch_content()
 
 	print("")
@@ -63,9 +62,9 @@ func _test_thresholds(tuning: TuningConfig) -> void:
 	_check("Alien staffer multiplier is > 1.0", EpochCatalog.staff_income_multiplier(2) > 1.0)
 
 
-func _test_epoch_advances(configs: Array, titles: Array, tuning: TuningConfig) -> void:
+func _test_epoch_advances(configs: Array, tuning: TuningConfig) -> void:
 	print("\n2. A generation advances epochs as lifetime earnings cross thresholds")
-	var game := GameState.new(configs, titles, tuning)
+	var game := GameState.new(configs, tuning)
 	_check("starts in epoch 1 (Earth)", game.epoch.current_tier == 1)
 
 	# Just under the Earth threshold: still Earth.
@@ -81,9 +80,9 @@ func _test_epoch_advances(configs: Array, titles: Array, tuning: TuningConfig) -
 	_check("enormous earnings cap at the last epoch (6)", game.epoch.current_tier == EpochCatalog.tier_count())
 
 
-func _test_staff_tier_income(configs: Array, titles: Array, tuning: TuningConfig) -> void:
+func _test_staff_tier_income(configs: Array, tuning: TuningConfig) -> void:
 	print("\n3 & 4. Hiring raises tier + income, and is gated by the reached epoch")
-	var game := GameState.new(configs, titles, tuning)
+	var game := GameState.new(configs, tuning)
 	# Plenty of cash and some units of the first property (ATM) so it earns.
 	game.economy.award_cash(1.0e18)
 	game.try_buy(0, 50)
@@ -111,9 +110,9 @@ func _test_staff_tier_income(configs: Array, titles: Array, tuning: TuningConfig
 		income_tier1 > 0.0 and is_equal_approx(income_tier2 / income_tier1, expected))
 
 
-func _test_save_round_trip(configs: Array, titles: Array, tuning: TuningConfig) -> void:
+func _test_save_round_trip(configs: Array, tuning: TuningConfig) -> void:
 	print("\n5. Save/reload round-trips staff_tier and the reached epoch")
-	var game := GameState.new(configs, titles, tuning)
+	var game := GameState.new(configs, tuning)
 	game.economy.award_cash(1.0e18)
 	game.try_buy(0, 30)
 	game.epoch.current_tier = 3          # pretend we reached the Geth-Sentinel epoch
@@ -124,7 +123,7 @@ func _test_save_round_trip(configs: Array, titles: Array, tuning: TuningConfig) 
 	_check("ATM reached staff tier 3 before save", atm.staff_tier == 3)
 
 	var dict := game.to_save_dict()
-	var reloaded := GameState.new(configs, titles, tuning)
+	var reloaded := GameState.new(configs, tuning)
 	reloaded.load_save_dict(dict)
 	var atm2 := reloaded.economy.properties[0] as PropertyState
 	_check("reloaded ATM staff_tier == 3", atm2.staff_tier == 3)
@@ -138,7 +137,7 @@ func _test_save_round_trip(configs: Array, titles: Array, tuning: TuningConfig) 
 		prop_dict.erase("staff_tier")
 		prop_dict["is_staffed"] = true
 	legacy_dict.erase("epoch_tier")
-	var migrated := GameState.new(configs, titles, tuning)
+	var migrated := GameState.new(configs, tuning)
 	migrated.load_save_dict(legacy_dict)
 	var atm3 := migrated.economy.properties[0] as PropertyState
 	_check("pre-v5 is_staffed:true migrates to staff_tier 1", atm3.staff_tier == 1)
@@ -146,9 +145,9 @@ func _test_save_round_trip(configs: Array, titles: Array, tuning: TuningConfig) 
 
 
 ## Phase 2: a Legacy-bought retained staffer tier carries into the heir on succession.
-func _test_staff_retention(configs: Array, titles: Array, tuning: TuningConfig) -> void:
+func _test_staff_retention(configs: Array, tuning: TuningConfig) -> void:
 	print("\n6. Per-staffer retention carries a staffer tier across prestige (GDD §6.3)")
-	var dynasty := DynastyState.new(configs, titles, tuning)
+	var dynasty := DynastyState.new(configs, tuning)
 	var game := dynasty.current
 	game.economy.award_cash(1.0e18)
 	game.try_buy(0, 50)              # own some ATMs so the staffer earns
@@ -185,7 +184,7 @@ func _test_staff_retention(configs: Array, titles: Array, tuning: TuningConfig) 
 
 	# Retention survives a dynasty save round-trip.
 	var data := dynasty.to_save_dict()
-	var reloaded := DynastyState.new(configs, titles, tuning)
+	var reloaded := DynastyState.new(configs, tuning)
 	reloaded.load_save_dict(data)
 	_check("retained tiers survive a dynasty save round-trip",
 		reloaded.staff_retention.get_retained_tier(0) == 2)

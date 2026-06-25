@@ -11,9 +11,11 @@ class_name GameState
 # excluded from the estate→Legacy conversion. v4 added cash_earned_this_gen, the
 # lifetime-earned accumulator that is now the gross estate (Spec §9.1). v5 replaced the
 # per-property is_staffed bool with a staff_tier int and added the run's reached epoch
-# (the alien-staffing system). Older saves still load (missing fields default to a clean
-# slate / zero earned; a v4 is_staffed:true becomes staff_tier 1).
-const SAVE_VERSION := 5
+# (the alien-staffing system). v6 replaced the named-title wage ladder with a numeric clock-in
+# LEVEL (the wage save block now stores level + taps_into_level instead of a title index).
+# Older saves still load (missing fields default to a clean slate / zero earned; a v4
+# is_staffed:true becomes staff_tier 1; a pre-v6 save starts the wage at level 0).
+const SAVE_VERSION := 6
 
 var tuning: TuningConfig
 var economy: EconomyState
@@ -50,10 +52,10 @@ var ui_minigame_enabled: bool = true
 var displayed_income_per_sec: float = 0.0
 
 
-func _init(property_configs: Array, titles: Array, p_tuning: TuningConfig) -> void:
+func _init(property_configs: Array, p_tuning: TuningConfig) -> void:
 	tuning = p_tuning
 	economy = EconomyState.new(property_configs, p_tuning)
-	wage = WageState.new(titles)
+	wage = WageState.new()
 	frenzy = FrenzyState.new(p_tuning)
 	epoch = EpochState.new(p_tuning)
 
@@ -88,7 +90,7 @@ func _update_displayed_income() -> void:
 # Player verbs — every tap feeds the frenzy meter (Spec §7)
 # ---------------------------------------------------------------------------
 
-## Layer 1: tap the wage button. Pays the current title's wage immediately.
+## Layer 1: tap the wage button. Pays the current level's wage immediately (and may level up).
 func tap_wage() -> void:
 	frenzy.on_tap()
 	var earned := wage.tap_wage(frenzy.get_multiplier())
@@ -149,19 +151,6 @@ func try_hire(prop_index: int) -> bool:
 	return economy.try_hire(prop_index, epoch.current_tier)
 
 
-## Claim the next wage-ladder title if the tap threshold is met and tuition
-## is affordable (Spec §5: promotion needs both). Returns true on success.
-func try_claim_promotion() -> bool:
-	if not wage.is_promotion_unlocked():
-		return false
-	var next := wage.get_next_title()
-	if economy.cash < next.tuition:
-		return false
-	economy.cash -= next.tuition
-	wage.claim_promotion()
-	return true
-
-
 # ---------------------------------------------------------------------------
 # Offline
 # ---------------------------------------------------------------------------
@@ -213,9 +202,10 @@ func to_save_dict() -> Dictionary:
 		"cash_earned_this_gen": economy.cash_earned_this_gen,
 		"properties": props,
 		"wage": {
-			"current_title_index": wage.current_title_index,
+			# v6: the numeric clock-in level + clicks banked toward the next level-up.
+			"level": wage.level,
+			"taps_into_level": wage.taps_into_level,
 			"lifetime_taps": wage.lifetime_taps,
-			"taps_at_title_start": wage.taps_at_title_start,
 		},
 		# A frenzy burn does not survive an app close; only the charge does.
 		"frenzy": {"meter": frenzy.meter},
@@ -263,15 +253,11 @@ func load_save_dict(data: Dictionary) -> void:
 		)
 
 	var w: Dictionary = data.get("wage", {})
-	wage.current_title_index = int(w.get("current_title_index", 0))
+	# v6 stores the numeric clock-in level; pre-v6 saves (title index) simply start the wage
+	# fresh at level 0, keeping only the dynastic Work Ethic tap count.
+	wage.level = int(w.get("level", 0))
+	wage.taps_into_level = int(w.get("taps_into_level", 0))
 	wage.lifetime_taps = int(w.get("lifetime_taps", 0))
-	# Older saves predate the rung-relative baseline. For those, fall back to the
-	# current title's own tap threshold: under the previous absolute-threshold scheme
-	# that was exactly the lifetime-tap count at which this title began, so the
-	# player's within-title progress carries over unchanged.
-	wage.taps_at_title_start = int(w.get(
-		"taps_at_title_start", wage.get_current_title().tap_threshold
-	))
 
 	var f: Dictionary = data.get("frenzy", {})
 	frenzy.meter = float(f.get("meter", 0.0))

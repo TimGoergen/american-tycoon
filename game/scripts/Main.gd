@@ -153,12 +153,11 @@ func _notification(what: int) -> void:
 func _create_game() -> void:
 	tuning = ConfigLoader.load_tuning()
 	var property_configs := ConfigLoader.load_property_configs()
-	var titles := ConfigLoader.load_title_configs()
 
 	# Constructing the dynasty also builds generation 1, already seeded with
 	# starting cash by DynastyState. So, unlike the old bare-GameState path, a
 	# fresh game needs no extra award_cash here.
-	dynasty = DynastyState.new(property_configs, titles, tuning)
+	dynasty = DynastyState.new(property_configs, tuning)
 
 	var save_dict := SaveManager.load_from_file()
 	if not save_dict.is_empty():
@@ -381,10 +380,9 @@ func _build_property_tab() -> Control:
 		_rows.append(row)
 
 	_wage_panel = WagePanel.new()
-	_wage_panel.setup(game.wage, game.economy, tuning, game.frenzy)
+	_wage_panel.setup(game.wage, tuning, game.frenzy)
 	_wage_panel.wage_tapped.connect(_on_wage_tapped)
 	_wage_panel.wage_hold_tapped.connect(_on_wage_hold_tapped)
-	_wage_panel.promotion_requested.connect(_on_promotion_requested)
 	v.add_child(_wage_panel)
 
 	return v
@@ -630,10 +628,6 @@ func _on_wage_tapped() -> void:
 
 func _on_wage_hold_tapped() -> void:
 	game.hold_tap_wage()
-
-
-func _on_promotion_requested() -> void:
-	game.try_claim_promotion()
 
 
 func _on_pop_requested() -> void:

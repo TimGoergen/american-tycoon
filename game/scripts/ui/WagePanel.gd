@@ -4,19 +4,18 @@ extends VBoxContainer
 # The wage button (Layer 1, GDD §5) — the only honest money in the game, and it
 # is never removed from the screen.
 #
-# The "clock in" button doubles as a promotion-progress meter (UI notes §2): a
-# dark-gold plate whose bright-gold bar fills toward the next title. A
-# ProgressBar draws that fill; a transparent Button sits on top to catch taps and
-# show the big (2×-size) CLOCK IN label. A compact context line below keeps the
-# title/next-title detail without crowding the big button. When the tap threshold
-# is met, the claim button appears.
+# The "clock in" button doubles as a LEVEL-progress meter (UI notes §2): a dark-gold
+# plate whose bright-gold bar fills toward the next clock-in level. A ProgressBar draws
+# that fill; a transparent Button sits on top to catch taps and show the big (2×-size)
+# CLOCK IN label. On the same row, to the right, a compact label shows the current level
+# and the one being climbed toward ("<level> / <next>") — see WageState for the level rule
+# (10 clicks for the first level, then 20, then 30, …). There is no promotion/claim step:
+# leveling up is automatic once the clicks are earned (Tim, 2026-06-24).
 
 signal wage_tapped
 signal wage_hold_tapped
-signal promotion_requested
 
 var _wage: WageState
-var _economy: EconomyState
 var _tuning: TuningConfig
 var _frenzy: FrenzyState
 
@@ -104,8 +103,9 @@ var _track_base: Color
 
 var _wage_meter: ProgressBar
 var _wage_button: Button
-var _context_label: Label
-var _promotion_button: Button
+## The "<level> / <next>" readout that sits to the right of the clock-in button (15% of the
+## row), showing the current clock-in level and the one being climbed toward.
+var _level_label: Label
 
 # The clock-in button's three-part content laid over the meter (Tim, 2026-06-22): a mail-cart
 # icon on the left, "CLOCK IN" centered, and the live per-tap earnings "+$x" on the right.
@@ -119,9 +119,8 @@ var _sweep_overlay: Control
 
 
 ## Call before adding to the tree.
-func setup(wage: WageState, economy: EconomyState, tuning: TuningConfig, frenzy: FrenzyState) -> void:
+func setup(wage: WageState, tuning: TuningConfig, frenzy: FrenzyState) -> void:
 	_wage = wage
-	_economy = economy
 	_tuning = tuning
 	_frenzy = frenzy
 
@@ -145,7 +144,29 @@ func _ready() -> void:
 	_track_style = _wage_meter.get_theme_stylebox("background") as StyleBoxFlat
 	_fill_base = _fill_style.bg_color
 	_track_base = _track_style.bg_color
-	add_child(_wage_meter)
+
+	# The clock-in button and its level readout share one row (Tim, 2026-06-24): the meter takes
+	# ~85% of the width and the "<level> / <next>" label the remaining ~15%. Setting both to
+	# EXPAND_FILL with these stretch ratios gives the proportional 85/15 split at any width.
+	var button_row := HBoxContainer.new()
+	button_row.add_theme_constant_override("separation", 12)
+	add_child(button_row)
+
+	_wage_meter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_wage_meter.size_flags_stretch_ratio = 0.85
+	button_row.add_child(_wage_meter)
+
+	# Level readout (the right 15% of the row): "<current level> / <next level>". Filled in
+	# each frame by _process from the live WageState.
+	_level_label = Label.new()
+	_level_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_level_label.size_flags_stretch_ratio = 0.15
+	_level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_level_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_level_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_level_label.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
+	_level_label.add_theme_color_override("font_color", UiPalette.NAVY)
+	button_row.add_child(_level_label)
 
 	# Highlight overlay: a transparent, mouse-ignoring layer filling the meter, on
 	# which _draw_sweep paints the gliding highlight band while the button is held.
@@ -223,73 +244,29 @@ func _ready() -> void:
 	_wage_amount_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(_wage_amount_label)
 
-	# Context line: which title you hold and what's next. Bumped 50% (20→30) for
-	# readability (Tim, 2026-06-17).
-	_context_label = Label.new()
-	_context_label.add_theme_color_override("font_color", UiPalette.NAVY)
-	# Sized 50% above FONT_BODY (32 -> 48) at Tim's request (2026-06-22) so the line under
-	# the big CLOCK IN button reads clearly at arm's length.
-	_context_label.add_theme_font_size_override("font_size", int(UiPalette.FONT_BODY * 1.5))
-	_context_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	# Wrap instead of forcing width. Without this, the full one-line text is the label's
-	# MINIMUM width, which at 48px exceeds the screen and inflates the whole Property tab
-	# column past the viewport — pushing everything off the right edge (Tim, 2026-06-22).
-	# Wrapping caps the minimum width at the longest single word, so the column fits.
-	_context_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_context_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	add_child(_context_label)
-
-	_promotion_button = Button.new()
-	_promotion_button.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
-	UiPalette.style_button(_promotion_button, true)  # tuition is a spend action
-	_promotion_button.pressed.connect(func() -> void: promotion_requested.emit())
-	add_child(_promotion_button)
+	# (The old title/next-title context line and the promotion claim button were removed when
+	# the wage ladder became a numeric level — Tim, 2026-06-24. The level reads from the
+	# "<level> / <next>" label on the clock-in row instead.)
 
 
 func _process(delta: float) -> void:
 	_pump_auto_tap(delta)
 	_update_plate_glow(delta)
 
-	# The headline rate always reflects BOTH wage Legacy upgrades — Old-Money Connections
+	# The per-tap rate always reflects BOTH wage Legacy upgrades — Old-Money Connections
 	# (wage_multiplier) and the auto-click POWER bonus (auto_tap_power_multiplier) — on top of
 	# the live frenzy multiplier (Spec §7). The power bonus used to be folded in only while the
 	# button was held, so at rest the amount read as if that Legacy upgrade weren't owned (Tim,
 	# 2026-06-22). The clock-in's primary mode is holding it (auto-tapping), so this full
 	# held/auto-tap rate is the canonical figure; a single manual tap still pays the base rate.
-	var title := _wage.get_current_title()
-	var wage_per_tap := title.wage_per_tap * _frenzy.get_multiplier() \
+	var wage_per_tap := _wage.current_wage_per_tap() * _frenzy.get_multiplier() \
 			* _wage.wage_multiplier * _wage.auto_tap_power_multiplier
 	_wage_amount_label.text = "+%s" % Money.of(wage_per_tap).display()
 
-	var next := _wage.get_next_title()
-	if next == null:
-		# Top of the placeholder ladder (the full title table arrives in M2).
-		_apply_wage_fill(1.0)
-		_context_label.text = "%s — top of the ladder (for now)" % title.title_name
-		_promotion_button.visible = false
-		return
-
-	if _wage.is_promotion_unlocked():
-		# Threshold met — the claim is now just a purchase (the credential gag).
-		_apply_wage_fill(1.0)
-		_context_label.text = "%s — promotion earned, claim it below" % title.title_name
-		_promotion_button.visible = true
-		_promotion_button.text = "CLAIM PROMOTION: %s — tuition %s" % [
-			next.title_name, Money.of(next.tuition).display()
-		]
-		_promotion_button.disabled = _economy.cash < next.tuition
-	else:
-		_apply_wage_fill(_promotion_progress(title, next))
-		# Show taps earned within THIS title, not the dynastic lifetime total, so the
-		# number matches the meter (and an heir starts each rung at 0 / span).
-		# Two lines (Tim, 2026-06-22): the title-to-title progression on top, the
-		# taps/tuition requirement beneath it.
-		_context_label.text = "%s → %s\n%d / %d taps + %s tuition" % [
-			title.title_name, next.title_name,
-			_wage.taps_in_current_title(), _wage.taps_required_for_promotion(),
-			Money.of(next.tuition).display()
-		]
-		_promotion_button.visible = false
+	# Right-side readout: the current level and the one being climbed toward (e.g. "3 / 4").
+	_level_label.text = "%d / %d" % [_wage.level, _wage.next_level()]
+	# The gold bar fills with the clicks banked toward the next level-up.
+	_apply_wage_fill(_level_progress())
 
 
 ## Set the wage meter to `target` (0–1) directly — no easing. Each tap advances
@@ -299,15 +276,14 @@ func _apply_wage_fill(target: float) -> void:
 	_wage_meter.value = clampf(target, 0.0, 1.0)
 
 
-## Fraction of the way through the current rung — the bright-gold fill level. Driven
-## by taps earned WITHIN the current title (which resets to 0 on each promotion and
-## for each new heir), so the meter shows current-title progress rather than the
-## dynasty's ever-growing lifetime tap count.
-func _promotion_progress(_title: TitleRow, _next: TitleRow) -> float:
-	var span := _wage.taps_required_for_promotion()
+## Fraction of the way to the next level — the bright-gold fill level. Driven by the clicks
+## banked toward the next level-up (which resets at each level-up and starts at 0 for each new
+## heir), so the meter shows current-level progress, not the dynasty's lifetime tap count.
+func _level_progress() -> float:
+	var span := _wage.clicks_required_for_next_level()
 	if span <= 0:
 		return 0.0
-	return clampf(float(_wage.taps_in_current_title()) / float(span), 0.0, 1.0)
+	return clampf(float(_wage.taps_into_level) / float(span), 0.0, 1.0)
 
 
 ## Holding the clock-in button auto-taps the wage at the configured rate — a
@@ -414,8 +390,7 @@ func _draw_sweep() -> void:
 ## pays (base wage × frenzy × the Old-Money Connections wage multiplier), floored.
 ## Used to label the floating "+income" indicators.
 func _current_tap_income() -> float:
-	var title := _wage.get_current_title()
-	return floorf(title.wage_per_tap * _frenzy.get_multiplier() * _wage.wage_multiplier)
+	return floorf(_wage.current_wage_per_tap() * _frenzy.get_multiplier() * _wage.wage_multiplier)
 
 
 ## Spawn a small black "+income" label that rises from a slightly random spot and

@@ -23,7 +23,6 @@ var tuning: TuningConfig
 
 # Held so each new generation is built from the same configs the dynasty started with.
 var _property_configs: Array
-var _title_configs: Array
 
 ## The spendable Legacy wallet and the purchased upgrade sheet (GDD §13). All
 ## prestige value flows through here now: deaths bank Legacy into it, the shop
@@ -58,9 +57,8 @@ var ancestors: Array = []
 var current: GameState
 
 
-func _init(property_configs: Array, titles: Array, p_tuning: TuningConfig) -> void:
+func _init(property_configs: Array, p_tuning: TuningConfig) -> void:
 	_property_configs = property_configs
-	_title_configs = titles
 	tuning = p_tuning
 	upgrades = LegacyUpgrades.new()
 	staff_retention = StaffRetention.new()
@@ -205,7 +203,7 @@ func perform_succession(
 ## purchased upgrade effect (cycle speed, staff cost, wage) applied to its fresh
 ## state. Property income is multiplied at tick time, not seeded as cash.
 func _new_generation() -> GameState:
-	var heir := GameState.new(_property_configs, _title_configs, tuning)
+	var heir := GameState.new(_property_configs, tuning)
 	# Seed the heir with opening capital + any Trust Fund bonus, and record that
 	# seed so the estate→Legacy conversion can later exclude it (granted money is
 	# not dynastic achievement). award_cash floors the amount, so floor the record
@@ -213,11 +211,9 @@ func _new_generation() -> GameState:
 	var seed_cash := floorf(tuning.m1_starting_cash + upgrades.starting_cash_bonus())
 	heir.economy.award_cash(seed_cash)
 	heir.economy.starting_cash = seed_cash
+	# Work Ethic (the lifetime tap count) carries forward as a number, but the heir
+	# re-climbs the clock-in ladder from level 0 (a fresh WageState already starts there).
 	heir.wage.lifetime_taps = dynastic_taps
-	# The heir starts back at the first title, so baseline their promotion meter to the
-	# inherited tap count: Work Ethic carries forward as a number, but the heir still
-	# re-climbs the ladder from an empty meter rather than inheriting a full one.
-	heir.wage.taps_at_title_start = dynastic_taps
 	_apply_upgrade_effects(heir)
 	_apply_retained_staff(heir)
 	return heir
@@ -320,7 +316,7 @@ func load_save_dict(data: Dictionary) -> void:
 		upgrades.available = carried
 		upgrades.earned_lifetime = carried
 
-	current = GameState.new(_property_configs, _title_configs, tuning)
+	current = GameState.new(_property_configs, tuning)
 	var current_data: Variant = data.get("current", data)
 	if current_data is Dictionary:
 		current.load_save_dict(current_data)

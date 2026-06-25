@@ -21,33 +21,6 @@ const PROPERTY_PATHS := [
 	"res://config/properties/12_executive_assets.tres",
 ]
 
-const TITLE_PATHS := [
-	"res://config/titles/01_intern.tres",
-	"res://config/titles/02_associate.tres",
-	"res://config/titles/03_shift_supervisor.tres",
-	"res://config/titles/04_assistant_manager.tres",
-	"res://config/titles/05_manager.tres",
-	"res://config/titles/06_senior_manager.tres",
-	"res://config/titles/07_department_head.tres",
-	"res://config/titles/08_director.tres",
-	"res://config/titles/09_senior_director.tres",
-	"res://config/titles/10_vice_president.tres",
-	"res://config/titles/11_senior_vice_president.tres",
-	"res://config/titles/12_executive_vice_president.tres",
-	"res://config/titles/13_managing_director.tres",
-	"res://config/titles/14_partner.tres",
-	"res://config/titles/15_senior_partner.tres",
-	"res://config/titles/16_chief_operating_officer.tres",
-	"res://config/titles/17_chief_financial_officer.tres",
-	"res://config/titles/18_chief_executive_officer.tres",
-	"res://config/titles/19_president.tres",
-	"res://config/titles/20_chairman.tres",
-	"res://config/titles/21_founder.tres",
-	"res://config/titles/22_magnate.tres",
-	"res://config/titles/23_tycoon.tres",
-]
-
-
 ## Returns null (with an error pushed) if the tuning file is missing.
 ##
 ## By default the dev/balance overrides written by the tuning panel (user://,
@@ -71,11 +44,6 @@ static func load_tuning(apply_user_overrides: bool = true) -> TuningConfig:
 ## Returns the 12 PropertyConfigs in GDD §4 ladder order, or [] on failure.
 static func load_property_configs() -> Array:
 	return _load_all(PROPERTY_PATHS)
-
-
-## Returns the wage-ladder TitleRows in rank order, or [] on failure.
-static func load_title_configs() -> Array:
-	return _load_all(TITLE_PATHS)
 
 
 static func _load_all(paths: Array) -> Array:

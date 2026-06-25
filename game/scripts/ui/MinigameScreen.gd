@@ -396,12 +396,19 @@ func _current_performance() -> float:
 
 
 func _keep_color(mult: float) -> Color:
+	# Below the "full" line the bar heats up red -> orange -> yellow as you approach 100%; at and
+	# above full it cools the other way, green -> blue, as you climb into the extra-high bonus band
+	# (Tim, 2026-06-25). The deliberate red/yellow -> green jump at exactly 100% marks the moment
+	# you stop losing Legacy and start banking the full inheritance.
 	if mult < 1.0:
 		var floor_mult := _tuning.minigame_keep_floor
 		var t := clampf((mult - floor_mult) / maxf(0.0001, 1.0 - floor_mult), 0.0, 1.0)
-		return UiPalette.KETCHUP_RED.lerp(UiPalette.MUSTARD_GOLD, t)
+		# Two warm segments: red -> orange in the first half, orange -> yellow in the second.
+		if t < 0.5:
+			return UiPalette.KETCHUP_RED.lerp(UiPalette.ORANGE, t / 0.5)
+		return UiPalette.ORANGE.lerp(UiPalette.MUSTARD_GOLD, (t - 0.5) / 0.5)
 	var into_extra := clampf((mult - 1.0) / maxf(0.0001, _bonus_max), 0.0, 1.0)
-	return UiPalette.MONEY_GREEN.lerp(UiPalette.ATOMIC_TEAL, into_extra)
+	return UiPalette.MONEY_GREEN.lerp(UiPalette.CYCLE_BLUE, into_extra)
 
 
 ## Format an amount the way this round's reward wants it: as dollars (the cash pile) or as a

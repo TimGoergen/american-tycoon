@@ -57,6 +57,10 @@ const CELL_SIZE := 96
 const GAP := 8
 const PITCH := CELL_SIZE + GAP
 
+## The bonus banner's gem tiles — deliberately larger than a board cell so this round's bonus
+## gems stand out as a prominent "chase these" cue directly above the grid.
+const BONUS_ICON_SIZE := 132
+
 ## How far a press must move before it counts as a drag-swap (rather than a stray tap).
 const DRAG_THRESHOLD := CELL_SIZE * 0.4
 
@@ -119,9 +123,12 @@ func begin(_tuning: TuningConfig) -> void:
 	intro.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
 	intro.add_theme_color_override("font_color", UiPalette.NAVY)
 
-	# The header sits directly above the grid: which gem types are BONUS this round (their colored
-	# symbols), plus a live running score.
-	var header := _build_header()
+	# A live running score readout, on its own line under the intro.
+	var score_row := _build_score_row()
+
+	# The bonus banner sits DIRECTLY above the grid: this round's BONUS gem types shown as large
+	# gem tiles so the player can see at a glance exactly which gems to chase for the ×10 swap.
+	var bonus_banner := _build_bonus_banner()
 
 	_board_area = Control.new()
 	_board_area.custom_minimum_size = Vector2(GRID_WIDTH * PITCH - GAP, GRID_HEIGHT * PITCH - GAP)
@@ -137,7 +144,8 @@ func begin(_tuning: TuningConfig) -> void:
 	column.set_anchors_preset(Control.PRESET_FULL_RECT)
 	column.add_theme_constant_override("separation", 12)
 	column.add_child(intro)
-	column.add_child(header)
+	column.add_child(score_row)
+	column.add_child(bonus_banner)
 	column.add_child(board_center)
 	add_child(column)
 
@@ -153,34 +161,11 @@ func _choose_bonus_types() -> void:
 		_bonus_types.append(available[i])
 
 
-## Build the header above the grid: a "BONUS" tag with this round's bonus gem symbol(s), then a
-## live running score readout (refreshed as cascades resolve by _update_score_display).
-func _build_header() -> Control:
+## The live running score readout (refreshed as cascades resolve by _update_score_display), on
+## its own centered line under the intro.
+func _build_score_row() -> Control:
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 16)
-
-	var bonus_tag := Label.new()
-	bonus_tag.text = "BONUS:"
-	bonus_tag.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
-	bonus_tag.add_theme_color_override("font_color", UiPalette.NAVY)
-	row.add_child(bonus_tag)
-
-	# One colored symbol per bonus gem type, so the player knows at a glance which gems pay ×10.
-	for color_id in _bonus_types:
-		var symbol := Label.new()
-		symbol.text = GEM_SYMBOL[color_id]
-		symbol.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
-		symbol.add_theme_color_override("font_color", GEM_FILL[color_id])
-		# A dark outline so a pale gem symbol (e.g. gold) still reads against the cream panel.
-		symbol.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
-		symbol.add_theme_constant_override("outline_size", 4)
-		row.add_child(symbol)
-
-	# A spacer pushes the score readout to the right end of the header row.
-	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(spacer)
 
 	_score_label = Label.new()
 	_score_label.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
@@ -189,6 +174,54 @@ func _build_header() -> Control:
 	_update_score_display()
 
 	return row
+
+
+## Build the bonus banner shown directly above the grid: a "BONUS" tag followed by this round's
+## bonus gem types rendered as large gem tiles (the same color + symbol as the board gems), so the
+## player can see at a glance which gems pay ×10 when matched.
+func _build_bonus_banner() -> Control:
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 16)
+
+	var bonus_tag := Label.new()
+	bonus_tag.text = "BONUS"
+	bonus_tag.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
+	bonus_tag.add_theme_color_override("font_color", UiPalette.NAVY)
+	bonus_tag.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	row.add_child(bonus_tag)
+
+	for color_id in _bonus_types:
+		row.add_child(_make_bonus_icon(color_id))
+
+	return row
+
+
+## A single large bonus gem tile for the banner — the same color, symbol, and rounded look as a
+## board gem, but oversized and non-interactive so it reads as a clear "look for this gem" cue.
+func _make_bonus_icon(color_id: int) -> Control:
+	var icon := Panel.new()
+	icon.custom_minimum_size = Vector2(BONUS_ICON_SIZE, BONUS_ICON_SIZE)
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var box := StyleBoxFlat.new()
+	box.bg_color = GEM_FILL[color_id]
+	box.set_corner_radius_all(14)
+	box.border_color = UiPalette.INK_NAVY
+	box.set_border_width_all(3)
+	icon.add_theme_stylebox_override("panel", box)
+
+	var label := Label.new()
+	label.text = GEM_SYMBOL[color_id]
+	label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", UiPalette.FONT_HERO)
+	label.add_theme_color_override("font_color", GEM_TEXT[color_id])
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon.add_child(label)
+
+	return icon
 
 
 func get_performance() -> float:

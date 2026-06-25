@@ -15,6 +15,10 @@ const MONEY_GREEN := Color("#7DA87B")
 const INK_NAVY := Color("#0D1830")
 const BRICK := Color("#8E2F1E")
 const PALE_GOLD := Color("#F0D49A")
+## Warm orange — the middle stop of the minigame spectrum bar's red→orange→yellow climb toward
+## the "full" line, so the bar reads as a clear heat gradient as performance rises (Tim,
+## 2026-06-25). A small warm extension of the §1 palette for that one gradient.
+const ORANGE := Color("#D9702B")
 
 # Grays for the "not yet owned" property state — a deliberately drab, inactive
 # look so an unbought rung reads as locked next to the live cream rungs. A small

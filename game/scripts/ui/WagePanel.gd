@@ -34,6 +34,10 @@ var _hold_accumulator := 0.0
 #     above the gold fill (see _draw_sweep), so the navy border and the label stay
 #     put and the button never changes size.
 
+## The level badge's fill — a cool metallic silver (no silver exists in UiPalette). Light
+## enough that the navy level number and the navy border both read clearly on it.
+const SILVER_PLATE := Color(0.80, 0.82, 0.85)
+
 ## How long the brighter-gold blink stays on for a single manual tap, in seconds.
 ## Short, so a deliberate tap reads as a crisp blink.
 const FLASH_DURATION := 0.05
@@ -156,17 +160,22 @@ func _ready() -> void:
 	_wage_meter.size_flags_stretch_ratio = 0.85
 	button_row.add_child(_wage_meter)
 
-	# Level readout (the right 15% of the row): "<current level> / <next level>". Filled in
-	# each frame by _process from the live WageState.
+	# Level readout (the right 15% of the row): the current clock-in level, shown inside a silver
+	# plate that is the same height as the clock-in button (Tim, 2026-06-24). The PanelContainer
+	# fills the row's height — which the 196px meter sets — so the plate matches the button, and
+	# the number is centered inside it.
+	var level_panel := PanelContainer.new()
+	level_panel.add_theme_stylebox_override("panel", _make_silver_plate())
+	level_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	level_panel.size_flags_stretch_ratio = 0.15
+	button_row.add_child(level_panel)
+
 	_level_label = Label.new()
-	_level_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_level_label.size_flags_stretch_ratio = 0.15
 	_level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_level_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_level_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_level_label.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
+	_level_label.add_theme_font_size_override("font_size", UiPalette.FONT_DISPLAY)
 	_level_label.add_theme_color_override("font_color", UiPalette.NAVY)
-	button_row.add_child(_level_label)
+	level_panel.add_child(_level_label)
 
 	# Highlight overlay: a transparent, mouse-ignoring layer filling the meter, on
 	# which _draw_sweep paints the gliding highlight band while the button is held.
@@ -263,8 +272,8 @@ func _process(delta: float) -> void:
 			* _wage.wage_multiplier * _wage.auto_tap_power_multiplier
 	_wage_amount_label.text = "+%s" % Money.of(wage_per_tap).display()
 
-	# Right-side readout: the current level and the one being climbed toward (e.g. "3 / 4").
-	_level_label.text = "%d / %d" % [_wage.level, _wage.next_level()]
+	# Right-side readout: the current clock-in level (just the number, in its silver plate).
+	_level_label.text = "%d" % _wage.level
 	# The gold bar fills with the clicks banked toward the next level-up.
 	_apply_wage_fill(_level_progress())
 
@@ -284,6 +293,19 @@ func _level_progress() -> float:
 	if span <= 0:
 		return 0.0
 	return clampf(float(_wage.taps_into_level) / float(span), 0.0, 1.0)
+
+
+## The silver plate behind the level number. A cool metallic gray fill with the project's usual
+## navy border and rounded corners, so it reads as a small "level badge" beside the gold meter.
+## (No silver lives in UiPalette, so the shade is defined here.)
+func _make_silver_plate() -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = SILVER_PLATE
+	style.set_corner_radius_all(10)
+	style.border_color = UiPalette.NAVY
+	style.set_border_width_all(4)
+	style.set_content_margin_all(8)
+	return style
 
 
 ## Holding the clock-in button auto-taps the wage at the configured rate — a

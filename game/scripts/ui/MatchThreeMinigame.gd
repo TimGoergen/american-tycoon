@@ -30,8 +30,11 @@ const GRID_HEIGHT := 6
 const GEM_COLORS := 4
 
 # --- Match scoring (Tim's minigame v4) ---------------------------------------
-## Base points for each gem in a match.
-const POINTS_PER_GEM := 10.0
+## Base points for each gem in a match. Every match's score derives from this multiplicatively,
+## so this single value scales the whole point economy. Trimmed 5% from the round v4 baseline of
+## 10.0 (Tim) — the SCORE_FULL / SCORE_MAX thresholds are unchanged, so clean/strong play now
+## needs marginally more matching to reach the full and max-bonus lines.
+const POINTS_PER_GEM := 9.5
 ## Larger matches pay more PER gem: a group of n gems is worth POINTS_PER_GEM × n × (1 + this ×
 ## (n - 3)). So a 3-line is ×1, a 4-line ×1.5, a 5-line ×2 — bigger lines are worth chasing.
 const SIZE_BONUS := 0.5
@@ -92,6 +95,10 @@ var _avoid_type: int = 0
 var _score: float = 0.0
 ## Whether the player ever matched a group containing the avoid gem — used in the result summary.
 var _matched_avoid_gem: bool = false
+## Set once the score reaches SCORE_MAX (performance 1.0, the host's max bonus). Because the score
+## only ever rises, the outcome can no longer change, so we end the round early and stop accepting
+## input. Guards against emitting `completed` more than once.
+var _finished: bool = false
 ## The live "Score: N" readout above the grid.
 var _score_label: Label
 
@@ -341,7 +348,7 @@ func _build_initial_gems() -> void:
 # ---------------------------------------------------------------------------
 
 func _on_board_input(event: InputEvent) -> void:
-	if _animating:
+	if _animating or _finished:
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
@@ -438,6 +445,20 @@ func _play_resolution(result: Dictionary) -> void:
 		await _animate_step(result["steps"][i], float(step_points[i]))
 
 	_animating = false
+	_maybe_finish_early()
+
+
+## End the round the instant the score reaches the max-bonus line (SCORE_MAX -> performance 1.0).
+## Since the score can only rise, no further play could change the outcome, so there's no reason to
+## keep the player matching — we emit `completed` with the final performance and the host ends the
+## round (its countdown would otherwise be the only thing stopping play). Called after a swap fully
+## resolves, so the score readout and spectrum bar have already climbed to the top on screen.
+func _maybe_finish_early() -> void:
+	if _finished:
+		return
+	if _score >= SCORE_MAX:
+		_finished = true
+		completed.emit(get_performance())
 
 
 ## Compute a swap's earnings from the board's recorded resolution steps. Returns the points to

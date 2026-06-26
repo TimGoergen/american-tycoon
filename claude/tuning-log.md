@@ -75,3 +75,31 @@ property income mult compounds 1.00→1.20→1.44→1.73; lifetime cash earned c
 accelerates 12.1M → 84.8M → 865.9M → 3.1B; first prestige still 11 Legacy. Save
 round-trip PASS, no script errors. Economy stays well under the $103.6T Earth target over
 6 gens (no compounding runaway). Still first-pass values for on-device feel-tuning.
+
+
+## 2026-06-25 — Back-tier cycle stretch, second pass (top → ~4.5 min)
+
+The 2026-06-22 rework took the back half (tiers 7–12) to a 180s (3 min) top at ~1.5×/tier.
+Tim asked to push the top further into the roadmap's stated 3–5 min ceiling. Raised the
+back-half ratio to ~1.6×/tier so the change concentrates at the top:
+
+| Tier | Property | Cycle old → new | base_income_per_unit old → new |
+|---|---|---|---|
+| 7 | Day Trading | 24 → 26 | 3,333,333 → 3,611,111 |
+| 8 | Flipping Houses | 36 → 41 | 24,242,424 → 27,609,427 |
+| 9 | Multi Level Marketing | 54 → 66 | 200,000,000 → 244,444,444 |
+| 10 | Hedge Fund | 81 → 106 | 1,500,000,000 → 1,962,962,963 |
+| 11 | Legislative Assets | 121 → 170 | 10,755,555,556 → 15,111,111,252 |
+| 12 | Executive Assets | 180 → 272 | 88,888,888,889 → 134,320,987,654 |
+
+**Income-neutral** (same discipline as the first pass): each tier's `base_income_per_unit`
+was scaled by the same factor as its `base_cycle_length`, so per-unit income/sec is
+unchanged to display precision (e.g. tier 12: 134,320,987,654 / 272 = 88,888,888,889 / 180
+= $493.8M/s). Only the cadence gets chunkier — longer waits, fatter lump sums, and more
+speed-up halvings before the 1s cycle floor. Tiers 1–6 untouched.
+
+Sim evidence (6-gen dynasty): dynasty still "speeds up every time" — 179.9 → 166.4 →
+166.4 → 134.5 → 120.3 s to the founder's peak; waterfall spot-check and save round-trip
+PASS; no script errors. As expected for an income-neutral change, economy magnitudes are
+unmoved. First-pass ceiling — on-device feel-test will say whether 4.5 min is the sweet
+spot or it wants 4 / 5 min.

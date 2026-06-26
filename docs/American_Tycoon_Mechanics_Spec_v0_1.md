@@ -60,9 +60,12 @@ else:                               income_per_unit ×= 2   (income mode)
 ```
 `CYCLE_FLOOR = 1.0s` (provisional `TBD-SIM`). Every property follows the arc *first it gets faster, then it gets richer*; conversion point is emergent per property (ATM converts almost immediately; political assets accelerate visibly for most of the game).
 
-**Base cycle-length rework — IMPLEMENTED 2026-06-22 (moderate stretch, back half only).** Tiers
-**1–6 unchanged**; tiers **7–12 stretched** ~1.5×/tier to a **180s** top (Day Trading 24 ·
-Flipping 36 · MLM 54 · Hedge Fund 81 · Legislative 121 · Executive 180). **Income-neutral:** each
+**Base cycle-length rework — IMPLEMENTED 2026-06-22, stretched further 2026-06-25 (back half only).** Tiers
+**1–6 unchanged**; tiers **7–12 stretched** ~1.6×/tier to a **272s (~4.5 min)** top (Day Trading 26 ·
+Flipping 41 · MLM 66 · Hedge Fund 106 · Legislative 170 · Executive 272). (The 2026-06-22 first cut
+topped at 180s/~1.5×; on 2026-06-25 Tim pushed the top deeper into the roadmap's 3–5 min ceiling —
+the ratio rose to ~1.6×, concentrating the change at the top (tier 7 24→26, tier 12 180→272).)
+**Income-neutral:** each
 stretched tier's `base_income_per_unit` was scaled up by the same factor as its `base_cycle_length`,
 so base income/sec (= income_per_cycle / cycle_length) is unchanged — only the cadence changes
 (longer waits, bigger lump sums, more speed-up halvings before the 1s floor). The fix is purely in

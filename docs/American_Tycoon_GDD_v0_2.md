@@ -108,9 +108,12 @@ From the original `AmericanTycoon_PropertyTypeConfig.xlsx`, Sheet2. **Not one ru
 > the live build had flattened to a ~81s top with a badly tapering back half (top tiers only
 > ~1.2× longer than the one below). Playing on vacation, Tim wanted the back-tier "leave it,
 > come back to a fat pile" payoff back. **Shipped:** tiers **1–6 unchanged** (the tuned early
-> game), tiers **7–12 stretched** to a clean ~1.5×/tier curve topping out at **180s (~3 min)**:
-> Day Trading 24s · Flipping 36s · MLM 54s · Hedge Fund 81s · Legislative 121s · Executive
-> 180s. **Income-neutral:** each stretched tier's `base_income_per_unit` was scaled up by the
+> game), tiers **7–12 stretched** to a clean ~1.6×/tier curve topping out at **272s (~4.5 min)**:
+> Day Trading 26s · Flipping 41s · MLM 66s · Hedge Fund 106s · Legislative 170s · Executive
+> 272s. (**Second stretch, 2026-06-25:** Tim wanted the top pushed further into the roadmap's
+> stated 3–5 min ceiling, so the back-half ratio went from ~1.5× to ~1.6×/tier — tier 7 barely
+> moved (24→26), the change concentrates at the top (180→272s), for a fatter leave-it-and-return
+> payoff. Was 24/36/54/81/121/180s.) **Income-neutral:** each stretched tier's `base_income_per_unit` was scaled up by the
 > same factor as its cycle, so base income/sec is unchanged — only the *rhythm* changes (longer
 > waits → bigger lump-sum payouts, and more visible speed-up beats as the longer cycle halves
 > more times before the 1s floor). Milestones + staffing compress it the way AdCap's long top

@@ -386,7 +386,9 @@ func _build_property_tab() -> Control:
 	_buy_mode_button = Button.new()
 	_buy_mode_button.custom_minimum_size = Vector2(0, UiPalette.STANDARD_BUTTON_HEIGHT)
 	_buy_mode_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_buy_mode_button.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
+	# Larger + bold BUY MODE label (Tim, 2026-06-25): 30% over the old FONT_SMALL lands at FONT_BUTTON.
+	_buy_mode_button.add_theme_font_size_override("font_size", UiPalette.FONT_BUTTON)
+	_buy_mode_button.add_theme_font_override("font", UiPalette.make_bold_font())
 	UiPalette.style_button(_buy_mode_button, false)
 	_buy_mode_button.text = "BUY MODE: " + _buy_mode_caption(_buy_mode)
 	_buy_mode_button.pressed.connect(_on_buy_mode_toggled)

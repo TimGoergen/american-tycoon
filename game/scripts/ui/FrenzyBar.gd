@@ -50,7 +50,9 @@ func _ready() -> void:
 	_button.set_anchors_preset(Control.PRESET_FULL_RECT)
 	# Horizontally centered label (Tim, 2026-06-21).
 	_button.alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_button.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
+	# Larger + bold TURBO label (Tim, 2026-06-25): 30% over the old FONT_SMALL lands at FONT_BUTTON.
+	_button.add_theme_font_size_override("font_size", UiPalette.FONT_BUTTON)
+	_button.add_theme_font_override("font", UiPalette.make_bold_font())
 	_button.add_theme_stylebox_override("normal", label_padding)
 	_button.add_theme_stylebox_override("hover", label_padding)
 	_button.add_theme_stylebox_override("pressed", label_padding)

@@ -131,6 +131,17 @@ static func make_app_theme() -> Theme:
 	return theme
 
 
+## A faux-bold version of the app's default font, for the few labels that need to read heavier
+## without a dedicated bold font file (the project ships no bold face yet). FontVariation's
+## `variation_embolden` thickens the built-in font's strokes — Godot's "fake bold." Assign it with
+## add_theme_font_override("font", …); pair it with a font_size override for the size.
+static func make_bold_font() -> FontVariation:
+	var bold := FontVariation.new()
+	bold.base_font = ThemeDB.fallback_font  # the same built-in face every un-themed control uses
+	bold.variation_embolden = 0.5
+	return bold
+
+
 ## Cream plate with a navy border — the standard card/panel (§8).
 static func make_panel_style() -> StyleBoxFlat:
 	return _make_plate(CREAM, NAVY)

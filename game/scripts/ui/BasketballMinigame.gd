@@ -1,67 +1,94 @@
 class_name BasketballMinigame
 extends Minigame
 
-# "Micro Basketball" minigame TYPE (GDD §5.5) — a quick swipe-to-shoot game. A hoop drifts
-# around the play area while a few basketballs sit waiting to be thrown. The player presses a
-# ball, swipes, and releases to fling it; the ball arcs under gravity and scores a basket if it
-# passes through the moving hoop. Baskets only ever accumulate, so the host's spectrum bar
-# climbs as the player sinks shots (matching the other types). It has no natural end — the
-# host's countdown ends the round.
+# "Micro Basketball" minigame TYPE (GDD §5.5) — a quick slingshot-to-shoot game. A still hoop
+# sits on the board; a few basketballs rest on the floor. The player presses a ball, DRAGS it
+# back (away from where they want it to go), and releases — the ball is flung in the OPPOSITE
+# direction of the pull, with force proportional to how far it was dragged, like a slingshot.
+# The ball then flies purely under gravity, bouncing off the walls, ceiling, floor, and the hoop
+# itself (which is a solid obstacle — a ball hitting the rim or coming up from underneath bounces
+# off). A shot scores only when a falling ball drops in through the top of the hoop, exactly like
+# real basketball. Each made basket relocates the hoop to a fresh spot in the upper-middle band.
+# Baskets only ever accumulate, so the host's spectrum bar climbs as the player sinks shots. It
+# has no natural end — the host's countdown ends the round.
 #
 # Owns only its gameplay; the host owns the countdown / spectrum / result / multiplier.
 
 ## Baskets that map to performance 1.0. Tuned for a ~20s round: a skilled player can plausibly
 ## sink this many, while an average player lands mid-range. FEEL-TUNE: raise to make 1.0x
 ## harder to reach, lower to make it easier.
-const TARGET_BASKETS := 7
+const TARGET_BASKETS := 6
 
-## How many grabbable balls to keep on the board at once (plus any currently in flight).
-const MAX_BALLS := 3
+## The fixed pool of basketballs on the floor at once. Balls are never spawned or removed during
+## play — a thrown ball bounces, settles, and becomes throwable again; a scored ball is reset to
+## the floor — so exactly this many balls always exist.
+const BALL_COUNT := 3
 
-## Ball and hoop sizes in pixels — kept generous for thumb play and imperfect vision.
-const BALL_RADIUS := 40.0          # 80px diameter
-const HOOP_RADIUS := 60.0          # 120px diameter (the drawn image)
-## How close a flying ball's center must get to the hoop center to count as a basket. A bit
-## smaller than the hoop image so it reads as "through the rim", but forgiving for easy play.
-const BASKET_CATCH_RADIUS := 46.0
+## Ball size in pixels — kept generous for thumb play and imperfect vision.
+const BALL_RADIUS := 38.0          # 76px diameter
 
-## Downward acceleration on a thrown ball (px/sec^2) — gives the throw a visible arc.
-const GRAVITY := 900.0
-## Cap on throw speed (px/sec) so a frantic swipe can't fling a ball uselessly fast.
-const MAX_THROW_SPEED := 2200.0
-## A swipe slower than this (px/sec) on release just drops the ball back down — not a throw.
-const MIN_THROW_SPEED := 250.0
+## The hoop is drawn as a wide, short ellipse — the rim seen nearly from the FRONT (more head-on
+## than from above), so it reads as a real basketball hoop rather than a flat ring seen from
+## overhead. RX is the horizontal (wide) radius; RY the vertical (short) radius.
+const HOOP_RX := 82.0
+const HOOP_RY := 30.0
+## Half-width of the scoring "mouth" at the top of the rim. Narrower than HOOP_RX so the solid rim
+## ENDS (the posts) sit just outside the mouth — a near-miss clips a post and bounces (a rim-out),
+## while a clean drop through the gap scores.
+const RIM_HALF_WIDTH := HOOP_RX * 0.74
+## Radius of each solid rim "post" at the left/right ends of the ellipse — the parts of the hoop a
+## ball physically bounces off.
+const RIM_POST_RADIUS := 14.0
 
-## How the drifting hoop wanders: it eases toward a randomly re-rolled target point, like the
-## balance minigame's gold zone, so it glides smoothly instead of snapping.
-const HOOP_TARGET_CHANGE := 1.6    # seconds between new hoop-target re-rolls
-const HOOP_EASE := 1.2             # how fast the hoop eases toward its target (per second)
+## Downward acceleration on every airborne ball (px/sec^2) — gives the throw a heavy, arcing fall.
+const GRAVITY := 1200.0
+
+## The slingshot: the throw velocity is the pull vector (ball dragged away from its rest spot),
+## reversed, times PULL_POWER. The drag is capped at MAX_PULL so a huge yank can't overpower the
+## board; a drag shorter than MIN_PULL on release is not a throw (the ball just snaps back).
+const MAX_PULL := 300.0
+const MIN_PULL := 28.0
+const PULL_POWER := 8.5
+## Hard cap on the resulting throw speed (px/sec).
+const MAX_THROW_SPEED := 2550.0
+
+## Fraction of speed KEPT when a ball bounces off a surface (0 = dead stop, 1 = perfectly elastic).
+## Below 1 so bounces visibly lose energy and the ball eventually settles.
+const RESTITUTION := 0.62
+## Extra horizontal slowdown applied each time a ball lands on the floor, so it doesn't skate
+## along the ground forever after the bounce height dies out.
+const FLOOR_FRICTION := 0.80
+## Once an airborne ball is resting on the floor and moving slower than this (px/sec) in both
+## axes, it settles: it becomes a still, throwable ball again.
+const REST_SPEED := 70.0
+
+## Thickness (px) of the dark-gray outline that frames the board and defines the walls, floor,
+## and ceiling the balls bounce against.
+const WALL_THICKNESS := 6.0
 
 # Each ball is a Dictionary: { "pos": Vector2, "vel": Vector2, "state": String }.
-# state is one of "idle" (sitting, grabbable), "grabbed" (following the finger),
-# or "flight" (thrown, moving under gravity).
+# state is one of "idle" (resting on the floor, throwable), "aiming" (pulled back, following the
+# finger, not yet released), or "flight" (airborne under gravity).
 var _balls: Array = []
 var _baskets: int = 0
 var _running: bool = false
 var _rng := RandomNumberGenerator.new()
+var _started_balls: bool = false   # one-shot: lay the balls on the floor once the board has a size
+var _hoop_placed: bool = false     # one-shot: center the hoop once the board has a size
 
 var _hoop_pos: Vector2 = Vector2.ZERO
-var _hoop_target: Vector2 = Vector2.ZERO
-var _hoop_timer: float = 0.0
-var _hoop_flash: float = 0.0       # brief brighten of the hoop after a made basket, decays in _process
+var _hoop_flash: float = 0.0       # brief brighten of the rim after a made basket, decays in _process
 
-# The ball the player is currently dragging (an index into _balls, or -1 for none), plus the
-# samples used to estimate swipe velocity at the moment of release.
-var _grabbed_index: int = -1
-var _drag_velocity: Vector2 = Vector2.ZERO
-var _drag_last_pos: Vector2 = Vector2.ZERO
-var _drag_last_usec: int = 0
+# The ball the player is currently aiming (an index into _balls, or -1 for none) and the rest spot
+# it was pulled back from (the slingshot anchor it launches from on release).
+var _aim_index: int = -1
+var _aim_anchor: Vector2 = Vector2.ZERO
 
 var _play: Control
 
-# Drawn each frame; preloaded so the textures are ready the instant play begins.
+# Drawn each frame; preloaded so the texture is ready the instant play begins. The hoop is drawn
+# with plain shapes (an ellipse rim + a net), so only the ball needs a texture.
 const BALL_TEX := preload("res://art/icons/basketball.svg")
-const HOOP_TEX := preload("res://art/icons/basket_hoop.svg")
 
 
 func display_name() -> String:
@@ -73,12 +100,14 @@ func begin(tuning: TuningConfig) -> void:
 	_rng.randomize()
 	_running = true
 	_baskets = 0
+	_started_balls = false
+	_hoop_placed = false
 	# Round length is read (not hardcoded) so this type tracks whatever the host sets; only used
 	# here for the comment math — performance is baskets/target, which the host samples live.
 	var _round_seconds := maxf(0.1, tuning.minigame_duration_seconds)
 
 	var intro := Label.new()
-	intro.text = "Press a ball, swipe, and let go to shoot it through the hoop."
+	intro.text = "Press a ball, pull it back, and release to sling it through the top of the hoop!"
 	intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	intro.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
@@ -86,8 +115,8 @@ func begin(tuning: TuningConfig) -> void:
 
 	# A single full-size play Control holds the whole scene. Custom _draw (rather than moving
 	# TextureRects) is the more readable choice here: every ball and the hoop are positioned by
-	# plain math in one place, and the arcing flight + the hit test all read off the same Vector2
-	# positions, so there's no node bookkeeping to keep in sync.
+	# plain math in one place, and the arcing flight, the wall/hoop bounces, and the basket
+	# hit-test all read off the same Vector2 positions, so there's no node bookkeeping to sync.
 	_play = Control.new()
 	_play.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_play.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -119,75 +148,141 @@ func _process(delta: float) -> void:
 	if bounds.x <= 0.0 or bounds.y <= 0.0:
 		return
 
+	# The board's size isn't known until it's laid out, so the balls and the hoop are positioned
+	# here, the first frame the board has a real size, rather than in begin().
+	if not _hoop_placed:
+		_hoop_pos = Vector2(bounds.x * 0.5, bounds.y * 0.5)  # start in the middle
+		_hoop_placed = true
+	if not _started_balls:
+		_lay_balls_on_floor(bounds)
+		_started_balls = true
+
 	_hoop_flash = maxf(0.0, _hoop_flash - delta * 3.0)
-	_drift_hoop(delta, bounds)
 	_advance_balls(delta, bounds)
-	_refill_balls(bounds)
 	_play.queue_redraw()
 
 
-## Ease the hoop toward a randomly re-rolled target point, keeping the whole hoop on the board.
-func _drift_hoop(delta: float, bounds: Vector2) -> void:
-	if _hoop_target == Vector2.ZERO:
-		_hoop_pos = Vector2(bounds.x * 0.5, bounds.y * 0.35)
-		_hoop_target = _hoop_pos
-	_hoop_timer -= delta
-	if _hoop_timer <= 0.0:
-		# Keep the hoop in the upper ~60% of the board so balls (which spawn low) have room to
-		# arc up toward it, and so it never sits on top of the resting balls.
-		_hoop_target = Vector2(
-			_rng.randf_range(HOOP_RADIUS, bounds.x - HOOP_RADIUS),
-			_rng.randf_range(HOOP_RADIUS, bounds.y * 0.6)
-		)
-		_hoop_timer = HOOP_TARGET_CHANGE
-	_hoop_pos += (_hoop_target - _hoop_pos) * minf(1.0, HOOP_EASE * delta)
-
-
-## Move every in-flight ball under gravity, score baskets, and drop balls that leave the board.
-func _advance_balls(delta: float, bounds: Vector2) -> void:
-	var survivors: Array = []
-	for i in range(_balls.size()):
-		var ball: Dictionary = _balls[i]
-		if ball["state"] == "flight":
-			ball["vel"].y += GRAVITY * delta
-			ball["pos"] += ball["vel"] * delta
-			# Basket: a forgiving center-distance check against the moving hoop.
-			if ball["pos"].distance_to(_hoop_pos) <= BASKET_CATCH_RADIUS:
-				_baskets += 1
-				_hoop_flash = 1.0
-				continue  # remove the scored ball (do not add to survivors)
-			# Drop balls that have flown well off any edge; a margin keeps near-misses alive.
-			var margin := BALL_RADIUS * 3.0
-			if ball["pos"].x < -margin or ball["pos"].x > bounds.x + margin \
-					or ball["pos"].y > bounds.y + margin:
-				continue
-		survivors.append(ball)
-	_balls = survivors
-	# The grabbed ball may have been re-indexed by the rebuild; re-find it by state so the drag
-	# keeps tracking the right ball.
-	_grabbed_index = -1
-	for i in range(_balls.size()):
-		if _balls[i]["state"] == "grabbed":
-			_grabbed_index = i
-			break
-
-
-## Keep MAX_BALLS grabbable (idle or grabbed) balls on the board, spawning fresh ones low down.
-func _refill_balls(bounds: Vector2) -> void:
-	var grabbable := 0
-	for ball in _balls:
-		if ball["state"] != "flight":
-			grabbable += 1
-	while grabbable < MAX_BALLS:
+## Place the fixed pool of balls resting on the floor, evenly spread across the width.
+func _lay_balls_on_floor(bounds: Vector2) -> void:
+	_balls.clear()
+	var floor_y := bounds.y - WALL_THICKNESS - BALL_RADIUS
+	for i in range(BALL_COUNT):
+		# Spread the balls across the central span of the floor (avoiding the very corners).
+		var fraction := (float(i) + 1.0) / (float(BALL_COUNT) + 1.0)
+		var x := lerpf(bounds.x * 0.18, bounds.x * 0.82, fraction)
 		_balls.append({
-			"pos": Vector2(
-				_rng.randf_range(BALL_RADIUS, bounds.x - BALL_RADIUS),
-				_rng.randf_range(bounds.y * 0.72, bounds.y - BALL_RADIUS)
-			),
+			"pos": Vector2(x, floor_y),
 			"vel": Vector2.ZERO,
 			"state": "idle",
 		})
-		grabbable += 1
+
+
+## After a made basket, move the still hoop to a fresh spot: vertically somewhere between the
+## board's middle and halfway up to the top, horizontally anywhere that keeps the whole ellipse off
+## the walls.
+func _move_hoop(bounds: Vector2) -> void:
+	var margin_x := WALL_THICKNESS + HOOP_RX
+	_hoop_pos = Vector2(
+		_rng.randf_range(margin_x, bounds.x - margin_x),
+		_rng.randf_range(bounds.y * 0.25, bounds.y * 0.5)
+	)
+
+
+## Move every airborne ball under gravity, resolve hoop collisions / scoring, and bounce balls off
+## the board's walls.
+func _advance_balls(delta: float, bounds: Vector2) -> void:
+	var min_x := WALL_THICKNESS + BALL_RADIUS
+	var max_x := bounds.x - WALL_THICKNESS - BALL_RADIUS
+	var min_y := WALL_THICKNESS + BALL_RADIUS
+	var floor_y := bounds.y - WALL_THICKNESS - BALL_RADIUS
+
+	for ball in _balls:
+		if ball["state"] != "flight":
+			continue
+
+		var prev: Vector2 = ball["pos"]
+		ball["vel"].y += GRAVITY * delta
+		ball["pos"] += ball["vel"] * delta
+
+		# Resolve the hoop first (score or bounce). If it scored, the ball was reset to the floor
+		# and the hoop moved, so skip the rest of this ball's physics for the frame.
+		if _resolve_hoop(ball, prev, bounds):
+			continue
+
+		# Bounce off the side walls: clamp the center back inside and flip + dampen the horizontal
+		# velocity so the ball rebounds with a little less speed.
+		if ball["pos"].x < min_x:
+			ball["pos"].x = min_x
+			ball["vel"].x = absf(ball["vel"].x) * RESTITUTION
+		elif ball["pos"].x > max_x:
+			ball["pos"].x = max_x
+			ball["vel"].x = -absf(ball["vel"].x) * RESTITUTION
+
+		# Bounce off the ceiling.
+		if ball["pos"].y < min_y:
+			ball["pos"].y = min_y
+			ball["vel"].y = absf(ball["vel"].y) * RESTITUTION
+
+		# Bounce off the floor, with extra horizontal friction on each landing.
+		elif ball["pos"].y > floor_y:
+			ball["pos"].y = floor_y
+			ball["vel"].y = -absf(ball["vel"].y) * RESTITUTION
+			ball["vel"].x *= FLOOR_FRICTION
+			# Once the ball is barely moving along the floor, let it settle into a throwable rest
+			# instead of jittering with ever-tinier bounces.
+			if absf(ball["vel"].y) < REST_SPEED and absf(ball["vel"].x) < REST_SPEED:
+				ball["vel"] = Vector2.ZERO
+				ball["state"] = "idle"
+
+
+## Resolve a flight ball against the hoop. Returns true if it scored (the caller then skips the
+## rest of that ball's physics). The hoop is a SOLID obstacle: only a ball falling cleanly through
+## the top mouth scores; a ball rising up into the mouth from below is blocked, and a ball that
+## clips either rim post bounces off it.
+func _resolve_hoop(ball: Dictionary, prev: Vector2, bounds: Vector2) -> bool:
+	var rim_y := _hoop_pos.y
+	var within_mouth: bool = absf(ball["pos"].x - _hoop_pos.x) <= RIM_HALF_WIDTH
+
+	# Score: the ball is FALLING (vel.y > 0) and drops down across the rim plane within the mouth.
+	# Requiring downward motion is what makes a basket count only from the TOP.
+	if ball["vel"].y > 0.0 and prev.y <= rim_y and ball["pos"].y >= rim_y and within_mouth:
+		_baskets += 1
+		_hoop_flash = 1.0
+		_rest_ball(ball, bounds)
+		_move_hoop(bounds)
+		return true
+
+	# Blocked from below: the ball is RISING (vel.y < 0) up through the mouth — the basket's
+	# underside is solid, so push it back below the rim and bounce it downward.
+	if ball["vel"].y < 0.0 and prev.y >= rim_y and ball["pos"].y <= rim_y and within_mouth:
+		ball["pos"].y = rim_y + BALL_RADIUS
+		ball["vel"].y = absf(ball["vel"].y) * RESTITUTION
+
+	# Rim posts: the solid left/right ends of the ellipse. A ball overlapping a post is pushed out
+	# along the contact normal and its velocity reflected about that normal (a rim bounce).
+	for post in [_hoop_pos + Vector2(-HOOP_RX, 0.0), _hoop_pos + Vector2(HOOP_RX, 0.0)]:
+		var offset: Vector2 = ball["pos"] - post
+		var distance := offset.length()
+		var min_distance := BALL_RADIUS + RIM_POST_RADIUS
+		if distance < min_distance and distance > 0.01:
+			var normal := offset / distance
+			ball["pos"] = post + normal * min_distance
+			var into_post: float = ball["vel"].dot(normal)
+			if into_post < 0.0:  # only reflect if moving toward the post
+				ball["vel"] -= normal * into_post * (1.0 + RESTITUTION)
+	return false
+
+
+## Reset a ball to a still, throwable rest on the floor (used after it scores).
+func _rest_ball(ball: Dictionary, bounds: Vector2) -> void:
+	var min_x := WALL_THICKNESS + BALL_RADIUS
+	var max_x := bounds.x - WALL_THICKNESS - BALL_RADIUS
+	ball["pos"] = Vector2(
+		clampf(ball["pos"].x, min_x, max_x),
+		bounds.y - WALL_THICKNESS - BALL_RADIUS
+	)
+	ball["vel"] = Vector2.ZERO
+	ball["state"] = "idle"
 
 
 func _on_play_input(event: InputEvent) -> void:
@@ -197,17 +292,18 @@ func _on_play_input(event: InputEvent) -> void:
 	# button + motion covers both finger and mouse without separate touch handling.
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
-			_try_grab(event.position)
+			_begin_aim(event.position)
 		else:
-			_release_throw()
-	elif event is InputEventMouseMotion and _grabbed_index != -1:
-		_drag_to(event.position)
+			_release_sling()
+	elif event is InputEventMouseMotion and _aim_index != -1:
+		_drag_aim(event.position)
 
 
-## On press, grab the nearest idle ball within a generous radius of the touch point.
-func _try_grab(point: Vector2) -> void:
+## On press, grab the nearest resting ball within a generous radius and remember its rest spot as
+## the slingshot anchor.
+func _begin_aim(point: Vector2) -> void:
 	var best_index := -1
-	var best_distance := BALL_RADIUS * 1.4  # generous grab radius for thumb play
+	var best_distance := BALL_RADIUS * 1.6  # generous selection radius for thumb play
 	for i in range(_balls.size()):
 		if _balls[i]["state"] != "idle":
 			continue
@@ -219,54 +315,130 @@ func _try_grab(point: Vector2) -> void:
 			best_index = i
 	if best_index == -1:
 		return
-	_grabbed_index = best_index
-	_balls[best_index]["state"] = "grabbed"
-	_balls[best_index]["vel"] = Vector2.ZERO
-	# Start the swipe-velocity samples from this press.
-	_drag_velocity = Vector2.ZERO
-	_drag_last_pos = point
-	_drag_last_usec = Time.get_ticks_usec()
+	_aim_index = best_index
+	_aim_anchor = _balls[best_index]["pos"]
+	_balls[best_index]["state"] = "aiming"
 
 
-## While dragging, move the ball to the finger and keep a smoothed estimate of swipe velocity.
-func _drag_to(point: Vector2) -> void:
-	_balls[_grabbed_index]["pos"] = point
-	var now := Time.get_ticks_usec()
-	var dt := float(now - _drag_last_usec) / 1_000_000.0
-	if dt > 0.0:
-		var instant := (point - _drag_last_pos) / dt
-		# Smooth toward the latest sample so a single jittery frame doesn't define the throw.
-		_drag_velocity = _drag_velocity.lerp(instant, 0.5)
-	_drag_last_pos = point
-	_drag_last_usec = now
+## While dragging, move the ball to the finger to show the slingshot stretch — but cap how far it
+## can be pulled from its anchor, so the throw force is bounded.
+func _drag_aim(point: Vector2) -> void:
+	var pull := point - _aim_anchor
+	if pull.length() > MAX_PULL:
+		pull = pull.normalized() * MAX_PULL
+	_balls[_aim_index]["pos"] = _aim_anchor + pull
 
 
-## On release, fling the grabbed ball along the swipe — or, if the swipe was too gentle, just
-## let the ball fall (it becomes a flight ball with near-zero speed and drops off the board).
-func _release_throw() -> void:
-	if _grabbed_index == -1:
+## On release, sling the ball from its anchor in the direction OPPOSITE the pull, with speed
+## proportional to how far it was dragged. A pull shorter than MIN_PULL is not a throw — the ball
+## snaps back to its rest spot.
+func _release_sling() -> void:
+	if _aim_index == -1:
 		return
-	var ball: Dictionary = _balls[_grabbed_index]
-	var speed := _drag_velocity.length()
-	if speed < MIN_THROW_SPEED:
-		ball["vel"] = Vector2.ZERO
-	elif speed > MAX_THROW_SPEED:
-		ball["vel"] = _drag_velocity.normalized() * MAX_THROW_SPEED
+	var ball: Dictionary = _balls[_aim_index]
+	var pull: Vector2 = ball["pos"] - _aim_anchor
+	var pull_distance := pull.length()
+	# Always launch from the anchor (the ball "returns to the pocket" and shoots off), so it never
+	# starts mid-air at the pulled-back position.
+	ball["pos"] = _aim_anchor
+	if pull_distance < MIN_PULL:
+		ball["state"] = "idle"  # too small a pull — leave the ball resting
 	else:
-		ball["vel"] = _drag_velocity
-	ball["state"] = "flight"
-	_grabbed_index = -1
+		var throw := -pull * PULL_POWER  # opposite the drag, force ∝ drag distance
+		if throw.length() > MAX_THROW_SPEED:
+			throw = throw.normalized() * MAX_THROW_SPEED
+		ball["vel"] = throw
+		ball["state"] = "flight"
+	_aim_index = -1
 
 
-## Draw the hoop and every ball. The hoop is drawn first so a scoring ball passes in front of
-## the rim; the flash brightens the rim briefly when a basket is made.
+## Draw the board outline, the hoop (net + rim, split so a scoring ball passes through it), every
+## ball, and the slingshot aim guide while a ball is being pulled back.
 func _draw_play() -> void:
-	var hoop_rect := Rect2(_hoop_pos - Vector2(HOOP_RADIUS, HOOP_RADIUS), Vector2(HOOP_RADIUS * 2.0, HOOP_RADIUS * 2.0))
-	var hoop_tint := Color.WHITE.lerp(UiPalette.MUSTARD_GOLD, _hoop_flash)
-	_play.draw_texture_rect(HOOP_TEX, hoop_rect, false, hoop_tint)
+	var bounds := _play.size
+
+	# The hoop is drawn in layers so a falling ball reads as dropping THROUGH it: the net and the
+	# back (far) half of the rim go down first, then the balls, then the front (near) half of the
+	# rim on top. The flash brightens the rim briefly when a basket is made.
+	var rim_color := UiPalette.ORANGE.lerp(UiPalette.MUSTARD_GOLD, _hoop_flash)
+	_draw_net()
+	_draw_rim_half(rim_color, true)   # back half (top edge of the ellipse)
 
 	for ball in _balls:
-		# The grabbed ball draws a touch larger so the player can see what they're holding.
-		var radius := BALL_RADIUS * (1.12 if ball["state"] == "grabbed" else 1.0)
+		# The aimed ball draws a touch larger so the player can see which one they're slinging.
+		var radius := BALL_RADIUS * (1.12 if ball["state"] == "aiming" else 1.0)
 		var ball_rect := Rect2(ball["pos"] - Vector2(radius, radius), Vector2(radius * 2.0, radius * 2.0))
 		_play.draw_texture_rect(BALL_TEX, ball_rect, false)
+
+	_draw_rim_half(rim_color, false)  # front half (bottom edge of the ellipse), drawn over the ball
+
+	if _aim_index != -1:
+		_draw_aim_guide()
+
+	# The dark-gray frame that defines the walls, floor, and ceiling. Drawn last so it reads as a
+	# solid boundary in front of a ball pressed right up against it. Inset by half its thickness so
+	# the whole outline sits inside the board.
+	var frame := Rect2(
+		Vector2(WALL_THICKNESS * 0.5, WALL_THICKNESS * 0.5),
+		bounds - Vector2(WALL_THICKNESS, WALL_THICKNESS)
+	)
+	_play.draw_rect(frame, UiPalette.DARK_GRAY, false, WALL_THICKNESS)
+
+
+## Draw the slingshot feedback: a band from the anchor to the pulled-back ball, plus a gold guide
+## ray from the anchor in the direction the ball will fly (opposite the pull), its length growing
+## with the pull so the player can read the power before releasing.
+func _draw_aim_guide() -> void:
+	var ball_pos: Vector2 = _balls[_aim_index]["pos"]
+	var pull := ball_pos - _aim_anchor
+	# The stretched sling band.
+	_play.draw_line(_aim_anchor, ball_pos, Color(UiPalette.NAVY, 0.6), 4.0, true)
+	# A marker at the launch point.
+	_play.draw_circle(_aim_anchor, 6.0, Color(UiPalette.NAVY, 0.6))
+	# The aim ray, opposite the pull, scaled up so it clearly reads as the throw direction.
+	if pull.length() >= MIN_PULL:
+		var aim_end := _aim_anchor - pull * 1.5
+		_play.draw_line(_aim_anchor, aim_end, Color(UiPalette.MUSTARD_GOLD, 0.85), 3.0, true)
+
+
+## Draw half of the rim ellipse. top_half draws the far/top edge (sin < 0); otherwise the
+## near/bottom edge (sin > 0). Splitting the rim lets a scoring ball be drawn between the two
+## halves so it looks like it falls in front of the near rim and behind the far rim.
+func _draw_rim_half(color: Color, top_half: bool) -> void:
+	var steps := 28
+	var points := PackedVector2Array()
+	# Angles: PI..TAU is the top edge (y above center), 0..PI is the bottom edge (y below center).
+	var a_start := PI if top_half else 0.0
+	var a_end := TAU if top_half else PI
+	for i in range(steps + 1):
+		var a := lerpf(a_start, a_end, float(i) / float(steps))
+		points.append(_hoop_pos + Vector2(cos(a) * HOOP_RX, sin(a) * HOOP_RY))
+	_play.draw_polyline(points, color, 6.0, true)
+
+
+## Draw a simple hanging net below the rim: strands dropping from the rim ellipse to a smaller
+## ellipse beneath it, tied together by a couple of horizontal strands.
+func _draw_net() -> void:
+	var net_color := Color(UiPalette.CREAM, 0.85)
+	var depth := HOOP_RY + 56.0                 # how far the net hangs below the hoop center
+	var bottom_center := _hoop_pos + Vector2(0.0, depth)
+	var bottom_rx := HOOP_RX * 0.42             # the net pinches inward toward the bottom
+	var bottom_ry := HOOP_RY * 0.42
+
+	var strands := 8
+	for i in range(strands):
+		var a := lerpf(0.0, TAU, float(i) / float(strands))
+		var top := _hoop_pos + Vector2(cos(a) * HOOP_RX, sin(a) * HOOP_RY)
+		var bottom := bottom_center + Vector2(cos(a) * bottom_rx, sin(a) * bottom_ry)
+		_play.draw_line(top, bottom, net_color, 2.0, true)
+
+	# Two faint horizontal rings tie the strands together so the mesh reads as a net.
+	for ring in [0.45, 0.85]:
+		var ring_center := _hoop_pos.lerp(bottom_center, ring)
+		var ring_rx := lerpf(HOOP_RX, bottom_rx, ring)
+		var ring_ry := lerpf(HOOP_RY, bottom_ry, ring)
+		var ring_points := PackedVector2Array()
+		for i in range(17):
+			var a := lerpf(0.0, TAU, float(i) / 16.0)
+			ring_points.append(ring_center + Vector2(cos(a) * ring_rx, sin(a) * ring_ry))
+		_play.draw_polyline(ring_points, net_color, 2.0, true)

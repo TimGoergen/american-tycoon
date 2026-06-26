@@ -65,6 +65,14 @@ const HELD_RUSH_SATURATE := 1.4
 ## several times a second); easing toward that target instead of snapping to it
 ## makes a held rush read as smooth acceleration rather than a stutter of jumps.
 const RUSH_CATCHUP_TAU := 0.12
+
+## Once a property's EFFECTIVE cycle is shorter than this (seconds), the cycle bar stops
+## animating and is pinned solid-full, and its readout switches from "/cycle" to a steady
+## "/sec" rate. Past this speed the bar would refill several times a second — a meaningless
+## strobe at 60fps — so we instead show the property as a continuously-paying business
+## (genre-standard, Tim 2026-06-25). This is a pure presentation / legibility threshold,
+## NOT an economy value, so it lives here in the UI rather than in tuning.tres.
+const SOLID_BAR_THRESHOLD_SEC := 0.25
 ## Which cycle-bar fill look is currently applied, so we only rebuild the stylebox on a
 ## change, not every frame (the same approach FrenzyBar uses for its burn-color swap):
 ##   0 = normal green (idle/running, rush available)
@@ -347,8 +355,23 @@ func _refresh(delta: float) -> void:
 	# For an UNOWNED rung: the per-cycle value of a SINGLE unit, drawn dark gray (see
 	# _apply_ownership_styling), so the player can see what the next tier is worth before
 	# buying in (Tim 2026-06-17).
+	# Effective (sped-up) cycle length drives both the readout below and the bar fill
+	# further down. Once it drops below SOLID_BAR_THRESHOLD_SEC the property is paying so
+	# fast that the bar can't meaningfully animate, so we treat it as "humming": pin the
+	# bar solid (see further down) and quote a steady per-second rate instead of per-cycle.
+	var effective_length := _prop.get_effective_cycle_length()
+	var bar_is_solid := owned and _prop.is_cycle_running \
+		and effective_length > 0.0 and effective_length < SOLID_BAR_THRESHOLD_SEC
 	if owned:
-		_income_label.text = Money.of(_prop.get_income_per_cycle() * _frenzy.get_multiplier()).display() + "/cycle"
+		# get_income_per_cycle() already folds in the staffer and Family Fortune (Legacy)
+		# multipliers; frenzy is applied live on top, matching what the player receives.
+		var per_cycle := _prop.get_income_per_cycle() * _frenzy.get_multiplier()
+		if bar_is_solid:
+			# Derive the rate from the SAME per-cycle figure (not get_income_per_sec(),
+			# which omits legacy + frenzy) so "/sec" stays consistent with "/cycle".
+			_income_label.text = Money.of(per_cycle / effective_length).display() + "/sec"
+		else:
+			_income_label.text = Money.of(per_cycle).display() + "/cycle"
 	else:
 		_income_label.text = Money.of(_prop.get_single_unit_income_per_cycle()).display() + "/cycle"
 
@@ -357,9 +380,13 @@ func _refresh(delta: float) -> void:
 	# right once the Legacy "Efficiency Experts" upgrade shortens the real cycle — it just
 	# fills faster (Tim 2026-06-17). Measuring against the raw length capped the fill at
 	# 1 / cycle_speed_multiplier, so it stopped short of the right edge.
-	var effective_length := _prop.get_effective_cycle_length()
 	var true_fraction := _prop.cycle_progress / effective_length if effective_length > 0.0 else 0.0
-	if not _prop.is_cycle_running or _prop.units_owned == 0:
+	if bar_is_solid:
+		# Cycles faster than the eye/bar can follow — pin it full and skip the easing
+		# predictor entirely (see SOLID_BAR_THRESHOLD_SEC). The "/sec" readout above
+		# carries the information now; the bar just reads as "maxed and humming".
+		_displayed_cycle_fraction = 1.0
+	elif not _prop.is_cycle_running or _prop.units_owned == 0:
 		# Idle or empty: nothing is advancing, so just mirror the true value exactly.
 		_displayed_cycle_fraction = true_fraction
 	elif true_fraction < _last_true_cycle_fraction:

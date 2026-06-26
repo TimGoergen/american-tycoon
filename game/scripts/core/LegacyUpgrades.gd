@@ -105,8 +105,9 @@ func property_income_multiplier() -> float:
 
 ## Multiplier on cycle SPEED (Efficiency Experts). 1.0 = normal; 1.5 = cycles
 ## complete in 2/3 the time. PropertyState divides its cycle length by this.
-## Compounding per level, same rationale as property_income_multiplier (cycle_floor
-## in PropertyState still caps how short a cycle can actually get).
+## Compounding per level, same rationale as property_income_multiplier. Note: cycle_floor
+## only bounds the BASE cycle_length set by milestones; it does NOT cap the effective cycle
+## after dividing by this multiplier, so effective time-between-payouts can fall below 1s.
 func cycle_speed_multiplier() -> float:
 	var per_level := _per_level(LegacyUpgradeCatalog.EFFICIENCY)
 	var level := get_level(LegacyUpgradeCatalog.EFFICIENCY)

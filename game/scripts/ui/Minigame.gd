@@ -42,6 +42,13 @@ func is_busy() -> bool:
 func display_name() -> String:
 	return "Minigame"
 
+## Extra seconds this type adds on top of the host's standard round length
+## (tuning.minigame_duration_seconds). Most types add none; a type that needs more breathing
+## room than the shared default — e.g. the slingshot basketball — overrides this. The host reads
+## it once when the round starts and lengthens its countdown accordingly. Override in each type.
+func extra_seconds() -> float:
+	return 0.0
+
 ## A short line summarizing how the player DID this round (e.g. "Scored 1,240 points",
 ## "Caught 14 of 18"), shown on the host's result screen beneath the multiplier so the paused
 ## result clearly reflects the game just played. Default empty -> the host shows only the

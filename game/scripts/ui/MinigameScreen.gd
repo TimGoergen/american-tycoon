@@ -350,6 +350,8 @@ func start_game(
 	_active_minigame.outcome_bonus_max = _bonus_max
 	_play_area.add_child(_active_minigame)
 	_active_minigame.completed.connect(_on_minigame_completed)
+	# Most types run for the shared default; a type may ask for more time on top of it (basketball).
+	_seconds_left = _tuning.minigame_duration_seconds + maxf(0.0, _active_minigame.extra_seconds())
 	_active_minigame.begin(_tuning)
 
 	_play_view.visible = true

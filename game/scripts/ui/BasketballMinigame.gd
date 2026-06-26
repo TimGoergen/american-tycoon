@@ -95,6 +95,12 @@ func display_name() -> String:
 	return "Micro Basketball"
 
 
+## Slingshot aiming and bouncing shots take a beat longer to line up than the tap-based types, so
+## this round runs ~10s longer than the shared default (see Minigame.extra_seconds).
+func extra_seconds() -> float:
+	return 10.0
+
+
 func begin(tuning: TuningConfig) -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_rng.randomize()
@@ -417,9 +423,12 @@ func _draw_rim_half(color: Color, top_half: bool) -> void:
 
 
 ## Draw a simple hanging net below the rim: strands dropping from the rim ellipse to a smaller
-## ellipse beneath it, tied together by a couple of horizontal strands.
+## ellipse beneath it, tied together by a couple of horizontal rings. The net is white and gray —
+## the vertical strands alternate white / light-gray for a woven look, the tie rings a deeper gray.
 func _draw_net() -> void:
-	var net_color := Color(UiPalette.CREAM, 0.85)
+	var strand_white := Color.WHITE
+	var strand_gray := UiPalette.LIGHT_GRAY
+	var ring_gray := UiPalette.MID_GRAY
 	var depth := HOOP_RY + 56.0                 # how far the net hangs below the hoop center
 	var bottom_center := _hoop_pos + Vector2(0.0, depth)
 	var bottom_rx := HOOP_RX * 0.42             # the net pinches inward toward the bottom
@@ -430,9 +439,10 @@ func _draw_net() -> void:
 		var a := lerpf(0.0, TAU, float(i) / float(strands))
 		var top := _hoop_pos + Vector2(cos(a) * HOOP_RX, sin(a) * HOOP_RY)
 		var bottom := bottom_center + Vector2(cos(a) * bottom_rx, sin(a) * bottom_ry)
-		_play.draw_line(top, bottom, net_color, 2.0, true)
+		var strand_color := strand_white if i % 2 == 0 else strand_gray
+		_play.draw_line(top, bottom, strand_color, 2.0, true)
 
-	# Two faint horizontal rings tie the strands together so the mesh reads as a net.
+	# Two horizontal rings tie the strands together so the mesh reads as a net.
 	for ring in [0.45, 0.85]:
 		var ring_center := _hoop_pos.lerp(bottom_center, ring)
 		var ring_rx := lerpf(HOOP_RX, bottom_rx, ring)
@@ -441,4 +451,4 @@ func _draw_net() -> void:
 		for i in range(17):
 			var a := lerpf(0.0, TAU, float(i) / 16.0)
 			ring_points.append(ring_center + Vector2(cos(a) * ring_rx, sin(a) * ring_ry))
-		_play.draw_polyline(ring_points, net_color, 2.0, true)
+		_play.draw_polyline(ring_points, ring_gray, 2.0, true)

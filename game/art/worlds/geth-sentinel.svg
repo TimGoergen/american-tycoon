@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Geth-Sentinel Grid — home: Rannoch-01. Cybernetic & Mechano-Organics.
+     A ringed space station: navy hull ring, teal node lights, spokes to a glowing logic hub.
+     Same canvas/centre as earth.svg (circle at 104.7,145.6). -->
+<svg width="210mm" height="297mm" viewBox="0 0 210 297" version="1.1"
+     xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="gethCore" cx="104.7" cy="145.6" r="30" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#27406e"/>
+      <stop offset="1" stop-color="#0d1830"/>
+    </radialGradient>
+  </defs>
+
+  <g opacity="0.92">
+    <!-- spokes: one strut, rotated into six -->
+    <g fill="#1D2D50" stroke="#9FD8D4" stroke-width="0.8" stroke-opacity="0.7">
+      <rect x="101.7" y="67.6" width="6" height="48"/>
+      <rect x="101.7" y="67.6" width="6" height="48" transform="rotate(60,104.7,145.6)"/>
+      <rect x="101.7" y="67.6" width="6" height="48" transform="rotate(120,104.7,145.6)"/>
+      <rect x="101.7" y="67.6" width="6" height="48" transform="rotate(180,104.7,145.6)"/>
+      <rect x="101.7" y="67.6" width="6" height="48" transform="rotate(240,104.7,145.6)"/>
+      <rect x="101.7" y="67.6" width="6" height="48" transform="rotate(300,104.7,145.6)"/>
+    </g>
+
+    <!-- the hull ring -->
+    <circle cx="104.7" cy="145.6" r="86" fill="none" stroke="#1D2D50" stroke-width="16"/>
+    <circle cx="104.7" cy="145.6" r="93.5" fill="none" stroke="#9FD8D4" stroke-width="1.6" stroke-opacity="0.8"/>
+    <circle cx="104.7" cy="145.6" r="78.5" fill="none" stroke="#9FD8D4" stroke-width="1.6" stroke-opacity="0.8"/>
+
+    <!-- node lights around the ring: one dot, rotated into twelve -->
+    <g fill="#9FD8D4">
+      <circle cx="104.7" cy="59.6" r="3.2"/>
+      <circle cx="104.7" cy="59.6" r="3.2" transform="rotate(30,104.7,145.6)"/>
+      <circle cx="104.7" cy="59.6" r="3.2" transform="rotate(60,104.7,145.6)"/>
+      <circle cx="104.7" cy="59.6" r="3.2" transform="rotate(90,104.7,145.6)"/>
+      <circle cx="104.7" cy="59.6" r="3.2" transform="rotate(120,104.7,145.6)"/>
+      <circle cx="104.7" cy="59.6" r="3.2" transform="rotate(150,104.7,145.6)"/>
+      <circle cx="104.7" cy="59.6" r="3.2" transform="rotate(180,104.7,145.6)"/>
+      <circle cx="104.7" cy="59.6" r="3.2" transform="rotate(210,104.7,145.6)"/>
+      <circle cx="104.7" cy="59.6" r="3.2" transform="rotate(240,104.7,145.6)"/>
+      <circle cx="104.7" cy="59.6" r="3.2" transform="rotate(270,104.7,145.6)"/>
+      <circle cx="104.7" cy="59.6" r="3.2" transform="rotate(300,104.7,145.6)"/>
+      <circle cx="104.7" cy="59.6" r="3.2" transform="rotate(330,104.7,145.6)"/>
+    </g>
+
+    <!-- central logic hub -->
+    <circle cx="104.7" cy="145.6" r="30" fill="url(#gethCore)" stroke="#9FD8D4" stroke-width="1.6"/>
+    <!-- circuit traces on the hub -->
+    <g fill="none" stroke="#E3B23C" stroke-width="1.2" stroke-opacity="0.7">
+      <path d="M104.7,123 v-8 M104.7,168 v8 M82,145.6 h-8 M127,145.6 h8"/>
+    </g>
+    <circle cx="104.7" cy="145.6" r="12" fill="#9FD8D4" opacity="0.9"/>
+    <circle cx="104.7" cy="145.6" r="6"  fill="#1D2D50"/>
+    <circle cx="104.7" cy="145.6" r="2.4" fill="#E3B23C"/>
+  </g>
+</svg>

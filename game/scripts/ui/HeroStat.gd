@@ -47,6 +47,31 @@ const PANEL_MIN_HEIGHT := 171
 ## captions keep their exact positions even though the plate outline is now shorter.
 const LABEL_LAYOUT_HEIGHT := 190
 
+# Planet backdrop (Tim, 2026-06-26): a zoomed-in crop of the UPPER-LEFT section of the
+# current planet's world image sits behind the numbers, on a plain white plate. The world
+# SVGs have a transparent background (only the globe is painted), so the white plate shows
+# around the globe and the frenzy glow can still tint it. Drawn as a faint watermark so the
+# navy/green numerals stay readable on top.
+#
+# REGION_FRACTION picks how much of the source image's top-left we crop to (0.5 = exactly the
+# upper-left quadrant, i.e. the top-left quarter); a smaller value zooms in tighter. WATERMARK_ALPHA
+# fades the globe so it reads as a background, not a foreground graphic. Both are art-direction
+# knobs for Tim to eyeball — change them, not the layout code.
+const PLANET_REGION_FRACTION := 0.5
+const PLANET_WATERMARK_ALPHA := 0.6
+# Tier (1-based, EpochCatalog) -> world image. Index 0 is unused so the array is tier-aligned.
+const PLANET_IMAGE_PATHS := [
+	"",
+	"res://art/worlds/earth.svg",
+	"res://art/worlds/luminari.svg",
+	"res://art/worlds/geth-sentinel.svg",
+	"res://art/worlds/mycelium.svg",
+	"res://art/worlds/quartzite.svg",
+	"res://art/worlds/chronophage.svg",
+]
+var _planet_image: TextureRect
+var _shown_planet_tier := 0  # which tier's image is currently loaded (0 = none yet)
+
 # The brightness flash briefly lifts the whole panel toward white and eases back.
 # Multiplying modulate (rather than tinting the background) keeps the hue exactly
 # the same — it's a flash of light, not a color change — and stays out of the way
@@ -80,6 +105,9 @@ var _glow_time := 0.0
 
 func _ready() -> void:
 	var style := UiPalette.make_panel_style()
+	# Plain WHITE plate (Tim, 2026-06-26) so the planet watermark reads on a clean ground —
+	# replaces the former cream fill.
+	style.bg_color = Color.WHITE
 	style.border_color = UiPalette.KETCHUP_RED  # the red ticket frame (§8)
 	style.set_border_width_all(12)  # outline +300% (3 -> 12) at Tim's request (2026-06-23)
 	# Round the TOP corners to nest inside the phone's rounded screen corners (Tim,
@@ -88,6 +116,33 @@ func _ready() -> void:
 	style.corner_radius_top_right = UiPalette.SCREEN_CORNER_RADIUS
 	add_theme_stylebox_override("panel", style)
 	_panel_style = style  # kept so the frenzy glow can pulse its background
+
+	# Planet backdrop, BEHIND the labels. A PanelContainer sizes every child to the same
+	# interior rect, and draw order follows child order, so adding this mask before _content
+	# puts it behind the numbers. The mask is a rounded rectangle used purely as a stencil
+	# (clip_children ONLY draws its children where the mask is opaque, and never paints the
+	# mask itself), so the square planet image is clipped to the plate's rounded corners —
+	# the same trick Main uses for the prairie background. The corners are inset slightly from
+	# the plate's so the image tucks just inside the red frame.
+	var planet_mask := Panel.new()
+	var mask_style := StyleBoxFlat.new()
+	mask_style.bg_color = Color.WHITE  # only this shape's alpha matters — it is the stencil
+	mask_style.corner_radius_top_left = UiPalette.SCREEN_CORNER_RADIUS - 12
+	mask_style.corner_radius_top_right = UiPalette.SCREEN_CORNER_RADIUS - 12
+	mask_style.corner_radius_bottom_left = 4
+	mask_style.corner_radius_bottom_right = 4
+	planet_mask.add_theme_stylebox_override("panel", mask_style)
+	planet_mask.clip_children = CanvasItem.CLIP_CHILDREN_ONLY
+	planet_mask.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(planet_mask)
+
+	_planet_image = TextureRect.new()
+	_planet_image.set_anchors_preset(Control.PRESET_FULL_RECT)
+	# COVERED fills the wide plate with the cropped upper-left region, scaling it up (the zoom).
+	_planet_image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	_planet_image.modulate = Color(1, 1, 1, PLANET_WATERMARK_ALPHA)
+	_planet_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	planet_mask.add_child(_planet_image)
 
 	# Free-form layer the labels are pinned within. Its minimum height drives the
 	# whole panel's height (PanelContainer grows to fit it plus the stylebox margins).
@@ -153,6 +208,31 @@ func set_frenzy_glow(active: bool) -> void:
 	_frenzy_glow = active
 
 
+## Show the current planet's world image (1-based EpochCatalog tier). Main calls this every
+## frame; we only rebuild the cropped texture when the tier actually changes, so it is cheap.
+func set_planet_tier(tier: int) -> void:
+	if tier == _shown_planet_tier:
+		return
+	_shown_planet_tier = tier
+	if tier < 1 or tier >= PLANET_IMAGE_PATHS.size():
+		_planet_image.texture = null
+		return
+	var source: Texture2D = load(PLANET_IMAGE_PATHS[tier])
+	if source == null:
+		_planet_image.texture = null
+		return
+	# Crop to the image's UPPER-LEFT corner (an AtlasTexture is just "show this sub-rectangle
+	# of the source"); the TextureRect's COVERED stretch then scales that crop up to fill the
+	# plate, which is what "zoomed in" means here.
+	var region := AtlasTexture.new()
+	region.atlas = source
+	region.region = Rect2(
+		Vector2.ZERO,
+		source.get_size() * PLANET_REGION_FRACTION
+	)
+	_planet_image.texture = region
+
+
 ## Announce a purchase: a mild flash (a soft brightness pulse). No color change and
 ## no size change — the panel never resizes — see the class header.
 func flash_purchase() -> void:
@@ -169,15 +249,16 @@ func _process(delta: float) -> void:
 		_income_refresh_accumulator = 0.0
 		_income_label.text = Money.of(_pending_income_per_sec).display() + "/s"
 
-	# Frenzy glow: pulse the ticket background between cream and a soft red while
-	# a burn is active; snap back to plain cream the moment it ends.
+	# Frenzy glow: pulse the ticket background between white and a soft red while a burn is
+	# active; snap back to plain white the moment it ends. The glow shows through the planet
+	# watermark's transparent areas (the world art is a globe on a clear background).
 	if _frenzy_glow:
 		_glow_time += delta
 		var pulse := 0.5 + 0.5 * sin(_glow_time * TAU * GLOW_PULSE_HZ)
-		_panel_style.bg_color = UiPalette.CREAM.lerp(UiPalette.KETCHUP_RED, pulse * GLOW_MAX_TINT)
-	elif _panel_style.bg_color != UiPalette.CREAM:
+		_panel_style.bg_color = Color.WHITE.lerp(UiPalette.KETCHUP_RED, pulse * GLOW_MAX_TINT)
+	elif _panel_style.bg_color != Color.WHITE:
 		_glow_time = 0.0
-		_panel_style.bg_color = UiPalette.CREAM
+		_panel_style.bg_color = Color.WHITE
 
 
 ## Pin each label to its edge of the plate. Done every frame because the values'

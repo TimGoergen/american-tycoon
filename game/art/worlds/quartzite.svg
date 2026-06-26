@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Quartzite Conglomerate — home: Geode-7. Crystalloid & Silicon-Based.
+     A faceted crystal world: angular violet facets over a geode-bright core, with shards on the rim.
+     Same canvas/centre as earth.svg (circle at 104.7,145.6). -->
+
+<svg
+   width="210mm"
+   height="297mm"
+   viewBox="0 0 210 297"
+   version="1.1"
+   id="svg18"
+   sodipodi:docname="quartzite.svg"
+   inkscape:version="1.4.4 (dcaf3e7, 2026-05-05)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview18"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm"
+     inkscape:zoom="0.71891835"
+     inkscape:cx="396.42889"
+     inkscape:cy="561.25984"
+     inkscape:window-width="1920"
+     inkscape:window-height="1009"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="g18" />
+  <defs
+     id="defs3">
+    <radialGradient
+       id="quartz"
+       cx="104.7"
+       cy="145.6"
+       r="88"
+       gradientUnits="userSpaceOnUse">
+      <stop
+         offset="0"
+         stop-color="#d7c6ff"
+         id="stop1"
+         style="stop-color:#e6dcff;stop-opacity:1;" />
+      <stop
+         offset="0.55"
+         stop-color="#7a5cc8"
+         id="stop2" />
+      <stop
+         offset="1"
+         stop-color="#2e1d52"
+         id="stop3" />
+    </radialGradient>
+    <clipPath
+       id="quartzGlobe">
+      <circle
+         cx="104.7"
+         cy="145.6"
+         r="88"
+         id="circle3" />
+    </clipPath>
+  </defs>
+  <g
+     opacity="0.9"
+     id="g18">
+    <!-- shards jutting from the rim: one shard, rotated into five -->
+    <g
+       fill="#9a7ce0"
+       stroke="#d9c8ff"
+       stroke-width="0.8"
+       stroke-opacity="0.6"
+       id="g7">
+      <path
+         d="M104.7,40 L97.5,60 L111.9,60 Z"
+         id="path3" />
+      <path
+         d="M104.7,40 L97.5,60 L111.9,60 Z"
+         transform="rotate(72,104.7,145.6)"
+         id="path4" />
+      <path
+         d="M104.7,40 L97.5,60 L111.9,60 Z"
+         transform="rotate(144,104.7,145.6)"
+         id="path5" />
+      <path
+         d="M104.7,40 L97.5,60 L111.9,60 Z"
+         transform="rotate(216,104.7,145.6)"
+         id="path6" />
+      <path
+         d="M104.7,40 L97.5,60 L111.9,60 Z"
+         transform="rotate(288,104.7,145.6)"
+         id="path7" />
+    </g>
+    <!-- crystal body -->
+    <circle
+       cx="105.06803"
+       cy="144.86395"
+       r="88"
+       fill="url(#quartz)"
+       stroke="#d9c8ff"
+       stroke-width="1.8"
+       stroke-opacity="0.85"
+       id="circle7"
+       style="fill:url(#quartz)" />
+    <!-- faceting: a fan of triangles from centre to rim points (r=88), alternating tone -->
+    <g
+       clip-path="url(#quartzGlobe)"
+       stroke="#d9c8ff"
+       stroke-width="0.8"
+       stroke-opacity="0.5"
+       id="g17"
+       transform="translate(0.36802974)">
+      <path
+         d="m 104.7,145.6 v -88 l 51.7,16.8 z"
+         fill="#8f6fd6"
+         fill-opacity="0.5"
+         id="path8" />
+      <path
+         d="m 104.7,145.6 51.7,-71.2 32,44 z"
+         fill="#5a3aa0"
+         fill-opacity="0.5"
+         id="path9" />
+      <path
+         d="m 104.7,145.6 83.7,-27.2 v 54.4 z"
+         fill="#8f6fd6"
+         fill-opacity="0.5"
+         id="path10" />
+      <path
+         d="m 104.7,145.6 83.7,27.2 -32,44 z"
+         fill="#5a3aa0"
+         fill-opacity="0.5"
+         id="path11" />
+      <path
+         d="m 104.7,145.6 51.7,71.2 -51.7,16.8 z"
+         fill="#8f6fd6"
+         fill-opacity="0.5"
+         id="path12" />
+      <path
+         d="m 104.7,145.6 v 88 L 53,216.8 Z"
+         fill="#5a3aa0"
+         fill-opacity="0.5"
+         id="path13" />
+      <path
+         d="M 104.7,145.6 53,216.8 21,172.8 Z"
+         fill="#8f6fd6"
+         fill-opacity="0.5"
+         id="path14" />
+      <path
+         d="M 104.7,145.6 21,172.8 v -54.4 z"
+         fill="#5a3aa0"
+         fill-opacity="0.5"
+         id="path15" />
+      <path
+         d="M 104.7,145.6 21,118.4 53,74.4 Z"
+         fill="#8f6fd6"
+         fill-opacity="0.5"
+         id="path16" />
+      <path
+         d="M 104.7,145.6 53,74.4 104.7,57.6 Z"
+         fill="#5a3aa0"
+         fill-opacity="0.5"
+         id="path17" />
+    </g>
+    <!-- bright geode core -->
+    <circle
+       cx="104.7"
+       cy="145.6"
+       r="16"
+       fill="#f0e6ff"
+       opacity="0.85"
+       id="circle17" />
+    <circle
+       cx="104.7"
+       cy="145.6"
+       r="8"
+       fill="#ffffff"
+       opacity="0.8"
+       id="circle18"
+       style="opacity:1" />
+  </g>
+</svg>

@@ -26,6 +26,10 @@ const INCOME_DISPLAY_INTERVAL := 0.1
 var _income_display_timer := INCOME_DISPLAY_INTERVAL  # refresh on the very first frame
 
 var _hero_stat: HeroStat
+## The full-bleed play-field backdrop. Earth shows a prairie; it swaps to a space scene
+## after first contact and to a centered space scene after the tenth contact (see
+## _background_path_for_tier). Kept as a field so contact events can re-point its texture.
+var _background: TextureRect
 ## Small banner under the hero stat naming the civilization Earth is currently trading
 ## with (the reached epoch). Updates the moment a first contact advances the epoch.
 var _epoch_label: Label
@@ -139,6 +143,7 @@ func _process(delta: float) -> void:
 	# The heir name rides on the hero stat; the prestige-exit button and the Estate
 	# Office button (with its Legacy balance) reflect the live state.
 	_hero_stat.set_dynasty_name(HeirNames.dynasty_name(dynasty.generation))
+	_hero_stat.set_planet_tier(game.epoch.current_tier)
 	_update_epoch_label()
 	_update_plan_button()
 	_update_estate_badge()
@@ -247,14 +252,17 @@ func _build_ui() -> void:
 	bg_mask.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg_mask)
 
-	var background := TextureRect.new()
-	background.set_anchors_preset(Control.PRESET_FULL_RECT)
-	background.texture = load("res://art/backgrounds/prairie_background.png")
+	# Pick the backdrop for the epoch we are starting in: a fresh founder (or a heir after
+	# prestige) is on Earth and sees the prairie; a save loaded mid-run past first/tenth
+	# contact opens straight onto the matching space scene. _on_contact_made swaps it live.
+	_background = TextureRect.new()
+	_background.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_background.texture = load(_background_path_for_tier(game.epoch.current_tier))
 	# COVERED scales the square art to fill the tall play-field, cropping the overflow, so there
 	# are never empty bars — the landscape always reaches all four edges of the rounded frame.
-	background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bg_mask.add_child(background)
+	_background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	_background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bg_mask.add_child(_background)
 
 	# The viewing area: the shared rounded-rect frame (UiPalette) — inset from the screen edges by
 	# the bezel so black frames it, with the universal inner margin so no element crowds the
@@ -462,16 +470,46 @@ func _build_estate_tab() -> Control:
 
 ## Settings tab: player options. Today the prestige-minigame toggle and the dev panel
 ## entry; later, audio / haptics. (Was previously a deferred standalone screen.)
+##
+## Layout (Tim, 2026-06-26): the settings options live in a transparent, gray-outlined panel
+## held well clear of the screen edges; the two tuning buttons are pushed to the very bottom,
+## below that panel, sitting larger and bolder than the in-panel options.
 func _build_settings_tab() -> Control:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 16)
+
+	# The settings panel sits inside a margin that is wider than the tab's normal inset, so the
+	# transparent plate floats clear of the screen edges. A MarginContainer adds that gap; the
+	# PanelContainer inside it is the gray-outlined, see-through plate.
+	const SETTINGS_PANEL_EDGE_MARGIN := 40
+	var panel_margin := MarginContainer.new()
+	for side in ["margin_left", "margin_right", "margin_top"]:
+		panel_margin.add_theme_constant_override(side, SETTINGS_PANEL_EDGE_MARGIN)
+	v.add_child(panel_margin)
+
+	var settings_panel := PanelContainer.new()
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = Color.TRANSPARENT          # see-through plate
+	panel_style.border_color = UiPalette.MID_GRAY     # gray outline
+	panel_style.set_border_width_all(3)
+	panel_style.set_corner_radius_all(8)
+	panel_style.set_content_margin_all(24)            # keep the options clear of the outline
+	settings_panel.add_theme_stylebox_override("panel", panel_style)
+	panel_margin.add_child(settings_panel)
+
+	var panel_contents := VBoxContainer.new()
+	panel_contents.add_theme_constant_override("separation", 24)
+	settings_panel.add_child(panel_contents)
 
 	var heading := Label.new()
 	heading.text = "SETTINGS"
 	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	heading.add_theme_color_override("font_color", UiPalette.NAVY)
-	heading.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
-	v.add_child(heading)
+	# 40% larger than before (FONT_HEADLINE 52 -> 73) and bolder (Tim, 2026-06-26). The bold
+	# weight is faked with a FontVariation since the project ships no bold face yet.
+	heading.add_theme_font_size_override("font_size", int(UiPalette.FONT_HEADLINE * 1.4))
+	heading.add_theme_font_override("font", UiPalette.make_bold_font())
+	panel_contents.add_child(heading)
 
 	# Transition minigame toggle — the persistent home for the opt-out (GameState). Governs
 	# every site that rolls a minigame (prestige and welcome-back), not just prestige.
@@ -494,31 +532,40 @@ func _build_settings_tab() -> Control:
 	)
 	_minigame_check.button_pressed = game.ui_minigame_enabled
 	_minigame_check.toggled.connect(func(on: bool) -> void: game.ui_minigame_enabled = on)
-	v.add_child(_minigame_check)
+	panel_contents.add_child(_minigame_check)
+
+	# A spacer pushes the two tuning buttons to the very bottom of the tab, below the panel.
+	var spacer := Control.new()
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	v.add_child(spacer)
+
+	# Bottom-of-screen tuning buttons: 40% taller than the standard button, with a label
+	# large enough to fill that extra height (Tim, 2026-06-26).
+	var tuning_button_height := int(UiPalette.STANDARD_BUTTON_HEIGHT * 1.4)
+	const TUNING_BUTTON_FONT := 50
+	var bottom_buttons := VBoxContainer.new()
+	bottom_buttons.add_theme_constant_override("separation", 16)
+	v.add_child(bottom_buttons)
 
 	# Dev tools entry: the balance tuning panel (GDD §13). Moved here from the action row.
 	var dev_button := Button.new()
-	dev_button.custom_minimum_size = Vector2(0, UiPalette.STANDARD_BUTTON_HEIGHT)
-	# 40% above FONT_SMALL (26 -> 36) at Tim's request (2026-06-22).
-	dev_button.add_theme_font_size_override("font_size", int(UiPalette.FONT_SMALL * 1.4))
+	dev_button.custom_minimum_size = Vector2(0, tuning_button_height)
+	dev_button.add_theme_font_size_override("font_size", TUNING_BUTTON_FONT)
 	UiPalette.style_button(dev_button, false)
 	dev_button.text = "BALANCE TUNING"
 	dev_button.pressed.connect(_on_dev_pressed)
-	v.add_child(dev_button)
+	bottom_buttons.add_child(dev_button)
 
 	# Minigame review tool: opens the full-screen list of every minigame so they can each be
 	# played and reviewed on demand (GDD §5.5), independent of a real prestige.
 	var minigame_tuning_button := Button.new()
-	minigame_tuning_button.custom_minimum_size = Vector2(0, UiPalette.STANDARD_BUTTON_HEIGHT)
-	minigame_tuning_button.add_theme_font_size_override("font_size", int(UiPalette.FONT_SMALL * 1.4))
+	minigame_tuning_button.custom_minimum_size = Vector2(0, tuning_button_height)
+	minigame_tuning_button.add_theme_font_size_override("font_size", TUNING_BUTTON_FONT)
 	UiPalette.style_button(minigame_tuning_button, false)
 	minigame_tuning_button.text = "MINIGAME TUNING"
 	minigame_tuning_button.pressed.connect(_on_minigame_tuning_pressed)
-	v.add_child(minigame_tuning_button)
+	bottom_buttons.add_child(minigame_tuning_button)
 
-	var spacer := Control.new()
-	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	v.add_child(spacer)
 	return v
 
 
@@ -749,7 +796,30 @@ func _update_epoch_label() -> void:
 ## First contact: a new epoch was reached this tick. Show the beat (Main's _process
 ## guard freezes the economy while it is up).
 func _on_contact_made(new_tier: int) -> void:
+	# Swap the play-field backdrop to match the newly reached epoch before the beat plays,
+	# so when the first-contact overlay clears the player is looking at the new world.
+	_background.texture = load(_background_path_for_tier(new_tier))
 	_first_contact_overlay.show_contact(new_tier)
+
+
+# Backdrops keyed to how many alien contacts have been made (Tim, 2026-06-26). The epoch
+# tier is 1 on Earth, so the number of contacts made this run is (current_tier - 1):
+# Earth keeps the prairie; the first contact opens onto deep space; the tenth swaps to a
+# centered space composition. The space scenes cover every contact in between.
+const BACKGROUND_EARTH := "res://art/backgrounds/prairie_background.png"
+const BACKGROUND_SPACE := "res://art/backgrounds/space_background.png"
+const BACKGROUND_SPACE_CENTERED := "res://art/backgrounds/space_centered_background.png"
+
+
+## The backdrop image path for a given epoch tier. Used both to set the initial backdrop
+## on load and to swap it the moment a contact advances the epoch.
+func _background_path_for_tier(tier: int) -> String:
+	var contacts_made := tier - 1
+	if contacts_made >= 10:
+		return BACKGROUND_SPACE_CENTERED
+	if contacts_made >= 1:
+		return BACKGROUND_SPACE
+	return BACKGROUND_EARTH
 
 
 ## The Family Ledger is now a tab (UI Notes §7), refreshed on entry by _show_tab —

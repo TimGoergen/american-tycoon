@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
+  <!-- Green gem: a TEARDROP (pear) cut. Pointed top, round bottom — unmistakable shape. -->
+  <path d="M48 8 C58 30 80 40 80 60 A32 32 0 1 1 16 60 C16 40 38 30 48 8 Z"
+        fill="#7DA87B" stroke="#3F6B3D" stroke-width="6" stroke-linejoin="round"/>
+  <!-- Inner facet teardrop -->
+  <path d="M48 26 C54 40 66 46 66 60 A18 18 0 1 1 30 60 C30 46 42 40 48 26 Z"
+        fill="none" stroke="#5E8A5C" stroke-width="3" stroke-linejoin="round"/>
+  <!-- Lighter facet highlight -->
+  <ellipse cx="40" cy="54" rx="9" ry="13" fill="#A8C9A6" opacity="0.85"/>
+</svg>

@@ -98,6 +98,16 @@ static func make_screen_panel_style() -> StyleBoxFlat:
 	return style
 
 
+## A see-through version of the viewing-area plate: same rounded corners, thin black outline, and
+## universal inner margin as make_screen_panel_style, but with NO cream fill — used on the Main
+## screen so a full-bleed background image (the prairie) shows through behind the UI while the
+## crisp black frame and inner padding still read exactly as before.
+static func make_screen_frame_style() -> StyleBoxFlat:
+	var style := make_screen_panel_style()
+	style.bg_color = Color.TRANSPARENT
+	return style
+
+
 ## Inset `control` from its (full-screen) parent by the screen bezel, so the black parent shows
 ## through as the frame around it. Sets full-rect anchors first, then pulls each edge inward.
 static func apply_screen_bezel(control: Control) -> void:

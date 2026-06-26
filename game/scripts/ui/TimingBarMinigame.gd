@@ -13,7 +13,13 @@ extends Minigame
 # Owns only its gameplay; the host owns the countdown / spectrum / result / multiplier.
 
 ## How many successful locks make a full game (and the denominator for performance).
-const TARGET_LOCKS := 12
+## Tuned down from 12 to 10 for the shorter ~20s round: each lock now also pauses for a 0.5s
+## freeze-burst (which does NOT count against the countdown), so 10 keeps a full game feasible
+## inside ~20s of active play while still demanding a steady streak of good taps.
+const TARGET_LOCKS := 10
+## How long (seconds) each LOCK press freezes the marker/zone to show a hit-or-miss burst.
+## The freeze pauses the host countdown (see is_busy()), so it is never charged to the player.
+const FREEZE_TIME := 0.5
 ## Half-width of the gold "perfect" zone, as a fraction of the bar, at the START of the game.
 const ZONE_HALF := 0.12
 ## Smallest the zone's half-width shrinks to (reached at TARGET_LOCKS) — half the start width.
@@ -33,6 +39,13 @@ var _running: bool = false
 var _flash: float = 0.0       # brief cream highlight after a successful lock, decays in _process
 var _miss_flash: float = 0.0  # brief red highlight after a missed click, decays in _process
 var _zone_center: float = 0.5  # current center of the gold zone (bar fraction); jumps each lock
+## Freeze-burst state. While _freeze_left > 0 the marker and zone hold still, a hit/miss burst
+## is drawn, and is_busy() is true so the host pauses its countdown for the duration.
+var _freeze_left: float = 0.0
+var _freeze_success: bool = false  # true -> draw the white/gold "hit" burst; false -> gray "miss" burst
+## Set when the FINAL lock lands: we keep running through that lock's freeze so its success burst
+## is visible, then emit completed once the freeze ends (see _on_freeze_ended).
+var _finish_after_freeze: bool = false
 ## Pulsing white lines left where each click landed; each is {pos, age} and fades over
 ## CLICK_MARK_FADE seconds so the player can see exactly where their taps were perceived.
 var _click_marks: Array = []
@@ -100,7 +113,24 @@ func result_summary() -> String:
 	return "Locked %d of %d" % [_locks, TARGET_LOCKS]
 
 
+## True only during a freeze-burst; the host pauses its countdown so the 0.5s freeze (and its
+## animation) is not charged against the player's time.
+func is_busy() -> bool:
+	return _freeze_left > 0.0
+
+
 func _process(delta: float) -> void:
+	# While frozen: hold the marker and zone exactly where they are, only count the freeze down
+	# and redraw so the burst animates. We deliberately do NOT age _flash / _miss_flash / click
+	# marks here — they simply pause and resume their decay once the freeze ends, which keeps
+	# this branch dead simple.
+	if _freeze_left > 0.0:
+		_freeze_left = maxf(0.0, _freeze_left - delta)
+		if _bar != null:
+			_bar.queue_redraw()
+		if _freeze_left <= 0.0:
+			_on_freeze_ended()
+		return
 	if not _running:
 		return
 	_flash = maxf(0.0, _flash - delta * 4.0)
@@ -123,6 +153,13 @@ func _process(delta: float) -> void:
 func _on_lock() -> void:
 	if not _running:
 		return
+	# Ignore taps during the freeze, or they would reset it and re-score the held marker position
+	# (a double count). The player can only lock again once the bar has resumed sweeping.
+	if _freeze_left > 0.0:
+		return
+	# Every LOCK press freezes the bar for a beat so the player can read a hit/miss burst. The
+	# success flag (set below, once we know hit vs miss) chooses which burst _draw_bar shows.
+	_freeze_left = FREEZE_TIME
 	# Drop a fading white line wherever the marker was at the moment of the click — hit or miss —
 	# so the player gets clear feedback on exactly where their tap was perceived.
 	_click_marks.append({"pos": _marker_pos, "age": 0.0})
@@ -132,6 +169,7 @@ func _on_lock() -> void:
 		# Missed the zone: a misfire costs a lock (never below zero) and scores nothing.
 		_locks = maxi(0, _locks - 1)
 		_miss_flash = 1.0
+		_freeze_success = false  # draw the gray drop-shadow "miss" burst during the freeze
 		_update_locks_label()
 		return
 
@@ -141,13 +179,25 @@ func _on_lock() -> void:
 	_locks += 1
 	_marker_speed *= SPEED_RAMP
 	_flash = 1.0
+	_freeze_success = true  # draw the white-with-gold-glow "hit" burst during the freeze
 	_update_locks_label()
 	if _locks >= TARGET_LOCKS:
+		# Final lock: keep _running through the freeze so this success burst is visible, then
+		# emit completed once the freeze ends (in _on_freeze_ended). The zone does NOT jump.
+		_finish_after_freeze = true
+		return
+	# The zone holds where it was hit during the freeze, then jumps to a fresh spot once the
+	# freeze ends (in _on_freeze_ended), so the burst clearly lands on the gold it just caught.
+
+
+## Called once when a freeze finishes. Resolves whatever that lock set up: end the round on the
+## final lock, or jump the zone after a non-final hit. (A miss leaves the zone where it is.)
+func _on_freeze_ended() -> void:
+	if _finish_after_freeze:
 		_running = false
 		completed.emit(get_performance())
-		return
-	# Jump the zone to a fresh spot for the next lock (using the now-shrunken width).
-	_move_zone()
+	elif _freeze_success:
+		_move_zone()
 
 
 ## The zone's current half-width: starts at ZONE_HALF and shrinks linearly to ZONE_HALF_MIN
@@ -189,8 +239,21 @@ func _draw_bar() -> void:
 		var line_color := Color(1.0, 1.0, 1.0, life * pulse)
 		var cx := float(mark["pos"]) * w
 		_bar.draw_rect(Rect2(cx - 2.0, 0, 4.0, h), line_color)
-	# Marker (a thick vertical bar): cream, briefly brightened after a hit or reddened on a miss.
-	var marker_color := UiPalette.CREAM.lightened(_flash * 0.6).lerp(UiPalette.KETCHUP_RED, _miss_flash)
 	var mx := _marker_pos * w
-	_bar.draw_rect(Rect2(mx - 5.0, 0, 10.0, h), marker_color)
+	if _freeze_left > 0.0:
+		# Frozen burst: a noticeably THICKER marker line, drawn instead of the normal one.
+		if _freeze_success:
+			# Hit: a white core wrapped in a layered gold glow — two wider, low-alpha gold
+			# rectangles behind the solid white line so the glow fades outward from the core.
+			_bar.draw_rect(Rect2(mx - 22.0, 0, 44.0, h), Color(UiPalette.MUSTARD_GOLD, 0.18))
+			_bar.draw_rect(Rect2(mx - 13.0, 0, 26.0, h), Color(UiPalette.MUSTARD_GOLD, 0.40))
+			_bar.draw_rect(Rect2(mx - 8.0, 0, 16.0, h), Color.WHITE)
+		else:
+			# Miss: a gray core with a wider near-black low-alpha rect behind it for a drop shadow.
+			_bar.draw_rect(Rect2(mx - 16.0, 0, 32.0, h), Color(0.0, 0.0, 0.0, 0.45))
+			_bar.draw_rect(Rect2(mx - 8.0, 0, 16.0, h), Color(0.55, 0.55, 0.55, 1.0))
+	else:
+		# Normal marker (a thick vertical bar): cream, briefly brightened after a hit or reddened on a miss.
+		var marker_color := UiPalette.CREAM.lightened(_flash * 0.6).lerp(UiPalette.KETCHUP_RED, _miss_flash)
+		_bar.draw_rect(Rect2(mx - 5.0, 0, 10.0, h), marker_color)
 	_bar.draw_rect(Rect2(0, 0, w, h), UiPalette.NAVY, false, 3.0)

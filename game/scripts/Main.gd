@@ -219,20 +219,47 @@ func _build_ui() -> void:
 	theme = UiPalette.make_app_theme()
 
 	# Outermost: solid black fills the whole physical screen, framing the game as a rounded
-	# "viewing area" (Tim, 2026-06-22). The cream play-field is a rounded-corner panel inset
-	# from the edges (SCREEN_BEZEL_*), so the black showing around it reads as a defining
-	# border that follows the phone's rounded screen shape.
+	# "viewing area" (Tim, 2026-06-22). The play-field is a rounded-corner area inset from the
+	# edges (SCREEN_BEZEL_*), so the black showing around it reads as a defining border that
+	# follows the phone's rounded screen shape.
 	var black_field := ColorRect.new()
 	black_field.color = Color.BLACK
 	black_field.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(black_field)
 
-	# The cream viewing area: the shared rounded-rect frame (UiPalette) — inset from the screen
-	# edges by the bezel so black frames it, with the universal inner margin so no element
-	# crowds the border. The full-screen overlays use the same helper, so all framing matches.
+	# The play-field background: a full-bleed prairie scene behind all the UI (Tim, 2026-06-25),
+	# occupying the same inset rect as the viewing area. It must show the SAME rounded corners as
+	# the frame so it nests inside the phone's screen curve. We get that rounding without a shader
+	# by using Godot's clip_children: the parent `bg_mask` draws a rounded rectangle that is used
+	# purely as a stencil (CLIP_CHILDREN_ONLY draws the children only where the parent is opaque,
+	# and does not paint the parent itself), so the square image is clipped to rounded corners.
+	var bg_mask := Panel.new()
+	UiPalette.apply_screen_bezel(bg_mask)
+	var mask_style := StyleBoxFlat.new()
+	mask_style.bg_color = Color.WHITE  # color is irrelevant — only this shape's alpha is the mask
+	mask_style.set_corner_radius_all(UiPalette.SCREEN_CORNER_RADIUS)
+	bg_mask.add_theme_stylebox_override("panel", mask_style)
+	bg_mask.clip_children = CanvasItem.CLIP_CHILDREN_ONLY
+	bg_mask.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(bg_mask)
+
+	var background := TextureRect.new()
+	background.set_anchors_preset(Control.PRESET_FULL_RECT)
+	background.texture = load("res://art/backgrounds/prairie_background.png")
+	# COVERED scales the square art to fill the tall play-field, cropping the overflow, so there
+	# are never empty bars — the landscape always reaches all four edges of the rounded frame.
+	background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bg_mask.add_child(background)
+
+	# The viewing area: the shared rounded-rect frame (UiPalette) — inset from the screen edges by
+	# the bezel so black frames it, with the universal inner margin so no element crowds the
+	# border. Its fill is now TRANSPARENT (make_screen_frame_style) so the prairie behind it shows
+	# through; the crisp black outline and inner padding are unchanged. The full-screen overlays
+	# still use the cream make_screen_panel_style, so their framing matches.
 	var viewing_area := PanelContainer.new()
 	UiPalette.apply_screen_bezel(viewing_area)
-	viewing_area.add_theme_stylebox_override("panel", UiPalette.make_screen_panel_style())
+	viewing_area.add_theme_stylebox_override("panel", UiPalette.make_screen_frame_style())
 	add_child(viewing_area)
 
 	var column := VBoxContainer.new()

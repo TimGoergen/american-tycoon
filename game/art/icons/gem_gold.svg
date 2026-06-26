@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
+  <!-- Gold gem: a DIAMOND (rotated square) cut. Sharp four-point silhouette. -->
+  <polygon points="48,10 86,48 48,86 10,48" fill="#E3B23C" stroke="#9A7414" stroke-width="6" stroke-linejoin="round"/>
+  <!-- Inner facet lines from center -->
+  <polygon points="48,28 68,48 48,68 28,48" fill="none" stroke="#C5921F" stroke-width="3" stroke-linejoin="round"/>
+  <!-- Lighter facet highlight (upper-left face) -->
+  <polygon points="48,16 64,32 48,48 32,32" fill="#F2D488" opacity="0.85"/>
+</svg>

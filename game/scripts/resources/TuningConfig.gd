@@ -130,8 +130,9 @@ extends Resource
 ## full_score and this, the multiplier scales linearly from 1.0 into the bonus.
 @export var minigame_extra_score: float = 200.0  # feel-tune
 
-## How long one minigame round lasts, in seconds.
-@export var minigame_duration_seconds: float = 30.0  # feel-tune
+## How long one minigame round lasts, in seconds. Every type is tuned to a ~20s round
+## (Tim, 2026-06-25) — scoring targets in each minigame assume this length.
+@export var minigame_duration_seconds: float = 20.0  # feel-tune
 
 # --- Events (Spec §10) ---
 

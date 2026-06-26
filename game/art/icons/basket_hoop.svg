@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">
+  <!-- Basketball hoop seen face-on: a bold red-orange rim ring with the open center as the
+       target, and a short suggested net hanging below. The opening is left transparent so a
+       ball drawn behind it reads as "going through". -->
+  <!-- Backboard hint: a faint pale panel behind the rim. -->
+  <rect x="26" y="8" width="68" height="44" rx="4" fill="#F4ECD8" opacity="0.35"/>
+  <!-- The rim: a thick ring. The hollow center is the basket the player aims for. -->
+  <circle cx="60" cy="52" r="40" fill="none" stroke="#B5402A" stroke-width="9"/>
+  <circle cx="60" cy="52" r="40" fill="none" stroke="#D9702B" stroke-width="3"/>
+  <!-- Suggested net: a few strands fanning down from the rim. -->
+  <g fill="none" stroke="#F4ECD8" stroke-width="2.5" opacity="0.85">
+    <path d="M24 56 L 40 96"/>
+    <path d="M40 58 L 50 100"/>
+    <path d="M60 60 L 60 102"/>
+    <path d="M80 58 L 70 100"/>
+    <path d="M96 56 L 80 96"/>
+    <path d="M34 76 L 86 76"/>
+    <path d="M40 90 L 80 90"/>
+  </g>
+</svg>

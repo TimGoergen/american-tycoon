@@ -32,6 +32,7 @@ const MINIGAME_TYPES := [
 	preload("res://scripts/ui/CatchMoneyMinigame.gd"),
 	preload("res://scripts/ui/MemoryMinigame.gd"),
 	preload("res://scripts/ui/BalanceMinigame.gd"),
+	preload("res://scripts/ui/BasketballMinigame.gd"),
 ]
 
 ## The default purpose blurb shown in the play view's top section outside review mode. Each
@@ -443,12 +444,12 @@ func _draw_keep_bar() -> void:
 	var span := maxf(0.0001, (1.0 + _bonus_max) - floor_mult)
 	var mult := _multiplier_for_performance(_current_performance())
 	var fill_frac := clampf((mult - floor_mult) / span, 0.0, 1.0)
-	var full_x := ((1.0 - floor_mult) / span) * w
 
 	_keep_bar.draw_rect(Rect2(0, 0, w, h), UiPalette.INK_NAVY)
 	_keep_bar.draw_rect(Rect2(0, 0, fill_frac * w, h), _keep_color(mult))
-	# The "full inheritance" line — left of it you're losing Legacy, right of it is bonus.
-	_keep_bar.draw_rect(Rect2(full_x - 2.0, 0, 4.0, h), UiPalette.CREAM)
+	# No "full" divider line (Tim, 2026-06-25): the deliberate warm→green color jump at exactly
+	# 100% already marks where you stop losing Legacy and start banking bonus, so the line is
+	# redundant. The color change alone carries the meaning.
 	_keep_bar.draw_rect(Rect2(0, 0, w, h), UiPalette.NAVY, false, 2.0)
 
 

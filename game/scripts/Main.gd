@@ -807,8 +807,8 @@ func _on_contact_made(new_tier: int) -> void:
 # Earth keeps the prairie; the first contact opens onto deep space; the tenth swaps to a
 # centered space composition. The space scenes cover every contact in between.
 const BACKGROUND_EARTH := "res://art/backgrounds/prairie_background.png"
-const BACKGROUND_SPACE := "res://art/backgrounds/space_background.png"
-const BACKGROUND_SPACE_CENTERED := "res://art/backgrounds/space_centered_background.png"
+const BACKGROUND_SPACE := "res://art/backgrounds/space_background.jpg"
+const BACKGROUND_SPACE_CENTERED := "res://art/backgrounds/space_centered_background.jpg"
 
 
 ## The backdrop image path for a given epoch tier. Used both to set the initial backdrop

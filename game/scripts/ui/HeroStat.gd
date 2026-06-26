@@ -47,18 +47,32 @@ const PANEL_MIN_HEIGHT := 171
 ## captions keep their exact positions even though the plate outline is now shorter.
 const LABEL_LAYOUT_HEIGHT := 190
 
-# Planet backdrop (Tim, 2026-06-26): a zoomed-in crop of the UPPER-LEFT section of the
-# current planet's world image sits behind the numbers, on a plain white plate. The world
-# SVGs have a transparent background (only the globe is painted), so the white plate shows
-# around the globe and the frenzy glow can still tint it. Drawn as a faint watermark so the
-# navy/green numerals stay readable on top.
+# Planet backdrop (Tim, 2026-06-26): the current planet's world image sits behind the numbers
+# on a plain white plate, shown mostly whole and centred (zoomed out enough to read as a globe,
+# not a close-up of one spot). The world SVGs have a transparent background (only the globe is
+# painted), so the white plate shows around the globe and the frenzy glow can still tint it.
+# Drawn as a faint watermark so the navy/green numerals stay readable on top.
 #
-# REGION_FRACTION picks how much of the source image's top-left we crop to (0.5 = exactly the
-# upper-left quadrant, i.e. the top-left quarter); a smaller value zooms in tighter. WATERMARK_ALPHA
-# fades the globe so it reads as a background, not a foreground graphic. Both are art-direction
-# knobs for Tim to eyeball — change them, not the layout code.
-const PLANET_REGION_FRACTION := 0.5
+# We BAKE the watermark into a fresh ImageTexture in code rather than letting a TextureRect crop
+# and clip it. Two reasons, both learned the hard way (2026-06-26):
+#   1. The world art is an imported SVG. Assigning that imported texture (or an AtlasTexture over
+#      it) to a TextureRect draws nothing on the GPU here, even though the pixels are valid — so
+#      we read them with get_image() and rebuild the texture, which draws reliably.
+#   2. Godot's clip_children (the rounded-corner stencil trick Main uses for its backdrop) does
+#      not work when a SECOND clip_children group exists elsewhere in the tree (Main already has
+#      one). So we round the corners by writing transparency into the image's own alpha instead.
+#
+# FILL_FRACTION is how much of the plate the globe fills once scaled to fit (1.0 = as large as
+# fits with the whole globe still visible; smaller leaves a margin). WATERMARK_ALPHA fades the
+# globe so it reads as a background, not a foreground graphic. Both are art-direction knobs for
+# Tim to eyeball — change them, not the layout code.
+const PLANET_FILL_FRACTION := 1.0
 const PLANET_WATERMARK_ALPHA := 0.6
+# Corner rounding baked into the watermark, in pixels. Matches the white plate's own corners as
+# seen at the content rect: the plate rounds its TOP corners by SCREEN_CORNER_RADIUS and its
+# bottom corners only slightly, and the content sits ~12px (the border) inside that.
+const PLANET_CORNER_RADIUS_TOP := UiPalette.SCREEN_CORNER_RADIUS - 12
+const PLANET_CORNER_RADIUS_BOTTOM := 4
 # Tier (1-based, EpochCatalog) -> world image. Index 0 is unused so the array is tier-aligned.
 const PLANET_IMAGE_PATHS := [
 	"",
@@ -71,6 +85,7 @@ const PLANET_IMAGE_PATHS := [
 ]
 var _planet_image: TextureRect
 var _shown_planet_tier := 0  # which tier's image is currently loaded (0 = none yet)
+var _baked_planet_size := Vector2i.ZERO  # plate size the current watermark was baked for
 
 # The brightness flash briefly lifts the whole panel toward white and eases back.
 # Multiplying modulate (rather than tinting the background) keeps the hue exactly
@@ -117,32 +132,19 @@ func _ready() -> void:
 	add_theme_stylebox_override("panel", style)
 	_panel_style = style  # kept so the frenzy glow can pulse its background
 
-	# Planet backdrop, BEHIND the labels. A PanelContainer sizes every child to the same
-	# interior rect, and draw order follows child order, so adding this mask before _content
-	# puts it behind the numbers. The mask is a rounded rectangle used purely as a stencil
-	# (clip_children ONLY draws its children where the mask is opaque, and never paints the
-	# mask itself), so the square planet image is clipped to the plate's rounded corners —
-	# the same trick Main uses for the prairie background. The corners are inset slightly from
-	# the plate's so the image tucks just inside the red frame.
-	var planet_mask := Panel.new()
-	var mask_style := StyleBoxFlat.new()
-	mask_style.bg_color = Color.WHITE  # only this shape's alpha matters — it is the stencil
-	mask_style.corner_radius_top_left = UiPalette.SCREEN_CORNER_RADIUS - 12
-	mask_style.corner_radius_top_right = UiPalette.SCREEN_CORNER_RADIUS - 12
-	mask_style.corner_radius_bottom_left = 4
-	mask_style.corner_radius_bottom_right = 4
-	planet_mask.add_theme_stylebox_override("panel", mask_style)
-	planet_mask.clip_children = CanvasItem.CLIP_CHILDREN_ONLY
-	planet_mask.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(planet_mask)
-
+	# Planet backdrop, BEHIND the labels. The PanelContainer draws its own white plate first, then
+	# its children in order, so adding this image before _content puts the watermark between the
+	# plate and the numbers. The container sizes this child to the plate's interior rect; we bake
+	# a texture to exactly that size (see _refresh_planet_watermark), so STRETCH_SCALE fills it
+	# 1:1 with the cropping and rounded corners already baked in. EXPAND_IGNORE_SIZE keeps the
+	# huge source image from inflating the panel's minimum size.
 	_planet_image = TextureRect.new()
 	_planet_image.set_anchors_preset(Control.PRESET_FULL_RECT)
-	# COVERED fills the wide plate with the cropped upper-left region, scaling it up (the zoom).
-	_planet_image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	_planet_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_planet_image.stretch_mode = TextureRect.STRETCH_SCALE
 	_planet_image.modulate = Color(1, 1, 1, PLANET_WATERMARK_ALPHA)
 	_planet_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	planet_mask.add_child(_planet_image)
+	add_child(_planet_image)
 
 	# Free-form layer the labels are pinned within. Its minimum height drives the
 	# whole panel's height (PanelContainer grows to fit it plus the stylebox margins).
@@ -209,11 +211,27 @@ func set_frenzy_glow(active: bool) -> void:
 
 
 ## Show the current planet's world image (1-based EpochCatalog tier). Main calls this every
-## frame; we only rebuild the cropped texture when the tier actually changes, so it is cheap.
+## frame; the watermark is only re-baked when the tier (or the plate size) actually changes,
+## so the cost falls only on a first contact, not every frame.
 func set_planet_tier(tier: int) -> void:
-	if tier == _shown_planet_tier:
-		return
-	_shown_planet_tier = tier
+	if tier != _shown_planet_tier:
+		_shown_planet_tier = tier
+		_baked_planet_size = Vector2i.ZERO  # tier changed -> force a re-bake on the next refresh
+	_refresh_planet_watermark()
+
+
+## Build (or rebuild) the baked watermark texture if the tier or the plate size has changed.
+## Called from set_planet_tier and from _process, since the plate's real size is not known until
+## the container has laid this control out (the very first call usually has a zero size).
+func _refresh_planet_watermark() -> void:
+	var plate_size := Vector2i(_planet_image.size)
+	if plate_size.x <= 0 or plate_size.y <= 0:
+		return  # not laid out yet — try again next frame
+	if plate_size == _baked_planet_size:
+		return  # already baked for this tier and size
+	_baked_planet_size = plate_size
+
+	var tier := _shown_planet_tier
 	if tier < 1 or tier >= PLANET_IMAGE_PATHS.size():
 		_planet_image.texture = null
 		return
@@ -221,16 +239,70 @@ func set_planet_tier(tier: int) -> void:
 	if source == null:
 		_planet_image.texture = null
 		return
-	# Crop to the image's UPPER-LEFT corner (an AtlasTexture is just "show this sub-rectangle
-	# of the source"); the TextureRect's COVERED stretch then scales that crop up to fill the
-	# plate, which is what "zoomed in" means here.
-	var region := AtlasTexture.new()
-	region.atlas = source
-	region.region = Rect2(
-		Vector2.ZERO,
-		source.get_size() * PLANET_REGION_FRACTION
+	_planet_image.texture = _bake_planet_watermark(source.get_image(), plate_size)
+
+
+## Turn a world image into the plate-sized, rounded, zoomed watermark texture. Done on the CPU
+## (see the class header for why we copy pixels instead of using the imported texture directly).
+func _bake_planet_watermark(full_image: Image, plate_size: Vector2i) -> ImageTexture:
+	# 1. Frame the globe itself: crop away the SVG's transparent padding so we work with just the
+	# painted planet. get_used_rect() is the bounding box of the non-transparent pixels (the memory
+	# note on texture sizing: always use it, the canvas carries varying transparent padding).
+	var globe := full_image.get_region(full_image.get_used_rect())
+
+	# 2. Scale the WHOLE globe to fit inside the plate (contain, preserving aspect) so most/all of
+	# it stays visible rather than zooming into one spot. The plate is far wider than it is tall,
+	# so this fits the globe to the height and centres it, leaving the sides clear.
+	var fit_scale := minf(
+		float(plate_size.x) / globe.get_width(),
+		float(plate_size.y) / globe.get_height()
+	) * PLANET_FILL_FRACTION
+	var globe_size := Vector2i(
+		maxi(1, int(globe.get_width() * fit_scale)),
+		maxi(1, int(globe.get_height() * fit_scale))
 	)
-	_planet_image.texture = region
+	globe.resize(globe_size.x, globe_size.y, Image.INTERPOLATE_BILINEAR)
+	globe.convert(Image.FORMAT_RGBA8)  # ensure an alpha channel for the transparent surround
+
+	# 3. Compose the globe, centred, onto a transparent plate-sized canvas. The transparent
+	# surround lets the white plate (and the frenzy glow) show around the planet.
+	var watermark := Image.create(plate_size.x, plate_size.y, false, Image.FORMAT_RGBA8)
+	watermark.fill(Color(0, 0, 0, 0))
+	var center_offset := (plate_size - globe_size) / 2
+	watermark.blit_rect(globe, Rect2i(Vector2i.ZERO, globe_size), center_offset)
+
+	# 4. Round the corners by clearing the alpha outside the rounded rectangle, so the watermark
+	# matches the white plate's curved corners (clip_children can't do this here — see the header).
+	_clear_rounded_corners(watermark)
+	return ImageTexture.create_from_image(watermark)
+
+
+## Set alpha to 0 on the pixels of each corner that fall outside the rounded rectangle, matching
+## the plate (large top corners, tiny bottom corners). Only the small corner boxes are scanned.
+func _clear_rounded_corners(image: Image) -> void:
+	var w := image.get_width()
+	var h := image.get_height()
+	var corners := [
+		{"radius": PLANET_CORNER_RADIUS_TOP, "center": Vector2i(PLANET_CORNER_RADIUS_TOP, PLANET_CORNER_RADIUS_TOP), "dir": Vector2i(-1, -1)},
+		{"radius": PLANET_CORNER_RADIUS_TOP, "center": Vector2i(w - PLANET_CORNER_RADIUS_TOP, PLANET_CORNER_RADIUS_TOP), "dir": Vector2i(1, -1)},
+		{"radius": PLANET_CORNER_RADIUS_BOTTOM, "center": Vector2i(PLANET_CORNER_RADIUS_BOTTOM, h - PLANET_CORNER_RADIUS_BOTTOM), "dir": Vector2i(-1, 1)},
+		{"radius": PLANET_CORNER_RADIUS_BOTTOM, "center": Vector2i(w - PLANET_CORNER_RADIUS_BOTTOM, h - PLANET_CORNER_RADIUS_BOTTOM), "dir": Vector2i(1, 1)},
+	]
+	for corner in corners:
+		var radius: int = corner["radius"]
+		var center: Vector2i = corner["center"]
+		var dir: Vector2i = corner["dir"]
+		# Walk only the corner's square; a pixel that sits in the outward quadrant AND beyond the
+		# radius from the arc's centre is outside the rounded edge, so we make it transparent.
+		for offset_y in range(radius):
+			for offset_x in range(radius):
+				var pixel := center + Vector2i(dir.x * offset_x, dir.y * offset_y)
+				if pixel.x < 0 or pixel.y < 0 or pixel.x >= w or pixel.y >= h:
+					continue
+				if Vector2(offset_x, offset_y).length() > radius:
+					var color := image.get_pixel(pixel.x, pixel.y)
+					color.a = 0.0
+					image.set_pixel(pixel.x, pixel.y, color)
 
 
 ## Announce a purchase: a mild flash (a soft brightness pulse). No color change and

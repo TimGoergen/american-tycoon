@@ -14,7 +14,7 @@ extends Minigame
 #     multiplier on each successive cascade step.
 #   * Each round ONE gem type is flagged as the AVOID gem. A match group that does NOT contain
 #     the avoid gem earns a +15% bonus (×1.15); a match group that DOES contain it is docked
-#     −10% (×0.90). So the avoid gem is a gem to steer AROUND — clean matches pay the most.
+#     −60% (×0.40). So the avoid gem is a gem to steer AROUND — clean matches pay far more.
 #   * Calibration (Tim): a whole 20-second round of ordinary clean matching lands you at ~100%
 #     (the host's "full" line, keep all your Legacy). Strong cascade / large-match play climbs
 #     up into the extra-high bonus band toward the maximum. See get_performance, which maps the
@@ -40,12 +40,12 @@ const SIZE_BONUS := 0.5
 const COMBO_BONUS := 1.0
 ## A match group that AVOIDS the avoid gem earns this bonus (+15%).
 const CLEAN_MATCH_FACTOR := 1.15
-## A match group that INCLUDES the avoid gem is docked this much (−10%).
-const AVOID_MATCH_FACTOR := 0.90
+## A match group that INCLUDES the avoid gem is docked this much (−60%).
+const AVOID_MATCH_FACTOR := 0.40
 
 ## Score that maps to the host's "full" (1.0x) line — roughly a whole ~20-second round of
 ## ordinary clean matching (Tim: "regular clean play = ~100%"). Feel-tune estimate for the
-## v4 +15%/−10% model with NO ×10 bonus and the shorter 20-second round.
+## v4 +15%/−60% model with NO ×10 bonus and the shorter 20-second round.
 const SCORE_FULL := 300.0
 ## Score that maps to performance 1.0 (the host's max extra-high bonus) — roughly a whole round
 ## of strong cascade / large-match play. Feel-tune estimate (same v4 / 20-second basis).
@@ -86,7 +86,7 @@ var _rng := RandomNumberGenerator.new()
 
 # Avoid-gem scoring state.
 ## The single AVOID gem type this round (a color id). Matching a group that contains this gem
-## is docked −10%; matching only clean gems earns +15%.
+## is docked −60%; matching only clean gems earns +15%.
 var _avoid_type: int = 0
 ## Total points earned so far (only ever rises — there is no way to lose points).
 var _score: float = 0.0
@@ -172,7 +172,7 @@ func _build_score_row() -> Control:
 
 ## Build the AVOID banner pinned directly above the grid: an "AVOID" tag next to this round's
 ## avoid gem, shown large inside a gold-framed panel so the player can see at a glance which gem
-## to steer around (matching it is docked −10%; clean matches earn +15%).
+## to steer around (matching it is docked −60%; clean matches earn +15%).
 func _build_bonus_banner() -> Control:
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -444,7 +444,7 @@ func _play_resolution(result: Dictionary) -> void:
 ## award for each cascade step plus whether the swap matched the avoid gem anywhere:
 ##   { "step_points": Array[float], "matched_avoid": bool }
 ## Each match GROUP is scored on its own: a clean group (no avoid gem) earns +15%, a group that
-## contains the avoid gem is docked −10%. The groups' points are summed per step, then the step's
+## contains the avoid gem is docked −60%. The groups' points are summed per step, then the step's
 ## rising COMBO multiplier is applied.
 func _score_swap(result: Dictionary) -> Dictionary:
 	var steps: Array = result["steps"]

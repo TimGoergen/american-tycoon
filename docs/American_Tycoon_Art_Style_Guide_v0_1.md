@@ -84,6 +84,8 @@ Format: portrait bust in a circular cream medallion on navy card; name plate (sl
 
 6–8 per planet, crossfading at net-worth thresholds (GDD §12). Generation guidance for Copilot/Gemini prompts: *"1950s American advertisement illustration, flat color lithograph print style, limited palette (cream, brick red, navy, mustard), halftone texture, [SCENE], no text, wide portrait composition, muted matte finish"* — then manual grade to §1 palette and halftone overlay. Scene ladder: Main Street diner → suburban boomtown → downtown skyline → penthouse terrace → marble lobby → Capitol dome at golden hour.
 
+**Live play-field background (added 2026-06-25).** The Main screen now renders a full-bleed image behind the UI, clipped to the phone-screen rounded corners and shared by all four tabs (it is intentionally hidden under the full-screen overlays — will ceremony, dev panel, minigames, first contact). The shipped image is a green prairie (Earth) — a placeholder ahead of the graded 1950s-ad backdrops above. **Planned: the background swaps per epoch after each first contact** — Earth's prairie gives way to a Luminari / Geth / Mycelium / etc. scene, the play-field's visual echo of the per-epoch staffer reskins in §6. So this backdrop set is **epoch-keyed, not just net-worth-keyed**: one (eventually a small crossfading set) per shipped civilization, swapped on `EpochState` advancement.
+
 ## 8. UI Chrome
 
 - Cream field everywhere; navy ink for structure; red reserved for **actionable** (buy buttons, frenzy pop) — red = "spend/act," never decoration.

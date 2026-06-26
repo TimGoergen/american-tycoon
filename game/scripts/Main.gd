@@ -228,8 +228,12 @@ func _build_ui() -> void:
 	add_child(black_field)
 
 	# The play-field background: a full-bleed prairie scene behind all the UI (Tim, 2026-06-25),
-	# occupying the same inset rect as the viewing area. It must show the SAME rounded corners as
-	# the frame so it nests inside the phone's screen curve. We get that rounding without a shader
+	# occupying the same inset rect as the viewing area. This prairie is Earth's backdrop; later the
+	# image is meant to SWAP PER EPOCH after each first contact (a Luminari / Geth / Mycelium scene,
+	# etc.) — see Art Style Guide §7. For now it is a single fixed texture; when that lands, drive
+	# `background.texture` off the reached epoch and refresh it on EpochState advancement.
+	# It must show the SAME rounded corners as the frame so it nests inside the phone's screen
+	# curve. We get that rounding without a shader
 	# by using Godot's clip_children: the parent `bg_mask` draws a rounded rectangle that is used
 	# purely as a stencil (CLIP_CHILDREN_ONLY draws the children only where the parent is opaque,
 	# and does not paint the parent itself), so the square image is clipped to rounded corners.

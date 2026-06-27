@@ -91,6 +91,12 @@ var _result_amount_label: Label
 var _result_summary_label: Label
 var _opt_out_check: CheckBox
 
+## The "Get Ready / BEGIN" gate shown over the card at the start of every round. The clock and the
+## chosen type both stay frozen until the player presses Begin, so no round ever starts the instant
+## the screen appears (Tim, 2026-06-26). `_begin_title` names the drawn type on that gate.
+var _begin_overlay: Control
+var _begin_title: Label
+
 
 func setup(tuning: TuningConfig) -> void:
 	_tuning = tuning
@@ -134,6 +140,11 @@ func _ready() -> void:
 	slot.add_child(_play_view)
 	_result_view = _build_result_view()
 	slot.add_child(_result_view)
+
+	# The Begin gate floats on top of the card, covering the play/result views until the player
+	# presses Begin. Added to the panel after the slot so it draws over everything inside the card.
+	_begin_overlay = _build_begin_overlay()
+	panel.add_child(_begin_overlay)
 
 
 ## The cream card that frames every minigame: cream fill, a moderately thick black outline, and
@@ -245,6 +256,54 @@ func _build_result_view() -> Control:
 	return column
 
 
+## The "Get Ready" gate over the card: an opaque cream scrim with the drawn type's name and a big
+## BEGIN button. It hides the (not-yet-started) game until the player is ready, so the clock never
+## starts the instant the screen appears. start_game shows it; _on_begin_pressed dismisses it and
+## actually starts the round.
+func _build_begin_overlay() -> Control:
+	var overlay := Control.new()
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.visible = false
+
+	# An opaque cream scrim fully hides the blank, not-yet-begun game behind the gate.
+	var scrim := ColorRect.new()
+	scrim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	scrim.color = UiPalette.CREAM
+	overlay.add_child(scrim)
+
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.add_child(center)
+
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 24)
+	center.add_child(box)
+
+	var ready := _make_label("GET READY", UiPalette.FONT_HEADLINE, UiPalette.NAVY)
+	ready.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(ready)
+
+	# Names the randomly drawn type so the player knows what they're about to play.
+	_begin_title = _make_label("", UiPalette.FONT_DISPLAY, UiPalette.MUSTARD_GOLD)
+	_begin_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_begin_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(_begin_title)
+
+	var hint := _make_label("The clock starts when you press Begin.", UiPalette.FONT_LABEL, UiPalette.NAVY)
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(hint)
+
+	var begin_button := Button.new()
+	begin_button.custom_minimum_size = Vector2(360, 110)
+	UiPalette.style_button(begin_button, true)  # the action (red) button — this is the "go" control
+	begin_button.text = "BEGIN"
+	begin_button.pressed.connect(_on_begin_pressed)
+	box.add_child(begin_button)
+
+	return overlay
+
+
 ## Add a left-aligned Back button to the top of a view's column. Hidden by default; only
 ## review mode (start_game's review_mode flag) makes it visible. A short HBox keeps it from
 ## stretching the full width — it sits in the top-left like a typical "back" affordance.
@@ -352,13 +411,28 @@ func start_game(
 	_active_minigame.completed.connect(_on_minigame_completed)
 	# Most types run for the shared default; a type may ask for more time on top of it (basketball).
 	_seconds_left = _tuning.minigame_duration_seconds + maxf(0.0, _active_minigame.extra_seconds())
-	_active_minigame.begin(_tuning)
 
+	# The round does NOT start yet: the type stays un-begun and the clock paused behind the Begin
+	# gate, so the player is never caught off guard. _on_begin_pressed starts it for real.
 	_play_view.visible = true
 	_result_view.visible = false
+	_playing = false
+	_timer_label.text = "0:%02d" % int(ceil(_seconds_left))
+	_update_status()
+	_begin_title.text = _active_minigame.display_name()
+	_begin_overlay.visible = true
+	visible = true
+
+
+## Begin pressed on the Get Ready gate: hide it, start the chosen type, and unpause the clock — the
+## one and only point where a round actually goes live.
+func _on_begin_pressed() -> void:
+	if _active_minigame == null:
+		return
+	_begin_overlay.visible = false
+	_active_minigame.begin(_tuning)
 	_playing = true
 	_update_status()
-	visible = true
 
 
 func _process(delta: float) -> void:

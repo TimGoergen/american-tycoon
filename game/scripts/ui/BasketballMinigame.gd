@@ -40,35 +40,46 @@ const RIM_HALF_WIDTH := HOOP_RX * 0.74
 ## ball physically bounces off.
 const RIM_POST_RADIUS := 14.0
 
-## Downward acceleration on every airborne ball (px/sec^2) — gives the throw a heavy, arcing fall.
-const GRAVITY := 1200.0
+## Downward acceleration (px/sec^2). Deliberately heavy — a high gravity gives the balls a weighty,
+## fast-falling feel with tight arcs and little hang time, rather than floating like balloons.
+const GRAVITY := 2400.0
 
 ## The slingshot: the throw velocity is the pull vector (ball dragged away from its rest spot),
 ## reversed, times PULL_POWER. The drag is capped at MAX_PULL so a huge yank can't overpower the
-## board; a drag shorter than MIN_PULL on release is not a throw (the ball just snaps back).
+## board; a drag shorter than MIN_PULL on release is not a throw (the ball just snaps back). Power
+## is matched up to the heavier gravity so a full pull still comfortably reaches the hoop.
 const MAX_PULL := 300.0
 const MIN_PULL := 28.0
-const PULL_POWER := 8.5
+const PULL_POWER := 9.6
 ## Hard cap on the resulting throw speed (px/sec).
-const MAX_THROW_SPEED := 2550.0
+const MAX_THROW_SPEED := 2900.0
 
-## Fraction of speed KEPT when a ball bounces off a surface (0 = dead stop, 1 = perfectly elastic).
-## Below 1 so bounces visibly lose energy and the ball eventually settles.
-const RESTITUTION := 0.62
+## Fraction of speed KEPT when a ball bounces off a wall, the floor, the ceiling, or the hoop
+## (0 = dead stop, 1 = perfectly elastic). Lowered for the heavier feel — a dense ball thuds and
+## loses energy quickly rather than springing back.
+const RESTITUTION := 0.46
+## Fraction of speed kept when two balls bounce off each other — a touch deader than a wall bounce,
+## so a pile of balls absorbs energy and settles instead of scattering forever.
+const BALL_RESTITUTION := 0.40
 ## Extra horizontal slowdown applied each time a ball lands on the floor, so it doesn't skate
 ## along the ground forever after the bounce height dies out.
-const FLOOR_FRICTION := 0.80
+const FLOOR_FRICTION := 0.70
 ## Once an airborne ball is resting on the floor and moving slower than this (px/sec) in both
-## axes, it settles: it becomes a still, throwable ball again.
-const REST_SPEED := 70.0
+## axes, it settles: it becomes a still, throwable ball again. Raised with the heavier feel so
+## balls come to rest promptly instead of dribbling out a long tail of tiny bounces.
+const REST_SPEED := 95.0
+## A resting ball shoved by another ball faster than this (px/sec) wakes into flight; a gentler
+## nudge (e.g. two balls merely separated with no real speed) leaves it resting.
+const WAKE_SPEED := 60.0
 
 ## Thickness (px) of the dark-gray outline that frames the board and defines the walls, floor,
 ## and ceiling the balls bounce against.
 const WALL_THICKNESS := 6.0
 
-# Each ball is a Dictionary: { "pos": Vector2, "vel": Vector2, "state": String }.
-# state is one of "idle" (resting on the floor, throwable), "aiming" (pulled back, following the
-# finger, not yet released), or "flight" (airborne under gravity).
+# Each ball is a Dictionary: { "pos": Vector2, "vel": Vector2, "state": String }, plus a transient
+# "prev" (its start-of-frame position, written during the motion pass and read by the hoop's
+# top-entry test). state is one of "idle" (resting on the floor, throwable), "aiming" (pulled back,
+# following the finger, not yet released), or "flight" (airborne under gravity).
 var _balls: Array = []
 var _baskets: int = 0
 var _running: bool = false
@@ -194,51 +205,119 @@ func _move_hoop(bounds: Vector2) -> void:
 	)
 
 
-## Move every airborne ball under gravity, resolve hoop collisions / scoring, and bounce balls off
-## the board's walls.
+## Advance the simulation one frame, in three clear passes:
+##   1) integrate gravity + motion for every airborne ball (remembering each ball's start position
+##      so the hoop's top-entry test can see the crossing),
+##   2) resolve ball-to-ball collisions so the balls are solid obstacles to each other,
+##   3) resolve each airborne ball against the hoop and the board's walls/floor/ceiling.
+## Splitting the work this way keeps the (already busy) physics readable and means a collision can
+## never leave a ball overlapping a wall — the wall pass runs last.
 func _advance_balls(delta: float, bounds: Vector2) -> void:
+	# Pass 1: gravity + motion.
+	for ball in _balls:
+		if ball["state"] != "flight":
+			continue
+		ball["prev"] = ball["pos"]  # start-of-frame position, for the hoop crossing test
+		ball["vel"].y += GRAVITY * delta
+		ball["pos"] += ball["vel"] * delta
+
+	# Pass 2: the balls shove each other.
+	_resolve_ball_collisions(bounds)
+
+	# Pass 3: hoop scoring/bounces, then the board walls.
+	for ball in _balls:
+		if ball["state"] != "flight":
+			continue
+		# A ball woken by a collision this frame has no "prev" yet — treat it as not crossing.
+		var prev: Vector2 = ball.get("prev", ball["pos"])
+		# Resolve the hoop first. If it scored, the ball was reset to the floor and the hoop moved,
+		# so skip the wall pass for it this frame.
+		if _resolve_hoop(ball, prev, bounds):
+			continue
+		_resolve_walls(ball, bounds)
+
+
+## Treat every pair of (non-aimed) balls as solid, equal-mass circles: separate any overlap and, if
+## they are closing on each other, exchange momentum along the contact normal. A resting ball that
+## gets genuinely shoved wakes into flight; two balls merely nudged apart stay at rest.
+func _resolve_ball_collisions(bounds: Vector2) -> void:
+	var min_distance := BALL_RADIUS * 2.0
+	for i in range(_balls.size()):
+		var a: Dictionary = _balls[i]
+		if a["state"] == "aiming":
+			continue  # the held ball is under the player's finger — leave it out of collisions
+		for j in range(i + 1, _balls.size()):
+			var b: Dictionary = _balls[j]
+			if b["state"] == "aiming":
+				continue
+			var offset: Vector2 = a["pos"] - b["pos"]
+			var distance := offset.length()
+			if distance >= min_distance or distance <= 0.01:
+				continue
+			var normal := offset / distance
+			# Push the two apart equally so they no longer overlap.
+			var correction := normal * ((min_distance - distance) * 0.5)
+			a["pos"] += correction
+			b["pos"] -= correction
+			# Exchange momentum only if they're actually closing (relative speed along the normal is
+			# negative); otherwise the separation above is all that's needed.
+			var relative: float = (a["vel"] - b["vel"]).dot(normal)
+			if relative < 0.0:
+				var impulse := -(1.0 + BALL_RESTITUTION) * relative * 0.5  # equal mass: split evenly
+				a["vel"] += normal * impulse
+				b["vel"] -= normal * impulse
+			# Keep both inside the walls (the separation above could nudge a ball past an edge), and
+			# wake either one if it was resting and just took a real hit.
+			_clamp_inside(a, bounds)
+			_clamp_inside(b, bounds)
+			_wake_if_shoved(a)
+			_wake_if_shoved(b)
+
+
+## Bounce one airborne ball off the side walls, ceiling, and floor, and let it settle to rest once
+## it is barely moving along the floor.
+func _resolve_walls(ball: Dictionary, bounds: Vector2) -> void:
 	var min_x := WALL_THICKNESS + BALL_RADIUS
 	var max_x := bounds.x - WALL_THICKNESS - BALL_RADIUS
 	var min_y := WALL_THICKNESS + BALL_RADIUS
 	var floor_y := bounds.y - WALL_THICKNESS - BALL_RADIUS
 
-	for ball in _balls:
-		if ball["state"] != "flight":
-			continue
+	# Side walls: clamp the center back inside and flip + dampen the horizontal velocity.
+	if ball["pos"].x < min_x:
+		ball["pos"].x = min_x
+		ball["vel"].x = absf(ball["vel"].x) * RESTITUTION
+	elif ball["pos"].x > max_x:
+		ball["pos"].x = max_x
+		ball["vel"].x = -absf(ball["vel"].x) * RESTITUTION
 
-		var prev: Vector2 = ball["pos"]
-		ball["vel"].y += GRAVITY * delta
-		ball["pos"] += ball["vel"] * delta
+	# Ceiling.
+	if ball["pos"].y < min_y:
+		ball["pos"].y = min_y
+		ball["vel"].y = absf(ball["vel"].y) * RESTITUTION
 
-		# Resolve the hoop first (score or bounce). If it scored, the ball was reset to the floor
-		# and the hoop moved, so skip the rest of this ball's physics for the frame.
-		if _resolve_hoop(ball, prev, bounds):
-			continue
+	# Floor, with extra horizontal friction on each landing.
+	elif ball["pos"].y > floor_y:
+		ball["pos"].y = floor_y
+		ball["vel"].y = -absf(ball["vel"].y) * RESTITUTION
+		ball["vel"].x *= FLOOR_FRICTION
+		# Once the ball is barely moving along the floor, let it settle into a throwable rest
+		# instead of jittering with ever-tinier bounces.
+		if absf(ball["vel"].y) < REST_SPEED and absf(ball["vel"].x) < REST_SPEED:
+			ball["vel"] = Vector2.ZERO
+			ball["state"] = "idle"
 
-		# Bounce off the side walls: clamp the center back inside and flip + dampen the horizontal
-		# velocity so the ball rebounds with a little less speed.
-		if ball["pos"].x < min_x:
-			ball["pos"].x = min_x
-			ball["vel"].x = absf(ball["vel"].x) * RESTITUTION
-		elif ball["pos"].x > max_x:
-			ball["pos"].x = max_x
-			ball["vel"].x = -absf(ball["vel"].x) * RESTITUTION
 
-		# Bounce off the ceiling.
-		if ball["pos"].y < min_y:
-			ball["pos"].y = min_y
-			ball["vel"].y = absf(ball["vel"].y) * RESTITUTION
+## Clamp a ball's center inside the board's inner walls (used after a collision nudge, which can
+## push a ball slightly past an edge). Velocity is untouched — the wall pass handles the bounce.
+func _clamp_inside(ball: Dictionary, bounds: Vector2) -> void:
+	ball["pos"].x = clampf(ball["pos"].x, WALL_THICKNESS + BALL_RADIUS, bounds.x - WALL_THICKNESS - BALL_RADIUS)
+	ball["pos"].y = clampf(ball["pos"].y, WALL_THICKNESS + BALL_RADIUS, bounds.y - WALL_THICKNESS - BALL_RADIUS)
 
-		# Bounce off the floor, with extra horizontal friction on each landing.
-		elif ball["pos"].y > floor_y:
-			ball["pos"].y = floor_y
-			ball["vel"].y = -absf(ball["vel"].y) * RESTITUTION
-			ball["vel"].x *= FLOOR_FRICTION
-			# Once the ball is barely moving along the floor, let it settle into a throwable rest
-			# instead of jittering with ever-tinier bounces.
-			if absf(ball["vel"].y) < REST_SPEED and absf(ball["vel"].x) < REST_SPEED:
-				ball["vel"] = Vector2.ZERO
-				ball["state"] = "idle"
+
+## Wake a resting ball into flight if a collision gave it real speed; a tiny nudge leaves it resting.
+func _wake_if_shoved(ball: Dictionary) -> void:
+	if ball["state"] == "idle" and ball["vel"].length() > WAKE_SPEED:
+		ball["state"] = "flight"
 
 
 ## Resolve a flight ball against the hoop. Returns true if it scored (the caller then skips the

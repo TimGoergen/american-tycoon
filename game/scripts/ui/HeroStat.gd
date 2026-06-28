@@ -5,10 +5,12 @@ extends PanelContainer
 # not stub). Cream ticket plate with red frame, navy numerals (Style Guide §8).
 #
 # Layout is edge-pinned rather than stacked, to keep the readable values clear of
-# a phone's top camera cutout (Tim's device). Each value carries a small caption
-# directly beneath it, and the value+caption pair is centered vertically:
-#   • the income/sec NUMBER hugs the left edge, with an "INCOME" caption below it;
-#   • the CASH-on-hand NUMBER hugs the right edge, with a "CASH" caption below it.
+# a phone's top camera cutout (Tim's device). Each value carries a small icon
+# directly beneath it, and the value+icon pair is centered vertically:
+#   • the income/sec NUMBER hugs the left edge, with the gold "$/s" icon below it
+#     (Tim, 2026-06-28 — replaced the old "INCOME" word);
+#   • the CASH-on-hand NUMBER hugs the right edge, with the right-aligned dollar-bill
+#     icon below it (the old "CASH" word was removed, Tim 2026-06-28).
 # PanelContainer only fits a single child, so the labels live inside a plain
 # Control ("content") that fills the plate, and we position them by hand each frame
 # (their widths change as the values do) in _layout_labels.
@@ -24,26 +26,25 @@ const INCOME_FONT_SIZE := UiPalette.FONT_HERO
 # Cash on hand reads at the same size as income/sec (Tim's call) — kept tied to
 # INCOME_FONT_SIZE so the two stay matched if that value is ever retuned.
 const CASH_FONT_SIZE := INCOME_FONT_SIZE
-# Caption text uses UiPalette.FONT_BODY at Tim's request.
-const CAPTION_FONT_SIZE := UiPalette.FONT_BODY
 # The current EPOCH name lives in this panel (Tim, 2026-06-27 — it replaced the
-# heir/dynasty name). It sits centered between the two edge values, on the same line
-# as their captions, so it reads as one band: "INCOME … EPOCH … CASH". Uses
-# UiPalette.FONT_SUBHEAD (Tim's call) so the epoch name carries more weight than the
-# captions. The value shown is the civilization Earth is currently trading with
-# ("Earth" on tier 1, an alien race's name on later epochs).
+# heir/dynasty name). It sits centered between the two edge values, bottom-aligned with
+# the icon row, so it reads as one band: "$/s … EPOCH … 💵". Uses UiPalette.FONT_SUBHEAD
+# (Tim's call) so the epoch name carries weight. The value shown is the civilization Earth
+# is currently trading with ("Earth" on tier 1, an alien race's name on later epochs).
 const NAME_FONT_SIZE := UiPalette.FONT_SUBHEAD
 const INCOME_BOLD := 3
 const CASH_BOLD := 2
-const CAPTION_BOLD := 2
 const NAME_BOLD := 2
 
-# The dollar-bill icon shown next to the CASH caption. The art is a 2:1 green-and-gold
-# bill; we draw it at a medium size on the caption line. Gap is the space between the
-# bill and the "CASH" word.
+# The dollar-bill icon shown beneath the CASH number, right-aligned to the panel edge
+# (the "CASH" word was removed, Tim 2026-06-28). The art is a 2:1 green-and-gold bill.
 const CASH_BILL_ICON_PATH := "res://art/icons/dollar_bill.svg"
 const CASH_BILL_SIZE := Vector2(72, 36)
-const CASH_BILL_GAP := 8.0
+
+# The gold "$/s" income-per-second symbol shown beneath the income number, left-aligned
+# (replaced the old "INCOME" word, Tim 2026-06-28). Authored 140×64 (~2.19:1).
+const INCOME_ICON_PATH := "res://art/icons/income_per_sec.svg"
+const INCOME_ICON_SIZE := Vector2(118, 54)
 
 ## Gap kept between a pinned label and the panel edge it hugs.
 const EDGE_MARGIN := 14
@@ -113,9 +114,8 @@ var _income_refresh_accumulator := INCOME_REFRESH_INTERVAL  # repaint on the ver
 var _content: Control
 var _income_label: Label
 var _cash_label: Label
-var _income_caption: Label
-var _cash_caption: Label
-var _cash_bill: TextureRect  # small dollar-bill icon shown beside the CASH caption
+var _income_icon: TextureRect  # gold "$/s" symbol beneath the income number (was the "INCOME" word)
+var _cash_bill: TextureRect  # dollar-bill icon beneath the cash number, right-aligned (was beside "CASH")
 var _epoch_label: Label  # the current epoch / civilization name (was the heir name)
 
 # Frenzy glow: while a burn is active the ticket pulses toward red to signal the
@@ -167,21 +167,18 @@ func _ready() -> void:
 	_cash_label = _make_label(UiPalette.MONEY_GREEN, CASH_FONT_SIZE, CASH_BOLD)
 	_content.add_child(_cash_label)
 
-	# A small caption sits directly beneath each value (the old single, bottom-
-	# centered "INCOME PER SECOND" caption is gone). Each is colored to match the
-	# number it labels.
-	_income_caption = _make_label(UiPalette.NAVY, CAPTION_FONT_SIZE, CAPTION_BOLD)
-	_income_caption.text = "INCOME"
-	_content.add_child(_income_caption)
+	# Beneath each value sits a small icon instead of a word (Tim, 2026-06-28): the gold "$/s"
+	# symbol under the income number, and the green-and-gold dollar bill under the cash number.
+	# KEEP_ASPECT_CENTERED preserves each icon's shape inside its box.
+	_income_icon = TextureRect.new()
+	_income_icon.texture = load(INCOME_ICON_PATH)
+	_income_icon.custom_minimum_size = INCOME_ICON_SIZE
+	_income_icon.size = INCOME_ICON_SIZE
+	_income_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_income_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_income_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_content.add_child(_income_icon)
 
-	_cash_caption = _make_label(UiPalette.MONEY_GREEN, CAPTION_FONT_SIZE, CAPTION_BOLD)
-	_cash_caption.text = "CASH"
-	_content.add_child(_cash_caption)
-
-	# A small green-and-gold dollar-bill icon sits just left of the "CASH" caption
-	# (Tim, 2026-06-27) so the cash side reads as "💵 CASH". Medium size — tall enough
-	# to read as a bill, small enough to sit on the caption line. KEEP_ASPECT_CENTERED
-	# preserves the 2:1 bill shape inside its box.
 	_cash_bill = TextureRect.new()
 	_cash_bill.texture = load(CASH_BILL_ICON_PATH)
 	_cash_bill.custom_minimum_size = CASH_BILL_SIZE
@@ -366,43 +363,34 @@ func _layout_labels() -> void:
 	# to sit) to anchor each caption, then nudge the amount to half that distance from the
 	# top of the panel — i.e. twice as close to the top (Tim's call).
 
-	# Income (left edge): caption stays at the centered-block position; amount moves up.
+	# Income (left edge): the "$/s" icon sits where the caption used to; the amount moves up.
 	# Vertical math uses LABEL_LAYOUT_HEIGHT (the original plate height), not the live
-	# area.y, so shrinking the plate leaves every label exactly where it was.
+	# area.y, so shrinking the plate leaves every element exactly where it was.
 	_income_label.size = _income_label.get_minimum_size()
-	_income_caption.size = _income_caption.get_minimum_size()
-	var income_block_h := _income_label.size.y + caption_gap + _income_caption.size.y
+	var income_block_h := _income_label.size.y + caption_gap + INCOME_ICON_SIZE.y
 	var income_centered_top := (LABEL_LAYOUT_HEIGHT - income_block_h) / 2.0
-	var income_caption_top := income_centered_top + _income_label.size.y + caption_gap
+	var income_icon_top := income_centered_top + _income_label.size.y + caption_gap
 	_income_label.position = Vector2(EDGE_MARGIN, income_centered_top / 2.0)
-	_income_caption.position = Vector2(EDGE_MARGIN, income_caption_top)
+	_income_icon.position = Vector2(EDGE_MARGIN, income_icon_top)
 
-	# Cash (right edge): same treatment.
+	# Cash (right edge): the dollar-bill icon sits beneath the amount, right-aligned to the
+	# edge (no "CASH" word anymore), mirroring the income side.
 	_cash_label.size = _cash_label.get_minimum_size()
-	_cash_caption.size = _cash_caption.get_minimum_size()
-	var cash_block_h := _cash_label.size.y + caption_gap + _cash_caption.size.y
+	var cash_block_h := _cash_label.size.y + caption_gap + CASH_BILL_SIZE.y
 	var cash_centered_top := (LABEL_LAYOUT_HEIGHT - cash_block_h) / 2.0
-	var cash_caption_top := cash_centered_top + _cash_label.size.y + caption_gap
+	var cash_icon_top := cash_centered_top + _cash_label.size.y + caption_gap
 	_cash_label.position = Vector2(area.x - _cash_label.size.x - EDGE_MARGIN, cash_centered_top / 2.0)
-	_cash_caption.position = Vector2(area.x - _cash_caption.size.x - EDGE_MARGIN, cash_caption_top)
+	_cash_bill.position = Vector2(area.x - CASH_BILL_SIZE.x - EDGE_MARGIN, cash_icon_top)
 
-	# Dollar-bill icon: sits just left of the CASH caption, vertically centered on it, so the
-	# pair reads as "[bill] CASH" flush to the right edge.
-	_cash_bill.position = Vector2(
-		_cash_caption.position.x - CASH_BILL_GAP - CASH_BILL_SIZE.x,
-		cash_caption_top + (_cash_caption.size.y - CASH_BILL_SIZE.y) / 2.0
-	)
-
-	# Epoch name: horizontally centered across the whole plate, and BOTTOM-aligned with the
-	# INCOME / CASH captions (Tim, 2026-06-21) so all three labels share one baseline — the
-	# taller name (it's a larger font) now grows upward only, not below the captions.
-	# (Income and cash captions share the same y because both values are the same font size,
-	# so either caption's bottom is the baseline.)
+	# Epoch name: horizontally centered across the whole plate, BOTTOM-aligned with the icon
+	# row (Tim, 2026-06-21) so the three elements share one baseline — the taller name (larger
+	# font) grows upward only. Both icons share the same bottom because the income and cash
+	# numbers are the same font size, so either icon's bottom is the baseline.
 	_epoch_label.size = _epoch_label.get_minimum_size()
-	var caption_baseline_y := cash_caption_top + _cash_caption.size.y
+	var icon_baseline_y := income_icon_top + INCOME_ICON_SIZE.y
 	_epoch_label.position = Vector2(
 		(area.x - _epoch_label.size.x) / 2.0,
-		caption_baseline_y - _epoch_label.size.y
+		icon_baseline_y - _epoch_label.size.y
 	)
 
 

@@ -401,17 +401,27 @@ func _build_property_tab() -> Control:
 	_buy_mode_button.pressed.connect(_on_buy_mode_toggled)
 	action_row.add_child(_buy_mode_button)
 
-	# The property ladder: 12 rows in a vertical scroll (GDD §2).
+	# The property ladder: 12 rows in a vertical scroll (GDD §2). The vertical scrollbar gets
+	# the styled wide-handle / narrow-track look (UiPalette.style_vscrollbar).
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_RESERVE
 	v.add_child(scroll)
+	UiPalette.style_vscrollbar(scroll.get_v_scroll_bar())
+
+	# A small right margin holds the property rows just clear of the scrollbar (Tim, 2026-06-28),
+	# so the rows' right edge doesn't butt directly against the bar.
+	const LADDER_SCROLLBAR_GAP := 8
+	var ladder_margin := MarginContainer.new()
+	ladder_margin.add_theme_constant_override("margin_right", LADDER_SCROLLBAR_GAP)
+	ladder_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(ladder_margin)
 
 	var ladder := VBoxContainer.new()
 	ladder.add_theme_constant_override("separation", 10)
 	ladder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(ladder)
+	ladder_margin.add_child(ladder)
 
 	for i in range(game.economy.properties.size()):
 		var row := PropertyRow.new()

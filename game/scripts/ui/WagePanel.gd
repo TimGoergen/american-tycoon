@@ -34,9 +34,9 @@ var _hold_accumulator := 0.0
 #     above the gold fill (see _draw_sweep), so the navy border and the label stay
 #     put and the button never changes size.
 
-## The level badge's fill — a cool metallic silver (no silver exists in UiPalette). Light
-## enough that the navy level number and the navy border both read clearly on it.
-const SILVER_PLATE := Color(0.80, 0.82, 0.85)
+## The level badge's text — a bright sky-blue (in the CYCLE_BLUE family) that reads clearly
+## on the dark-blue (INK_NAVY) plate (Tim, 2026-06-28).
+const LEVEL_TEXT_BLUE := Color("#9DBDE4")
 
 ## How long the brighter-gold blink stays on for a single manual tap, in seconds.
 ## Short, so a deliberate tap reads as a crisp blink.
@@ -160,12 +160,12 @@ func _ready() -> void:
 	_wage_meter.size_flags_stretch_ratio = 0.85
 	button_row.add_child(_wage_meter)
 
-	# Level readout (the right 15% of the row): the current clock-in level, shown inside a silver
-	# plate that is the same height as the clock-in button (Tim, 2026-06-24). The PanelContainer
-	# fills the row's height — which the 196px meter sets — so the plate matches the button, and
-	# the number is centered inside it.
+	# Level readout (the right 15% of the row): the current clock-in level, shown inside a
+	# dark-blue plate with the same frame thickness as the clock-in button (Tim, 2026-06-24 /
+	# 2026-06-28). The PanelContainer fills the row's height — which the 196px meter sets — so
+	# the plate matches the button, and the bright-blue number is centered inside it.
 	var level_panel := PanelContainer.new()
-	level_panel.add_theme_stylebox_override("panel", _make_silver_plate())
+	level_panel.add_theme_stylebox_override("panel", _make_level_plate())
 	level_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	level_panel.size_flags_stretch_ratio = 0.15
 	button_row.add_child(level_panel)
@@ -174,7 +174,7 @@ func _ready() -> void:
 	_level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_level_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_level_label.add_theme_font_size_override("font_size", UiPalette.FONT_DISPLAY)
-	_level_label.add_theme_color_override("font_color", UiPalette.NAVY)
+	_level_label.add_theme_color_override("font_color", LEVEL_TEXT_BLUE)
 	level_panel.add_child(_level_label)
 
 	# Highlight overlay: a transparent, mouse-ignoring layer filling the meter, on
@@ -298,12 +298,15 @@ func _level_progress() -> float:
 ## The silver plate behind the level number. A cool metallic gray fill with the project's usual
 ## navy border and rounded corners, so it reads as a small "level badge" beside the gold meter.
 ## (No silver lives in UiPalette, so the shade is defined here.)
-func _make_silver_plate() -> StyleBoxFlat:
+## The level badge plate: a dark-blue (INK_NAVY) fill with the SAME navy frame thickness as
+## the clock-in meter beside it (style_framed_progress uses 8), so the two read as a matched
+## pair on the row (Tim, 2026-06-28).
+func _make_level_plate() -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
-	style.bg_color = SILVER_PLATE
+	style.bg_color = UiPalette.INK_NAVY
 	style.set_corner_radius_all(10)
 	style.border_color = UiPalette.NAVY
-	style.set_border_width_all(4)
+	style.set_border_width_all(8)
 	style.set_content_margin_all(8)
 	return style
 

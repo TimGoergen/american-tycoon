@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="140" height="64" viewBox="0 0 140 64">
+  <!-- Income-per-second symbol: a gold "$/s" ("dollars per second"). Drawn as vector
+       strokes, not <text>, because Godot's SVG rasterizer embeds no fonts (see
+       dollar_bill.svg). Each glyph is stroked twice: a navy underlay for contrast on the
+       cream panel (matching the numerals' navy faux-bold outline), then the gold on top. -->
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Navy underlay (outline) -->
+    <g stroke="#1D2D50" stroke-width="12">
+      <line x1="28" y1="8" x2="28" y2="56"/>
+      <path d="M 42 17 C 42 9 14 9 14 22 C 14 32 42 32 42 42 C 42 55 14 55 14 47"/>
+      <line x1="74" y1="12" x2="58" y2="52"/>
+      <path d="M 120 33 C 120 27 92 27 92 34 C 92 40 120 40 120 46 C 120 53 92 53 92 47"/>
+    </g>
+    <!-- Gold top -->
+    <g stroke="#E3B23C" stroke-width="6">
+      <line x1="28" y1="8" x2="28" y2="56"/>
+      <path d="M 42 17 C 42 9 14 9 14 22 C 14 32 42 32 42 42 C 42 55 14 55 14 47"/>
+      <line x1="74" y1="12" x2="58" y2="52"/>
+      <path d="M 120 33 C 120 27 92 27 92 34 C 92 40 120 40 120 46 C 120 53 92 53 92 47"/>
+    </g>
+  </g>
+</svg>

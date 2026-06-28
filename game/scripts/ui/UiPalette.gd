@@ -217,6 +217,36 @@ static func style_unowned_button(button: Button) -> void:
 	button.add_theme_color_override("font_disabled_color", CREAM)
 
 
+## Reserved width of a styled vertical scrollbar — also the width of its (wider) handle.
+const SCROLLBAR_WIDTH := 24
+## How far the track is inset on EACH side, so the handle reads as wider than the track:
+## against a ~20px base the handle is ~20% wider (24) and the track ~20% narrower (16).
+const SCROLLBAR_TRACK_INSET := 4
+
+
+## Style a ScrollContainer's vertical scrollbar (Tim, 2026-06-28): a wide navy handle riding
+## over a narrower gray track, both with rounded ends. Pass ScrollContainer.get_v_scroll_bar().
+static func style_vscrollbar(bar: VScrollBar) -> void:
+	bar.custom_minimum_size.x = SCROLLBAR_WIDTH
+
+	# The handle fills the bar's full reserved width (the wider element).
+	var handle := StyleBoxFlat.new()
+	handle.bg_color = NAVY
+	handle.set_corner_radius_all(SCROLLBAR_WIDTH / 2)
+
+	# The track is drawn narrower than the bar: negative expand margins inset its draw rect by
+	# SCROLLBAR_TRACK_INSET on each side (the same shrink trick style_framed_progress uses).
+	var track := StyleBoxFlat.new()
+	track.bg_color = PROGRESS_TRACK_GRAY
+	track.set_corner_radius_all((SCROLLBAR_WIDTH - 2 * SCROLLBAR_TRACK_INSET) / 2)
+	track.set_expand_margin(SIDE_LEFT, -float(SCROLLBAR_TRACK_INSET))
+	track.set_expand_margin(SIDE_RIGHT, -float(SCROLLBAR_TRACK_INSET))
+
+	bar.add_theme_stylebox_override("scroll", track)
+	for state in ["grabber", "grabber_highlight", "grabber_pressed"]:
+		bar.add_theme_stylebox_override(state, handle)
+
+
 ## Teal track with a fill in the given color (§8: sliders and meters).
 static func style_progress_bar(bar: ProgressBar, fill_color: Color) -> void:
 	var track := StyleBoxFlat.new()

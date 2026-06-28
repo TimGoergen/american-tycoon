@@ -21,9 +21,9 @@
      inkscape:pageopacity="0.0"
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#d1d1d1"
-     inkscape:zoom="1.1322126"
-     inkscape:cx="176.64526"
-     inkscape:cy="90.530697"
+     inkscape:zoom="3.202381"
+     inkscape:cx="101.48699"
+     inkscape:cy="116.63197"
      inkscape:window-width="1920"
      inkscape:window-height="1009"
      inkscape:window-x="1912"
@@ -36,12 +36,32 @@
        No SVG filters (the Godot/thorvg importer doesn't render them) — the glow is gradient ellipses. -->
   <defs
      id="defs10">
+    <linearGradient
+       id="linearGradient25"
+       x1="0"
+       y1="0"
+       x2="1"
+       y2="0">
+      <stop
+         offset="0"
+         stop-color="#511f78"
+         id="stop23"
+         style="stop-color:#8d36d0;stop-opacity:1;" />
+      <stop
+         offset="0.5"
+         stop-color="#8a44ac"
+         id="stop24" />
+      <stop
+         offset="1"
+         stop-color="#511f78"
+         id="stop25" />
+    </linearGradient>
     <radialGradient
        id="lg_core"
        cx="152.79744"
        cy="74.804916"
        r="69.268177"
-       gradientTransform="matrix(-0.58901509,0,0,-1.6977494,178.75093,255.24907)"
+       gradientTransform="matrix(-0.58901509,0,0,-1.6977494,180,254.62454)"
        fx="152.79744"
        fy="74.804916"
        gradientUnits="userSpaceOnUse">
@@ -92,7 +112,8 @@
       <stop
          offset="0"
          stop-color="#511f78"
-         id="stop8" />
+         id="stop8"
+         style="stop-color:#702ba7;stop-opacity:1;" />
       <stop
          offset="0.5"
          stop-color="#8a44ac"
@@ -110,7 +131,7 @@
     </clipPath>
     <linearGradient
        inkscape:collect="always"
-       xlink:href="#lg_side"
+       xlink:href="#linearGradient25"
        id="linearGradient22"
        x1="45.71241"
        y1="43.239122"
@@ -137,7 +158,8 @@
      stroke-width="9"
      stroke-linejoin="round"
      id="polygon11"
-     transform="rotate(180,90,127)" />
+     transform="rotate(180,90,127)"
+     style="stroke-width:0.8;stroke-dasharray:none" />
   <!-- Facets: tile the gem, each with a dark border stroke (the borders between facets) -->
   <g
      stroke="#1c0a28"
@@ -145,48 +167,48 @@
      stroke-linejoin="round"
      id="g18"
      transform="rotate(180,90,127.78067)"
-     style="stroke-width:5.4;stroke-dasharray:none">
+     style="stroke-width:5.1;stroke-dasharray:none">
     <polygon
        points="70,24 90,24 72,70 30,84 "
        fill="#491d63"
        id="polygon12"
-       style="stroke-width:5.4;stroke-dasharray:none" />
+       style="stroke-width:5.1;stroke-dasharray:none;fill:#572376;fill-opacity:1" />
     <!-- left top -->
     <polygon
        points="30,84 72,70 72,180 38,172 "
        fill="url(#lg_side)"
        id="polygon13"
-       style="fill:url(#linearGradient22);stroke-width:5.4;stroke-dasharray:none" />
+       style="fill:url(#linearGradient22);stroke-width:5.1;stroke-dasharray:none" />
     <!-- left mid -->
     <polygon
        points="38,172 72,180 90,230 72,230 "
        fill="#391450"
        id="polygon14"
-       style="stroke-width:5.4;stroke-dasharray:none" />
+       style="stroke-width:5.1;stroke-dasharray:none;fill:#6b2596;fill-opacity:1" />
     <!-- left bottom -->
     <polygon
        points="90,24 110,24 150,84 108,70 "
        fill="#491d63"
        id="polygon15"
-       style="stroke-width:5.4;stroke-dasharray:none" />
+       style="stroke-width:5.1;stroke-dasharray:none;fill:#622785;fill-opacity:1" />
     <!-- right top -->
     <polygon
        points="108,70 150,84 142,172 108,180 "
        fill="url(#lg_side)"
        id="polygon16"
-       style="fill:url(#linearGradient23);stroke-width:5.4;stroke-dasharray:none" />
+       style="fill:url(#linearGradient23);stroke-width:5.1;stroke-dasharray:none" />
     <!-- right mid -->
     <polygon
        points="108,180 142,172 108,230 90,230 "
        fill="#391450"
        id="polygon17"
-       style="stroke-width:5.4;stroke-dasharray:none" />
+       style="stroke-width:5.1;stroke-dasharray:none;fill:#9033cb;fill-opacity:1" />
     <!-- right bottom -->
     <polygon
        points="72,180 72,70 90,24 108,70 108,180 90,230 "
        fill="url(#lg_center)"
        id="polygon18"
-       style="fill:url(#lg_center);stroke-width:5.4;stroke-dasharray:none" />
+       style="fill:url(#lg_center);stroke-width:5.1;stroke-dasharray:none" />
     <!-- center -->
   </g>
   <!-- Glowing magenta core, clipped to the central facet -->
@@ -194,7 +216,7 @@
      clip-path="url(#lg_centerclip)"
      id="g19"
      style="stroke-width:37.4;stroke-dasharray:none"
-     transform="rotate(180,89.375465,127.62454)">
+     transform="rotate(180,90.000001,127.31227)">
     <ellipse
        cx="90"
        cy="127"
@@ -213,53 +235,16 @@
        id="ellipse19"
        style="stroke-width:37.4;stroke-dasharray:none" />
     <rect
-       x="86"
-       y="44"
-       width="8"
-       height="166"
-       rx="4"
+       x="88.185875"
+       y="45.249073"
+       width="3.9405205"
+       height="163.81413"
+       rx="1.9702603"
        fill="#ffdcf9"
        opacity="0.55"
        id="rect19"
-       style="stroke-width:37.4;stroke-dasharray:none"
+       style="stroke-width:0.9;stroke-dasharray:none"
        ry="4" />
   </g>
   <!-- Beveled highlights: light lavender along the upper inner facet edges where light catches -->
-  <g
-     fill="none"
-     stroke="#e3c4f6"
-     stroke-width="2"
-     stroke-linecap="round"
-     opacity="0.55"
-     id="g22"
-     transform="matrix(0.984719,0,0,1.0077686,0.84313773,2.6934729)">
-    <line
-       x1="89.907013"
-       y1="20.806196"
-       x2="71.563141"
-       y2="69.676758"
-       id="line19"
-       style="stroke-width:2.21482" />
-    <line
-       x1="89.967148"
-       y1="20.502468"
-       x2="108.43804"
-       y2="70.438057"
-       id="line20"
-       style="stroke-width:2.24657" />
-    <line
-       x1="34.892754"
-       y1="81.014313"
-       x2="71.136986"
-       y2="70.863014"
-       id="line21"
-       style="stroke-width:1.72602" />
-    <line
-       x1="146.9368"
-       y1="81.594788"
-       x2="108.90707"
-       y2="70.907066"
-       id="line22"
-       style="stroke-width:1.81414" />
-  </g>
 </svg>

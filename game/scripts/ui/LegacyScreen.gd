@@ -123,6 +123,8 @@ func _build_ui() -> void:
 	wallet_gem.custom_minimum_size = WALLET_GEM_SIZE
 	wallet_gem.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	wallet_gem.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	# Mipmapped filtering so the detailed gem downscales smoothly instead of aliasing ("blocky").
+	wallet_gem.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	wallet_gem.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	wallet_row.add_child(wallet_gem)
 
@@ -470,8 +472,9 @@ func _add_upgrade_card(parent: VBoxContainer, definition: Dictionary, accent: Co
 	buy_button.custom_minimum_size = Vector2(240, 123)
 	buy_button.add_theme_font_size_override("font_size", BUTTON_SIZE)
 	# The legacy-gem icon (set in refresh) replaces the word "BUY"; cap its width so the tall gem
-	# art sizes down to a button glyph beside the cost.
+	# art sizes down to a button glyph beside the cost. Mipmapped filtering keeps it from aliasing.
 	buy_button.add_theme_constant_override("icon_max_width", BUY_GEM_WIDTH)
+	buy_button.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	UiPalette.style_button(buy_button, true)  # red: this is a spend action
 	# Press buys one level immediately; holding then auto-repeats slowly until release
 	# (see _process). bind(id) passes which upgrade this button buys.

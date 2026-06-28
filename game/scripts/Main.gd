@@ -498,6 +498,8 @@ func _build_estate_tab() -> Control:
 	_plan_label.add_theme_font_override("normal_font", UiPalette.make_bold_font())
 	_plan_label.add_theme_font_size_override("normal_font_size", int(round(UiPalette.FONT_LABEL * 1.4)))
 	_plan_label.add_theme_color_override("default_color", UiPalette.PALE_GOLD)
+	# Mipmapped filtering so the inline gem image downscales smoothly rather than aliasing.
+	_plan_label.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	plan_center.add_child(_plan_label)
 	_plan_label.text = "[center]PLAN THE ESTATE[/center]"
 

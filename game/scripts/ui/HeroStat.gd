@@ -338,7 +338,10 @@ func _process(delta: float) -> void:
 	_income_refresh_accumulator += delta
 	if _income_refresh_accumulator >= INCOME_REFRESH_INTERVAL:
 		_income_refresh_accumulator = 0.0
-		_income_label.text = Money.of(_pending_income_per_sec).display() + "/s"
+		# Just the amount — the "$/s" icon beneath it carries the "per second" (Tim, 2026-06-28).
+		# A bare "$" icon would read the same as the cash side's dollar bill, so the icon keeps
+		# its "/s"; printing "/s" on the number too would be redundant.
+		_income_label.text = Money.of(_pending_income_per_sec).display()
 
 	# Frenzy glow: pulse the ticket background between white and a soft red while a burn is
 	# active; snap back to plain white the moment it ends. The glow shows through the planet

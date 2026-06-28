@@ -1,23 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="120" height="64" viewBox="0 0 120 64">
-  <!-- Income-per-second symbol: a gold "$/s" ("dollars per second"). Drawn as vector strokes,
-       not <text>, because Godot's SVG rasterizer embeds no fonts (see dollar_bill.svg). Each
-       glyph is stroked twice: a DARK-GOLD underlay for an all-gold outline that still reads on
-       the cream panel (Tim, 2026-06-28), then the bright gold on top. The "s" is deliberately
-       narrower than the "$" so it reads as a small unit suffix, not a second large glyph. -->
-  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
-    <!-- Dark-gold underlay (the outline) -->
-    <g stroke="#8A6A1C" stroke-width="12">
-      <line x1="28" y1="8" x2="28" y2="56"/>
-      <path d="M 42 17 C 42 9 14 9 14 22 C 14 32 42 32 42 42 C 42 55 14 55 14 47"/>
-      <line x1="74" y1="12" x2="58" y2="52"/>
-      <path d="M 108 36 C 108 31 90 31 90 36 C 90 41 108 41 108 45 C 108 50 90 50 90 45"/>
-    </g>
-    <!-- Bright gold on top -->
-    <g stroke="#E3B23C" stroke-width="6">
-      <line x1="28" y1="8" x2="28" y2="56"/>
-      <path d="M 42 17 C 42 9 14 9 14 22 C 14 32 42 32 42 42 C 42 55 14 55 14 47"/>
-      <line x1="74" y1="12" x2="58" y2="52"/>
-      <path d="M 108 36 C 108 31 90 31 90 36 C 90 41 108 41 108 45 C 108 50 90 50 90 45"/>
-    </g>
+  <!-- Income-per-second symbol (Tim, 2026-06-28): "$ / stopwatch" = dollars per second. A single
+       dark gold, NO outline (the earlier two-tone "$/s" read poorly). The "s" is replaced by a
+       stopwatch so "per second" is unmistakable. Drawn as strokes (the SVG importer embeds no
+       fonts; see dollar_bill.svg). -->
+  <g fill="none" stroke="#8A6A1C" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+    <!-- $ -->
+    <line x1="24" y1="9" x2="24" y2="55"/>
+    <path d="M 38 18 C 38 10 11 10 11 23 C 11 32 38 32 38 41 C 38 54 11 54 11 46"/>
+    <!-- / -->
+    <line x1="62" y1="12" x2="48" y2="52"/>
+    <!-- stopwatch: face, top plunger (stem + button cap), a side start/stop button, and a hand -->
+    <circle cx="94" cy="42" r="17"/>
+    <line x1="94" y1="13" x2="94" y2="25"/>
+    <line x1="85" y1="13" x2="103" y2="13"/>
+    <line x1="109" y1="29" x2="114" y2="24"/>
+    <line x1="94" y1="42" x2="102" y2="34"/>
   </g>
 </svg>

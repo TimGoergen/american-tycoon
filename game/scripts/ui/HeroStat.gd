@@ -46,11 +46,11 @@ const CASH_BILL_ICON_PATH := "res://art/icons/dollar_bill.svg"
 const CASH_BILL_SIZE := Vector2(100, 50)
 const CASH_BILL_EDGE_PAD := 14
 
-# The gold "$/s" income-per-second symbol shown beneath the income number, left-aligned
-# (replaced the old "INCOME" word, Tim 2026-06-28). Box matches the SVG's 120×64 (~1.875:1)
-# aspect so the glyphs sit flush-left in the box with no extra padding.
+# The dark-gold "$ / stopwatch" income-per-second symbol shown beneath the income number,
+# left-aligned (replaced the old "INCOME" word, Tim 2026-06-28). Box matches the SVG's 124×64
+# (~1.94:1) aspect so the glyphs sit flush-left in the box with no extra padding.
 const INCOME_ICON_PATH := "res://art/icons/income_per_sec.svg"
-const INCOME_ICON_SIZE := Vector2(101, 54)
+const INCOME_ICON_SIZE := Vector2(113, 60)
 
 ## Gap kept between a pinned label and the panel edge it hugs.
 const EDGE_MARGIN := 14

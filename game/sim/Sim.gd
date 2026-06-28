@@ -58,6 +58,10 @@ func _initialize() -> void:
 	# M2 prestige spine: prove the dynasty "speeds up every time" (GDD §13).
 	_run_dynasty_protocol()
 
+	# Epoch transition study: does each alien epoch take longer or shorter than
+	# the last? (The "second epoch stalls out" investigation, 2026-06-27.)
+	_run_epoch_timing_study()
+
 	quit()
 
 
@@ -508,3 +512,189 @@ func _print_ladder_magnitude() -> void:
 		prev_ips = ips
 		prev_cost = c.base_cost
 	print("")
+
+
+# ---------------------------------------------------------------------------
+# Epoch transition study — "does the second epoch stall out?"
+# ---------------------------------------------------------------------------
+#
+# THE QUESTION (Tim, 2026-06-27): reaching epoch 2 feels like it stalls — the only
+# change is that new staff become available, and at billions/sec a flat property
+# purchase no longer moves the needle. Is that a feel problem or a math problem?
+#
+# THE MODEL. Time to clear an epoch ~= (dollars you must earn) / (your income/sec).
+#   - Dollars to clear epoch T = earth_target * economy_scale(T) (EpochCatalog.consume_threshold).
+#   - Income/sec while IN epoch T ~= (your built-up Earth income) * staff_income_multiplier(T),
+#     because the staffer-tier multiplier is a flat linear factor on property income
+#     (EconomyState.get_passive_income_per_sec / PropertyState.get_income_per_cycle).
+#
+# So once we MEASURE one number — the income/sec a fully-built, fully-staffed
+# generation reaches on Earth (tier 1) — every epoch's duration follows by
+# multiplying that base by the tier's staff multiplier. We measure that base by
+# actually playing a juiced heir (high-fidelity 0.1 s ticks), then PROJECT the
+# whole 6-epoch ladder. The projection is exact for the RELATIVE timing (the thing
+# we care about) precisely because the staff multiplier is linear; only the
+# absolute clock depends on how juiced the heir is, and the divergence ratio does
+# not depend on it at all.
+#
+# A brute-force play-to-a-quadrillion sim is deliberately NOT used: epoch 3 alone
+# requires earning $103.6 quadrillion, which is hundreds of millions of ticks and
+# would only re-derive what the linear staff factor already tells us exactly.
+
+## Legacy granted to the measured heir so it buys a realistic deep-dynasty perk
+## sheet (maxes the compounding accelerators). Only affects the ABSOLUTE clock, not
+## the per-epoch divergence ratio — chosen generous so the absolute hours read realistically.
+const STUDY_HEIR_LEGACY := 50_000
+const STUDY_BUILDUP_SECONDS := 600.0   # active play before we read the income plateau
+
+
+func _run_epoch_timing_study() -> void:
+	print("")
+	print("=== Epoch transition study (does the 2nd epoch stall?) ===")
+
+	var base_ips := _measure_tier1_plateau_income()
+	print("  Measured Earth (tier 1) income plateau, fully staffed: %s/s" % Money.of(base_ips).display())
+	if base_ips <= 0.0:
+		push_error("Sim: epoch study could not measure a base income")
+		return
+
+	# 1) The CURRENT constants, straight from the live catalog.
+	var current_econ: Array = []
+	var current_staff: Array = []
+	for tier in range(1, EpochCatalog.tier_count() + 1):
+		current_econ.append(EpochCatalog.economy_scale(tier))
+		current_staff.append(EpochCatalog.staff_income_multiplier(tier))
+	print("")
+	print("  --- CURRENT constants (live EpochCatalog) ---")
+	_print_epoch_projection(current_econ, current_staff, base_ips)
+
+	# 2) Candidate matched/under-matched pairs. The per-epoch duration ratio is
+	#    asymptotically economy_step / staff_step, so:
+	#      step ratio  < 1  -> each epoch is FASTER than the last (accelerates)
+	#      step ratio == 1  -> every epoch takes the same wall-clock (flat)
+	#      step ratio  > 1  -> each epoch is slower (the current stall)
+	#    Each candidate is a geometric ladder over 6 tiers from (1, 1).
+	var candidates := [
+		{"name": "Match high (econ x1000, staff x1000)", "econ": 1000.0, "staff": 1000.0},
+		{"name": "Match moderate (econ x30, staff x30)", "econ": 30.0, "staff": 30.0},
+		{"name": "Accelerating (econ x30, staff x40)", "econ": 30.0, "staff": 40.0},
+		{"name": "Accelerating (econ x50, staff x60)", "econ": 50.0, "staff": 60.0},
+	]
+	for candidate in candidates:
+		print("")
+		print("  --- Candidate: %s ---" % candidate["name"])
+		var econ := _geometric_ladder(float(candidate["econ"]), EpochCatalog.tier_count())
+		var staff := _geometric_ladder(float(candidate["staff"]), EpochCatalog.tier_count())
+		_print_epoch_projection(econ, staff, base_ips)
+
+	print("")
+	print("  TAKEAWAY: per-epoch duration ratio = economy_step / staff_step.")
+	# Read the live epoch-2 step straight from the catalog so this line never goes
+	# stale when the constants are retuned (it cited the old 1000/17 stall before).
+	var econ_step: float = float(current_econ[1]) / float(current_econ[0]) if current_econ.size() > 1 else 0.0
+	var staff_step: float = float(current_staff[1]) / float(current_staff[0]) if current_staff.size() > 1 else 0.0
+	var verdict := "ACCELERATES" if staff_step > econ_step \
+			else ("FLAT" if is_equal_approx(staff_step, econ_step) else "STALLS (slower each epoch)")
+	print("  Live epoch-2 step: economy x%.0f / staff x%.0f  ->  %s." % [econ_step, staff_step, verdict])
+	print("  Rule of thumb: keep staff step >= economy step to stay flat-or-accelerating.")
+
+
+## Play one juiced generation to a build-out plateau and return its passive
+## income/sec on Earth (every property staffed at tier 1). This is the single
+## measured number the whole projection rests on.
+func _measure_tier1_plateau_income() -> float:
+	var dynasty := DynastyState.new(_property_configs, _tuning)
+	dynasty.upgrades.award(STUDY_HEIR_LEGACY)
+	var levels := _buy_upgrades_greedily(dynasty)
+	print("  Juiced heir: spent %d Legacy on %d upgrade levels (property income x%.1f)" % [
+		STUDY_HEIR_LEGACY, levels, dynasty.get_legacy_income_multiplier(),
+	])
+
+	var game := dynasty.current
+	var sim_time := 0.0
+	var next_wage_tap := 0.0
+	while sim_time < STUDY_BUILDUP_SECONDS:
+		if sim_time >= next_wage_tap:
+			game.tap_wage()
+			next_wage_tap += WAGE_TAP_PERIOD
+		game.pop_frenzy()
+		_greedy_buy_spree(game)
+		# Keep every owned property staffed at tier 1 (the Earth automation tier)
+		# and restart anything idle — we want the dependable passive plateau.
+		for i in range(game.economy.properties.size()):
+			var prop := game.economy.properties[i] as PropertyState
+			if prop.units_owned > 0:
+				if prop.staff_tier < 1:
+					game.try_hire(i)
+				if not prop.is_cycle_running:
+					game.tap_property(i)
+		dynasty.tick(TICK_SIZE)
+		sim_time += TICK_SIZE
+
+	# The passive (staffed) rate excludes the temporary frenzy multiplier, so it is
+	# the steady income the epoch climb actually runs on.
+	return game.economy.get_passive_income_per_sec()
+
+
+## Build a geometric ladder [1, step, step^2, ...] of `count` tiers (tier 1 = 1.0).
+func _geometric_ladder(step: float, count: int) -> Array:
+	var ladder: Array = []
+	var value := 1.0
+	for _i in range(count):
+		ladder.append(value)
+		value *= step
+	return ladder
+
+
+## Print, for one set of (economy_scale, staff_multiplier) ladders, how long each
+## epoch takes given the measured base income, and the ratio vs. the previous epoch.
+func _print_epoch_projection(economy_scale: Array, staff_mult: Array, base_ips: float) -> void:
+	print("    epoch  econ_scale   staff_x    income/sec       must earn      duration     vs prev")
+	var earth_target := _tuning.earth_economy_target
+	var prev_threshold := 0.0
+	var prev_duration := 0.0
+	var total := 0.0
+	for index in range(economy_scale.size()):
+		var tier := index + 1
+		var threshold := earth_target * float(economy_scale[index])
+		var to_earn := threshold - prev_threshold
+		var income := base_ips * float(staff_mult[index])
+		var duration := to_earn / income if income > 0.0 else INF
+		total += duration
+		var ratio_text := "—"
+		if prev_duration > 0.0 and is_finite(duration):
+			ratio_text = "x%.1f" % (duration / prev_duration)
+		print("    %4d   %10s   %7s   %12s   %12s   %10s   %7s" % [
+			tier,
+			_format_scale(float(economy_scale[index])),
+			_format_scale(float(staff_mult[index])),
+			Money.of(income).display() + "/s",
+			Money.of(to_earn).display(),
+			_format_duration(duration),
+			ratio_text,
+		])
+		prev_threshold = threshold
+		prev_duration = duration
+	print("    total time across all %d epochs: %s" % [economy_scale.size(), _format_duration(total)])
+
+
+## Compact magnitude label for the projection table (e.g. 1000 -> "1e3", 15 -> "15").
+func _format_scale(value: float) -> String:
+	if value >= 1000.0:
+		return "1e%d" % int(round(log(value) / log(10.0)))
+	return "%.0f" % value
+
+
+## Human-readable duration: seconds / minutes / hours / days / years, whichever fits.
+func _format_duration(seconds: float) -> String:
+	if not is_finite(seconds):
+		return "never"
+	if seconds < 60.0:
+		return "%.0f s" % seconds
+	if seconds < 3600.0:
+		return "%.1f m" % (seconds / 60.0)
+	if seconds < 86400.0:
+		return "%.1f h" % (seconds / 3600.0)
+	if seconds < 31_536_000.0:
+		return "%.1f d" % (seconds / 86400.0)
+	return "%.1f y" % (seconds / 31_536_000.0)

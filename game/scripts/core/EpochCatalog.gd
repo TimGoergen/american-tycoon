@@ -21,9 +21,21 @@ class_name EpochCatalog
 # `economy_scale` so the win/contact threshold has a single source of truth.
 #
 # v1 ships Earth + 5 alien races (Plans doc §8 named the first 3; Quartzite and
-# Chronophage were added in Phase 4). Numbers are first-pass, meant for
-# on-device feel-tuning, not final balance; the dynasty sim verifies "speeds up every
-# time" still holds with them.
+# Chronophage were added in Phase 4).
+#
+# EPOCH PACING (reworked 2026-06-27 — the "second epoch stalls out" fix). The two
+# ladders below race each other: economy_scale sets how much you must EARN to clear
+# an epoch, and staff_income_multiplier sets how much your income GROWS in it. Time
+# to clear an epoch is roughly (must-earn) / (income), so the per-epoch duration
+# ratio is economy_step / staff_step (proven by sim/Sim.gd _run_epoch_timing_study).
+# The old v1 numbers (economy ×1000/epoch, staff ×~17/epoch) made every epoch ~60×
+# LONGER than the last — a guaranteed wall by epoch 2. We now use matched GEOMETRIC
+# ladders with staff stepping slightly faster than the economy:
+#   economy_scale          = 30^(tier-1)  -> 1, 30, 900, 27k, 810k, 24.3M
+#   staff_income_multiplier = 40^(tier-1) -> 1, 40, 1.6k, 64k, 2.56M, 102.4M
+# Because staff_step (40) > economy_step (30), each epoch is a touch FASTER than the
+# one before (ratio ~0.75) — the GDD §5.1 "it speeds up every time" feel — instead of
+# slower. Still first-pass feel-tuning values; the dynasty sim + epoch study verify them.
 
 
 # Each epoch is one dictionary with these keys:
@@ -63,8 +75,8 @@ const EPOCHS := [
 		"civilization": "Luminari Collective",
 		"home_planet": "Solaria Prime",
 		"currency_flavor": "Photons",
-		"economy_scale": 1_000.0,
-		"staff_income_multiplier": 15.0,
+		"economy_scale": 30.0,
+		"staff_income_multiplier": 40.0,
 		"contact_line": "You bought the Earth. The Luminari Collective noticed. " \
 			+ "Now your money moves at the speed of light — and so does everyone else's.",
 		# Energy/light beings — money now moves at the speed of light.
@@ -80,8 +92,8 @@ const EPOCHS := [
 		"civilization": "Geth-Sentinel Grid",
 		"home_planet": "Rannoch-01",
 		"currency_flavor": "Logic Nodes",
-		"economy_scale": 1_000_000.0,
-		"staff_income_multiplier": 250.0,
+		"economy_scale": 900.0,
+		"staff_income_multiplier": 1_600.0,
 		"contact_line": "The Geth-Sentinel Grid comes online. Every trade, every fund, " \
 			+ "every hustle — handed to machines that never sleep, never quit, never ask why.",
 		# Cybernetic collective — finance run entirely by machines.
@@ -97,8 +109,8 @@ const EPOCHS := [
 		"civilization": "Mycelium Unity",
 		"home_planet": "Spore-Deep",
 		"currency_flavor": "Spores",
-		"economy_scale": 1_000_000_000.0,
-		"staff_income_multiplier": 5_000.0,
+		"economy_scale": 27_000.0,
+		"staff_income_multiplier": 64_000.0,
 		"contact_line": "The Mycelium Unity spreads into your holdings. Money that grows " \
 			+ "itself now — branching through the dark, feeding on everything it touches.",
 		# Fungal hive-mind — money that literally spreads and self-replicates.
@@ -114,8 +126,8 @@ const EPOCHS := [
 		"civilization": "Quartzite Conglomerate",
 		"home_planet": "Geode-7",
 		"currency_flavor": "Prisms",
-		"economy_scale": 1_000_000_000_000.0,
-		"staff_income_multiplier": 90_000.0,
+		"economy_scale": 810_000.0,
+		"staff_income_multiplier": 2_560_000.0,
 		"contact_line": "The Quartzite Conglomerate refracts your fortune. Wealth, " \
 			+ "crystallized — harder than diamond, and just as cold.",
 		# Crystalloid life — capital made permanent, faceted, light bent to its will.
@@ -131,8 +143,8 @@ const EPOCHS := [
 		"civilization": "Chronophage Enclave",
 		"home_planet": "Tempus",
 		"currency_flavor": "Seconds",
-		"economy_scale": 1_000_000_000_000_000.0,
-		"staff_income_multiplier": 1_600_000.0,
+		"economy_scale": 24_300_000.0,
+		"staff_income_multiplier": 102_400_000.0,
 		"contact_line": "The Chronophage Enclave opens the quarter. They sell you time " \
 			+ "itself, by the second — at a markup you will never live long enough to repay.",
 		# Time-eaters — they trade in stolen moments; your money compounds across hours

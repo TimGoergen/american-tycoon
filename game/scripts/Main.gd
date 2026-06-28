@@ -292,11 +292,16 @@ func _build_ui() -> void:
 	column.add_child(_tab_content)
 
 	# The Family Ledger tab IS the (now embedded) FamilyLedgerScreen; the other three
-	# are built below. All four fill the content slot; _show_tab toggles visibility.
+	# are built below. Every tab's content is wrapped in the same edge-margin + outlined
+	# translucent-cream panel (UiPalette.wrap_in_tab_panel) so all four share one framed look.
+	# All four wrappers fill the content slot; _show_tab toggles visibility.
 	_ledger_screen = FamilyLedgerScreen.new()
 	_ledger_screen.setup()
 	_tab_panels = [
-		_build_property_tab(), _build_estate_tab(), _ledger_screen, _build_settings_tab(),
+		UiPalette.wrap_in_tab_panel(_build_property_tab()),
+		UiPalette.wrap_in_tab_panel(_build_estate_tab()),
+		UiPalette.wrap_in_tab_panel(_ledger_screen),
+		UiPalette.wrap_in_tab_panel(_build_settings_tab()),
 	]
 	for panel in _tab_panels:
 		(panel as Control).set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -470,31 +475,12 @@ func _build_estate_tab() -> Control:
 ## held well clear of the screen edges; the two tuning buttons are pushed to the very bottom,
 ## below that panel, sitting larger and bolder than the in-panel options.
 func _build_settings_tab() -> Control:
+	# Settings content now sits directly inside the shared per-tab panel
+	# (UiPalette.wrap_in_tab_panel), which supplies the edge margin, gray outline, and inner
+	# padding this tab used to build for itself — so every tab is framed identically. Everything,
+	# including the bottom tuning buttons, lives inside that one panel.
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 16)
-
-	# The settings panel sits inside a margin that is wider than the tab's normal inset, so the
-	# transparent plate floats clear of the screen edges. A MarginContainer adds that gap; the
-	# PanelContainer inside it is the gray-outlined, see-through plate.
-	const SETTINGS_PANEL_EDGE_MARGIN := 40
-	var panel_margin := MarginContainer.new()
-	for side in ["margin_left", "margin_right", "margin_top"]:
-		panel_margin.add_theme_constant_override(side, SETTINGS_PANEL_EDGE_MARGIN)
-	v.add_child(panel_margin)
-
-	var settings_panel := PanelContainer.new()
-	var panel_style := StyleBoxFlat.new()
-	panel_style.bg_color = Color.TRANSPARENT          # see-through plate
-	panel_style.border_color = UiPalette.MID_GRAY     # gray outline
-	panel_style.set_border_width_all(3)
-	panel_style.set_corner_radius_all(8)
-	panel_style.set_content_margin_all(24)            # keep the options clear of the outline
-	settings_panel.add_theme_stylebox_override("panel", panel_style)
-	panel_margin.add_child(settings_panel)
-
-	var panel_contents := VBoxContainer.new()
-	panel_contents.add_theme_constant_override("separation", 24)
-	settings_panel.add_child(panel_contents)
+	v.add_theme_constant_override("separation", 24)
 
 	var heading := Label.new()
 	heading.text = "SETTINGS"
@@ -504,7 +490,7 @@ func _build_settings_tab() -> Control:
 	# weight is faked with a FontVariation since the project ships no bold face yet.
 	heading.add_theme_font_size_override("font_size", int(UiPalette.FONT_HEADLINE * 1.4))
 	heading.add_theme_font_override("font", UiPalette.make_bold_font())
-	panel_contents.add_child(heading)
+	v.add_child(heading)
 
 	# Transition minigame toggle — the persistent home for the opt-out (GameState). Governs
 	# every site that rolls a minigame (prestige and welcome-back), not just prestige.
@@ -527,9 +513,9 @@ func _build_settings_tab() -> Control:
 	)
 	_minigame_check.button_pressed = game.ui_minigame_enabled
 	_minigame_check.toggled.connect(func(on: bool) -> void: game.ui_minigame_enabled = on)
-	panel_contents.add_child(_minigame_check)
+	v.add_child(_minigame_check)
 
-	# A spacer pushes the two tuning buttons to the very bottom of the tab, below the panel.
+	# A spacer pushes the two tuning buttons to the bottom of the panel, clear of the options above.
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(spacer)

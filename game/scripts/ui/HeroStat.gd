@@ -56,9 +56,9 @@ const PANEL_MIN_HEIGHT := 222
 const LABEL_LAYOUT_HEIGHT := 247
 
 # Planet backdrop (Tim, 2026-06-26): the current planet's world image sits behind the numbers
-# on a plain white plate, shown mostly whole and centred (zoomed out enough to read as a globe,
+# on the cream plate, shown mostly whole and centred (zoomed out enough to read as a globe,
 # not a close-up of one spot). The world SVGs have a transparent background (only the globe is
-# painted), so the white plate shows around the globe and the frenzy glow can still tint it.
+# painted), so the cream plate shows around the globe and the frenzy glow can still tint it.
 # Drawn as a faint watermark so the navy/green numerals stay readable on top.
 #
 # We BAKE the watermark into a fresh ImageTexture in code rather than letting a TextureRect crop
@@ -76,7 +76,7 @@ const LABEL_LAYOUT_HEIGHT := 247
 # Tim to eyeball — change them, not the layout code.
 const PLANET_FILL_FRACTION := 1.0
 const PLANET_WATERMARK_ALPHA := 0.6
-# Corner rounding baked into the watermark, in pixels. Matches the white plate's own corners as
+# Corner rounding baked into the watermark, in pixels. Matches the cream plate's own corners as
 # seen at the content rect: the plate rounds its TOP corners by SCREEN_CORNER_RADIUS and its
 # bottom corners only slightly, and the content sits ~12px (the border) inside that.
 const PLANET_CORNER_RADIUS_TOP := UiPalette.SCREEN_CORNER_RADIUS - 12
@@ -129,9 +129,9 @@ var _glow_time := 0.0
 
 func _ready() -> void:
 	var style := UiPalette.make_panel_style()
-	# Plain WHITE plate (Tim, 2026-06-26) so the planet watermark reads on a clean ground —
-	# replaces the former cream fill.
-	style.bg_color = Color.WHITE
+	# Cream plate (Tim, 2026-06-28: every control uses the cream ground) with the red ticket
+	# frame; the planet watermark and navy numerals still read cleanly over the warm tan.
+	style.bg_color = UiPalette.CREAM
 	style.border_color = UiPalette.KETCHUP_RED  # the red ticket frame (§8)
 	style.set_border_width_all(12)  # outline +300% (3 -> 12) at Tim's request (2026-06-23)
 	# Round the TOP corners to nest inside the phone's rounded screen corners (Tim,
@@ -141,7 +141,7 @@ func _ready() -> void:
 	add_theme_stylebox_override("panel", style)
 	_panel_style = style  # kept so the frenzy glow can pulse its background
 
-	# Planet backdrop, BEHIND the labels. The PanelContainer draws its own white plate first, then
+	# Planet backdrop, BEHIND the labels. The PanelContainer draws its own cream plate first, then
 	# its children in order, so adding this image before _content puts the watermark between the
 	# plate and the numbers. The container sizes this child to the plate's interior rect; we bake
 	# a texture to exactly that size (see _refresh_planet_watermark), so STRETCH_SCALE fills it
@@ -349,10 +349,10 @@ func _process(delta: float) -> void:
 	if _frenzy_glow:
 		_glow_time += delta
 		var pulse := 0.5 + 0.5 * sin(_glow_time * TAU * GLOW_PULSE_HZ)
-		_panel_style.bg_color = Color.WHITE.lerp(UiPalette.KETCHUP_RED, pulse * GLOW_MAX_TINT)
-	elif _panel_style.bg_color != Color.WHITE:
+		_panel_style.bg_color = UiPalette.CREAM.lerp(UiPalette.KETCHUP_RED, pulse * GLOW_MAX_TINT)
+	elif _panel_style.bg_color != UiPalette.CREAM:
 		_glow_time = 0.0
-		_panel_style.bg_color = Color.WHITE
+		_panel_style.bg_color = UiPalette.CREAM
 
 
 ## Pin each label to its edge of the plate. Done every frame because the values'

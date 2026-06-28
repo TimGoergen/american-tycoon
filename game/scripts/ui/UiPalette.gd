@@ -147,6 +147,38 @@ static func make_panel_style() -> StyleBoxFlat:
 	return _make_plate(CREAM, NAVY)
 
 
+## Edge gap that floats each tab's content panel clear of the screen — the same inset the
+## settings tab established, now shared by every tab.
+const TAB_PANEL_EDGE_MARGIN := 40
+
+
+## The standard per-tab content panel: a HALF-ALPHA cream plate with the gray outline the
+## settings tab established (3px border, 8px corners) and an inner content margin so nothing
+## crowds the outline. Translucent (50% alpha) so the epoch backdrop reads faintly through it.
+static func make_tab_panel_style() -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(CREAM, 0.5)
+	style.border_color = MID_GRAY
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(8)
+	style.set_content_margin_all(24)
+	return style
+
+
+## Wrap a tab's content Control in the standard edge margin + outlined translucent-cream panel,
+## so every tab shares one framed look (the settings-tab outline). Returns the outer
+## MarginContainer; the caller drops THAT into the tab-content slot in place of the bare content.
+static func wrap_in_tab_panel(content: Control) -> MarginContainer:
+	var margin := MarginContainer.new()
+	for side in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
+		margin.add_theme_constant_override(side, TAB_PANEL_EDGE_MARGIN)
+	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", make_tab_panel_style())
+	panel.add_child(content)
+	margin.add_child(panel)
+	return margin
+
+
 ## Style a Button in place. Standard buttons are navy-on-mustard; action
 ## buttons (spend/act: buy, pop, tuition) are pale-gold-on-red — red is
 ## reserved for "spend/act", never decoration (§8).

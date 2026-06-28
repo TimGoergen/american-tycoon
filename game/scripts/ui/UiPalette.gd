@@ -152,12 +152,12 @@ static func make_panel_style() -> StyleBoxFlat:
 const TAB_PANEL_EDGE_MARGIN := 40
 
 
-## The standard per-tab content panel: a HALF-ALPHA cream plate with the gray outline the
+## The standard per-tab content panel: a translucent cream plate with the gray outline the
 ## settings tab established (3px border, 8px corners) and an inner content margin so nothing
-## crowds the outline. Translucent (50% alpha) so the epoch backdrop reads faintly through it.
+## crowds the outline. 65% alpha so the epoch backdrop reads faintly through it (Tim, 2026-06-28).
 static func make_tab_panel_style() -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(CREAM, 0.5)
+	style.bg_color = Color(CREAM, 0.65)
 	style.border_color = MID_GRAY
 	style.set_border_width_all(3)
 	style.set_corner_radius_all(8)

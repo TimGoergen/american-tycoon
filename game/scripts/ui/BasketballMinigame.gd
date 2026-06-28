@@ -2,15 +2,16 @@ class_name BasketballMinigame
 extends Minigame
 
 # "Micro Basketball" minigame TYPE (GDD §5.5) — a quick slingshot-to-shoot game. A still hoop
-# sits on the board; a few basketballs rest on the floor. The player presses a ball, DRAGS it
-# back (away from where they want it to go), and releases — the ball is flung in the OPPOSITE
+# sits on the board; a SINGLE basketball rests on the floor. The player presses the ball, DRAGS
+# it back (away from where they want it to go), and releases — the ball is flung in the OPPOSITE
 # direction of the pull, with force proportional to how far it was dragged, like a slingshot.
 # The ball then flies purely under gravity, bouncing off the walls, ceiling, floor, and the hoop
 # itself (which is a solid obstacle — a ball hitting the rim or coming up from underneath bounces
-# off). A shot scores only when a falling ball drops in through the top of the hoop, exactly like
-# real basketball. Each made basket relocates the hoop to a fresh spot in the upper-middle band.
-# Baskets only ever accumulate, so the host's spectrum bar climbs as the player sinks shots. It
-# has no natural end — the host's countdown ends the round.
+# off), spinning as it rolls. At ANY time the player can press the ball again — even mid-flight —
+# to FREEZE it where it is and re-shoot from that spot. A shot scores only when a falling ball
+# drops in through the top of the hoop, exactly like real basketball. Each made basket relocates
+# the hoop to a fresh spot in the upper-middle band. Baskets only ever accumulate, so the host's
+# spectrum bar climbs as the player sinks shots. It has no natural end — the host's countdown ends it.
 #
 # Owns only its gameplay; the host owns the countdown / spectrum / result / multiplier.
 
@@ -19,10 +20,10 @@ extends Minigame
 ## harder to reach, lower to make it easier.
 const TARGET_BASKETS := 6
 
-## The fixed pool of basketballs on the floor at once. Balls are never spawned or removed during
-## play — a thrown ball bounces, settles, and becomes throwable again; a scored ball is reset to
-## the floor — so exactly this many balls always exist.
-const BALL_COUNT := 3
+## A single basketball is in play (Tim, 2026-06-28). It is never spawned or removed — a thrown
+## ball bounces, settles, and becomes throwable again; a scored ball is reset to the floor — so
+## the one ball always exists. (Kept as a count so the lay/loop code reads uniformly.)
+const BALL_COUNT := 1
 
 ## Ball size in pixels — kept generous for thumb play and imperfect vision.
 const BALL_RADIUS := 38.0          # 76px diameter
@@ -58,9 +59,6 @@ const MAX_THROW_SPEED := 2900.0
 ## (0 = dead stop, 1 = perfectly elastic). Lowered for the heavier feel — a dense ball thuds and
 ## loses energy quickly rather than springing back.
 const RESTITUTION := 0.46
-## Fraction of speed kept when two balls bounce off each other — a touch deader than a wall bounce,
-## so a pile of balls absorbs energy and settles instead of scattering forever.
-const BALL_RESTITUTION := 0.40
 ## Extra horizontal slowdown applied each time a ball lands on the floor, so it doesn't skate
 ## along the ground forever after the bounce height dies out.
 const FLOOR_FRICTION := 0.70
@@ -68,18 +66,16 @@ const FLOOR_FRICTION := 0.70
 ## axes, it settles: it becomes a still, throwable ball again. Raised with the heavier feel so
 ## balls come to rest promptly instead of dribbling out a long tail of tiny bounces.
 const REST_SPEED := 95.0
-## A resting ball shoved by another ball faster than this (px/sec) wakes into flight; a gentler
-## nudge (e.g. two balls merely separated with no real speed) leaves it resting.
-const WAKE_SPEED := 60.0
 
 ## Thickness (px) of the dark-gray outline that frames the board and defines the walls, floor,
 ## and ceiling the balls bounce against.
 const WALL_THICKNESS := 6.0
 
-# Each ball is a Dictionary: { "pos": Vector2, "vel": Vector2, "state": String }, plus a transient
-# "prev" (its start-of-frame position, written during the motion pass and read by the hoop's
-# top-entry test). state is one of "idle" (resting on the floor, throwable), "aiming" (pulled back,
-# following the finger, not yet released), or "flight" (airborne under gravity).
+# Each ball is a Dictionary: { "pos": Vector2, "vel": Vector2, "state": String, "spin": float },
+# plus a transient "prev" (its start-of-frame position, written during the motion pass and read by
+# the hoop's top-entry test). state is one of "idle" (resting on the floor, throwable), "aiming"
+# (held by the finger, frozen, not yet released), or "flight" (airborne under gravity). spin is the
+# ball's draw rotation, accumulated from horizontal motion so it visibly rolls.
 var _balls: Array = []
 var _baskets: int = 0
 var _running: bool = false
@@ -124,7 +120,7 @@ func begin(tuning: TuningConfig) -> void:
 	var _round_seconds := maxf(0.1, tuning.minigame_duration_seconds)
 
 	var intro := Label.new()
-	intro.text = "Press a ball, pull it back, and release to sling it through the top of the hoop!"
+	intro.text = "Pull the ball back and release to sling it through the hoop. Tap it any time — even mid-air — to freeze it and shoot again from there!"
 	intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	intro.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
@@ -179,18 +175,19 @@ func _process(delta: float) -> void:
 	_play.queue_redraw()
 
 
-## Place the fixed pool of balls resting on the floor, evenly spread across the width.
+## Place the ball resting on the floor (BALL_COUNT == 1 → centered; the spread math still reads
+## uniformly if the count is ever raised).
 func _lay_balls_on_floor(bounds: Vector2) -> void:
 	_balls.clear()
 	var floor_y := bounds.y - WALL_THICKNESS - BALL_RADIUS
 	for i in range(BALL_COUNT):
-		# Spread the balls across the central span of the floor (avoiding the very corners).
 		var fraction := (float(i) + 1.0) / (float(BALL_COUNT) + 1.0)
 		var x := lerpf(bounds.x * 0.18, bounds.x * 0.82, fraction)
 		_balls.append({
 			"pos": Vector2(x, floor_y),
 			"vel": Vector2.ZERO,
 			"state": "idle",
+			"spin": 0.0,
 		})
 
 
@@ -205,73 +202,33 @@ func _move_hoop(bounds: Vector2) -> void:
 	)
 
 
-## Advance the simulation one frame, in three clear passes:
-##   1) integrate gravity + motion for every airborne ball (remembering each ball's start position
-##      so the hoop's top-entry test can see the crossing),
-##   2) resolve ball-to-ball collisions so the balls are solid obstacles to each other,
-##   3) resolve each airborne ball against the hoop and the board's walls/floor/ceiling.
-## Splitting the work this way keeps the (already busy) physics readable and means a collision can
-## never leave a ball overlapping a wall — the wall pass runs last.
+## Advance the simulation one frame, in two clear passes:
+##   1) integrate gravity + motion for the airborne ball (remembering its start position so the
+##      hoop's top-entry test can see the crossing), and spin it from its horizontal motion,
+##   2) resolve the airborne ball against the hoop and the board's walls/floor/ceiling.
+## The wall pass runs last so a ball can never be left overlapping a wall.
 func _advance_balls(delta: float, bounds: Vector2) -> void:
-	# Pass 1: gravity + motion.
+	# Pass 1: gravity + motion, plus rolling spin.
 	for ball in _balls:
 		if ball["state"] != "flight":
 			continue
 		ball["prev"] = ball["pos"]  # start-of-frame position, for the hoop crossing test
 		ball["vel"].y += GRAVITY * delta
 		ball["pos"] += ball["vel"] * delta
+		# Spin from horizontal motion (rolling without slipping: angular speed = vx / radius), so the
+		# ball visibly rotates as it rolls along the floor or arcs through the air (Tim, 2026-06-28).
+		ball["spin"] = float(ball.get("spin", 0.0)) + ball["vel"].x / BALL_RADIUS * delta
 
-	# Pass 2: the balls shove each other.
-	_resolve_ball_collisions(bounds)
-
-	# Pass 3: hoop scoring/bounces, then the board walls.
+	# Pass 2: hoop scoring/bounces, then the board walls.
 	for ball in _balls:
 		if ball["state"] != "flight":
 			continue
-		# A ball woken by a collision this frame has no "prev" yet — treat it as not crossing.
 		var prev: Vector2 = ball.get("prev", ball["pos"])
 		# Resolve the hoop first. If it scored, the ball was reset to the floor and the hoop moved,
 		# so skip the wall pass for it this frame.
 		if _resolve_hoop(ball, prev, bounds):
 			continue
 		_resolve_walls(ball, bounds)
-
-
-## Treat every pair of (non-aimed) balls as solid, equal-mass circles: separate any overlap and, if
-## they are closing on each other, exchange momentum along the contact normal. A resting ball that
-## gets genuinely shoved wakes into flight; two balls merely nudged apart stay at rest.
-func _resolve_ball_collisions(bounds: Vector2) -> void:
-	var min_distance := BALL_RADIUS * 2.0
-	for i in range(_balls.size()):
-		var a: Dictionary = _balls[i]
-		if a["state"] == "aiming":
-			continue  # the held ball is under the player's finger — leave it out of collisions
-		for j in range(i + 1, _balls.size()):
-			var b: Dictionary = _balls[j]
-			if b["state"] == "aiming":
-				continue
-			var offset: Vector2 = a["pos"] - b["pos"]
-			var distance := offset.length()
-			if distance >= min_distance or distance <= 0.01:
-				continue
-			var normal := offset / distance
-			# Push the two apart equally so they no longer overlap.
-			var correction := normal * ((min_distance - distance) * 0.5)
-			a["pos"] += correction
-			b["pos"] -= correction
-			# Exchange momentum only if they're actually closing (relative speed along the normal is
-			# negative); otherwise the separation above is all that's needed.
-			var relative: float = (a["vel"] - b["vel"]).dot(normal)
-			if relative < 0.0:
-				var impulse := -(1.0 + BALL_RESTITUTION) * relative * 0.5  # equal mass: split evenly
-				a["vel"] += normal * impulse
-				b["vel"] -= normal * impulse
-			# Keep both inside the walls (the separation above could nudge a ball past an edge), and
-			# wake either one if it was resting and just took a real hit.
-			_clamp_inside(a, bounds)
-			_clamp_inside(b, bounds)
-			_wake_if_shoved(a)
-			_wake_if_shoved(b)
 
 
 ## Bounce one airborne ball off the side walls, ceiling, and floor, and let it settle to rest once
@@ -305,19 +262,6 @@ func _resolve_walls(ball: Dictionary, bounds: Vector2) -> void:
 		if absf(ball["vel"].y) < REST_SPEED and absf(ball["vel"].x) < REST_SPEED:
 			ball["vel"] = Vector2.ZERO
 			ball["state"] = "idle"
-
-
-## Clamp a ball's center inside the board's inner walls (used after a collision nudge, which can
-## push a ball slightly past an edge). Velocity is untouched — the wall pass handles the bounce.
-func _clamp_inside(ball: Dictionary, bounds: Vector2) -> void:
-	ball["pos"].x = clampf(ball["pos"].x, WALL_THICKNESS + BALL_RADIUS, bounds.x - WALL_THICKNESS - BALL_RADIUS)
-	ball["pos"].y = clampf(ball["pos"].y, WALL_THICKNESS + BALL_RADIUS, bounds.y - WALL_THICKNESS - BALL_RADIUS)
-
-
-## Wake a resting ball into flight if a collision gave it real speed; a tiny nudge leaves it resting.
-func _wake_if_shoved(ball: Dictionary) -> void:
-	if ball["state"] == "idle" and ball["vel"].length() > WAKE_SPEED:
-		ball["state"] = "flight"
 
 
 ## Resolve a flight ball against the hoop. Returns true if it scored (the caller then skips the
@@ -384,14 +328,15 @@ func _on_play_input(event: InputEvent) -> void:
 		_drag_aim(event.position)
 
 
-## On press, grab the nearest resting ball within a generous radius and remember its rest spot as
-## the slingshot anchor.
+## On press, grab the nearest ball within a generous radius — in ANY state, so a ball caught
+## mid-flight FREEZES where it is (Tim, 2026-06-28). Its current position becomes the slingshot
+## anchor, so the next shot launches from wherever it was caught rather than from the floor.
 func _begin_aim(point: Vector2) -> void:
 	var best_index := -1
-	var best_distance := BALL_RADIUS * 1.6  # generous selection radius for thumb play
+	var best_distance := BALL_RADIUS * 2.0  # generous radius — also helps catch a moving ball
 	for i in range(_balls.size()):
-		if _balls[i]["state"] != "idle":
-			continue
+		if _balls[i]["state"] == "aiming":
+			continue  # already held
 		# Explicit float type: a Dictionary lookup is untyped (Variant), so distance_to() can't be
 		# inferred with := here.
 		var distance: float = _balls[i]["pos"].distance_to(point)
@@ -401,7 +346,8 @@ func _begin_aim(point: Vector2) -> void:
 	if best_index == -1:
 		return
 	_aim_index = best_index
-	_aim_anchor = _balls[best_index]["pos"]
+	_balls[best_index]["vel"] = Vector2.ZERO   # freeze a ball caught mid-flight in place
+	_aim_anchor = _balls[best_index]["pos"]    # re-shoot from where it was caught
 	_balls[best_index]["state"] = "aiming"
 
 
@@ -450,10 +396,13 @@ func _draw_play() -> void:
 	_draw_rim_half(rim_color, true)   # back half (top edge of the ellipse)
 
 	for ball in _balls:
-		# The aimed ball draws a touch larger so the player can see which one they're slinging.
+		# The aimed ball draws a touch larger so the player can see they're holding it.
 		var radius := BALL_RADIUS * (1.12 if ball["state"] == "aiming" else 1.0)
-		var ball_rect := Rect2(ball["pos"] - Vector2(radius, radius), Vector2(radius * 2.0, radius * 2.0))
-		_play.draw_texture_rect(BALL_TEX, ball_rect, false)
+		# Rotate the ball around its center by its accumulated spin so it visibly rolls as it moves.
+		# draw_set_transform applies to the next draw; we reset it right after.
+		_play.draw_set_transform(ball["pos"], float(ball.get("spin", 0.0)), Vector2.ONE)
+		_play.draw_texture_rect(BALL_TEX, Rect2(-radius, -radius, radius * 2.0, radius * 2.0), false)
+	_play.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 	_draw_rim_half(rim_color, false)  # front half (bottom edge of the ellipse), drawn over the ball
 

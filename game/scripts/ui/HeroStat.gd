@@ -41,7 +41,9 @@ const NAME_BOLD := 2
 # CASH_BILL_EDGE_PAD is extra right clearance on top of EDGE_MARGIN so the edge-filling bill
 # sits comfortably inside the thick red frame rather than against it.
 const CASH_BILL_ICON_PATH := "res://art/icons/dollar_bill.svg"
-const CASH_BILL_SIZE := Vector2(72, 36)
+# 40% larger than the original 72×36 (Tim, 2026-06-28). The bill is positioned from its RIGHT
+# edge (area.x − margin), so enlarging it grows the bill leftward and keeps the right margin.
+const CASH_BILL_SIZE := Vector2(100, 50)
 const CASH_BILL_EDGE_PAD := 14
 
 # The gold "$/s" income-per-second symbol shown beneath the income number, left-aligned
@@ -168,7 +170,7 @@ func _ready() -> void:
 	_income_label = _make_label(UiPalette.NAVY, INCOME_FONT_SIZE, INCOME_BOLD)
 	_content.add_child(_income_label)
 
-	_cash_label = _make_label(UiPalette.MONEY_GREEN, CASH_FONT_SIZE, CASH_BOLD)
+	_cash_label = _make_label(UiPalette.DARK_MONEY_GREEN, CASH_FONT_SIZE, CASH_BOLD)
 	_content.add_child(_cash_label)
 
 	# Beneath each value sits a small icon instead of a word (Tim, 2026-06-28): the gold "$/s"

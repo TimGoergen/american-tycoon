@@ -61,7 +61,7 @@ func _build_chrome() -> void:
 
 	_total_label = Label.new()
 	_total_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_total_label.add_theme_color_override("font_color", UiPalette.MONEY_GREEN)
+	_total_label.add_theme_color_override("font_color", UiPalette.DARK_MONEY_GREEN)
 	_total_label.add_theme_font_size_override("font_size", TOTAL_SIZE)
 	column.add_child(_total_label)
 
@@ -89,7 +89,7 @@ func _build_chrome() -> void:
 ## reads chronologically). `lifetime_total` is the dynasty-wide cash-earned sum shown in
 ## the header. Call when the tab is opened, so it reflects the latest succession.
 func refresh(ancestors: Array, lifetime_total: float) -> void:
-	_total_label.text = "Dynasty total: %s" % Money.of(lifetime_total).display()
+	_total_label.text = "Dynasty Total: %s" % Money.of(lifetime_total).display()
 
 	# The list grows each generation, so rebuild it fresh rather than appending.
 	for child in _list.get_children():

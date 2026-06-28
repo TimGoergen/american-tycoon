@@ -15,6 +15,9 @@ const MUSTARD_GOLD := Color("#E3B23C")
 const DARK_GOLD := Color("#A87C16")
 const ATOMIC_TEAL := Color("#9FD8D4")
 const MONEY_GREEN := Color("#7DA87B")
+## A darker money green for headline dollar figures that want more weight than the soft
+## MONEY_GREEN — the cash-on-hand total and the Family Ledger's dynasty total (Tim, 2026-06-28).
+const DARK_MONEY_GREEN := Color("#5E7E5C")
 const INK_NAVY := Color("#0D1830")
 const BRICK := Color("#8E2F1E")
 const PALE_GOLD := Color("#F0D49A")

@@ -253,7 +253,8 @@ func _ready() -> void:
 	_wage_title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_wage_title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_wage_title_label.add_theme_font_size_override("font_size", UiPalette.FONT_PAGE_TITLE)
-	_wage_title_label.add_theme_color_override("font_color", UiPalette.NAVY)
+	# Full black to match the reference art (Tim, 2026-06-28).
+	_wage_title_label.add_theme_color_override("font_color", Color.BLACK)
 	_wage_title_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(_wage_title_label)
 
@@ -262,7 +263,8 @@ func _ready() -> void:
 	_wage_amount_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_wage_amount_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_wage_amount_label.add_theme_font_size_override("font_size", UiPalette.FONT_DISPLAY)
-	_wage_amount_label.add_theme_color_override("font_color", UiPalette.NAVY)
+	# Full black to match the CLOCK IN label (Tim, 2026-06-28).
+	_wage_amount_label.add_theme_color_override("font_color", Color.BLACK)
 	_wage_amount_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(_wage_amount_label)
 
@@ -319,9 +321,14 @@ func _level_progress() -> float:
 ## The level badge plate: a dark-blue (INK_NAVY) fill with the SAME navy frame thickness as
 ## the clock-in meter beside it (style_framed_progress uses 8), so the two read as a matched
 ## pair on the row (Tim, 2026-06-28).
+## A slightly brighter dark blue than INK_NAVY for the level plate — INK_NAVY read as nearly
+## black (Tim, 2026-06-28); still darker than the NAVY frame so the border stays visible.
+const LEVEL_PLATE_BG := Color("#15243F")
+
+
 func _make_level_plate() -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
-	style.bg_color = UiPalette.INK_NAVY
+	style.bg_color = LEVEL_PLATE_BG
 	style.set_corner_radius_all(10)
 	style.border_color = UiPalette.NAVY
 	style.set_border_width_all(8)

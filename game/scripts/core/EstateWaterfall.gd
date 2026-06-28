@@ -56,7 +56,7 @@ static func compute(
 ## curve produced.
 const LEGACY_BASE := 1_000.0
 
-## Convert an estate's post-tax net into dynastic Legacy points.
+## Convert an estate's post-tax net into dynastic Legacy Gems (the estate currency).
 ##
 ## legacy_gain = floor(K_LEGACY × log10(estate_net / LEGACY_BASE) ^ ALPHA).
 ##

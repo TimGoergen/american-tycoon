@@ -41,7 +41,7 @@ const MINIGAME_BONUS   := "minigame_bonus"
 
 
 # ── The catalog ───────────────────────────────────────────────────────────────
-# Cost note: Legacy is on a SMALL scale so each point feels hard-won. The estate→Legacy
+# Cost note: Legacy Gems are on a SMALL scale so each gem feels hard-won. The estate→Legacy
 # curve (k_legacy × estate_net ^ alpha — see tuning.tres / EstateWaterfall, tuned
 # 2026-06-15 so a first prestige yields ~10–16 Legacy) keeps yields modest, and the
 # single-digit first-level costs below are matched to it so a first prestige buys ~1–2

@@ -44,6 +44,9 @@ var _minigame_screen: MinigameScreen
 var _minigame_review_screen: MinigameReviewScreen
 var _buy_mode_button: Button
 var _plan_button: Button
+## Rich-text content overlaid on the plan button so the "(+x [gem])" parenthetical can show the
+## legacy-gem image inline (a plain Button can't put an image mid-text). _update_plan_button drives it.
+var _plan_label: RichTextLabel
 var _rows: Array = []
 
 # Bottom tab bar (UI Notes §7). The four surfaces share one content slot; one is
@@ -472,12 +475,31 @@ func _build_estate_tab() -> Control:
 	# The prestige exit, pinned to the BOTTOM of the tab (Tim, 2026-06-28): plan the estate,
 	# pass on, raise a faster heir. Red = big commit.
 	_plan_button = Button.new()
-	_plan_button.custom_minimum_size = Vector2(0, UiPalette.STANDARD_BUTTON_HEIGHT)
-	_plan_button.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
+	# Taller to fit the larger bold label + the inline gem image.
+	_plan_button.custom_minimum_size = Vector2(0, int(UiPalette.STANDARD_BUTTON_HEIGHT * 1.35))
 	UiPalette.style_button(_plan_button, true)
-	_plan_button.text = "PLAN THE ESTATE"
 	_plan_button.pressed.connect(_on_plan_estate_pressed)
 	v.add_child(_plan_button)
+
+	# The button's label is a RichTextLabel so the parenthetical can show the legacy-gem image
+	# inline (Tim, 2026-06-28). It is 40% larger than the standard label and bold. A CenterContainer
+	# centers it over the button; both ignore the mouse so the press still reaches the button.
+	var plan_center := CenterContainer.new()
+	plan_center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	plan_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_plan_button.add_child(plan_center)
+
+	_plan_label = RichTextLabel.new()
+	_plan_label.bbcode_enabled = true
+	_plan_label.fit_content = true
+	_plan_label.scroll_active = false
+	_plan_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	_plan_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_plan_label.add_theme_font_override("normal_font", UiPalette.make_bold_font())
+	_plan_label.add_theme_font_size_override("normal_font_size", int(round(UiPalette.FONT_LABEL * 1.4)))
+	_plan_label.add_theme_color_override("default_color", UiPalette.PALE_GOLD)
+	plan_center.add_child(_plan_label)
+	_plan_label.text = "[center]PLAN THE ESTATE[/center]"
 
 	return v
 
@@ -775,9 +797,10 @@ func _update_plan_button() -> void:
 	_plan_button.visible = dynasty.upgrades.earned_lifetime > 0 or can_succeed
 	_plan_button.disabled = not can_succeed
 	if can_succeed:
-		_plan_button.text = "PASS THE TORCH  (+%d Legacy)" % dynasty.projected_legacy_gain()
+		# "(+x [gem])" — the legacy-gem image stands in for the word "Legacy" inside the parens.
+		_plan_label.text = "[center]PASS THE TORCH  (+%d [img width=29 height=40]res://art/icons/legacy_gem.svg[/img])[/center]" % dynasty.projected_legacy_gain()
 	else:
-		_plan_button.text = "PASS THE TORCH"
+		_plan_label.text = "[center]PASS THE TORCH[/center]"
 
 
 ## First contact: a new epoch was reached this tick. Show the beat (Main's _process

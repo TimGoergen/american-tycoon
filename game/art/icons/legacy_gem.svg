@@ -1,57 +1,265 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="180" height="256" viewBox="0 0 180 256">
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="180"
+   height="252"
+   viewBox="0 0 180 252"
+   version="1.1"
+   id="svg22"
+   sodipodi:docname="legacy_gem.svg"
+   inkscape:version="1.4.4 (dcaf3e7, 2026-05-05)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview22"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="1.1322126"
+     inkscape:cx="176.64526"
+     inkscape:cy="90.530697"
+     inkscape:window-width="1920"
+     inkscape:window-height="1009"
+     inkscape:window-x="1912"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg22" />
   <!-- "Legacy gem" — a vertical faceted crystal with a glowing magenta core, vectorized from the
        concept art (art concepts/legacy_gem_firstdraft.png). Built as cleanly-tiling facet polygons
        (left/right split top-mid-bottom, plus a central glowing column) over a black silhouette.
        No SVG filters (the Godot/thorvg importer doesn't render them) — the glow is gradient ellipses. -->
-  <defs>
-    <radialGradient id="lg_core" cx="0.5" cy="0.5" r="0.6">
-      <stop offset="0" stop-color="#ffd6f6"/>
-      <stop offset="0.22" stop-color="#ff58e2"/>
-      <stop offset="0.55" stop-color="#cf2fbe"/>
-      <stop offset="1" stop-color="#7d279a"/>
+  <defs
+     id="defs10">
+    <radialGradient
+       id="lg_core"
+       cx="152.79744"
+       cy="74.804916"
+       r="69.268177"
+       gradientTransform="matrix(-0.58901509,0,0,-1.6977494,178.75093,255.24907)"
+       fx="152.79744"
+       fy="74.804916"
+       gradientUnits="userSpaceOnUse">
+      <stop
+         offset="0"
+         stop-color="#ffd6f6"
+         id="stop1" />
+      <stop
+         offset="0.22"
+         stop-color="#ff58e2"
+         id="stop2" />
+      <stop
+         offset="0.55"
+         stop-color="#cf2fbe"
+         id="stop3" />
+      <stop
+         offset="1"
+         stop-color="#7d279a"
+         id="stop4" />
     </radialGradient>
-    <linearGradient id="lg_center" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#8a47b6"/>
-      <stop offset="0.5" stop-color="#b478e0"/>
-      <stop offset="1" stop-color="#793aa6"/>
+    <linearGradient
+       id="lg_center"
+       x1="164.64503"
+       y1="9.7760492"
+       x2="164.64503"
+       y2="99.370872"
+       gradientTransform="matrix(-0.42971233,0,0,-2.3271382,180,255.56134)"
+       gradientUnits="userSpaceOnUse">
+      <stop
+         offset="0"
+         stop-color="#8a47b6"
+         id="stop5" />
+      <stop
+         offset="0.5"
+         stop-color="#b478e0"
+         id="stop6" />
+      <stop
+         offset="1"
+         stop-color="#793aa6"
+         id="stop7" />
     </linearGradient>
-    <linearGradient id="lg_side" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#8a45ac"/>
-      <stop offset="0.55" stop-color="#642a8c"/>
-      <stop offset="1" stop-color="#481c6c"/>
+    <linearGradient
+       id="lg_side"
+       x1="0"
+       y1="0"
+       x2="1"
+       y2="0">
+      <stop
+         offset="0"
+         stop-color="#511f78"
+         id="stop8" />
+      <stop
+         offset="0.5"
+         stop-color="#8a44ac"
+         id="stop9" />
+      <stop
+         offset="1"
+         stop-color="#511f78"
+         id="stop10" />
     </linearGradient>
-    <clipPath id="lg_centerclip">
-      <polygon points="90,22 106,72 106,176 90,234 74,176 74,72"/>
+    <clipPath
+       id="lg_centerclip">
+      <polygon
+         points="90,24 108,70 108,180 90,230 72,180 72,70"
+         id="polygon10" />
     </clipPath>
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#lg_side"
+       id="linearGradient22"
+       x1="45.71241"
+       y1="43.239122"
+       x2="116.46724"
+       y2="43.239122"
+       gradientTransform="matrix(-0.62893224,0,0,-1.5899964,180,255.56134)"
+       gradientUnits="userSpaceOnUse" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#lg_side"
+       id="linearGradient23"
+       x1="169.73212"
+       y1="43.239122"
+       x2="240.48694"
+       y2="43.239122"
+       gradientTransform="matrix(-0.62893224,0,0,-1.5899964,180,255.56134)"
+       gradientUnits="userSpaceOnUse" />
   </defs>
-
   <!-- Black crystal silhouette (the thick outline) -->
-  <polygon points="78,22 102,22 146,82 138,176 102,234 78,234 42,176 34,82"
-           fill="#1a0820" stroke="#0c0410" stroke-width="9" stroke-linejoin="round"/>
-
+  <polygon
+     points="110,24 150,84 142,172 108,230 72,230 38,172 30,84 70,24 "
+     fill="#1a0820"
+     stroke="#0c0410"
+     stroke-width="9"
+     stroke-linejoin="round"
+     id="polygon11"
+     transform="rotate(180,90,127)" />
   <!-- Facets: tile the gem, each with a dark border stroke (the borders between facets) -->
-  <g stroke="#1c0a28" stroke-width="2.5" stroke-linejoin="round">
-    <polygon points="78,22 90,22 74,72 34,82"        fill="#4a1d64"/>  <!-- left top -->
-    <polygon points="34,82 74,72 74,176 42,176"      fill="url(#lg_side)"/> <!-- left mid -->
-    <polygon points="42,176 74,176 90,234 78,234"    fill="#391450"/>  <!-- left bottom -->
-    <polygon points="90,22 102,22 146,82 106,72"     fill="#4a1d64"/>  <!-- right top -->
-    <polygon points="106,72 146,82 138,176 106,176"  fill="url(#lg_side)"/> <!-- right mid -->
-    <polygon points="106,176 138,176 102,234 90,234" fill="#391450"/>  <!-- right bottom -->
-    <polygon points="90,22 106,72 106,176 90,234 74,176 74,72" fill="url(#lg_center)"/> <!-- center -->
+  <g
+     stroke="#1c0a28"
+     stroke-width="2.5"
+     stroke-linejoin="round"
+     id="g18"
+     transform="rotate(180,90,127.78067)"
+     style="stroke-width:5.4;stroke-dasharray:none">
+    <polygon
+       points="70,24 90,24 72,70 30,84 "
+       fill="#491d63"
+       id="polygon12"
+       style="stroke-width:5.4;stroke-dasharray:none" />
+    <!-- left top -->
+    <polygon
+       points="30,84 72,70 72,180 38,172 "
+       fill="url(#lg_side)"
+       id="polygon13"
+       style="fill:url(#linearGradient22);stroke-width:5.4;stroke-dasharray:none" />
+    <!-- left mid -->
+    <polygon
+       points="38,172 72,180 90,230 72,230 "
+       fill="#391450"
+       id="polygon14"
+       style="stroke-width:5.4;stroke-dasharray:none" />
+    <!-- left bottom -->
+    <polygon
+       points="90,24 110,24 150,84 108,70 "
+       fill="#491d63"
+       id="polygon15"
+       style="stroke-width:5.4;stroke-dasharray:none" />
+    <!-- right top -->
+    <polygon
+       points="108,70 150,84 142,172 108,180 "
+       fill="url(#lg_side)"
+       id="polygon16"
+       style="fill:url(#linearGradient23);stroke-width:5.4;stroke-dasharray:none" />
+    <!-- right mid -->
+    <polygon
+       points="108,180 142,172 108,230 90,230 "
+       fill="#391450"
+       id="polygon17"
+       style="stroke-width:5.4;stroke-dasharray:none" />
+    <!-- right bottom -->
+    <polygon
+       points="72,180 72,70 90,24 108,70 108,180 90,230 "
+       fill="url(#lg_center)"
+       id="polygon18"
+       style="fill:url(#lg_center);stroke-width:5.4;stroke-dasharray:none" />
+    <!-- center -->
   </g>
-
   <!-- Glowing magenta core, clipped to the central facet -->
-  <g clip-path="url(#lg_centerclip)">
-    <ellipse cx="90" cy="128" rx="30" ry="100" fill="url(#lg_core)"/>
-    <ellipse cx="90" cy="128" rx="10" ry="84" fill="#ff86ef" opacity="0.8"/>
-    <rect x="86" y="42" width="8" height="172" rx="4" fill="#ffdcf9" opacity="0.55"/>
+  <g
+     clip-path="url(#lg_centerclip)"
+     id="g19"
+     style="stroke-width:37.4;stroke-dasharray:none"
+     transform="rotate(180,89.375465,127.62454)">
+    <ellipse
+       cx="90"
+       cy="127"
+       rx="34"
+       ry="98"
+       fill="url(#lg_core)"
+       id="ellipse18"
+       style="fill:url(#lg_core);stroke-width:37.4;stroke-dasharray:none" />
+    <ellipse
+       cx="90"
+       cy="127"
+       rx="11"
+       ry="82"
+       fill="#ff86ef"
+       opacity="0.8"
+       id="ellipse19"
+       style="stroke-width:37.4;stroke-dasharray:none" />
+    <rect
+       x="86"
+       y="44"
+       width="8"
+       height="166"
+       rx="4"
+       fill="#ffdcf9"
+       opacity="0.55"
+       id="rect19"
+       style="stroke-width:37.4;stroke-dasharray:none"
+       ry="4" />
   </g>
-
   <!-- Beveled highlights: light lavender along the upper inner facet edges where light catches -->
-  <g fill="none" stroke="#e3c4f6" stroke-width="2" stroke-linecap="round" opacity="0.5">
-    <line x1="90" y1="24" x2="75" y2="71"/>
-    <line x1="90" y1="24" x2="105" y2="71"/>
-    <line x1="37" y1="82" x2="73" y2="72"/>
-    <line x1="143" y1="82" x2="107" y2="72"/>
+  <g
+     fill="none"
+     stroke="#e3c4f6"
+     stroke-width="2"
+     stroke-linecap="round"
+     opacity="0.55"
+     id="g22"
+     transform="matrix(0.984719,0,0,1.0077686,0.84313773,2.6934729)">
+    <line
+       x1="89.907013"
+       y1="20.806196"
+       x2="71.563141"
+       y2="69.676758"
+       id="line19"
+       style="stroke-width:2.21482" />
+    <line
+       x1="89.967148"
+       y1="20.502468"
+       x2="108.43804"
+       y2="70.438057"
+       id="line20"
+       style="stroke-width:2.24657" />
+    <line
+       x1="34.892754"
+       y1="81.014313"
+       x2="71.136986"
+       y2="70.863014"
+       id="line21"
+       style="stroke-width:1.72602" />
+    <line
+       x1="146.9368"
+       y1="81.594788"
+       x2="108.90707"
+       y2="70.907066"
+       id="line22"
+       style="stroke-width:1.81414" />
   </g>
 </svg>

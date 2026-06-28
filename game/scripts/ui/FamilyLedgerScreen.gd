@@ -19,7 +19,6 @@ extends Control
 # Type sizes — large for at-a-glance phone reading (UI notes §1), but the title/total
 # are a notch smaller than the old full-screen-overlay sizes: as an embedded tab the
 # header must fit the tab width, and FONT_PAGE_TITLE/DISPLAY side-by-side overflowed.
-const TITLE_SIZE := UiPalette.FONT_HEADLINE
 const TOTAL_SIZE := UiPalette.FONT_SUBHEAD
 const NAME_SIZE := UiPalette.FONT_HEADLINE
 const BODY_SIZE := UiPalette.FONT_CARD_BODY
@@ -56,15 +55,10 @@ func _build_chrome() -> void:
 	column.add_theme_constant_override("separation", 12)
 	margin.add_child(column)
 
-	# ── Header: title then dynasty lifetime-earned readout, STACKED (not side-by-side).
-	# Side-by-side at large type overflowed the tab's right edge; stacking each on its own
-	# line keeps both within the tab width. Both wrap as a final safety net.
-	var title := Label.new()
-	title.text = "The Family Ledger"
-	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	title.add_theme_color_override("font_color", UiPalette.NAVY)
-	title.add_theme_font_size_override("font_size", TITLE_SIZE)
-	column.add_child(title)
+	# ── Header: the centered "FAMILY LEDGER" title (shared tab-title style, matching the Settings
+	# and Estate Planning tabs; "The" dropped — Tim 2026-06-28), then the dynasty lifetime-earned
+	# readout beneath it on its own line. ──
+	column.add_child(UiPalette.make_tab_title("FAMILY LEDGER"))
 
 	_total_label = Label.new()
 	_total_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

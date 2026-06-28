@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+  <!-- Down arrow = "collapse all" (the sections fold down/shut). Navy strokes to read on the
+       gold utility button. Drawn as strokes (the SVG importer embeds no fonts). -->
+  <g fill="none" stroke="#1D2D50" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="24" y1="9" x2="24" y2="33"/>
+    <polyline points="12,23 24,39 36,23"/>
+  </g>
+</svg>

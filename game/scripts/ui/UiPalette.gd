@@ -217,6 +217,20 @@ static func style_unowned_button(button: Button) -> void:
 	button.add_theme_color_override("font_disabled_color", CREAM)
 
 
+## A tab's title label in the standard tab-title format (Tim, 2026-06-28): the settings-tab
+## heading style — large (FONT_HEADLINE ×1.4), faux-bold, navy, horizontally centered. Used by
+## every tab (Settings, Estate Planning, Family Ledger) so the titles all match.
+static func make_tab_title(text: String) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL  # fill the width so "centered" is the whole tab
+	label.add_theme_color_override("font_color", NAVY)
+	label.add_theme_font_size_override("font_size", int(FONT_HEADLINE * 1.4))
+	label.add_theme_font_override("font", make_bold_font())
+	return label
+
+
 ## Reserved width of a styled vertical scrollbar — also the width of its (wider) handle.
 const SCROLLBAR_WIDTH := 24
 ## How far the track is inset on EACH side, so the handle reads as wider than the track:

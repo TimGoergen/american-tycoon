@@ -27,7 +27,6 @@ signal retain_requested(property_index: int)
 
 # Type sizes — large for at-a-glance phone reading (UI notes §1). The title/wallet are a
 # notch smaller than the old full-screen sizes so the stacked header fits the tab width.
-const TITLE_SIZE   := UiPalette.FONT_HEADLINE
 const WALLET_SIZE  := UiPalette.FONT_SUBHEAD
 const CATEGORY_SIZE := UiPalette.FONT_HEADLINE
 const CARD_NAME_SIZE := UiPalette.FONT_HEADLINE
@@ -97,35 +96,37 @@ func _build_ui() -> void:
 	column.add_theme_constant_override("separation", 12)
 	margin.add_child(column)
 
-	# ── Header row: the "Estate Planning" title plus the Collapse-All / Expand-All controls
-	# (Tim, 2026-06-24), which open or close every category section at once. The Legacy wallet
-	# sits on its own line beneath (side-by-side overflowed the tab width at large type). ──
-	var header_row := HBoxContainer.new()
-	header_row.add_theme_constant_override("separation", 10)
-	column.add_child(header_row)
+	# ── Title: the centered "ESTATE PLANNING" heading, in the shared tab-title style (matches the
+	# Settings and Family Ledger tabs). The Collapse-All / Expand-All controls moved down onto the
+	# Legacy-wallet row below (Tim, 2026-06-28). ──
+	column.add_child(UiPalette.make_tab_title("ESTATE PLANNING"))
 
-	var title := Label.new()
-	title.text = "Estate Planning"
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title.add_theme_color_override("font_color", UiPalette.NAVY)
-	title.add_theme_font_size_override("font_size", TITLE_SIZE)
-	header_row.add_child(title)
-
-	var collapse_all_button := _make_bulk_button("COLLAPSE ALL")
-	collapse_all_button.pressed.connect(set_all_collapsed.bind(true))
-	header_row.add_child(collapse_all_button)
-
-	var expand_all_button := _make_bulk_button("EXPAND ALL")
-	expand_all_button.pressed.connect(set_all_collapsed.bind(false))
-	header_row.add_child(expand_all_button)
+	# ── Wallet row: the Legacy balance on the left, and the Collapse-All / Expand-All buttons
+	# (now compact arrow icons) right-aligned on the same line as the wallet (Tim, 2026-06-28). ──
+	var wallet_row := HBoxContainer.new()
+	wallet_row.add_theme_constant_override("separation", 10)
+	column.add_child(wallet_row)
 
 	_wallet_label = Label.new()
+	# Expand so the label takes the slack and pushes the two icon buttons to the right edge.
+	_wallet_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_wallet_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER  # center against the taller buttons
 	_wallet_label.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD)
 	# Faux-bold via a same-color outline, matching the project's plate aesthetic.
 	_wallet_label.add_theme_color_override("font_outline_color", UiPalette.MUSTARD_GOLD)
 	_wallet_label.add_theme_constant_override("outline_size", 4)
 	_wallet_label.add_theme_font_size_override("font_size", WALLET_SIZE)
-	column.add_child(_wallet_label)
+	wallet_row.add_child(_wallet_label)
+
+	# Down arrow = collapse all; up arrow = expand all (Tim, 2026-06-28). Icon-only, so they are
+	# narrow and stay right-aligned via the expanding wallet label beside them.
+	var collapse_all_button := _make_bulk_button("res://art/icons/arrow_down.svg")
+	collapse_all_button.pressed.connect(set_all_collapsed.bind(true))
+	wallet_row.add_child(collapse_all_button)
+
+	var expand_all_button := _make_bulk_button("res://art/icons/arrow_up.svg")
+	expand_all_button.pressed.connect(set_all_collapsed.bind(false))
+	wallet_row.add_child(expand_all_button)
 
 	# ── Scrollable list of upgrade cards (grouped by category) ──
 	# Takes all the leftover height between the wallet readout and the close
@@ -306,13 +307,15 @@ func _make_accent_card_style(color: Color) -> StyleBoxFlat:
 	return style
 
 
-## A compact header-row utility button (Collapse All / Expand All), styled as a standard
-## (non-spend) button so it never reads as a buy action.
-func _make_bulk_button(text: String) -> Button:
+## A compact icon utility button (Collapse All / Expand All — an arrow glyph), styled as a
+## standard (non-spend) button so it never reads as a buy action. Icon-only, so it stays narrow
+## (Tim, 2026-06-28); expand_icon scales the arrow to fill the button square.
+func _make_bulk_button(icon_path: String) -> Button:
 	var button := Button.new()
-	button.text = text
-	button.custom_minimum_size = Vector2(0, 72)
-	button.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
+	button.icon = load(icon_path)
+	button.expand_icon = true
+	button.custom_minimum_size = Vector2(84, 72)
+	button.add_theme_constant_override("icon_max_width", 44)
 	UiPalette.style_button(button, false)
 	return button
 

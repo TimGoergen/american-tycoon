@@ -34,9 +34,15 @@ var _hold_accumulator := 0.0
 #     above the gold fill (see _draw_sweep), so the navy border and the label stay
 #     put and the button never changes size.
 
-## The level badge's text — a bright sky-blue (in the CYCLE_BLUE family) that reads clearly
-## on the dark-blue (INK_NAVY) plate (Tim, 2026-06-28).
-const LEVEL_TEXT_BLUE := Color("#9DBDE4")
+## The level badge's text — a vivid, saturated blue that pops on the dark-blue (INK_NAVY)
+## plate (Tim, 2026-06-28).
+const LEVEL_TEXT_BLUE := Color("#2E9BFF")
+
+## Level-up blink: when the clock-in level rises, the badge pulses brighter twice, slowly, to
+## announce it (Tim, 2026-06-28). BRIGHTNESS multiplies the plate's modulate at each peak;
+## HALF is the up (or down) duration of one pulse, so two pulses take 4 × HALF seconds.
+const LEVEL_BLINK_BRIGHTNESS := 1.9
+const LEVEL_BLINK_HALF := 0.34
 
 ## How long the brighter-gold blink stays on for a single manual tap, in seconds.
 ## Short, so a deliberate tap reads as a crisp blink.
@@ -110,6 +116,13 @@ var _wage_button: Button
 ## The "<level> / <next>" readout that sits to the right of the clock-in button (15% of the
 ## row), showing the current clock-in level and the one being climbed toward.
 var _level_label: Label
+## The dark-blue plate behind the level number — blinked on level-up (modulate is pulsed).
+var _level_panel: PanelContainer
+## Last level shown, to detect a level-up. -1 until the first refresh so opening at a non-1
+## level (a loaded save) does not fire the blink.
+var _shown_level := -1
+## The running level-up blink tween, held so a fresh level-up can restart it cleanly.
+var _level_blink_tween: Tween
 
 # The clock-in button's three-part content laid over the meter (Tim, 2026-06-22): a mail-cart
 # icon on the left, "CLOCK IN" centered, and the live per-tap earnings "+$x" on the right.
@@ -164,18 +177,18 @@ func _ready() -> void:
 	# dark-blue plate with the same frame thickness as the clock-in button (Tim, 2026-06-24 /
 	# 2026-06-28). The PanelContainer fills the row's height — which the 196px meter sets — so
 	# the plate matches the button, and the bright-blue number is centered inside it.
-	var level_panel := PanelContainer.new()
-	level_panel.add_theme_stylebox_override("panel", _make_level_plate())
-	level_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	level_panel.size_flags_stretch_ratio = 0.15
-	button_row.add_child(level_panel)
+	_level_panel = PanelContainer.new()
+	_level_panel.add_theme_stylebox_override("panel", _make_level_plate())
+	_level_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_level_panel.size_flags_stretch_ratio = 0.15
+	button_row.add_child(_level_panel)
 
 	_level_label = Label.new()
 	_level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_level_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_level_label.add_theme_font_size_override("font_size", UiPalette.FONT_DISPLAY)
 	_level_label.add_theme_color_override("font_color", LEVEL_TEXT_BLUE)
-	level_panel.add_child(_level_label)
+	_level_panel.add_child(_level_label)
 
 	# Highlight overlay: a transparent, mouse-ignoring layer filling the meter, on
 	# which _draw_sweep paints the gliding highlight band while the button is held.
@@ -272,7 +285,12 @@ func _process(delta: float) -> void:
 			* _wage.wage_multiplier * _wage.auto_tap_power_multiplier
 	_wage_amount_label.text = "+%s" % Money.of(wage_per_tap).display()
 
-	# Right-side readout: the current clock-in level (just the number, in its silver plate).
+	# Right-side readout: the current clock-in level (just the number, in its dark-blue plate).
+	# A rise in level blinks the plate (skipping the very first frame, _shown_level == -1, so a
+	# loaded save that opens at a high level doesn't flash on arrival).
+	if _shown_level >= 0 and _wage.level > _shown_level:
+		_blink_level_up()
+	_shown_level = _wage.level
 	_level_label.text = "%d" % _wage.level
 	# The gold bar fills with the clicks banked toward the next level-up.
 	_apply_wage_fill(_level_progress())
@@ -309,6 +327,21 @@ func _make_level_plate() -> StyleBoxFlat:
 	style.set_border_width_all(8)
 	style.set_content_margin_all(8)
 	return style
+
+
+## Blink the level badge brighter twice, slowly, to announce a level-up (Tim, 2026-06-28).
+## Pulses the panel's modulate up to LEVEL_BLINK_BRIGHTNESS and back, twice. modulate multiplies
+## the plate and its text together, so the dark-blue ground and the blue number brighten as one.
+func _blink_level_up() -> void:
+	if _level_blink_tween != null and _level_blink_tween.is_valid():
+		_level_blink_tween.kill()
+	_level_panel.modulate = Color.WHITE
+	var bright := Color(LEVEL_BLINK_BRIGHTNESS, LEVEL_BLINK_BRIGHTNESS, LEVEL_BLINK_BRIGHTNESS)
+	_level_blink_tween = create_tween()
+	_level_blink_tween.set_trans(Tween.TRANS_SINE)
+	for _i in range(2):
+		_level_blink_tween.tween_property(_level_panel, "modulate", bright, LEVEL_BLINK_HALF)
+		_level_blink_tween.tween_property(_level_panel, "modulate", Color.WHITE, LEVEL_BLINK_HALF)
 
 
 ## Holding the clock-in button auto-taps the wage at the configured rate — a

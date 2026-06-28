@@ -410,9 +410,9 @@ func _build_property_tab() -> Control:
 	v.add_child(scroll)
 	UiPalette.style_vscrollbar(scroll.get_v_scroll_bar())
 
-	# A small right margin holds the property rows just clear of the scrollbar (Tim, 2026-06-28),
-	# so the rows' right edge doesn't butt directly against the bar.
-	const LADDER_SCROLLBAR_GAP := 8
+	# A right margin narrows the property rows so a visible gap of space sits between their right
+	# edge and the scrollbar handle (Tim, 2026-06-28) — the rows never butt against the bar.
+	const LADDER_SCROLLBAR_GAP := 18
 	var ladder_margin := MarginContainer.new()
 	ladder_margin.add_theme_constant_override("margin_right", LADDER_SCROLLBAR_GAP)
 	ladder_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -452,18 +452,10 @@ func _build_estate_tab() -> Control:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 10)
 
-	# The prestige exit: plan the estate, pass on, raise a faster heir. Red = big commit.
-	_plan_button = Button.new()
-	_plan_button.custom_minimum_size = Vector2(0, UiPalette.STANDARD_BUTTON_HEIGHT)
-	_plan_button.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
-	UiPalette.style_button(_plan_button, true)
-	_plan_button.text = "PLAN THE ESTATE"
-	_plan_button.pressed.connect(_on_plan_estate_pressed)
-	v.add_child(_plan_button)
-
-	# The Estate Office (Legacy upgrade shop + staff retention) now lives right here on the
-	# tab, not behind a modal button. It fills the rest of the tab and reads/writes the
-	# live upgrade state; _show_tab refreshes it on entry, and purchases re-apply effects.
+	# The Estate Office (Legacy upgrade shop + staff retention) lives right here on the tab,
+	# not behind a modal button. It fills the tab and reads/writes the live upgrade state;
+	# _show_tab refreshes it on entry, and purchases re-apply effects. It is added FIRST so it
+	# takes all the vertical slack and the prestige button pins to the bottom (Tim, 2026-06-28).
 	_legacy_screen = LegacyScreen.new()
 	_legacy_screen.setup(dynasty.upgrades)
 	_legacy_screen.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -474,6 +466,16 @@ func _build_estate_tab() -> Control:
 	# Populate once now so the cards aren't blank on first view.
 	_legacy_screen.set_retention_entries(_build_retention_entries())
 	_legacy_screen.refresh()
+
+	# The prestige exit, pinned to the BOTTOM of the tab (Tim, 2026-06-28): plan the estate,
+	# pass on, raise a faster heir. Red = big commit.
+	_plan_button = Button.new()
+	_plan_button.custom_minimum_size = Vector2(0, UiPalette.STANDARD_BUTTON_HEIGHT)
+	_plan_button.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
+	UiPalette.style_button(_plan_button, true)
+	_plan_button.text = "PLAN THE ESTATE"
+	_plan_button.pressed.connect(_on_plan_estate_pressed)
+	v.add_child(_plan_button)
 
 	return v
 
@@ -492,15 +494,9 @@ func _build_settings_tab() -> Control:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 24)
 
-	var heading := Label.new()
-	heading.text = "SETTINGS"
-	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	heading.add_theme_color_override("font_color", UiPalette.NAVY)
-	# 40% larger than before (FONT_HEADLINE 52 -> 73) and bolder (Tim, 2026-06-26). The bold
-	# weight is faked with a FontVariation since the project ships no bold face yet.
-	heading.add_theme_font_size_override("font_size", int(UiPalette.FONT_HEADLINE * 1.4))
-	heading.add_theme_font_override("font", UiPalette.make_bold_font())
-	v.add_child(heading)
+	# The shared tab-title style (UiPalette.make_tab_title) — the same centered, faux-bold,
+	# FONT_HEADLINE×1.4 navy heading every tab now uses.
+	v.add_child(UiPalette.make_tab_title("SETTINGS"))
 
 	# Transition minigame toggle — the persistent home for the opt-out (GameState). Governs
 	# every site that rolls a minigame (prestige and welcome-back), not just prestige.

@@ -38,13 +38,17 @@ const NAME_BOLD := 2
 
 # The dollar-bill icon shown beneath the CASH number, right-aligned to the panel edge
 # (the "CASH" word was removed, Tim 2026-06-28). The art is a 2:1 green-and-gold bill.
+# CASH_BILL_EDGE_PAD is extra right clearance on top of EDGE_MARGIN so the edge-filling bill
+# sits comfortably inside the thick red frame rather than against it.
 const CASH_BILL_ICON_PATH := "res://art/icons/dollar_bill.svg"
 const CASH_BILL_SIZE := Vector2(72, 36)
+const CASH_BILL_EDGE_PAD := 14
 
 # The gold "$/s" income-per-second symbol shown beneath the income number, left-aligned
-# (replaced the old "INCOME" word, Tim 2026-06-28). Authored 140×64 (~2.19:1).
+# (replaced the old "INCOME" word, Tim 2026-06-28). Box matches the SVG's 120×64 (~1.875:1)
+# aspect so the glyphs sit flush-left in the box with no extra padding.
 const INCOME_ICON_PATH := "res://art/icons/income_per_sec.svg"
-const INCOME_ICON_SIZE := Vector2(118, 54)
+const INCOME_ICON_SIZE := Vector2(101, 54)
 
 ## Gap kept between a pinned label and the panel edge it hugs.
 const EDGE_MARGIN := 14
@@ -383,7 +387,10 @@ func _layout_labels() -> void:
 	var cash_centered_top := (LABEL_LAYOUT_HEIGHT - cash_block_h) / 2.0
 	var cash_icon_top := cash_centered_top + _cash_label.size.y + caption_gap
 	_cash_label.position = Vector2(area.x - _cash_label.size.x - EDGE_MARGIN, cash_centered_top / 2.0)
-	_cash_bill.position = Vector2(area.x - CASH_BILL_SIZE.x - EDGE_MARGIN, cash_icon_top)
+	# The bill fills its box edge-to-edge (unlike a number, whose last glyph carries side-bearing),
+	# so it needs extra right clearance to sit comfortably within the panel's thick frame, not
+	# butt against it (Tim, 2026-06-28).
+	_cash_bill.position = Vector2(area.x - CASH_BILL_SIZE.x - (EDGE_MARGIN + CASH_BILL_EDGE_PAD), cash_icon_top)
 
 	# Epoch name: horizontally centered across the whole plate, BOTTOM-aligned with the icon
 	# row (Tim, 2026-06-21) so the three elements share one baseline — the taller name (larger

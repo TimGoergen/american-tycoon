@@ -13,9 +13,11 @@ class_name GameState
 # per-property is_staffed bool with a staff_tier int and added the run's reached epoch
 # (the alien-staffing system). v6 replaced the named-title wage ladder with a numeric clock-in
 # LEVEL (the wage save block now stores level + taps_into_level instead of a title index).
+# v7 added the per-property within-epoch staff_level (the per-epoch upgrade track).
 # Older saves still load (missing fields default to a clean slate / zero earned; a v4
-# is_staffed:true becomes staff_tier 1; a pre-v6 save starts the wage at level 0).
-const SAVE_VERSION := 6
+# is_staffed:true becomes staff_tier 1; a pre-v6 save starts the wage at level 0; a pre-v7
+# save has every property's staff_level default to 0).
+const SAVE_VERSION := 7
 
 var tuning: TuningConfig
 var economy: EconomyState
@@ -151,6 +153,12 @@ func try_hire(prop_index: int) -> bool:
 	return economy.try_hire(prop_index, epoch.current_tier)
 
 
+## Buy one within-epoch staff level for a property (the per-epoch upgrade track, GDD §6.1).
+## Returns false if the property is unstaffed or unaffordable.
+func try_upgrade_staff_level(prop_index: int) -> bool:
+	return economy.try_upgrade_staff_level(prop_index)
+
+
 # ---------------------------------------------------------------------------
 # Offline
 # ---------------------------------------------------------------------------
@@ -179,6 +187,8 @@ func to_save_dict() -> Dictionary:
 			# saved — it is re-derived from the tier via EpochCatalog on load, so the two
 			# can never drift (same principle as recomputing cost_product from purchases).
 			"staff_tier": p.staff_tier,
+			# v7: within-epoch staff level (resets each epoch, so it is small and bounded).
+			"staff_level": p.staff_level,
 			"cycle_progress": p.cycle_progress,
 			"is_cycle_running": p.is_cycle_running,
 		})
@@ -244,10 +254,12 @@ func load_save_dict(data: Dictionary) -> void:
 		# v5 stores staff_tier; a pre-v5 save only has the is_staffed bool, which maps to
 		# tier 1 (the Earth staffer) when true. The tier's multiplier is re-derived here.
 		var staff_tier := int(sp.get("staff_tier", 1 if bool(sp.get("is_staffed", false)) else 0))
+		# Pre-v7 saves have no staff_level; default 0 (the alien staffer starts un-leveled).
 		prop.restore(
 			int(sp.get("units_owned", 0)),
 			staff_tier,
 			EpochCatalog.staff_income_multiplier(staff_tier),
+			int(sp.get("staff_level", 0)),
 			float(sp.get("cycle_progress", 0.0)),
 			bool(sp.get("is_cycle_running", false))
 		)

@@ -15,6 +15,10 @@ signal buy_requested(prop_index: int, mode: BuyMode)
 signal tap_requested(prop_index: int)
 signal hold_rush_requested(prop_index: int)
 signal hire_requested(prop_index: int)
+## Emitted when the staff button is pressed in its LEVEL UP state — i.e. the property is
+## already staffed at the best tier this epoch allows, so the button now buys a within-epoch
+## staff level (the continuous upgrade sink, GDD §6.1) instead of a tier hire/upgrade.
+signal level_up_requested(prop_index: int)
 
 var prop_index: int = -1
 
@@ -231,7 +235,10 @@ func _ready() -> void:
 	_hire_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_hire_button.custom_minimum_size = Vector2(0, BUTTON_ROW_HEIGHT)
 	UiPalette.style_button(_hire_button, false)
-	_hire_button.pressed.connect(func() -> void: hire_requested.emit(prop_index))
+	# The hire button does double duty (hire/upgrade a tier, then level up within the epoch),
+	# so its single `pressed` is connected ONCE here and routed by state in _on_hire_pressed.
+	# Reconnecting it per-state would stack handlers and fire the action twice.
+	_hire_button.pressed.connect(_on_hire_pressed)
 	var hire_labels := _add_split_button_labels(_hire_button)
 	_hire_left_label = hire_labels[0]
 	_hire_cost_label = hire_labels[1]
@@ -479,27 +486,51 @@ func _apply_ownership_styling(owned: bool) -> void:
 		_income_label.add_theme_color_override("font_outline_color", UiPalette.DARK_GRAY)
 
 
-## Update the hire/upgrade/staffed button for the property's current staff tier and the
+## True once the property is staffed at the best tier this epoch allows. In that state the
+## hire button stops being a tier hire/upgrade and becomes the within-epoch LEVEL UP sink
+## (GDD §6.1). Used both to draw the button (_refresh_hire_button) and to route its press
+## (_on_hire_pressed), so the two never disagree about which action the button performs.
+func _is_in_level_up_state() -> bool:
+	# Highest tier hireable right now: the reached epoch, capped at the defined epochs.
+	var max_tier := mini(_epoch.current_tier, EpochCatalog.tier_count())
+	return _prop.staff_tier >= 1 and _prop.staff_tier >= max_tier
+
+
+## The hire button's single `pressed` handler. It performs different actions depending on
+## the staff state, so we dispatch here rather than reconnecting the signal each frame.
+func _on_hire_pressed() -> void:
+	if _is_in_level_up_state():
+		level_up_requested.emit(prop_index)
+	else:
+		hire_requested.emit(prop_index)
+
+
+## Update the hire/upgrade/level-up button for the property's current staff tier and the
 ## reached epoch (the alien-staffing track, GDD §6). Three states:
 ##   • tier 0 → HIRE the Earth staffer (tier 1).
 ##   • a higher tier is unlocked by the reached epoch → UPGRADE to the next alien tier.
-##   • staffed at the best tier this epoch allows → show the staffer name + tier,
-##     disabled and faint green, until the next first contact unlocks a better tier.
+##   • staffed at the best tier this epoch allows → a live LEVEL UP button buying
+##     within-epoch staff levels (the continuous upgrade sink), until the next first
+##     contact unlocks a better tier and resets the level.
 func _refresh_hire_button() -> void:
 	var tier := _prop.staff_tier
-	# Highest tier hireable right now: the reached epoch, capped at the defined epochs.
-	var max_tier := mini(_epoch.current_tier, EpochCatalog.tier_count())
 
-	if tier >= 1 and tier >= max_tier:
-		# Fully staffed for this epoch — nothing to upgrade until the next first contact.
-		# The headshot icon yields to the staffer's NAME in this state.
-		_apply_hire_styling(true)
+	if _is_in_level_up_state():
+		# Best tier for this epoch reached — the button now buys within-epoch staff levels,
+		# each compounding this property's income (GDD §6.1). It is a live action, so it uses
+		# the normal action styling, not the old faint-green disabled plate. The headshot icon
+		# yields to the staffer's NAME + current level.
+		_apply_hire_styling(false)
 		_hire_icon.visible = false
-		_hire_left_label.text = EpochCatalog.staffer_name(tier, prop_index).to_upper()
-		_hire_cost_label.text = "TIER %d" % tier
-		_hire_button.disabled = true
-		# The faint-green staffed plate keeps full navy text, matching style_button's look.
-		_set_split_label_color(_hire_left_label, _hire_cost_label, UiPalette.NAVY)
+		var staffer := EpochCatalog.staffer_name(tier, prop_index).to_upper()
+		_hire_left_label.text = "%s · LV %d" % [staffer, _prop.staff_level]
+		var level_cost := _economy.get_staff_level_cost(prop_index)
+		_hire_cost_label.text = Money.of(level_cost).display()
+		# Same gate as hiring: need the cash, and units for the staffer to run.
+		_hire_button.disabled = _economy.cash < level_cost or _prop.units_owned == 0
+		# Full navy when affordable; dimmed navy when not — matching the HIRE/UPGRADE state.
+		var level_color := Color(UiPalette.NAVY, 0.45) if _hire_button.disabled else UiPalette.NAVY
+		_set_split_label_color(_hire_left_label, _hire_cost_label, level_color)
 		return
 
 	# Otherwise a tier is available to buy: tier 1 (HIRE) from unstaffed, or the next

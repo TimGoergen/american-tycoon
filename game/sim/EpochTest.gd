@@ -31,6 +31,7 @@ func _initialize() -> void:
 	_test_staff_tier_income(property_configs, tuning)
 	_test_save_round_trip(property_configs, tuning)
 	_test_staff_retention(property_configs, tuning)
+	_test_staff_levels(property_configs, tuning)
 	_test_epoch_content()
 
 	print("")
@@ -54,8 +55,8 @@ func _test_thresholds(tuning: TuningConfig) -> void:
 	var earth := tuning.earth_economy_target
 	_check("Earth (tier 1) consume threshold == Earth target",
 		is_equal_approx(EpochCatalog.consume_threshold(1, earth), earth))
-	_check("Luminari (tier 2) threshold == Earth target x1000",
-		is_equal_approx(EpochCatalog.consume_threshold(2, earth), earth * 1000.0))
+	_check("Luminari (tier 2) threshold == Earth target x30 (2026-06-27 ladder)",
+		is_equal_approx(EpochCatalog.consume_threshold(2, earth), earth * 30.0))
 	_check("There are 6 epochs (Earth + 5 aliens)", EpochCatalog.tier_count() == 6)
 	_check("Earth staffer multiplier is 1.0 (no income change)",
 		is_equal_approx(EpochCatalog.staff_income_multiplier(1), 1.0))
@@ -188,6 +189,66 @@ func _test_staff_retention(configs: Array, tuning: TuningConfig) -> void:
 	reloaded.load_save_dict(data)
 	_check("retained tiers survive a dynasty save round-trip",
 		reloaded.staff_retention.get_retained_tier(0) == 2)
+
+
+## The within-epoch staff-level track (Option A, 2026-06-27): hiring is followed by leveling
+## the same staffer up through the epoch, each level a compounding income bonus; levels reset
+## when the tier advances, and the cost climbs geometrically.
+func _test_staff_levels(configs: Array, tuning: TuningConfig) -> void:
+	print("\n8. Within-epoch staff levels: compounding income, reset on tier change, geometric cost")
+	var game := GameState.new(configs, tuning)
+	game.economy.award_cash(1.0e24)
+	game.try_buy(0, 50)
+	var atm := game.economy.properties[0] as PropertyState
+
+	# Unstaffed: leveling is impossible until a staffer is hired.
+	_check("unstaffed property has zero level cost", is_equal_approx(game.economy.get_staff_level_cost(0), 0.0))
+	_check("unstaffed property refuses a level upgrade", not game.try_upgrade_staff_level(0))
+
+	# Hire the Earth staffer (tier 1, multiplier 1.0), then level it up once.
+	game.try_hire(0)
+	var income_level0 := atm.get_income_per_sec()
+	_check("a level upgrade succeeds once staffed", game.try_upgrade_staff_level(0))
+	_check("ATM is now staff level 1", atm.staff_level == 1)
+	var income_level1 := atm.get_income_per_sec()
+	_check("one level multiplies income by (1 + staff_level_step)",
+		income_level0 > 0.0 and is_equal_approx(income_level1 / income_level0, 1.0 + tuning.staff_level_step))
+
+	# Advancing the tier (a fresh alien staffer at contact) resets the level track to 0.
+	_check("ATM has a level before contact", atm.staff_level == 1)
+	game.epoch.current_tier = 2
+	game.try_hire(0)  # upgrade to the tier-2 alien staffer
+	_check("ATM advanced to tier 2", atm.staff_tier == 2)
+	_check("staff level reset to 0 on the new tier", atm.staff_level == 0)
+
+	# The level cost climbs geometrically with each level. Checked at tier 2, where the
+	# trillions-scale numbers make the $5 cost-rounding negligible (at Earth scale the
+	# snapping would distort the ratio).
+	var cost_level_1 := game.economy.get_staff_level_cost(0)
+	game.try_upgrade_staff_level(0)
+	var cost_level_2 := game.economy.get_staff_level_cost(0)
+	_check("staff level 2 cost > level 1 cost (geometric)", cost_level_2 > cost_level_1)
+	_check("level cost grows by staff_level_cost_growth",
+		cost_level_1 > 0.0 and is_equal_approx(cost_level_2 / cost_level_1, tuning.staff_level_cost_growth))
+
+	# Levels survive a save/reload round-trip (v7). Level is 1 from the geometric check above;
+	# two more brings it to 3.
+	game.try_upgrade_staff_level(0)
+	game.try_upgrade_staff_level(0)
+	_check("ATM reached staff level 3 before save", atm.staff_level == 3)
+	var reloaded := GameState.new(configs, tuning)
+	reloaded.load_save_dict(game.to_save_dict())
+	var atm2 := reloaded.economy.properties[0] as PropertyState
+	_check("reloaded ATM staff_level == 3 (v7 round-trip)", atm2.staff_level == 3)
+
+	# A pre-v7 save (no staff_level key) defaults the level to 0.
+	var legacy_dict := game.to_save_dict()
+	for prop_dict in legacy_dict["properties"]:
+		prop_dict.erase("staff_level")
+	var migrated := GameState.new(configs, tuning)
+	migrated.load_save_dict(legacy_dict)
+	var atm3 := migrated.economy.properties[0] as PropertyState
+	_check("pre-v7 save defaults staff_level to 0", atm3.staff_level == 0)
 
 
 ## Phase 4: every epoch ships a full 12-staffer roster, and every alien epoch ships a

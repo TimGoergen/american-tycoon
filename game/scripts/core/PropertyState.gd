@@ -27,10 +27,17 @@ var cost_product: float = 1.0
 var staff_tier: int = 0
 
 ## Income multiplier granted by the current staffer tier (1.0 when unstaffed or at the
-## Earth tier). Set by set_staff_tier from EpochCatalog; applied at point of payment in
-## _collect, the same way the global frenzy/Legacy multiplier is, so alien staff are
-## what scale a property's income into absurd ranges.
+## Earth tier). This is the ENTRY multiplier for the tier (the big jump at first contact);
+## the within-epoch staff levels below compound on top of it. Set by set_staff_tier from
+## EpochCatalog; applied at point of payment in _collect alongside the global frenzy/Legacy
+## multiplier, so alien staff are what scale a property's income into absurd ranges.
 var staff_income_multiplier: float = 1.0
+
+## How many times the current epoch's staffer has been LEVELED UP (the per-epoch upgrade
+## track, GDD §6.1). Each level multiplies this property's income by (1 + staff_level_step),
+## compounding — the steady "always a next upgrade to chase" sink that fills an epoch. RESETS
+## to 0 whenever the tier advances (a new epoch's staffer is a fresh hire — Tim 2026-06-27).
+var staff_level: int = 0
 
 ## Whether ANY staffer is hired, enabling auto-cycle forever. Read-only: derived from
 ## staff_tier so the many places that ask "is this staffed?" keep working unchanged
@@ -153,8 +160,25 @@ func buy(count: int) -> void:
 func set_staff_tier(tier: int, income_multiplier: float) -> void:
 	staff_tier = tier
 	staff_income_multiplier = income_multiplier
+	# A new tier is a brand-new (alien) staffer, so the within-epoch level track restarts
+	# from scratch (Tim 2026-06-27: levels reset on contact; the tier jump is the payoff).
+	staff_level = 0
 	if staff_tier >= 1 and not is_cycle_running:
 		_start_cycle_internal()
+
+
+## Buy one within-epoch level for the current staffer (the per-epoch upgrade track).
+## Caller (EconomyState) must verify the property is staffed and the level is affordable.
+func add_staff_level() -> void:
+	staff_level += 1
+
+
+## This property's full staffer income multiplier: the tier's entry multiplier compounded by
+## the within-epoch levels bought so far. Everything that pays or displays property income
+## routes through here so the level bonus applies uniformly (the same way _effective_cycle_length
+## centralizes the speed bonus).
+func _effective_staff_multiplier() -> float:
+	return staff_income_multiplier * pow(1.0 + tuning.staff_level_step, float(staff_level))
 
 
 ## Set the Legacy cycle-speed multiplier and keep the in-flight cycle consistent.
@@ -216,6 +240,7 @@ func restore(
 		p_units: int,
 		p_staff_tier: int,
 		p_staff_income_multiplier: float,
+		p_staff_level: int,
 		p_cycle_progress: float,
 		p_is_running: bool
 ) -> void:
@@ -226,12 +251,14 @@ func restore(
 	_milestones_crossed = 0
 	staff_tier = 0
 	staff_income_multiplier = 1.0
+	staff_level = 0
 
 	if p_units > 0:
 		buy(p_units)
 
 	staff_tier = p_staff_tier
 	staff_income_multiplier = p_staff_income_multiplier
+	staff_level = maxi(0, p_staff_level)
 	cycle_progress = clampf(p_cycle_progress, 0.0, _effective_cycle_length())
 	is_cycle_running = (p_is_running or is_staffed) and units_owned > 0
 
@@ -298,7 +325,7 @@ func get_income_per_sec() -> float:
 	# Use the effective (sped-up) length so the Efficiency upgrade shows up as a
 	# higher income/sec, matching what the property actually pays over time. The staffer
 	# tier's multiplier is included so alien staff visibly raise this property's rate.
-	return floor(units_owned * income_per_unit * staff_income_multiplier) / _effective_cycle_length()
+	return floor(units_owned * income_per_unit * _effective_staff_multiplier()) / _effective_cycle_length()
 
 
 ## Cash paid out each time a full cycle completes, before frenzy/event
@@ -311,14 +338,14 @@ func get_income_per_cycle() -> float:
 	# Includes the staffer-tier multiplier AND the dynasty Family Fortune multiplier, so
 	# the displayed figure tracks a Legacy income upgrade (which the live tick also applies
 	# at payment). Frenzy/event multipliers still apply on top, at payment.
-	return floor(units_owned * income_per_unit * staff_income_multiplier * legacy_income_multiplier)
+	return floor(units_owned * income_per_unit * _effective_staff_multiplier() * legacy_income_multiplier)
 
 
 ## Cash a SINGLE unit of this property would pay per cycle right now (Family Fortune
 ## included). Shown grayed on a rung the player owns none of yet, so they can see what
 ## the next tier is worth before buying in (Tim 2026-06-17).
 func get_single_unit_income_per_cycle() -> float:
-	return floor(income_per_unit * staff_income_multiplier * legacy_income_multiplier)
+	return floor(income_per_unit * _effective_staff_multiplier() * legacy_income_multiplier)
 
 
 ## Current milestone band (how many bands have been crossed).
@@ -350,10 +377,10 @@ func _start_cycle_internal() -> void:
 ## Collect income at the end of a cycle and return the amount earned.
 ## Multipliers apply here — at point of payment — then floor (Spec §1, §3.4).
 func _collect(income_multiplier: float = 1.0) -> float:
-	# staff_income_multiplier is this property's own alien-staffer tier bonus; the
-	# passed-in income_multiplier is the global frenzy × Legacy factor. Both apply here,
-	# at point of payment, then floor (Spec §1, §3.4).
-	return floorf(units_owned * income_per_unit * staff_income_multiplier * income_multiplier)
+	# _effective_staff_multiplier() is this property's own alien-staffer bonus (tier entry
+	# multiplier × within-epoch levels); the passed-in income_multiplier is the global
+	# frenzy × Legacy factor. Both apply here, at point of payment, then floor (Spec §1, §3.4).
+	return floorf(units_owned * income_per_unit * _effective_staff_multiplier() * income_multiplier)
 
 
 ## Check whether a milestone has been crossed and apply the adaptive reward.

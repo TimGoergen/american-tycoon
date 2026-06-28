@@ -421,6 +421,7 @@ func _build_property_tab() -> Control:
 		row.tap_requested.connect(_on_tap_requested)
 		row.hold_rush_requested.connect(_on_hold_rush_requested)
 		row.hire_requested.connect(_on_hire_requested)
+		row.level_up_requested.connect(_on_level_up_requested)
 		row.set_buy_mode(_buy_mode)
 		ladder.add_child(row)
 		_rows.append(row)
@@ -708,6 +709,13 @@ func _on_hold_rush_requested(prop_index: int) -> void:
 
 func _on_hire_requested(prop_index: int) -> void:
 	game.try_hire(prop_index)
+
+
+## Player pressed the staff button in its LEVEL UP state: buy one within-epoch staff level
+## (the continuous upgrade sink). Mirrors _on_hire_requested — the row re-reads game state
+## every frame, so a successful purchase shows up on the next _process refresh.
+func _on_level_up_requested(prop_index: int) -> void:
+	game.try_upgrade_staff_level(prop_index)
 
 
 func _on_wage_tapped() -> void:

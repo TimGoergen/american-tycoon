@@ -123,6 +123,38 @@ func get_staff_cost(prop_index: int, tier: int) -> float:
 	return CostCurve.round_nice(epoch_economy * fraction * prop.staff_cost_multiplier)
 
 
+## Cost to buy the NEXT within-epoch staff level for a property (the per-epoch upgrade track,
+## GDD §6.1). Anchored to the CURRENT tier's entry-hire cost so it inherits the same epoch +
+## per-property scaling: the first level is a small fraction of that hire, then each level
+## climbs geometrically (staff_level_cost_growth) so there is always a next one but never a
+## free one. Returns 0 if the property is not staffed yet (you must hire before you can level).
+func get_staff_level_cost(prop_index: int) -> float:
+	var prop := properties[prop_index] as PropertyState
+	if prop.staff_tier < 1:
+		return 0.0
+	var tuning := prop.tuning
+	var entry_cost := get_staff_cost(prop_index, prop.staff_tier)
+	var level_factor := tuning.staff_level_cost_base \
+			* pow(tuning.staff_level_cost_growth, float(prop.staff_level))
+	return CostCurve.round_nice(entry_cost * level_factor)
+
+
+## Try to buy one within-epoch staff level for a property. Returns true on success; false if
+## the property is unstaffed or the player can't afford the next level. Like a hire, the spend
+## counts toward the generation's staff book value.
+func try_upgrade_staff_level(prop_index: int) -> bool:
+	var prop := properties[prop_index] as PropertyState
+	if prop.staff_tier < 1:
+		return false
+	var cost := get_staff_level_cost(prop_index)
+	if cash < cost:
+		return false
+	cash -= cost
+	spent_on_staff_this_gen += cost
+	prop.add_staff_level()
+	return true
+
+
 ## Layer 2 start verb: tap on an idle, unstaffed property.
 func start_cycle(prop_index: int) -> void:
 	(properties[prop_index] as PropertyState).start_cycle()

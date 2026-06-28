@@ -587,6 +587,12 @@ func _run_epoch_timing_study() -> void:
 		var staff := _geometric_ladder(float(candidate["staff"]), EpochCatalog.tier_count())
 		_print_epoch_projection(econ, staff, base_ips)
 
+	# NOTE: the projection above uses the LEVEL-0 staff multiplier (the tier entry jump only),
+	# which is the purest demonstration of the pacing law. The within-epoch staff levels add a
+	# compounding bonus on top, so REAL epoch durations are shorter than projected (an epoch
+	# becomes an income ramp). The staff-economics readout below shows what those levels cost.
+	_print_staff_economics()
+
 	print("")
 	print("  TAKEAWAY: per-epoch duration ratio = economy_step / staff_step.")
 	# Read the live epoch-2 step straight from the catalog so this line never goes
@@ -597,6 +603,33 @@ func _run_epoch_timing_study() -> void:
 			else ("FLAT" if is_equal_approx(staff_step, econ_step) else "STALLS (slower each epoch)")
 	print("  Live epoch-2 step: economy x%.0f / staff x%.0f  ->  %s." % [econ_step, staff_step, verdict])
 	print("  Rule of thumb: keep staff step >= economy step to stay flat-or-accelerating.")
+
+
+## Print, per alien epoch, what the new staffer costs vs. the epoch's whole economy — so the
+## staff_cost_fraction retune (2026-06-27) is visible and tunable. Shows the cheapest (ATM,
+## index 0) and priciest (Executive Assets, index 11) entry-hire prices, the entry price as a
+## fraction of the epoch economy (the "is it too cheap at contact?" number Tim flagged), and the
+## first within-epoch level cost. Uses a fresh economy at base prices (no Legacy discount).
+func _print_staff_economics() -> void:
+	print("")
+	print("  --- Staff economics (entry-hire cost vs epoch economy; staff_cost_fraction=%.4f) ---" % _tuning.staff_cost_fraction)
+	print("    epoch   epoch economy     hire ATM    %of econ   hire Exec    1st level (ATM)")
+	var economy := EconomyState.new(_property_configs, _tuning)
+	for tier in range(2, EpochCatalog.tier_count() + 1):
+		var epoch_econ := _tuning.earth_economy_target * EpochCatalog.economy_scale(tier)
+		var hire_cheap := economy.get_staff_cost(0, tier)
+		var hire_dear := economy.get_staff_cost(11, tier)
+		var pct := (hire_cheap / epoch_econ * 100.0) if epoch_econ > 0.0 else 0.0
+		# First level (staff_level 0) costs the entry hire × staff_level_cost_base.
+		var first_level := CostCurve.round_nice(hire_cheap * _tuning.staff_level_cost_base)
+		print("    %4d   %13s   %10s   %6.2f%%   %10s   %14s" % [
+			tier,
+			Money.of(epoch_econ).display(),
+			Money.of(hire_cheap).display(),
+			pct,
+			Money.of(hire_dear).display(),
+			Money.of(first_level).display(),
+		])
 
 
 ## Play one juiced generation to a build-out plateau and return its passive

@@ -46,16 +46,39 @@ extends Resource
 
 # --- Staffing & offline (Spec §6) ---
 
-## Alien staff (tier 2+) cost as a fraction of the TARGET epoch's whole economy
+## Alien staff (tier 2+) ENTRY hire cost as a fraction of the TARGET epoch's whole economy
 ## (earth_economy_target × that epoch's economy_scale). Anchoring to the epoch economy
-## — not the property's tiny Earth base cost — is what makes alien staff cost ~1000×
-## more each epoch, so you cannot afford the next epoch's staff the instant you arrive
-## (Tim 2026-06-17). The Earth staffer (tier 1) keeps its small property-scaled cost.
-@export var staff_cost_fraction: float = 0.001  # feel-tune
+## — not the property's tiny Earth base cost — is what makes alien staff scale with each
+## epoch, so you cannot afford the next epoch's staff the instant you arrive (Tim 2026-06-17).
+## The Earth staffer (tier 1) keeps its small property-scaled cost.
+## RETUNED 2026-06-27 0.001 → 0.01: at 0.001 the cheapest new staffer was ~0.1% of the
+## epoch's whole economy — trivially affordable at contact, which Tim flagged as "too cheap."
+## At 0.01 the cheapest staffer is ~1% of the epoch economy and the full alien roster costs
+## more than one epoch's earnings, so staffing is a prioritized spend, not a one-tap sweep.
+@export var staff_cost_fraction: float = 0.01  # feel-tune
 
 ## Per-property growth of that fraction: cheaper rungs (ATM) get the base fraction, each
 ## higher rung multiplies by this, so pricier properties cost proportionally more to staff.
 @export var staff_cost_property_growth: float = 1.4  # feel-tune
+
+# --- Within-epoch staff levels (the per-epoch upgrade track, GDD §6.1 / Plans/Per_Epoch_Upgrade_Track.md) ---
+# After hiring an epoch's staffer, you keep LEVELING that staffer up through the epoch —
+# the continuous "there's always a next upgrade to chase" sink that fills an epoch (criterion
+# #3). Levels reset to 0 when you advance to the next epoch's staffer (a fresh hire). The
+# entry hire is the big tier jump (staff_cost_fraction above); levels are the small steps after.
+
+## Income bonus per staff level, COMPOUNDING: a property's staffer multiplier is
+## staff_income_multiplier(tier) × (1 + this)^staff_level. Same "every level is the same
+## relative jump" feel as the Legacy Family Fortune upgrade (which uses 0.20).
+@export var staff_level_step: float = 0.25  # feel-tune
+
+## Cost of the FIRST staff level as a fraction of the current tier's entry-hire cost. Levels
+## start cheap relative to the hire you just paid, then climb by staff_level_cost_growth.
+@export var staff_level_cost_base: float = 0.10  # feel-tune
+
+## Geometric growth of the staff-level cost: each level costs the previous × this. This is
+## the only brake on leveling (there is no hard cap), so the chase never runs out.
+@export var staff_level_cost_growth: float = 1.6  # feel-tune
 
 ## Offline income efficiency vs. live play (0–1).
 @export var offline_efficiency: float = 0.5  # TBD-SIM

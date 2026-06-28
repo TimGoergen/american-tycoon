@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="60" viewBox="0 0 120 60">
+  <!-- Dollar bill: green note with a gold border and a gold center seal. The "$"
+       is drawn as vector strokes (not <text>) because Godot's SVG rasterizer does
+       not embed fonts, so a text glyph would not render reliably. -->
+  <!-- Bill body -->
+  <rect x="2" y="2" width="116" height="56" rx="7" fill="#2E7D4F" stroke="#D4AF37" stroke-width="4"/>
+  <!-- Inner gold guilloche frame -->
+  <rect x="9" y="9" width="102" height="42" rx="4" fill="none" stroke="#D4AF37" stroke-width="2"/>
+  <!-- Corner pips (gold) -->
+  <circle cx="15" cy="15" r="3" fill="#D4AF37"/>
+  <circle cx="105" cy="15" r="3" fill="#D4AF37"/>
+  <circle cx="15" cy="45" r="3" fill="#D4AF37"/>
+  <circle cx="105" cy="45" r="3" fill="#D4AF37"/>
+  <!-- Center seal -->
+  <circle cx="60" cy="30" r="15" fill="#F2D277" stroke="#D4AF37" stroke-width="2"/>
+  <!-- "$" glyph, drawn with strokes over the seal -->
+  <g fill="none" stroke="#1F5C39" stroke-width="3" stroke-linecap="round">
+    <path d="M66 24 C66 20 54 20 54 25 C54 30 66 30 66 35 C66 40 54 40 54 36"/>
+    <line x1="60" y1="18" x2="60" y2="42"/>
+  </g>
+</svg>

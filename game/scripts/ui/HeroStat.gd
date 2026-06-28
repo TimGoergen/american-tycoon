@@ -26,26 +26,34 @@ const INCOME_FONT_SIZE := UiPalette.FONT_HERO
 const CASH_FONT_SIZE := INCOME_FONT_SIZE
 # Caption text uses UiPalette.FONT_BODY at Tim's request.
 const CAPTION_FONT_SIZE := UiPalette.FONT_BODY
-# The dynasty/heir name now lives in this panel (it used to be its own header
-# strip). It sits centered between the two edge values, on the same line as their
-# captions, so it reads as one band: "INCOME … NAME … CASH". Uses UiPalette.FONT_SUBHEAD
-# (Tim's call) so the heir name carries more weight than the captions.
+# The current EPOCH name lives in this panel (Tim, 2026-06-27 — it replaced the
+# heir/dynasty name). It sits centered between the two edge values, on the same line
+# as their captions, so it reads as one band: "INCOME … EPOCH … CASH". Uses
+# UiPalette.FONT_SUBHEAD (Tim's call) so the epoch name carries more weight than the
+# captions. The value shown is the civilization Earth is currently trading with
+# ("Earth" on tier 1, an alien race's name on later epochs).
 const NAME_FONT_SIZE := UiPalette.FONT_SUBHEAD
 const INCOME_BOLD := 3
 const CASH_BOLD := 2
 const CAPTION_BOLD := 2
 const NAME_BOLD := 2
 
+# The dollar-bill icon shown next to the CASH caption. The art is a 2:1 green-and-gold
+# bill; we draw it at a medium size on the caption line. Gap is the space between the
+# bill and the "CASH" word.
+const CASH_BILL_ICON_PATH := "res://art/icons/dollar_bill.svg"
+const CASH_BILL_SIZE := Vector2(72, 36)
+const CASH_BILL_GAP := 8.0
+
 ## Gap kept between a pinned label and the panel edge it hugs.
 const EDGE_MARGIN := 14
-## Panel height — tall enough that the vertically-centered values clear the caption
-## pinned along the bottom edge. Reduced 10% (190 -> 171) at Tim's request: the trim
-## comes out of the empty space below the captions, and the label layout is frozen at
-## the original height (LABEL_LAYOUT_HEIGHT) so NO text moves.
-const PANEL_MIN_HEIGHT := 171
-## Height the labels are laid out against. Held at the original 190 so the numerals and
-## captions keep their exact positions even though the plate outline is now shorter.
-const LABEL_LAYOUT_HEIGHT := 190
+## Panel height. Made 30% taller (171 -> 222) at Tim's request (2026-06-27) for a bigger,
+## bolder income panel. The label layout height below is scaled with it so the numerals
+## and captions stay proportionally placed in the taller plate.
+const PANEL_MIN_HEIGHT := 222
+## Height the labels are laid out against. Scaled up with the panel (190 -> 247, +30%) so
+## the vertical centering tracks the taller plate.
+const LABEL_LAYOUT_HEIGHT := 247
 
 # Planet backdrop (Tim, 2026-06-26): the current planet's world image sits behind the numbers
 # on a plain white plate, shown mostly whole and centred (zoomed out enough to read as a globe,
@@ -107,7 +115,8 @@ var _income_label: Label
 var _cash_label: Label
 var _income_caption: Label
 var _cash_caption: Label
-var _name_label: Label
+var _cash_bill: TextureRect  # small dollar-bill icon shown beside the CASH caption
+var _epoch_label: Label  # the current epoch / civilization name (was the heir name)
 
 # Frenzy glow: while a burn is active the ticket pulses toward red to signal the
 # accelerated state. Subtle — navy numerals stay readable over the tint.
@@ -169,11 +178,24 @@ func _ready() -> void:
 	_cash_caption.text = "CASH"
 	_content.add_child(_cash_caption)
 
-	# The heir/dynasty name, centered between the two edge values and laid out on the
-	# caption line (see _layout_labels). Navy to match the income side; Main feeds it
-	# via set_dynasty_name each frame.
-	_name_label = _make_label(UiPalette.NAVY, NAME_FONT_SIZE, NAME_BOLD)
-	_content.add_child(_name_label)
+	# A small green-and-gold dollar-bill icon sits just left of the "CASH" caption
+	# (Tim, 2026-06-27) so the cash side reads as "💵 CASH". Medium size — tall enough
+	# to read as a bill, small enough to sit on the caption line. KEEP_ASPECT_CENTERED
+	# preserves the 2:1 bill shape inside its box.
+	_cash_bill = TextureRect.new()
+	_cash_bill.texture = load(CASH_BILL_ICON_PATH)
+	_cash_bill.custom_minimum_size = CASH_BILL_SIZE
+	_cash_bill.size = CASH_BILL_SIZE
+	_cash_bill.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_cash_bill.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_cash_bill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_content.add_child(_cash_bill)
+
+	# The current epoch / civilization name, centered between the two edge values and laid
+	# out on the caption line (see _layout_labels). Navy to match the income side; Main feeds
+	# it via set_epoch_name each frame.
+	_epoch_label = _make_label(UiPalette.NAVY, NAME_FONT_SIZE, NAME_BOLD)
+	_content.add_child(_epoch_label)
 
 
 ## Build a large, faux-bold label in the given color. The bold weight is faked with
@@ -199,10 +221,10 @@ func set_cash(cash: float) -> void:
 	_cash_label.text = Money.of(cash).display_cash()
 
 
-## The current heir's full name (e.g. "Wellington Pemberton IX"). Shown UPPERCASE
-## to match the ticket-plate convention the old header used.
-func set_dynasty_name(dynasty_name: String) -> void:
-	_name_label.text = dynasty_name.to_upper()
+## The current epoch / civilization name (e.g. "EARTH", "LUMINARI COLLECTIVE"). Shown
+## UPPERCASE to match the ticket-plate convention. Replaced the heir name (Tim, 2026-06-27).
+func set_epoch_name(epoch_name: String) -> void:
+	_epoch_label.text = epoch_name.to_upper()
 
 
 ## Toggle the frenzy glow. Main drives this from the live frenzy state each frame.
@@ -364,16 +386,23 @@ func _layout_labels() -> void:
 	_cash_label.position = Vector2(area.x - _cash_label.size.x - EDGE_MARGIN, cash_centered_top / 2.0)
 	_cash_caption.position = Vector2(area.x - _cash_caption.size.x - EDGE_MARGIN, cash_caption_top)
 
-	# Heir name: horizontally centered across the whole plate, and BOTTOM-aligned with the
+	# Dollar-bill icon: sits just left of the CASH caption, vertically centered on it, so the
+	# pair reads as "[bill] CASH" flush to the right edge.
+	_cash_bill.position = Vector2(
+		_cash_caption.position.x - CASH_BILL_GAP - CASH_BILL_SIZE.x,
+		cash_caption_top + (_cash_caption.size.y - CASH_BILL_SIZE.y) / 2.0
+	)
+
+	# Epoch name: horizontally centered across the whole plate, and BOTTOM-aligned with the
 	# INCOME / CASH captions (Tim, 2026-06-21) so all three labels share one baseline — the
 	# taller name (it's a larger font) now grows upward only, not below the captions.
 	# (Income and cash captions share the same y because both values are the same font size,
 	# so either caption's bottom is the baseline.)
-	_name_label.size = _name_label.get_minimum_size()
+	_epoch_label.size = _epoch_label.get_minimum_size()
 	var caption_baseline_y := cash_caption_top + _cash_caption.size.y
-	_name_label.position = Vector2(
-		(area.x - _name_label.size.x) / 2.0,
-		caption_baseline_y - _name_label.size.y
+	_epoch_label.position = Vector2(
+		(area.x - _epoch_label.size.x) / 2.0,
+		caption_baseline_y - _epoch_label.size.y
 	)
 
 

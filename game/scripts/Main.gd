@@ -32,7 +32,6 @@ var _hero_stat: HeroStat
 var _background: TextureRect
 ## Small banner under the hero stat naming the civilization Earth is currently trading
 ## with (the reached epoch). Updates the moment a first contact advances the epoch.
-var _epoch_label: Label
 var _first_contact_overlay: FirstContactOverlay
 var _frenzy_bar: FrenzyBar
 var _wage_panel: WagePanel
@@ -140,11 +139,11 @@ func _process(delta: float) -> void:
 	_hero_stat.set_cash(game.economy.cash)
 	_hero_stat.set_frenzy_glow(game.frenzy.get_multiplier() > 1.0)
 
-	# The heir name rides on the hero stat; the prestige-exit button and the Estate
-	# Office button (with its Legacy balance) reflect the live state.
-	_hero_stat.set_dynasty_name(HeirNames.dynasty_name(dynasty.generation))
+	# The current epoch name rides on the hero stat (replaced the heir name, Tim 2026-06-27);
+	# the prestige-exit button and the Estate Office button (with its Legacy balance) reflect
+	# the live state.
+	_hero_stat.set_epoch_name(EpochCatalog.civilization(game.epoch.current_tier))
 	_hero_stat.set_planet_tier(game.epoch.current_tier)
-	_update_epoch_label()
 	_update_plan_button()
 	_update_estate_badge()
 
@@ -278,16 +277,11 @@ func _build_ui() -> void:
 	column.add_theme_constant_override("separation", 10)
 	viewing_area.add_child(column)
 
-	# Pinned across every tab (UI Notes §7): the income/cash hero stat (the heartbeat)
-	# and the epoch banner just under it. Main feeds both each frame in _process.
+	# Pinned across every tab (UI Notes §7): the income/cash hero stat (the heartbeat).
+	# The epoch name now rides inside the hero stat itself (Tim, 2026-06-28), so the
+	# separate banner that used to sit here was removed.
 	_hero_stat = HeroStat.new()
 	column.add_child(_hero_stat)
-
-	_epoch_label = Label.new()
-	_epoch_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_epoch_label.add_theme_color_override("font_color", UiPalette.NAVY)
-	_epoch_label.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
-	column.add_child(_epoch_label)
 
 	# Tab content: the four surfaces stacked in one slot, one visible at a time. It
 	# expands so the bottom tab bar pins beneath it. Switching tabs never pauses the
@@ -790,15 +784,6 @@ func _update_plan_button() -> void:
 		_plan_button.text = "PASS THE TORCH  (+%d Legacy)" % dynasty.projected_legacy_gain()
 	else:
 		_plan_button.text = "PASS THE TORCH"
-
-
-## Keep the epoch banner in sync with the civilization Earth is currently trading with.
-func _update_epoch_label() -> void:
-	var tier := game.epoch.current_tier
-	if tier <= 1:
-		_epoch_label.text = "EARTH"
-	else:
-		_epoch_label.text = "TRADING WITH: " + EpochCatalog.civilization(tier).to_upper()
 
 
 ## First contact: a new epoch was reached this tick. Show the beat (Main's _process

@@ -41,9 +41,10 @@ const NAME_BOLD := 2
 # CASH_BILL_EDGE_PAD is extra right clearance on top of EDGE_MARGIN so the edge-filling bill
 # sits comfortably inside the thick red frame rather than against it.
 const CASH_BILL_ICON_PATH := "res://art/icons/dollar_bill.svg"
-# 40% larger than the original 72×36 (Tim, 2026-06-28). The bill is positioned from its RIGHT
-# edge (area.x − margin), so enlarging it grows the bill leftward and keeps the right margin.
-const CASH_BILL_SIZE := Vector2(100, 50)
+# Enlarged in two passes (Tim, 2026-06-28): +40% then +30% over the original 72×36. The bill is
+# positioned from its RIGHT edge (area.x − margin), so enlarging it grows the bill leftward and
+# keeps the right margin unchanged.
+const CASH_BILL_SIZE := Vector2(130, 65)
 const CASH_BILL_EDGE_PAD := 14
 
 # The dark-gold "$ / stopwatch" income-per-second symbol shown beneath the income number,

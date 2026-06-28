@@ -1,19 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="120" height="64" viewBox="0 0 120 64">
   <!-- Income-per-second symbol (Tim, 2026-06-28): "$ / stopwatch" = dollars per second. A single
        dark gold, NO outline (the earlier two-tone "$/s" read poorly). The "s" is replaced by a
-       stopwatch so "per second" is unmistakable. Drawn as strokes (the SVG importer embeds no
-       fonts; see dollar_bill.svg). -->
+       stopwatch so "per second" is unmistakable. The stopwatch is slightly SHORTER than the "$"
+       and vertically CENTERED on it (its bounding box spans y14–51, midpoint ~32, just like the
+       "$"'s y9–55). Drawn as strokes (the SVG importer embeds no fonts; see dollar_bill.svg). -->
   <g fill="none" stroke="#8A6A1C" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
-    <!-- $ -->
+    <!-- $ (vertical span y9–55, centered ~y32) -->
     <line x1="24" y1="9" x2="24" y2="55"/>
     <path d="M 38 18 C 38 10 11 10 11 23 C 11 32 38 32 38 41 C 38 54 11 54 11 46"/>
     <!-- / -->
     <line x1="62" y1="12" x2="48" y2="52"/>
     <!-- stopwatch: face, top plunger (stem + button cap), a side start/stop button, and a hand -->
-    <circle cx="94" cy="42" r="17"/>
-    <line x1="94" y1="13" x2="94" y2="25"/>
-    <line x1="85" y1="13" x2="103" y2="13"/>
-    <line x1="109" y1="29" x2="114" y2="24"/>
-    <line x1="94" y1="42" x2="102" y2="34"/>
+    <circle cx="93" cy="37" r="14"/>
+    <line x1="93" y1="14" x2="93" y2="23"/>
+    <line x1="85" y1="14" x2="101" y2="14"/>
+    <line x1="106" y1="28" x2="110" y2="24"/>
+    <line x1="93" y1="37" x2="100" y2="30"/>
   </g>
 </svg>

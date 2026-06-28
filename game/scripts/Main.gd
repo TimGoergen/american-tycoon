@@ -81,9 +81,14 @@ var _buy_mode: PropertyRow.BuyMode = PropertyRow.BuyMode.ONE
 var _elapsed_since_save := 0.0
 
 # Which site launched the currently-running minigame, so _on_minigame_finished knows what its
-# multiplier scales (GDD §5.5). One host serves both sites; only one runs at a time.
-enum MinigameSite { NONE, SUCCESSION, WELCOME_BACK }
+# multiplier scales (GDD §5.5). One host serves every site; only one runs at a time.
+enum MinigameSite { NONE, SUCCESSION, WELCOME_BACK, FIRST_CONTACT }
 var _minigame_site: int = MinigameSite.NONE
+## First Contact (GDD §5.5 site 2): the property whose head-start units the running negotiation
+## minigame is for, and the epoch tier that opened it. Set when the contact beat is dismissed
+## into the minigame; consumed when the minigame finishes and the units are granted.
+var _first_contact_prop_index: int = -1
+var _pending_contact_tier: int = 0
 ## The offline pile awaiting the welcome-back minigame's verdict. The base pile is already
 ## banked when the minigame starts; on finish we credit the +/- delta and show the welcome
 ## screen with the final, post-minigame haul.
@@ -318,6 +323,9 @@ func _build_ui() -> void:
 	_first_contact_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_first_contact_overlay)
 	game.epoch.contact_made.connect(_on_contact_made)
+	# When the player answers the contact, the trade-deal minigame negotiates their head start
+	# on the new alien property (GDD §5.5 site 2), so the negotiation follows the narration.
+	_first_contact_overlay.dismissed.connect(_on_contact_dismissed)
 
 	# The succession ceremony overlay (the Reading of the Will + heir reveal),
 	# also above everything and hidden until the player plans the estate.
@@ -787,12 +795,42 @@ func _update_plan_button() -> void:
 
 
 ## First contact: a new epoch was reached this tick. Show the beat (Main's _process
-## guard freezes the economy while it is up).
+## guard freezes the economy while it is up). We remember the tier so that when the player
+## answers the call (_on_contact_dismissed) we can negotiate the trade deal for that epoch's
+## new alien property. (If a single huge tick crossed two epochs, the later contact's beat
+## simply replaces this one — vanishingly rare given epochs are ~30× apart.)
 func _on_contact_made(new_tier: int) -> void:
 	# Swap the play-field backdrop to match the newly reached epoch before the beat plays,
 	# so when the first-contact overlay clears the player is looking at the new world.
 	_background.texture = load(_background_path_for_tier(new_tier))
+	_pending_contact_tier = new_tier
 	_first_contact_overlay.show_contact(new_tier)
+
+
+## The player answered the contact call (the overlay's "ANSWER THE CALL"). If this epoch opened
+## a new alien property type, negotiate the trade deal for it (GDD §5.5 site 2): the minigame's
+## performance becomes the player's head start (free starting units). Epochs with no new property
+## just resume play. With minigames opted out, we still grant the keep-floor head start directly.
+func _on_contact_dismissed() -> void:
+	var tier := _pending_contact_tier
+	_pending_contact_tier = 0
+	var prop_index := game.economy.get_property_index_for_unlock_tier(tier)
+	if prop_index < 0:
+		return  # no new business this epoch — nothing more to negotiate
+
+	if not game.ui_minigame_enabled:
+		# Opted out of minigames: bank the keep floor, matching the prestige/welcome-back rule.
+		var floor_units := int(floor(tuning.first_contact_starting_units * tuning.minigame_keep_floor))
+		game.economy.grant_starting_units(prop_index, floor_units)
+		return
+
+	var prop_name := (game.economy.properties[prop_index] as PropertyState).config.display_name
+	_minigame_site = MinigameSite.FIRST_CONTACT
+	_first_contact_prop_index = prop_index
+	_minigame_screen.start_game(
+		MinigameScreen.first_contact_reward(tuning.first_contact_starting_units, prop_name),
+		dynasty.upgrades.minigame_bonus_max()
+	)
 
 
 # Backdrops keyed to how many alien contacts have been made (Tim, 2026-06-26). The epoch
@@ -930,6 +968,8 @@ func _on_minigame_finished(multiplier: float, opt_out: bool) -> void:
 	match site:
 		MinigameSite.WELCOME_BACK:
 			_finish_welcome_back_minigame(multiplier)
+		MinigameSite.FIRST_CONTACT:
+			_finish_first_contact_minigame(multiplier)
 		_:
 			# SUCCESSION (and any unexpected NONE) finalize the death with the multiplier.
 			_finalize_succession(multiplier)
@@ -945,6 +985,19 @@ func _on_welcome_risk_pressed() -> void:
 		MinigameScreen.offline_pile_reward(_pending_offline_pile),
 		WELCOME_BACK_BONUS_MAX
 	)
+
+
+## The First Contact negotiation produced `multiplier`: convert it to a count of free starting
+## units (the universal keep_floor..1+bonus curve scales the cap) and grant them on the new alien
+## property (GDD §5.5 site 2). The contact narration already played, so there is no closing beat —
+## the player drops back into the now-bigger game owning a head start on the new business. Save so
+## the granted units survive a crash before the next autosave.
+func _finish_first_contact_minigame(multiplier: float) -> void:
+	if _first_contact_prop_index >= 0:
+		var units := int(floor(tuning.first_contact_starting_units * multiplier))
+		game.economy.grant_starting_units(_first_contact_prop_index, units)
+		SaveManager.save_dict_to_file(dynasty.to_save_dict())
+	_first_contact_prop_index = -1
 
 
 ## The welcome-back minigame produced `multiplier`: the base pile was already banked, so we

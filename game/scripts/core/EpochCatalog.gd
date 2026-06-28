@@ -48,7 +48,9 @@ class_name EpochCatalog
 #                        lifetime earnings advances OUT of this epoch into the next.
 #   staff_income_multiplier — income multiplier a property gets while staffed at this tier
 #   contact_line       — the narrator's first-contact line (empty for Earth)
-#   staffer_names      — the staffer title shown per property, indexed 0–11 in GDD §4 order
+#   staffer_names      — the staffer title shown per property, indexed by ladder position
+#                        (0–11 are the GDD §4 Earth properties; index 12+ are alien property
+#                        types added at later epochs — GDD §5.5 site 2). One entry per property.
 # (Alien staff cost is no longer a per-epoch multiplier; it is derived from economy_scale
 #  × earth_economy_target in EconomyState.get_staff_cost — see TuningConfig.staff_cost_*.)
 const EPOCHS := [
@@ -68,6 +70,9 @@ const EPOCHS := [
 			"Tax Strategist", "Logistics Director", "Freshness Consultant",
 			"Portfolio Analyst", "Property Manager", "Downline Coordinator",
 			"Fund Administrator", "Lobbyist", "Chief of Staff",
+			# 13th rung = the first alien property type (Photon Exchange). Earth never staffs it
+			# (it is locked until epoch 2), but the roster stays aligned to the property ladder.
+			"Exchange Floor Boss",
 		],
 	},
 	{
@@ -85,6 +90,7 @@ const EPOCHS := [
 			"Flux Auditor", "Lightstream Courier", "Radiance Cleaner",
 			"Photon Day-Trader", "Solar Flipper", "Aura Recruiter",
 			"Plasma Fund Manager", "Light-Speed Lobbyist", "Luminous Chief of Staff",
+			"Photon Exchange Director",
 		],
 	},
 	{
@@ -102,6 +108,7 @@ const EPOCHS := [
 			"Tax Optimization Daemon", "Logistics Mainframe", "Laundering Protocol",
 			"High-Frequency Core", "Property Acquisition Bot", "Recruitment Network Node",
 			"Quant Supercluster", "Policy Compiler", "Executive Mainframe",
+			"Exchange Daemon",
 		],
 	},
 	{
@@ -119,6 +126,7 @@ const EPOCHS := [
 			"Rhizome Financier", "Spore-Drift Network", "Decomposition Specialist",
 			"Hyphae Trader", "Overgrowth Developer", "Mycelial Downline",
 			"Spore Cloud Fund", "Root-Network Lobbyist", "Hive-Mind Chief of Staff",
+			"Spore-Market Maker",
 		],
 	},
 	{
@@ -136,6 +144,7 @@ const EPOCHS := [
 			"Refraction Auditor", "Lattice Courier", "Facet Cleaner",
 			"Quartz Day-Trader", "Geode Flipper", "Prism Recruiter",
 			"Crystalline Fund Manager", "Bedrock Lobbyist", "Diamond Chief of Staff",
+			"Prism Exchange Broker",
 		],
 	},
 	{
@@ -154,6 +163,7 @@ const EPOCHS := [
 			"Hourglass Auditor", "Timeline Courier", "Era Cleaner",
 			"Microsecond Day-Trader", "Era Flipper", "Tomorrow Recruiter",
 			"Temporal Fund Manager", "Eternity Lobbyist", "Time-Lord Chief of Staff",
+			"Temporal Exchange Lord",
 		],
 	},
 ]

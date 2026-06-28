@@ -257,6 +257,11 @@ func _greedy_buy_spree(game: GameState) -> int:
 
 		for i in range(game.economy.properties.size()):
 			var prop := game.economy.properties[i] as PropertyState
+			# Respect the epoch unlock gate, same as the player: an alien property still locked
+			# behind a later epoch can't be bought, so it must not be chosen here either (or the
+			# spree would pick it, fail the buy, and waste an iteration — GDD §5.5 site 2).
+			if not game.economy.is_property_unlocked(i, game.epoch.current_tier):
+				continue
 			var cost := prop.get_next_cost()
 			if cost <= 0.0 or game.economy.cash < cost:
 				continue

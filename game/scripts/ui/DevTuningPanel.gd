@@ -77,6 +77,7 @@ const DESCRIPTIONS := {
 	"staff_level_step": "Income added per within-epoch staff level (compounding).",
 	"staff_level_cost_base": "First staff level's cost as a fraction of the hire price.",
 	"staff_level_cost_growth": "How much each further staff level costs vs the last.",
+	"first_contact_starting_units": "Free units a full First Contact deal grants on a new alien property.",
 	"offline_efficiency": "Offline income rate vs live play (0–1).",
 	"offline_cap_seconds": "Longest offline accrual window (seconds; 14400 = 4h).",
 	"frenzy_max_multiplier": "Peak income multiplier during a frenzy burn.",

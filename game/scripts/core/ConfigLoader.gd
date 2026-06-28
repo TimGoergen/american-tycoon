@@ -19,6 +19,9 @@ const PROPERTY_PATHS := [
 	"res://config/properties/10_hedge_fund.tres",
 	"res://config/properties/11_legislative_assets.tres",
 	"res://config/properties/12_executive_assets.tres",
+	# First alien property type (GDD §5.5 site 2): locked behind epoch 2 (unlock_tier),
+	# opened by the Luminari First Contact trade-deal minigame. Phase 2 of that feature.
+	"res://config/properties/13_photon_exchange.tres",
 ]
 
 ## Returns null (with an error pushed) if the tuning file is missing.
@@ -41,7 +44,8 @@ static func load_tuning(apply_user_overrides: bool = true) -> TuningConfig:
 	return tuning
 
 
-## Returns the 12 PropertyConfigs in GDD §4 ladder order, or [] on failure.
+## Returns the property ladder configs in order (the 12 Earth properties plus any alien
+## property types appended for later epochs), or [] on failure.
 static func load_property_configs() -> Array:
 	return _load_all(PROPERTY_PATHS)
 

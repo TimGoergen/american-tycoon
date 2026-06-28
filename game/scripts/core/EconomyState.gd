@@ -96,6 +96,29 @@ func try_buy(prop_index: int, count: int, current_tier: int) -> bool:
 	return true
 
 
+## Grant `count` free units of a property — the First Contact negotiation head start (GDD §5.5
+## site 2). The minigame's performance decides `count`; this is the only reward for opening an
+## alien property type. Runs through PropertyState.buy so the cost curve, milestones, and (if
+## staffed) auto-cycle all stay consistent — but it costs nothing and is NOT counted as spend,
+## because these units were won at the negotiating table, not bought, so they must never inflate
+## the estate's asset book value (the same earned-vs-granted distinction award_cash draws).
+func grant_starting_units(prop_index: int, count: int) -> void:
+	if count <= 0:
+		return
+	(properties[prop_index] as PropertyState).buy(count)
+
+
+## Index of the property that unlocks at exactly `tier` — the alien business a First Contact
+## opens — or -1 if no property is gated to that tier. The 12 Earth properties all unlock at
+## tier 1; each alien property type carries a distinct later unlock_tier (one per epoch).
+func get_property_index_for_unlock_tier(tier: int) -> int:
+	for i in range(properties.size()):
+		var cfg := (properties[i] as PropertyState).config as PropertyConfig
+		if cfg.unlock_tier == tier:
+			return i
+	return -1
+
+
 ## Try to hire OR upgrade the staffer for the property at `prop_index`, advancing it
 ## one tier. `max_tier` is the highest tier currently unlocked (the generation's reached
 ## epoch — GameState passes EpochState.current_tier). Returns true on success; false if

@@ -363,6 +363,16 @@ static func offline_pile_reward(pile: float) -> Dictionary:
 	)
 
 
+## The First Contact round (GDD §5.5 site 2): the alien trade negotiation. Unlike the other
+## two sites it does NOT scale money or Legacy — it scales the player's HEAD START on the new
+## alien property, a count of free starting units. `cap` is what a full negotiation grants;
+## `property_name` is the business being opened (shown as the result heading).
+static func first_contact_reward(cap: int, property_name: String) -> Dictionary:
+	return make_reward(
+		float(cap), "units", property_name.to_upper(), "Negotiate the alien trade deal", false
+	)
+
+
 ## Start a round. `reward` is a context from `make_reward` (or one of the named builders)
 ## describing what is being scaled and how to show it; `bonus_max` is the max extra-high
 ## bonus fraction (Family Reputation). Normally picks a random minigame type; the review

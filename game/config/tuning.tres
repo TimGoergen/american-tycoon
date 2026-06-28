@@ -34,6 +34,7 @@ minigame_keep_floor = 0.5
 minigame_full_score = 100.0
 minigame_extra_score = 200.0
 minigame_duration_seconds = 20.0
+first_contact_starting_units = 8
 crash_multiplier = 0.5
 crash_duration_minutes = 10.0
 audit_settle_rate = 0.08

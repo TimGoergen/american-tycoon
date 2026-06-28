@@ -41,6 +41,7 @@ extends Resource
 ## Accent color for this property — the background tint shown behind the staffer's
 ## portrait once the property is staffed (a per-property color, GDD §5.5 / Tim 2026-06-22).
 ## A deliberate, sanctioned extension beyond the Art Style Guide's 9-color palette: with
-## 12 properties there are not enough palette colors to give each a unique hue, so this
-## 12-color property palette is its own small, documented exception.
+## 17 properties (12 Earth + 5 alien property types, GDD §5.5) there are not enough palette
+## colors to give each a unique hue, so this per-property palette is its own small, documented
+## exception. The 5 alien properties carry placeholder accent hues until their art lands (M3).
 @export var accent_color: Color = Color("#7DA87B")

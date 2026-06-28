@@ -1,6 +1,14 @@
 # First Contact Reward — New Alien Property Types
 
-**Status:** Design pass complete 2026-06-28. Build-ready, NOT yet built.
+**Status:** BUILT — all 4 phases complete 2026-06-28 (branch `feature/first-contact-property-reward`,
+Phases 1–4 = commits 6b9f9ab, d694e48, 0c750d2, + copy/doc-sync). NOT yet merged to main;
+on-device feel-test (reach epoch 2 to play the negotiation) still owed.
+
+**As-built deltas from the plan below:** (a) skip/opt-out banks the keep-floor SHARE of the cap,
+not 0 units — matches the GDD §5.5 rule the other two minigame sites use (plan §2/§7-Q1 said "0");
+(b) magnitude is a FIXED flagship (~5× Executive Assets), epoch scaling from staffing only — NOT
+anchored to economy_scale (an economy_scale anchor double-counted the epoch; see §6 / Sim study);
+(c) reveal-after-contact chosen for locked rungs (plan §7-Q2 recommendation).
 **GDD reference:** §5.5 minigame usage site 2 ("Epoch change / First Contact").
 **Decided by:** Tim chose "new property type" over the GDD's three TBD options
 (entry income boost / starting cash / first-staffer discount) on 2026-06-24. Design

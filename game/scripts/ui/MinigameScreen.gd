@@ -369,7 +369,8 @@ static func offline_pile_reward(pile: float) -> Dictionary:
 ## `property_name` is the business being opened (shown as the result heading).
 static func first_contact_reward(cap: int, property_name: String) -> Dictionary:
 	return make_reward(
-		float(cap), "units", property_name.to_upper(), "Negotiate the alien trade deal", false
+		float(cap), "units", property_name.to_upper(),
+		"Negotiate your opening stake in %s" % property_name, false
 	)
 
 

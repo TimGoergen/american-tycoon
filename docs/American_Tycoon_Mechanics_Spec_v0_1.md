@@ -81,6 +81,12 @@ Global multipliers (frenzy §7, sprint/residual §9.4, event modifiers §10) mul
 ### 3.5 Per-property UI
 Milestone progress slider per property: min = last milestone, max = next (recovered 2022 design, kept — it feeds the return spike: "the pile can push me over 40").
 
+### 3.6 Alien property types — epoch unlock + First Contact reward (built 2026-06-28, GDD §5.5 site 2)
+The ladder is **17** `PropertyConfig`s: the 12 Earth properties plus 5 alien property types, one per alien epoch — Photon Exchange (epoch 2), Data Foundry (3), Spore Bank (4), Prism Vault (5), Time Bank (6).
+- **`unlock_tier`** (new `PropertyConfig` field, default 1): a property is buyable/visible only once `EpochState.current_tier ≥ unlock_tier`. Earth's 12 are tier 1; each alien property carries its epoch tier. Gate enforced in `EconomyState.try_buy` / `is_property_unlocked` / `get_cheapest_unaffordable_unowned_index` (all take the run's reached tier) and hidden entirely in `PropertyRow` until unlocked. A locked property is also skipped by the sim's greedy buy.
+- **Reward = a head start, not the unlock.** A property is unlocked-or-not, so the minigame can't multiply the unlock. At First Contact the trade-deal minigame's universal multiplier instead scales **starting units**: `grant_starting_units = floor(first_contact_starting_units × multiplier)`, granted free (run through `PropertyState.buy`, but **not** counted as estate spend — won, not bought). Full deal → the cap (`first_contact_starting_units` = 8, dev-tunable); skip / opt-out → the keep-floor share (≈half); minigames-off grants the keep-floor units directly with no screen. Flow lives in `Main` (`MinigameSite.FIRST_CONTACT`): contact overlay → its `dismissed` signal launches the minigame → `_finish_first_contact_minigame` grants the units + saves.
+- **Magnitude:** each alien property is a fixed flagship (~5× Executive Assets: `base_cost` $500B, `income/unit` $671.6B, ratio 1.34×); epoch scaling comes purely from staffing (§6), so its "clear @10 units" sits in a sane band (≈58→22 min across epochs 2–6) instead of running away. An early cut that scaled base magnitude by `economy_scale` double-counted the epoch. Readout: `sim/Sim.gd._print_alien_property_economics`. All first-pass — at-scale feel is an on-device tuning pass (the sim can't reach epoch 2 in its per-generation budget).
+
 ## 4. Tapping (Active Layer 2)
 
 - **Start verb:** a tap on an idle, unstaffed property starts its cycle (2022 verb, preserved). Cycles pay on completion; unstaffed cycles stop after paying.
@@ -176,6 +182,12 @@ into the extra-high bonus. Tuning: `minigame_keep_floor` 0.5, `minigame_full_sco
 the extra bonus cap is the Family Reputation upgrade (LegacyUpgradeCatalog). Governed by the
 persisted `GameState.ui_minigame_enabled` (default mandatory). Applied in
 `DynastyState.perform_succession(cause, minigame_multiplier)`, floored, clamped ≥ 0.
+
+The same minigame host (`MinigameScreen`) serves **three sites** (GDD §5.5), each reusing the
+universal multiplier for a different reward: this prestige round (scales Legacy), the welcome-back
+round (scales the offline pile, §6), and First Contact (scales starting units on a new alien
+property, §3.6). The host is reward-agnostic — it only emits the multiplier; the caller decides
+what it scales and how it's worded.
 
 Displayed as **brackets** (thresholds where legacy_gain crosses integers / named tiers); advisor announces bracket crossings. Total Legacy is dynastic and never spent down by conversion — Legacy *upgrades* cost Legacy per the upgrade table (content pass). The catalog includes **per-staffer retention** (GDD §6.3): spend Legacy to keep a specific property's staffer at its tier across the prestige reset, so the heir starts pre-staffed there. *(This is distinct from the existing "Loyal Staff" upgrade, which only discounts hire cost. Staff otherwise reset on prestige.)*
 

@@ -237,13 +237,15 @@ Earth runs on **one currency — the dollar.** Alien civilizations are *flavor, 
   | Tier | Civilization | Economy vs. Earth | Staffer income ×| Flavor |
   |---|---|---|---|---|
   | 1 | **Earth** | 1× (~$103.6T) | 1× | The honest starting grind; tier 1 just turns on automation. |
-  | 2 | **Luminari Collective** (Solaria Prime, *Photons*) | 1,000× | 15× | Energy/light beings — money now moves at light speed. |
-  | 3 | **Geth-Sentinel Grid** (Rannoch-01, *Logic Nodes*) | 1,000,000× | 250× | Cybernetic collective — finance run entirely by machines. |
-  | 4 | **Mycelium Unity** (Spore-Deep, *Spores*) | 1,000,000,000× | 5,000× | Fungal hive-mind — money that literally spreads and self-replicates. |
-  | 5 | **Quartzite Conglomerate** (Geode-7, *Prisms*) | 1,000,000,000,000× | 90,000× | Crystalloid — wealth crystallized, harder than diamond and just as cold. |
-  | 6 | **Chronophage Enclave** (Tempus, *Seconds*) | 1,000,000,000,000,000× | 1,600,000× | Time-eaters — they sell you time itself, by the second, at a ruinous markup. |
+  | 2 | **Luminari Collective** (Solaria Prime, *Photons*) | 30× | 40× | Energy/light beings — money now moves at light speed. |
+  | 3 | **Geth-Sentinel Grid** (Rannoch-01, *Logic Nodes*) | 900× | 1,600× | Cybernetic collective — finance run entirely by machines. |
+  | 4 | **Mycelium Unity** (Spore-Deep, *Spores*) | 27,000× | 64,000× | Fungal hive-mind — money that literally spreads and self-replicates. |
+  | 5 | **Quartzite Conglomerate** (Geode-7, *Prisms*) | 810,000× | 2,560,000× | Crystalloid — wealth crystallized, harder than diamond and just as cold. |
+  | 6 | **Chronophage Enclave** (Tempus, *Seconds*) | 24,300,000× | 102,400,000× | Time-eaters — they sell you time itself, by the second, at a ruinous markup. |
 
-  Arc: energy → automation → proliferation → crystallization → time, each a different flavor of "the aliens make your money machine inhuman." *(Economy scales, income and hire multipliers are first-pass values in `EpochCatalog.gd`, for on-device feel-tuning; the dynasty sim verifies "speeds up every time" still holds with them. More civilizations can be added as data rows — `docs/alien_civilizations.md` holds 100.)*
+  Arc: energy → automation → proliferation → crystallization → time, each a different flavor of "the aliens make your money machine inhuman." More civilizations can be added as data rows — `docs/alien_civilizations.md` holds 100.
+
+  **Epoch pacing — the law (reworked 2026-06-27).** Time to clear an epoch ≈ (dollars to earn) ÷ (income/sec), so the **per-epoch duration ratio = economy_step ÷ staff_step**. The original v1 numbers (economy ×1,000/epoch, staff ×~17/epoch) made each epoch ~60× *longer* than the last — epoch 2 stalled into hours of nothing-new, epoch 6 into millennia. The ladder is now **matched geometric, staff stepping slightly faster than the economy**: `economy_scale = 30^(tier−1)`, `staff_income_multiplier = 40^(tier−1)`. Because 40 > 30, each epoch arrives ~0.75× the time of the last — the §5.1 "it speeds up every time" feel, not a wall. The trade-off: top-epoch economy is now ~24M× Earth (still vast, ~7 orders of magnitude over the run) rather than 10¹⁵×. *Values are first-pass in `EpochCatalog.gd`; the epoch-timing study in `sim/Sim.gd` (`_run_epoch_timing_study`) measures the live ladder and verifies the duration ratio on every run, and the dynasty sim confirms "speeds up every time" still holds.* **Note — what the ladder does NOT govern:** alien-staff *affordability* is always 0.1% of the epoch economy (`earth_target × economy_scale × staff_cost_fraction`), independent of these steps; "staff too cheap at contact" is a separate `staff_cost_fraction` knob (open tuning item). And the ladder fixes *pacing only* — it does not by itself give the player something to **do** during an epoch (the per-epoch upgrade-track / modifier-choice idea in Future Features remains the engagement half).
 
 ### 6.3 Dynasty interaction — staff retention
 

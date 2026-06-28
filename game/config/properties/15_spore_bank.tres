@@ -4,12 +4,12 @@
 
 [resource]
 script = ExtResource("1")
-property_id = 13
-display_name = "Photon Exchange"
-unlock_tier = 2
+property_id = 15
+display_name = "Spore Bank"
+unlock_tier = 4
 base_cost = 500000000000.0
 r0 = 1.07
 base_income_per_unit = 671604938270.0
-base_cycle_length = 300.0
-staffer_name = "Photon Exchange Director"
-accent_color = Color(0.98, 0.8, 0.25, 1)
+base_cycle_length = 330.0
+staffer_name = "Spore Banker"
+accent_color = Color(0.55, 0.3, 0.65, 1)

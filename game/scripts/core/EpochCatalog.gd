@@ -70,9 +70,11 @@ const EPOCHS := [
 			"Tax Strategist", "Logistics Director", "Freshness Consultant",
 			"Portfolio Analyst", "Property Manager", "Downline Coordinator",
 			"Fund Administrator", "Lobbyist", "Chief of Staff",
-			# 13th rung = the first alien property type (Photon Exchange). Earth never staffs it
-			# (it is locked until epoch 2), but the roster stays aligned to the property ladder.
+			# Rungs 13–17 are the alien property types (Photon Exchange, Data Foundry, Spore Bank,
+			# Prism Vault, Time Bank). Earth never staffs them (each is locked until its epoch),
+			# but the roster stays the same length as the property ladder so indexing always works.
 			"Exchange Floor Boss",
+			"Data Foundry Manager", "Spore Bank Manager", "Vault Keeper", "Time Bank Manager",
 		],
 	},
 	{
@@ -91,6 +93,7 @@ const EPOCHS := [
 			"Photon Day-Trader", "Solar Flipper", "Aura Recruiter",
 			"Plasma Fund Manager", "Light-Speed Lobbyist", "Luminous Chief of Staff",
 			"Photon Exchange Director",
+			"Photon Foundry", "Light Spore Bank", "Prism Keeper", "Lumen Time Bank",
 		],
 	},
 	{
@@ -109,6 +112,7 @@ const EPOCHS := [
 			"High-Frequency Core", "Property Acquisition Bot", "Recruitment Network Node",
 			"Quant Supercluster", "Policy Compiler", "Executive Mainframe",
 			"Exchange Daemon",
+			"Foundry Core", "Spore Daemon", "Vault Subroutine", "Chrono Daemon",
 		],
 	},
 	{
@@ -127,6 +131,7 @@ const EPOCHS := [
 			"Hyphae Trader", "Overgrowth Developer", "Mycelial Downline",
 			"Spore Cloud Fund", "Root-Network Lobbyist", "Hive-Mind Chief of Staff",
 			"Spore-Market Maker",
+			"Mycelial Foundry", "Spore Banker", "Fungal Vault", "Spore Time Bank",
 		],
 	},
 	{
@@ -145,6 +150,7 @@ const EPOCHS := [
 			"Quartz Day-Trader", "Geode Flipper", "Prism Recruiter",
 			"Crystalline Fund Manager", "Bedrock Lobbyist", "Diamond Chief of Staff",
 			"Prism Exchange Broker",
+			"Crystal Foundry", "Crystal Spore Vault", "Prism Vault Keeper", "Crystal Time Bank",
 		],
 	},
 	{
@@ -164,6 +170,7 @@ const EPOCHS := [
 			"Microsecond Day-Trader", "Era Flipper", "Tomorrow Recruiter",
 			"Temporal Fund Manager", "Eternity Lobbyist", "Time-Lord Chief of Staff",
 			"Temporal Exchange Lord",
+			"Chrono Foundry", "Eternal Spore Bank", "Timeless Vault", "Time Banker",
 		],
 	},
 ]

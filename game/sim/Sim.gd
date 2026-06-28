@@ -597,6 +597,7 @@ func _run_epoch_timing_study() -> void:
 	# compounding bonus on top, so REAL epoch durations are shorter than projected (an epoch
 	# becomes an income ramp). The staff-economics readout below shows what those levels cost.
 	_print_staff_economics()
+	_print_alien_property_economics()
 
 	print("")
 	print("  TAKEAWAY: per-epoch duration ratio = economy_step / staff_step.")
@@ -634,6 +635,47 @@ func _print_staff_economics() -> void:
 			pct,
 			Money.of(hire_dear).display(),
 			Money.of(first_level).display(),
+		])
+
+
+## Print, for each alien property type (GDD §5.5 site 2), the first-pass magnitudes and how
+## they sit against their epoch's economy — the Phase 3 tuning readout. Reads the live configs +
+## catalog, so it never goes stale: retune a .tres and this table moves with it.
+##
+## The magnitude rule (first-pass): every alien property is a FIXED flagship magnitude (~5× Earth's
+## Executive Assets), NOT scaled by the epoch. Its epoch scaling comes purely from staffing (the
+## staff_income_multiplier every property rides), so income/unit and base_cost are identical across
+## the alien set — only the theme, unlock epoch, and cycle differ. "% of econ" therefore SHRINKS
+## per epoch (the flagship is trivially cheap deep in the climb, exactly like the Earth ladder by
+## then), while "clear @10 units" — how long ten staffed units alone would take to consume the
+## epoch — should stay in a sane band and accelerate only mildly (staff x40 vs economy x30 per
+## epoch), the same gentle speed-up Earth's flagship shows, NOT collapse toward zero.
+func _print_alien_property_economics() -> void:
+	print("")
+	print("  --- Alien property economics (first-pass magnitudes vs epoch economy) ---")
+	print("    property            epoch   base cost      income/unit    ratio   %of econ   clear @10 units")
+	for cfg_variant in _property_configs:
+		var cfg := cfg_variant as PropertyConfig
+		if cfg.unlock_tier < 2:
+			continue  # Earth properties are not alien property types
+		var tier := cfg.unlock_tier
+		var epoch_econ := _tuning.earth_economy_target * EpochCatalog.economy_scale(tier)
+		var ratio := cfg.base_income_per_unit / cfg.base_cost if cfg.base_cost > 0.0 else 0.0
+		var pct := cfg.base_cost / epoch_econ * 100.0 if epoch_econ > 0.0 else 0.0
+		# Income/sec of ONE unit staffed at this epoch's entry tier (level 0), then how long ten
+		# such units would take alone to earn the epoch's whole consume threshold.
+		var staffed_unit_ips := cfg.base_income_per_unit * EpochCatalog.staff_income_multiplier(tier) \
+				/ cfg.base_cycle_length
+		var threshold := EpochCatalog.consume_threshold(tier, _tuning.earth_economy_target)
+		var clear_seconds := threshold / (10.0 * staffed_unit_ips) if staffed_unit_ips > 0.0 else 0.0
+		print("    %-18s  %4d   %12s   %13s   %5.2fx   %6.3f%%   %15s" % [
+			cfg.display_name,
+			tier,
+			Money.of(cfg.base_cost).display(),
+			Money.of(cfg.base_income_per_unit).display(),
+			ratio,
+			pct,
+			_format_duration(clear_seconds),
 		])
 
 

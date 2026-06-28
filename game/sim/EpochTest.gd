@@ -328,6 +328,18 @@ func _test_epoch_locked_properties(configs: Array, tuning: TuningConfig) -> void
 func _test_first_contact_grant(configs: Array, tuning: TuningConfig) -> void:
 	print("\n10. First Contact grants free starting units on the new alien property")
 
+	# Every alien epoch (2..last) ships exactly one new property type gated to it, and the
+	# tier→property lookup resolves each — so every First Contact opens a distinct business.
+	var game_for_lookup := GameState.new(configs, tuning)
+	for tier in range(2, EpochCatalog.tier_count() + 1):
+		var gated := 0
+		for cfg in configs:
+			if (cfg as PropertyConfig).unlock_tier == tier:
+				gated += 1
+		_check("epoch %d ships exactly one new alien property" % tier, gated == 1)
+		_check("epoch %d's property resolves via the tier lookup" % tier,
+			game_for_lookup.economy.get_property_index_for_unlock_tier(tier) >= 0)
+
 	# The shipped ladder includes at least one alien property gated to a later epoch.
 	var alien_index := -1
 	for i in range(configs.size()):

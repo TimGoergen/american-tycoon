@@ -322,10 +322,15 @@ func _refresh(delta: float) -> void:
 	# single cheapest rung they cannot yet afford (grayed, a peek at what's next).
 	# Everything beyond that one peek stays hidden. An invisible child takes no space in
 	# the VBox, so the list grows as the player's reach grows.
+	# A property still locked behind a later epoch never shows — not even as the grayed
+	# peek rung. It is revealed only once First Contact opens its epoch (GDD §5.5 site 2).
+	var current_tier := _epoch.current_tier
+	var unlocked := _economy.is_property_unlocked(prop_index, current_tier)
 	var can_afford_one := _economy.cash >= _prop.get_bulk_cost(1)
-	visible = _prop.units_owned > 0 \
+	visible = unlocked and ( \
+			_prop.units_owned > 0 \
 			or can_afford_one \
-			or prop_index == _economy.get_cheapest_unaffordable_unowned_index()
+			or prop_index == _economy.get_cheapest_unaffordable_unowned_index(current_tier))
 
 	var config := _prop.config as PropertyConfig
 	_name_label.text = "%s  ×%d" % [config.display_name, _prop.units_owned]

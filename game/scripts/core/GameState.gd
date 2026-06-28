@@ -142,9 +142,10 @@ func pop_frenzy() -> bool:
 	return true
 
 
-## Buy `count` units of a property. Returns false if unaffordable.
+## Buy `count` units of a property. Returns false if unaffordable, or if the property is
+## still locked behind a later epoch (gated by the run's reached epoch, like hiring).
 func try_buy(prop_index: int, count: int) -> bool:
-	return economy.try_buy(prop_index, count)
+	return economy.try_buy(prop_index, count, epoch.current_tier)
 
 
 ## Hire or upgrade a property's staffer one tier, capped at the epoch reached this run.

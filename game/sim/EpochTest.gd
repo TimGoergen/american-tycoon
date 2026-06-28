@@ -33,6 +33,7 @@ func _initialize() -> void:
 	_test_staff_retention(property_configs, tuning)
 	_test_staff_levels(property_configs, tuning)
 	_test_epoch_content()
+	_test_epoch_locked_properties(property_configs, tuning)
 
 	print("")
 	if _failures == 0:
@@ -268,3 +269,48 @@ func _test_epoch_content() -> void:
 		if tier >= 2:
 			_check("epoch %d (%s) has a contact line" % [tier, civ],
 				EpochCatalog.contact_line(tier).strip_edges() != "")
+
+
+## Phase 1 of the First Contact "new property type" reward (GDD §5.5 site 2): a property
+## carrying an unlock_tier above the run's reached epoch is hidden, cannot be bought, and is
+## never the ladder peek rung — until the epoch is reached, after which it buys normally.
+func _test_epoch_locked_properties(configs: Array, tuning: TuningConfig) -> void:
+	print("\n9. A property locked behind a later epoch is hidden and unbuyable until reached")
+
+	# Every shipped Earth property is tier 1 (unlocked from the start).
+	var all_earth_tier1 := true
+	for cfg in configs:
+		if (cfg as PropertyConfig).unlock_tier != 1:
+			all_earth_tier1 = false
+	_check("all 12 Earth properties default to unlock_tier 1", all_earth_tier1)
+
+	# Build a run where property index 0 is gated behind epoch 2 (a stand-in for a future
+	# alien property). Duplicate the config so we never mutate the shared loaded resource.
+	var gated_configs := configs.duplicate()
+	var gated := (configs[0] as PropertyConfig).duplicate() as PropertyConfig
+	gated.unlock_tier = 2
+	gated_configs[0] = gated
+
+	var game := GameState.new(gated_configs, tuning)
+	game.economy.cash = 1.0e12  # plenty to afford anything — so only the lock can stop a buy
+
+	# On Earth (tier 1) the gated property is locked.
+	_check("gated property reads locked at tier 1",
+		not game.economy.is_property_unlocked(0, 1))
+	_check("buying the gated property at tier 1 fails", not game.try_buy(0, 1))
+	_check("gated property owns nothing after the blocked buy",
+		(game.economy.properties[0] as PropertyState).units_owned == 0)
+	_check("locked property is never the peek rung at tier 1",
+		game.economy.get_cheapest_unaffordable_unowned_index(1) != 0)
+
+	# A normal tier-1 property is unaffected by the gate.
+	_check("a tier-1 property is unlocked and buyable at tier 1",
+		game.economy.is_property_unlocked(1, 1) and game.try_buy(1, 1))
+
+	# Reaching epoch 2 opens the gated property; it now buys like any other.
+	game.epoch.restore(2)
+	_check("gated property reads unlocked at tier 2",
+		game.economy.is_property_unlocked(0, 2))
+	_check("buying the gated property succeeds once its epoch is reached", game.try_buy(0, 1))
+	_check("gated property owns a unit after the successful buy",
+		(game.economy.properties[0] as PropertyState).units_owned == 1)

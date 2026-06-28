@@ -10,6 +10,13 @@ extends Resource
 ## Display name shown to the player.
 @export var display_name: String = ""
 
+## The epoch tier (EpochCatalog, 1-based) at which this property becomes available to
+## buy. The 12 Earth properties are tier 1 — available from the start, so this defaults
+## to 1 and their .tres files need not set it. Alien property types added at First Contact
+## (GDD §5.5 site 2) carry a higher tier: they stay hidden and unbuyable until the run has
+## reached that epoch, then the trade-deal minigame grants the player a head start on them.
+@export var unlock_tier: int = 1
+
 ## Base cost of the first unit, in dollars.
 @export var base_cost: float = 0.0
 

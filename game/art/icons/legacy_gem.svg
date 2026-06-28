@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="256" viewBox="0 0 180 256">
+  <!-- "Legacy gem" — a vertical faceted crystal with a glowing magenta core, vectorized from the
+       concept art (art concepts/legacy_gem_firstdraft.png). Built as cleanly-tiling facet polygons
+       (left/right split top-mid-bottom, plus a central glowing column) over a black silhouette.
+       No SVG filters (the Godot/thorvg importer doesn't render them) — the glow is gradient ellipses. -->
+  <defs>
+    <radialGradient id="lg_core" cx="0.5" cy="0.5" r="0.6">
+      <stop offset="0" stop-color="#ffd6f6"/>
+      <stop offset="0.22" stop-color="#ff58e2"/>
+      <stop offset="0.55" stop-color="#cf2fbe"/>
+      <stop offset="1" stop-color="#7d279a"/>
+    </radialGradient>
+    <linearGradient id="lg_center" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8a47b6"/>
+      <stop offset="0.5" stop-color="#b478e0"/>
+      <stop offset="1" stop-color="#793aa6"/>
+    </linearGradient>
+    <linearGradient id="lg_side" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8a45ac"/>
+      <stop offset="0.55" stop-color="#642a8c"/>
+      <stop offset="1" stop-color="#481c6c"/>
+    </linearGradient>
+    <clipPath id="lg_centerclip">
+      <polygon points="90,22 106,72 106,176 90,234 74,176 74,72"/>
+    </clipPath>
+  </defs>
+
+  <!-- Black crystal silhouette (the thick outline) -->
+  <polygon points="78,22 102,22 146,82 138,176 102,234 78,234 42,176 34,82"
+           fill="#1a0820" stroke="#0c0410" stroke-width="9" stroke-linejoin="round"/>
+
+  <!-- Facets: tile the gem, each with a dark border stroke (the borders between facets) -->
+  <g stroke="#1c0a28" stroke-width="2.5" stroke-linejoin="round">
+    <polygon points="78,22 90,22 74,72 34,82"        fill="#4a1d64"/>  <!-- left top -->
+    <polygon points="34,82 74,72 74,176 42,176"      fill="url(#lg_side)"/> <!-- left mid -->
+    <polygon points="42,176 74,176 90,234 78,234"    fill="#391450"/>  <!-- left bottom -->
+    <polygon points="90,22 102,22 146,82 106,72"     fill="#4a1d64"/>  <!-- right top -->
+    <polygon points="106,72 146,82 138,176 106,176"  fill="url(#lg_side)"/> <!-- right mid -->
+    <polygon points="106,176 138,176 102,234 90,234" fill="#391450"/>  <!-- right bottom -->
+    <polygon points="90,22 106,72 106,176 90,234 74,176 74,72" fill="url(#lg_center)"/> <!-- center -->
+  </g>
+
+  <!-- Glowing magenta core, clipped to the central facet -->
+  <g clip-path="url(#lg_centerclip)">
+    <ellipse cx="90" cy="128" rx="30" ry="100" fill="url(#lg_core)"/>
+    <ellipse cx="90" cy="128" rx="10" ry="84" fill="#ff86ef" opacity="0.8"/>
+    <rect x="86" y="42" width="8" height="172" rx="4" fill="#ffdcf9" opacity="0.55"/>
+  </g>
+
+  <!-- Beveled highlights: light lavender along the upper inner facet edges where light catches -->
+  <g fill="none" stroke="#e3c4f6" stroke-width="2" stroke-linecap="round" opacity="0.5">
+    <line x1="90" y1="24" x2="75" y2="71"/>
+    <line x1="90" y1="24" x2="105" y2="71"/>
+    <line x1="37" y1="82" x2="73" y2="72"/>
+    <line x1="143" y1="82" x2="107" y2="72"/>
+  </g>
+</svg>

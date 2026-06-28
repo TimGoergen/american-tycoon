@@ -57,12 +57,12 @@ func _ready() -> void:
 	_button.add_theme_stylebox_override("hover", label_padding)
 	_button.add_theme_stylebox_override("pressed", label_padding)
 	_button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-	# White TURBO label in every state (Tim, 2026-06-23). Disabled is the common state
-	# (can't pop until charged), so it too stays white rather than the default greyed wash.
-	_button.add_theme_color_override("font_color", Color.WHITE)
-	_button.add_theme_color_override("font_hover_color", Color.WHITE)
-	_button.add_theme_color_override("font_pressed_color", Color.WHITE)
-	_button.add_theme_color_override("font_disabled_color", Color.WHITE)
+	# White TURBO label in EVERY state (Tim, 2026-06-23 / 2026-06-28) — including focus and
+	# hover-pressed, so a click never recolors it. Disabled is the common state (can't pop until
+	# charged), so it too stays white rather than the default greyed wash.
+	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color",
+			"font_hover_pressed_color", "font_disabled_color"]:
+		_button.add_theme_color_override(state, Color.WHITE)
 	_button.pressed.connect(func() -> void: pop_requested.emit())
 	add_child(_button)
 

@@ -236,15 +236,26 @@ func _ready() -> void:
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	content.add_child(row)
 
-	# Left: the "office worker pushing a mail cart" icon, tinted navy to match the labels.
+	# Left: the "office worker pushing a mail cart" icon, tinted navy to match the labels. It is
+	# 30% smaller than before and RIGHT-aligned within its cell (the cell's ALIGNMENT_END pushes
+	# the icon to its right), so the smaller cart sits closer to the centered "CLOCK IN" text
+	# (Tim, 2026-06-28).
+	var icon_cell := HBoxContainer.new()
+	icon_cell.custom_minimum_size = Vector2(180, 0)  # same left footprint; the icon hugs its right
+	icon_cell.alignment = BoxContainer.ALIGNMENT_END
+	icon_cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
 	_wage_icon = TextureRect.new()
 	_wage_icon.texture = preload("res://art/icons/mail_cart.svg")
-	_wage_icon.custom_minimum_size = Vector2(180, 0)
+	_wage_icon.custom_minimum_size = Vector2(126, 0)  # 180 × 0.7 = 30% smaller
+	_wage_icon.size_flags_horizontal = Control.SIZE_SHRINK_END  # don't fill — let ALIGNMENT_END place it
+	_wage_icon.size_flags_vertical = Control.SIZE_FILL
 	_wage_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_wage_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_wage_icon.modulate = UiPalette.NAVY
 	_wage_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_child(_wage_icon)
+	icon_cell.add_child(_wage_icon)
+	row.add_child(icon_cell)
 
 	# Center: the big "CLOCK IN" label, taking the slack between the icon and the amount.
 	_wage_title_label = Label.new()
@@ -252,7 +263,8 @@ func _ready() -> void:
 	_wage_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_wage_title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_wage_title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_wage_title_label.add_theme_font_size_override("font_size", UiPalette.FONT_PAGE_TITLE)
+	# 25% smaller than before, still centered (Tim, 2026-06-28).
+	_wage_title_label.add_theme_font_size_override("font_size", int(round(UiPalette.FONT_PAGE_TITLE * 0.75)))
 	# Full black to match the reference art (Tim, 2026-06-28).
 	_wage_title_label.add_theme_color_override("font_color", Color.BLACK)
 	_wage_title_label.mouse_filter = Control.MOUSE_FILTER_IGNORE

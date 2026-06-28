@@ -198,9 +198,13 @@ static func style_button(button: Button, is_action: bool) -> void:
 	button.add_theme_stylebox_override("pressed", _make_plate(pressed_plate, NAVY))
 	button.add_theme_stylebox_override("disabled", _make_plate(CREAM, NAVY))
 
-	button.add_theme_color_override("font_color", label_color)
-	button.add_theme_color_override("font_hover_color", label_color)
-	button.add_theme_color_override("font_pressed_color", NAVY)
+	# The label color NEVER changes with interaction state (Tim, 2026-06-28): every interactive
+	# state — including focus (which a button keeps after a click on desktop) and pressed — uses
+	# the one label color, so the text doesn't flip color when clicked or hovered. Only the
+	# disabled state dims it.
+	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color",
+			"font_hover_pressed_color"]:
+		button.add_theme_color_override(state, label_color)
 	button.add_theme_color_override("font_disabled_color", Color(NAVY, 0.45))
 
 
@@ -219,8 +223,11 @@ static func style_unowned_button(button: Button) -> void:
 	button.add_theme_stylebox_override("hover", plate)
 	button.add_theme_stylebox_override("pressed", plate)
 	button.add_theme_stylebox_override("disabled", plate)
-	button.add_theme_color_override("font_color", CREAM)
-	button.add_theme_color_override("font_disabled_color", CREAM)
+	# Constant cream label across every state (incl. focus/hover/pressed) so a click never
+	# recolors it (Tim, 2026-06-28).
+	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color",
+			"font_hover_pressed_color", "font_disabled_color"]:
+		button.add_theme_color_override(state, CREAM)
 
 
 ## A tab's title label in the standard tab-title format (Tim, 2026-06-28): the settings-tab

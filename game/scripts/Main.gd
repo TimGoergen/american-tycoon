@@ -475,8 +475,9 @@ func _build_estate_tab() -> Control:
 	# The prestige exit, pinned to the BOTTOM of the tab (Tim, 2026-06-28): plan the estate,
 	# pass on, raise a faster heir. Red = big commit.
 	_plan_button = Button.new()
-	# Taller to fit the larger bold label + the inline gem image.
-	_plan_button.custom_minimum_size = Vector2(0, int(UiPalette.STANDARD_BUTTON_HEIGHT * 1.35))
+	# ~35% shorter than its previous (taller) size, still fitting the bold label + inline gem
+	# (Tim, 2026-06-28).
+	_plan_button.custom_minimum_size = Vector2(0, int(UiPalette.STANDARD_BUTTON_HEIGHT * 0.88))
 	UiPalette.style_button(_plan_button, true)
 	_plan_button.pressed.connect(_on_plan_estate_pressed)
 	v.add_child(_plan_button)

@@ -40,8 +40,9 @@ const BUTTON_SIZE  := UiPalette.FONT_SUBHEAD
 const GEM_TEX := preload("res://art/icons/legacy_gem.svg")
 ## The gem balance icon's size, ~25% larger than its baseline to match the enlarged amount.
 const WALLET_GEM_SIZE := Vector2(46, 64)
-## The smaller gem shown on each upgrade's buy button (in place of the word "BUY").
-const BUY_GEM_WIDTH := 44
+## The smaller gem shown on each upgrade's buy button (in place of the word "BUY"). Sized to fit
+## the shorter buy button.
+const BUY_GEM_WIDTH := 38
 
 ## Hold-to-buy pacing (Tim, 2026-06-17): a quick tap buys one level; holding a buy
 ## button keeps buying at a calm cadence so the player can watch the wallet/effect and
@@ -251,7 +252,7 @@ func _category_color(category: String) -> Color:
 ## Staff), used to count how many are currently affordable for the collapsed-section badge.
 func _add_collapsible_section(parent: VBoxContainer, category: String, accent: Color, upgrade_ids: Array) -> VBoxContainer:
 	var header := Button.new()
-	header.custom_minimum_size = Vector2(0, 96)
+	header.custom_minimum_size = Vector2(0, 62)  # ~35% shorter (Tim, 2026-06-28)
 	header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_theme_font_size_override("font_size", CATEGORY_SIZE)
 	# Caret + name read from the left like a typical section/disclosure header.
@@ -314,7 +315,7 @@ func _make_section_plate(color: Color) -> StyleBoxFlat:
 	style.border_color = UiPalette.NAVY
 	style.set_border_width_all(3)
 	style.set_corner_radius_all(4)
-	style.set_content_margin_all(12)
+	style.set_content_margin_all(8)  # tighter so the name fits the shorter header (Tim, 2026-06-28)
 	return style
 
 
@@ -340,7 +341,7 @@ func _make_bulk_button(icon_path: String) -> Button:
 	# Center the arrow both ways in the button (default icon alignment is left/center).
 	button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	button.vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
-	button.custom_minimum_size = Vector2(84, 72)
+	button.custom_minimum_size = Vector2(84, 47)  # ~35% shorter (Tim, 2026-06-28)
 	button.add_theme_constant_override("icon_max_width", 48)
 	UiPalette.style_button(button, false)
 	return button
@@ -469,7 +470,7 @@ func _add_upgrade_card(parent: VBoxContainer, definition: Dictionary, accent: Co
 	var buy_button := Button.new()
 	# A flexible width (was a fixed 440, wide enough to overflow the framed viewport): the
 	# button hugs its own cost text while the effect label beside it takes the slack.
-	buy_button.custom_minimum_size = Vector2(240, 123)
+	buy_button.custom_minimum_size = Vector2(240, 80)  # ~35% shorter (Tim, 2026-06-28)
 	buy_button.add_theme_font_size_override("font_size", BUTTON_SIZE)
 	# The legacy-gem icon (set in refresh) replaces the word "BUY"; cap its width so the tall gem
 	# art sizes down to a button glyph beside the cost. Mipmapped filtering keeps it from aliasing.
@@ -555,9 +556,10 @@ func _add_retention_row(entry: Dictionary) -> void:
 
 	var button := Button.new()
 	# Flexible width (was a fixed 440 that overflowed the framed viewport), matching the
-	# upgrade cards' RETAIN/BUY buttons.
-	button.custom_minimum_size = Vector2(240, 123)
-	button.add_theme_font_size_override("font_size", BUTTON_SIZE)
+	# upgrade cards' RETAIN/BUY buttons. ~35% shorter (Tim, 2026-06-28); a smaller font so the
+	# two-line "RETAIN TIER n / n Gems" still fits the shorter button.
+	button.custom_minimum_size = Vector2(240, 80)
+	button.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
 	UiPalette.style_button(button, true)  # red: spends Legacy
 	var cost := int(entry["cost"])
 	if cost < 0:

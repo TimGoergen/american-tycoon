@@ -111,20 +111,21 @@ func _build_ui() -> void:
 	# Expand so the label takes the slack and pushes the two icon buttons to the right edge.
 	_wallet_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_wallet_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER  # center against the taller buttons
-	_wallet_label.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD)
+	_wallet_label.add_theme_color_override("font_color", UiPalette.DARK_GOLD)
 	# Faux-bold via a same-color outline, matching the project's plate aesthetic.
-	_wallet_label.add_theme_color_override("font_outline_color", UiPalette.MUSTARD_GOLD)
+	_wallet_label.add_theme_color_override("font_outline_color", UiPalette.DARK_GOLD)
 	_wallet_label.add_theme_constant_override("outline_size", 4)
 	_wallet_label.add_theme_font_size_override("font_size", WALLET_SIZE)
 	wallet_row.add_child(_wallet_label)
 
-	# Down arrow = collapse all; up arrow = expand all (Tim, 2026-06-28). Icon-only, so they are
-	# narrow and stay right-aligned via the expanding wallet label beside them.
-	var collapse_all_button := _make_bulk_button("res://art/icons/arrow_down.svg")
+	# Up arrow = collapse all (the list folds up); down arrow = expand all (it opens down) — the
+	# intuitive convention (Tim, 2026-06-28). Icon-only, so they stay narrow and right-aligned via
+	# the expanding wallet label beside them.
+	var collapse_all_button := _make_bulk_button("res://art/icons/arrow_up.svg")
 	collapse_all_button.pressed.connect(set_all_collapsed.bind(true))
 	wallet_row.add_child(collapse_all_button)
 
-	var expand_all_button := _make_bulk_button("res://art/icons/arrow_up.svg")
+	var expand_all_button := _make_bulk_button("res://art/icons/arrow_down.svg")
 	expand_all_button.pressed.connect(set_all_collapsed.bind(false))
 	wallet_row.add_child(expand_all_button)
 
@@ -314,8 +315,11 @@ func _make_bulk_button(icon_path: String) -> Button:
 	var button := Button.new()
 	button.icon = load(icon_path)
 	button.expand_icon = true
+	# Center the arrow both ways in the button (default icon alignment is left/center).
+	button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	button.vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
 	button.custom_minimum_size = Vector2(84, 72)
-	button.add_theme_constant_override("icon_max_width", 44)
+	button.add_theme_constant_override("icon_max_width", 48)
 	UiPalette.style_button(button, false)
 	return button
 

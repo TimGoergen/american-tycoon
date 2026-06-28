@@ -10,6 +10,9 @@ const CREAM := Color("#F4ECD8")
 const KETCHUP_RED := Color("#B5402A")
 const NAVY := Color("#1D2D50")
 const MUSTARD_GOLD := Color("#E3B23C")
+## A darker, deeper gold (a darkened MUSTARD_GOLD) for gold elements that need more weight than
+## the bright mustard — e.g. the Estate tab's "Legacy:" balance (Tim, 2026-06-28).
+const DARK_GOLD := Color("#A87C16")
 const ATOMIC_TEAL := Color("#9FD8D4")
 const MONEY_GREEN := Color("#7DA87B")
 const INK_NAVY := Color("#0D1830")

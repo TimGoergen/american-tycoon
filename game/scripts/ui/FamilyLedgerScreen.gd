@@ -43,12 +43,11 @@ func setup() -> void:
 func _build_chrome() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 
+	# No inner margin (Tim, 2026-06-28): the shared tab panel (UiPalette.wrap_in_tab_panel) already
+	# pads this tab, and an extra inset here pushed the title 8px lower than the Estate/Settings
+	# titles, breaking their vertical alignment.
 	var margin := MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	margin.add_theme_constant_override("margin_left", 8)
-	margin.add_theme_constant_override("margin_right", 8)
-	margin.add_theme_constant_override("margin_top", 8)
-	margin.add_theme_constant_override("margin_bottom", 8)
 	add_child(margin)
 
 	var column := VBoxContainer.new()

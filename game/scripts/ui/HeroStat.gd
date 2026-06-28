@@ -365,6 +365,13 @@ func _layout_labels() -> void:
 	var area := _content.size
 	var caption_gap := 2.0  # space between a value and its caption beneath it
 
+	# A TextureRect sizes itself to its texture's NATIVE size unless pinned (EXPAND_IGNORE_SIZE
+	# only frees the minimum size, it doesn't hold the rect). Force both icon boxes to their
+	# intended sizes every frame, or the bill renders at its 120px source width and its right edge
+	# overflows the panel (the bug behind "the dollar bill goes off the edge", Tim 2026-06-28).
+	_income_icon.size = INCOME_ICON_SIZE
+	_cash_bill.size = CASH_BILL_SIZE
+
 	# Captions stay put where the old centered value+caption block placed them; only the
 	# big amounts move up. So we still compute the centered-block top (where the pair used
 	# to sit) to anchor each caption, then nudge the amount to half that distance from the

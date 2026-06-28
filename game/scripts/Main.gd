@@ -410,9 +410,11 @@ func _build_property_tab() -> Control:
 	v.add_child(scroll)
 	UiPalette.style_vscrollbar(scroll.get_v_scroll_bar())
 
-	# A right margin narrows the property rows so a visible gap of space sits between their right
-	# edge and the scrollbar handle (Tim, 2026-06-28) — the rows never butt against the bar.
-	const LADDER_SCROLLBAR_GAP := 18
+	# A right margin narrows the property rows so a visible gap sits between their right edge and
+	# the scrollbar handle (Tim, 2026-06-28). The ScrollContainer does NOT reserve a gutter here
+	# (the bar overlays the right edge), so the margin must clear the FULL scrollbar width and then
+	# leave a visible gap beyond it — hence scrollbar width + a 16px gap.
+	const LADDER_SCROLLBAR_GAP := UiPalette.SCROLLBAR_WIDTH + 16
 	var ladder_margin := MarginContainer.new()
 	ladder_margin.add_theme_constant_override("margin_right", LADDER_SCROLLBAR_GAP)
 	ladder_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL

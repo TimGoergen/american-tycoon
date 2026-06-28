@@ -25,21 +25,23 @@ const TARGET_BASKETS := 6
 ## the one ball always exists. (Kept as a count so the lay/loop code reads uniformly.)
 const BALL_COUNT := 1
 
-## Ball size in pixels — kept generous for thumb play and imperfect vision.
-const BALL_RADIUS := 38.0          # 76px diameter
+## Ball size in pixels — kept generous for thumb play and imperfect vision. (Enlarged 40% from
+## the original 38, Tim 2026-06-28.)
+const BALL_RADIUS := 53.2          # ~106px diameter
 
 ## The hoop is drawn as a wide, short ellipse — the rim seen nearly from the FRONT (more head-on
 ## than from above), so it reads as a real basketball hoop rather than a flat ring seen from
-## overhead. RX is the horizontal (wide) radius; RY the vertical (short) radius.
-const HOOP_RX := 82.0
-const HOOP_RY := 30.0
+## overhead. RX is the horizontal (wide) radius; RY the vertical (short) radius. (Enlarged 15%
+## from the original 82×30, Tim 2026-06-28.)
+const HOOP_RX := 94.3
+const HOOP_RY := 34.5
 ## Half-width of the scoring "mouth" at the top of the rim. Narrower than HOOP_RX so the solid rim
 ## ENDS (the posts) sit just outside the mouth — a near-miss clips a post and bounces (a rim-out),
 ## while a clean drop through the gap scores.
 const RIM_HALF_WIDTH := HOOP_RX * 0.74
 ## Radius of each solid rim "post" at the left/right ends of the ellipse — the parts of the hoop a
-## ball physically bounces off.
-const RIM_POST_RADIUS := 14.0
+## ball physically bounces off. (Scaled 15% with the hoop.)
+const RIM_POST_RADIUS := 16.1
 
 ## Downward acceleration (px/sec^2). Deliberately heavy — a high gravity gives the balls a weighty,
 ## fast-falling feel with tight arcs and little hang time, rather than floating like balloons.
@@ -373,7 +375,11 @@ func _release_sling() -> void:
 	# starts mid-air at the pulled-back position.
 	ball["pos"] = _aim_anchor
 	if pull_distance < MIN_PULL:
-		ball["state"] = "idle"  # too small a pull — leave the ball resting
+		# A tap with no real drag isn't a throw — let the ball GO and fall under gravity from where
+		# it was held (Tim 2026-06-28): a ball frozen mid-air drops; a ball on the floor just
+		# settles straight back. Either way it is released, not left hanging, frozen, in the air.
+		ball["vel"] = Vector2.ZERO
+		ball["state"] = "flight"
 	else:
 		var throw := -pull * PULL_POWER  # opposite the drag, force ∝ drag distance
 		if throw.length() > MAX_THROW_SPEED:

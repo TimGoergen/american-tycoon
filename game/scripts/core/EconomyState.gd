@@ -71,9 +71,21 @@ func tick(delta: float, income_multiplier: float = 1.0) -> void:
 # Player actions
 # ---------------------------------------------------------------------------
 
-## Try to buy `count` units of property at index `prop_index`.
-## Returns true if the purchase succeeded; false if the player can't afford it.
-func try_buy(prop_index: int, count: int) -> bool:
+## Whether the player may buy into the property at `prop_index` yet. A property is locked
+## until the run has reached its `unlock_tier` epoch (the 12 Earth properties are tier 1, so
+## always unlocked); alien property types open only after First Contact with their race.
+## `current_tier` is the generation's reached epoch (GameState passes EpochState.current_tier).
+func is_property_unlocked(prop_index: int, current_tier: int) -> bool:
+	var cfg := (properties[prop_index] as PropertyState).config as PropertyConfig
+	return current_tier >= cfg.unlock_tier
+
+
+## Try to buy `count` units of property at index `prop_index`. `current_tier` is the run's
+## reached epoch — a property still locked behind a later epoch cannot be bought.
+## Returns true if the purchase succeeded; false if locked or the player can't afford it.
+func try_buy(prop_index: int, count: int, current_tier: int) -> bool:
+	if not is_property_unlocked(prop_index, current_tier):
+		return false
 	var prop := properties[prop_index] as PropertyState
 	var cost := prop.get_bulk_cost(count)
 	if cash < cost:
@@ -82,6 +94,29 @@ func try_buy(prop_index: int, count: int) -> bool:
 	spent_on_units_this_gen += cost
 	prop.buy(count)
 	return true
+
+
+## Grant `count` free units of a property — the First Contact negotiation head start (GDD §5.5
+## site 2). The minigame's performance decides `count`; this is the only reward for opening an
+## alien property type. Runs through PropertyState.buy so the cost curve, milestones, and (if
+## staffed) auto-cycle all stay consistent — but it costs nothing and is NOT counted as spend,
+## because these units were won at the negotiating table, not bought, so they must never inflate
+## the estate's asset book value (the same earned-vs-granted distinction award_cash draws).
+func grant_starting_units(prop_index: int, count: int) -> void:
+	if count <= 0:
+		return
+	(properties[prop_index] as PropertyState).buy(count)
+
+
+## Index of the property that unlocks at exactly `tier` — the alien business a First Contact
+## opens — or -1 if no property is gated to that tier. The 12 Earth properties all unlock at
+## tier 1; each alien property type carries a distinct later unlock_tier (one per epoch).
+func get_property_index_for_unlock_tier(tier: int) -> int:
+	for i in range(properties.size()):
+		var cfg := (properties[i] as PropertyState).config as PropertyConfig
+		if cfg.unlock_tier == tier:
+			return i
+	return -1
 
 
 ## Try to hire OR upgrade the staffer for the property at `prop_index`, advancing it
@@ -219,13 +254,17 @@ func get_passive_income_per_sec() -> float:
 ## "peek": on top of every owned rung and every rung the player can already afford,
 ## exactly this one unaffordable rung is shown (grayed) so the player always sees the
 ## next thing to save toward — but nothing further. (Cost compared at the price of a
-## single unit, matching what the buy button charges in ×1 mode.)
-func get_cheapest_unaffordable_unowned_index() -> int:
+## single unit, matching what the buy button charges in ×1 mode.) `current_tier` is the
+## run's reached epoch: a property still locked behind a later epoch is never the peek
+## rung — it isn't yet a thing to save toward, so it stays hidden until First Contact.
+func get_cheapest_unaffordable_unowned_index(current_tier: int) -> int:
 	var best := -1
 	var best_cost := INF
 	for i in range(properties.size()):
 		var p := properties[i] as PropertyState
 		if p.units_owned > 0:
+			continue
+		if not is_property_unlocked(i, current_tier):
 			continue
 		var unit_cost := p.get_bulk_cost(1)
 		if cash < unit_cost and unit_cost < best_cost:

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 17
+display_name = "Time Bank"
+unlock_tier = 6
+base_cost = 500000000000.0
+r0 = 1.07
+base_income_per_unit = 671604938270.0
+base_cycle_length = 360.0
+staffer_name = "Time Banker"
+accent_color = Color(0.4, 0.6, 0.85, 1)

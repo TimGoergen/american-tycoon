@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 14
+display_name = "Data Foundry"
+unlock_tier = 3
+base_cost = 500000000000.0
+r0 = 1.07
+base_income_per_unit = 671604938270.0
+base_cycle_length = 315.0
+staffer_name = "Foundry Core"
+accent_color = Color(0.2, 0.7, 0.75, 1)

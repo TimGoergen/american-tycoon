@@ -19,6 +19,18 @@ const PROPERTY_PATHS := [
 	"res://config/properties/10_hedge_fund.tres",
 	"res://config/properties/11_legislative_assets.tres",
 	"res://config/properties/12_executive_assets.tres",
+	# Alien property types (GDD §5.5 site 2): each is locked behind its epoch (unlock_tier)
+	# and opened by that civilization's First Contact trade-deal minigame — one new kind of
+	# business per alien epoch (Luminari → Chronophage). Each is a fixed flagship magnitude
+	# (~5× Earth's Executive Assets); its income scales across epochs PURELY through staffing,
+	# like every property, so it accelerates with the empire instead of running away. (An earlier
+	# pass scaled base magnitude by economy_scale too — that double-counted the epoch and let a
+	# few units clear a whole epoch instantly. See sim/Sim.gd _print_alien_property_economics.)
+	"res://config/properties/13_photon_exchange.tres",   # epoch 2 — Luminari Collective
+	"res://config/properties/14_data_foundry.tres",      # epoch 3 — Geth-Sentinel Grid
+	"res://config/properties/15_spore_bank.tres",        # epoch 4 — Mycelium Unity
+	"res://config/properties/16_prism_vault.tres",       # epoch 5 — Quartzite Conglomerate
+	"res://config/properties/17_time_bank.tres",         # epoch 6 — Chronophage Enclave
 ]
 
 ## Returns null (with an error pushed) if the tuning file is missing.
@@ -41,7 +53,8 @@ static func load_tuning(apply_user_overrides: bool = true) -> TuningConfig:
 	return tuning
 
 
-## Returns the 12 PropertyConfigs in GDD §4 ladder order, or [] on failure.
+## Returns the property ladder configs in order (the 12 Earth properties plus any alien
+## property types appended for later epochs), or [] on failure.
 static func load_property_configs() -> Array:
 	return _load_all(PROPERTY_PATHS)
 

@@ -32,7 +32,9 @@ func _initialize() -> void:
 	_test_save_round_trip(property_configs, tuning)
 	_test_staff_retention(property_configs, tuning)
 	_test_staff_levels(property_configs, tuning)
-	_test_epoch_content()
+	_test_epoch_content(property_configs)
+	_test_epoch_locked_properties(property_configs, tuning)
+	_test_first_contact_grant(property_configs, tuning)
 
 	print("")
 	if _failures == 0:
@@ -251,15 +253,18 @@ func _test_staff_levels(configs: Array, tuning: TuningConfig) -> void:
 	_check("pre-v7 save defaults staff_level to 0", atm3.staff_level == 0)
 
 
-## Phase 4: every epoch ships a full 12-staffer roster, and every alien epoch ships a
-## narrator contact line. Guards against a new epoch row being added with missing copy.
-func _test_epoch_content() -> void:
+## Phase 4: every epoch ships a staffer roster covering the whole property ladder, and every
+## alien epoch ships a narrator contact line. Guards against a new epoch row being added with
+## missing copy, or a new property leaving a roster short an entry (e.g. the alien properties).
+func _test_epoch_content(configs: Array) -> void:
 	print("\n7. Every epoch has a full staffer roster (and aliens have contact copy)")
+	var ladder_size := configs.size()
 	for tier in range(1, EpochCatalog.tier_count() + 1):
 		var epoch := EpochCatalog.get_epoch(tier)
 		var civ := String(epoch["civilization"])
 		var names: Array = epoch["staffer_names"]
-		_check("epoch %d (%s) has 12 staffer names" % [tier, civ], names.size() == 12)
+		_check("epoch %d (%s) has a staffer name per property (%d)" % [tier, civ, ladder_size],
+			names.size() == ladder_size)
 		var all_named := true
 		for staffer in names:
 			if String(staffer).strip_edges() == "":
@@ -268,3 +273,100 @@ func _test_epoch_content() -> void:
 		if tier >= 2:
 			_check("epoch %d (%s) has a contact line" % [tier, civ],
 				EpochCatalog.contact_line(tier).strip_edges() != "")
+
+
+## Phase 1 of the First Contact "new property type" reward (GDD §5.5 site 2): a property
+## carrying an unlock_tier above the run's reached epoch is hidden, cannot be bought, and is
+## never the ladder peek rung — until the epoch is reached, after which it buys normally.
+func _test_epoch_locked_properties(configs: Array, tuning: TuningConfig) -> void:
+	print("\n9. A property locked behind a later epoch is hidden and unbuyable until reached")
+
+	# Every Earth property (GDD §4 ladder rows 1–12) is tier 1, unlocked from the start; only
+	# the alien property types added for later epochs (property_id 13+) carry a higher tier.
+	var earth_all_tier1 := true
+	for cfg in configs:
+		var pc := cfg as PropertyConfig
+		if pc.property_id <= 12 and pc.unlock_tier != 1:
+			earth_all_tier1 = false
+	_check("all 12 Earth properties default to unlock_tier 1", earth_all_tier1)
+
+	# Build a run where property index 0 is gated behind epoch 2 (a stand-in for a future
+	# alien property). Duplicate the config so we never mutate the shared loaded resource.
+	var gated_configs := configs.duplicate()
+	var gated := (configs[0] as PropertyConfig).duplicate() as PropertyConfig
+	gated.unlock_tier = 2
+	gated_configs[0] = gated
+
+	var game := GameState.new(gated_configs, tuning)
+	game.economy.cash = 1.0e12  # plenty to afford anything — so only the lock can stop a buy
+
+	# On Earth (tier 1) the gated property is locked.
+	_check("gated property reads locked at tier 1",
+		not game.economy.is_property_unlocked(0, 1))
+	_check("buying the gated property at tier 1 fails", not game.try_buy(0, 1))
+	_check("gated property owns nothing after the blocked buy",
+		(game.economy.properties[0] as PropertyState).units_owned == 0)
+	_check("locked property is never the peek rung at tier 1",
+		game.economy.get_cheapest_unaffordable_unowned_index(1) != 0)
+
+	# A normal tier-1 property is unaffected by the gate.
+	_check("a tier-1 property is unlocked and buyable at tier 1",
+		game.economy.is_property_unlocked(1, 1) and game.try_buy(1, 1))
+
+	# Reaching epoch 2 opens the gated property; it now buys like any other.
+	game.epoch.restore(2)
+	_check("gated property reads unlocked at tier 2",
+		game.economy.is_property_unlocked(0, 2))
+	_check("buying the gated property succeeds once its epoch is reached", game.try_buy(0, 1))
+	_check("gated property owns a unit after the successful buy",
+		(game.economy.properties[0] as PropertyState).units_owned == 1)
+
+
+## Phase 2 of the First Contact reward (GDD §5.5 site 2): the real ladder ships an alien property
+## gated to epoch 2, the tier→property lookup finds it, and grant_starting_units hands over free
+## units (the negotiation head start) without counting them as spend on the estate's book value.
+func _test_first_contact_grant(configs: Array, tuning: TuningConfig) -> void:
+	print("\n10. First Contact grants free starting units on the new alien property")
+
+	# Every alien epoch (2..last) ships exactly one new property type gated to it, and the
+	# tier→property lookup resolves each — so every First Contact opens a distinct business.
+	var game_for_lookup := GameState.new(configs, tuning)
+	for tier in range(2, EpochCatalog.tier_count() + 1):
+		var gated := 0
+		for cfg in configs:
+			if (cfg as PropertyConfig).unlock_tier == tier:
+				gated += 1
+		_check("epoch %d ships exactly one new alien property" % tier, gated == 1)
+		_check("epoch %d's property resolves via the tier lookup" % tier,
+			game_for_lookup.economy.get_property_index_for_unlock_tier(tier) >= 0)
+
+	# The shipped ladder includes at least one alien property gated to a later epoch.
+	var alien_index := -1
+	for i in range(configs.size()):
+		if (configs[i] as PropertyConfig).unlock_tier >= 2:
+			alien_index = i
+			break
+	_check("ladder ships an alien property gated to epoch 2+", alien_index >= 0)
+	if alien_index < 0:
+		return
+
+	var alien_tier := (configs[alien_index] as PropertyConfig).unlock_tier
+	var game := GameState.new(configs, tuning)
+	_check("tier→property lookup finds the alien property at its epoch",
+		game.economy.get_property_index_for_unlock_tier(alien_tier) == alien_index)
+
+	# Simulate having reached the epoch and won a head start at the negotiating table.
+	game.epoch.restore(alien_tier)
+	var book_before := game.economy.get_asset_book_value()
+	game.economy.grant_starting_units(alien_index, 6)
+	var alien := game.economy.properties[alien_index] as PropertyState
+	_check("granted units are owned", alien.units_owned == 6)
+	_check("granted units are NOT charged to the estate book value (they were won, not bought)",
+		is_equal_approx(game.economy.get_asset_book_value(), book_before))
+
+	# The Main-side mapping floor(cap × multiplier): a full deal grants the cap, a skip the floor.
+	var cap := tuning.first_contact_starting_units
+	_check("a full negotiation (1.0×) grants the cap",
+		int(floor(cap * 1.0)) == cap)
+	_check("a skip (keep-floor ×) grants fewer than the cap",
+		int(floor(cap * tuning.minigame_keep_floor)) < cap)

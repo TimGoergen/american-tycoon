@@ -132,7 +132,10 @@ func _ready() -> void:
 	column.add_child(_narration_label)
 
 	var note := Label.new()
-	note.text = "New markets open. Your staff can be upgraded with their technology."
+	# Foreshadows both rewards of contact: a brand-new kind of business opens in the alien
+	# market (negotiated via the trade-deal minigame on "Answer the Call"), and every existing
+	# property's staffer can now be upgraded to this civilization's technology tier.
+	note.text = "A new kind of business opens in their market. Your staff can be upgraded with their technology, too."
 	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	note.custom_minimum_size = Vector2(760, 0)

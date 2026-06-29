@@ -157,6 +157,14 @@ extends Resource
 ## (Tim, 2026-06-25) — scoring targets in each minigame assume this length.
 @export var minigame_duration_seconds: float = 20.0  # feel-tune
 
+# --- First Contact reward (GDD §5.5 site 2) ---
+
+## How many free starting units of a newly-opened alien property a FULL First Contact
+## negotiation grants. The minigame's universal multiplier (keep_floor..1+bonus) scales this:
+## a great deal hands you near this many units already running; a skip / opt-out banks the
+## keep_floor share. First-pass value — Phase 3 sim-tunes it against the epoch-2 economy.
+@export var first_contact_starting_units: int = 8  # feel-tune
+
 # --- Events (Spec §10) ---
 
 ## Income multiplier during a Market Crash event.

@@ -175,16 +175,29 @@ screens shouldn't be dead air. This grew (Tim, 2026-06-22) into a **minigame fra
 
 **Usage sites (each rolls a random minigame type):**
 1. **Prestige / succession — multiplier on Legacy (BUILT).** See the match-3 below.
-2. **Epoch change / First Contact — reward = a NEW PROPERTY TYPE (design pending, Tim
-   2026-06-24).** Theme: *negotiating the alien trade deal*. Tim chose this over the earlier
-   TBD options (entry income boost / starting cash / first-staffer discount): winning the
-   negotiation should open a genuinely new *kind* of business in the bigger market, not just
-   hand out cash. **This breaks the universal 0.5×→1.25× multiplier model** (a property is
-   unlocked or not — performance has to scale something else, e.g. the new property's starting
-   units / a head-start discount on it), and the property ladder is currently 12 fixed Earth
-   configs, so epoch-gated alien property *types* are a content + systems feature, not "wiring."
-   **NOT built; needs its own design pass.** The First Contact minigame hook is therefore left
-   unwired for now (firing a minigame that grants nothing would be worse than none).
+2. **Epoch change / First Contact — reward = a NEW PROPERTY TYPE (BUILT 2026-06-28).** Theme:
+   *negotiating the alien trade deal*. Tim chose this over the earlier TBD options (entry income
+   boost / starting cash / first-staffer discount): winning the negotiation opens a genuinely new
+   *kind* of business in the bigger market, not just cash. Because a property is unlocked-or-not,
+   performance can't be the universal 0.5×→1.25× multiplier on the unlock; instead it scales the
+   **opening terms**: the player always gets the business, and the minigame decides their **head
+   start** — a count of free starting units already running. As-built model:
+   - **One new alien property per alien epoch** (`unlock_tier` on `PropertyConfig`): Photon
+     Exchange (epoch 2, Luminari), Data Foundry (3, Geth), Spore Bank (4, Mycelium), Prism Vault
+     (5, Quartzite), Time Bank (6, Chronophage). Each is a normal ladder rung — same milestones,
+     staffing, and per-epoch staff levels — just hidden and unbuyable until its epoch is reached.
+   - **Head start = starting units.** On answering the contact, the trade-deal minigame runs; the
+     granted units = `floor(first_contact_starting_units × multiplier)`. A full deal grants the
+     cap (8, dev-tunable); a skip / opt-out banks the **keep-floor share** (≈half), matching the
+     other sites — never zero, but real stakes. The units are *granted* (free), never counted as
+     estate spend. Flow: contact narration overlay → "Answer the Call" → negotiation minigame →
+     units granted on the new property → back into the now-bigger game.
+   - **Magnitude:** each alien property is a fixed flagship (~5× Earth's Executive Assets); its
+     epoch scaling comes purely from staffing, like every property (an early cut that scaled base
+     magnitude by `economy_scale` double-counted the epoch and let a few units clear it instantly).
+   All first-pass values; the at-scale feel is an on-device tuning pass (the sim can't reach
+   epoch 2 in its per-generation budget). Implemented in four phases; see
+   `Plans/First_Contact_Property_Reward.md`.
 3. **Welcome-back / offline return — multiplier on the offline pile (BUILT 2026-06-24).** A
    round scales the overnight pile: the base pile is banked on resume, the minigame credits the
    +/- delta (earned income), then the welcome screen shows the final haul. *(Watch: welcome-back
@@ -194,7 +207,8 @@ screens shouldn't be dead air. This grew (Tim, 2026-06-22) into a **minigame fra
 
 **Player setting:** a persisted toggle (`GameState.ui_minigame_enabled`). **Default:
 mandatory.** **Opting out — or tapping Skip — banks the keep floor** (the worst result, not a
-safe 100%), so skipping has a real cost. A per-round Skip is always available.
+safe 100%), so skipping has a real cost. A per-round Skip is always available. (At First Contact
+with minigames off, the keep-floor head start is granted directly, no screen.)
 
 **Built 2026-06-22 — match-3 type (the first of the library):** drag a gem to swap; matches
 flash with a size badge, clear, and survivors + new gems fall in; a live spectrum bar shows
@@ -206,8 +220,9 @@ is the next build.
 [0,1] performance to the universal multiplier; refactor match-3 into the first type; route
 prestige through it (no behavior change). (2) **add 2–4 more types** so the random draw has
 variety. (3) **wire the First Contact and Welcome-back sites** with their rewards —
-**welcome-back DONE 2026-06-24** (host generalized to be reward-agnostic; pile multiplier
-wired); **First Contact deferred** pending the "new property type" design (site 2 above).
+**welcome-back DONE 2026-06-24**; **First Contact DONE 2026-06-28** (its own 4-phase sub-build —
+epoch unlock gate → first alien property + minigame hook → properties 14–17 + magnitude tuning →
+copy polish + doc sync; site 2 above).
 
 ---
 

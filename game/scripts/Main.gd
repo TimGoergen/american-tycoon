@@ -44,6 +44,9 @@ var _minigame_screen: MinigameScreen
 var _minigame_review_screen: MinigameReviewScreen
 var _buy_mode_button: Button
 var _plan_button: Button
+## Rich-text content overlaid on the plan button so the "(+x [gem])" parenthetical can show the
+## legacy-gem image inline (a plain Button can't put an image mid-text). _update_plan_button drives it.
+var _plan_label: RichTextLabel
 var _rows: Array = []
 
 # Bottom tab bar (UI Notes §7). The four surfaces share one content slot; one is
@@ -297,11 +300,16 @@ func _build_ui() -> void:
 	column.add_child(_tab_content)
 
 	# The Family Ledger tab IS the (now embedded) FamilyLedgerScreen; the other three
-	# are built below. All four fill the content slot; _show_tab toggles visibility.
+	# are built below. Every tab's content is wrapped in the same edge-margin + outlined
+	# translucent-cream panel (UiPalette.wrap_in_tab_panel) so all four share one framed look.
+	# All four wrappers fill the content slot; _show_tab toggles visibility.
 	_ledger_screen = FamilyLedgerScreen.new()
 	_ledger_screen.setup()
 	_tab_panels = [
-		_build_property_tab(), _build_estate_tab(), _ledger_screen, _build_settings_tab(),
+		UiPalette.wrap_in_tab_panel(_build_property_tab()),
+		UiPalette.wrap_in_tab_panel(_build_estate_tab()),
+		UiPalette.wrap_in_tab_panel(_ledger_screen),
+		UiPalette.wrap_in_tab_panel(_build_settings_tab()),
 	]
 	for panel in _tab_panels:
 		(panel as Control).set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -404,17 +412,29 @@ func _build_property_tab() -> Control:
 	_buy_mode_button.pressed.connect(_on_buy_mode_toggled)
 	action_row.add_child(_buy_mode_button)
 
-	# The property ladder: 12 rows in a vertical scroll (GDD §2).
+	# The property ladder: 12 rows in a vertical scroll (GDD §2). The vertical scrollbar gets
+	# the styled wide-handle / narrow-track look (UiPalette.style_vscrollbar).
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_RESERVE
 	v.add_child(scroll)
+	UiPalette.style_vscrollbar(scroll.get_v_scroll_bar())
+
+	# A right margin narrows the property rows so a visible gap sits between their right edge and
+	# the scrollbar handle (Tim, 2026-06-28). The ScrollContainer does NOT reserve a gutter here
+	# (the bar overlays the right edge), so the margin must clear the FULL scrollbar width and then
+	# leave a visible gap beyond it — hence scrollbar width + a 16px gap.
+	const LADDER_SCROLLBAR_GAP := UiPalette.SCROLLBAR_WIDTH + 16
+	var ladder_margin := MarginContainer.new()
+	ladder_margin.add_theme_constant_override("margin_right", LADDER_SCROLLBAR_GAP)
+	ladder_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(ladder_margin)
 
 	var ladder := VBoxContainer.new()
 	ladder.add_theme_constant_override("separation", 10)
 	ladder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(ladder)
+	ladder_margin.add_child(ladder)
 
 	for i in range(game.economy.properties.size()):
 		var row := PropertyRow.new()
@@ -445,18 +465,10 @@ func _build_estate_tab() -> Control:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 10)
 
-	# The prestige exit: plan the estate, pass on, raise a faster heir. Red = big commit.
-	_plan_button = Button.new()
-	_plan_button.custom_minimum_size = Vector2(0, UiPalette.STANDARD_BUTTON_HEIGHT)
-	_plan_button.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
-	UiPalette.style_button(_plan_button, true)
-	_plan_button.text = "PLAN THE ESTATE"
-	_plan_button.pressed.connect(_on_plan_estate_pressed)
-	v.add_child(_plan_button)
-
-	# The Estate Office (Legacy upgrade shop + staff retention) now lives right here on the
-	# tab, not behind a modal button. It fills the rest of the tab and reads/writes the
-	# live upgrade state; _show_tab refreshes it on entry, and purchases re-apply effects.
+	# The Estate Office (Legacy upgrade shop + staff retention) lives right here on the tab,
+	# not behind a modal button. It fills the tab and reads/writes the live upgrade state;
+	# _show_tab refreshes it on entry, and purchases re-apply effects. It is added FIRST so it
+	# takes all the vertical slack and the prestige button pins to the bottom (Tim, 2026-06-28).
 	_legacy_screen = LegacyScreen.new()
 	_legacy_screen.setup(dynasty.upgrades)
 	_legacy_screen.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -468,6 +480,38 @@ func _build_estate_tab() -> Control:
 	_legacy_screen.set_retention_entries(_build_retention_entries())
 	_legacy_screen.refresh()
 
+	# The prestige exit, pinned to the BOTTOM of the tab (Tim, 2026-06-28): plan the estate,
+	# pass on, raise a faster heir. Red = big commit.
+	_plan_button = Button.new()
+	# ~35% shorter than its previous (taller) size, still fitting the bold label + inline gem
+	# (Tim, 2026-06-28).
+	_plan_button.custom_minimum_size = Vector2(0, int(UiPalette.STANDARD_BUTTON_HEIGHT * 0.88))
+	UiPalette.style_button(_plan_button, true)
+	_plan_button.pressed.connect(_on_plan_estate_pressed)
+	v.add_child(_plan_button)
+
+	# The button's label is a RichTextLabel so the parenthetical can show the legacy-gem image
+	# inline (Tim, 2026-06-28). It is 40% larger than the standard label and bold. A CenterContainer
+	# centers it over the button; both ignore the mouse so the press still reaches the button.
+	var plan_center := CenterContainer.new()
+	plan_center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	plan_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_plan_button.add_child(plan_center)
+
+	_plan_label = RichTextLabel.new()
+	_plan_label.bbcode_enabled = true
+	_plan_label.fit_content = true
+	_plan_label.scroll_active = false
+	_plan_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	_plan_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_plan_label.add_theme_font_override("normal_font", UiPalette.make_bold_font())
+	_plan_label.add_theme_font_size_override("normal_font_size", int(round(UiPalette.FONT_LABEL * 1.4)))
+	_plan_label.add_theme_color_override("default_color", UiPalette.PALE_GOLD)
+	# Mipmapped filtering so the inline gem image downscales smoothly rather than aliasing.
+	_plan_label.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	plan_center.add_child(_plan_label)
+	_plan_label.text = "[center]PLAN THE ESTATE[/center]"
+
 	return v
 
 
@@ -478,41 +522,16 @@ func _build_estate_tab() -> Control:
 ## held well clear of the screen edges; the two tuning buttons are pushed to the very bottom,
 ## below that panel, sitting larger and bolder than the in-panel options.
 func _build_settings_tab() -> Control:
+	# Settings content now sits directly inside the shared per-tab panel
+	# (UiPalette.wrap_in_tab_panel), which supplies the edge margin, gray outline, and inner
+	# padding this tab used to build for itself — so every tab is framed identically. Everything,
+	# including the bottom tuning buttons, lives inside that one panel.
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 16)
+	v.add_theme_constant_override("separation", 24)
 
-	# The settings panel sits inside a margin that is wider than the tab's normal inset, so the
-	# transparent plate floats clear of the screen edges. A MarginContainer adds that gap; the
-	# PanelContainer inside it is the gray-outlined, see-through plate.
-	const SETTINGS_PANEL_EDGE_MARGIN := 40
-	var panel_margin := MarginContainer.new()
-	for side in ["margin_left", "margin_right", "margin_top"]:
-		panel_margin.add_theme_constant_override(side, SETTINGS_PANEL_EDGE_MARGIN)
-	v.add_child(panel_margin)
-
-	var settings_panel := PanelContainer.new()
-	var panel_style := StyleBoxFlat.new()
-	panel_style.bg_color = Color.TRANSPARENT          # see-through plate
-	panel_style.border_color = UiPalette.MID_GRAY     # gray outline
-	panel_style.set_border_width_all(3)
-	panel_style.set_corner_radius_all(8)
-	panel_style.set_content_margin_all(24)            # keep the options clear of the outline
-	settings_panel.add_theme_stylebox_override("panel", panel_style)
-	panel_margin.add_child(settings_panel)
-
-	var panel_contents := VBoxContainer.new()
-	panel_contents.add_theme_constant_override("separation", 24)
-	settings_panel.add_child(panel_contents)
-
-	var heading := Label.new()
-	heading.text = "SETTINGS"
-	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	heading.add_theme_color_override("font_color", UiPalette.NAVY)
-	# 40% larger than before (FONT_HEADLINE 52 -> 73) and bolder (Tim, 2026-06-26). The bold
-	# weight is faked with a FontVariation since the project ships no bold face yet.
-	heading.add_theme_font_size_override("font_size", int(UiPalette.FONT_HEADLINE * 1.4))
-	heading.add_theme_font_override("font", UiPalette.make_bold_font())
-	panel_contents.add_child(heading)
+	# The shared tab-title style (UiPalette.make_tab_title) — the same centered, faux-bold,
+	# FONT_HEADLINE×1.4 navy heading every tab now uses.
+	v.add_child(UiPalette.make_tab_title("SETTINGS"))
 
 	# Transition minigame toggle — the persistent home for the opt-out (GameState). Governs
 	# every site that rolls a minigame (prestige and welcome-back), not just prestige.
@@ -535,9 +554,9 @@ func _build_settings_tab() -> Control:
 	)
 	_minigame_check.button_pressed = game.ui_minigame_enabled
 	_minigame_check.toggled.connect(func(on: bool) -> void: game.ui_minigame_enabled = on)
-	panel_contents.add_child(_minigame_check)
+	v.add_child(_minigame_check)
 
-	# A spacer pushes the two tuning buttons to the very bottom of the tab, below the panel.
+	# A spacer pushes the two tuning buttons to the bottom of the panel, clear of the options above.
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(spacer)
@@ -789,9 +808,10 @@ func _update_plan_button() -> void:
 	_plan_button.visible = dynasty.upgrades.earned_lifetime > 0 or can_succeed
 	_plan_button.disabled = not can_succeed
 	if can_succeed:
-		_plan_button.text = "PASS THE TORCH  (+%d Legacy)" % dynasty.projected_legacy_gain()
+		# "(+x [gem])" — the legacy-gem image stands in for the word "Legacy" inside the parens.
+		_plan_label.text = "[center]PASS THE TORCH  (+%d [img width=29 height=40]res://art/icons/legacy_gem.svg[/img])[/center]" % dynasty.projected_legacy_gain()
 	else:
-		_plan_button.text = "PASS THE TORCH"
+		_plan_label.text = "[center]PASS THE TORCH[/center]"
 
 
 ## First contact: a new epoch was reached this tick. Show the beat (Main's _process

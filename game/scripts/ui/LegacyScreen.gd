@@ -27,12 +27,22 @@ signal retain_requested(property_index: int)
 
 # Type sizes — large for at-a-glance phone reading (UI notes §1). The title/wallet are a
 # notch smaller than the old full-screen sizes so the stacked header fits the tab width.
-const TITLE_SIZE   := UiPalette.FONT_HEADLINE
+# The wallet balance amount is 25% larger than the rest of the header (Tim, 2026-06-28).
 const WALLET_SIZE  := UiPalette.FONT_SUBHEAD
-const CATEGORY_SIZE := UiPalette.FONT_HEADLINE
+const WALLET_AMOUNT_SIZE := int(round(UiPalette.FONT_SUBHEAD * 1.25))
+const CATEGORY_SIZE := int(round(UiPalette.FONT_HEADLINE * 0.85))  # 15% smaller (Tim, 2026-06-28)
 const CARD_NAME_SIZE := UiPalette.FONT_HEADLINE
 const CARD_BODY_SIZE := UiPalette.FONT_CARD_BODY
 const BUTTON_SIZE  := UiPalette.FONT_SUBHEAD
+
+## The legacy-gem currency icon (the new estate currency art) — shown in place of the word
+## "Legacy" beside the balance and on each upgrade's buy button (Tim, 2026-06-28).
+const GEM_TEX := preload("res://art/icons/legacy_gem.svg")
+## The gem balance icon's size, ~25% larger than its baseline to match the enlarged amount.
+const WALLET_GEM_SIZE := Vector2(46, 64)
+## The smaller gem shown on each upgrade's buy button (in place of the word "BUY"). Sized to fit
+## the shorter buy button.
+const BUY_GEM_WIDTH := 38
 
 ## Hold-to-buy pacing (Tim, 2026-06-17): a quick tap buys one level; holding a buy
 ## button keeps buying at a calm cadence so the player can watch the wallet/effect and
@@ -97,35 +107,50 @@ func _build_ui() -> void:
 	column.add_theme_constant_override("separation", 12)
 	margin.add_child(column)
 
-	# ── Header row: the "Estate Planning" title plus the Collapse-All / Expand-All controls
-	# (Tim, 2026-06-24), which open or close every category section at once. The Legacy wallet
-	# sits on its own line beneath (side-by-side overflowed the tab width at large type). ──
-	var header_row := HBoxContainer.new()
-	header_row.add_theme_constant_override("separation", 10)
-	column.add_child(header_row)
+	# ── Title: the centered "ESTATE PLANNING" heading, in the shared tab-title style (matches the
+	# Settings and Family Ledger tabs). The Collapse-All / Expand-All controls moved down onto the
+	# Legacy-wallet row below (Tim, 2026-06-28). ──
+	column.add_child(UiPalette.make_tab_title("ESTATE PLANNING"))
 
-	var title := Label.new()
-	title.text = "Estate Planning"
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title.add_theme_color_override("font_color", UiPalette.NAVY)
-	title.add_theme_font_size_override("font_size", TITLE_SIZE)
-	header_row.add_child(title)
+	# ── Wallet row: the legacy-gem icon + balance on the left (the gem icon replaces the word
+	# "Legacy", Tim 2026-06-28), and the Collapse-All / Expand-All arrow buttons right-aligned. ──
+	var wallet_row := HBoxContainer.new()
+	wallet_row.add_theme_constant_override("separation", 10)
+	column.add_child(wallet_row)
 
-	var collapse_all_button := _make_bulk_button("COLLAPSE ALL")
-	collapse_all_button.pressed.connect(set_all_collapsed.bind(true))
-	header_row.add_child(collapse_all_button)
-
-	var expand_all_button := _make_bulk_button("EXPAND ALL")
-	expand_all_button.pressed.connect(set_all_collapsed.bind(false))
-	header_row.add_child(expand_all_button)
+	# The gem icon stands in for the word "Legacy" in front of the balance.
+	var wallet_gem := TextureRect.new()
+	wallet_gem.texture = GEM_TEX
+	wallet_gem.custom_minimum_size = WALLET_GEM_SIZE
+	wallet_gem.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	wallet_gem.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	# Mipmapped filtering so the detailed gem downscales smoothly instead of aliasing ("blocky").
+	wallet_gem.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	wallet_gem.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	wallet_row.add_child(wallet_gem)
 
 	_wallet_label = Label.new()
-	_wallet_label.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD)
+	# Expand so the amount takes the slack and pushes the two icon buttons to the right edge.
+	_wallet_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_wallet_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER  # center against the taller buttons
+	_wallet_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_wallet_label.add_theme_color_override("font_color", UiPalette.DARK_GOLD)
 	# Faux-bold via a same-color outline, matching the project's plate aesthetic.
-	_wallet_label.add_theme_color_override("font_outline_color", UiPalette.MUSTARD_GOLD)
+	_wallet_label.add_theme_color_override("font_outline_color", UiPalette.DARK_GOLD)
 	_wallet_label.add_theme_constant_override("outline_size", 4)
-	_wallet_label.add_theme_font_size_override("font_size", WALLET_SIZE)
-	column.add_child(_wallet_label)
+	_wallet_label.add_theme_font_size_override("font_size", WALLET_AMOUNT_SIZE)
+	wallet_row.add_child(_wallet_label)
+
+	# Up arrow = collapse all (the list folds up); down arrow = expand all (it opens down) — the
+	# intuitive convention (Tim, 2026-06-28). Icon-only, so they stay narrow and right-aligned via
+	# the expanding wallet label beside them.
+	var collapse_all_button := _make_bulk_button("res://art/icons/arrow_up.svg")
+	collapse_all_button.pressed.connect(set_all_collapsed.bind(true))
+	wallet_row.add_child(collapse_all_button)
+
+	var expand_all_button := _make_bulk_button("res://art/icons/arrow_down.svg")
+	expand_all_button.pressed.connect(set_all_collapsed.bind(false))
+	wallet_row.add_child(expand_all_button)
 
 	# ── Scrollable list of upgrade cards (grouped by category) ──
 	# Takes all the leftover height between the wallet readout and the close
@@ -227,7 +252,7 @@ func _category_color(category: String) -> Color:
 ## Staff), used to count how many are currently affordable for the collapsed-section badge.
 func _add_collapsible_section(parent: VBoxContainer, category: String, accent: Color, upgrade_ids: Array) -> VBoxContainer:
 	var header := Button.new()
-	header.custom_minimum_size = Vector2(0, 96)
+	header.custom_minimum_size = Vector2(0, 62)  # ~35% shorter (Tim, 2026-06-28)
 	header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_theme_font_size_override("font_size", CATEGORY_SIZE)
 	# Caret + name read from the left like a typical section/disclosure header.
@@ -290,7 +315,7 @@ func _make_section_plate(color: Color) -> StyleBoxFlat:
 	style.border_color = UiPalette.NAVY
 	style.set_border_width_all(3)
 	style.set_corner_radius_all(4)
-	style.set_content_margin_all(12)
+	style.set_content_margin_all(8)  # tighter so the name fits the shorter header (Tim, 2026-06-28)
 	return style
 
 
@@ -306,13 +331,18 @@ func _make_accent_card_style(color: Color) -> StyleBoxFlat:
 	return style
 
 
-## A compact header-row utility button (Collapse All / Expand All), styled as a standard
-## (non-spend) button so it never reads as a buy action.
-func _make_bulk_button(text: String) -> Button:
+## A compact icon utility button (Collapse All / Expand All — an arrow glyph), styled as a
+## standard (non-spend) button so it never reads as a buy action. Icon-only, so it stays narrow
+## (Tim, 2026-06-28); expand_icon scales the arrow to fill the button square.
+func _make_bulk_button(icon_path: String) -> Button:
 	var button := Button.new()
-	button.text = text
-	button.custom_minimum_size = Vector2(0, 72)
-	button.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
+	button.icon = load(icon_path)
+	button.expand_icon = true
+	# Center the arrow both ways in the button (default icon alignment is left/center).
+	button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	button.vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
+	button.custom_minimum_size = Vector2(84, 47)  # ~35% shorter (Tim, 2026-06-28)
+	button.add_theme_constant_override("icon_max_width", 48)
 	UiPalette.style_button(button, false)
 	return button
 
@@ -440,8 +470,12 @@ func _add_upgrade_card(parent: VBoxContainer, definition: Dictionary, accent: Co
 	var buy_button := Button.new()
 	# A flexible width (was a fixed 440, wide enough to overflow the framed viewport): the
 	# button hugs its own cost text while the effect label beside it takes the slack.
-	buy_button.custom_minimum_size = Vector2(240, 123)
+	buy_button.custom_minimum_size = Vector2(240, 80)  # ~35% shorter (Tim, 2026-06-28)
 	buy_button.add_theme_font_size_override("font_size", BUTTON_SIZE)
+	# The legacy-gem icon (set in refresh) replaces the word "BUY"; cap its width so the tall gem
+	# art sizes down to a button glyph beside the cost. Mipmapped filtering keeps it from aliasing.
+	buy_button.add_theme_constant_override("icon_max_width", BUY_GEM_WIDTH)
+	buy_button.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	UiPalette.style_button(buy_button, true)  # red: this is a spend action
 	# Press buys one level immediately; holding then auto-repeats slowly until release
 	# (see _process). bind(id) passes which upgrade this button buys.
@@ -522,9 +556,10 @@ func _add_retention_row(entry: Dictionary) -> void:
 
 	var button := Button.new()
 	# Flexible width (was a fixed 440 that overflowed the framed viewport), matching the
-	# upgrade cards' RETAIN/BUY buttons.
-	button.custom_minimum_size = Vector2(240, 123)
-	button.add_theme_font_size_override("font_size", BUTTON_SIZE)
+	# upgrade cards' RETAIN/BUY buttons. ~35% shorter (Tim, 2026-06-28); a smaller font so the
+	# two-line "RETAIN TIER n / n Gems" still fits the shorter button.
+	button.custom_minimum_size = Vector2(240, 80)
+	button.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
 	UiPalette.style_button(button, true)  # red: spends Legacy
 	var cost := int(entry["cost"])
 	if cost < 0:
@@ -532,7 +567,7 @@ func _add_retention_row(entry: Dictionary) -> void:
 		button.text = "RETAINED"
 		button.disabled = true
 	else:
-		button.text = "RETAIN TIER %d\n%d Legacy" % [int(entry["retained_tier"]) + 1, cost]
+		button.text = "RETAIN TIER %d\n%d Gems" % [int(entry["retained_tier"]) + 1, cost]
 		button.disabled = not bool(entry["can_afford"])
 		button.pressed.connect(func() -> void: retain_requested.emit(index))
 	bottom.add_child(button)
@@ -544,8 +579,8 @@ func _add_retention_row(entry: Dictionary) -> void:
 
 ## Re-read the live state and update the wallet readout and every card.
 func refresh() -> void:
-	# Short label so it fits beside the large title on the header row.
-	_wallet_label.text = "Legacy: %d" % _upgrades.available
+	# Just the number — the gem icon beside it stands in for the word "Legacy" (Tim, 2026-06-28).
+	_wallet_label.text = "%d" % _upgrades.available
 
 	for definition in LegacyUpgradeCatalog.all():
 		var id := String(definition["id"])
@@ -558,11 +593,14 @@ func refresh() -> void:
 
 		var buy_button := controls["buy_button"] as Button
 		if _upgrades.is_maxed(id):
+			buy_button.icon = null
 			buy_button.text = "MAXED"
 			buy_button.disabled = true
 		else:
 			var cost := _upgrades.get_next_cost(id)
-			buy_button.text = "BUY  %d" % cost
+			# The legacy-gem icon replaces the word "BUY"; the cost follows it (Tim, 2026-06-28).
+			buy_button.icon = GEM_TEX
+			buy_button.text = "  %d" % cost
 			# Greyed out (but still readable) when the player can't afford it.
 			buy_button.disabled = not _upgrades.can_buy(id)
 

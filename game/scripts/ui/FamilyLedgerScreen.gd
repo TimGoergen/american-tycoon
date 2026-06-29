@@ -19,7 +19,6 @@ extends Control
 # Type sizes — large for at-a-glance phone reading (UI notes §1), but the title/total
 # are a notch smaller than the old full-screen-overlay sizes: as an embedded tab the
 # header must fit the tab width, and FONT_PAGE_TITLE/DISPLAY side-by-side overflowed.
-const TITLE_SIZE := UiPalette.FONT_HEADLINE
 const TOTAL_SIZE := UiPalette.FONT_SUBHEAD
 const NAME_SIZE := UiPalette.FONT_HEADLINE
 const BODY_SIZE := UiPalette.FONT_CARD_BODY
@@ -44,31 +43,25 @@ func setup() -> void:
 func _build_chrome() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 
+	# No inner margin (Tim, 2026-06-28): the shared tab panel (UiPalette.wrap_in_tab_panel) already
+	# pads this tab, and an extra inset here pushed the title 8px lower than the Estate/Settings
+	# titles, breaking their vertical alignment.
 	var margin := MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	margin.add_theme_constant_override("margin_left", 8)
-	margin.add_theme_constant_override("margin_right", 8)
-	margin.add_theme_constant_override("margin_top", 8)
-	margin.add_theme_constant_override("margin_bottom", 8)
 	add_child(margin)
 
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 12)
 	margin.add_child(column)
 
-	# ── Header: title then dynasty lifetime-earned readout, STACKED (not side-by-side).
-	# Side-by-side at large type overflowed the tab's right edge; stacking each on its own
-	# line keeps both within the tab width. Both wrap as a final safety net.
-	var title := Label.new()
-	title.text = "The Family Ledger"
-	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	title.add_theme_color_override("font_color", UiPalette.NAVY)
-	title.add_theme_font_size_override("font_size", TITLE_SIZE)
-	column.add_child(title)
+	# ── Header: the centered "FAMILY LEDGER" title (shared tab-title style, matching the Settings
+	# and Estate Planning tabs; "The" dropped — Tim 2026-06-28), then the dynasty lifetime-earned
+	# readout beneath it on its own line. ──
+	column.add_child(UiPalette.make_tab_title("FAMILY LEDGER"))
 
 	_total_label = Label.new()
 	_total_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_total_label.add_theme_color_override("font_color", UiPalette.MONEY_GREEN)
+	_total_label.add_theme_color_override("font_color", UiPalette.DARK_MONEY_GREEN)
 	_total_label.add_theme_font_size_override("font_size", TOTAL_SIZE)
 	column.add_child(_total_label)
 
@@ -96,7 +89,7 @@ func _build_chrome() -> void:
 ## reads chronologically). `lifetime_total` is the dynasty-wide cash-earned sum shown in
 ## the header. Call when the tab is opened, so it reflects the latest succession.
 func refresh(ancestors: Array, lifetime_total: float) -> void:
-	_total_label.text = "Dynasty total: %s" % Money.of(lifetime_total).display()
+	_total_label.text = "Dynasty Total: %s" % Money.of(lifetime_total).display()
 
 	# The list grows each generation, so rebuild it fresh rather than appending.
 	for child in _list.get_children():

@@ -10,8 +10,14 @@ const CREAM := Color("#F4ECD8")
 const KETCHUP_RED := Color("#B5402A")
 const NAVY := Color("#1D2D50")
 const MUSTARD_GOLD := Color("#E3B23C")
+## A darker, deeper gold (a darkened MUSTARD_GOLD) for gold elements that need more weight than
+## the bright mustard — e.g. the Estate tab's "Legacy:" balance (Tim, 2026-06-28).
+const DARK_GOLD := Color("#A87C16")
 const ATOMIC_TEAL := Color("#9FD8D4")
 const MONEY_GREEN := Color("#7DA87B")
+## A darker money green for headline dollar figures that want more weight than the soft
+## MONEY_GREEN — the cash-on-hand total and the Family Ledger's dynasty total (Tim, 2026-06-28).
+const DARK_MONEY_GREEN := Color("#5E7E5C")
 const INK_NAVY := Color("#0D1830")
 const BRICK := Color("#8E2F1E")
 const PALE_GOLD := Color("#F0D49A")
@@ -147,6 +153,38 @@ static func make_panel_style() -> StyleBoxFlat:
 	return _make_plate(CREAM, NAVY)
 
 
+## Edge gap that floats each tab's content panel clear of the screen — the same inset the
+## settings tab established, now shared by every tab.
+const TAB_PANEL_EDGE_MARGIN := 40
+
+
+## The standard per-tab content panel: a translucent cream plate with the gray outline the
+## settings tab established (3px border, 8px corners) and an inner content margin so nothing
+## crowds the outline. 65% alpha so the epoch backdrop reads faintly through it (Tim, 2026-06-28).
+static func make_tab_panel_style() -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(CREAM, 0.65)
+	style.border_color = MID_GRAY
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(8)
+	style.set_content_margin_all(24)
+	return style
+
+
+## Wrap a tab's content Control in the standard edge margin + outlined translucent-cream panel,
+## so every tab shares one framed look (the settings-tab outline). Returns the outer
+## MarginContainer; the caller drops THAT into the tab-content slot in place of the bare content.
+static func wrap_in_tab_panel(content: Control) -> MarginContainer:
+	var margin := MarginContainer.new()
+	for side in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
+		margin.add_theme_constant_override(side, TAB_PANEL_EDGE_MARGIN)
+	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", make_tab_panel_style())
+	panel.add_child(content)
+	margin.add_child(panel)
+	return margin
+
+
 ## Style a Button in place. Standard buttons are navy-on-mustard; action
 ## buttons (spend/act: buy, pop, tuition) are pale-gold-on-red — red is
 ## reserved for "spend/act", never decoration (§8).
@@ -160,9 +198,13 @@ static func style_button(button: Button, is_action: bool) -> void:
 	button.add_theme_stylebox_override("pressed", _make_plate(pressed_plate, NAVY))
 	button.add_theme_stylebox_override("disabled", _make_plate(CREAM, NAVY))
 
-	button.add_theme_color_override("font_color", label_color)
-	button.add_theme_color_override("font_hover_color", label_color)
-	button.add_theme_color_override("font_pressed_color", NAVY)
+	# The label color NEVER changes with interaction state (Tim, 2026-06-28): every interactive
+	# state — including focus (which a button keeps after a click on desktop) and pressed — uses
+	# the one label color, so the text doesn't flip color when clicked or hovered. Only the
+	# disabled state dims it.
+	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color",
+			"font_hover_pressed_color"]:
+		button.add_theme_color_override(state, label_color)
 	button.add_theme_color_override("font_disabled_color", Color(NAVY, 0.45))
 
 
@@ -181,8 +223,55 @@ static func style_unowned_button(button: Button) -> void:
 	button.add_theme_stylebox_override("hover", plate)
 	button.add_theme_stylebox_override("pressed", plate)
 	button.add_theme_stylebox_override("disabled", plate)
-	button.add_theme_color_override("font_color", CREAM)
-	button.add_theme_color_override("font_disabled_color", CREAM)
+	# Constant cream label across every state (incl. focus/hover/pressed) so a click never
+	# recolors it (Tim, 2026-06-28).
+	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color",
+			"font_hover_pressed_color", "font_disabled_color"]:
+		button.add_theme_color_override(state, CREAM)
+
+
+## A tab's title label in the standard tab-title format (Tim, 2026-06-28): the settings-tab
+## heading style — large (FONT_HEADLINE ×1.4), faux-bold, navy, horizontally centered. Used by
+## every tab (Settings, Estate Planning, Family Ledger) so the titles all match.
+static func make_tab_title(text: String) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL  # fill the width so "centered" is the whole tab
+	label.add_theme_color_override("font_color", NAVY)
+	label.add_theme_font_size_override("font_size", int(FONT_HEADLINE * 1.4))
+	label.add_theme_font_override("font", make_bold_font())
+	return label
+
+
+## Reserved width of a styled vertical scrollbar — also the width of its (wider) handle.
+const SCROLLBAR_WIDTH := 24
+## How far the track is inset on EACH side, so the handle reads as wider than the track:
+## against a ~20px base the handle is ~20% wider (24) and the track ~20% narrower (16).
+const SCROLLBAR_TRACK_INSET := 4
+
+
+## Style a ScrollContainer's vertical scrollbar (Tim, 2026-06-28): a wide navy handle riding
+## over a narrower gray track, both with rounded ends. Pass ScrollContainer.get_v_scroll_bar().
+static func style_vscrollbar(bar: VScrollBar) -> void:
+	bar.custom_minimum_size.x = SCROLLBAR_WIDTH
+
+	# The handle fills the bar's full reserved width (the wider element).
+	var handle := StyleBoxFlat.new()
+	handle.bg_color = NAVY
+	handle.set_corner_radius_all(SCROLLBAR_WIDTH / 2)
+
+	# The track is drawn narrower than the bar: negative expand margins inset its draw rect by
+	# SCROLLBAR_TRACK_INSET on each side (the same shrink trick style_framed_progress uses).
+	var track := StyleBoxFlat.new()
+	track.bg_color = PROGRESS_TRACK_GRAY
+	track.set_corner_radius_all((SCROLLBAR_WIDTH - 2 * SCROLLBAR_TRACK_INSET) / 2)
+	track.set_expand_margin(SIDE_LEFT, -float(SCROLLBAR_TRACK_INSET))
+	track.set_expand_margin(SIDE_RIGHT, -float(SCROLLBAR_TRACK_INSET))
+
+	bar.add_theme_stylebox_override("scroll", track)
+	for state in ["grabber", "grabber_highlight", "grabber_pressed"]:
+		bar.add_theme_stylebox_override(state, handle)
 
 
 ## Teal track with a fill in the given color (§8: sliders and meters).

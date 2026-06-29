@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="114" height="64" viewBox="0 0 114 64">
+  <!-- Income-per-second symbol (Tim, 2026-06-28): "$ / clock" = dollars per second. A single dark
+       gold, NO outline. A clock (circle + two hands) reads more clearly than the earlier stopwatch.
+       The clock is slightly shorter than the "$" and vertically centered on it (~y33 vs the "$"'s
+       ~y32), with EQUAL whitespace on both sides of the slash. Drawn as strokes (the SVG importer
+       embeds no fonts; see dollar_bill.svg). -->
+  <g fill="none" stroke="#8A6A1C" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+    <!-- $ (right edge ~x38) -->
+    <line x1="24" y1="9" x2="24" y2="55"/>
+    <path d="M 38 18 C 38 10 11 10 11 23 C 11 32 38 32 38 41 C 38 54 11 54 11 46"/>
+    <!-- / (centered between the $ and the clock) -->
+    <line x1="61" y1="12" x2="49" y2="52"/>
+    <!-- clock: face + two hands in a V (like ~10:10) -->
+    <circle cx="86" cy="33" r="14"/>
+    <line x1="86" y1="33" x2="93" y2="24"/>
+    <line x1="86" y1="33" x2="80" y2="26"/>
+  </g>
+</svg>

@@ -34,9 +34,15 @@ var _hold_accumulator := 0.0
 #     above the gold fill (see _draw_sweep), so the navy border and the label stay
 #     put and the button never changes size.
 
-## The level badge's fill — a cool metallic silver (no silver exists in UiPalette). Light
-## enough that the navy level number and the navy border both read clearly on it.
-const SILVER_PLATE := Color(0.80, 0.82, 0.85)
+## The level badge's text — a vivid, saturated blue that pops on the dark-blue (INK_NAVY)
+## plate (Tim, 2026-06-28).
+const LEVEL_TEXT_BLUE := Color("#2E9BFF")
+
+## Level-up blink: when the clock-in level rises, the badge pulses brighter twice, slowly, to
+## announce it (Tim, 2026-06-28). BRIGHTNESS multiplies the plate's modulate at each peak;
+## HALF is the up (or down) duration of one pulse, so two pulses take 4 × HALF seconds.
+const LEVEL_BLINK_BRIGHTNESS := 1.9
+const LEVEL_BLINK_HALF := 0.34
 
 ## How long the brighter-gold blink stays on for a single manual tap, in seconds.
 ## Short, so a deliberate tap reads as a crisp blink.
@@ -110,6 +116,13 @@ var _wage_button: Button
 ## The "<level> / <next>" readout that sits to the right of the clock-in button (15% of the
 ## row), showing the current clock-in level and the one being climbed toward.
 var _level_label: Label
+## The dark-blue plate behind the level number — blinked on level-up (modulate is pulsed).
+var _level_panel: PanelContainer
+## Last level shown, to detect a level-up. -1 until the first refresh so opening at a non-1
+## level (a loaded save) does not fire the blink.
+var _shown_level := -1
+## The running level-up blink tween, held so a fresh level-up can restart it cleanly.
+var _level_blink_tween: Tween
 
 # The clock-in button's three-part content laid over the meter (Tim, 2026-06-22): a mail-cart
 # icon on the left, "CLOCK IN" centered, and the live per-tap earnings "+$x" on the right.
@@ -160,22 +173,22 @@ func _ready() -> void:
 	_wage_meter.size_flags_stretch_ratio = 0.85
 	button_row.add_child(_wage_meter)
 
-	# Level readout (the right 15% of the row): the current clock-in level, shown inside a silver
-	# plate that is the same height as the clock-in button (Tim, 2026-06-24). The PanelContainer
-	# fills the row's height — which the 196px meter sets — so the plate matches the button, and
-	# the number is centered inside it.
-	var level_panel := PanelContainer.new()
-	level_panel.add_theme_stylebox_override("panel", _make_silver_plate())
-	level_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	level_panel.size_flags_stretch_ratio = 0.15
-	button_row.add_child(level_panel)
+	# Level readout (the right 15% of the row): the current clock-in level, shown inside a
+	# dark-blue plate with the same frame thickness as the clock-in button (Tim, 2026-06-24 /
+	# 2026-06-28). The PanelContainer fills the row's height — which the 196px meter sets — so
+	# the plate matches the button, and the bright-blue number is centered inside it.
+	_level_panel = PanelContainer.new()
+	_level_panel.add_theme_stylebox_override("panel", _make_level_plate())
+	_level_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_level_panel.size_flags_stretch_ratio = 0.15
+	button_row.add_child(_level_panel)
 
 	_level_label = Label.new()
 	_level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_level_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_level_label.add_theme_font_size_override("font_size", UiPalette.FONT_DISPLAY)
-	_level_label.add_theme_color_override("font_color", UiPalette.NAVY)
-	level_panel.add_child(_level_label)
+	_level_label.add_theme_color_override("font_color", LEVEL_TEXT_BLUE)
+	_level_panel.add_child(_level_label)
 
 	# Highlight overlay: a transparent, mouse-ignoring layer filling the meter, on
 	# which _draw_sweep paints the gliding highlight band while the button is held.
@@ -223,15 +236,24 @@ func _ready() -> void:
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	content.add_child(row)
 
-	# Left: the "office worker pushing a mail cart" icon, tinted navy to match the labels.
+	# Left: the "office worker pushing a mail cart" icon, tinted navy to match the labels. It is
+	# 30% smaller than before and CENTER-aligned within its cell (Tim, 2026-06-29).
+	var icon_cell := HBoxContainer.new()
+	icon_cell.custom_minimum_size = Vector2(180, 0)  # the icon's left footprint
+	icon_cell.alignment = BoxContainer.ALIGNMENT_CENTER
+	icon_cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
 	_wage_icon = TextureRect.new()
 	_wage_icon.texture = preload("res://art/icons/mail_cart.svg")
-	_wage_icon.custom_minimum_size = Vector2(180, 0)
+	_wage_icon.custom_minimum_size = Vector2(126, 0)  # 180 × 0.7 = 30% smaller
+	_wage_icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER  # don't fill — let ALIGNMENT_CENTER place it
+	_wage_icon.size_flags_vertical = Control.SIZE_FILL
 	_wage_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_wage_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_wage_icon.modulate = UiPalette.NAVY
 	_wage_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_child(_wage_icon)
+	icon_cell.add_child(_wage_icon)
+	row.add_child(icon_cell)
 
 	# Center: the big "CLOCK IN" label, taking the slack between the icon and the amount.
 	_wage_title_label = Label.new()
@@ -239,8 +261,10 @@ func _ready() -> void:
 	_wage_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_wage_title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_wage_title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_wage_title_label.add_theme_font_size_override("font_size", UiPalette.FONT_PAGE_TITLE)
-	_wage_title_label.add_theme_color_override("font_color", UiPalette.NAVY)
+	# 25% smaller than before, still centered (Tim, 2026-06-28).
+	_wage_title_label.add_theme_font_size_override("font_size", int(round(UiPalette.FONT_PAGE_TITLE * 0.75)))
+	# Full black to match the reference art (Tim, 2026-06-28).
+	_wage_title_label.add_theme_color_override("font_color", Color.BLACK)
 	_wage_title_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(_wage_title_label)
 
@@ -249,7 +273,8 @@ func _ready() -> void:
 	_wage_amount_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_wage_amount_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_wage_amount_label.add_theme_font_size_override("font_size", UiPalette.FONT_DISPLAY)
-	_wage_amount_label.add_theme_color_override("font_color", UiPalette.NAVY)
+	# Full black to match the CLOCK IN label (Tim, 2026-06-28).
+	_wage_amount_label.add_theme_color_override("font_color", Color.BLACK)
 	_wage_amount_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(_wage_amount_label)
 
@@ -272,7 +297,12 @@ func _process(delta: float) -> void:
 			* _wage.wage_multiplier * _wage.auto_tap_power_multiplier
 	_wage_amount_label.text = "+%s" % Money.of(wage_per_tap).display()
 
-	# Right-side readout: the current clock-in level (just the number, in its silver plate).
+	# Right-side readout: the current clock-in level (just the number, in its dark-blue plate).
+	# A rise in level blinks the plate (skipping the very first frame, _shown_level == -1, so a
+	# loaded save that opens at a high level doesn't flash on arrival).
+	if _shown_level >= 0 and _wage.level > _shown_level:
+		_blink_level_up()
+	_shown_level = _wage.level
 	_level_label.text = "%d" % _wage.level
 	# The gold bar fills with the clicks banked toward the next level-up.
 	_apply_wage_fill(_level_progress())
@@ -298,14 +328,37 @@ func _level_progress() -> float:
 ## The silver plate behind the level number. A cool metallic gray fill with the project's usual
 ## navy border and rounded corners, so it reads as a small "level badge" beside the gold meter.
 ## (No silver lives in UiPalette, so the shade is defined here.)
-func _make_silver_plate() -> StyleBoxFlat:
+## The level badge plate: a dark-blue (INK_NAVY) fill with the SAME navy frame thickness as
+## the clock-in meter beside it (style_framed_progress uses 8), so the two read as a matched
+## pair on the row (Tim, 2026-06-28).
+## A slightly brighter dark blue than INK_NAVY for the level plate — INK_NAVY read as nearly
+## black (Tim, 2026-06-28); still darker than the NAVY frame so the border stays visible.
+const LEVEL_PLATE_BG := Color("#15243F")
+
+
+func _make_level_plate() -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
-	style.bg_color = SILVER_PLATE
+	style.bg_color = LEVEL_PLATE_BG
 	style.set_corner_radius_all(10)
 	style.border_color = UiPalette.NAVY
-	style.set_border_width_all(4)
+	style.set_border_width_all(8)
 	style.set_content_margin_all(8)
 	return style
+
+
+## Blink the level badge brighter twice, slowly, to announce a level-up (Tim, 2026-06-28).
+## Pulses the panel's modulate up to LEVEL_BLINK_BRIGHTNESS and back, twice. modulate multiplies
+## the plate and its text together, so the dark-blue ground and the blue number brighten as one.
+func _blink_level_up() -> void:
+	if _level_blink_tween != null and _level_blink_tween.is_valid():
+		_level_blink_tween.kill()
+	_level_panel.modulate = Color.WHITE
+	var bright := Color(LEVEL_BLINK_BRIGHTNESS, LEVEL_BLINK_BRIGHTNESS, LEVEL_BLINK_BRIGHTNESS)
+	_level_blink_tween = create_tween()
+	_level_blink_tween.set_trans(Tween.TRANS_SINE)
+	for _i in range(2):
+		_level_blink_tween.tween_property(_level_panel, "modulate", bright, LEVEL_BLINK_HALF)
+		_level_blink_tween.tween_property(_level_panel, "modulate", Color.WHITE, LEVEL_BLINK_HALF)
 
 
 ## Holding the clock-in button auto-taps the wage at the configured rate — a

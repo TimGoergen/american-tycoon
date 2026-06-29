@@ -340,6 +340,11 @@ func _refresh(delta: float) -> void:
 	var owned := _prop.units_owned > 0
 	_apply_ownership_styling(owned)
 
+	# An unowned rung has no cycle to run and no milestone tier reached, so both bars are
+	# hidden until the player owns at least one unit (Tim, 2026-06-28).
+	_cycle_bar.visible = owned
+	_milestone_bar.visible = owned
+
 	# Keep the portrait circle square and as tall as this top section: its height is already
 	# stretched to the section by the layout, so we just match the width to it.
 	_manager_circle.custom_minimum_size.x = _manager_circle.size.y

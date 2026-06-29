@@ -83,6 +83,10 @@ func _ready() -> void:
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# The project's default 2D filter is plain linear (no mipmaps), which aliases badly when a
+	# large SVG texture is minified to this small size. Switch this icon to the mipmapped filter
+	# so it actually uses the mipmaps we generate at import — same fix the Legacy gem icons use.
+	icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	row.add_child(icon)
 
 	# Right: the live reward readout. It takes the remaining width and right-aligns, so the

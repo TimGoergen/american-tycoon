@@ -502,7 +502,11 @@ func _refresh_hire_button() -> void:
 		# shows the current level (Tim, 2026-06-29).
 		_apply_hire_styling(false)
 		_hire_icon.visible = true
-		_hire_left_label.text = "LVL %d" % _prop.staff_level
+		# `staff_level` is stored 0-based (the count of level-ups bought; 0 = freshly hired,
+		# no compounding bonus yet). The player should read a freshly hired staffer as "LVL 1",
+		# so the label adds one — a pure display offset, the economy still anchors level 0 to the
+		# plain entry multiplier (Tim, 2026-06-29).
+		_hire_left_label.text = "LVL %d" % (_prop.staff_level + 1)
 		var level_cost := _economy.get_staff_level_cost(prop_index)
 		_hire_cost_label.text = Money.of(level_cost).display()
 		# Same gate as hiring: need the cash, and units for the staffer to run.

@@ -15,8 +15,10 @@ signal pop_requested
 
 ## The growth-arrow symbol that replaces the word "TURBO" on the button.
 const TURBO_TEX := preload("res://art/icons/turbo.svg")
-## Side length of that icon, sized to sit comfortably inside the button's height.
-const TURBO_ICON_SIZE := 64
+## Side length of the icon's (square) layout box. The arrow art is taller than it is wide
+## and fits inside this box keeping its aspect, so this is effectively its drawn height —
+## sized to nearly fill the button so the symbol reads large (Tim, 2026-06-29).
+const TURBO_ICON_SIZE := 90
 
 var _frenzy: FrenzyState
 var _tuning: TuningConfig

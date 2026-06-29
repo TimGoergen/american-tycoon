@@ -99,8 +99,6 @@ var _manager_circle: ManagerCircle
 var _name_label: Label
 var _income_label: Label
 var _cycle_bar: ProgressBar
-var _milestone_bar: ProgressBar
-var _milestone_label: Label
 var _buy_button: Button
 var _buy_caption_label: Label
 var _buy_cost_label: Label
@@ -193,26 +191,6 @@ func _ready() -> void:
 	_cycle_bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	UiPalette.style_progress_bar(_cycle_bar, UiPalette.MONEY_GREEN)
 	top_section.add_child(_cycle_bar)
-
-	# Milestone slider: min = last milestone, max = next (Spec §3.5 — "the pile can push me
-	# over 40" is part of the return spike). Lives in top_section (right of the portrait) so it
-	# shares the cycle bar's width and the portrait spans it too (Tim, 2026-06-22).
-	var milestone_line := HBoxContainer.new()
-	milestone_line.add_theme_constant_override("separation", 10)
-	top_section.add_child(milestone_line)
-
-	_milestone_bar = ProgressBar.new()
-	_milestone_bar.show_percentage = false
-	_milestone_bar.custom_minimum_size = Vector2(0, 18)
-	_milestone_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_milestone_bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	UiPalette.style_progress_bar(_milestone_bar, UiPalette.NAVY)
-	milestone_line.add_child(_milestone_bar)
-
-	_milestone_label = Label.new()
-	_milestone_label.add_theme_color_override("font_color", UiPalette.NAVY)
-	_milestone_label.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
-	milestone_line.add_child(_milestone_label)
 
 	# Buy / hire buttons (bulk-buy is mandatory — GDD §3.1). The buy button's
 	# count follows the global buy-mode toggle.
@@ -333,17 +311,23 @@ func _refresh(delta: float) -> void:
 			or prop_index == _economy.get_cheapest_unaffordable_unowned_index(current_tier))
 
 	var config := _prop.config as PropertyConfig
-	_name_label.text = "%s  ×%d" % [config.display_name, _prop.units_owned]
+	# Name shows the owned count and, after the slash, the unit threshold of the next
+	# milestone tier (the old progress bar's information, folded into the title — Tim,
+	# 2026-06-29). Past the final milestone there is no next count, so we show "MAX".
+	var next_milestone := _prop.get_next_milestone_count()
+	if next_milestone <= 0:
+		_name_label.text = "%s  ×%d / MAX" % [config.display_name, _prop.units_owned]
+	else:
+		_name_label.text = "%s  ×%d / %d" % [config.display_name, _prop.units_owned, next_milestone]
 
 	# A rung the player owns no units of yet gets a drab gray "locked" look; once a
 	# unit is bought it switches to the normal cream styling (applied on change).
 	var owned := _prop.units_owned > 0
 	_apply_ownership_styling(owned)
 
-	# An unowned rung has no cycle to run and no milestone tier reached, so both bars are
-	# hidden until the player owns at least one unit (Tim, 2026-06-28).
+	# An unowned rung has no cycle to run, so the cycle bar is hidden until the player
+	# owns at least one unit (Tim, 2026-06-28).
 	_cycle_bar.visible = owned
-	_milestone_bar.visible = owned
 
 	# Keep the portrait circle square and as tall as this top section: its height is already
 	# stretched to the section by the layout, so we just match the width to it.
@@ -432,21 +416,6 @@ func _refresh(delta: float) -> void:
 	var rush_held := _manager_circle.is_held() and _prop.units_owned > 0
 	_set_cycle_color(rush_no_longer_option, rush_held)
 
-	# Milestone slider runs from the last crossed milestone to the next one. Past the
-	# final milestone (400) there is no next, so the bar reads full and the label maxed.
-	var next_milestone := _prop.get_next_milestone_count()
-	var last_milestone := _prop.get_last_milestone_count()
-	if next_milestone <= 0:
-		_milestone_bar.min_value = 0
-		_milestone_bar.max_value = maxi(last_milestone, 1)
-		_milestone_bar.value = maxi(last_milestone, 1)
-		_milestone_label.text = "%d / MAX" % _prop.units_owned
-	else:
-		_milestone_bar.min_value = last_milestone
-		_milestone_bar.max_value = next_milestone
-		_milestone_bar.value = _prop.units_owned
-		_milestone_label.text = "%d / %d" % [_prop.units_owned, next_milestone]
-
 	_refresh_buy_button()
 	_refresh_hire_button()
 
@@ -529,11 +498,11 @@ func _refresh_hire_button() -> void:
 		# Best tier for this epoch reached — the button now buys within-epoch staff levels,
 		# each compounding this property's income (GDD §6.1). It is a live action, so it uses
 		# the normal action styling, not the old faint-green disabled plate. The headshot icon
-		# yields to the staffer's NAME + current level.
+		# stands in for the staffer (we no longer spell out the job title); the left label just
+		# shows the current level (Tim, 2026-06-29).
 		_apply_hire_styling(false)
-		_hire_icon.visible = false
-		var staffer := EpochCatalog.staffer_name(tier, prop_index).to_upper()
-		_hire_left_label.text = "%s · LV %d" % [staffer, _prop.staff_level]
+		_hire_icon.visible = true
+		_hire_left_label.text = "LVL %d" % _prop.staff_level
 		var level_cost := _economy.get_staff_level_cost(prop_index)
 		_hire_cost_label.text = Money.of(level_cost).display()
 		# Same gate as hiring: need the cash, and units for the staffer to run.
@@ -541,6 +510,7 @@ func _refresh_hire_button() -> void:
 		# Full navy when affordable; dimmed navy when not — matching the HIRE/UPGRADE state.
 		var level_color := Color(UiPalette.NAVY, 0.45) if _hire_button.disabled else UiPalette.NAVY
 		_set_split_label_color(_hire_left_label, _hire_cost_label, level_color)
+		_hire_icon.modulate = level_color
 		return
 
 	# Otherwise a tier is available to buy: tier 1 (HIRE) from unstaffed, or the next

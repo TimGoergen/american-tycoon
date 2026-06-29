@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  TURBO-mode symbol: an upward zig-zag "growth" arrow, recreated from Tim's
+  reference PNG (2026-06-29). Drawn as one reusable shape (a thick zig-zag
+  stroke plus a solid arrowhead) that is stamped twice: a darker copy offset
+  down-and-right for the extruded 3D shadow, then the bright copy on top.
+  Colors are driven by `color`/currentColor so the same geometry serves both.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1063 886" width="1063" height="886">
+  <defs>
+    <g id="growth-arrow">
+      <!-- The climbing body: bottom-left up through two peaks toward the head. -->
+      <polyline points="120,715 255,592 372,690 520,452 652,560 812,388"
+                fill="none" stroke="currentColor" stroke-width="86"
+                stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
+      <!-- Solid arrowhead; its back edge overlaps the body so they read as one. -->
+      <polygon points="980,138 712,248 892,520" fill="currentColor"/>
+    </g>
+  </defs>
+
+  <!-- Extruded shadow face: same shape, darker green, nudged down-right. -->
+  <use href="#growth-arrow" color="#11772A" transform="translate(20,22)"/>
+  <!-- Bright top face. -->
+  <use href="#growth-arrow" color="#1FA038"/>
+</svg>

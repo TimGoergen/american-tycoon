@@ -40,11 +40,16 @@ const MINIGAME_TYPES := [
 ## prestige default, used when a reward omits a purpose.
 const DEFAULT_PURPOSE := "Grow the inheritance"
 
-## The centered panel that frames every minigame: 95% of the screen wide, 70% tall, with a
-## moderately thick black outline (Tim's minigame v2 layout, 2026-06-23). These are anchor
-## fractions of the full-screen scrim — the panel stays centered and scales with the screen.
-const PANEL_WIDTH_FRACTION := 0.95
-const PANEL_HEIGHT_FRACTION := 0.84
+## The full-bleed themed backdrop shown behind the card (Tim, 2026-06-29): a casino/library
+## "Riches & Rolls" scene with an ornate empty frame in its center that the (now semi-transparent)
+## card floats over. Sits inside the black screen bezel like every other screen's background.
+const BACKGROUND_IMAGE := "res://art/backgrounds/minigame_background.png"
+
+## The centered panel that frames every minigame, as anchor fractions of the full-screen scrim, so
+## it stays centered and scales with the screen. Shrunk 2026-06-29 (Tim): 20% shorter and 10%
+## narrower than the original 0.84 tall / 0.95 wide, so more of the backdrop shows around it.
+const PANEL_WIDTH_FRACTION := 0.855   # 0.95 * 0.90  (10% narrower)
+const PANEL_HEIGHT_FRACTION := 0.672  # 0.84 * 0.80  (20% shorter)
 ## Thickness of that black outline. It is the ONLY thing setting the card apart from the cream
 ## background behind it (same fill), so it is deliberately thick and well above the 2px screen
 ## bezel frame.
@@ -129,18 +134,32 @@ func setup(tuning: TuningConfig) -> void:
 
 
 func _ready() -> void:
-	# A black field hugs the screen edge and frames a cream rounded viewing area — the same
-	# bezel every other full-screen screen uses (Tim, 2026-06-23). The minigame's own card then
-	# floats centered on top of that cream background; because the card's fill is the SAME cream,
-	# it is set apart only by its thick black outline. (95% of the screen wide, 84% tall.)
+	# A black field hugs the screen edge and frames the viewing area — the same bezel every other
+	# full-screen screen uses. Behind the card now sits a full-bleed themed backdrop (Tim,
+	# 2026-06-29); the card itself is semi-transparent so the backdrop reads through it.
 	color = Color.BLACK
 	visible = false
 
-	# The framed cream background — the black border at the screen edge plus the light-tan plate.
-	var background := PanelContainer.new()
-	UiPalette.apply_screen_bezel(background)
-	background.add_theme_stylebox_override("panel", UiPalette.make_screen_panel_style())
-	add_child(background)
+	# The full-bleed backdrop image, inset inside the black bezel like every other screen's
+	# background. A plain TextureRect (NOT a clip_children rounded mask): the project only supports
+	# one clip_children stencil at a time — Main already owns one, so a second here would render
+	# empty (the documented 2026-06-26 render bug). The image's corners are dark, so square corners
+	# against the black bezel read fine. COVERED fills the tall screen without empty bars.
+	var backdrop := TextureRect.new()
+	UiPalette.apply_screen_bezel(backdrop)
+	backdrop.texture = load(BACKGROUND_IMAGE)
+	backdrop.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(backdrop)
+
+	# The shared rounded screen frame over the backdrop edges: transparent fill (so the image
+	# shows through), thin black rounded border, universal inner margin — the same frame every
+	# screen uses, kept for visual consistency with the rest of the game.
+	var frame := PanelContainer.new()
+	UiPalette.apply_screen_bezel(frame)
+	frame.add_theme_stylebox_override("panel", UiPalette.make_screen_frame_style())
+	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(frame)
 
 	# The game card itself, centered on top of that background with its own thick outline.
 	var panel := PanelContainer.new()
@@ -177,7 +196,8 @@ func _ready() -> void:
 ## the universal inner content margin so nothing crowds the edge.
 func _make_panel_style() -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
-	style.bg_color = UiPalette.CREAM
+	# 50% alpha (Tim, 2026-06-29) so the themed backdrop reads through the card.
+	style.bg_color = Color(UiPalette.CREAM, 0.5)
 	style.set_corner_radius_all(24)
 	style.border_color = Color.BLACK
 	style.set_border_width_all(PANEL_BORDER_WIDTH)

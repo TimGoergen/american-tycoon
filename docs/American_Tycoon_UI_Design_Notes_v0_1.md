@@ -326,6 +326,11 @@ The shared minigame host (`MinigameScreen`) and the Minigame Tuning review scree
   brightens into the bonus band and a flash the instant it first reaches "full". The numeric
   "what you'd keep" readout was removed; legibility of the floor moves to the **SKIP button**,
   which now reads "SKIP · keep N …".
+- **Get Ready gate states the goal + stakes up front.** Before the clock starts, the gate now
+  shows the game's name, its one-line **goal** (`Minigame.how_to_play()`, also reused as each
+  game's in-round intro so they can't diverge), and the universal **win/lose stakes** ("play well
+  to keep more — a bonus on top; a weak round or Skip keeps only the minimum"). Previously the
+  player only learned the goal once play began (Tim, 2026-06-29).
 - **Reveal & transitions.** The result reveal blooms (fade + scale + color); the Begin gate fades
   off to unmask the game (the clock only starts after the fade).
 - **Per-type juice & difficulty direction.** Each of the six types got its own juice and a locked

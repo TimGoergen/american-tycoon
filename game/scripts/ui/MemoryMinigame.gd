@@ -47,13 +47,17 @@ func display_name() -> String:
 	return "Memory Match"
 
 
+func how_to_play() -> String:
+	return "Watch the sequence, then tap it back."
+
+
 func begin(_tuning: TuningConfig) -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_rng.randomize()
 	_running = true
 
 	var intro := Label.new()
-	intro.text = "Watch the sequence, then tap it back."
+	intro.text = how_to_play()
 	intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	intro.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
 	intro.add_theme_color_override("font_color", UiPalette.NAVY)

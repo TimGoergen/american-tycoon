@@ -42,6 +42,13 @@ func is_busy() -> bool:
 func display_name() -> String:
 	return "Minigame"
 
+## A one-line "how to play" goal for this type, shown on the host's Get Ready gate BEFORE the
+## clock starts (so the player learns the objective up front, not only once play begins). Each
+## type also shows this same line as its in-round intro, so the two never diverge. Override in
+## each type.
+func how_to_play() -> String:
+	return ""
+
 ## Extra seconds this type adds on top of the host's standard round length
 ## (tuning.minigame_duration_seconds). Most types add none; a type that needs more breathing
 ## room than the shared default — e.g. the slingshot basketball — overrides this. The host reads

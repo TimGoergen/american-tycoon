@@ -72,6 +72,10 @@ func display_name() -> String:
 	return "Timing Bar"
 
 
+func how_to_play() -> String:
+	return "Tap LOCK when the marker hits the gold zone."
+
+
 func begin(_tuning: TuningConfig) -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_rng.randomize()
@@ -90,7 +94,7 @@ func begin(_tuning: TuningConfig) -> void:
 	add_child(column)
 
 	var intro := Label.new()
-	intro.text = "Tap LOCK when the marker hits the gold zone."
+	intro.text = how_to_play()
 	intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	intro.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)

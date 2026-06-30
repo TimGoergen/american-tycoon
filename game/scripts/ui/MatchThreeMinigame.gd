@@ -139,6 +139,10 @@ func display_name() -> String:
 	return "Match Three"
 
 
+func how_to_play() -> String:
+	return "Match gems to score. Clean matches pay MORE — AVOID matching the marked gem!"
+
+
 func begin(_tuning: TuningConfig) -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_rng.randomize()
@@ -146,7 +150,7 @@ func begin(_tuning: TuningConfig) -> void:
 	_choose_avoid_type()
 
 	var intro := Label.new()
-	intro.text = "Match gems to score. Clean matches pay MORE — AVOID matching the marked gem!"
+	intro.text = how_to_play()
 	intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	intro.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)

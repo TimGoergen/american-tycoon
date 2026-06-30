@@ -55,6 +55,10 @@ func display_name() -> String:
 	return "Balance the Books"
 
 
+func how_to_play() -> String:
+	return "Hold the arrows to keep the marker in the gold zone."
+
+
 func begin(tuning: TuningConfig) -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_rng.randomize()
@@ -67,7 +71,7 @@ func begin(tuning: TuningConfig) -> void:
 	_total_round_seconds = maxf(0.1, tuning.minigame_duration_seconds)
 
 	var intro := Label.new()
-	intro.text = "Hold the arrows to keep the marker in the gold zone."
+	intro.text = how_to_play()
 	intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	intro.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)

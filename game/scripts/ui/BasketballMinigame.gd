@@ -133,6 +133,10 @@ func display_name() -> String:
 	return "Micro Basketball"
 
 
+func how_to_play() -> String:
+	return "Pull the ball back and release to sling it through the hoop. Tap it any time — even mid-air — to freeze it and shoot again from there!"
+
+
 ## Slingshot aiming and bouncing shots take a beat longer to line up than the tap-based types, so
 ## this round runs ~10s longer than the shared default (see Minigame.extra_seconds).
 func extra_seconds() -> float:
@@ -156,7 +160,7 @@ func begin(tuning: TuningConfig) -> void:
 	var _round_seconds := maxf(0.1, tuning.minigame_duration_seconds)
 
 	var intro := Label.new()
-	intro.text = "Pull the ball back and release to sling it through the hoop. Tap it any time — even mid-air — to freeze it and shoot again from there!"
+	intro.text = how_to_play()
 	intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	intro.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)

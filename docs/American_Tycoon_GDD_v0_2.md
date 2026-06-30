@@ -219,8 +219,11 @@ benefits: the **timer** is a large focal point that pulses amber under 10s and b
 3s; the **spectrum bar reads by fill + color ONLY (no numbers)** and now glides smoothly with an
 edge-cap that brightens into the bonus band and a flash on first reaching "full"; the **SKIP
 button shows the concrete kept reward** ("SKIP · keep N …") since the bar carries no numbers;
-the **result reveal blooms** in; the **Begin gate fades** off; a **"⏸" cue** shows while a game
-pauses the clock mid-animation. Each type got its own juice + a locked difficulty *direction*
+the **result reveal blooms** in; a **"⏸" cue** shows while a game pauses the clock mid-animation.
+The **Get Ready gate** now states the game's goal AND the universal win/lose stakes (play well to
+keep more + a bonus; a weak round or Skip keeps only the minimum) **before** the clock starts —
+previously the player saw the goal only once play began (Tim, 2026-06-29) — then fades off to
+unmask the game. Each type got its own juice + a locked difficulty *direction*
 (some harder, some "made clearer", Basketball held) — all difficulty constants are first-pass,
 pending an on-device re-tune (plan step 5). **Visual treatment (Tim, 2026-06-29):** the minigame
 screen and the Minigame Tuning screen now float over a **themed "Riches & Rolls" casino/library

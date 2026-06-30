@@ -127,6 +127,9 @@ var _opt_out_check: CheckBox
 ## the screen appears (Tim, 2026-06-26). `_begin_title` names the drawn type on that gate.
 var _begin_overlay: Control
 var _begin_title: Label
+## The "how to play" goal line on the Get Ready gate — the active type's own one-liner (set per
+## round in start_game), so the player learns the goal BEFORE the clock starts (Tim, 2026-06-29).
+var _begin_howto: Label
 
 
 func setup(tuning: TuningConfig) -> void:
@@ -326,6 +329,10 @@ func _build_begin_overlay() -> Control:
 
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 24)
+	# Constrain the column width (design space is 1080 wide) so the longer goal lines wrap inside
+	# the card instead of running off it — the CenterContainer otherwise shrinks the box to its
+	# widest single line.
+	box.custom_minimum_size = Vector2(720, 0)
 	center.add_child(box)
 
 	var ready := _make_label("GET READY", UiPalette.FONT_HEADLINE, UiPalette.NAVY)
@@ -337,6 +344,24 @@ func _build_begin_overlay() -> Control:
 	_begin_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_begin_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(_begin_title)
+
+	# The goal of THIS game (set per round from the type's how_to_play), so the player knows the
+	# objective before the clock starts rather than only once play begins (Tim, 2026-06-29).
+	_begin_howto = _make_label("", UiPalette.FONT_CARD_BODY, UiPalette.NAVY)
+	_begin_howto.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_begin_howto.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(_begin_howto)
+
+	# The universal win/lose stakes — the SAME for every type, so it is built once here. It tells
+	# the player, before they start, that playing well keeps more (with a bonus on top) while a weak
+	# round or a Skip keeps only the minimum.
+	var stakes := _make_label(
+		"Play well to keep MORE — a great round earns a bonus on top. A weak round or Skip keeps only the minimum.",
+		UiPalette.FONT_LABEL, UiPalette.DARK_GOLD
+	)
+	stakes.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	stakes.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(stakes)
 
 	var hint := _make_label("The clock starts when you press Begin.", UiPalette.FONT_LABEL, UiPalette.NAVY)
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -495,6 +520,7 @@ func start_game(
 	_skip_button.text = "SKIP · keep %s" % _format_amount(skip_amount)
 
 	_begin_title.text = _active_minigame.display_name()
+	_begin_howto.text = _active_minigame.how_to_play()
 	# The Begin gate is opaque at the start of every round; _on_begin_pressed fades it off.
 	_begin_overlay.modulate = Color.WHITE
 	_begin_overlay.visible = true

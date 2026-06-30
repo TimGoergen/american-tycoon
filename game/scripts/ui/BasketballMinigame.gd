@@ -49,13 +49,28 @@ const GRAVITY := 2400.0
 
 ## The slingshot: the throw velocity is the pull vector (ball dragged away from its rest spot),
 ## reversed, times PULL_POWER. The drag is capped at MAX_PULL so a huge yank can't overpower the
-## board; a drag shorter than MIN_PULL on release is not a throw (the ball just snaps back). Power
-## is matched up to the heavier gravity so a full pull still comfortably reaches the hoop.
+## board; a drag shorter than MIN_PULL on release is not a throw (the ball just snaps back).
+## PULL_POWER raised 9.6 -> 15.0 (Tim, 2026-06-30): the ball rests near the floor, so there often
+## isn't room to drag it far — more force per pixel means a short pull already reaches the hoop,
+## hitting the MAX_THROW_SPEED cap at ~193px of drag instead of needing the full 300. FEEL-TUNE.
 const MAX_PULL := 300.0
 const MIN_PULL := 28.0
-const PULL_POWER := 9.6
+const PULL_POWER := 15.0
 ## Hard cap on the resulting throw speed (px/sec).
 const MAX_THROW_SPEED := 2900.0
+
+## Aim-guide force colors (Tim, 2026-06-30): the slingshot band is chunked and tinted by the actual
+## force the current pull will produce — blue (low) → purple (medium) → bright red (high/maxed) — so
+## the player reads the power before releasing. Purple is a deliberate one-off exception to the §1
+## palette for this force gauge (the same way ORANGE was added for the spectrum bar).
+const FORCE_COLOR_LOW := Color("#3A78D0")    # blue — low force
+const FORCE_COLOR_MED := Color("#8244C0")    # purple — medium force
+const FORCE_COLOR_HIGH := Color("#E23B2C")   # bright red — high / maxed force
+## The band is drawn in short segments so its color steps are visible ("by chunk"); a small chunk
+## gives fine-grained feedback. It also TAPERS — thin at the launch anchor, thick at the finger.
+const AIM_CHUNK_LENGTH := 16.0
+const AIM_BAND_MIN_WIDTH := 4.0
+const AIM_BAND_MAX_WIDTH := 18.0
 
 ## Fraction of speed KEPT when a ball bounces off a wall, the floor, the ceiling, or the hoop
 ## (0 = dead stop, 1 = perfectly elastic). Lowered for the heavier feel — a dense ball thuds and
@@ -537,20 +552,50 @@ func _draw_play() -> void:
 	_play.draw_rect(frame, UiPalette.DARK_GRAY, false, WALL_THICKNESS)
 
 
-## Draw the slingshot feedback: a band from the anchor to the pulled-back ball, plus a gold guide
-## ray from the anchor in the direction the ball will fly (opposite the pull), its length growing
-## with the pull so the player can read the power before releasing.
+## Draw the slingshot feedback: a chunked, tapering force band from the launch anchor to the
+## finger, plus a gold guide ray from the anchor in the direction the ball will fly (opposite the
+## pull). The band is THIN at the anchor and THICK at the finger, and each short chunk is colored by
+## the FORCE this pull will produce there — blue → purple → bright red — so the player can read the
+## power before releasing (Tim, 2026-06-30).
 func _draw_aim_guide() -> void:
 	var ball_pos: Vector2 = _balls[_aim_index]["pos"]
 	var pull := ball_pos - _aim_anchor
-	# The stretched sling band.
-	_play.draw_line(_aim_anchor, ball_pos, Color(UiPalette.NAVY, 0.6), 4.0, true)
-	# A marker at the launch point.
+	var pull_distance := pull.length()
+
+	# A marker at the launch point (where the ball actually shoots from).
 	_play.draw_circle(_aim_anchor, 6.0, Color(UiPalette.NAVY, 0.6))
+
+	# The stretched sling band, drawn in small chunks from the anchor out to the finger.
+	if pull_distance >= 1.0:
+		var direction := pull / pull_distance
+		var chunk_count := int(ceil(pull_distance / AIM_CHUNK_LENGTH))
+		for i in range(chunk_count):
+			var start_dist := i * AIM_CHUNK_LENGTH
+			var end_dist := minf((i + 1) * AIM_CHUNK_LENGTH, pull_distance)
+			var mid_dist := (start_dist + end_dist) * 0.5
+			var segment_start := _aim_anchor + direction * start_dist
+			var segment_end := _aim_anchor + direction * end_dist
+			# Color by the REAL force fraction at this point — pull distance × power, capped at the
+			# throw-speed limit — so the band turns red exactly when more pull would add nothing
+			# (telling the player they already have enough power without needing more room).
+			var force_fraction := clampf(mid_dist * PULL_POWER / MAX_THROW_SPEED, 0.0, 1.0)
+			# Width grows along the pull so the band tapers thin (anchor) → thick (finger).
+			var width_fraction := clampf(mid_dist / pull_distance, 0.0, 1.0)
+			var width := lerpf(AIM_BAND_MIN_WIDTH, AIM_BAND_MAX_WIDTH, width_fraction)
+			_play.draw_line(segment_start, segment_end, _force_color(force_fraction), width, true)
+
 	# The aim ray, opposite the pull, scaled up so it clearly reads as the throw direction.
-	if pull.length() >= MIN_PULL:
+	if pull_distance >= MIN_PULL:
 		var aim_end := _aim_anchor - pull * 1.5
 		_play.draw_line(_aim_anchor, aim_end, Color(UiPalette.MUSTARD_GOLD, 0.85), 3.0, true)
+
+
+## Map a force fraction (0 = none, 1 = maxed) to the aim band's color ramp: blue → purple at the
+## halfway point → bright red at full. See FORCE_COLOR_* (purple is a deliberate palette exception).
+func _force_color(fraction: float) -> Color:
+	if fraction < 0.5:
+		return FORCE_COLOR_LOW.lerp(FORCE_COLOR_MED, fraction / 0.5)
+	return FORCE_COLOR_MED.lerp(FORCE_COLOR_HIGH, (fraction - 0.5) / 0.5)
 
 
 ## Draw the celebration layer: the expanding/fading score rings from a made basket, then the

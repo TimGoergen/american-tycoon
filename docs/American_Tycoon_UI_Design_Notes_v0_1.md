@@ -307,3 +307,28 @@ tab" (Mechanics Spec §9.1 / §14).**
 bottom-aligned and icon-only) or a custom bottom bar + swapped content panels. The four
 content areas already exist as scenes/overlays; the work is hosting them in tabs and
 moving the prestige/ledger buttons into their tabs.
+
+## 8. Minigame screen & Minigame Tuning (polish pass + visual treatment, BUILT 2026-06-29)
+
+The shared minigame host (`MinigameScreen`) and the Minigame Tuning review screen
+(`MinigameReviewScreen`, Settings) got a deliberate polish pass — plan
+`Plans/Minigame_Polish_Pass.md`. As-built:
+
+- **Themed backdrop.** Both screens float over a full-bleed "Riches & Rolls" casino/library
+  image (`art/backgrounds/minigame_background.png`) inside the standard black bezel. The minigame
+  card sits in the backdrop's ornate frame; the Tuning list's cream plate sits over it.
+- **Translucent, smaller card.** The minigame card fill is **50% cream** and the card is **20%
+  shorter, 10% narrower** than before, so the backdrop reads around and through it. The Tuning
+  list's viewing-area plate is likewise **50%-alpha cream**.
+- **Timer as focal point.** Large, centered, faux-bold; pulses amber under 10s and blinks gold +
+  scales under 3s. A **"⏸" cue** appears while a game pauses the clock mid-animation.
+- **Spectrum bar = fill + color only (no numbers).** It glides (smoothed), with an edge-cap that
+  brightens into the bonus band and a flash the instant it first reaches "full". The numeric
+  "what you'd keep" readout was removed; legibility of the floor moves to the **SKIP button**,
+  which now reads "SKIP · keep N …".
+- **Reveal & transitions.** The result reveal blooms (fade + scale + color); the Begin gate fades
+  off to unmask the game (the clock only starts after the fade).
+- **Per-type juice & difficulty direction.** Each of the six types got its own juice and a locked
+  difficulty *direction* (Timing Bar / Catch Money harder; Match Three / Memory / Balance made
+  clearer; Basketball held). All difficulty constants are **first-pass — on-device re-tune owed**
+  (use Settings → Minigame Tuning to preview each type).

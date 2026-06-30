@@ -162,8 +162,8 @@ The early game must *feel* faster on every timescale:
 Playing the game on vacation, Tim wanted **more energy at transitions** — the seams between
 screens shouldn't be dead air. This grew (Tim, 2026-06-22) into a **minigame framework**:
 
-- **A library of 3–5 distinct minigame TYPES** (match-3 is the first; others TBD — e.g. a
-  timing/precision bar, catch-the-falling-money, a memory/sequence game, physics/balance).
+- **A library of 6 distinct minigame TYPES (all BUILT):** Match Three, Timing Bar, Catch the
+  Money, Memory Match, Balance the Books, and Micro Basketball.
 - **Random selection at every site:** each time a minigame fires, the type is chosen **at
   random**, so the player doesn't know which they'll get — variety and surprise.
 - **One universal outcome spectrum for ALL minigames:** performance maps to roughly
@@ -211,10 +211,23 @@ safe 100%), so skipping has a real cost. A per-round Skip is always available. (
 with minigames off, the keep-floor head start is granted directly, no screen.)
 
 **Built 2026-06-22 — match-3 type (the first of the library):** drag a gem to swap; matches
-flash with a size badge, clear, and survivors + new gems fall in; a live spectrum bar shows
-the kept fraction (red→gold→green→teal) with the Legacy amount + bonus. Currently wired only
-to the prestige site; the framework refactor (random type selection + the other two sites)
-is the next build.
+flash with a size badge, clear, and survivors + new gems fall in.
+
+**Polish pass (2026-06-29) — host shell + all six types.** A deliberate visual/juice/feel pass
+(plan `Plans/Minigame_Polish_Pass.md`). Shared host treatment, applied once so every type
+benefits: the **timer** is a large focal point that pulses amber under 10s and blinks gold under
+3s; the **spectrum bar reads by fill + color ONLY (no numbers)** and now glides smoothly with an
+edge-cap that brightens into the bonus band and a flash on first reaching "full"; the **SKIP
+button shows the concrete kept reward** ("SKIP · keep N …") since the bar carries no numbers;
+the **result reveal blooms** in; the **Begin gate fades** off; a **"⏸" cue** shows while a game
+pauses the clock mid-animation. Each type got its own juice + a locked difficulty *direction*
+(some harder, some "made clearer", Basketball held) — all difficulty constants are first-pass,
+pending an on-device re-tune (plan step 5). **Visual treatment (Tim, 2026-06-29):** the minigame
+screen and the Minigame Tuning screen now float over a **themed "Riches & Rolls" casino/library
+backdrop** (`art/backgrounds/minigame_background.png`); the card sits in the backdrop's ornate
+frame and is **semi-transparent (50% cream)** and smaller (20% shorter, 10% narrower) so the
+scene reads around and through it. The reward MATH is unchanged: every type still only reports a
+[0,1] performance and the host maps it to the universal multiplier.
 
 **Build phasing:** (1) **framework** — a host that picks a random minigame type and maps its
 [0,1] performance to the universal multiplier; refactor match-3 into the first type; route
@@ -454,10 +467,12 @@ Resolved since v0.1: ~~automation/managers~~ (§6), ~~dynasty identity~~ (§8.2)
     **kept fraction** of base Legacy: `minigame_keep_floor` 0.5 (also what Skip/opt-out banks) →
     **1.0 full** at `minigame_full_score` → up to **+bonus** at `minigame_extra_score`, bonus cap =
     `LegacyUpgrades.minigame_bonus_max()` (0.25 base, +5%/level via the **Family Reputation**
-    upgrade). A live spectrum bar (red→gold→green→teal) + Legacy-with-bonus readout shows it.
-    Applied in `DynastyState.perform_succession`; setting persisted in `GameState.ui_minigame_enabled`.
-    **Still open:** transition minigames (deferred); on-device feel-tune of floor / full / extra
-    scores / duration / bonus magnitudes.
+    upgrade). The spectrum bar reads by **fill + color only** (no numeric readout); the SKIP
+    button shows what skipping banks. Applied in `DynastyState.perform_succession`; setting
+    persisted in `GameState.ui_minigame_enabled`. **Library now 6 types, all three sites wired,
+    and a full polish pass shipped (2026-06-29) — see §5.5.** **Still open:** on-device feel-tune
+    of the keep floor / bonus magnitudes / round duration **and** every per-type difficulty
+    constant touched in the polish pass (plan step 5).
 
 ---
 

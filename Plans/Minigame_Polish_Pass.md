@@ -1,7 +1,16 @@
 # Minigame Polish Pass — Plan
 
 **Created:** 2026-06-29
-**Status:** Planning — decisions locked 2026-06-29 (see §5), implementation not started
+**Status:** **BUILT 2026-06-29** on `feature/minigame-polish-pass` (host shell + all six games +
+the themed backdrop / translucent-card visual treatment Tim added during the pass). Decisions
+locked 2026-06-29 (see §5). **Only step 5 remains: the on-device difficulty re-tune** — every
+difficulty constant shipped is a first-pass hypothesis to confirm on the Pixel via Settings →
+Minigame Tuning.
+**As-built deltas from the plan:** (1) Tim added a full-bleed themed "Riches & Rolls" backdrop
+behind both the minigame screen and the Tuning screen, with a 50%-alpha, smaller card — beyond
+the original visual scope. (2) Match Three combo bonus left intentionally **unbounded** (a lucky
+long cascade ending early is pure upside; you can never lose points). (3) Memory added an
+`is_busy()` override so the host holds its countdown through the new end-beat/celebration.
 **Scope (Tim's call):** The host shell (`MinigameScreen`) **and** each of the 6 individual
 minigames.
 **Focus areas (Tim's call):** Visual / layout · Juice / feedback · Feel / difficulty tuning.

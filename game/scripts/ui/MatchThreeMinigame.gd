@@ -30,16 +30,24 @@ const GRID_HEIGHT := 6
 const GEM_COLORS := 4
 
 # --- Match scoring (Tim's minigame v4) ---------------------------------------
+# UN-PLAYTESTED (polish pass 2026-06-29): the three score constants below were RE-ANCHORED
+# together so they read as one coherent set instead of a trimmed odd value (9.5) sitting next
+# to round thresholds. POINTS_PER_GEM went back to a clean 10.0 and SCORE_FULL nudged 300 -> 320
+# to hold the SAME "full" difficulty (full ≈ 32 gem-units either way), so this is a tidy-up, NOT
+# a difficulty crank (per the locked "Match Three = hold difficulty" decision). Confirm on device.
 ## Base points for each gem in a match. Every match's score derives from this multiplicatively,
-## so this single value scales the whole point economy. Trimmed 5% from the round v4 baseline of
-## 10.0 (Tim) — the SCORE_FULL / SCORE_MAX thresholds are unchanged, so clean/strong play now
-## needs marginally more matching to reach the full and max-bonus lines.
-const POINTS_PER_GEM := 9.5
+## so this single value scales the whole point economy. Restored to the clean 10.0 basis (was 9.5).
+const POINTS_PER_GEM := 10.0
 ## Larger matches pay more PER gem: a group of n gems is worth POINTS_PER_GEM × n × (1 + this ×
 ## (n - 3)). So a 3-line is ×1, a 4-line ×1.5, a 5-line ×2 — bigger lines are worth chasing.
 const SIZE_BONUS := 0.5
 ## Combo: each successive cascade step in ONE swap multiplies that step's points by
 ## 1 + COMBO_BONUS × step_index (step 0 = ×1, step 1 = ×2, step 2 = ×3 …). Rewards chain setups.
+## DESIRABILITY (polish pass, Tim's "decide and comment"): this combo is left DELIBERATELY
+## UNBOUNDED. A long lucky cascade can spike the score straight to SCORE_MAX and end the round —
+## but because you can only ever EARN points (never lose them), that is a pure positive surprise,
+## never a punishment. A big chain "winning" the round outright is a good feeling, so we keep it
+## uncapped. (If device play shows it ending rounds too abruptly, cap it then.)
 const COMBO_BONUS := 1.0
 ## A match group that AVOIDS the avoid gem earns this bonus (+15%).
 const CLEAN_MATCH_FACTOR := 1.15
@@ -47,9 +55,9 @@ const CLEAN_MATCH_FACTOR := 1.15
 const AVOID_MATCH_FACTOR := 0.40
 
 ## Score that maps to the host's "full" (1.0x) line — roughly a whole ~20-second round of
-## ordinary clean matching (Tim: "regular clean play = ~100%"). Feel-tune estimate for the
-## v4 +15%/−60% model with NO ×10 bonus and the shorter 20-second round.
-const SCORE_FULL := 300.0
+## ordinary clean matching (Tim: "regular clean play = ~100%"). Nudged 300 -> 320 alongside the
+## POINTS_PER_GEM restore so the "full" difficulty is held (see the re-anchor note above).
+const SCORE_FULL := 320.0
 ## Score that maps to performance 1.0 (the host's max extra-high bonus) — roughly a whole round
 ## of strong cascade / large-match play. Feel-tune estimate (same v4 / 20-second basis).
 const SCORE_MAX := 1000.0
@@ -112,6 +120,20 @@ var _board_area: Control
 ## _gem_nodes[row][col] -> the gem Control currently at that cell (or null mid-clear).
 var _gem_nodes: Array = []
 
+# --- Polish-pass juice state -------------------------------------------------
+## A bright rounded ring shown around the gem the player is currently dragging, so "selected"
+## reads loudly on the cream board (the old modulate/scale alone was too subtle). Pulses while
+## visible, driven from _process by _pulse_phase. Hidden whenever no gem is grabbed.
+var _select_ring: Panel
+## The big AVOID gem tile from the banner, kept so we can pop it in on round start and give it a
+## gentle continuous pulse (it is the round's "steer around this" cue, so it should draw the eye).
+var _banner_icon: Control
+## True once the banner's intro pop has finished, so the idle pulse doesn't fight the intro tween.
+var _banner_ready: bool = false
+## Free-running phase (seconds) accumulated in _process, driving the idle pulses of the selection
+## ring and the AVOID banner. A single accumulated float so we never leak idle-pulse tweens.
+var _pulse_phase: float = 0.0
+
 
 func display_name() -> String:
 	return "Match Three"
@@ -155,6 +177,11 @@ func begin(_tuning: TuningConfig) -> void:
 	add_child(column)
 
 	_build_initial_gems()
+	_build_select_ring()
+	# Pop the AVOID banner in once layout has run (its size — needed to pivot the pop about its
+	# center — is only known after the first layout pass), so the round opens by calling out the
+	# gem to steer around.
+	call_deferred("_animate_banner_intro")
 
 
 ## Pick the single AVOID gem type for this round (one random color id).
@@ -192,7 +219,8 @@ func _build_bonus_banner() -> Control:
 	avoid_tag.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	row.add_child(avoid_tag)
 
-	row.add_child(_make_bonus_icon(_avoid_type))
+	_banner_icon = _make_bonus_icon(_avoid_type)
+	row.add_child(_banner_icon)
 
 	return row
 
@@ -320,15 +348,89 @@ func _make_gem(color_id: int) -> Control:
 
 
 ## Show a gem as selected/active during a drag. With textured gems there is no panel stylebox to
-## restyle, so we brighten (modulate) and slightly enlarge the gem instead; clearing it resets to
-## the plain look. Alpha is kept at 1 so we never interfere with the clear-fade animation.
+## restyle, so we brighten (modulate) and ENLARGE the gem, AND raise its z_index so it lifts above
+## its neighbors — the old subtle 1.35×/1.08× alone read weakly on cream (polish pass). The bright
+## roving selection RING (see _begin_drag) does most of the "this one is grabbed" work; this just
+## makes the grabbed gem itself pop. Alpha stays 1 so we never disturb the clear-fade animation.
 func _style_gem(gem: Control, active: bool) -> void:
 	if active:
-		gem.modulate = Color(1.35, 1.35, 1.35, 1.0)
-		gem.scale = Vector2(1.08, 1.08)
+		gem.modulate = Color(1.5, 1.5, 1.5, 1.0)
+		gem.scale = Vector2(1.18, 1.18)
+		gem.z_index = 2  # above the ring (z 1) and the plain gems (z 0)
 	else:
 		gem.modulate = Color.WHITE
 		gem.scale = Vector2.ONE
+		gem.z_index = 0
+
+
+## Build the roving "selected" ring once: a transparent, thick-bordered rounded square a little
+## larger than a cell, hidden until a drag begins. It is positioned over the grabbed gem and
+## pulses (in _process) so the selection is unmistakable on the cream board. Kept as a single
+## reusable node we move around rather than one ring per cell.
+func _build_select_ring() -> void:
+	_select_ring = Panel.new()
+	var pad := 14.0  # how far the ring sits outside the cell, so it reads as a halo around the gem
+	_select_ring.custom_minimum_size = Vector2(CELL_SIZE + pad * 2.0, CELL_SIZE + pad * 2.0)
+	_select_ring.size = _select_ring.custom_minimum_size
+	_select_ring.pivot_offset = _select_ring.size / 2.0
+	_select_ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_select_ring.visible = false
+
+	var box := StyleBoxFlat.new()
+	box.bg_color = Color.TRANSPARENT
+	box.border_color = UiPalette.MUSTARD_GOLD
+	box.set_border_width_all(7)
+	box.set_corner_radius_all(18)
+	_select_ring.add_theme_stylebox_override("panel", box)
+	_board_area.add_child(_select_ring)
+
+
+## Place and show the selection ring over the cell at (row, col).
+func _show_select_ring(row: int, col: int) -> void:
+	if _select_ring == null:
+		return
+	var pad := 14.0
+	_select_ring.position = _cell_pos(row, col) - Vector2(pad, pad)
+	_select_ring.z_index = 1  # above plain gems, below the lifted grabbed gem (z 2)
+	_select_ring.visible = true
+
+
+func _hide_select_ring() -> void:
+	if _select_ring != null:
+		_select_ring.visible = false
+
+
+## Drive the idle pulses (selection ring + AVOID banner) from one accumulated phase, so we never
+## leak a per-frame tween for a continuous effect (polish-pass rule). Guarded so it is a no-op
+## before begin() builds these nodes.
+func _process(delta: float) -> void:
+	_pulse_phase += delta
+	if _select_ring != null and _select_ring.visible:
+		# A gentle breathing pulse so the grabbed cell clearly "lives".
+		var ring_pulse := 1.0 + 0.07 * sin(_pulse_phase * 6.0)
+		_select_ring.pivot_offset = _select_ring.size / 2.0
+		_select_ring.scale = Vector2(ring_pulse, ring_pulse)
+	if _banner_icon != null and _banner_ready:
+		# A small continuous pulse keeps the "steer around this" gem drawing the eye.
+		var banner_pulse := 1.0 + 0.04 * sin(_pulse_phase * 2.5)
+		_banner_icon.pivot_offset = _banner_icon.size / 2.0
+		_banner_icon.scale = Vector2(banner_pulse, banner_pulse)
+
+
+## Pop the AVOID banner in on round start: a scale bloom from small + a brief white-to-normal flash,
+## so the round opens by announcing the gem to avoid. Sets _banner_ready when done so the idle
+## pulse takes over without fighting this tween.
+func _animate_banner_intro() -> void:
+	if _banner_icon == null:
+		return
+	_banner_icon.pivot_offset = _banner_icon.size / 2.0
+	_banner_icon.scale = Vector2(0.5, 0.5)
+	_banner_icon.modulate = Color(1.6, 1.6, 1.6, 1.0)  # a bright flash that settles to normal
+	var intro := create_tween().set_parallel(true)
+	intro.tween_property(_banner_icon, "scale", Vector2.ONE, 0.45) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	intro.tween_property(_banner_icon, "modulate", Color.WHITE, 0.45)
+	intro.chain().tween_callback(func() -> void: _banner_ready = true)
 
 
 func _build_initial_gems() -> void:
@@ -369,6 +471,7 @@ func _begin_drag(local: Vector2) -> void:
 	_drag_col = col
 	_drag_press_pos = local
 	_style_gem(_gem_nodes[row][col], true)
+	_show_select_ring(row, col)
 
 
 func _continue_drag(local: Vector2) -> void:
@@ -385,6 +488,7 @@ func _continue_drag(local: Vector2) -> void:
 	var target_col := _drag_col + d_col
 
 	_style_gem(_gem_nodes[_drag_row][_drag_col], false)
+	_hide_select_ring()
 	var from_row := _drag_row
 	var from_col := _drag_col
 	_dragging = false
@@ -400,6 +504,7 @@ func _continue_drag(local: Vector2) -> void:
 func _cancel_drag() -> void:
 	if _dragging and _drag_row >= 0:
 		_style_gem(_gem_nodes[_drag_row][_drag_col], false)
+	_hide_select_ring()
 	_dragging = false
 	_drag_row = -1
 	_drag_col = -1
@@ -442,7 +547,12 @@ func _play_resolution(result: Dictionary) -> void:
 		_matched_avoid_gem = true
 
 	for i in range(result["steps"].size()):
-		await _animate_step(result["steps"][i], float(step_points[i]))
+		await _animate_step(result["steps"][i], float(step_points[i]), i)
+
+	# Celebrate hitting the max-bonus line BEFORE clearing _animating, so is_busy() keeps the host's
+	# countdown paused through the celebration (otherwise the host would end the round mid-burst).
+	if not _finished and _score >= SCORE_MAX:
+		await _celebrate_max()
 
 	_animating = false
 	_maybe_finish_early()
@@ -506,14 +616,21 @@ func _score_swap(result: Dictionary) -> Dictionary:
 	return {"step_points": step_points, "matched_avoid": matched_avoid}
 
 
-func _animate_step(step: Dictionary, points: float) -> void:
+func _animate_step(step: Dictionary, points: float, step_index: int) -> void:
 	for group in step["matches"]:
 		_spawn_match_badge(group)
+	# A cascade step (step_index >= 1) is a chain reaction off the same swap — call it out with a
+	# rising "COMBO ×N" flourish so the player SEES the chain paying off (the combo was invisible
+	# before). step_index 0 is the initial match, so the first cascade is ×2.
+	if step_index >= 1:
+		_spawn_combo_flourish(step, step_index)
+	# Cascades also flash BIGGER, so a deep chain reads as more energetic as it climbs.
+	var flash_scale := 1.25 + 0.08 * float(step_index)
 	var flash := create_tween().set_parallel(true)
 	for cell in step["cleared"]:
 		var gem: Control = _gem_nodes[cell[0]][cell[1]]
 		if gem != null:
-			flash.tween_property(gem, "scale", Vector2(1.25, 1.25), FLASH_TIME)
+			flash.tween_property(gem, "scale", Vector2(flash_scale, flash_scale), FLASH_TIME)
 	await flash.finished
 
 	var clear := create_tween().set_parallel(true)
@@ -594,6 +711,82 @@ func _spawn_match_badge(group: Array) -> void:
 	tween.tween_property(badge, "position:y", badge.position.y - 36.0, FLASH_TIME + CLEAR_TIME)
 	tween.tween_property(badge, "modulate:a", 0.0, FLASH_TIME + CLEAR_TIME)
 	tween.chain().tween_callback(badge.queue_free)
+
+
+## A cascade chain signal: a teal "COMBO ×N" label that blooms up and fades over the cells a
+## cascade step just cleared, so a chain reaction reads as a building combo rather than gems quietly
+## vanishing. N is the step's combo multiplier (step_index 1 -> ×2, etc.), matching _score_swap.
+func _spawn_combo_flourish(step: Dictionary, step_index: int) -> void:
+	var cleared: Array = step["cleared"]
+	if cleared.is_empty():
+		return
+	# Center the flourish on the average of the cleared cells, in board-local coordinates.
+	var sum := Vector2.ZERO
+	for cell in cleared:
+		sum += _cell_pos(cell[0], cell[1])
+	var center: Vector2 = sum / float(cleared.size()) + Vector2(CELL_SIZE, CELL_SIZE) / 2.0
+
+	var label := Label.new()
+	label.text = "COMBO ×%d" % (step_index + 1)
+	label.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
+	label.add_theme_color_override("font_color", UiPalette.ATOMIC_TEAL)
+	label.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
+	label.add_theme_constant_override("outline_size", 8)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.size = Vector2(CELL_SIZE * 3.0, CELL_SIZE)
+	label.position = center - label.size / 2.0
+	label.pivot_offset = label.size / 2.0
+	label.z_index = 3  # above gems and the selection ring
+	label.scale = Vector2(0.6, 0.6)
+	_board_area.add_child(label)
+
+	var bloom := create_tween().set_parallel(true)
+	bloom.tween_property(label, "scale", Vector2(1.15, 1.15), 0.22) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	bloom.tween_property(label, "position:y", label.position.y - 48.0, 0.55)
+	bloom.tween_property(label, "modulate:a", 0.0, 0.55).set_delay(0.15)
+	bloom.chain().tween_callback(label.queue_free)
+
+
+## The max-bonus celebration: when the score reaches SCORE_MAX (performance 1.0, the best possible
+## result) the round used to just end. Now it pays off — a white wash sweeps the board and a big
+## "MAXED OUT!" label blooms — before the host shows the result. Kept brief; the caller holds
+## is_busy() true across this await so the countdown stays paused.
+func _celebrate_max() -> void:
+	# A white flash over the whole board.
+	var flash := ColorRect.new()
+	flash.color = Color(1, 1, 1, 0.0)
+	flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+	flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	flash.z_index = 4
+	_board_area.add_child(flash)
+
+	var banner := Label.new()
+	banner.text = "MAXED OUT!"
+	banner.add_theme_font_size_override("font_size", UiPalette.FONT_DISPLAY)
+	banner.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD)
+	banner.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
+	banner.add_theme_constant_override("outline_size", 10)
+	banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	banner.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	banner.size = _board_area.size
+	banner.pivot_offset = banner.size / 2.0
+	banner.z_index = 5
+	banner.scale = Vector2(0.5, 0.5)
+	_board_area.add_child(banner)
+
+	var celebrate := create_tween().set_parallel(true)
+	celebrate.tween_property(flash, "color", Color(1, 1, 1, 0.7), 0.12)
+	celebrate.tween_property(flash, "color", Color(1, 1, 1, 0.0), 0.45).set_delay(0.12)
+	celebrate.tween_property(banner, "scale", Vector2.ONE, 0.35) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	celebrate.tween_property(banner, "modulate:a", 0.0, 0.3).set_delay(0.4)
+	await celebrate.finished
+	flash.queue_free()
+	banner.queue_free()
 
 
 func result_summary() -> String:

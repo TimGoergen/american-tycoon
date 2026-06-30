@@ -22,13 +22,21 @@ const TARGET_LOCKS := 10
 const FREEZE_TIME := 0.5
 ## Half-width of the gold "perfect" zone, as a fraction of the bar, at the START of the game.
 const ZONE_HALF := 0.12
-## Smallest the zone's half-width shrinks to (reached at TARGET_LOCKS) — half the start width.
-const ZONE_HALF_MIN := ZONE_HALF * 0.5
+## Smallest the zone's half-width shrinks to (reached at TARGET_LOCKS).
+## UN-PLAYTESTED (polish pass 2026-06-29 "harder" direction): steepened from half the start width
+## (0.06) to 0.375× the start (0.045) so the late-game zone is genuinely tight. Confirm on device.
+const ZONE_HALF_MIN := ZONE_HALF * 0.375
 ## Marker sweep speed (bar-fractions per second) and how much it ramps each lock.
 const BASE_SPEED := 0.9
-const SPEED_RAMP := 1.06
+## UN-PLAYTESTED (polish pass 2026-06-29 "harder" direction): ramp steepened 1.06 -> 1.09 so the
+## marker speeds up more noticeably each lock. Paired with the unchanged TARGET_LOCKS of 10 — the
+## whole "harder" feel (tighter zone + faster sweep at the same lock count) needs a device check.
+const SPEED_RAMP := 1.09
 ## Seconds a click-feedback line lingers before it has fully faded out.
 const CLICK_MARK_FADE := 2.0
+## How long (seconds) the fading "previous size" outline lingers after the zone shrinks+jumps, so
+## the player can SEE it got smaller (the shrink was invisible until felt before).
+const ZONE_GHOST_TIME := 0.5
 
 var _marker_pos: float = 0.0
 var _marker_dir: float = 1.0
@@ -46,9 +54,14 @@ var _freeze_success: bool = false  # true -> draw the white/gold "hit" burst; fa
 ## Set when the FINAL lock lands: we keep running through that lock's freeze so its success burst
 ## is visible, then emit completed once the freeze ends (see _on_freeze_ended).
 var _finish_after_freeze: bool = false
-## Pulsing white lines left where each click landed; each is {pos, age} and fades over
-## CLICK_MARK_FADE seconds so the player can see exactly where their taps were perceived.
+## Click-feedback lines left where each click landed; each is {pos, age, hit} and fades over
+## CLICK_MARK_FADE seconds so the player can see exactly where their taps were perceived. `hit`
+## colors the line green (a scored lock) or red (a wasted, lock-costing miss).
 var _click_marks: Array = []
+## Fading "previous size" outline drawn when the zone shrinks+jumps, so the shrink is visible.
+## _zone_ghost_half is the OLD (larger) half-width; _zone_ghost_left counts down ZONE_GHOST_TIME.
+var _zone_ghost_half: float = 0.0
+var _zone_ghost_left: float = 0.0
 var _rng := RandomNumberGenerator.new()
 
 var _bar: Control
@@ -139,6 +152,8 @@ func _process(delta: float) -> void:
 	for mark in _click_marks:
 		mark["age"] += delta
 	_click_marks = _click_marks.filter(func(m: Dictionary) -> bool: return m["age"] < CLICK_MARK_FADE)
+	# Fade the "it just shrank" outline.
+	_zone_ghost_left = maxf(0.0, _zone_ghost_left - delta)
 	_marker_pos += _marker_dir * _marker_speed * delta
 	if _marker_pos >= 1.0:
 		_marker_pos = 1.0
@@ -160,12 +175,14 @@ func _on_lock() -> void:
 	# Every LOCK press freezes the bar for a beat so the player can read a hit/miss burst. The
 	# success flag (set below, once we know hit vs miss) chooses which burst _draw_bar shows.
 	_freeze_left = FREEZE_TIME
-	# Drop a fading white line wherever the marker was at the moment of the click — hit or miss —
-	# so the player gets clear feedback on exactly where their tap was perceived.
-	_click_marks.append({"pos": _marker_pos, "age": 0.0})
 	var half := _current_zone_half()
 	var distance := absf(_marker_pos - _zone_center)
-	if distance > half:
+	var hit := distance <= half
+	# Drop a fading line wherever the marker was at the moment of the click — hit or miss — colored
+	# green (scored) or red (wasted) so the player gets clear feedback on exactly where, and how
+	# well, their tap was perceived.
+	_click_marks.append({"pos": _marker_pos, "age": 0.0, "hit": hit})
+	if not hit:
 		# Missed the zone: a misfire costs a lock (never below zero) and scores nothing.
 		_locks = maxi(0, _locks - 1)
 		_miss_flash = 1.0
@@ -211,6 +228,14 @@ func _current_zone_half() -> float:
 ## half-width of either end), so a freshly placed zone is never clipped off the edge.
 func _move_zone() -> void:
 	var half := _current_zone_half()
+	# Leave a brief fading outline at the PREVIOUS (larger) width at the new spot, so the player sees
+	# the zone actually shrank. _move_zone runs after _locks has incremented, so the previous width is
+	# the half for (_locks - 1). Skipped at the very first placement (_locks == 0), where nothing has
+	# shrunk yet.
+	if _locks > 0:
+		var prev_progress := clampf(float(_locks - 1) / float(TARGET_LOCKS), 0.0, 1.0)
+		_zone_ghost_half = lerpf(ZONE_HALF, ZONE_HALF_MIN, prev_progress)
+		_zone_ghost_left = ZONE_GHOST_TIME
 	_zone_center = _rng.randf_range(half, 1.0 - half)
 
 
@@ -226,19 +251,29 @@ func _draw_bar() -> void:
 	if w <= 0.0 or h <= 0.0:
 		return
 	_bar.draw_rect(Rect2(0, 0, w, h), UiPalette.INK_NAVY)
+	# Shrink cue: a fading outline at the zone's PREVIOUS (larger) size, drawn UNDER the current gold
+	# zone so the eye reads "it just got smaller." It is an outline only — never a fill — so it can
+	# never be mistaken for the catchable gold area.
+	if _zone_ghost_left > 0.0:
+		var ghost_life := _zone_ghost_left / ZONE_GHOST_TIME
+		var ghost_x := (_zone_center - _zone_ghost_half) * w
+		var ghost_w := (_zone_ghost_half * 2.0) * w
+		_bar.draw_rect(Rect2(ghost_x, 0, ghost_w, h), Color(UiPalette.MUSTARD_GOLD, 0.45 * ghost_life), false, 4.0)
 	# Gold target zone at its current center and width.
 	var half := _current_zone_half()
 	var zone_x := (_zone_center - half) * w
 	var zone_w := (half * 2.0) * w
 	_bar.draw_rect(Rect2(zone_x, 0, zone_w, h), UiPalette.MUSTARD_GOLD)
-	# Click-feedback lines: a white line at each recorded click, pulsing as it fades over
-	# CLICK_MARK_FADE seconds (alpha falls with age; the pulse keeps it lively while visible).
+	# Click-feedback lines: a green line for a scored lock, a red line for a wasted miss, at each
+	# recorded click, pulsing as it fades over CLICK_MARK_FADE seconds (alpha falls with age; the
+	# pulse keeps it lively while visible).
 	for mark in _click_marks:
 		var life := 1.0 - clampf(float(mark["age"]) / CLICK_MARK_FADE, 0.0, 1.0)
 		var pulse := 0.55 + 0.45 * absf(sin(float(mark["age"]) * PI * 3.0))
-		var line_color := Color(1.0, 1.0, 1.0, life * pulse)
+		var base_color: Color = UiPalette.MONEY_GREEN if mark["hit"] else UiPalette.KETCHUP_RED
+		var line_color := Color(base_color, life * pulse)
 		var cx := float(mark["pos"]) * w
-		_bar.draw_rect(Rect2(cx - 2.0, 0, 4.0, h), line_color)
+		_bar.draw_rect(Rect2(cx - 3.0, 0, 6.0, h), line_color)
 	var mx := _marker_pos * w
 	if _freeze_left > 0.0:
 		# Frozen burst: a noticeably THICKER marker line, drawn instead of the normal one.
@@ -249,10 +284,25 @@ func _draw_bar() -> void:
 			_bar.draw_rect(Rect2(mx - 13.0, 0, 26.0, h), Color(UiPalette.MUSTARD_GOLD, 0.40))
 			_bar.draw_rect(Rect2(mx - 8.0, 0, 16.0, h), Color.WHITE)
 		else:
-			# Miss: a gray core with a wider near-black low-alpha rect behind it for a drop shadow.
-			_bar.draw_rect(Rect2(mx - 16.0, 0, 32.0, h), Color(0.0, 0.0, 0.0, 0.45))
-			_bar.draw_rect(Rect2(mx - 8.0, 0, 16.0, h), Color(0.55, 0.55, 0.55, 1.0))
+			# Miss: the −1-lock penalty should STING and read. The core SHAKES (a decaying quiver) and
+			# GROWS (starts fat, settles), wrapped in a wide red wash so a wasted lock clearly hurts.
+			var elapsed := FREEZE_TIME - _freeze_left
+			var decay := _freeze_left / FREEZE_TIME          # 1 at the start of the freeze -> 0 at the end
+			var shake := sin(elapsed * 42.0) * 12.0 * decay  # a quiver that settles as the freeze ends
+			var grow := 1.0 + 0.6 * decay                    # a "thunk" that starts big and shrinks back
+			var sx := mx + shake
+			_bar.draw_rect(Rect2(sx - 28.0 * grow, 0, 56.0 * grow, h), Color(UiPalette.KETCHUP_RED, 0.30))
+			_bar.draw_rect(Rect2(sx - 11.0 * grow, 0, 22.0 * grow, h), Color(UiPalette.KETCHUP_RED, 0.95))
 	else:
+		# Speed cue: faint streaks trailing BEHIND the marker, more of them the faster it sweeps, so
+		# the per-lock speed ramp is visible and not only felt. Count scales with how far the speed
+		# has climbed above the base (each lock multiplies speed by SPEED_RAMP).
+		var speed_ratio := _marker_speed / BASE_SPEED
+		var streaks := int(clampf((speed_ratio - 1.0) / 0.09, 0.0, 6.0))
+		for s in range(streaks):
+			var trail_x := mx - _marker_dir * float(s + 1) * 7.0
+			var trail_fade := (1.0 - float(s) / 6.0) * 0.5
+			_bar.draw_rect(Rect2(trail_x - 3.0, h * 0.25, 6.0, h * 0.5), Color(UiPalette.CREAM, trail_fade))
 		# Normal marker (a thick vertical bar): cream, briefly brightened after a hit or reddened on a miss.
 		var marker_color := UiPalette.CREAM.lightened(_flash * 0.6).lerp(UiPalette.KETCHUP_RED, _miss_flash)
 		_bar.draw_rect(Rect2(mx - 5.0, 0, 10.0, h), marker_color)

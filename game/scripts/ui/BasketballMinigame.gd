@@ -88,6 +88,35 @@ var _hoop_placed: bool = false     # one-shot: center the hoop once the board ha
 var _hoop_pos: Vector2 = Vector2.ZERO
 var _hoop_flash: float = 0.0       # brief brighten of the rim after a made basket, decays in _process
 
+# --- Celebration juice (polish pass, Tim 2026-06-29) -------------------------------------------
+# This pass adds NO difficulty change (Basketball "holds"); it only makes a made basket and a
+# near-miss rim clang feel good. All of the state below is purely cosmetic — it never touches
+# _baskets or get_performance().
+
+## The aimed ball's draw scale, EASED toward its target each frame (1.0 normal, ~1.12 while held)
+## so grabbing a ball blooms smoothly instead of snapping to 1.12x in one frame.
+const AIM_SCALE_HELD := 1.12
+const AIM_SCALE_EASE := 14.0       # how fast the held-ball scale catches its target (per second)
+var _aim_scale: float = 1.0
+
+## Short-lived spray/clang particles: small circles flung from the hoop on a score and from a rim
+## post on a near-miss bounce. Each is { "pos", "vel", "life" (1->0), "color", "radius" }.
+var _particles: Array = []
+const PARTICLE_GRAVITY := 1400.0   # lighter than the ball's gravity — confetti floats a touch more
+const PARTICLE_FADE := 1.6         # life drained per second (so a spray lasts ~0.6s)
+
+## Expanding "score ring" pops drawn outward from the hoop on a made basket. Each is { "pos", "life" }.
+var _score_rings: Array = []
+const SCORE_RING_FADE := 2.2       # life drained per second
+const SCORE_RING_MAX_RADIUS := 130.0
+
+## A decaying net "swing": after a ball drops through, the net sways side to side and settles. This
+## counts down from NET_SWING_DURATION; _draw_net offsets the net's bottom by a damped sine of it.
+var _net_swing_time: float = 0.0
+const NET_SWING_DURATION := 0.9
+const NET_SWING_FREQ := 22.0       # how quickly the net sways back and forth
+const NET_SWING_AMPLITUDE := 18.0  # px the net bottom swings at the peak of a fresh swing
+
 # The ball the player is currently aiming (an index into _balls, or -1 for none) and the rest spot
 # it was pulled back from (the slingshot anchor it launches from on release).
 var _aim_index: int = -1
@@ -117,6 +146,11 @@ func begin(tuning: TuningConfig) -> void:
 	_baskets = 0
 	_started_balls = false
 	_hoop_placed = false
+	# Clear any carried-over celebration state so a fresh round starts clean.
+	_aim_scale = 1.0
+	_particles.clear()
+	_score_rings.clear()
+	_net_swing_time = 0.0
 	# Round length is read (not hardcoded) so this type tracks whatever the host sets; only used
 	# here for the comment math — performance is baskets/target, which the host samples live.
 	var _round_seconds := maxf(0.1, tuning.minigame_duration_seconds)
@@ -174,7 +208,32 @@ func _process(delta: float) -> void:
 
 	_hoop_flash = maxf(0.0, _hoop_flash - delta * 3.0)
 	_advance_balls(delta, bounds)
+	_advance_celebration(delta)
 	_play.queue_redraw()
+
+
+## Advance the cosmetic celebration state: ease the held-ball scale toward its target, drift/fade the
+## spray particles, grow/fade the score rings, and let the net swing decay. None of this affects play.
+func _advance_celebration(delta: float) -> void:
+	# Ease the aimed ball's bloom toward its target (held vs. not), so a grab is a smooth pop.
+	var any_aiming := _aim_index != -1
+	var target_scale := AIM_SCALE_HELD if any_aiming else 1.0
+	_aim_scale = lerpf(_aim_scale, target_scale, clampf(delta * AIM_SCALE_EASE, 0.0, 1.0))
+
+	# Spray particles fall under a light gravity and fade out; drop the dead ones.
+	for particle in _particles:
+		particle["vel"].y += PARTICLE_GRAVITY * delta
+		particle["pos"] += particle["vel"] * delta
+		particle["life"] -= PARTICLE_FADE * delta
+	_particles = _particles.filter(func(p: Dictionary) -> bool: return p["life"] > 0.0)
+
+	# Score rings just fade (their radius is derived from remaining life in the draw).
+	for ring in _score_rings:
+		ring["life"] -= SCORE_RING_FADE * delta
+	_score_rings = _score_rings.filter(func(r: Dictionary) -> bool: return r["life"] > 0.0)
+
+	# The net swing winds down to rest.
+	_net_swing_time = maxf(0.0, _net_swing_time - delta)
 
 
 ## Place the ball resting on the floor (BALL_COUNT == 1 → centered; the spread math still reads
@@ -279,6 +338,7 @@ func _resolve_hoop(ball: Dictionary, prev: Vector2, bounds: Vector2) -> bool:
 	if ball["vel"].y > 0.0 and prev.y <= rim_y and ball["pos"].y >= rim_y and within_mouth:
 		_baskets += 1
 		_hoop_flash = 1.0
+		_celebrate_basket()  # net swing + score-ring pop + a small confetti spray (cosmetic only)
 		_rest_ball(ball, bounds)
 		_move_hoop(bounds)
 		return true
@@ -301,6 +361,9 @@ func _resolve_hoop(ball: Dictionary, prev: Vector2, bounds: Vector2) -> bool:
 			var into_post: float = ball["vel"].dot(normal)
 			if into_post < 0.0:  # only reflect if moving toward the post
 				ball["vel"] -= normal * into_post * (1.0 + RESTITUTION)
+				# A near-miss clang: splash a few gray sparks off the contact point so the rim-out
+				# reads as a real impact, not a silent deflection (plan §2.6).
+				_spawn_clang(ball["pos"], normal)
 	return false
 
 
@@ -314,6 +377,46 @@ func _rest_ball(ball: Dictionary, bounds: Vector2) -> void:
 	)
 	ball["vel"] = Vector2.ZERO
 	ball["state"] = "idle"
+
+
+# ---------------------------------------------------------------------------
+# Celebration spawns (cosmetic only — never touch _baskets / performance)
+# ---------------------------------------------------------------------------
+
+## A made basket: swing the net, pop an expanding score ring from the rim, and spray a burst of
+## warm confetti up and out of the hoop.
+func _celebrate_basket() -> void:
+	_net_swing_time = NET_SWING_DURATION
+	_score_rings.append({"pos": _hoop_pos, "life": 1.0})
+	# Confetti: alternating gold/teal sparks flung mostly upward out of the hoop mouth.
+	var colors := [UiPalette.MUSTARD_GOLD, UiPalette.ATOMIC_TEAL, Color.WHITE]
+	for i in range(16):
+		var angle := _rng.randf_range(-PI * 0.85, -PI * 0.15)  # fan upward (negative y is up)
+		var speed := _rng.randf_range(420.0, 820.0)
+		_particles.append({
+			"pos": _hoop_pos,
+			"vel": Vector2(cos(angle), sin(angle)) * speed,
+			"life": 1.0,
+			"color": colors[i % colors.size()],
+			"radius": _rng.randf_range(4.0, 8.0),
+		})
+
+
+## A near-miss rim clang: a few small gray sparks kicked off the post along the bounce normal, so a
+## rim-out has a readable little impact.
+func _spawn_clang(point: Vector2, normal: Vector2) -> void:
+	for i in range(6):
+		# Spread the sparks in a fan around the contact normal (away from the post).
+		var spread := _rng.randf_range(-PI * 0.5, PI * 0.5)
+		var direction := normal.rotated(spread)
+		var speed := _rng.randf_range(180.0, 360.0)
+		_particles.append({
+			"pos": point,
+			"vel": direction * speed,
+			"life": 1.0,
+			"color": UiPalette.LIGHT_GRAY,
+			"radius": _rng.randf_range(3.0, 5.0),
+		})
 
 
 func _on_play_input(event: InputEvent) -> void:
@@ -402,8 +505,9 @@ func _draw_play() -> void:
 	_draw_rim_half(rim_color, true)   # back half (top edge of the ellipse)
 
 	for ball in _balls:
-		# The aimed ball draws a touch larger so the player can see they're holding it.
-		var radius := BALL_RADIUS * (1.12 if ball["state"] == "aiming" else 1.0)
+		# The aimed ball draws a touch larger so the player can see they're holding it. The scale is
+		# EASED (see _advance_celebration) rather than snapped, so the grab blooms smoothly.
+		var radius := BALL_RADIUS * (_aim_scale if ball["state"] == "aiming" else 1.0)
 		# Rotate the ball around its center by its accumulated spin so it visibly rolls as it moves.
 		# draw_set_transform applies to the next draw; we reset it right after.
 		_play.draw_set_transform(ball["pos"], float(ball.get("spin", 0.0)), Vector2.ONE)
@@ -414,6 +518,10 @@ func _draw_play() -> void:
 
 	if _aim_index != -1:
 		_draw_aim_guide()
+
+	# The celebration layer (score rings + confetti/clang sparks), drawn over the play field but
+	# under the board frame so it never spills past the walls visually.
+	_draw_celebration()
 
 	# The dark-gray frame that defines the walls, floor, and ceiling. Drawn last so it reads as a
 	# solid boundary in front of a ball pressed right up against it. Inset by half its thickness so
@@ -441,6 +549,25 @@ func _draw_aim_guide() -> void:
 		_play.draw_line(_aim_anchor, aim_end, Color(UiPalette.MUSTARD_GOLD, 0.85), 3.0, true)
 
 
+## Draw the celebration layer: the expanding/fading score rings from a made basket, then the
+## confetti and clang sparks. Pure cosmetics; these read off _score_rings and _particles, which
+## _advance_celebration grows and fades.
+func _draw_celebration() -> void:
+	# Score rings: a thin ring that expands outward from the hoop and fades as its life drains.
+	for ring in _score_rings:
+		var life: float = ring["life"]
+		var radius := SCORE_RING_MAX_RADIUS * (1.0 - life)  # small at spawn (life 1) -> wide as it fades
+		var ring_color := UiPalette.MUSTARD_GOLD
+		ring_color.a = life  # fade out as it grows
+		_play.draw_arc(ring["pos"], radius, 0.0, TAU, 32, ring_color, 4.0, true)
+
+	# Confetti / clang sparks: little solid circles that fade with their life.
+	for particle in _particles:
+		var spark_color: Color = particle["color"]
+		spark_color.a = clampf(particle["life"], 0.0, 1.0)
+		_play.draw_circle(particle["pos"], particle["radius"], spark_color)
+
+
 ## Draw half of the rim ellipse. top_half draws the far/top edge (sin < 0); otherwise the
 ## near/bottom edge (sin > 0). Splitting the rim lets a scoring ball be drawn between the two
 ## halves so it looks like it falls in front of the near rim and behind the far rim.
@@ -464,7 +591,14 @@ func _draw_net() -> void:
 	var strand_gray := UiPalette.LIGHT_GRAY
 	var ring_gray := UiPalette.MID_GRAY
 	var depth := HOOP_RY + 56.0                 # how far the net hangs below the hoop center
-	var bottom_center := _hoop_pos + Vector2(0.0, depth)
+	# After a made basket the net sways: a damped sine, strongest right after the ball drops through
+	# and settling to zero over NET_SWING_DURATION. Only the net's BOTTOM swings; the rim stays put.
+	var swing_x := 0.0
+	if _net_swing_time > 0.0:
+		var elapsed := NET_SWING_DURATION - _net_swing_time
+		var decay := _net_swing_time / NET_SWING_DURATION
+		swing_x = sin(elapsed * NET_SWING_FREQ) * NET_SWING_AMPLITUDE * decay
+	var bottom_center := _hoop_pos + Vector2(swing_x, depth)
 	var bottom_rx := HOOP_RX * 0.42             # the net pinches inward toward the bottom
 	var bottom_ry := HOOP_RY * 0.42
 

@@ -50,6 +50,17 @@ const PANEL_HEIGHT_FRACTION := 0.84
 ## bezel frame.
 const PANEL_BORDER_WIDTH := 8
 
+## How fast the spectrum bar's fill glides toward its true value (per-second lerp weight). The
+## bar tracks a smoothed `_display_mult` rather than the raw live multiplier so it reads as a
+## sweep, not a jitter — the single most-visible shared element, smoothed once here for all six
+## games (plan §1 juice).
+const KEEP_BAR_LERP_SPEED := 8.0
+## Time-pressure thresholds (seconds left) where the shared timer escalates its warning: a slow
+## amber pulse under WARN, a fast gold blink + scale under CRITICAL. Shared by every game for
+## free (plan §1 juice).
+const TIMER_WARN_SECONDS := 10.0
+const TIMER_CRITICAL_SECONDS := 3.0
+
 var _tuning: TuningConfig
 ## The pre-minigame base reward being scaled (Legacy count at prestige, cash pile at
 ## welcome-back). Kept as a float so it can hold either a small Legacy count or a large
@@ -80,8 +91,23 @@ var _purpose_label: Label
 var _play_view: Control
 var _result_view: Control
 var _timer_label: Label
-var _keep_label: Label
+## The spectrum bar communicates by fill + color ONLY — no numeric "kept" readout (plan §1,
+## decision 2026-06-29). What you'd keep on a skip is made legible on the SKIP button instead.
 var _keep_bar: Control
+## The skip control, kept as a field so start_game can label it with the concrete reward a skip
+## banks (the keep floor), now that the spectrum bar shows no numbers.
+var _skip_button: Button
+## The smoothed multiplier the spectrum bar actually draws — lerped toward the live multiplier
+## each frame so the fill glides (see KEEP_BAR_LERP_SPEED).
+var _display_mult: float = 0.5
+## Tracks whether the smoothed fill has reached the "full" (1.0x) line, so the host can fire a
+## one-shot flash the moment it first crosses (plan §1: the warm→green jump made loud).
+var _was_at_least_full: bool = false
+## A decaying [0,1] flash intensity drawn over the whole bar when the fill crosses into "full".
+var _full_flash: float = 0.0
+## Accumulates while a round runs; drives the timer's warning pulse/blink oscillation without
+## needing a wall-clock (it is reset each round).
+var _warn_phase: float = 0.0
 var _play_area: Control
 var _result_heading_label: Label
 var _result_mult_label: Label
@@ -175,16 +201,16 @@ func _build_play_view() -> Control:
 	_purpose_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(_purpose_label)
 
-	_timer_label = _make_label("0:30", UiPalette.FONT_SUBHEAD, UiPalette.KETCHUP_RED)
+	# The timer is the round's focal point (plan §1): big, centered, faux-bold, so time pressure
+	# reads at a glance. Its color/scale escalate as time runs low (see _refresh_timer).
+	_timer_label = _make_label("0:30", UiPalette.FONT_DISPLAY, UiPalette.KETCHUP_RED)
 	_timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_timer_label.add_theme_font_override("font", UiPalette.make_bold_font())
 	column.add_child(_timer_label)
 
-	# The universal "Legacy kept" readout + spectrum bar — identical for every minigame
-	# type; it reads the active type's live performance.
-	_keep_label = _make_label("", UiPalette.FONT_SUBHEAD, UiPalette.MONEY_GREEN)
-	_keep_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	column.add_child(_keep_label)
-
+	# The universal spectrum bar — identical for every minigame type; it reads the active type's
+	# live performance. It carries meaning by fill + color ONLY (no numbers): warm red→gold below
+	# the "full" line, green→blue into the extra-high bonus band.
 	_keep_bar = Control.new()
 	_keep_bar.custom_minimum_size = Vector2(0, 34)
 	_keep_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -200,12 +226,15 @@ func _build_play_view() -> Control:
 	_play_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	column.add_child(_play_area)
 
-	var skip_button := Button.new()
-	skip_button.custom_minimum_size = Vector2(0, 72)
-	UiPalette.style_button(skip_button, false)
-	skip_button.text = "SKIP (keep the minimum)"
-	skip_button.pressed.connect(_on_skip_pressed)
-	column.add_child(skip_button)
+	# SKIP banks the keep floor immediately. Now that the spectrum bar shows no numbers, this
+	# button is the one place "what you'd keep" is made legible: start_game labels it with the
+	# concrete keep-floor reward (plan §1, decision 2026-06-29).
+	_skip_button = Button.new()
+	_skip_button.custom_minimum_size = Vector2(0, 72)
+	UiPalette.style_button(_skip_button, false)
+	_skip_button.text = "SKIP"
+	_skip_button.pressed.connect(_on_skip_pressed)
+	column.add_child(_skip_button)
 
 	_opt_out_check = CheckBox.new()
 	_opt_out_check.text = "Skip minigames from now on"
@@ -426,11 +455,28 @@ func start_game(
 	# The round does NOT start yet: the type stays un-begun and the clock paused behind the Begin
 	# gate, so the player is never caught off guard. _on_begin_pressed starts it for real.
 	_play_view.visible = true
+	_play_view.modulate = Color.WHITE
 	_result_view.visible = false
 	_playing = false
 	_timer_label.text = "0:%02d" % int(ceil(_seconds_left))
-	_update_status()
+	_timer_label.scale = Vector2.ONE
+
+	# Reset the shared juice state so a new round starts at the keep floor with no carried-over
+	# flash, pulse, or smoothing from the previous round.
+	_display_mult = _tuning.minigame_keep_floor
+	_was_at_least_full = false
+	_full_flash = 0.0
+	_warn_phase = 0.0
+	_keep_bar.queue_redraw()
+
+	# Label SKIP with what skipping actually banks (the keep floor) — the one place the floor is
+	# made legible now that the spectrum bar carries no numbers.
+	var skip_amount := _base_amount * _tuning.minigame_keep_floor
+	_skip_button.text = "SKIP · keep %s" % _format_amount(skip_amount)
+
 	_begin_title.text = _active_minigame.display_name()
+	# The Begin gate is opaque at the start of every round; _on_begin_pressed fades it off.
+	_begin_overlay.modulate = Color.WHITE
 	_begin_overlay.visible = true
 	visible = true
 
@@ -440,24 +486,36 @@ func start_game(
 func _on_begin_pressed() -> void:
 	if _active_minigame == null:
 		return
+	# Fade the cream gate off to unmask the game (plan §1), THEN start the round — so the clock
+	# doesn't run during the fade. The actual go-live happens in _start_active_round when the
+	# fade completes.
+	var fade := create_tween()
+	fade.tween_property(_begin_overlay, "modulate:a", 0.0, 0.25)
+	fade.tween_callback(_start_active_round)
+
+
+## The one and only point where a round actually goes live: hide the (now-invisible) gate, start
+## the chosen type, and unpause the clock. Called by _on_begin_pressed's fade-out tween.
+func _start_active_round() -> void:
+	if _active_minigame == null:
+		return
 	_begin_overlay.visible = false
 	_active_minigame.begin(_tuning)
 	_playing = true
-	_update_status()
 
 
 func _process(delta: float) -> void:
 	if not _playing:
 		return
-	# Pause the countdown while a type is mid-animation (e.g. match-3 cascades), so that
-	# animation time isn't charged to the player. The spectrum still updates.
-	if _active_minigame != null and _active_minigame.is_busy():
-		_update_status()
-		return
-	_seconds_left = maxf(0.0, _seconds_left - delta)
-	_timer_label.text = "0:%02d" % int(ceil(_seconds_left))
-	_update_status()
-	if _seconds_left <= 0.0:
+	# Pause the countdown while a type is mid-animation (e.g. match-3 cascades) so animation time
+	# isn't charged to the player — but keep the spectrum bar gliding and show a "held" cue on the
+	# timer so a stalled countdown doesn't read as a bug (plan §1).
+	var busy := _active_minigame != null and _active_minigame.is_busy()
+	if not busy:
+		_seconds_left = maxf(0.0, _seconds_left - delta)
+	_refresh_timer(delta, busy)
+	_refresh_keep_bar(delta)
+	if not busy and _seconds_left <= 0.0:
 		_end_round()
 
 
@@ -507,18 +565,56 @@ func _format_amount(amount: float) -> String:
 	return "%d %s" % [int(floor(amount)), _reward_noun]
 
 
-func _update_status() -> void:
-	var mult := _multiplier_for_performance(_current_performance())
-	var kept := _base_amount * mult
-	if mult > 1.0:
-		_keep_label.text = "%s  (+%s bonus)" % [_format_amount(kept), _format_amount(kept - _base_amount)]
-		_keep_label.add_theme_color_override("font_color", UiPalette.ATOMIC_TEAL)
-	elif mult >= 1.0:
-		_keep_label.text = "%s  (full)" % _format_amount(kept)
-		_keep_label.add_theme_color_override("font_color", UiPalette.MONEY_GREEN)
-	else:
-		_keep_label.text = "%s of %s" % [_format_amount(kept), _format_amount(_base_amount)]
-		_keep_label.add_theme_color_override("font_color", _keep_color(mult))
+## Update the focal timer each frame: a slow amber pulse under TIMER_WARN_SECONDS, a fast gold
+## blink + scale under TIMER_CRITICAL_SECONDS, and a "held" cue (muted color + pause glyph) while
+## the type is mid-animation so the paused countdown doesn't read as a bug. (plan §1 juice.)
+func _refresh_timer(delta: float, busy: bool) -> void:
+	var secs := int(ceil(_seconds_left))
+	if busy:
+		_timer_label.text = "0:%02d  ⏸" % secs
+		_timer_label.add_theme_color_override("font_color", UiPalette.NAVY)
+		_set_timer_scale(1.0)
+		return
+
+	_warn_phase += delta
+	_timer_label.text = "0:%02d" % secs
+	var color := UiPalette.KETCHUP_RED
+	var pulse := 1.0
+	if _seconds_left <= TIMER_CRITICAL_SECONDS and _seconds_left > 0.0:
+		# A fast 0..1 oscillation drives a blink toward gold plus a gentle grow, for real urgency.
+		var beat := 0.5 + 0.5 * sin(_warn_phase * 18.0)
+		color = UiPalette.KETCHUP_RED.lerp(UiPalette.MUSTARD_GOLD, beat)
+		pulse = 1.0 + 0.14 * beat
+	elif _seconds_left <= TIMER_WARN_SECONDS:
+		var beat := 0.5 + 0.5 * sin(_warn_phase * 8.0)
+		color = UiPalette.KETCHUP_RED.lerp(UiPalette.MUSTARD_GOLD, beat * 0.5)
+		pulse = 1.0 + 0.05 * beat
+	_timer_label.add_theme_color_override("font_color", color)
+	_set_timer_scale(pulse)
+
+
+## Scale the timer label about its own center (a Label scales from its top-left by default, which
+## would drift the centered text sideways as it pulses).
+func _set_timer_scale(factor: float) -> void:
+	_timer_label.pivot_offset = _timer_label.size / 2.0
+	_timer_label.scale = Vector2(factor, factor)
+
+
+## Glide the spectrum bar toward the live multiplier and fire a one-shot flash when it first
+## crosses into "full". The smoothed value `_display_mult` is what _draw_keep_bar paints.
+func _refresh_keep_bar(delta: float) -> void:
+	var target := _multiplier_for_performance(_current_performance())
+	var weight := clampf(delta * KEEP_BAR_LERP_SPEED, 0.0, 1.0)
+	_display_mult = lerpf(_display_mult, target, weight)
+
+	# Flash the moment the smoothed fill first reaches the "full" line (and re-arm if it drops
+	# back below), so the warm→green color jump lands with a visible pop instead of silently.
+	if not _was_at_least_full and _display_mult >= 1.0:
+		_was_at_least_full = true
+		_full_flash = 1.0
+	elif _was_at_least_full and _display_mult < 1.0:
+		_was_at_least_full = false
+	_full_flash = maxf(0.0, _full_flash - delta * 2.5)
 	_keep_bar.queue_redraw()
 
 
@@ -529,11 +625,27 @@ func _draw_keep_bar() -> void:
 		return
 	var floor_mult := _tuning.minigame_keep_floor
 	var span := maxf(0.0001, (1.0 + _bonus_max) - floor_mult)
-	var mult := _multiplier_for_performance(_current_performance())
+	# Draw the SMOOTHED multiplier so the fill glides rather than jumps (see _refresh_keep_bar).
+	var mult := _display_mult
 	var fill_frac := clampf((mult - floor_mult) / span, 0.0, 1.0)
 
 	_keep_bar.draw_rect(Rect2(0, 0, w, h), UiPalette.INK_NAVY)
 	_keep_bar.draw_rect(Rect2(0, 0, fill_frac * w, h), _keep_color(mult))
+
+	# A soft bright cap rides the leading edge of the fill, brightening as performance climbs into
+	# the extra-high bonus band (plan §1) — a small reward for pushing past "full".
+	var into_bonus := clampf((mult - 1.0) / maxf(0.0001, _bonus_max), 0.0, 1.0)
+	var edge_x := fill_frac * w
+	var cap_w := 10.0
+	var cap_color := _keep_color(mult).lerp(Color.WHITE, 0.4 + 0.5 * into_bonus)
+	cap_color.a = 0.35 + 0.55 * into_bonus
+	_keep_bar.draw_rect(Rect2(edge_x - cap_w, 0, cap_w, h), cap_color)
+
+	# A one-shot white wash across the whole bar the instant the fill first reaches "full"
+	# (decays in _refresh_keep_bar) so the warm→green color jump lands with a pop, not silently.
+	if _full_flash > 0.0:
+		_keep_bar.draw_rect(Rect2(0, 0, w, h), Color(1, 1, 1, _full_flash * 0.5))
+
 	# No "full" divider line (Tim, 2026-06-25): the deliberate warm→green color jump at exactly
 	# 100% already marks where you stop losing Legacy and start banking bonus, so the line is
 	# redundant. The color change alone carries the meaning.
@@ -573,6 +685,30 @@ func _show_result(mult: float) -> void:
 	_play_view.visible = false
 	_result_view.visible = true
 	visible = true
+	_animate_result()
+
+
+## The payoff beat (plan §1): fade the result view in, then bloom the multiplier and amount with a
+## brief scale pop and a flash to white, so the reveal reads as a reward rather than an instant cut.
+func _animate_result() -> void:
+	_result_view.modulate = Color(1, 1, 1, 0)
+	var reveal := create_tween()
+	reveal.tween_property(_result_view, "modulate:a", 1.0, 0.25)
+
+	for label in [_result_mult_label, _result_amount_label]:
+		# Capture each label's settled color so the white flash can resolve back to it.
+		var final_color: Color = label.get_theme_color("font_color")
+		label.pivot_offset = label.size / 2.0
+		label.scale = Vector2(0.7, 0.7)
+		label.add_theme_color_override("font_color", Color.WHITE)
+		var bloom := create_tween()
+		bloom.set_parallel(true)
+		bloom.tween_property(label, "scale", Vector2.ONE, 0.4) \
+				.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		bloom.tween_property(label, "modulate", Color.WHITE, 0.0)  # ensure full opacity for the bloom
+		bloom.tween_method(
+				func(c: Color) -> void: label.add_theme_color_override("font_color", c),
+				Color.WHITE, final_color, 0.45)
 
 
 ## Back (review mode only): abandon the round and return to the review list. No result is

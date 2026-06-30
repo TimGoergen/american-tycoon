@@ -66,12 +66,12 @@ const MAX_THROW_SPEED := 2900.0
 const FORCE_COLOR_LOW := Color("#3A78D0")    # blue — low force
 const FORCE_COLOR_MED := Color("#8244C0")    # purple — medium force
 const FORCE_COLOR_HIGH := Color("#E23B2C")   # bright red — high / maxed force
-## The force wedge is a filled triangle whose THICK base sits at the ball's original (launch)
-## location and tapers to a point in the DIRECTION OF TRAVEL (opposite the pull), so it reads as an
-## arrow showing where the ball will go (Tim, 2026-06-30). Its base width grows with force; its
-## length grows with the pull distance.
-const AIM_WEDGE_BASE_MIN := 10.0    # base width at near-zero force
-const AIM_WEDGE_BASE_MAX := 40.0    # base width at maxed force
+## The force wedge is a filled triangle with its POINT at the ball's launch location, FANNING OUT
+## to a wide far end in the DIRECTION OF TRAVEL (opposite the pull) — like a beam showing where the
+## ball will go (Tim, 2026-06-30). The wide end's width grows with force; the wedge's length grows
+## with the pull distance.
+const AIM_WEDGE_BASE_MIN := 10.0    # wide-end width at near-zero force
+const AIM_WEDGE_BASE_MAX := 40.0    # wide-end width at maxed force
 const AIM_WEDGE_LENGTH_SCALE := 1.6 # wedge length = pull distance × this
 
 ## Fraction of speed KEPT when a ball bounces off a wall, the floor, the ceiling, or the hoop
@@ -555,10 +555,11 @@ func _draw_play() -> void:
 
 
 ## Draw the slingshot feedback: a thin connector from the launch point to the held ball, plus the
-## FORCE WEDGE — a filled triangle whose thick base sits at the ball's original (launch) location
-## and tapers to a point in the DIRECTION OF TRAVEL (opposite the pull). The wedge's base width and
-## length grow with the pull's force, and its single color CHANGES with force (blue → purple →
-## bright red), so the player reads both power and aim direction at a glance (Tim, 2026-06-30).
+## FORCE WEDGE — a filled triangle with its POINT at the ball's launch location, fanning out to a
+## WIDE far end in the DIRECTION OF TRAVEL (opposite the pull), like a beam showing where the ball
+## will go. The wide end's width and the wedge's length grow with the pull's force, and its single
+## color CHANGES with force (blue → purple → bright red), so the player reads both power and aim
+## direction at a glance (Tim, 2026-06-30).
 func _draw_aim_guide() -> void:
 	var ball_pos: Vector2 = _balls[_aim_index]["pos"]
 	var pull := ball_pos - _aim_anchor
@@ -576,13 +577,13 @@ func _draw_aim_guide() -> void:
 	# wedge maxes out exactly when more pull would add nothing.
 	var force := clampf(pull_distance * PULL_POWER / MAX_THROW_SPEED, 0.0, 1.0)
 	var travel_dir := -pull / pull_distance               # the ball flies OPPOSITE the pull
-	var perp := Vector2(-travel_dir.y, travel_dir.x)       # base spread, across the travel direction
-	var base_half := lerpf(AIM_WEDGE_BASE_MIN, AIM_WEDGE_BASE_MAX, force) * 0.5
-	var tip := _aim_anchor + travel_dir * (pull_distance * AIM_WEDGE_LENGTH_SCALE)
+	var perp := Vector2(-travel_dir.y, travel_dir.x)       # wide-end spread, across the travel direction
+	var wide_half := lerpf(AIM_WEDGE_BASE_MIN, AIM_WEDGE_BASE_MAX, force) * 0.5
+	var wide_center := _aim_anchor + travel_dir * (pull_distance * AIM_WEDGE_LENGTH_SCALE)
 	var wedge := PackedVector2Array([
-		_aim_anchor + perp * base_half,   # thick base, at the ball's original location
-		_aim_anchor - perp * base_half,
-		tip,                              # point, out in the direction of travel
+		_aim_anchor,                          # POINT — at the ball's launch location
+		wide_center + perp * wide_half,       # wide end, fanned out in the direction of travel
+		wide_center - perp * wide_half,
 	])
 	_play.draw_colored_polygon(wedge, _force_color(force))
 

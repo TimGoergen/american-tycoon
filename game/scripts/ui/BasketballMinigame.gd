@@ -67,10 +67,13 @@ const FORCE_COLOR_LOW := Color("#3A78D0")    # blue — low force
 const FORCE_COLOR_MED := Color("#8244C0")    # purple — medium force
 const FORCE_COLOR_HIGH := Color("#E23B2C")   # bright red — high / maxed force
 ## The band is drawn in short segments so its color steps are visible ("by chunk"); a small chunk
-## gives fine-grained feedback. It also TAPERS — thin at the launch anchor, thick at the finger.
+## gives fine-grained feedback. It TAPERS from a thin point at the launch anchor to a wide end at
+## the ball — and that wide (ball) end GROWS with the pull's force (Tim, 2026-06-30), so a harder
+## pull shows a visibly fatter wedge at the ball while the anchor stays a point.
 const AIM_CHUNK_LENGTH := 16.0
-const AIM_BAND_MIN_WIDTH := 4.0
-const AIM_BAND_MAX_WIDTH := 18.0
+const AIM_BAND_POINT_WIDTH := 3.0   # narrow end, at the launch anchor (fixed)
+const AIM_BALL_WIDTH_MIN := 6.0     # wide end, at the ball, when force is near zero
+const AIM_BALL_WIDTH_MAX := 30.0    # wide end, at the ball, when force is maxed
 
 ## Fraction of speed KEPT when a ball bounces off a wall, the floor, the ceiling, or the hoop
 ## (0 = dead stop, 1 = perfectly elastic). Lowered for the heavier feel — a dense ball thuds and
@@ -552,11 +555,11 @@ func _draw_play() -> void:
 	_play.draw_rect(frame, UiPalette.DARK_GRAY, false, WALL_THICKNESS)
 
 
-## Draw the slingshot feedback: a chunked, tapering force band from the launch anchor to the
-## finger, plus a gold guide ray from the anchor in the direction the ball will fly (opposite the
-## pull). The band is THIN at the anchor and THICK at the finger, and each short chunk is colored by
-## the FORCE this pull will produce there — blue → purple → bright red — so the player can read the
-## power before releasing (Tim, 2026-06-30).
+## Draw the slingshot feedback: a chunked force band from the launch anchor to the ball, plus a
+## gold guide ray from the anchor in the direction the ball will fly (opposite the pull). The band
+## narrows to a POINT at the anchor and WIDENS to the ball, and the wide (ball) end GROWS with the
+## pull's force. Each short chunk is colored by the FORCE this pull will produce there — blue →
+## purple → bright red — so the player can read the power before releasing (Tim, 2026-06-30).
 func _draw_aim_guide() -> void:
 	var ball_pos: Vector2 = _balls[_aim_index]["pos"]
 	var pull := ball_pos - _aim_anchor
@@ -565,10 +568,14 @@ func _draw_aim_guide() -> void:
 	# A marker at the launch point (where the ball actually shoots from).
 	_play.draw_circle(_aim_anchor, 6.0, Color(UiPalette.NAVY, 0.6))
 
-	# The stretched sling band, drawn in small chunks from the anchor out to the finger.
+	# The stretched sling band, drawn in small chunks from the anchor out to the ball.
 	if pull_distance >= 1.0:
 		var direction := pull / pull_distance
 		var chunk_count := int(ceil(pull_distance / AIM_CHUNK_LENGTH))
+		# The wide (ball) end's width scales with the WHOLE pull's force, so a harder pull fattens
+		# the wedge at the ball; the anchor end always stays a thin point.
+		var total_force := clampf(pull_distance * PULL_POWER / MAX_THROW_SPEED, 0.0, 1.0)
+		var ball_width := lerpf(AIM_BALL_WIDTH_MIN, AIM_BALL_WIDTH_MAX, total_force)
 		for i in range(chunk_count):
 			var start_dist := i * AIM_CHUNK_LENGTH
 			var end_dist := minf((i + 1) * AIM_CHUNK_LENGTH, pull_distance)
@@ -579,9 +586,9 @@ func _draw_aim_guide() -> void:
 			# throw-speed limit — so the band turns red exactly when more pull would add nothing
 			# (telling the player they already have enough power without needing more room).
 			var force_fraction := clampf(mid_dist * PULL_POWER / MAX_THROW_SPEED, 0.0, 1.0)
-			# Width grows along the pull so the band tapers thin (anchor) → thick (finger).
-			var width_fraction := clampf(mid_dist / pull_distance, 0.0, 1.0)
-			var width := lerpf(AIM_BAND_MIN_WIDTH, AIM_BAND_MAX_WIDTH, width_fraction)
+			# Width tapers from the anchor point (0) to the force-scaled ball end (1).
+			var position_fraction := clampf(mid_dist / pull_distance, 0.0, 1.0)
+			var width := lerpf(AIM_BAND_POINT_WIDTH, ball_width, position_fraction)
 			_play.draw_line(segment_start, segment_end, _force_color(force_fraction), width, true)
 
 	# The aim ray, opposite the pull, scaled up so it clearly reads as the throw direction.

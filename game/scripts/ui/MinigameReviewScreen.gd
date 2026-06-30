@@ -30,10 +30,21 @@ func setup(tuning: TuningConfig) -> void:
 
 
 func _ready() -> void:
-	# Black field framing the cream rounded viewing area, matching the main game (Tim,
-	# 2026-06-23). The reviewed minigame (_player) draws its own identical frame on top.
+	# Black field framing the rounded viewing area, matching the main game (Tim, 2026-06-23).
+	# The reviewed minigame (_player) draws its own identical frame on top.
 	color = Color.BLACK
 	visible = false
+
+	# The same themed backdrop the live minigame screen uses (Tim, 2026-06-29), drawn full-bleed
+	# inside the black bezel BEHIND the list, so the 50%-alpha cream list plate reads over it. A
+	# plain TextureRect, not a clip_children mask (only one clip stencil works at a time — see
+	# MinigameScreen for the full note).
+	var backdrop := TextureRect.new()
+	UiPalette.apply_screen_bezel(backdrop)
+	backdrop.texture = load(MinigameScreen.BACKGROUND_IMAGE)
+	backdrop.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(backdrop)
 
 	_list_view = _build_list_view()
 	add_child(_list_view)
@@ -65,7 +76,10 @@ func _build_list_view() -> Control:
 	# main game uses, so the list page sits in an identical bezel and rounded plate.
 	var viewing_area := PanelContainer.new()
 	UiPalette.apply_screen_bezel(viewing_area)
-	viewing_area.add_theme_stylebox_override("panel", UiPalette.make_screen_panel_style())
+	# 50%-alpha cream plate (Tim, 2026-06-29) so the themed backdrop reads through the list page.
+	var plate := UiPalette.make_screen_panel_style()
+	plate.bg_color = Color(UiPalette.CREAM, 0.5)
+	viewing_area.add_theme_stylebox_override("panel", plate)
 
 	# The list of buttons is centered within that full-screen frame.
 	var center := CenterContainer.new()

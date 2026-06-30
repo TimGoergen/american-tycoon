@@ -59,21 +59,20 @@ const PULL_POWER := 15.0
 ## Hard cap on the resulting throw speed (px/sec).
 const MAX_THROW_SPEED := 2900.0
 
-## Aim-guide force colors (Tim, 2026-06-30): the slingshot band is chunked and tinted by the actual
-## force the current pull will produce — blue (low) → purple (medium) → bright red (high/maxed) — so
-## the player reads the power before releasing. Purple is a deliberate one-off exception to the §1
-## palette for this force gauge (the same way ORANGE was added for the spectrum bar).
+## Aim-guide force colors (Tim, 2026-06-30): the force wedge is a SINGLE color that CHANGES with the
+## current pull's force — blue (low) → purple (medium) → bright red (high/maxed) — so the player
+## reads the power before releasing. Purple is a deliberate one-off exception to the §1 palette for
+## this force gauge (the same way ORANGE was added for the spectrum bar).
 const FORCE_COLOR_LOW := Color("#3A78D0")    # blue — low force
 const FORCE_COLOR_MED := Color("#8244C0")    # purple — medium force
 const FORCE_COLOR_HIGH := Color("#E23B2C")   # bright red — high / maxed force
-## The band is drawn in short segments so its color steps are visible ("by chunk"); a small chunk
-## gives fine-grained feedback. It TAPERS from a thin point at the launch anchor to a wide end at
-## the ball — and that wide (ball) end GROWS with the pull's force (Tim, 2026-06-30), so a harder
-## pull shows a visibly fatter wedge at the ball while the anchor stays a point.
-const AIM_CHUNK_LENGTH := 16.0
-const AIM_BAND_POINT_WIDTH := 3.0   # narrow end, at the launch anchor (fixed)
-const AIM_BALL_WIDTH_MIN := 6.0     # wide end, at the ball, when force is near zero
-const AIM_BALL_WIDTH_MAX := 30.0    # wide end, at the ball, when force is maxed
+## The force wedge is a filled triangle whose THICK base sits at the ball's original (launch)
+## location and tapers to a point in the DIRECTION OF TRAVEL (opposite the pull), so it reads as an
+## arrow showing where the ball will go (Tim, 2026-06-30). Its base width grows with force; its
+## length grows with the pull distance.
+const AIM_WEDGE_BASE_MIN := 10.0    # base width at near-zero force
+const AIM_WEDGE_BASE_MAX := 40.0    # base width at maxed force
+const AIM_WEDGE_LENGTH_SCALE := 1.6 # wedge length = pull distance × this
 
 ## Fraction of speed KEPT when a ball bounces off a wall, the floor, the ceiling, or the hoop
 ## (0 = dead stop, 1 = perfectly elastic). Lowered for the heavier feel — a dense ball thuds and
@@ -555,46 +554,37 @@ func _draw_play() -> void:
 	_play.draw_rect(frame, UiPalette.DARK_GRAY, false, WALL_THICKNESS)
 
 
-## Draw the slingshot feedback: a chunked force band from the launch anchor to the ball, plus a
-## gold guide ray from the anchor in the direction the ball will fly (opposite the pull). The band
-## narrows to a POINT at the anchor and WIDENS to the ball, and the wide (ball) end GROWS with the
-## pull's force. Each short chunk is colored by the FORCE this pull will produce there — blue →
-## purple → bright red — so the player can read the power before releasing (Tim, 2026-06-30).
+## Draw the slingshot feedback: a thin connector from the launch point to the held ball, plus the
+## FORCE WEDGE — a filled triangle whose thick base sits at the ball's original (launch) location
+## and tapers to a point in the DIRECTION OF TRAVEL (opposite the pull). The wedge's base width and
+## length grow with the pull's force, and its single color CHANGES with force (blue → purple →
+## bright red), so the player reads both power and aim direction at a glance (Tim, 2026-06-30).
 func _draw_aim_guide() -> void:
 	var ball_pos: Vector2 = _balls[_aim_index]["pos"]
 	var pull := ball_pos - _aim_anchor
 	var pull_distance := pull.length()
 
-	# A marker at the launch point (where the ball actually shoots from).
+	# A thin connector from the launch point to the held ball, so the pull itself is still visible.
+	_play.draw_line(_aim_anchor, ball_pos, Color(UiPalette.NAVY, 0.5), 3.0, true)
+	# A marker at the launch point — the ball's original spot, where it shoots from.
 	_play.draw_circle(_aim_anchor, 6.0, Color(UiPalette.NAVY, 0.6))
 
-	# The stretched sling band, drawn in small chunks from the anchor out to the ball.
-	if pull_distance >= 1.0:
-		var direction := pull / pull_distance
-		var chunk_count := int(ceil(pull_distance / AIM_CHUNK_LENGTH))
-		# The wide (ball) end's width scales with the WHOLE pull's force, so a harder pull fattens
-		# the wedge at the ball; the anchor end always stays a thin point.
-		var total_force := clampf(pull_distance * PULL_POWER / MAX_THROW_SPEED, 0.0, 1.0)
-		var ball_width := lerpf(AIM_BALL_WIDTH_MIN, AIM_BALL_WIDTH_MAX, total_force)
-		for i in range(chunk_count):
-			var start_dist := i * AIM_CHUNK_LENGTH
-			var end_dist := minf((i + 1) * AIM_CHUNK_LENGTH, pull_distance)
-			var mid_dist := (start_dist + end_dist) * 0.5
-			var segment_start := _aim_anchor + direction * start_dist
-			var segment_end := _aim_anchor + direction * end_dist
-			# Color by the REAL force fraction at this point — pull distance × power, capped at the
-			# throw-speed limit — so the band turns red exactly when more pull would add nothing
-			# (telling the player they already have enough power without needing more room).
-			var force_fraction := clampf(mid_dist * PULL_POWER / MAX_THROW_SPEED, 0.0, 1.0)
-			# Width tapers from the anchor point (0) to the force-scaled ball end (1).
-			var position_fraction := clampf(mid_dist / pull_distance, 0.0, 1.0)
-			var width := lerpf(AIM_BAND_POINT_WIDTH, ball_width, position_fraction)
-			_play.draw_line(segment_start, segment_end, _force_color(force_fraction), width, true)
+	if pull_distance < MIN_PULL:
+		return  # too short to be a throw — no force wedge yet
 
-	# The aim ray, opposite the pull, scaled up so it clearly reads as the throw direction.
-	if pull_distance >= MIN_PULL:
-		var aim_end := _aim_anchor - pull * 1.5
-		_play.draw_line(_aim_anchor, aim_end, Color(UiPalette.MUSTARD_GOLD, 0.85), 3.0, true)
+	# The force this pull will produce (distance × power, capped at the throw-speed limit), so the
+	# wedge maxes out exactly when more pull would add nothing.
+	var force := clampf(pull_distance * PULL_POWER / MAX_THROW_SPEED, 0.0, 1.0)
+	var travel_dir := -pull / pull_distance               # the ball flies OPPOSITE the pull
+	var perp := Vector2(-travel_dir.y, travel_dir.x)       # base spread, across the travel direction
+	var base_half := lerpf(AIM_WEDGE_BASE_MIN, AIM_WEDGE_BASE_MAX, force) * 0.5
+	var tip := _aim_anchor + travel_dir * (pull_distance * AIM_WEDGE_LENGTH_SCALE)
+	var wedge := PackedVector2Array([
+		_aim_anchor + perp * base_half,   # thick base, at the ball's original location
+		_aim_anchor - perp * base_half,
+		tip,                              # point, out in the direction of travel
+	])
+	_play.draw_colored_polygon(wedge, _force_color(force))
 
 
 ## Map a force fraction (0 = none, 1 = maxed) to the aim band's color ramp: blue → purple at the

@@ -131,6 +131,13 @@ var _begin_title: Label
 ## round in start_game), so the player learns the goal BEFORE the clock starts (Tim, 2026-06-29).
 var _begin_howto: Label
 
+## The full-bleed themed backdrop. Its rounded corners are CPU-BAKED at the displayed size (see
+## _rebake_backdrop) so the bright bottom-corner art doesn't poke past the screen's rounded frame —
+## clip_children can't do it here (the project supports only one clip stencil, and Main owns it).
+var _backdrop: TextureRect
+## The size the backdrop was last baked for, so we only re-bake when it actually changes.
+var _baked_backdrop_size: Vector2 = Vector2.ZERO
+
 
 func setup(tuning: TuningConfig) -> void:
 	_tuning = tuning
@@ -144,16 +151,20 @@ func _ready() -> void:
 	visible = false
 
 	# The full-bleed backdrop image, inset inside the black bezel like every other screen's
-	# background. A plain TextureRect (NOT a clip_children rounded mask): the project only supports
-	# one clip_children stencil at a time — Main already owns one, so a second here would render
-	# empty (the documented 2026-06-26 render bug). The image's corners are dark, so square corners
-	# against the black bezel read fine. COVERED fills the tall screen without empty bars.
-	var backdrop := TextureRect.new()
-	UiPalette.apply_screen_bezel(backdrop)
-	backdrop.texture = load(BACKGROUND_IMAGE)
-	backdrop.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(backdrop)
+	# background. Its texture is CPU-baked (see _rebake_backdrop): the source image is scaled to
+	# cover this rect and its four corners are rounded to match the screen frame, so the bright
+	# bottom-corner art (chips/gold) doesn't poke past the rounded border. We bake instead of using
+	# clip_children because the project supports only one clip stencil and Main already owns one — a
+	# second would render empty (the documented 2026-06-26 render bug). STRETCH_SCALE because the
+	# baked image is already sized to this rect.
+	_backdrop = TextureRect.new()
+	UiPalette.apply_screen_bezel(_backdrop)
+	_backdrop.stretch_mode = TextureRect.STRETCH_SCALE
+	_backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_backdrop)
+	# Bake once the backdrop has been laid out (its size is known), and again if that size changes.
+	_backdrop.resized.connect(_rebake_backdrop)
+	_rebake_backdrop.call_deferred()
 
 	# The shared rounded screen frame over the backdrop edges: transparent fill (so the image
 	# shows through), thin black rounded border, universal inner margin — the same frame every
@@ -206,6 +217,79 @@ func _make_panel_style() -> StyleBoxFlat:
 	style.set_border_width_all(PANEL_BORDER_WIDTH)
 	style.set_content_margin_all(UiPalette.UNIVERSAL_CONTENT_MARGIN)
 	return style
+
+
+## Bake this screen's backdrop to fit its current on-screen size with ROUNDED corners, so the
+## bright bottom-corner art doesn't square off past the screen's rounded frame. Re-runs only when
+## the size actually changes. The Minigame Tuning screen shares the baking via the static helper.
+func _rebake_backdrop() -> void:
+	if _backdrop == null:
+		return
+	var target := Vector2i(int(_backdrop.size.x), int(_backdrop.size.y))
+	if target.x < 1 or target.y < 1 or _baked_backdrop_size == _backdrop.size:
+		return
+	_baked_backdrop_size = _backdrop.size
+	var texture := bake_rounded_backdrop(target, UiPalette.SCREEN_CORNER_RADIUS)
+	if texture != null:
+		_backdrop.texture = texture
+
+
+## Load the shared backdrop image, scale it to COVER `size` (cropping the overflow, like
+## STRETCH_KEEP_ASPECT_COVERED), and round its four corners to `radius`. Returns a ready-to-assign
+## texture, or null if the image can't be loaded. Static + shared so the minigame screen and the
+## Minigame Tuning screen produce the identical rounded backdrop from one place.
+static func bake_rounded_backdrop(size: Vector2i, radius: int) -> ImageTexture:
+	if size.x < 1 or size.y < 1:
+		return null
+	var source: Texture2D = load(BACKGROUND_IMAGE)
+	if source == null:
+		return null
+	var image := source.get_image()
+	# Editing pixels needs an uncompressed RGBA image (the source PNG imports as RGB / possibly VRAM
+	# compressed); convert so we can crop, resize, and write transparent corners.
+	if image.is_compressed():
+		image.decompress()
+	image.convert(Image.FORMAT_RGBA8)
+
+	# Scale to COVER the target rect (fill fully, crop the overflow), then center-crop to size.
+	var cover := maxf(float(size.x) / image.get_width(), float(size.y) / image.get_height())
+	image.resize(
+		int(ceil(image.get_width() * cover)), int(ceil(image.get_height() * cover)),
+		Image.INTERPOLATE_BILINEAR
+	)
+	var crop_offset := Vector2i((image.get_width() - size.x) / 2, (image.get_height() - size.y) / 2)
+	var fitted := image.get_region(Rect2i(crop_offset, size))
+
+	_clear_image_corners(fitted, radius)
+	return ImageTexture.create_from_image(fitted)
+
+
+## Make the four corners of `image` transparent to a quarter-circle of the given radius, so the
+## image reads with rounded corners (same technique HeroStat uses for its globe watermark).
+static func _clear_image_corners(image: Image, radius: int) -> void:
+	var w := image.get_width()
+	var h := image.get_height()
+	var corners := [
+		{"center": Vector2i(radius, radius), "dir": Vector2i(-1, -1)},           # top-left
+		{"center": Vector2i(w - radius, radius), "dir": Vector2i(1, -1)},        # top-right
+		{"center": Vector2i(radius, h - radius), "dir": Vector2i(-1, 1)},        # bottom-left
+		{"center": Vector2i(w - radius, h - radius), "dir": Vector2i(1, 1)},     # bottom-right
+	]
+	for corner in corners:
+		var center: Vector2i = corner["center"]
+		var dir: Vector2i = corner["dir"]
+		for offset_y in range(radius):
+			for offset_x in range(radius):
+				# A pixel in the outward corner quadrant, beyond the radius from the arc centre, is
+				# outside the rounded edge — clear it.
+				if Vector2(offset_x, offset_y).length() <= radius:
+					continue
+				var pixel := center + Vector2i(dir.x * offset_x, dir.y * offset_y)
+				if pixel.x < 0 or pixel.y < 0 or pixel.x >= w or pixel.y >= h:
+					continue
+				var color := image.get_pixel(pixel.x, pixel.y)
+				color.a = 0.0
+				image.set_pixel(pixel.x, pixel.y, color)
 
 
 # ---------------------------------------------------------------------------

@@ -23,6 +23,9 @@ const SAMPLE_BONUS_MAX := 0.25
 var _tuning: TuningConfig
 var _list_view: Control
 var _player: MinigameScreen
+## The themed backdrop behind the list, with CPU-baked rounded corners (shared with MinigameScreen).
+var _backdrop: TextureRect
+var _baked_backdrop_size: Vector2 = Vector2.ZERO
 
 
 func setup(tuning: TuningConfig) -> void:
@@ -36,15 +39,17 @@ func _ready() -> void:
 	visible = false
 
 	# The same themed backdrop the live minigame screen uses (Tim, 2026-06-29), drawn full-bleed
-	# inside the black bezel BEHIND the list, so the 50%-alpha cream list plate reads over it. A
-	# plain TextureRect, not a clip_children mask (only one clip stencil works at a time — see
-	# MinigameScreen for the full note).
-	var backdrop := TextureRect.new()
-	UiPalette.apply_screen_bezel(backdrop)
-	backdrop.texture = load(MinigameScreen.BACKGROUND_IMAGE)
-	backdrop.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(backdrop)
+	# inside the black bezel BEHIND the list, so the 50%-alpha cream list plate reads over it. Its
+	# texture is CPU-baked with rounded corners (shared with MinigameScreen) so the bright
+	# bottom-corner art doesn't square off past the rounded frame — clip_children can't do it here
+	# (only one clip stencil works at a time; see MinigameScreen for the full note).
+	_backdrop = TextureRect.new()
+	UiPalette.apply_screen_bezel(_backdrop)
+	_backdrop.stretch_mode = TextureRect.STRETCH_SCALE
+	_backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_backdrop)
+	_backdrop.resized.connect(_rebake_backdrop)
+	_rebake_backdrop.call_deferred()
 
 	_list_view = _build_list_view()
 	add_child(_list_view)
@@ -65,6 +70,20 @@ func open() -> void:
 	_player.visible = false
 	_list_view.visible = true
 	visible = true
+
+
+## Bake the backdrop to its current size with rounded corners (shared with MinigameScreen), so the
+## bright bottom-corner art doesn't square off past the rounded frame. Re-runs only on size change.
+func _rebake_backdrop() -> void:
+	if _backdrop == null:
+		return
+	var target := Vector2i(int(_backdrop.size.x), int(_backdrop.size.y))
+	if target.x < 1 or target.y < 1 or _baked_backdrop_size == _backdrop.size:
+		return
+	_baked_backdrop_size = _backdrop.size
+	var texture := MinigameScreen.bake_rounded_backdrop(target, UiPalette.SCREEN_CORNER_RADIUS)
+	if texture != null:
+		_backdrop.texture = texture
 
 
 # ---------------------------------------------------------------------------

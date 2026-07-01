@@ -30,12 +30,22 @@ var _baked_backdrop_size: Vector2 = Vector2.ZERO
 ## Challenge Mode toggle state (Tim, 2026-06-30): false = Minigame Mode (normal review play with a
 ## timer + win/loss), true = Challenge Mode (endless free play, high scores). Defaults to Minigame.
 var _challenge_selected: bool = false
-## The large mode toggle button, the subtitle line, and the per-type buttons (each {type, button,
-## name}) — kept so the toggle can restyle itself and re-label every game button (name only, or name
-## + saved high score in Challenge Mode).
-var _mode_button: Button
+## The two side-by-side mode toggles (Tim, 2026-07-01, replacing the old single flip button): the
+## selected one is lit, the other dimmed. Kept, along with the subtitle line and the per-type buttons
+## (each {type, button, name}), so selecting a mode can restyle both toggles and re-label every game
+## button (name only, or name + saved high score in Challenge Mode).
+var _minigame_mode_button: Button
+var _challenge_mode_button: Button
 var _subtitle_label: Label
 var _type_buttons: Array = []
+
+## Fixed height reserved for the two-line subtitle so the buttons beneath it never shift when the
+## mode's blurb wraps to a different number of lines (Tim, 2026-07-01: buttons must not move when
+## the mode changes). Two lines of FONT_BODY plus a little breathing room.
+const SUBTITLE_RESERVED_HEIGHT := 96
+
+## Opacity of the UNSELECTED mode toggle, so it reads as the inactive choice while staying tappable.
+const DIM_MODE_ALPHA := 0.4
 
 
 func setup(tuning: TuningConfig) -> void:
@@ -117,36 +127,39 @@ func _build_list_view() -> Control:
 	card.offset_top = 0.0
 	card.offset_bottom = 0.0
 
-	# The list of buttons is centered within that card.
-	var center := CenterContainer.new()
-	card.add_child(center)
-
+	# One column filling the whole card. Every button below stretches to the card's full width
+	# (size_flags_horizontal EXPAND_FILL), so the layout is anchored to the fixed card width and NO
+	# button ever shifts sideways when a label's text length changes with the mode (Tim, 2026-07-01).
+	# A vertical spacer between the game list and the Close button pushes Close to the very bottom.
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 14)
-	center.add_child(column)
+	card.add_child(column)
 
-	var heading := Label.new()
-	heading.text = "MINIGAME TUNING"
-	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	heading.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
-	heading.add_theme_color_override("font_color", UiPalette.NAVY)
-	column.add_child(heading)
+	# The title now uses the shared tab-title format (make_tab_title) so it matches the tab
+	# headings on the game screen exactly — large, faux-bold, navy, centered (Tim, 2026-07-01).
+	column.add_child(UiPalette.make_tab_title("MINIGAME TUNING"))
 
 	_subtitle_label = Label.new()
 	_subtitle_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_subtitle_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_subtitle_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	# A fixed reserved height so a one- vs two-line blurb doesn't push the buttons below it up or down.
+	_subtitle_label.custom_minimum_size = Vector2(0, SUBTITLE_RESERVED_HEIGHT)
 	_subtitle_label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
 	_subtitle_label.add_theme_color_override("font_color", UiPalette.NAVY)
 	column.add_child(_subtitle_label)
 
-	# The large Challenge Mode toggle (Tim, 2026-06-30): switches every game launch below between
-	# normal Minigame Mode and endless Challenge Mode. Its label + style show the CURRENT mode; it is
-	# taller than the game buttons so it reads as the mode switch, not just another entry.
-	_mode_button = Button.new()
-	_mode_button.custom_minimum_size = Vector2(0, int(UiPalette.STANDARD_BUTTON_HEIGHT * 1.4))
-	_mode_button.add_theme_font_size_override("font_size", UiPalette.FONT_BUTTON)
-	_mode_button.pressed.connect(_toggle_mode)
-	column.add_child(_mode_button)
+	# Two side-by-side mode toggles (Tim, 2026-07-01, replacing the single flip button): tap a mode
+	# to select it. Both have fixed labels, so this row never changes size. The selected one is lit
+	# (mustard); the other is dimmed — see _apply_mode_selection.
+	var mode_row := HBoxContainer.new()
+	mode_row.add_theme_constant_override("separation", 12)
+	column.add_child(mode_row)
+
+	_minigame_mode_button = _make_mode_button("MINIGAME MODE", false)
+	mode_row.add_child(_minigame_mode_button)
+	_challenge_mode_button = _make_mode_button("CHALLENGE MODE", true)
+	mode_row.add_child(_challenge_mode_button)
 
 	# One button per type in the library. We read each type's display name by briefly
 	# instantiating it — a bare Minigame node is cheap and display_name() is safe to call
@@ -158,23 +171,30 @@ func _build_list_view() -> Control:
 		probe.free()
 
 		var button := Button.new()
-		button.custom_minimum_size = Vector2(420, UiPalette.STANDARD_BUTTON_HEIGHT)
+		# Height fixed; width stretches to the card so the Challenge-mode "— Best: N" suffix
+		# can't widen the button and shove the layout around.
+		button.custom_minimum_size = Vector2(0, UiPalette.STANDARD_BUTTON_HEIGHT)
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.clip_text = true
 		button.add_theme_font_size_override("font_size", UiPalette.FONT_BUTTON)
 		UiPalette.style_button(button, false)
 		button.pressed.connect(_on_type_pressed.bind(type_script))
 		column.add_child(button)
 		_type_buttons.append({"type": type_script, "button": button, "name": type_name})
 
-	# Set the toggle, subtitle, and game-button labels for the starting mode (Minigame).
+	# Set both toggles', the subtitle's, and the game-button labels for the starting mode (Minigame).
 	_refresh_mode_ui()
 
+	# Expanding spacer: eats the leftover height so the Close button sits at the bottom of the
+	# card, clearly separated from the list of minigames above rather than reading as one of them.
 	var spacer := Control.new()
-	spacer.custom_minimum_size = Vector2(0, 12)
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	column.add_child(spacer)
 
 	var close_button := Button.new()
 	close_button.text = "CLOSE"
 	close_button.custom_minimum_size = Vector2(0, UiPalette.STANDARD_BUTTON_HEIGHT)
+	close_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	close_button.add_theme_font_size_override("font_size", UiPalette.FONT_BUTTON)
 	UiPalette.style_button(close_button, true)  # red: leaving the screen
 	close_button.pressed.connect(_on_close_pressed)
@@ -183,20 +203,32 @@ func _build_list_view() -> Control:
 	return card
 
 
+## Build one of the two side-by-side mode toggles. `selects_challenge` marks which mode tapping it
+## chooses. Both stretch equally to fill the row (EXPAND_FILL) so the split is a fixed 50/50 and the
+## row never reflows; the lit/dimmed look is set by _apply_mode_selection.
+func _make_mode_button(label: String, selects_challenge: bool) -> Button:
+	var button := Button.new()
+	button.text = label
+	button.custom_minimum_size = Vector2(0, UiPalette.STANDARD_BUTTON_HEIGHT)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.clip_text = true
+	button.add_theme_font_size_override("font_size", UiPalette.FONT_BUTTON)
+	UiPalette.style_button(button, false)
+	button.pressed.connect(_select_mode.bind(selects_challenge))
+	return button
+
+
 # ---------------------------------------------------------------------------
 # Navigation
 # ---------------------------------------------------------------------------
 
-## Restyle the toggle + relabel everything for the current mode. In Challenge Mode each game button
-## also shows its saved high score, and the toggle turns red (the "hot" mode) to read as active.
+## Light the selected mode toggle, dim the other, refresh the subtitle, and relabel every game
+## button for the current mode. In Challenge Mode each game button also shows its saved high score.
 func _refresh_mode_ui() -> void:
+	_apply_mode_selection()
 	if _challenge_selected:
-		_mode_button.text = "CHALLENGE MODE — tap for Minigame"
-		UiPalette.style_button(_mode_button, true)   # red action styling marks the active mode
 		_subtitle_label.text = "Free play — no timer, no win/loss. Beat your best score!"
 	else:
-		_mode_button.text = "MINIGAME MODE — tap for Challenge"
-		UiPalette.style_button(_mode_button, false)
 		_subtitle_label.text = "Open any minigame to review it."
 	for entry in _type_buttons:
 		var type_name: String = entry["name"]
@@ -207,9 +239,16 @@ func _refresh_mode_ui() -> void:
 			button.text = type_name
 
 
-## Flip between Minigame Mode and Challenge Mode (the toggle button).
-func _toggle_mode() -> void:
-	_challenge_selected = not _challenge_selected
+## Light the selected mode's toggle (full mustard) and dim the other (faded), so the two side-by-side
+## buttons read as a segmented control — the lit one is the active mode.
+func _apply_mode_selection() -> void:
+	_minigame_mode_button.modulate.a = DIM_MODE_ALPHA if _challenge_selected else 1.0
+	_challenge_mode_button.modulate.a = 1.0 if _challenge_selected else DIM_MODE_ALPHA
+
+
+## Select a mode from the two side-by-side toggles. Re-tapping the current mode simply re-refreshes.
+func _select_mode(challenge: bool) -> void:
+	_challenge_selected = challenge
 	_refresh_mode_ui()
 
 

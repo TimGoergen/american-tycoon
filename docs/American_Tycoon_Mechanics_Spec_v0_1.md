@@ -194,8 +194,19 @@ juice + a locked per-type difficulty *direction*. Each type owns its own scoring
 constants in its script (e.g. Timing Bar `ZONE_HALF_MIN` / `SPEED_RAMP`, Catch Money
 `MISS_PENALTY` + spawn ramp, Balance `DRIFT_MAX`, Match Three `POINTS_PER_GEM`/`SCORE_FULL`) —
 all first-pass, pending an on-device re-tune. Visual treatment: the minigame screen and Minigame
-Tuning screen render over a themed backdrop (`art/backgrounds/minigame_background.png`) with a
-semi-transparent (50% cream), smaller card.
+Tuning screen render over a themed backdrop (`art/backgrounds/minigame_background.png`, corners
+CPU-rounded to the frame) with a semi-transparent (70% cream), smaller card; the Tuning list sits
+on a card matching the Get Ready panel exactly.
+
+**Challenge Mode (2026-06-30).** A toggle on the Minigame Tuning screen switches every game launch
+between normal Minigame Mode and **Challenge Mode**: endless free play, no countdown, no reward
+multiplier. The host sets `Minigame.challenge_mode = true` before `begin()`; a type then runs
+forever (never emits `completed`, mistakes don't stop play) and reports a raw cumulative score via
+`Minigame.get_score() -> int` (points / successful locks / coins caught / rounds cleared / seconds
+in zone / baskets). The host hides the reward chrome, shows a live Score + Best, and DONE records
+the score. High scores are per-type, saved across sessions in `ChallengeScores`
+(`user://challenge_scores.json`), independent of the dynasty save. `get_performance()` is untouched
+and simply unused in Challenge Mode.
 
 The same minigame host (`MinigameScreen`) serves **three sites** (GDD §5.5), each reusing the
 universal multiplier for a different reward: this prestige round (scales Legacy), the welcome-back

@@ -225,12 +225,32 @@ keep more + a bonus; a weak round or Skip keeps only the minimum) **before** the
 previously the player saw the goal only once play began (Tim, 2026-06-29) — then fades off to
 unmask the game. Each type got its own juice + a locked difficulty *direction*
 (some harder, some "made clearer", Basketball held) — all difficulty constants are first-pass,
-pending an on-device re-tune (plan step 5). **Visual treatment (Tim, 2026-06-29):** the minigame
-screen and the Minigame Tuning screen now float over a **themed "Riches & Rolls" casino/library
-backdrop** (`art/backgrounds/minigame_background.png`); the card sits in the backdrop's ornate
-frame and is **semi-transparent (50% cream)** and smaller (20% shorter, 10% narrower) so the
-scene reads around and through it. The reward MATH is unchanged: every type still only reports a
-[0,1] performance and the host maps it to the universal multiplier.
+pending an on-device re-tune (plan step 5). **Visual treatment (Tim, 2026-06-29 → 2026-06-30):**
+the minigame screen and the Minigame Tuning screen float over a **themed casino/library backdrop**
+(`art/backgrounds/minigame_background.png`, its corners CPU-rounded to the screen frame so the
+bright bottom-corner art doesn't square off); the card is **semi-transparent (70% cream)** and
+smaller (20% shorter, 10% narrower) so the scene reads around and through it. The **Minigame Tuning
+list sits on a card that matches the Get Ready panel exactly** (same size/shape, same 70% cream).
+The reward MATH is unchanged: every type still only reports a [0,1] performance and the host maps
+it to the universal multiplier.
+
+**Challenge Mode (Tim, 2026-06-30).** The Minigame Tuning screen has a large toggle switching
+between **Minigame Mode** (default — normal reward-style review play) and **Challenge Mode**: a
+free-play arcade layer with **no time limit and no win/loss** where a chosen type runs endlessly
+until the player taps DONE. Each type reports a raw cumulative **score** (points / locks / catches
+/ rounds recalled / seconds balanced / baskets) instead of the [0,1] reward metric; mistakes never
+end a run (Timing misses don't stop, Memory soft-resets the round on a wrong tap, etc.). A
+**per-game high score is saved across sessions** (`ChallengeScores` → `user://challenge_scores.json`);
+the play view shows a live Score + Best (Best ticks up as you pass it), and the tuning list shows
+each game's best. Currently a Tuning-screen (dev/settings) feature; could be promoted player-facing
+later.
+
+**Basketball specifics (Tim, 2026-06-30).** The aim guide is a **force wedge**: a triangle whose
+point sits at the ball's launch spot and fans out wide in the direction of travel, its size + a
+single blue→purple→red color both scaling with the pull's force (red = maxed). Pull power was
+raised so a short drag reaches the hoop (the ball rests near the floor with little room to pull).
+The board has a generous margin, a **thick black rounded outline**, and a **gym backdrop**
+(`art/backgrounds/basketball_court.png`) inside the rounded corners.
 
 **Build phasing:** (1) **framework** — a host that picks a random minigame type and maps its
 [0,1] performance to the universal multiplier; refactor match-3 into the first type; route

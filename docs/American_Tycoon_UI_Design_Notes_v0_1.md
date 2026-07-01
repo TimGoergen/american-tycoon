@@ -314,12 +314,14 @@ The shared minigame host (`MinigameScreen`) and the Minigame Tuning review scree
 (`MinigameReviewScreen`, Settings) got a deliberate polish pass — plan
 `Plans/Minigame_Polish_Pass.md`. As-built:
 
-- **Themed backdrop.** Both screens float over a full-bleed "Riches & Rolls" casino/library
-  image (`art/backgrounds/minigame_background.png`) inside the standard black bezel. The minigame
-  card sits in the backdrop's ornate frame; the Tuning list's cream plate sits over it.
-- **Translucent, smaller card.** The minigame card fill is **50% cream** and the card is **20%
-  shorter, 10% narrower** than before, so the backdrop reads around and through it. The Tuning
-  list's viewing-area plate is likewise **50%-alpha cream**.
+- **Themed backdrop.** Both screens float over a full-bleed casino/library image
+  (`art/backgrounds/minigame_background.png`) inside the standard black bezel, its corners
+  CPU-rounded to the screen frame (a plain TextureRect, not clip_children — only one clip stencil
+  works at a time and Main owns it) so the bright bottom-corner art doesn't square off.
+- **Translucent, smaller card — matched across both screens.** The minigame card fill is **70%
+  cream** and the card is **20% shorter, 10% narrower**, so the backdrop reads around and through
+  it. The **Minigame Tuning list now sits on a card of the SAME size, shape, and 70% cream as the
+  Get Ready panel** (it no longer uses the old full-screen plate).
 - **Timer as focal point.** Large, centered, faux-bold; pulses amber under 10s and blinks gold +
   scales under 3s. A **"⏸" cue** appears while a game pauses the clock mid-animation.
 - **Spectrum bar = fill + color only (no numbers).** It glides (smoothed), with an edge-cap that
@@ -337,3 +339,13 @@ The shared minigame host (`MinigameScreen`) and the Minigame Tuning review scree
   difficulty *direction* (Timing Bar / Catch Money harder; Match Three / Memory / Balance made
   clearer; Basketball held). All difficulty constants are **first-pass — on-device re-tune owed**
   (use Settings → Minigame Tuning to preview each type).
+- **Challenge Mode toggle (2026-06-30).** A large toggle on the Tuning list switches every game
+  launch between Minigame Mode (default) and **Challenge Mode** — endless free play, no timer, no
+  win/loss, per-game high scores saved across sessions. The toggle turns red when Challenge is
+  active; the subtitle changes; each game button shows "Best: N". In a Challenge round the reward
+  chrome (timer/spectrum/skip/opt-out) is swapped for a big live **Score** + **Best**, and DONE
+  ends the run and saves the high score.
+- **Basketball board (2026-06-30).** Generous margin around the board, a **thick black rounded
+  outline**, and a gym backdrop (`art/backgrounds/basketball_court.png`) inside the rounded
+  corners. The aim guide is a **force wedge** — point at the ball, fanning out toward the shot
+  direction, size + a single blue→purple→red color scaling with pull force (red = maxed).

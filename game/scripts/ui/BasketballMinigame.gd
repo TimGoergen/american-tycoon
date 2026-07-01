@@ -86,9 +86,18 @@ const FLOOR_FRICTION := 0.70
 ## balls come to rest promptly instead of dribbling out a long tail of tiny bounces.
 const REST_SPEED := 95.0
 
-## Thickness (px) of the dark-gray outline that frames the board and defines the walls, floor,
-## and ceiling the balls bounce against.
-const WALL_THICKNESS := 6.0
+## Thickness (px) of the outline that frames the board and defines the walls, floor, and ceiling
+## the balls bounce against. Doubled 6 -> 12 and recolored to BLACK with rounded corners (Tim,
+## 2026-06-30) — the physics wall inset uses the same value, so the ball bounces at the inner edge
+## of the drawn border.
+const WALL_THICKNESS := 12.0
+## Corner radius (px) of the board's rounded outline + its background image's rounded corners.
+const BOARD_CORNER_RADIUS := 28
+## Empty space (px) between the board and the surrounding card, on every side. Provided by a
+## MarginContainer around the play field (Tim, 2026-06-30: "3× as much space around the edge").
+const BOARD_MARGIN := 48
+## The gym backdrop shown inside the board's rounded outline (Tim, 2026-06-30).
+const BOARD_IMAGE := "res://art/backgrounds/basketball_court.png"
 
 # Each ball is a Dictionary: { "pos": Vector2, "vel": Vector2, "state": String, "spin": float },
 # plus a transient "prev" (its start-of-frame position, written during the motion pass and read by
@@ -140,6 +149,10 @@ var _aim_index: int = -1
 var _aim_anchor: Vector2 = Vector2.ZERO
 
 var _play: Control
+## The gym backdrop, CPU-baked to the board size with rounded corners (so it nests inside the
+## rounded outline) and cached; re-baked only when the board size changes.
+var _board_bg: ImageTexture
+var _board_bg_size: Vector2 = Vector2.ZERO
 
 # Drawn each frame; preloaded so the texture is ready the instant play begins. The hoop is drawn
 # with plain shapes (an ellipse rim + a net), so only the ball needs a texture.
@@ -193,11 +206,21 @@ func begin(tuning: TuningConfig) -> void:
 	_play.draw.connect(_draw_play)
 	_play.gui_input.connect(_on_play_input)
 
+	# A margin around the board so it doesn't crowd the card edges (Tim, 2026-06-30). Wrapping the
+	# play field in a MarginContainer keeps the board's own coordinate space at 0..size, so all the
+	# physics/aim math below is unchanged — the space is provided entirely by the container.
+	var board_margin := MarginContainer.new()
+	board_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	board_margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	for side in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
+		board_margin.add_theme_constant_override(side, BOARD_MARGIN)
+	board_margin.add_child(_play)
+
 	var column := VBoxContainer.new()
 	column.set_anchors_preset(Control.PRESET_FULL_RECT)
 	column.add_theme_constant_override("separation", 12)
 	column.add_child(intro)
-	column.add_child(_play)
+	column.add_child(board_margin)
 	add_child(column)
 
 
@@ -528,6 +551,12 @@ func _release_sling() -> void:
 func _draw_play() -> void:
 	var bounds := _play.size
 
+	# The gym backdrop fills the board, behind all the gameplay, with rounded corners baked in so it
+	# nests inside the rounded outline drawn last (Tim, 2026-06-30).
+	_ensure_board_bg(bounds)
+	if _board_bg != null:
+		_play.draw_texture_rect(_board_bg, Rect2(Vector2.ZERO, bounds), false)
+
 	# The hoop is drawn in layers so a falling ball reads as dropping THROUGH it: the net and the
 	# back (far) half of the rim go down first, then the balls, then the front (near) half of the
 	# rim on top. The flash brightens the rim briefly when a basket is made.
@@ -554,14 +583,69 @@ func _draw_play() -> void:
 	# under the board frame so it never spills past the walls visually.
 	_draw_celebration()
 
-	# The dark-gray frame that defines the walls, floor, and ceiling. Drawn last so it reads as a
-	# solid boundary in front of a ball pressed right up against it. Inset by half its thickness so
-	# the whole outline sits inside the board.
-	var frame := Rect2(
-		Vector2(WALL_THICKNESS * 0.5, WALL_THICKNESS * 0.5),
-		bounds - Vector2(WALL_THICKNESS, WALL_THICKNESS)
+	# The board outline: a thick BLACK, ROUNDED-corner border drawn last so it reads as a solid
+	# boundary in front of a ball pressed against it (Tim, 2026-06-30). A StyleBoxFlat gives the
+	# rounded corners a plain draw_rect can't; its border grows inward from the board rect, matching
+	# the WALL_THICKNESS the physics uses for the wall inset.
+	var border := StyleBoxFlat.new()
+	border.bg_color = Color.TRANSPARENT
+	border.border_color = Color.BLACK
+	border.set_border_width_all(int(WALL_THICKNESS))
+	border.set_corner_radius_all(BOARD_CORNER_RADIUS)
+	_play.draw_style_box(border, Rect2(Vector2.ZERO, bounds))
+
+
+## Bake the gym backdrop to the current board size with rounded corners, cached until the size
+## changes. We CPU-bake (rather than clip_children) because the project supports only one clip
+## stencil at a time and Main already owns it (see MinigameScreen for the full note).
+func _ensure_board_bg(size: Vector2) -> void:
+	var target := Vector2i(int(size.x), int(size.y))
+	if target.x < 1 or target.y < 1 or (_board_bg != null and _board_bg_size == size):
+		return
+	_board_bg_size = size
+	var source: Texture2D = load(BOARD_IMAGE)
+	if source == null:
+		return
+	var image := source.get_image()
+	if image.is_compressed():
+		image.decompress()
+	image.convert(Image.FORMAT_RGBA8)
+	# Scale to COVER the board (fill fully, crop the overflow), then center-crop to size.
+	var cover := maxf(float(target.x) / image.get_width(), float(target.y) / image.get_height())
+	image.resize(
+		int(ceil(image.get_width() * cover)), int(ceil(image.get_height() * cover)),
+		Image.INTERPOLATE_BILINEAR
 	)
-	_play.draw_rect(frame, UiPalette.DARK_GRAY, false, WALL_THICKNESS)
+	var crop_offset := Vector2i((image.get_width() - target.x) / 2, (image.get_height() - target.y) / 2)
+	var fitted := image.get_region(Rect2i(crop_offset, target))
+	_round_image_corners(fitted, BOARD_CORNER_RADIUS)
+	_board_bg = ImageTexture.create_from_image(fitted)
+
+
+## Make the four corners of `image` transparent to a quarter-circle of `radius`, so the backdrop
+## reads with rounded corners that match the board outline.
+func _round_image_corners(image: Image, radius: int) -> void:
+	var w := image.get_width()
+	var h := image.get_height()
+	var corners := [
+		{"center": Vector2i(radius, radius), "dir": Vector2i(-1, -1)},
+		{"center": Vector2i(w - radius, radius), "dir": Vector2i(1, -1)},
+		{"center": Vector2i(radius, h - radius), "dir": Vector2i(-1, 1)},
+		{"center": Vector2i(w - radius, h - radius), "dir": Vector2i(1, 1)},
+	]
+	for corner in corners:
+		var center: Vector2i = corner["center"]
+		var dir: Vector2i = corner["dir"]
+		for offset_y in range(radius):
+			for offset_x in range(radius):
+				if Vector2(offset_x, offset_y).length() <= radius:
+					continue
+				var pixel := center + Vector2i(dir.x * offset_x, dir.y * offset_y)
+				if pixel.x < 0 or pixel.y < 0 or pixel.x >= w or pixel.y >= h:
+					continue
+				var color := image.get_pixel(pixel.x, pixel.y)
+				color.a = 0.0
+				image.set_pixel(pixel.x, pixel.y, color)
 
 
 ## Draw the slingshot feedback: a thin connector from the launch point to the held ball, plus the

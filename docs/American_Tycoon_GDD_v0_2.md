@@ -308,6 +308,14 @@ Earth runs on **one currency — the dollar.** Alien civilizations are *flavor, 
 
 A future staffer-card stat: one-time hire cost beside lifetime revenue generated — two numbers drifting apart by ten orders of magnitude, no commentary. The labor-vs-capital argument as a stat line. No longer the centerpiece now that staffing is a tiered track; tracked as a polish-phase addition.
 
+### 6.5 Staffer portraits — the layered generator (proposed 2026-07-01, M3)
+
+Every automated property shows a **face** in its portrait circle. There are ~100 role slots — **17 property rungs × 6 epoch tiers** — so portraits are generated **procedurally from stacked art layers** rather than hand-authored one by one. A `PortraitGenerator` composites each face from a base/hair/eyes/clothing/accessory stack, picking one variant per layer from a **seed derived from the role** (so a given staffer is stable across redraws, screens, and the run's lifetime), then **bakes it once** to a cached texture (the portrait circle redraws every frame, so per-frame compositing is out). Layers are authored **white and tinted at draw time** — the same trick the icon set already uses — so a few parts and a small palette yield thousands of recognizable faces.
+
+- **Per-epoch part sets.** The six tiers are different *kinds* of being (humans → light-beings → machines → fungal hive-mind → crystalloids → time-eaters, §6.2), so each tier draws from its own part set. Earth uses a full human paper-doll taxonomy; the alien tiers are expected to use a **cheaper, more abstract treatment** (a per-epoch silhouette + procedural accent patterns in that epoch's palette) since aliens don't need human features — this keeps the art bill for tiers 2–6 affordable while still distinct.
+- **Override hatch.** `PropertyConfig.manager_portrait`, when set, replaces the generated face — an escape hatch for a hand-authored hero portrait on a flagship role.
+- **Distinct from the dynasty heir** (§8.2), who stays portrait-less in v1. Full design + phasing (Earth-slice-first) and the three open decisions (seed basis, alien treatment, scope) live in `Plans/Layered_Staffer_Portrait_Generator.md`.
+
 ---
 
 ## 7. Offline Earnings — A Purchased Class Privilege
@@ -427,7 +435,7 @@ The native visual language of the American Dream: 1950s advertising — the era 
 - **The joke is sincerity:** Money Laundering as a Maytag ad ("Freshness You Can Bank On!"); MLM as a Tupperware party; Legislative Assets as a handshake under bunting.
 - **Not a period setting.** NFTs and Day Trading rendered in 50s ad vocabulary — the anachronism is the gag. The aesthetic is the Dream's eternal branding.
 - **Evolving backdrops (added v0.2):** 6–8 painted mid-century backdrops per planet, crossfading at net-worth thresholds — Main Street diner-and-alley → suburban boomtown → downtown skyline → penthouse → marble lobby → the Capitol dome at golden hour. An ambient progress bar needing no numbers. Prestige interaction: each heir inherits post-tax, so the backdrop briefly regresses a tier and re-climbs visibly faster — "speeds up every time," rendered in scenery.
-- **Asset bill (Earth):** ~12 property hero illustrations, ~12 staffer cards, 6–8 backdrops, ad-styled UI chrome, ceremony screens (obituary/will, Final Dollar set).
+- **Asset bill (Earth):** ~12 property hero illustrations, 6–8 backdrops, ad-styled UI chrome, ceremony screens (obituary/will, Final Dollar set). **Staffer portraits are generated, not drawn one-by-one:** rather than ~100 hand-authored staffer cards (17 rungs × 6 epochs), a layered generator composites faces from a small per-epoch part library (§6.5, `Plans/Layered_Staffer_Portrait_Generator.md`) — the Earth human part set is the priority slice.
 - **Audio:** chipper exotica/muzak — the hold music of prosperity. (Winds down at the Final Dollar.)
 
 ---

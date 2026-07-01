@@ -138,6 +138,24 @@ var _backdrop: TextureRect
 ## The size the backdrop was last baked for, so we only re-bake when it actually changes.
 var _baked_backdrop_size: Vector2 = Vector2.ZERO
 
+## Challenge Mode (Tim, 2026-06-30): a free-play arcade mode launched from the Minigame Tuning
+## screen. No time limit, no win/loss reward — the chosen type runs endlessly and we track the raw
+## score, saving a per-type high score. When true the host hides the timer/spectrum/skip reward
+## chrome and shows a live score + best readout, and DONE ends the run (saving the high score).
+var _challenge_mode: bool = false
+var _score_label: Label
+var _highscore_label: Label
+## The best score to beat this run — starts at the saved high score and rises live as the player
+## passes it, so the "Best" readout ticks up in real time.
+var _challenge_high: int = 0
+## The active type's display name — the key under which its Challenge high score is saved.
+var _active_type_key: String = ""
+
+## The Get Ready gate's stakes and hint lines, kept as fields so start_game / start_challenge can
+## set the wording per mode (reward stakes vs. "play as long as you like").
+var _begin_stakes: Label
+var _begin_hint: Label
+
 
 func setup(tuning: TuningConfig) -> void:
 	_tuning = tuning
@@ -317,6 +335,20 @@ func _build_play_view() -> Control:
 	_timer_label.add_theme_font_override("font", UiPalette.make_bold_font())
 	column.add_child(_timer_label)
 
+	# Challenge Mode readouts (hidden in normal reward rounds): the live score, big and central like
+	# the timer it replaces, with the best-to-beat under it. start_challenge shows them; start_game
+	# hides them.
+	_score_label = _make_label("", UiPalette.FONT_DISPLAY, UiPalette.MONEY_GREEN)
+	_score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_score_label.add_theme_font_override("font", UiPalette.make_bold_font())
+	_score_label.visible = false
+	column.add_child(_score_label)
+
+	_highscore_label = _make_label("", UiPalette.FONT_SUBHEAD, UiPalette.DARK_GOLD)
+	_highscore_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_highscore_label.visible = false
+	column.add_child(_highscore_label)
+
 	# The universal spectrum bar — identical for every minigame type; it reads the active type's
 	# live performance. It carries meaning by fill + color ONLY (no numbers): warm red→gold below
 	# the "full" line, green→blue into the extra-high bonus band.
@@ -433,21 +465,18 @@ func _build_begin_overlay() -> Control:
 	_begin_howto.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(_begin_howto)
 
-	# The universal win/lose stakes — the SAME for every type, so it is built once here. It tells
-	# the player, before they start, that playing well keeps more (with a bonus on top) while a weak
-	# round or a Skip keeps only the minimum.
-	var stakes := _make_label(
-		"Play well to keep MORE — a great round earns a bonus on top. A weak round or Skip keeps only the minimum.",
-		UiPalette.FONT_LABEL, UiPalette.DARK_GOLD
-	)
-	stakes.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	stakes.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	box.add_child(stakes)
+	# The stakes line — reward win/lose in a normal round, "play as long as you like" in Challenge
+	# Mode. Set per mode by start_game / start_challenge (kept as a field for that).
+	_begin_stakes = _make_label("", UiPalette.FONT_LABEL, UiPalette.DARK_GOLD)
+	_begin_stakes.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_begin_stakes.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(_begin_stakes)
 
-	var hint := _make_label("The clock starts when you press Begin.", UiPalette.FONT_LABEL, UiPalette.NAVY)
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	box.add_child(hint)
+	# The closing hint ("The clock starts…" normally; hidden in Challenge Mode). Also a field.
+	_begin_hint = _make_label("The clock starts when you press Begin.", UiPalette.FONT_LABEL, UiPalette.NAVY)
+	_begin_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_begin_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(_begin_hint)
 
 	var begin_button := Button.new()
 	begin_button.custom_minimum_size = Vector2(360, 110)
@@ -537,6 +566,10 @@ static func first_contact_reward(cap: int, property_name: String) -> Dictionary:
 func start_game(
 		reward: Dictionary, bonus_max: float, forced_type: Script = null, review_mode: bool = false
 ) -> void:
+	# A normal reward round: make sure the reward chrome (timer/spectrum/skip/opt-out) is shown and
+	# the Challenge chrome hidden, in case the previous round was a Challenge run.
+	_challenge_mode = false
+	_set_challenge_chrome(false)
 	_base_amount = float(reward.get("base", 0.0))
 	_reward_noun = String(reward.get("noun", "Legacy"))
 	_result_heading = String(reward.get("heading", "THE INHERITANCE"))
@@ -604,10 +637,75 @@ func start_game(
 
 	_begin_title.text = _active_minigame.display_name()
 	_begin_howto.text = _active_minigame.how_to_play()
-	# The Begin gate is opaque at the start of every round; _on_begin_pressed fades it off.
+	# Reward stakes on the gate (Challenge Mode replaces this in start_challenge).
+	_begin_stakes.text = "Play well to keep MORE — a great round earns a bonus on top. A weak round or Skip keeps only the minimum."
+	_begin_stakes.visible = true
+	_begin_hint.text = "The clock starts when you press Begin."
+	_begin_hint.visible = true
+
 	_begin_overlay.modulate = Color.WHITE
 	_begin_overlay.visible = true
 	visible = true
+
+
+## Start a CHALLENGE MODE run (Tim, 2026-06-30): the given type runs ENDLESSLY — no timer, no
+## win/loss — and the host tracks its raw score, shown live with the saved high score to beat.
+## Launched from the Minigame Tuning screen, so review_mode is on (a Back button appears). Tapping
+## DONE (or Back) saves the high score and returns to the list.
+func start_challenge(type_script: Script) -> void:
+	_challenge_mode = true
+	_review_mode = true
+	_set_challenge_chrome(true)
+
+	# Back button visible (review context); the purpose blurb is hidden — the score readouts take
+	# the top slot instead.
+	for back in _back_buttons:
+		(back as Button).visible = true
+	if _purpose_label != null:
+		_purpose_label.visible = false
+
+	for child in _play_area.get_children():
+		child.queue_free()
+	_active_minigame = type_script.new()
+	_active_minigame.set_anchors_preset(Control.PRESET_FULL_RECT)
+	# Tell the type to run endlessly BEFORE begin() (see Minigame.challenge_mode).
+	_active_minigame.challenge_mode = true
+	_play_area.add_child(_active_minigame)
+	# A type shouldn't self-complete in Challenge Mode, but connect anyway — a stray completion is
+	# simply ignored (see _on_minigame_completed).
+	_active_minigame.completed.connect(_on_minigame_completed)
+
+	_active_type_key = _active_minigame.display_name()
+	_challenge_high = ChallengeScores.get_high_score(_active_type_key)
+	_score_label.text = "Score: 0"
+	_highscore_label.text = "Best: %s" % _group_thousands(_challenge_high)
+	# The skip control becomes the "I'm done" control in Challenge Mode.
+	_skip_button.text = "DONE"
+
+	_play_view.visible = false
+	_play_view.modulate = Color.WHITE
+	_result_view.visible = false
+	_playing = false
+
+	_begin_title.text = _active_minigame.display_name()
+	_begin_howto.text = _active_minigame.how_to_play()
+	_begin_stakes.text = "Challenge Mode — no timer, play as long as you like. Beat your best score!"
+	_begin_stakes.visible = true
+	_begin_hint.visible = false
+
+	_begin_overlay.modulate = Color.WHITE
+	_begin_overlay.visible = true
+	visible = true
+
+
+## Swap the reward chrome for the Challenge chrome. Reward mode (on=false): the timer, spectrum
+## bar, and opt-out show. Challenge mode (on=true): the live score + best-to-beat show instead.
+func _set_challenge_chrome(on: bool) -> void:
+	_timer_label.visible = not on
+	_keep_bar.visible = not on
+	_opt_out_check.visible = not on
+	_score_label.visible = on
+	_highscore_label.visible = on
 
 
 ## Begin pressed on the Get Ready gate: hide it, start the chosen type, and unpause the clock — the
@@ -637,6 +735,10 @@ func _start_active_round() -> void:
 func _process(delta: float) -> void:
 	if not _playing:
 		return
+	# Challenge Mode has no countdown and no win/loss — just keep the live score readout current.
+	if _challenge_mode:
+		_update_challenge_score()
+		return
 	# Pause the countdown while a type is mid-animation (e.g. match-3 cascades) so animation time
 	# isn't charged to the player — but keep the spectrum bar gliding and show a "held" cue on the
 	# timer so a stalled countdown doesn't read as a bug (plan §1).
@@ -649,10 +751,45 @@ func _process(delta: float) -> void:
 		_end_round()
 
 
-## A type finished on its own (e.g. the timing bar's last lock) — end with its result.
+## Refresh the Challenge Mode readouts: the live score, and the best-to-beat (which ticks up in real
+## time once the current score passes the saved high, so a new record is visible as it happens).
+func _update_challenge_score() -> void:
+	var score := _active_minigame.get_score() if _active_minigame != null else 0
+	_score_label.text = "Score: %s" % _group_thousands(score)
+	if score > _challenge_high:
+		_challenge_high = score
+	_highscore_label.text = "Best: %s" % _group_thousands(_challenge_high)
+
+
+## A type finished on its own (e.g. the timing bar's last lock) — end with its result. Ignored in
+## Challenge Mode, which never ends on its own (the player taps DONE).
 func _on_minigame_completed(_performance: float) -> void:
-	if _playing:
+	if _playing and not _challenge_mode:
 		_end_round()
+
+
+## Format an integer with thousands separators ("1,240"), for the Challenge score readouts.
+func _group_thousands(value: int) -> String:
+	var digits := str(absi(value))
+	var grouped := ""
+	var count := 0
+	for i in range(digits.length() - 1, -1, -1):
+		grouped = digits[i] + grouped
+		count += 1
+		if count % 3 == 0 and i > 0:
+			grouped = "," + grouped
+	return ("-" if value < 0 else "") + grouped
+
+
+## End a Challenge run: record the final score (updates the saved high score if beaten) and return
+## to the Minigame Tuning list. Called by DONE and by Back.
+func _end_challenge() -> void:
+	_playing = false
+	var score := _active_minigame.get_score() if _active_minigame != null else 0
+	ChallengeScores.record_score(_active_type_key, score)
+	_challenge_mode = false
+	visible = false
+	back_pressed.emit()
 
 
 # ---------------------------------------------------------------------------
@@ -842,15 +979,23 @@ func _animate_result() -> void:
 
 
 ## Back (review mode only): abandon the round and return to the review list. No result is
-## emitted — reviewing a minigame never touches the run's Legacy.
+## emitted — reviewing a minigame never touches the run's Legacy. In a Challenge run it saves the
+## high score on the way out (same as DONE).
 func _on_back_pressed() -> void:
+	if _challenge_mode:
+		_end_challenge()
+		return
 	_playing = false
 	visible = false
 	back_pressed.emit()
 
 
-## Skip: bank the keep floor (the worst result), leave immediately.
+## Skip (reward round): bank the keep floor (the worst result) and leave. In Challenge Mode this is
+## the DONE button — it saves the high score and returns to the list instead.
 func _on_skip_pressed() -> void:
+	if _challenge_mode:
+		_end_challenge()
+		return
 	_playing = false
 	visible = false
 	finished.emit(_tuning.minigame_keep_floor, _opt_out)

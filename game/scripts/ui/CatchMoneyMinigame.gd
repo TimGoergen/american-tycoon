@@ -92,6 +92,12 @@ func get_performance() -> float:
 	return clampf(net / float(TARGET_COINS), 0.0, 1.0)
 
 
+## Challenge Mode's running high score = coins CAUGHT this run. It only ever increases (a miss
+## never subtracts here — see the class note), so the host can sample it live for a high-score bar.
+func get_score() -> int:
+	return _caught
+
+
 func result_summary() -> String:
 	return "Caught %d of %d" % [_caught, TARGET_COINS]
 
@@ -118,8 +124,12 @@ func _process(delta: float) -> void:
 		if is_instance_valid(glint):
 			glint.modulate.a = glint_alpha
 
-	# Spawn until we've dropped the whole batch, at the current (ramping) interval.
-	if _spawned < TARGET_COINS:
+	# Spawn coins at the current (ramping) interval. Normal mode drops one fixed batch of
+	# TARGET_COINS; Challenge Mode ignores that limit and spawns FOREVER. The ramp self-caps at
+	# SPAWN_INTERVAL_END because _current_spawn_interval() clamps its progress to 1.0, so the
+	# late-round "rush" speed becomes the sustained speed rather than accelerating without bound —
+	# fast but still playable indefinitely.
+	if challenge_mode or _spawned < TARGET_COINS:
 		_spawn_timer += delta
 		if _spawn_timer >= _current_spawn_interval():
 			_spawn_timer = 0.0
@@ -136,8 +146,9 @@ func _process(delta: float) -> void:
 			coin.queue_free()
 			_spawn_miss_effect(drop_center)
 
-	# All spawned and none left on screen -> the round is over.
-	if _spawned >= TARGET_COINS and _coins.is_empty():
+	# All spawned and none left on screen -> the round is over. Challenge Mode never self-completes
+	# (it keeps spawning above), so this end check applies to normal (reward) mode only.
+	if not challenge_mode and _spawned >= TARGET_COINS and _coins.is_empty():
 		_running = false
 		completed.emit(get_performance())
 

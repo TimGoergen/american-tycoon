@@ -12,6 +12,13 @@ extends Minigame
 # tap plays a red game-over beat and a full sequence a green round-clear celebration before the
 # result. The host countdown is held (is_busy) only during those end beats so they're seen — the
 # watch/play timing is unchanged, so difficulty is unchanged.
+#
+# Challenge Mode (2026-06-30): when the host sets `challenge_mode` true before begin(), this runs
+# ENDLESSLY. There is no target and no game-over: a wrong tap does NOT end play — it soft-resets the
+# CURRENT round (same length, a fresh random sequence) so the player retries, and the sequence only
+# grows once a round is recalled correctly. We never emit `completed` in this mode; the host ends the
+# run itself and reads get_score() (rounds cleared) live. Normal (reward) mode is unchanged: every
+# new branch below is guarded on `challenge_mode`, so the wrong-tap game-over beat still fires.
 
 ## Rounds (sequence length) that make a full game (also the performance denominator).
 const TARGET_ROUNDS := 8
@@ -99,6 +106,13 @@ func get_performance() -> float:
 	return clampf(float(_rounds_done) / float(TARGET_ROUNDS), 0.0, 1.0)
 
 
+## Rounds cleared this run — the raw high-score for Challenge Mode. It equals the highest sequence
+## length recalled correctly, is cumulative and NON-DECREASING (a wrong tap leaves it unchanged), and
+## the host samples it live. Fine to return in both modes; the host only uses it in Challenge Mode.
+func get_score() -> int:
+	return _rounds_done
+
+
 func result_summary() -> String:
 	return "Recalled %d of %d rounds" % [_rounds_done, TARGET_ROUNDS]
 
@@ -149,8 +163,25 @@ func _set_status(text: String, color: Color) -> void:
 ## Begin a round: extend the sequence by one and play it back (input is locked meanwhile).
 func _start_round() -> void:
 	_sequence.append(_rng.randi_range(0, 3))
+	await _playback_then_enable("Watch…")
+
+
+## Challenge Mode only: replay the CURRENT round after a miss. The sequence keeps its length (so the
+## player retries the same difficulty, not an easier one) but gets a fresh random pattern, then plays
+## back and re-enables input. The score is untouched — no round was cleared.
+func _soft_reset_round() -> void:
+	var length := _sequence.size()
+	_sequence.clear()
+	for _i in range(length):
+		_sequence.append(_rng.randi_range(0, 3))
+	await _playback_then_enable("Missed — watch again…")
+
+
+## Shared tail for both a fresh round and a Challenge-Mode retry: reset the input cursor, play the
+## sequence back with input locked, then (if still running) hand the turn to the player.
+func _playback_then_enable(watch_text: String) -> void:
 	_input_index = 0
-	_set_status("Watch…", UiPalette.MUSTARD_GOLD)
+	_set_status(watch_text, UiPalette.MUSTARD_GOLD)
 	await _play_sequence()
 	if not _running:
 		return
@@ -195,7 +226,13 @@ func _on_pad_input(event: InputEvent, pad_id: int) -> void:
 		)
 
 	if pad_id != _sequence[_input_index]:
-		# Wrong — the game ends here with whatever rounds were banked, after a red game-over beat.
+		if challenge_mode:
+			# Challenge Mode: a miss never ends play. Keep the score, then soft-reset the current
+			# round (same length, fresh pattern) so the player retries. No game-over beat.
+			_accepting_input = false
+			_soft_reset_round()
+			return
+		# Normal mode: the game ends here with whatever rounds were banked, after a red game-over beat.
 		_running = false
 		_accepting_input = false
 		_play_game_over_beat(pad_id)
@@ -206,7 +243,11 @@ func _on_pad_input(event: InputEvent, pad_id: int) -> void:
 		# Whole sequence repeated — round complete.
 		_rounds_done += 1
 		_accepting_input = false
-		if _rounds_done >= TARGET_ROUNDS:
+		if challenge_mode:
+			# Challenge Mode: no target and no win screen — grow by one and keep going forever.
+			_set_status("Round %d cleared!" % _rounds_done, UiPalette.MONEY_GREEN)
+			_start_round()
+		elif _rounds_done >= TARGET_ROUNDS:
 			# Full game — celebrate before handing off to the result screen.
 			_running = false
 			_play_round_clear_celebration()

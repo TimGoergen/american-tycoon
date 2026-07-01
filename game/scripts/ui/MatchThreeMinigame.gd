@@ -291,6 +291,15 @@ func _build_board_frame() -> Control:
 	return frame
 
 
+## Challenge Mode's high-score metric (see Minigame.get_score): the raw cumulative points scored
+## this round, floored to int. Distinct from get_performance()'s normalized [0,1] reward value —
+## this just keeps rising as you match, with no cap. `_score` only ever increases, so this is
+## naturally cumulative and non-decreasing across a run (the host samples it live each frame).
+## Safe to return in both modes; the host only reads it in Challenge Mode.
+func get_score() -> int:
+	return int(_score)
+
+
 func get_performance() -> float:
 	if _board == null:
 		return 0.0
@@ -555,7 +564,10 @@ func _play_resolution(result: Dictionary) -> void:
 
 	# Celebrate hitting the max-bonus line BEFORE clearing _animating, so is_busy() keeps the host's
 	# countdown paused through the celebration (otherwise the host would end the round mid-burst).
-	if not _finished and _score >= SCORE_MAX:
+	# Challenge Mode has NO max-bonus line and never ends on score, so we skip the celebration there —
+	# otherwise it would fire on every swap once the score passed SCORE_MAX. The board keeps
+	# cascading and refilling endlessly; only the player tapping DONE stops it.
+	if not challenge_mode and not _finished and _score >= SCORE_MAX:
 		await _celebrate_max()
 
 	_animating = false
@@ -568,6 +580,11 @@ func _play_resolution(result: Dictionary) -> void:
 ## round (its countdown would otherwise be the only thing stopping play). Called after a swap fully
 ## resolves, so the score readout and spectrum bar have already climbed to the top on screen.
 func _maybe_finish_early() -> void:
+	# Challenge Mode runs ENDLESSLY: never self-complete, ignore the SCORE_MAX end condition, and let
+	# the board keep matching/cascading/refilling forever. Mistakes don't stop play (a miss just
+	# doesn't score). The player plays until they tap DONE, so we return before ever emitting.
+	if challenge_mode:
+		return
 	if _finished:
 		return
 	if _score >= SCORE_MAX:

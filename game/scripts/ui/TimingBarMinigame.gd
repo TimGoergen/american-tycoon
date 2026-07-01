@@ -28,6 +28,10 @@ const ZONE_HALF := 0.12
 const ZONE_HALF_MIN := ZONE_HALF * 0.375
 ## Marker sweep speed (bar-fractions per second) and how much it ramps each lock.
 const BASE_SPEED := 0.9
+## Challenge Mode only: a ceiling on the sweep speed. Endless play would ramp the marker to an
+## unhittable blur, so we cap it here to keep an infinite run playable. Normal mode ends at
+## TARGET_LOCKS long before this would matter, so it never caps there.
+const CHALLENGE_MAX_SPEED := BASE_SPEED * 3.0
 ## UN-PLAYTESTED (polish pass 2026-06-29 "harder" direction): ramp steepened 1.06 -> 1.09 so the
 ## marker speeds up more noticeably each lock. Paired with the unchanged TARGET_LOCKS of 10 — the
 ## whole "harder" feel (tighter zone + faster sweep at the same lock count) needs a device check.
@@ -42,6 +46,10 @@ var _marker_pos: float = 0.0
 var _marker_dir: float = 1.0
 var _marker_speed: float = BASE_SPEED
 var _locks: int = 0
+## Successful locks made this run — Challenge Mode's cumulative high-score metric. Unlike `_locks`
+## (which a miss decrements as the normal-mode −1 penalty), this ONLY ever increases, once per good
+## lock, so get_score() can report a non-decreasing score the host samples live in Challenge Mode.
+var _success_count: int = 0
 var _accuracy_sum: float = 0.0
 var _running: bool = false
 var _flash: float = 0.0       # brief cream highlight after a successful lock, decays in _process
@@ -83,6 +91,7 @@ func begin(_tuning: TuningConfig) -> void:
 	_marker_dir = 1.0
 	_marker_speed = BASE_SPEED
 	_locks = 0
+	_success_count = 0
 	_accuracy_sum = 0.0
 	_running = true
 	_move_zone()
@@ -124,6 +133,13 @@ func begin(_tuning: TuningConfig) -> void:
 
 func get_performance() -> float:
 	return clampf(_accuracy_sum / float(TARGET_LOCKS), 0.0, 1.0)
+
+
+## Challenge Mode's raw score: how many successful (in-the-gold-zone) locks the player has made this
+## run. Non-decreasing — misses don't count and never subtract. The host only reads this in Challenge
+## Mode; in normal mode it's harmless to return the same tally.
+func get_score() -> int:
+	return _success_count
 
 
 func result_summary() -> String:
@@ -187,8 +203,11 @@ func _on_lock() -> void:
 	# well, their tap was perceived.
 	_click_marks.append({"pos": _marker_pos, "age": 0.0, "hit": hit})
 	if not hit:
-		# Missed the zone: a misfire costs a lock (never below zero) and scores nothing.
-		_locks = maxi(0, _locks - 1)
+		# Missed the zone. Normal mode: a misfire costs a lock (never below zero) and scores nothing.
+		# Challenge Mode: mistakes must NOT stop play or reduce the score, so we skip the −1 penalty
+		# entirely — the miss simply doesn't score and the endless run continues.
+		if not challenge_mode:
+			_locks = maxi(0, _locks - 1)
 		_miss_flash = 1.0
 		_freeze_success = false  # draw the gray drop-shadow "miss" burst during the freeze
 		_update_locks_label()
@@ -198,11 +217,18 @@ func _on_lock() -> void:
 	var accuracy := clampf(1.0 - distance / half, 0.0, 1.0)
 	_accuracy_sum += accuracy
 	_locks += 1
+	_success_count += 1
 	_marker_speed *= SPEED_RAMP
+	if challenge_mode:
+		# Endless play would ramp the sweep past what's hittable; hold it at the cap so the run stays
+		# playable however long the streak goes. (Normal mode ends at TARGET_LOCKS, so it never caps.)
+		_marker_speed = minf(_marker_speed, CHALLENGE_MAX_SPEED)
 	_flash = 1.0
 	_freeze_success = true  # draw the white-with-gold-glow "hit" burst during the freeze
 	_update_locks_label()
-	if _locks >= TARGET_LOCKS:
+	# Normal mode ends after TARGET_LOCKS successful locks. Challenge Mode ignores the target and
+	# runs forever (never emits completed), so we skip this end check entirely when it's on.
+	if not challenge_mode and _locks >= TARGET_LOCKS:
 		# Final lock: keep _running through the freeze so this success burst is visible, then
 		# emit completed once the freeze ends (in _on_freeze_ended). The zone does NOT jump.
 		_finish_after_freeze = true
@@ -244,7 +270,12 @@ func _move_zone() -> void:
 
 
 func _update_locks_label() -> void:
-	_locks_label.text = "Locks: %d / %d" % [_locks, TARGET_LOCKS]
+	# Challenge Mode is endless, so "x / TARGET" is meaningless there — show the running successful-lock
+	# score instead. Normal mode keeps the familiar progress-toward-target readout.
+	if challenge_mode:
+		_locks_label.text = "Locks: %d" % _success_count
+	else:
+		_locks_label.text = "Locks: %d / %d" % [_locks, TARGET_LOCKS]
 
 
 ## Draw the bar: a navy track, the gold target zone at its current (roving, shrinking) spot,

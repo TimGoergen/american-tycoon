@@ -120,7 +120,18 @@ func begin(tuning: TuningConfig) -> void:
 func get_performance() -> float:
 	# Fixed denominator (the round length), not elapsed time, so the meter rises monotonically
 	# from empty. Holding the marker in the zone for the whole round reaches ~1.0.
+	# NOTE: this is the NORMAL-mode reward metric; Challenge Mode ignores it and uses get_score()
+	# instead. The clamp to 1.0 is harmless in Challenge Mode (the host doesn't read it there).
 	return clampf(_time_in_zone / _total_round_seconds, 0.0, 1.0)
+
+
+func get_score() -> int:
+	# Challenge Mode's raw score: total whole seconds the marker has spent IN the gold zone this run.
+	# _time_in_zone only ever grows (see _process, which adds delta only while in-zone), so this is
+	# cumulative and non-decreasing as the host samples it live. Unlike get_performance() it is NOT
+	# normalized against the round length — in an endless Challenge run there is no fixed length, so
+	# the score simply keeps climbing the longer the player keeps the marker balanced.
+	return int(_time_in_zone)
 
 
 func result_summary() -> String:

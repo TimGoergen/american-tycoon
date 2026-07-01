@@ -207,6 +207,16 @@ func get_performance() -> float:
 	return clampf(float(_baskets) / float(TARGET_BASKETS), 0.0, 1.0)
 
 
+## Challenge Mode score = total baskets made this run (Tim, 2026-06-30). Cumulative and
+## non-decreasing (see _baskets: it only ever counts up), so the host can sample it live for the
+## high-score readout. Micro Basketball is ALREADY endless — it never emits `completed`, has no
+## end condition (TARGET_BASKETS is only get_performance()'s denominator, not a stop), and a miss
+## simply doesn't score — so Challenge Mode needs no other behavior change; the flag is honored by
+## there being nothing to suppress. Returned in both modes; the host only reads it in Challenge Mode.
+func get_score() -> int:
+	return _baskets
+
+
 func result_summary() -> String:
 	return "Sank %d baskets" % _baskets
 

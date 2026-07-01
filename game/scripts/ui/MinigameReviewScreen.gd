@@ -27,6 +27,16 @@ var _player: MinigameScreen
 var _backdrop: TextureRect
 var _baked_backdrop_size: Vector2 = Vector2.ZERO
 
+## Challenge Mode toggle state (Tim, 2026-06-30): false = Minigame Mode (normal review play with a
+## timer + win/loss), true = Challenge Mode (endless free play, high scores). Defaults to Minigame.
+var _challenge_selected: bool = false
+## The large mode toggle button, the subtitle line, and the per-type buttons (each {type, button,
+## name}) — kept so the toggle can restyle itself and re-label every game button (name only, or name
+## + saved high score in Challenge Mode).
+var _mode_button: Button
+var _subtitle_label: Label
+var _type_buttons: Array = []
+
 
 func setup(tuning: TuningConfig) -> void:
 	_tuning = tuning
@@ -122,28 +132,41 @@ func _build_list_view() -> Control:
 	heading.add_theme_color_override("font_color", UiPalette.NAVY)
 	column.add_child(heading)
 
-	var subtitle := Label.new()
-	subtitle.text = "Open any minigame to review it."
-	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	subtitle.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
-	subtitle.add_theme_color_override("font_color", UiPalette.NAVY)
-	column.add_child(subtitle)
+	_subtitle_label = Label.new()
+	_subtitle_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_subtitle_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_subtitle_label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
+	_subtitle_label.add_theme_color_override("font_color", UiPalette.NAVY)
+	column.add_child(_subtitle_label)
+
+	# The large Challenge Mode toggle (Tim, 2026-06-30): switches every game launch below between
+	# normal Minigame Mode and endless Challenge Mode. Its label + style show the CURRENT mode; it is
+	# taller than the game buttons so it reads as the mode switch, not just another entry.
+	_mode_button = Button.new()
+	_mode_button.custom_minimum_size = Vector2(0, int(UiPalette.STANDARD_BUTTON_HEIGHT * 1.4))
+	_mode_button.add_theme_font_size_override("font_size", UiPalette.FONT_BUTTON)
+	_mode_button.pressed.connect(_toggle_mode)
+	column.add_child(_mode_button)
 
 	# One button per type in the library. We read each type's display name by briefly
 	# instantiating it — a bare Minigame node is cheap and display_name() is safe to call
 	# before begin(); we free the probe immediately since it's never added to the tree.
+	_type_buttons.clear()
 	for type_script in MinigameScreen.MINIGAME_TYPES:
 		var probe := type_script.new() as Minigame
-		var label := probe.display_name()
+		var type_name := probe.display_name()
 		probe.free()
 
 		var button := Button.new()
-		button.text = label
 		button.custom_minimum_size = Vector2(420, UiPalette.STANDARD_BUTTON_HEIGHT)
 		button.add_theme_font_size_override("font_size", UiPalette.FONT_BUTTON)
 		UiPalette.style_button(button, false)
 		button.pressed.connect(_on_type_pressed.bind(type_script))
 		column.add_child(button)
+		_type_buttons.append({"type": type_script, "button": button, "name": type_name})
+
+	# Set the toggle, subtitle, and game-button labels for the starting mode (Minigame).
+	_refresh_mode_ui()
 
 	var spacer := Control.new()
 	spacer.custom_minimum_size = Vector2(0, 12)
@@ -164,18 +187,50 @@ func _build_list_view() -> Control:
 # Navigation
 # ---------------------------------------------------------------------------
 
+## Restyle the toggle + relabel everything for the current mode. In Challenge Mode each game button
+## also shows its saved high score, and the toggle turns red (the "hot" mode) to read as active.
+func _refresh_mode_ui() -> void:
+	if _challenge_selected:
+		_mode_button.text = "CHALLENGE MODE — tap for Minigame"
+		UiPalette.style_button(_mode_button, true)   # red action styling marks the active mode
+		_subtitle_label.text = "Free play — no timer, no win/loss. Beat your best score!"
+	else:
+		_mode_button.text = "MINIGAME MODE — tap for Challenge"
+		UiPalette.style_button(_mode_button, false)
+		_subtitle_label.text = "Open any minigame to review it."
+	for entry in _type_buttons:
+		var type_name: String = entry["name"]
+		var button: Button = entry["button"]
+		if _challenge_selected:
+			button.text = "%s — Best: %d" % [type_name, ChallengeScores.get_high_score(type_name)]
+		else:
+			button.text = type_name
+
+
+## Flip between Minigame Mode and Challenge Mode (the toggle button).
+func _toggle_mode() -> void:
+	_challenge_selected = not _challenge_selected
+	_refresh_mode_ui()
+
+
 func _on_type_pressed(type_script: Script) -> void:
 	_list_view.visible = false
-	# Review play always shows the prestige/Legacy framing with sample numbers; it never
-	# banks anything, so the reward context is purely cosmetic here.
-	_player.start_game(
-		MinigameScreen.legacy_reward(SAMPLE_BASE_LEGACY), SAMPLE_BONUS_MAX, type_script, true
-	)
+	if _challenge_selected:
+		# Endless free play with high-score tracking.
+		_player.start_challenge(type_script)
+	else:
+		# Review play shows the prestige/Legacy framing with sample numbers; it never banks
+		# anything, so the reward context is purely cosmetic here.
+		_player.start_game(
+			MinigameScreen.legacy_reward(SAMPLE_BASE_LEGACY), SAMPLE_BONUS_MAX, type_script, true
+		)
 
 
 func _return_to_list() -> void:
 	_player.visible = false
 	_list_view.visible = true
+	# A Challenge run may have set a new high score — re-read so the buttons show it immediately.
+	_refresh_mode_ui()
 
 
 func _on_close_pressed() -> void:

@@ -161,6 +161,12 @@ func _build_list_view() -> Control:
 	_challenge_mode_button = _make_mode_button("CHALLENGE MODE", true)
 	mode_row.add_child(_challenge_mode_button)
 
+	# A small gap setting the blue mode toggles apart from the gold game buttons below (Tim,
+	# 2026-07-01), so the two groups read as separate rather than one continuous stack.
+	var mode_gap := Control.new()
+	mode_gap.custom_minimum_size = Vector2(0, 16)
+	column.add_child(mode_gap)
+
 	# One button per type in the library. We read each type's display name by briefly
 	# instantiating it — a bare Minigame node is cheap and display_name() is safe to call
 	# before begin(); we free the probe immediately since it's never added to the tree.
@@ -213,7 +219,8 @@ func _make_mode_button(label: String, selects_challenge: bool) -> Button:
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.clip_text = true
 	button.add_theme_font_size_override("font_size", UiPalette.FONT_BUTTON)
-	UiPalette.style_button(button, false)
+	# Blue (not the gold of the game buttons) so the mode toggles read as a distinct control.
+	UiPalette.style_blue_button(button)
 	button.pressed.connect(_select_mode.bind(selects_challenge))
 	return button
 

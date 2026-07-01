@@ -197,10 +197,11 @@ func _ready() -> void:
 
 	_buy_button = Button.new()
 	_buy_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	# The hire button gets the larger share of the row (Tim, 2026-07-01): both stretch to
-	# fill, but the buy button's stretch ratio is pulled below the hire button's default 1.0,
-	# so the split lands around 40% buy / 60% hire instead of an even half-and-half.
-	_buy_button.size_flags_stretch_ratio = 0.65
+	# The hire button gets a slightly larger share of the row (Tim, 2026-07-01): both stretch
+	# to fill, but the buy button's stretch ratio is pulled a little below the hire button's
+	# default 1.0, so the split lands around 46% buy / 54% hire. (An earlier 0.65 ratio made
+	# the buy button too narrow — its "BUY ×N" and cost labels ran together.)
+	_buy_button.size_flags_stretch_ratio = 0.85
 	_buy_button.custom_minimum_size = Vector2(0, BUTTON_ROW_HEIGHT)
 	UiPalette.style_button(_buy_button, true)  # red: buying is a spend action (§8)
 	_buy_button.pressed.connect(func() -> void: buy_requested.emit(prop_index, _buy_mode))

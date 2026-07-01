@@ -307,3 +307,45 @@ tab" (Mechanics Spec §9.1 / §14).**
 bottom-aligned and icon-only) or a custom bottom bar + swapped content panels. The four
 content areas already exist as scenes/overlays; the work is hosting them in tabs and
 moving the prestige/ledger buttons into their tabs.
+
+## 8. Minigame screen & Minigame Tuning (polish pass + visual treatment, BUILT 2026-06-29)
+
+The shared minigame host (`MinigameScreen`) and the Minigame Tuning review screen
+(`MinigameReviewScreen`, Settings) got a deliberate polish pass — plan
+`Plans/Minigame_Polish_Pass.md`. As-built:
+
+- **Themed backdrop.** Both screens float over a full-bleed casino/library image
+  (`art/backgrounds/minigame_background.png`) inside the standard black bezel, its corners
+  CPU-rounded to the screen frame (a plain TextureRect, not clip_children — only one clip stencil
+  works at a time and Main owns it) so the bright bottom-corner art doesn't square off.
+- **Translucent, smaller card — matched across both screens.** The minigame card fill is **70%
+  cream** and the card is **20% shorter, 10% narrower**, so the backdrop reads around and through
+  it. The **Minigame Tuning list now sits on a card of the SAME size, shape, and 70% cream as the
+  Get Ready panel** (it no longer uses the old full-screen plate).
+- **Timer as focal point.** Large, centered, faux-bold; pulses amber under 10s and blinks gold +
+  scales under 3s. A **"⏸" cue** appears while a game pauses the clock mid-animation.
+- **Spectrum bar = fill + color only (no numbers).** It glides (smoothed), with an edge-cap that
+  brightens into the bonus band and a flash the instant it first reaches "full". The numeric
+  "what you'd keep" readout was removed; legibility of the floor moves to the **SKIP button**,
+  which now reads "SKIP · keep N …".
+- **Get Ready gate states the goal + stakes up front.** Before the clock starts, the gate now
+  shows the game's name, its one-line **goal** (`Minigame.how_to_play()`, also reused as each
+  game's in-round intro so they can't diverge), and the universal **win/lose stakes** ("play well
+  to keep more — a bonus on top; a weak round or Skip keeps only the minimum"). Previously the
+  player only learned the goal once play began (Tim, 2026-06-29).
+- **Reveal & transitions.** The result reveal blooms (fade + scale + color); the Begin gate fades
+  off to unmask the game (the clock only starts after the fade).
+- **Per-type juice & difficulty direction.** Each of the six types got its own juice and a locked
+  difficulty *direction* (Timing Bar / Catch Money harder; Match Three / Memory / Balance made
+  clearer; Basketball held). All difficulty constants are **first-pass — on-device re-tune owed**
+  (use Settings → Minigame Tuning to preview each type).
+- **Challenge Mode toggle (2026-06-30).** A large toggle on the Tuning list switches every game
+  launch between Minigame Mode (default) and **Challenge Mode** — endless free play, no timer, no
+  win/loss, per-game high scores saved across sessions. The toggle turns red when Challenge is
+  active; the subtitle changes; each game button shows "Best: N". In a Challenge round the reward
+  chrome (timer/spectrum/skip/opt-out) is swapped for a big live **Score** + **Best**, and DONE
+  ends the run and saves the high score.
+- **Basketball board (2026-06-30).** Generous margin around the board, a **thick black rounded
+  outline**, and a gym backdrop (`art/backgrounds/basketball_court.png`) inside the rounded
+  corners. The aim guide is a **force wedge** — point at the ball, fanning out toward the shot
+  direction, size + a single blue→purple→red color scaling with pull force (red = maxed).

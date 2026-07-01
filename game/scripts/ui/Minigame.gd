@@ -22,6 +22,20 @@ signal completed(performance: float)
 var outcome_keep_floor: float = 0.5
 var outcome_bonus_max: float = 0.25
 
+## Challenge Mode (Tim, 2026-06-30): the host sets this true BEFORE begin() when the player picks
+## Challenge Mode on the Minigame Tuning screen. In Challenge Mode a type must run ENDLESSLY — no
+## self-completion (never emit `completed`), no reliance on the host's countdown, and MISTAKES DO
+## NOT STOP PLAY (a miss simply doesn't score; the player plays until they tap DONE). In normal
+## (reward) mode it stays false and the type behaves exactly as before.
+var challenge_mode: bool = false
+
+## The type's raw cumulative SCORE, used only by Challenge Mode's high-score tracking — e.g. points
+## scored, coins caught, baskets made, rounds recalled, seconds balanced. This is DISTINCT from
+## get_performance() (the normalized [0,1] reward metric): a score is unbounded and grows the longer
+## you play well. Override in each type; default 0.
+func get_score() -> int:
+	return 0
+
 ## Start play. The host calls this once, after adding this control to the play area.
 func begin(tuning: TuningConfig) -> void:
 	pass
@@ -41,6 +55,13 @@ func is_busy() -> bool:
 ## they can each be opened and tested. Override in each type.
 func display_name() -> String:
 	return "Minigame"
+
+## A one-line "how to play" goal for this type, shown on the host's Get Ready gate BEFORE the
+## clock starts (so the player learns the objective up front, not only once play begins). Each
+## type also shows this same line as its in-round intro, so the two never diverge. Override in
+## each type.
+func how_to_play() -> String:
+	return ""
 
 ## Extra seconds this type adds on top of the host's standard round length
 ## (tuning.minigame_duration_seconds). Most types add none; a type that needs more breathing

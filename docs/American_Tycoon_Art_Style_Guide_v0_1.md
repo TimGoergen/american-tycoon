@@ -26,6 +26,8 @@ Core four (GDD §12) plus the accents the ATM draft established. **No colors out
 
 Rules: shadows are **darker palette members, never black**; highlights are cream or pale gold, never white. Raster backdrops get graded to this table in the manual pass (Photoshop: gradient map or selective color toward the nine values).
 
+**Sanctioned UI-only exceptions** (functional feedback colors, defined in `UiPalette.gd` / the minigame scripts, never in art assets): a warm **Orange** middle stop for the minigame spectrum bar's red→gold heat gradient; a **Purple** middle stop for the basketball aim force gauge's blue→purple→red power ramp. Each was added deliberately because a single feedback ramp needed a stop the nine values don't provide.
+
 ## 2. Typography
 
 The ATM draft used Georgia as a stand-in; production picks era-true free fonts (Google Fonts, all embeddable in Godot):
@@ -86,7 +88,11 @@ Format: portrait bust in a circular cream medallion on navy card; name plate (sl
 
 6–8 per planet, crossfading at net-worth thresholds (GDD §12). Generation guidance for Copilot/Gemini prompts: *"1950s American advertisement illustration, flat color lithograph print style, limited palette (cream, brick red, navy, mustard), halftone texture, [SCENE], no text, wide portrait composition, muted matte finish"* — then manual grade to §1 palette and halftone overlay. Scene ladder: Main Street diner → suburban boomtown → downtown skyline → penthouse terrace → marble lobby → Capitol dome at golden hour.
 
-**Live play-field background (added 2026-06-25).** The Main screen now renders a full-bleed image behind the UI, clipped to the phone-screen rounded corners and shared by all four tabs (it is intentionally hidden under the full-screen overlays — will ceremony, dev panel, minigames, first contact). The shipped image is a green prairie (Earth) — a placeholder ahead of the graded 1950s-ad backdrops above. **Planned: the background swaps per epoch after each first contact** — Earth's prairie gives way to a Luminari / Geth / Mycelium / etc. scene, the play-field's visual echo of the per-epoch staffer reskins in §6. So this backdrop set is **epoch-keyed, not just net-worth-keyed**: one (eventually a small crossfading set) per shipped civilization, swapped on `EpochState` advancement.
+**Live play-field background (added 2026-06-25).** The Main screen now renders a full-bleed image behind the UI, clipped to the phone-screen rounded corners and shared by all four tabs (it is intentionally hidden under the full-screen overlays — will ceremony, dev panel, first contact). The shipped image is a green prairie (Earth) — a placeholder ahead of the graded 1950s-ad backdrops above.
+
+**Minigame backdrop (added 2026-06-29, updated 2026-06-30).** The minigame screen and the Minigame Tuning screen render over their own full-bleed themed backdrop — `art/backgrounds/minigame_background.png`, a casino/library scene. The minigame card floats over it, **semi-transparent (70% cream)** and smaller (20% shorter, 10% narrower) so the scene reads around and through it; the Tuning list uses a matching card. Drawn as a plain `TextureRect`, NOT a `clip_children` rounded mask — the engine supports only one such stencil at a time and Main already owns it — with its **corners CPU-rounded** (transparent-corner bake) to the screen frame so bright bottom-corner art doesn't square off. First-pass raster (Gemini), not yet graded to the §1 palette.
+
+**Basketball board backdrop (added 2026-06-30).** The Micro Basketball board shows a gym scene — `art/backgrounds/basketball_court.png` (cinder-block wall, hanging lamps, court floor) — inside the board's thick black rounded outline, CPU-rounded the same way. First-pass raster (Gemini), ungraded. The board also sits inside a generous margin so it doesn't crowd the card. **Planned: the background swaps per epoch after each first contact** — Earth's prairie gives way to a Luminari / Geth / Mycelium / etc. scene, the play-field's visual echo of the per-epoch staffer reskins in §6. So this backdrop set is **epoch-keyed, not just net-worth-keyed**: one (eventually a small crossfading set) per shipped civilization, swapped on `EpochState` advancement.
 
 ## 8. UI Chrome
 

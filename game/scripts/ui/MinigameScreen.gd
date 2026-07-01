@@ -40,15 +40,31 @@ const MINIGAME_TYPES := [
 ## prestige default, used when a reward omits a purpose.
 const DEFAULT_PURPOSE := "Grow the inheritance"
 
-## The centered panel that frames every minigame: 95% of the screen wide, 70% tall, with a
-## moderately thick black outline (Tim's minigame v2 layout, 2026-06-23). These are anchor
-## fractions of the full-screen scrim — the panel stays centered and scales with the screen.
-const PANEL_WIDTH_FRACTION := 0.95
-const PANEL_HEIGHT_FRACTION := 0.84
+## The full-bleed themed backdrop shown behind the card (Tim, 2026-06-29): a casino/library
+## "Riches & Rolls" scene with an ornate empty frame in its center that the (now semi-transparent)
+## card floats over. Sits inside the black screen bezel like every other screen's background.
+const BACKGROUND_IMAGE := "res://art/backgrounds/minigame_background.png"
+
+## The centered panel that frames every minigame, as anchor fractions of the full-screen scrim, so
+## it stays centered and scales with the screen. Shrunk 2026-06-29 (Tim): 20% shorter and 10%
+## narrower than the original 0.84 tall / 0.95 wide, so more of the backdrop shows around it.
+const PANEL_WIDTH_FRACTION := 0.855   # 0.95 * 0.90  (10% narrower)
+const PANEL_HEIGHT_FRACTION := 0.672  # 0.84 * 0.80  (20% shorter)
 ## Thickness of that black outline. It is the ONLY thing setting the card apart from the cream
 ## background behind it (same fill), so it is deliberately thick and well above the 2px screen
 ## bezel frame.
 const PANEL_BORDER_WIDTH := 8
+
+## How fast the spectrum bar's fill glides toward its true value (per-second lerp weight). The
+## bar tracks a smoothed `_display_mult` rather than the raw live multiplier so it reads as a
+## sweep, not a jitter — the single most-visible shared element, smoothed once here for all six
+## games (plan §1 juice).
+const KEEP_BAR_LERP_SPEED := 8.0
+## Time-pressure thresholds (seconds left) where the shared timer escalates its warning: a slow
+## amber pulse under WARN, a fast gold blink + scale under CRITICAL. Shared by every game for
+## free (plan §1 juice).
+const TIMER_WARN_SECONDS := 10.0
+const TIMER_CRITICAL_SECONDS := 3.0
 
 var _tuning: TuningConfig
 ## The pre-minigame base reward being scaled (Legacy count at prestige, cash pile at
@@ -80,8 +96,23 @@ var _purpose_label: Label
 var _play_view: Control
 var _result_view: Control
 var _timer_label: Label
-var _keep_label: Label
+## The spectrum bar communicates by fill + color ONLY — no numeric "kept" readout (plan §1,
+## decision 2026-06-29). What you'd keep on a skip is made legible on the SKIP button instead.
 var _keep_bar: Control
+## The skip control, kept as a field so start_game can label it with the concrete reward a skip
+## banks (the keep floor), now that the spectrum bar shows no numbers.
+var _skip_button: Button
+## The smoothed multiplier the spectrum bar actually draws — lerped toward the live multiplier
+## each frame so the fill glides (see KEEP_BAR_LERP_SPEED).
+var _display_mult: float = 0.5
+## Tracks whether the smoothed fill has reached the "full" (1.0x) line, so the host can fire a
+## one-shot flash the moment it first crosses (plan §1: the warm→green jump made loud).
+var _was_at_least_full: bool = false
+## A decaying [0,1] flash intensity drawn over the whole bar when the fill crosses into "full".
+var _full_flash: float = 0.0
+## Accumulates while a round runs; drives the timer's warning pulse/blink oscillation without
+## needing a wall-clock (it is reset each round).
+var _warn_phase: float = 0.0
 var _play_area: Control
 var _result_heading_label: Label
 var _result_mult_label: Label
@@ -96,6 +127,34 @@ var _opt_out_check: CheckBox
 ## the screen appears (Tim, 2026-06-26). `_begin_title` names the drawn type on that gate.
 var _begin_overlay: Control
 var _begin_title: Label
+## The "how to play" goal line on the Get Ready gate — the active type's own one-liner (set per
+## round in start_game), so the player learns the goal BEFORE the clock starts (Tim, 2026-06-29).
+var _begin_howto: Label
+
+## The full-bleed themed backdrop. Its rounded corners are CPU-BAKED at the displayed size (see
+## _rebake_backdrop) so the bright bottom-corner art doesn't poke past the screen's rounded frame —
+## clip_children can't do it here (the project supports only one clip stencil, and Main owns it).
+var _backdrop: TextureRect
+## The size the backdrop was last baked for, so we only re-bake when it actually changes.
+var _baked_backdrop_size: Vector2 = Vector2.ZERO
+
+## Challenge Mode (Tim, 2026-06-30): a free-play arcade mode launched from the Minigame Tuning
+## screen. No time limit, no win/loss reward — the chosen type runs endlessly and we track the raw
+## score, saving a per-type high score. When true the host hides the timer/spectrum/skip reward
+## chrome and shows a live score + best readout, and DONE ends the run (saving the high score).
+var _challenge_mode: bool = false
+var _score_label: Label
+var _highscore_label: Label
+## The best score to beat this run — starts at the saved high score and rises live as the player
+## passes it, so the "Best" readout ticks up in real time.
+var _challenge_high: int = 0
+## The active type's display name — the key under which its Challenge high score is saved.
+var _active_type_key: String = ""
+
+## The Get Ready gate's stakes and hint lines, kept as fields so start_game / start_challenge can
+## set the wording per mode (reward stakes vs. "play as long as you like").
+var _begin_stakes: Label
+var _begin_hint: Label
 
 
 func setup(tuning: TuningConfig) -> void:
@@ -103,22 +162,40 @@ func setup(tuning: TuningConfig) -> void:
 
 
 func _ready() -> void:
-	# A black field hugs the screen edge and frames a cream rounded viewing area — the same
-	# bezel every other full-screen screen uses (Tim, 2026-06-23). The minigame's own card then
-	# floats centered on top of that cream background; because the card's fill is the SAME cream,
-	# it is set apart only by its thick black outline. (95% of the screen wide, 84% tall.)
+	# A black field hugs the screen edge and frames the viewing area — the same bezel every other
+	# full-screen screen uses. Behind the card now sits a full-bleed themed backdrop (Tim,
+	# 2026-06-29); the card itself is semi-transparent so the backdrop reads through it.
 	color = Color.BLACK
 	visible = false
 
-	# The framed cream background — the black border at the screen edge plus the light-tan plate.
-	var background := PanelContainer.new()
-	UiPalette.apply_screen_bezel(background)
-	background.add_theme_stylebox_override("panel", UiPalette.make_screen_panel_style())
-	add_child(background)
+	# The full-bleed backdrop image, inset inside the black bezel like every other screen's
+	# background. Its texture is CPU-baked (see _rebake_backdrop): the source image is scaled to
+	# cover this rect and its four corners are rounded to match the screen frame, so the bright
+	# bottom-corner art (chips/gold) doesn't poke past the rounded border. We bake instead of using
+	# clip_children because the project supports only one clip stencil and Main already owns one — a
+	# second would render empty (the documented 2026-06-26 render bug). STRETCH_SCALE because the
+	# baked image is already sized to this rect.
+	_backdrop = TextureRect.new()
+	UiPalette.apply_screen_bezel(_backdrop)
+	_backdrop.stretch_mode = TextureRect.STRETCH_SCALE
+	_backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_backdrop)
+	# Bake once the backdrop has been laid out (its size is known), and again if that size changes.
+	_backdrop.resized.connect(_rebake_backdrop)
+	_rebake_backdrop.call_deferred()
+
+	# The shared rounded screen frame over the backdrop edges: transparent fill (so the image
+	# shows through), thin black rounded border, universal inner margin — the same frame every
+	# screen uses, kept for visual consistency with the rest of the game.
+	var frame := PanelContainer.new()
+	UiPalette.apply_screen_bezel(frame)
+	frame.add_theme_stylebox_override("panel", UiPalette.make_screen_frame_style())
+	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(frame)
 
 	# The game card itself, centered on top of that background with its own thick outline.
 	var panel := PanelContainer.new()
-	panel.add_theme_stylebox_override("panel", _make_panel_style())
+	panel.add_theme_stylebox_override("panel", make_card_style())
 	# Center the panel by anchor fractions so it scales with the screen and stays centered.
 	var half_w := PANEL_WIDTH_FRACTION / 2.0
 	var half_h := PANEL_HEIGHT_FRACTION / 2.0
@@ -147,16 +224,92 @@ func _ready() -> void:
 	panel.add_child(_begin_overlay)
 
 
-## The cream card that frames every minigame: cream fill, a moderately thick black outline, and
-## the universal inner content margin so nothing crowds the edge.
-func _make_panel_style() -> StyleBoxFlat:
+## The cream card that frames every minigame — and, shared, the Minigame Tuning list, so the two
+## match exactly: cream fill at 70% alpha (so the themed backdrop reads through), a moderately thick
+## black outline, and the universal inner content margin. Static so the review screen builds the
+## identical card via this + PANEL_WIDTH_FRACTION / PANEL_HEIGHT_FRACTION.
+static func make_card_style() -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
-	style.bg_color = UiPalette.CREAM
+	# 70% alpha (Tim, 2026-06-30) so the themed backdrop reads through the card.
+	style.bg_color = Color(UiPalette.CREAM, 0.7)
 	style.set_corner_radius_all(24)
 	style.border_color = Color.BLACK
 	style.set_border_width_all(PANEL_BORDER_WIDTH)
 	style.set_content_margin_all(UiPalette.UNIVERSAL_CONTENT_MARGIN)
 	return style
+
+
+## Bake this screen's backdrop to fit its current on-screen size with ROUNDED corners, so the
+## bright bottom-corner art doesn't square off past the screen's rounded frame. Re-runs only when
+## the size actually changes. The Minigame Tuning screen shares the baking via the static helper.
+func _rebake_backdrop() -> void:
+	if _backdrop == null:
+		return
+	var target := Vector2i(int(_backdrop.size.x), int(_backdrop.size.y))
+	if target.x < 1 or target.y < 1 or _baked_backdrop_size == _backdrop.size:
+		return
+	_baked_backdrop_size = _backdrop.size
+	var texture := bake_rounded_backdrop(target, UiPalette.SCREEN_CORNER_RADIUS)
+	if texture != null:
+		_backdrop.texture = texture
+
+
+## Load the shared backdrop image, scale it to COVER `size` (cropping the overflow, like
+## STRETCH_KEEP_ASPECT_COVERED), and round its four corners to `radius`. Returns a ready-to-assign
+## texture, or null if the image can't be loaded. Static + shared so the minigame screen and the
+## Minigame Tuning screen produce the identical rounded backdrop from one place.
+static func bake_rounded_backdrop(size: Vector2i, radius: int) -> ImageTexture:
+	if size.x < 1 or size.y < 1:
+		return null
+	var source: Texture2D = load(BACKGROUND_IMAGE)
+	if source == null:
+		return null
+	var image := source.get_image()
+	# Editing pixels needs an uncompressed RGBA image (the source PNG imports as RGB / possibly VRAM
+	# compressed); convert so we can crop, resize, and write transparent corners.
+	if image.is_compressed():
+		image.decompress()
+	image.convert(Image.FORMAT_RGBA8)
+
+	# Scale to COVER the target rect (fill fully, crop the overflow), then center-crop to size.
+	var cover := maxf(float(size.x) / image.get_width(), float(size.y) / image.get_height())
+	image.resize(
+		int(ceil(image.get_width() * cover)), int(ceil(image.get_height() * cover)),
+		Image.INTERPOLATE_BILINEAR
+	)
+	var crop_offset := Vector2i((image.get_width() - size.x) / 2, (image.get_height() - size.y) / 2)
+	var fitted := image.get_region(Rect2i(crop_offset, size))
+
+	_clear_image_corners(fitted, radius)
+	return ImageTexture.create_from_image(fitted)
+
+
+## Make the four corners of `image` transparent to a quarter-circle of the given radius, so the
+## image reads with rounded corners (same technique HeroStat uses for its globe watermark).
+static func _clear_image_corners(image: Image, radius: int) -> void:
+	var w := image.get_width()
+	var h := image.get_height()
+	var corners := [
+		{"center": Vector2i(radius, radius), "dir": Vector2i(-1, -1)},           # top-left
+		{"center": Vector2i(w - radius, radius), "dir": Vector2i(1, -1)},        # top-right
+		{"center": Vector2i(radius, h - radius), "dir": Vector2i(-1, 1)},        # bottom-left
+		{"center": Vector2i(w - radius, h - radius), "dir": Vector2i(1, 1)},     # bottom-right
+	]
+	for corner in corners:
+		var center: Vector2i = corner["center"]
+		var dir: Vector2i = corner["dir"]
+		for offset_y in range(radius):
+			for offset_x in range(radius):
+				# A pixel in the outward corner quadrant, beyond the radius from the arc centre, is
+				# outside the rounded edge — clear it.
+				if Vector2(offset_x, offset_y).length() <= radius:
+					continue
+				var pixel := center + Vector2i(dir.x * offset_x, dir.y * offset_y)
+				if pixel.x < 0 or pixel.y < 0 or pixel.x >= w or pixel.y >= h:
+					continue
+				var color := image.get_pixel(pixel.x, pixel.y)
+				color.a = 0.0
+				image.set_pixel(pixel.x, pixel.y, color)
 
 
 # ---------------------------------------------------------------------------
@@ -175,16 +328,30 @@ func _build_play_view() -> Control:
 	_purpose_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(_purpose_label)
 
-	_timer_label = _make_label("0:30", UiPalette.FONT_SUBHEAD, UiPalette.KETCHUP_RED)
+	# The timer is the round's focal point (plan §1): big, centered, faux-bold, so time pressure
+	# reads at a glance. Its color/scale escalate as time runs low (see _refresh_timer).
+	_timer_label = _make_label("0:30", UiPalette.FONT_DISPLAY, UiPalette.KETCHUP_RED)
 	_timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_timer_label.add_theme_font_override("font", UiPalette.make_bold_font())
 	column.add_child(_timer_label)
 
-	# The universal "Legacy kept" readout + spectrum bar — identical for every minigame
-	# type; it reads the active type's live performance.
-	_keep_label = _make_label("", UiPalette.FONT_SUBHEAD, UiPalette.MONEY_GREEN)
-	_keep_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	column.add_child(_keep_label)
+	# Challenge Mode readouts (hidden in normal reward rounds): the live score, big and central like
+	# the timer it replaces, with the best-to-beat under it. start_challenge shows them; start_game
+	# hides them.
+	_score_label = _make_label("", UiPalette.FONT_DISPLAY, UiPalette.MONEY_GREEN)
+	_score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_score_label.add_theme_font_override("font", UiPalette.make_bold_font())
+	_score_label.visible = false
+	column.add_child(_score_label)
 
+	_highscore_label = _make_label("", UiPalette.FONT_SUBHEAD, UiPalette.DARK_GOLD)
+	_highscore_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_highscore_label.visible = false
+	column.add_child(_highscore_label)
+
+	# The universal spectrum bar — identical for every minigame type; it reads the active type's
+	# live performance. It carries meaning by fill + color ONLY (no numbers): warm red→gold below
+	# the "full" line, green→blue into the extra-high bonus band.
 	_keep_bar = Control.new()
 	_keep_bar.custom_minimum_size = Vector2(0, 34)
 	_keep_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -200,12 +367,15 @@ func _build_play_view() -> Control:
 	_play_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	column.add_child(_play_area)
 
-	var skip_button := Button.new()
-	skip_button.custom_minimum_size = Vector2(0, 72)
-	UiPalette.style_button(skip_button, false)
-	skip_button.text = "SKIP (keep the minimum)"
-	skip_button.pressed.connect(_on_skip_pressed)
-	column.add_child(skip_button)
+	# SKIP banks the keep floor immediately. Now that the spectrum bar shows no numbers, this
+	# button is the one place "what you'd keep" is made legible: start_game labels it with the
+	# concrete keep-floor reward (plan §1, decision 2026-06-29).
+	_skip_button = Button.new()
+	_skip_button.custom_minimum_size = Vector2(0, 72)
+	UiPalette.style_button(_skip_button, false)
+	_skip_button.text = "SKIP"
+	_skip_button.pressed.connect(_on_skip_pressed)
+	column.add_child(_skip_button)
 
 	_opt_out_check = CheckBox.new()
 	_opt_out_check.text = "Skip minigames from now on"
@@ -256,20 +426,15 @@ func _build_result_view() -> Control:
 	return column
 
 
-## The "Get Ready" gate over the card: an opaque cream scrim with the drawn type's name and a big
-## BEGIN button. It hides the (not-yet-started) game until the player is ready, so the clock never
-## starts the instant the screen appears. start_game shows it; _on_begin_pressed dismisses it and
-## actually starts the round.
+## The "Get Ready" gate over the card: the drawn type's name, goal, stakes, and a big BEGIN button.
+## No opaque scrim — the gate lets the 70%-translucent card (and the backdrop through it) show, so
+## Get Ready reads at the same 70% as the rest of the panel (Tim, 2026-06-30). The not-yet-started
+## game is hidden instead by keeping _play_view invisible until Begin (see start_game /
+## _start_active_round). start_game shows the gate; _on_begin_pressed fades it and starts the round.
 func _build_begin_overlay() -> Control:
 	var overlay := Control.new()
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	overlay.visible = false
-
-	# An opaque cream scrim fully hides the blank, not-yet-begun game behind the gate.
-	var scrim := ColorRect.new()
-	scrim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	scrim.color = UiPalette.CREAM
-	overlay.add_child(scrim)
 
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -277,6 +442,10 @@ func _build_begin_overlay() -> Control:
 
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 24)
+	# Constrain the column width (design space is 1080 wide) so the longer goal lines wrap inside
+	# the card instead of running off it — the CenterContainer otherwise shrinks the box to its
+	# widest single line.
+	box.custom_minimum_size = Vector2(720, 0)
 	center.add_child(box)
 
 	var ready := _make_label("GET READY", UiPalette.FONT_HEADLINE, UiPalette.NAVY)
@@ -289,10 +458,25 @@ func _build_begin_overlay() -> Control:
 	_begin_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(_begin_title)
 
-	var hint := _make_label("The clock starts when you press Begin.", UiPalette.FONT_LABEL, UiPalette.NAVY)
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	box.add_child(hint)
+	# The goal of THIS game (set per round from the type's how_to_play), so the player knows the
+	# objective before the clock starts rather than only once play begins (Tim, 2026-06-29).
+	_begin_howto = _make_label("", UiPalette.FONT_CARD_BODY, UiPalette.NAVY)
+	_begin_howto.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_begin_howto.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(_begin_howto)
+
+	# The stakes line — reward win/lose in a normal round, "play as long as you like" in Challenge
+	# Mode. Set per mode by start_game / start_challenge (kept as a field for that).
+	_begin_stakes = _make_label("", UiPalette.FONT_LABEL, UiPalette.DARK_GOLD)
+	_begin_stakes.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_begin_stakes.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(_begin_stakes)
+
+	# The closing hint ("The clock starts…" normally; hidden in Challenge Mode). Also a field.
+	_begin_hint = _make_label("The clock starts when you press Begin.", UiPalette.FONT_LABEL, UiPalette.NAVY)
+	_begin_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_begin_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(_begin_hint)
 
 	var begin_button := Button.new()
 	begin_button.custom_minimum_size = Vector2(360, 110)
@@ -382,6 +566,10 @@ static func first_contact_reward(cap: int, property_name: String) -> Dictionary:
 func start_game(
 		reward: Dictionary, bonus_max: float, forced_type: Script = null, review_mode: bool = false
 ) -> void:
+	# A normal reward round: make sure the reward chrome (timer/spectrum/skip/opt-out) is shown and
+	# the Challenge chrome hidden, in case the previous round was a Challenge run.
+	_challenge_mode = false
+	_set_challenge_chrome(false)
 	_base_amount = float(reward.get("base", 0.0))
 	_reward_noun = String(reward.get("noun", "Legacy"))
 	_result_heading = String(reward.get("heading", "THE INHERITANCE"))
@@ -425,14 +613,99 @@ func start_game(
 
 	# The round does NOT start yet: the type stays un-begun and the clock paused behind the Begin
 	# gate, so the player is never caught off guard. _on_begin_pressed starts it for real.
-	_play_view.visible = true
+	# The play view stays hidden behind the (now scrim-less) Get Ready gate, so the not-yet-started
+	# game doesn't show through the translucent card; _start_active_round reveals it on Begin.
+	_play_view.visible = false
+	_play_view.modulate = Color.WHITE
 	_result_view.visible = false
 	_playing = false
 	_timer_label.text = "0:%02d" % int(ceil(_seconds_left))
-	_update_status()
+	_timer_label.scale = Vector2.ONE
+
+	# Reset the shared juice state so a new round starts at the keep floor with no carried-over
+	# flash, pulse, or smoothing from the previous round.
+	_display_mult = _tuning.minigame_keep_floor
+	_was_at_least_full = false
+	_full_flash = 0.0
+	_warn_phase = 0.0
+	_keep_bar.queue_redraw()
+
+	# Label SKIP with what skipping actually banks (the keep floor) — the one place the floor is
+	# made legible now that the spectrum bar carries no numbers.
+	var skip_amount := _base_amount * _tuning.minigame_keep_floor
+	_skip_button.text = "SKIP · keep %s" % _format_amount(skip_amount)
+
 	_begin_title.text = _active_minigame.display_name()
+	_begin_howto.text = _active_minigame.how_to_play()
+	# Reward stakes on the gate (Challenge Mode replaces this in start_challenge).
+	_begin_stakes.text = "Play well to keep MORE — a great round earns a bonus on top. A weak round or Skip keeps only the minimum."
+	_begin_stakes.visible = true
+	_begin_hint.text = "The clock starts when you press Begin."
+	_begin_hint.visible = true
+
+	_begin_overlay.modulate = Color.WHITE
 	_begin_overlay.visible = true
 	visible = true
+
+
+## Start a CHALLENGE MODE run (Tim, 2026-06-30): the given type runs ENDLESSLY — no timer, no
+## win/loss — and the host tracks its raw score, shown live with the saved high score to beat.
+## Launched from the Minigame Tuning screen, so review_mode is on (a Back button appears). Tapping
+## DONE (or Back) saves the high score and returns to the list.
+func start_challenge(type_script: Script) -> void:
+	_challenge_mode = true
+	_review_mode = true
+	_set_challenge_chrome(true)
+
+	# Back button visible (review context); the purpose blurb is hidden — the score readouts take
+	# the top slot instead.
+	for back in _back_buttons:
+		(back as Button).visible = true
+	if _purpose_label != null:
+		_purpose_label.visible = false
+
+	for child in _play_area.get_children():
+		child.queue_free()
+	_active_minigame = type_script.new()
+	_active_minigame.set_anchors_preset(Control.PRESET_FULL_RECT)
+	# Tell the type to run endlessly BEFORE begin() (see Minigame.challenge_mode).
+	_active_minigame.challenge_mode = true
+	_play_area.add_child(_active_minigame)
+	# A type shouldn't self-complete in Challenge Mode, but connect anyway — a stray completion is
+	# simply ignored (see _on_minigame_completed).
+	_active_minigame.completed.connect(_on_minigame_completed)
+
+	_active_type_key = _active_minigame.display_name()
+	_challenge_high = ChallengeScores.get_high_score(_active_type_key)
+	_score_label.text = "Score: 0"
+	_highscore_label.text = "Best: %s" % _group_thousands(_challenge_high)
+	# The skip control becomes the "I'm done" control in Challenge Mode.
+	_skip_button.text = "DONE"
+
+	_play_view.visible = false
+	_play_view.modulate = Color.WHITE
+	_result_view.visible = false
+	_playing = false
+
+	_begin_title.text = _active_minigame.display_name()
+	_begin_howto.text = _active_minigame.how_to_play()
+	_begin_stakes.text = "Challenge Mode — no timer, play as long as you like. Beat your best score!"
+	_begin_stakes.visible = true
+	_begin_hint.visible = false
+
+	_begin_overlay.modulate = Color.WHITE
+	_begin_overlay.visible = true
+	visible = true
+
+
+## Swap the reward chrome for the Challenge chrome. Reward mode (on=false): the timer, spectrum
+## bar, and opt-out show. Challenge mode (on=true): the live score + best-to-beat show instead.
+func _set_challenge_chrome(on: bool) -> void:
+	_timer_label.visible = not on
+	_keep_bar.visible = not on
+	_opt_out_check.visible = not on
+	_score_label.visible = on
+	_highscore_label.visible = on
 
 
 ## Begin pressed on the Get Ready gate: hide it, start the chosen type, and unpause the clock — the
@@ -440,31 +713,83 @@ func start_game(
 func _on_begin_pressed() -> void:
 	if _active_minigame == null:
 		return
+	# Fade the cream gate off to unmask the game (plan §1), THEN start the round — so the clock
+	# doesn't run during the fade. The actual go-live happens in _start_active_round when the
+	# fade completes.
+	var fade := create_tween()
+	fade.tween_property(_begin_overlay, "modulate:a", 0.0, 0.25)
+	fade.tween_callback(_start_active_round)
+
+
+## The one and only point where a round actually goes live: hide the (now-invisible) gate, start
+## the chosen type, and unpause the clock. Called by _on_begin_pressed's fade-out tween.
+func _start_active_round() -> void:
+	if _active_minigame == null:
+		return
 	_begin_overlay.visible = false
+	_play_view.visible = true  # reveal the game now that the gate is gone and the round goes live
 	_active_minigame.begin(_tuning)
 	_playing = true
-	_update_status()
 
 
 func _process(delta: float) -> void:
 	if not _playing:
 		return
-	# Pause the countdown while a type is mid-animation (e.g. match-3 cascades), so that
-	# animation time isn't charged to the player. The spectrum still updates.
-	if _active_minigame != null and _active_minigame.is_busy():
-		_update_status()
+	# Challenge Mode has no countdown and no win/loss — just keep the live score readout current.
+	if _challenge_mode:
+		_update_challenge_score()
 		return
-	_seconds_left = maxf(0.0, _seconds_left - delta)
-	_timer_label.text = "0:%02d" % int(ceil(_seconds_left))
-	_update_status()
-	if _seconds_left <= 0.0:
+	# Pause the countdown while a type is mid-animation (e.g. match-3 cascades) so animation time
+	# isn't charged to the player — but keep the spectrum bar gliding and show a "held" cue on the
+	# timer so a stalled countdown doesn't read as a bug (plan §1).
+	var busy := _active_minigame != null and _active_minigame.is_busy()
+	if not busy:
+		_seconds_left = maxf(0.0, _seconds_left - delta)
+	_refresh_timer(delta, busy)
+	_refresh_keep_bar(delta)
+	if not busy and _seconds_left <= 0.0:
 		_end_round()
 
 
-## A type finished on its own (e.g. the timing bar's last lock) — end with its result.
+## Refresh the Challenge Mode readouts: the live score, and the best-to-beat (which ticks up in real
+## time once the current score passes the saved high, so a new record is visible as it happens).
+func _update_challenge_score() -> void:
+	var score := _active_minigame.get_score() if _active_minigame != null else 0
+	_score_label.text = "Score: %s" % _group_thousands(score)
+	if score > _challenge_high:
+		_challenge_high = score
+	_highscore_label.text = "Best: %s" % _group_thousands(_challenge_high)
+
+
+## A type finished on its own (e.g. the timing bar's last lock) — end with its result. Ignored in
+## Challenge Mode, which never ends on its own (the player taps DONE).
 func _on_minigame_completed(_performance: float) -> void:
-	if _playing:
+	if _playing and not _challenge_mode:
 		_end_round()
+
+
+## Format an integer with thousands separators ("1,240"), for the Challenge score readouts.
+func _group_thousands(value: int) -> String:
+	var digits := str(absi(value))
+	var grouped := ""
+	var count := 0
+	for i in range(digits.length() - 1, -1, -1):
+		grouped = digits[i] + grouped
+		count += 1
+		if count % 3 == 0 and i > 0:
+			grouped = "," + grouped
+	return ("-" if value < 0 else "") + grouped
+
+
+## End a Challenge run: record the final score (updates the saved high score if beaten) and return
+## to the Minigame Tuning list. Called by DONE and by Back.
+func _end_challenge() -> void:
+	_playing = false
+	var score := _active_minigame.get_score() if _active_minigame != null else 0
+	ChallengeScores.record_score(_active_type_key, score)
+	_challenge_mode = false
+	visible = false
+	back_pressed.emit()
 
 
 # ---------------------------------------------------------------------------
@@ -507,18 +832,56 @@ func _format_amount(amount: float) -> String:
 	return "%d %s" % [int(floor(amount)), _reward_noun]
 
 
-func _update_status() -> void:
-	var mult := _multiplier_for_performance(_current_performance())
-	var kept := _base_amount * mult
-	if mult > 1.0:
-		_keep_label.text = "%s  (+%s bonus)" % [_format_amount(kept), _format_amount(kept - _base_amount)]
-		_keep_label.add_theme_color_override("font_color", UiPalette.ATOMIC_TEAL)
-	elif mult >= 1.0:
-		_keep_label.text = "%s  (full)" % _format_amount(kept)
-		_keep_label.add_theme_color_override("font_color", UiPalette.MONEY_GREEN)
-	else:
-		_keep_label.text = "%s of %s" % [_format_amount(kept), _format_amount(_base_amount)]
-		_keep_label.add_theme_color_override("font_color", _keep_color(mult))
+## Update the focal timer each frame: a slow amber pulse under TIMER_WARN_SECONDS, a fast gold
+## blink + scale under TIMER_CRITICAL_SECONDS, and a "held" cue (muted color + pause glyph) while
+## the type is mid-animation so the paused countdown doesn't read as a bug. (plan §1 juice.)
+func _refresh_timer(delta: float, busy: bool) -> void:
+	var secs := int(ceil(_seconds_left))
+	if busy:
+		_timer_label.text = "0:%02d  ⏸" % secs
+		_timer_label.add_theme_color_override("font_color", UiPalette.NAVY)
+		_set_timer_scale(1.0)
+		return
+
+	_warn_phase += delta
+	_timer_label.text = "0:%02d" % secs
+	var color := UiPalette.KETCHUP_RED
+	var pulse := 1.0
+	if _seconds_left <= TIMER_CRITICAL_SECONDS and _seconds_left > 0.0:
+		# A fast 0..1 oscillation drives a blink toward gold plus a gentle grow, for real urgency.
+		var beat := 0.5 + 0.5 * sin(_warn_phase * 18.0)
+		color = UiPalette.KETCHUP_RED.lerp(UiPalette.MUSTARD_GOLD, beat)
+		pulse = 1.0 + 0.14 * beat
+	elif _seconds_left <= TIMER_WARN_SECONDS:
+		var beat := 0.5 + 0.5 * sin(_warn_phase * 8.0)
+		color = UiPalette.KETCHUP_RED.lerp(UiPalette.MUSTARD_GOLD, beat * 0.5)
+		pulse = 1.0 + 0.05 * beat
+	_timer_label.add_theme_color_override("font_color", color)
+	_set_timer_scale(pulse)
+
+
+## Scale the timer label about its own center (a Label scales from its top-left by default, which
+## would drift the centered text sideways as it pulses).
+func _set_timer_scale(factor: float) -> void:
+	_timer_label.pivot_offset = _timer_label.size / 2.0
+	_timer_label.scale = Vector2(factor, factor)
+
+
+## Glide the spectrum bar toward the live multiplier and fire a one-shot flash when it first
+## crosses into "full". The smoothed value `_display_mult` is what _draw_keep_bar paints.
+func _refresh_keep_bar(delta: float) -> void:
+	var target := _multiplier_for_performance(_current_performance())
+	var weight := clampf(delta * KEEP_BAR_LERP_SPEED, 0.0, 1.0)
+	_display_mult = lerpf(_display_mult, target, weight)
+
+	# Flash the moment the smoothed fill first reaches the "full" line (and re-arm if it drops
+	# back below), so the warm→green color jump lands with a visible pop instead of silently.
+	if not _was_at_least_full and _display_mult >= 1.0:
+		_was_at_least_full = true
+		_full_flash = 1.0
+	elif _was_at_least_full and _display_mult < 1.0:
+		_was_at_least_full = false
+	_full_flash = maxf(0.0, _full_flash - delta * 2.5)
 	_keep_bar.queue_redraw()
 
 
@@ -529,11 +892,27 @@ func _draw_keep_bar() -> void:
 		return
 	var floor_mult := _tuning.minigame_keep_floor
 	var span := maxf(0.0001, (1.0 + _bonus_max) - floor_mult)
-	var mult := _multiplier_for_performance(_current_performance())
+	# Draw the SMOOTHED multiplier so the fill glides rather than jumps (see _refresh_keep_bar).
+	var mult := _display_mult
 	var fill_frac := clampf((mult - floor_mult) / span, 0.0, 1.0)
 
 	_keep_bar.draw_rect(Rect2(0, 0, w, h), UiPalette.INK_NAVY)
 	_keep_bar.draw_rect(Rect2(0, 0, fill_frac * w, h), _keep_color(mult))
+
+	# A soft bright cap rides the leading edge of the fill, brightening as performance climbs into
+	# the extra-high bonus band (plan §1) — a small reward for pushing past "full".
+	var into_bonus := clampf((mult - 1.0) / maxf(0.0001, _bonus_max), 0.0, 1.0)
+	var edge_x := fill_frac * w
+	var cap_w := 10.0
+	var cap_color := _keep_color(mult).lerp(Color.WHITE, 0.4 + 0.5 * into_bonus)
+	cap_color.a = 0.35 + 0.55 * into_bonus
+	_keep_bar.draw_rect(Rect2(edge_x - cap_w, 0, cap_w, h), cap_color)
+
+	# A one-shot white wash across the whole bar the instant the fill first reaches "full"
+	# (decays in _refresh_keep_bar) so the warm→green color jump lands with a pop, not silently.
+	if _full_flash > 0.0:
+		_keep_bar.draw_rect(Rect2(0, 0, w, h), Color(1, 1, 1, _full_flash * 0.5))
+
 	# No "full" divider line (Tim, 2026-06-25): the deliberate warm→green color jump at exactly
 	# 100% already marks where you stop losing Legacy and start banking bonus, so the line is
 	# redundant. The color change alone carries the meaning.
@@ -573,18 +952,50 @@ func _show_result(mult: float) -> void:
 	_play_view.visible = false
 	_result_view.visible = true
 	visible = true
+	_animate_result()
+
+
+## The payoff beat (plan §1): fade the result view in, then bloom the multiplier and amount with a
+## brief scale pop and a flash to white, so the reveal reads as a reward rather than an instant cut.
+func _animate_result() -> void:
+	_result_view.modulate = Color(1, 1, 1, 0)
+	var reveal := create_tween()
+	reveal.tween_property(_result_view, "modulate:a", 1.0, 0.25)
+
+	for label in [_result_mult_label, _result_amount_label]:
+		# Capture each label's settled color so the white flash can resolve back to it.
+		var final_color: Color = label.get_theme_color("font_color")
+		label.pivot_offset = label.size / 2.0
+		label.scale = Vector2(0.7, 0.7)
+		label.add_theme_color_override("font_color", Color.WHITE)
+		var bloom := create_tween()
+		bloom.set_parallel(true)
+		bloom.tween_property(label, "scale", Vector2.ONE, 0.4) \
+				.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		bloom.tween_property(label, "modulate", Color.WHITE, 0.0)  # ensure full opacity for the bloom
+		bloom.tween_method(
+				func(c: Color) -> void: label.add_theme_color_override("font_color", c),
+				Color.WHITE, final_color, 0.45)
 
 
 ## Back (review mode only): abandon the round and return to the review list. No result is
-## emitted — reviewing a minigame never touches the run's Legacy.
+## emitted — reviewing a minigame never touches the run's Legacy. In a Challenge run it saves the
+## high score on the way out (same as DONE).
 func _on_back_pressed() -> void:
+	if _challenge_mode:
+		_end_challenge()
+		return
 	_playing = false
 	visible = false
 	back_pressed.emit()
 
 
-## Skip: bank the keep floor (the worst result), leave immediately.
+## Skip (reward round): bank the keep floor (the worst result) and leave. In Challenge Mode this is
+## the DONE button — it saves the high score and returns to the list instead.
 func _on_skip_pressed() -> void:
+	if _challenge_mode:
+		_end_challenge()
+		return
 	_playing = false
 	visible = false
 	finished.emit(_tuning.minigame_keep_floor, _opt_out)

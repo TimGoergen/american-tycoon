@@ -49,13 +49,30 @@ const GRAVITY := 2400.0
 
 ## The slingshot: the throw velocity is the pull vector (ball dragged away from its rest spot),
 ## reversed, times PULL_POWER. The drag is capped at MAX_PULL so a huge yank can't overpower the
-## board; a drag shorter than MIN_PULL on release is not a throw (the ball just snaps back). Power
-## is matched up to the heavier gravity so a full pull still comfortably reaches the hoop.
+## board; a drag shorter than MIN_PULL on release is not a throw (the ball just snaps back).
+## PULL_POWER raised 9.6 -> 15.0 (Tim, 2026-06-30): the ball rests near the floor, so there often
+## isn't room to drag it far — more force per pixel means a short pull already reaches the hoop,
+## hitting the MAX_THROW_SPEED cap at ~193px of drag instead of needing the full 300. FEEL-TUNE.
 const MAX_PULL := 300.0
 const MIN_PULL := 28.0
-const PULL_POWER := 9.6
+const PULL_POWER := 15.0
 ## Hard cap on the resulting throw speed (px/sec).
 const MAX_THROW_SPEED := 2900.0
+
+## Aim-guide force colors (Tim, 2026-06-30): the force wedge is a SINGLE color that CHANGES with the
+## current pull's force — blue (low) → purple (medium) → bright red (high/maxed) — so the player
+## reads the power before releasing. Purple is a deliberate one-off exception to the §1 palette for
+## this force gauge (the same way ORANGE was added for the spectrum bar).
+const FORCE_COLOR_LOW := Color("#3A78D0")    # blue — low force
+const FORCE_COLOR_MED := Color("#8244C0")    # purple — medium force
+const FORCE_COLOR_HIGH := Color("#E23B2C")   # bright red — high / maxed force
+## The force wedge is a filled triangle with its POINT at the ball's launch location, FANNING OUT
+## to a wide far end in the DIRECTION OF TRAVEL (opposite the pull) — like a beam showing where the
+## ball will go (Tim, 2026-06-30). The wide end's width grows with force; the wedge's length grows
+## with the pull distance.
+const AIM_WEDGE_BASE_MIN := 10.0    # wide-end width at near-zero force
+const AIM_WEDGE_BASE_MAX := 40.0    # wide-end width at maxed force
+const AIM_WEDGE_LENGTH_SCALE := 1.6 # wedge length = pull distance × this
 
 ## Fraction of speed KEPT when a ball bounces off a wall, the floor, the ceiling, or the hoop
 ## (0 = dead stop, 1 = perfectly elastic). Lowered for the heavier feel — a dense ball thuds and
@@ -69,9 +86,18 @@ const FLOOR_FRICTION := 0.70
 ## balls come to rest promptly instead of dribbling out a long tail of tiny bounces.
 const REST_SPEED := 95.0
 
-## Thickness (px) of the dark-gray outline that frames the board and defines the walls, floor,
-## and ceiling the balls bounce against.
-const WALL_THICKNESS := 6.0
+## Thickness (px) of the outline that frames the board and defines the walls, floor, and ceiling
+## the balls bounce against. Doubled 6 -> 12 and recolored to BLACK with rounded corners (Tim,
+## 2026-06-30) — the physics wall inset uses the same value, so the ball bounces at the inner edge
+## of the drawn border.
+const WALL_THICKNESS := 12.0
+## Corner radius (px) of the board's rounded outline + its background image's rounded corners.
+const BOARD_CORNER_RADIUS := 28
+## Empty space (px) between the board and the surrounding card, on every side. Provided by a
+## MarginContainer around the play field (Tim, 2026-06-30: "3× as much space around the edge").
+const BOARD_MARGIN := 48
+## The gym backdrop shown inside the board's rounded outline (Tim, 2026-06-30).
+const BOARD_IMAGE := "res://art/backgrounds/basketball_court.png"
 
 # Each ball is a Dictionary: { "pos": Vector2, "vel": Vector2, "state": String, "spin": float },
 # plus a transient "prev" (its start-of-frame position, written during the motion pass and read by
@@ -88,12 +114,45 @@ var _hoop_placed: bool = false     # one-shot: center the hoop once the board ha
 var _hoop_pos: Vector2 = Vector2.ZERO
 var _hoop_flash: float = 0.0       # brief brighten of the rim after a made basket, decays in _process
 
+# --- Celebration juice (polish pass, Tim 2026-06-29) -------------------------------------------
+# This pass adds NO difficulty change (Basketball "holds"); it only makes a made basket and a
+# near-miss rim clang feel good. All of the state below is purely cosmetic — it never touches
+# _baskets or get_performance().
+
+## The aimed ball's draw scale, EASED toward its target each frame (1.0 normal, ~1.12 while held)
+## so grabbing a ball blooms smoothly instead of snapping to 1.12x in one frame.
+const AIM_SCALE_HELD := 1.12
+const AIM_SCALE_EASE := 14.0       # how fast the held-ball scale catches its target (per second)
+var _aim_scale: float = 1.0
+
+## Short-lived spray/clang particles: small circles flung from the hoop on a score and from a rim
+## post on a near-miss bounce. Each is { "pos", "vel", "life" (1->0), "color", "radius" }.
+var _particles: Array = []
+const PARTICLE_GRAVITY := 1400.0   # lighter than the ball's gravity — confetti floats a touch more
+const PARTICLE_FADE := 1.6         # life drained per second (so a spray lasts ~0.6s)
+
+## Expanding "score ring" pops drawn outward from the hoop on a made basket. Each is { "pos", "life" }.
+var _score_rings: Array = []
+const SCORE_RING_FADE := 2.2       # life drained per second
+const SCORE_RING_MAX_RADIUS := 130.0
+
+## A decaying net "swing": after a ball drops through, the net sways side to side and settles. This
+## counts down from NET_SWING_DURATION; _draw_net offsets the net's bottom by a damped sine of it.
+var _net_swing_time: float = 0.0
+const NET_SWING_DURATION := 0.9
+const NET_SWING_FREQ := 22.0       # how quickly the net sways back and forth
+const NET_SWING_AMPLITUDE := 18.0  # px the net bottom swings at the peak of a fresh swing
+
 # The ball the player is currently aiming (an index into _balls, or -1 for none) and the rest spot
 # it was pulled back from (the slingshot anchor it launches from on release).
 var _aim_index: int = -1
 var _aim_anchor: Vector2 = Vector2.ZERO
 
 var _play: Control
+## The gym backdrop, CPU-baked to the board size with rounded corners (so it nests inside the
+## rounded outline) and cached; re-baked only when the board size changes.
+var _board_bg: ImageTexture
+var _board_bg_size: Vector2 = Vector2.ZERO
 
 # Drawn each frame; preloaded so the texture is ready the instant play begins. The hoop is drawn
 # with plain shapes (an ellipse rim + a net), so only the ball needs a texture.
@@ -102,6 +161,10 @@ const BALL_TEX := preload("res://art/icons/basketball.svg")
 
 func display_name() -> String:
 	return "Micro Basketball"
+
+
+func how_to_play() -> String:
+	return "Pull the ball back and release to sling it through the hoop. Tap it any time — even mid-air — to freeze it and shoot again from there!"
 
 
 ## Slingshot aiming and bouncing shots take a beat longer to line up than the tap-based types, so
@@ -117,12 +180,17 @@ func begin(tuning: TuningConfig) -> void:
 	_baskets = 0
 	_started_balls = false
 	_hoop_placed = false
+	# Clear any carried-over celebration state so a fresh round starts clean.
+	_aim_scale = 1.0
+	_particles.clear()
+	_score_rings.clear()
+	_net_swing_time = 0.0
 	# Round length is read (not hardcoded) so this type tracks whatever the host sets; only used
 	# here for the comment math — performance is baskets/target, which the host samples live.
 	var _round_seconds := maxf(0.1, tuning.minigame_duration_seconds)
 
 	var intro := Label.new()
-	intro.text = "Pull the ball back and release to sling it through the hoop. Tap it any time — even mid-air — to freeze it and shoot again from there!"
+	intro.text = how_to_play()
 	intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	intro.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
@@ -138,11 +206,21 @@ func begin(tuning: TuningConfig) -> void:
 	_play.draw.connect(_draw_play)
 	_play.gui_input.connect(_on_play_input)
 
+	# A margin around the board so it doesn't crowd the card edges (Tim, 2026-06-30). Wrapping the
+	# play field in a MarginContainer keeps the board's own coordinate space at 0..size, so all the
+	# physics/aim math below is unchanged — the space is provided entirely by the container.
+	var board_margin := MarginContainer.new()
+	board_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	board_margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	for side in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
+		board_margin.add_theme_constant_override(side, BOARD_MARGIN)
+	board_margin.add_child(_play)
+
 	var column := VBoxContainer.new()
 	column.set_anchors_preset(Control.PRESET_FULL_RECT)
 	column.add_theme_constant_override("separation", 12)
 	column.add_child(intro)
-	column.add_child(_play)
+	column.add_child(board_margin)
 	add_child(column)
 
 
@@ -150,6 +228,16 @@ func get_performance() -> float:
 	# Fixed denominator (TARGET_BASKETS), so the meter rises monotonically as baskets are sunk
 	# and never falls back — matching the other types' climbing spectrum.
 	return clampf(float(_baskets) / float(TARGET_BASKETS), 0.0, 1.0)
+
+
+## Challenge Mode score = total baskets made this run (Tim, 2026-06-30). Cumulative and
+## non-decreasing (see _baskets: it only ever counts up), so the host can sample it live for the
+## high-score readout. Micro Basketball is ALREADY endless — it never emits `completed`, has no
+## end condition (TARGET_BASKETS is only get_performance()'s denominator, not a stop), and a miss
+## simply doesn't score — so Challenge Mode needs no other behavior change; the flag is honored by
+## there being nothing to suppress. Returned in both modes; the host only reads it in Challenge Mode.
+func get_score() -> int:
+	return _baskets
 
 
 func result_summary() -> String:
@@ -174,7 +262,32 @@ func _process(delta: float) -> void:
 
 	_hoop_flash = maxf(0.0, _hoop_flash - delta * 3.0)
 	_advance_balls(delta, bounds)
+	_advance_celebration(delta)
 	_play.queue_redraw()
+
+
+## Advance the cosmetic celebration state: ease the held-ball scale toward its target, drift/fade the
+## spray particles, grow/fade the score rings, and let the net swing decay. None of this affects play.
+func _advance_celebration(delta: float) -> void:
+	# Ease the aimed ball's bloom toward its target (held vs. not), so a grab is a smooth pop.
+	var any_aiming := _aim_index != -1
+	var target_scale := AIM_SCALE_HELD if any_aiming else 1.0
+	_aim_scale = lerpf(_aim_scale, target_scale, clampf(delta * AIM_SCALE_EASE, 0.0, 1.0))
+
+	# Spray particles fall under a light gravity and fade out; drop the dead ones.
+	for particle in _particles:
+		particle["vel"].y += PARTICLE_GRAVITY * delta
+		particle["pos"] += particle["vel"] * delta
+		particle["life"] -= PARTICLE_FADE * delta
+	_particles = _particles.filter(func(p: Dictionary) -> bool: return p["life"] > 0.0)
+
+	# Score rings just fade (their radius is derived from remaining life in the draw).
+	for ring in _score_rings:
+		ring["life"] -= SCORE_RING_FADE * delta
+	_score_rings = _score_rings.filter(func(r: Dictionary) -> bool: return r["life"] > 0.0)
+
+	# The net swing winds down to rest.
+	_net_swing_time = maxf(0.0, _net_swing_time - delta)
 
 
 ## Place the ball resting on the floor (BALL_COUNT == 1 → centered; the spread math still reads
@@ -279,6 +392,7 @@ func _resolve_hoop(ball: Dictionary, prev: Vector2, bounds: Vector2) -> bool:
 	if ball["vel"].y > 0.0 and prev.y <= rim_y and ball["pos"].y >= rim_y and within_mouth:
 		_baskets += 1
 		_hoop_flash = 1.0
+		_celebrate_basket()  # net swing + score-ring pop + a small confetti spray (cosmetic only)
 		_rest_ball(ball, bounds)
 		_move_hoop(bounds)
 		return true
@@ -301,6 +415,9 @@ func _resolve_hoop(ball: Dictionary, prev: Vector2, bounds: Vector2) -> bool:
 			var into_post: float = ball["vel"].dot(normal)
 			if into_post < 0.0:  # only reflect if moving toward the post
 				ball["vel"] -= normal * into_post * (1.0 + RESTITUTION)
+				# A near-miss clang: splash a few gray sparks off the contact point so the rim-out
+				# reads as a real impact, not a silent deflection (plan §2.6).
+				_spawn_clang(ball["pos"], normal)
 	return false
 
 
@@ -314,6 +431,46 @@ func _rest_ball(ball: Dictionary, bounds: Vector2) -> void:
 	)
 	ball["vel"] = Vector2.ZERO
 	ball["state"] = "idle"
+
+
+# ---------------------------------------------------------------------------
+# Celebration spawns (cosmetic only — never touch _baskets / performance)
+# ---------------------------------------------------------------------------
+
+## A made basket: swing the net, pop an expanding score ring from the rim, and spray a burst of
+## warm confetti up and out of the hoop.
+func _celebrate_basket() -> void:
+	_net_swing_time = NET_SWING_DURATION
+	_score_rings.append({"pos": _hoop_pos, "life": 1.0})
+	# Confetti: alternating gold/teal sparks flung mostly upward out of the hoop mouth.
+	var colors := [UiPalette.MUSTARD_GOLD, UiPalette.ATOMIC_TEAL, Color.WHITE]
+	for i in range(16):
+		var angle := _rng.randf_range(-PI * 0.85, -PI * 0.15)  # fan upward (negative y is up)
+		var speed := _rng.randf_range(420.0, 820.0)
+		_particles.append({
+			"pos": _hoop_pos,
+			"vel": Vector2(cos(angle), sin(angle)) * speed,
+			"life": 1.0,
+			"color": colors[i % colors.size()],
+			"radius": _rng.randf_range(4.0, 8.0),
+		})
+
+
+## A near-miss rim clang: a few small gray sparks kicked off the post along the bounce normal, so a
+## rim-out has a readable little impact.
+func _spawn_clang(point: Vector2, normal: Vector2) -> void:
+	for i in range(6):
+		# Spread the sparks in a fan around the contact normal (away from the post).
+		var spread := _rng.randf_range(-PI * 0.5, PI * 0.5)
+		var direction := normal.rotated(spread)
+		var speed := _rng.randf_range(180.0, 360.0)
+		_particles.append({
+			"pos": point,
+			"vel": direction * speed,
+			"life": 1.0,
+			"color": UiPalette.LIGHT_GRAY,
+			"radius": _rng.randf_range(3.0, 5.0),
+		})
 
 
 func _on_play_input(event: InputEvent) -> void:
@@ -394,6 +551,12 @@ func _release_sling() -> void:
 func _draw_play() -> void:
 	var bounds := _play.size
 
+	# The gym backdrop fills the board, behind all the gameplay, with rounded corners baked in so it
+	# nests inside the rounded outline drawn last (Tim, 2026-06-30).
+	_ensure_board_bg(bounds)
+	if _board_bg != null:
+		_play.draw_texture_rect(_board_bg, Rect2(Vector2.ZERO, bounds), false)
+
 	# The hoop is drawn in layers so a falling ball reads as dropping THROUGH it: the net and the
 	# back (far) half of the rim go down first, then the balls, then the front (near) half of the
 	# rim on top. The flash brightens the rim briefly when a basket is made.
@@ -402,8 +565,9 @@ func _draw_play() -> void:
 	_draw_rim_half(rim_color, true)   # back half (top edge of the ellipse)
 
 	for ball in _balls:
-		# The aimed ball draws a touch larger so the player can see they're holding it.
-		var radius := BALL_RADIUS * (1.12 if ball["state"] == "aiming" else 1.0)
+		# The aimed ball draws a touch larger so the player can see they're holding it. The scale is
+		# EASED (see _advance_celebration) rather than snapped, so the grab blooms smoothly.
+		var radius := BALL_RADIUS * (_aim_scale if ball["state"] == "aiming" else 1.0)
 		# Rotate the ball around its center by its accumulated spin so it visibly rolls as it moves.
 		# draw_set_transform applies to the next draw; we reset it right after.
 		_play.draw_set_transform(ball["pos"], float(ball.get("spin", 0.0)), Vector2.ONE)
@@ -415,30 +579,134 @@ func _draw_play() -> void:
 	if _aim_index != -1:
 		_draw_aim_guide()
 
-	# The dark-gray frame that defines the walls, floor, and ceiling. Drawn last so it reads as a
-	# solid boundary in front of a ball pressed right up against it. Inset by half its thickness so
-	# the whole outline sits inside the board.
-	var frame := Rect2(
-		Vector2(WALL_THICKNESS * 0.5, WALL_THICKNESS * 0.5),
-		bounds - Vector2(WALL_THICKNESS, WALL_THICKNESS)
+	# The celebration layer (score rings + confetti/clang sparks), drawn over the play field but
+	# under the board frame so it never spills past the walls visually.
+	_draw_celebration()
+
+	# The board outline: a thick BLACK, ROUNDED-corner border drawn last so it reads as a solid
+	# boundary in front of a ball pressed against it (Tim, 2026-06-30). A StyleBoxFlat gives the
+	# rounded corners a plain draw_rect can't; its border grows inward from the board rect, matching
+	# the WALL_THICKNESS the physics uses for the wall inset.
+	var border := StyleBoxFlat.new()
+	border.bg_color = Color.TRANSPARENT
+	border.border_color = Color.BLACK
+	border.set_border_width_all(int(WALL_THICKNESS))
+	border.set_corner_radius_all(BOARD_CORNER_RADIUS)
+	_play.draw_style_box(border, Rect2(Vector2.ZERO, bounds))
+
+
+## Bake the gym backdrop to the current board size with rounded corners, cached until the size
+## changes. We CPU-bake (rather than clip_children) because the project supports only one clip
+## stencil at a time and Main already owns it (see MinigameScreen for the full note).
+func _ensure_board_bg(size: Vector2) -> void:
+	var target := Vector2i(int(size.x), int(size.y))
+	if target.x < 1 or target.y < 1 or (_board_bg != null and _board_bg_size == size):
+		return
+	_board_bg_size = size
+	var source: Texture2D = load(BOARD_IMAGE)
+	if source == null:
+		return
+	var image := source.get_image()
+	if image.is_compressed():
+		image.decompress()
+	image.convert(Image.FORMAT_RGBA8)
+	# Scale to COVER the board (fill fully, crop the overflow), then center-crop to size.
+	var cover := maxf(float(target.x) / image.get_width(), float(target.y) / image.get_height())
+	image.resize(
+		int(ceil(image.get_width() * cover)), int(ceil(image.get_height() * cover)),
+		Image.INTERPOLATE_BILINEAR
 	)
-	_play.draw_rect(frame, UiPalette.DARK_GRAY, false, WALL_THICKNESS)
+	var crop_offset := Vector2i((image.get_width() - target.x) / 2, (image.get_height() - target.y) / 2)
+	var fitted := image.get_region(Rect2i(crop_offset, target))
+	_round_image_corners(fitted, BOARD_CORNER_RADIUS)
+	_board_bg = ImageTexture.create_from_image(fitted)
 
 
-## Draw the slingshot feedback: a band from the anchor to the pulled-back ball, plus a gold guide
-## ray from the anchor in the direction the ball will fly (opposite the pull), its length growing
-## with the pull so the player can read the power before releasing.
+## Make the four corners of `image` transparent to a quarter-circle of `radius`, so the backdrop
+## reads with rounded corners that match the board outline.
+func _round_image_corners(image: Image, radius: int) -> void:
+	var w := image.get_width()
+	var h := image.get_height()
+	var corners := [
+		{"center": Vector2i(radius, radius), "dir": Vector2i(-1, -1)},
+		{"center": Vector2i(w - radius, radius), "dir": Vector2i(1, -1)},
+		{"center": Vector2i(radius, h - radius), "dir": Vector2i(-1, 1)},
+		{"center": Vector2i(w - radius, h - radius), "dir": Vector2i(1, 1)},
+	]
+	for corner in corners:
+		var center: Vector2i = corner["center"]
+		var dir: Vector2i = corner["dir"]
+		for offset_y in range(radius):
+			for offset_x in range(radius):
+				if Vector2(offset_x, offset_y).length() <= radius:
+					continue
+				var pixel := center + Vector2i(dir.x * offset_x, dir.y * offset_y)
+				if pixel.x < 0 or pixel.y < 0 or pixel.x >= w or pixel.y >= h:
+					continue
+				var color := image.get_pixel(pixel.x, pixel.y)
+				color.a = 0.0
+				image.set_pixel(pixel.x, pixel.y, color)
+
+
+## Draw the slingshot feedback: a thin connector from the launch point to the held ball, plus the
+## FORCE WEDGE — a filled triangle with its POINT at the ball's launch location, fanning out to a
+## WIDE far end in the DIRECTION OF TRAVEL (opposite the pull), like a beam showing where the ball
+## will go. The wide end's width and the wedge's length grow with the pull's force, and its single
+## color CHANGES with force (blue → purple → bright red), so the player reads both power and aim
+## direction at a glance (Tim, 2026-06-30).
 func _draw_aim_guide() -> void:
 	var ball_pos: Vector2 = _balls[_aim_index]["pos"]
 	var pull := ball_pos - _aim_anchor
-	# The stretched sling band.
-	_play.draw_line(_aim_anchor, ball_pos, Color(UiPalette.NAVY, 0.6), 4.0, true)
-	# A marker at the launch point.
+	var pull_distance := pull.length()
+
+	# A thin connector from the launch point to the held ball, so the pull itself is still visible.
+	_play.draw_line(_aim_anchor, ball_pos, Color(UiPalette.NAVY, 0.5), 3.0, true)
+	# A marker at the launch point — the ball's original spot, where it shoots from.
 	_play.draw_circle(_aim_anchor, 6.0, Color(UiPalette.NAVY, 0.6))
-	# The aim ray, opposite the pull, scaled up so it clearly reads as the throw direction.
-	if pull.length() >= MIN_PULL:
-		var aim_end := _aim_anchor - pull * 1.5
-		_play.draw_line(_aim_anchor, aim_end, Color(UiPalette.MUSTARD_GOLD, 0.85), 3.0, true)
+
+	if pull_distance < MIN_PULL:
+		return  # too short to be a throw — no force wedge yet
+
+	# The force this pull will produce (distance × power, capped at the throw-speed limit), so the
+	# wedge maxes out exactly when more pull would add nothing.
+	var force := clampf(pull_distance * PULL_POWER / MAX_THROW_SPEED, 0.0, 1.0)
+	var travel_dir := -pull / pull_distance               # the ball flies OPPOSITE the pull
+	var perp := Vector2(-travel_dir.y, travel_dir.x)       # wide-end spread, across the travel direction
+	var wide_half := lerpf(AIM_WEDGE_BASE_MIN, AIM_WEDGE_BASE_MAX, force) * 0.5
+	var wide_center := _aim_anchor + travel_dir * (pull_distance * AIM_WEDGE_LENGTH_SCALE)
+	var wedge := PackedVector2Array([
+		_aim_anchor,                          # POINT — at the ball's launch location
+		wide_center + perp * wide_half,       # wide end, fanned out in the direction of travel
+		wide_center - perp * wide_half,
+	])
+	_play.draw_colored_polygon(wedge, _force_color(force))
+
+
+## Map a force fraction (0 = none, 1 = maxed) to the aim band's color ramp: blue → purple at the
+## halfway point → bright red at full. See FORCE_COLOR_* (purple is a deliberate palette exception).
+func _force_color(fraction: float) -> Color:
+	if fraction < 0.5:
+		return FORCE_COLOR_LOW.lerp(FORCE_COLOR_MED, fraction / 0.5)
+	return FORCE_COLOR_MED.lerp(FORCE_COLOR_HIGH, (fraction - 0.5) / 0.5)
+
+
+## Draw the celebration layer: the expanding/fading score rings from a made basket, then the
+## confetti and clang sparks. Pure cosmetics; these read off _score_rings and _particles, which
+## _advance_celebration grows and fades.
+func _draw_celebration() -> void:
+	# Score rings: a thin ring that expands outward from the hoop and fades as its life drains.
+	for ring in _score_rings:
+		var life: float = ring["life"]
+		var radius := SCORE_RING_MAX_RADIUS * (1.0 - life)  # small at spawn (life 1) -> wide as it fades
+		var ring_color := UiPalette.MUSTARD_GOLD
+		ring_color.a = life  # fade out as it grows
+		_play.draw_arc(ring["pos"], radius, 0.0, TAU, 32, ring_color, 4.0, true)
+
+	# Confetti / clang sparks: little solid circles that fade with their life.
+	for particle in _particles:
+		var spark_color: Color = particle["color"]
+		spark_color.a = clampf(particle["life"], 0.0, 1.0)
+		_play.draw_circle(particle["pos"], particle["radius"], spark_color)
 
 
 ## Draw half of the rim ellipse. top_half draws the far/top edge (sin < 0); otherwise the
@@ -464,7 +732,14 @@ func _draw_net() -> void:
 	var strand_gray := UiPalette.LIGHT_GRAY
 	var ring_gray := UiPalette.MID_GRAY
 	var depth := HOOP_RY + 56.0                 # how far the net hangs below the hoop center
-	var bottom_center := _hoop_pos + Vector2(0.0, depth)
+	# After a made basket the net sways: a damped sine, strongest right after the ball drops through
+	# and settling to zero over NET_SWING_DURATION. Only the net's BOTTOM swings; the rim stays put.
+	var swing_x := 0.0
+	if _net_swing_time > 0.0:
+		var elapsed := NET_SWING_DURATION - _net_swing_time
+		var decay := _net_swing_time / NET_SWING_DURATION
+		swing_x = sin(elapsed * NET_SWING_FREQ) * NET_SWING_AMPLITUDE * decay
+	var bottom_center := _hoop_pos + Vector2(swing_x, depth)
 	var bottom_rx := HOOP_RX * 0.42             # the net pinches inward toward the bottom
 	var bottom_ry := HOOP_RY * 0.42
 

@@ -132,35 +132,32 @@ func setup(p_index: int, prop: PropertyState, economy: EconomyState, frenzy: Fre
 func _ready() -> void:
 	add_theme_stylebox_override("panel", UiPalette.make_panel_style())
 
-	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 6)
-	add_child(column)
-
-	# Top of the row: a round manager-portrait slot on the left, and to its right a section
-	# holding the name, the cycle progress bar, AND the milestone (inventory count) bar. The
-	# circle is sized in _refresh to be a square as tall as that whole section (all three
-	# lines), so it reads as one tall portrait spanning them — and the milestone bar, now in
-	# that section, lines up with the cycle bar's width instead of running the full row (Tim,
-	# 2026-06-22).
-	var top_row := HBoxContainer.new()
-	top_row.add_theme_constant_override("separation", 12)
-	column.add_child(top_row)
+	# The portrait/rush control sits on the LEFT as a single tall square spanning the WHOLE
+	# panel height (Tim, 2026-07-01): on device the old section-height circle was a hard tap
+	# target, so it now runs the full height of the row for a big, easy-to-hit button. To its
+	# right, a column holds the three stacked rows — name/income header, cycle progress bar,
+	# and the buy/hire buttons — each now a little narrower because the tall portrait claims
+	# the left edge. The circle's square size is set in _refresh to match its own height.
+	var outer_row := HBoxContainer.new()
+	outer_row.add_theme_constant_override("separation", 12)
+	add_child(outer_row)
 
 	_manager_circle = ManagerCircle.new()
-	_manager_circle.size_flags_vertical = Control.SIZE_FILL  # stretch to the section's height
+	_manager_circle.size_flags_vertical = Control.SIZE_FILL  # stretch to the whole panel height
 	# The portrait IS the start/rush control now (the old START button is gone): a single tap
 	# starts an idle cycle (or rushes a running one); holding it auto-rushes (see _pump_held_rush).
 	_manager_circle.pressed.connect(func() -> void: tap_requested.emit(prop_index))
-	top_row.add_child(_manager_circle)
+	outer_row.add_child(_manager_circle)
 
-	var top_section := VBoxContainer.new()
-	top_section.add_theme_constant_override("separation", 6)
-	top_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	top_row.add_child(top_section)
+	# The three stacked rows to the right of the tall portrait.
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 6)
+	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	outer_row.add_child(column)
 
 	# Header: name ×count on the left, income/sec on the right.
 	var header := HBoxContainer.new()
-	top_section.add_child(header)
+	column.add_child(header)
 
 	_name_label = Label.new()
 	_name_label.add_theme_color_override("font_color", UiPalette.NAVY)
@@ -190,7 +187,7 @@ func _ready() -> void:
 	_cycle_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_cycle_bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	UiPalette.style_progress_bar(_cycle_bar, UiPalette.MONEY_GREEN)
-	top_section.add_child(_cycle_bar)
+	column.add_child(_cycle_bar)
 
 	# Buy / hire buttons (bulk-buy is mandatory — GDD §3.1). The buy button's
 	# count follows the global buy-mode toggle.
@@ -200,7 +197,10 @@ func _ready() -> void:
 
 	_buy_button = Button.new()
 	_buy_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	# Buy and hire each take half the panel width (default stretch ratio 1.0 on both).
+	# The hire button gets the larger share of the row (Tim, 2026-07-01): both stretch to
+	# fill, but the buy button's stretch ratio is pulled below the hire button's default 1.0,
+	# so the split lands around 40% buy / 60% hire instead of an even half-and-half.
+	_buy_button.size_flags_stretch_ratio = 0.65
 	_buy_button.custom_minimum_size = Vector2(0, BUTTON_ROW_HEIGHT)
 	UiPalette.style_button(_buy_button, true)  # red: buying is a spend action (§8)
 	_buy_button.pressed.connect(func() -> void: buy_requested.emit(prop_index, _buy_mode))
@@ -329,8 +329,8 @@ func _refresh(delta: float) -> void:
 	# owns at least one unit (Tim, 2026-06-28).
 	_cycle_bar.visible = owned
 
-	# Keep the portrait circle square and as tall as this top section: its height is already
-	# stretched to the section by the layout, so we just match the width to it.
+	# Keep the portrait circle square and as tall as the whole panel: its height is already
+	# stretched to the full row by the layout, so we just match the width to it.
 	_manager_circle.custom_minimum_size.x = _manager_circle.size.y
 
 	# The portrait is the start/rush control (ManagerCircle). Decide its look and whether it

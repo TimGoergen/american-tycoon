@@ -483,16 +483,17 @@ func _build_estate_tab() -> Control:
 	# The prestige exit, pinned to the BOTTOM of the tab (Tim, 2026-06-28): plan the estate,
 	# pass on, raise a faster heir. Red = big commit.
 	_plan_button = Button.new()
-	# ~35% shorter than its previous (taller) size, still fitting the bold label + inline gem
-	# (Tim, 2026-06-28).
-	_plan_button.custom_minimum_size = Vector2(0, int(UiPalette.STANDARD_BUTTON_HEIGHT * 0.88))
+	# As tall as the Settings tab's tuning buttons (STANDARD_BUTTON_HEIGHT × 1.4) so this
+	# prestige exit reads as an equally weighty, easy-to-hit control (Tim, 2026-07-01).
+	_plan_button.custom_minimum_size = Vector2(0, int(UiPalette.STANDARD_BUTTON_HEIGHT * 1.4))
 	UiPalette.style_button(_plan_button, true)
 	_plan_button.pressed.connect(_on_plan_estate_pressed)
 	v.add_child(_plan_button)
 
 	# The button's label is a RichTextLabel so the parenthetical can show the legacy-gem image
-	# inline (Tim, 2026-06-28). It is 40% larger than the standard label and bold. A CenterContainer
-	# centers it over the button; both ignore the mouse so the press still reaches the button.
+	# inline (Tim, 2026-06-28). It is bold and sized to match the Settings tuning buttons'
+	# font (Tim, 2026-07-01). A CenterContainer centers it over the button; both ignore the
+	# mouse so the press still reaches the button.
 	var plan_center := CenterContainer.new()
 	plan_center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	plan_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -505,7 +506,8 @@ func _build_estate_tab() -> Control:
 	_plan_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	_plan_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_plan_label.add_theme_font_override("normal_font", UiPalette.make_bold_font())
-	_plan_label.add_theme_font_size_override("normal_font_size", int(round(UiPalette.FONT_LABEL * 1.4)))
+	# Font size 50 — the same as the Settings tab's tuning buttons (TUNING_BUTTON_FONT).
+	_plan_label.add_theme_font_size_override("normal_font_size", 50)
 	_plan_label.add_theme_color_override("default_color", UiPalette.PALE_GOLD)
 	# Mipmapped filtering so the inline gem image downscales smoothly rather than aliasing.
 	_plan_label.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
@@ -809,7 +811,7 @@ func _update_plan_button() -> void:
 	_plan_button.disabled = not can_succeed
 	if can_succeed:
 		# "(+x [gem])" — the legacy-gem image stands in for the word "Legacy" inside the parens.
-		_plan_label.text = "[center]PASS THE TORCH  (+%d [img width=29 height=40]res://art/icons/legacy_gem.svg[/img])[/center]" % dynasty.projected_legacy_gain()
+		_plan_label.text = "[center]PASS THE TORCH  (+%d [img width=36 height=50]res://art/icons/legacy_gem.svg[/img])[/center]" % dynasty.projected_legacy_gain()
 	else:
 		_plan_label.text = "[center]PASS THE TORCH[/center]"
 

@@ -91,18 +91,25 @@ func _rebake_backdrop() -> void:
 # ---------------------------------------------------------------------------
 
 func _build_list_view() -> Control:
-	# The cream rounded viewing area, framed by the black field — the same shared frame the
-	# main game uses, so the list page sits in an identical bezel and rounded plate.
-	var viewing_area := PanelContainer.new()
-	UiPalette.apply_screen_bezel(viewing_area)
-	# 50%-alpha cream plate (Tim, 2026-06-29) so the themed backdrop reads through the list page.
-	var plate := UiPalette.make_screen_panel_style()
-	plate.bg_color = Color(UiPalette.CREAM, 0.5)
-	viewing_area.add_theme_stylebox_override("panel", plate)
+	# A centered card matching the minigame screen's Get Ready panel — the SAME size, shape, and
+	# 70%-alpha cream (Tim, 2026-06-30) — so the Tuning list sits on the identical plate the games
+	# use, with the themed backdrop showing around it.
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", MinigameScreen.make_card_style())
+	var half_w := MinigameScreen.PANEL_WIDTH_FRACTION / 2.0
+	var half_h := MinigameScreen.PANEL_HEIGHT_FRACTION / 2.0
+	card.anchor_left = 0.5 - half_w
+	card.anchor_right = 0.5 + half_w
+	card.anchor_top = 0.5 - half_h
+	card.anchor_bottom = 0.5 + half_h
+	card.offset_left = 0.0
+	card.offset_right = 0.0
+	card.offset_top = 0.0
+	card.offset_bottom = 0.0
 
-	# The list of buttons is centered within that full-screen frame.
+	# The list of buttons is centered within that card.
 	var center := CenterContainer.new()
-	viewing_area.add_child(center)
+	card.add_child(center)
 
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 14)
@@ -150,7 +157,7 @@ func _build_list_view() -> Control:
 	close_button.pressed.connect(_on_close_pressed)
 	column.add_child(close_button)
 
-	return viewing_area
+	return card
 
 
 # ---------------------------------------------------------------------------

@@ -177,7 +177,7 @@ func _ready() -> void:
 
 	# The game card itself, centered on top of that background with its own thick outline.
 	var panel := PanelContainer.new()
-	panel.add_theme_stylebox_override("panel", _make_panel_style())
+	panel.add_theme_stylebox_override("panel", make_card_style())
 	# Center the panel by anchor fractions so it scales with the screen and stays centered.
 	var half_w := PANEL_WIDTH_FRACTION / 2.0
 	var half_h := PANEL_HEIGHT_FRACTION / 2.0
@@ -206,12 +206,14 @@ func _ready() -> void:
 	panel.add_child(_begin_overlay)
 
 
-## The cream card that frames every minigame: cream fill, a moderately thick black outline, and
-## the universal inner content margin so nothing crowds the edge.
-func _make_panel_style() -> StyleBoxFlat:
+## The cream card that frames every minigame — and, shared, the Minigame Tuning list, so the two
+## match exactly: cream fill at 70% alpha (so the themed backdrop reads through), a moderately thick
+## black outline, and the universal inner content margin. Static so the review screen builds the
+## identical card via this + PANEL_WIDTH_FRACTION / PANEL_HEIGHT_FRACTION.
+static func make_card_style() -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
-	# 50% alpha (Tim, 2026-06-29) so the themed backdrop reads through the card.
-	style.bg_color = Color(UiPalette.CREAM, 0.5)
+	# 70% alpha (Tim, 2026-06-30) so the themed backdrop reads through the card.
+	style.bg_color = Color(UiPalette.CREAM, 0.7)
 	style.set_corner_radius_all(24)
 	style.border_color = Color.BLACK
 	style.set_border_width_all(PANEL_BORDER_WIDTH)
@@ -392,20 +394,15 @@ func _build_result_view() -> Control:
 	return column
 
 
-## The "Get Ready" gate over the card: an opaque cream scrim with the drawn type's name and a big
-## BEGIN button. It hides the (not-yet-started) game until the player is ready, so the clock never
-## starts the instant the screen appears. start_game shows it; _on_begin_pressed dismisses it and
-## actually starts the round.
+## The "Get Ready" gate over the card: the drawn type's name, goal, stakes, and a big BEGIN button.
+## No opaque scrim — the gate lets the 70%-translucent card (and the backdrop through it) show, so
+## Get Ready reads at the same 70% as the rest of the panel (Tim, 2026-06-30). The not-yet-started
+## game is hidden instead by keeping _play_view invisible until Begin (see start_game /
+## _start_active_round). start_game shows the gate; _on_begin_pressed fades it and starts the round.
 func _build_begin_overlay() -> Control:
 	var overlay := Control.new()
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	overlay.visible = false
-
-	# An opaque cream scrim fully hides the blank, not-yet-begun game behind the gate.
-	var scrim := ColorRect.new()
-	scrim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	scrim.color = UiPalette.CREAM
-	overlay.add_child(scrim)
 
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -583,7 +580,9 @@ func start_game(
 
 	# The round does NOT start yet: the type stays un-begun and the clock paused behind the Begin
 	# gate, so the player is never caught off guard. _on_begin_pressed starts it for real.
-	_play_view.visible = true
+	# The play view stays hidden behind the (now scrim-less) Get Ready gate, so the not-yet-started
+	# game doesn't show through the translucent card; _start_active_round reveals it on Begin.
+	_play_view.visible = false
 	_play_view.modulate = Color.WHITE
 	_result_view.visible = false
 	_playing = false
@@ -630,6 +629,7 @@ func _start_active_round() -> void:
 	if _active_minigame == null:
 		return
 	_begin_overlay.visible = false
+	_play_view.visible = true  # reveal the game now that the gate is gone and the round goes live
 	_active_minigame.begin(_tuning)
 	_playing = true
 

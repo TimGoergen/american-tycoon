@@ -55,6 +55,29 @@ The satire lives in the mechanics, not the writing. In America, success is defin
 | Push notifications | **None. Ever.** | Principle 5. Also zero infrastructure. Old money doesn't chase you; a full offline cap is something you discover, like interest |
 | Balance tooling | **Headless balance simulator** (early build priority) | §0.1. The original spreadsheets were this instinct in embryo |
 
+### 2.1 Number formatting — one authority, named scale to sextillion+ (note added 2026-07-01)
+
+**Problem.** The current formatter (`Money.display()` / `display_cash()`) tops out at **Trillion** — anything past $1e12 just piles digits in front of "T" ("$1000000T"). But the epoch ladder already blows past that: tier-6's economy is ~24.3M × Earth ≈ **$2.5 sextillion** ($2.5e21), and the proposed meta-tier upgrades (§8.7, ×10/×100 leaps) push higher still. Currency must read cleanly all the way up.
+
+**Requirement 1 — extend the named-scale ladder.** Continue the short-scale suffixes past Trillion through at least **Decillion**, which covers the game's top scale with comfortable headroom:
+
+| Suffix | Magnitude | | Suffix | Magnitude |
+|---|---|---|---|---|
+| K | 1e3 | | Sx (Sextillion) | 1e21 |
+| M | 1e6 | | Sp (Septillion) | 1e24 |
+| B | 1e9 | | Oc (Octillion) | 1e27 |
+| T | 1e12 | | No (Nonillion) | 1e30 |
+| Qa (Quadrillion) | 1e15 | | Dc (Decillion) | 1e33 |
+| Qi (Quintillion) | 1e18 | | | |
+
+The exact abbreviations are fixed here so they're unambiguous (Qa vs Qi, Sx vs Sp). **Never scientific notation** (the §2 Numbers rule). Beyond Decillion is out of the planned range; a graceful overflow (extend the names, or an AdCap-style `aa/ab/ac…` scheme) is a minor open item, not a launch blocker.
+
+**Open decision — compact suffix vs. spelled word.** The §2 Numbers row states a deadpan preference for the readable real-dollar style ("$14.3 trillion") over obscure suffixes, yet the code uses compact suffixes ("$14.3T") to fit tight rows. Recommendation: keep **compact suffixes** in space-constrained UI (property costs, income/sec, buttons) and reserve the fuller style only where there's room (the cash hero, ceremony screens) — but the call is Tim's, and it bears on §14 readability (large text, imperfect vision). Whatever is chosen, the abbreviation set above is the canonical mapping.
+
+**Requirement 2 — one formatting authority, used everywhere.** Every currency amount on screen must route through `Money` (`display()` for compact, `display_cash()` for the watched balance) — no ad-hoc `"$" + "%.2f"` formatting anywhere. Most call sites already do this; the task is to (a) extend **both** `Money` methods over the **same** suffix table (ideally a single shared ladder so they can't drift), and (b) audit every currency display site to confirm none bypasses `Money`.
+
+**Underlying type.** `Money` wraps a float64, which loses *exact* integer precision beyond ~9e15 (2⁵³); amounts above that drift by dollars/thousands. For an idle game at this scale that display-only drift is standard and acceptable. If exactness ever matters, swap the internal representation to a mantissa+exponent big-number — the `Money` class already documents itself as that swap point, satisfying the §2 "big-number support from day one" intent for display today and precision later.
+
 ---
 
 ## 3. Core Loop Architecture — Three Nested Loops
@@ -385,6 +408,18 @@ Legislative & Executive Assets unlock estate-tax erosion: raised exemptions, dyn
 
 **Credit comes to you.** Periodic take-it-or-leave-it loan offers; fixed principal; fixed milestone schedule; **one active loan at a time.** **Terms improve as you need them less:** payday-lender terms for the bootstrapper → prime rates on enormous sums → late-game *bailouts* ("you're load-bearing now"). Implementation: a data table of offer tiers + §8.5 plumbing.
 
+### 8.7 Meta-tier upgrades — the second-order prestige track (proposed 2026-07-01)
+
+> **PROPOSED — design note only, first-pass, no values or code.** Raised by Tim 2026-07-01. This deliberately **reopens the §14 / Future-Features decision that there is "exactly one spendable prestige currency"** (resolved 2026-06-14). See the "why this doesn't re-trigger the two-competing-tracks trap" note below; the reopening is intentional and flagged, not an oversight.
+
+Today's Legacy upgrades (§8.4 Estate Office; the `LegacyUpgradeCatalog`) are mostly **compounding, geometric-cost** perks — "effectively endless," but by design each successive level is a smaller *relative* dent against a steeper price, so deep into a dynasty the base shop stalls. The **meta tier** sits *above* that shop: a small set of **standalone order-of-magnitude upgrades** — ×10 / ×100 leaps applied to a whole domain at once (e.g. "×100 to all property income," "×10 to every wage source") rather than another +20%/level line. They are the late-run "the numbers jump a whole order again" beat, matching the absurd scale escalation the epochs already embrace (§6.2, top-epoch economy ~24M× Earth).
+
+- **Gated by epoch / First Contact.** The meta tier scales with the economy band: a given meta upgrade (or its next level) unlocks only once the run has reached the epoch it belongs to. This also gives First Contact a **lasting prestige reward** it currently lacks — today a contact grants a new property type (§5.5) and a staff tier (§6.2), but no persistent currency.
+- **A NEW meta-currency, earned separately from Legacy.** Legacy is earned **per death** (within a bloodline); the meta-currency is earned **per epoch / first contact** (across the run). *Different faucets is exactly what keeps the two tracks orthogonal rather than competing:* Legacy = accelerate a bloodline; meta = buy the next order of magnitude as the galaxy opens. Working name **TBD** (see §14 currency-name question — candidates: *Ascendancy*, *Influence*, *Standing*). The one-currency guarantee in Future Features is superseded *for this track only*; Legacy remains the sole *death→Estate-Office* currency.
+- **Kept small and legible.** A handful of headline leaps, not a second full catalog — the base Legacy shop stays the broad, textured one; the meta tier is a short list of big, expensive, epoch-gated jumps.
+
+**Open (to pin before building):** the meta-currency's name and earn formula (flat per contact? scaled by epoch economy?); how many meta upgrades and which domains they hit; whether meta upgrades persist across the whole dynasty (they should, being epoch-sourced) or reset; and the interaction with the base-catalog refinement below (§14 open item — some base upgrades merge/retire, some gaps like offline-cap extension get filled).
+
 ---
 
 ## 9. Rare Events (added v0.2)
@@ -572,7 +607,10 @@ own design pass before it becomes a milestone.
   conversion — not a second currency.** There remains exactly **one** spendable prestige
   currency (Legacy, spent in the Estate Office; §8.4, Mechanics Spec §9.3). Lifetime-earned is
   the *meter*; Legacy is the *currency* it converts into. This avoids the two-competing-tracks
-  trap. Mechanically:
+  trap. *(Amended 2026-07-01: the **meta-tier upgrade track (§8.7, proposed)** introduces a
+  second, epoch-sourced prestige currency above Legacy. It does not violate the intent here —
+  it is earned from a different faucet (per epoch/first contact, not per death), keeping the two
+  tracks orthogonal. This decision governs the death→Estate-Office track only.)* Mechanically:
   - The **dynasty** holds `lifetime_cash_earned`, a cumulative all-generations accumulator —
     the cross-epoch yardstick, the §8.3 obituary headline, and the Family Ledger career stat.
     It only ever grows; spending never reduces it.

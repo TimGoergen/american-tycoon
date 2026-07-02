@@ -34,13 +34,19 @@ var _buy_mode: BuyMode = BuyMode.ONE
 ## Accumulates held-down time on the tap button to pace auto-rush pulses.
 var _hold_accumulator := 0.0
 
-## Hold-to-buy pacing on the BUY button (Tim, 2026-06-22), mirroring the Estate shop: a
-## quick tap buys once; holding auto-repeats after a short initial delay so the player can
-## watch the cost climb and release when they want to stop.
+## Hold-to-buy pacing (Tim, 2026-06-22), mirroring the Estate shop: a quick tap acts once; holding
+## auto-repeats after a short initial delay so the player can watch the cost climb and release when
+## they want to stop. Shared by BOTH the buy button and the staff (hire/upgrade/level-up) button.
 const BUY_HOLD_INITIAL_DELAY := 0.45
 const BUY_HOLD_REPEAT_INTERVAL := 0.35
 var _buy_hold_accumulator := 0.0
 var _buy_hold_repeating := false
+
+## Hold-to-repeat state for the STAFF button (Tim, 2026-07-01): holding it keeps hiring/upgrading —
+## and then leveling up the staffer — until the player releases, using the same pacing as the buy
+## button above.
+var _hire_hold_accumulator := 0.0
+var _hire_hold_repeating := false
 
 # The cycle progress bar is driven by our own smooth, per-frame prediction rather
 # than the raw logic value. Logic ticks at LOGIC_HZ (10 Hz) while rendering runs
@@ -257,6 +263,7 @@ func _process(delta: float) -> void:
 	_refresh(delta)
 	_pump_held_rush(delta)
 	_pump_held_buy(delta)
+	_pump_held_hire(delta)
 
 
 ## Holding the start/rush button continually drives the property at the tuning
@@ -298,6 +305,26 @@ func _pump_held_buy(delta: float) -> void:
 		_buy_hold_repeating = true
 		if not _buy_button.disabled:
 			buy_requested.emit(prop_index, _buy_mode)
+
+
+## Holding the STAFF button keeps performing its current action on a calm cadence (Tim, 2026-07-01):
+## a quick tap is handled by the button's own `pressed` (one hire/upgrade/level-up); this only adds
+## the repeats while it stays held. It routes through _on_hire_pressed, so a held button naturally
+## flows from hiring to upgrading to leveling up as the state changes. Unaffordable pulses are
+## skipped (the button disables itself), so a held button simply idles once the player runs out of
+## cash rather than spamming failures — exactly like the buy button.
+func _pump_held_hire(delta: float) -> void:
+	if not _hire_button.button_pressed:
+		_hire_hold_accumulator = 0.0
+		_hire_hold_repeating = false
+		return
+	_hire_hold_accumulator += delta
+	var threshold := BUY_HOLD_REPEAT_INTERVAL if _hire_hold_repeating else BUY_HOLD_INITIAL_DELAY
+	if _hire_hold_accumulator >= threshold:
+		_hire_hold_accumulator = 0.0
+		_hire_hold_repeating = true
+		if not _hire_button.disabled:
+			_on_hire_pressed()
 
 
 func _refresh(delta: float) -> void:

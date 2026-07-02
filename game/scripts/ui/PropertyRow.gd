@@ -163,6 +163,11 @@ func _ready() -> void:
 	_name_label.add_theme_color_override("font_color", UiPalette.NAVY)
 	_name_label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
 	_name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# Clip a long name rather than letting it force the whole row wider than the panel. Without
+	# this a long "Name ×count / next" sets the row's MINIMUM width; paired with the now-taller
+	# (and so wider) full-height portrait, that pushed the panel off the right edge of the screen
+	# (Tim, 2026-07-01). Clipping lets the row shrink to fit; the income label stays fully visible.
+	_name_label.clip_text = true
 	header.add_child(_name_label)
 
 	_income_label = Label.new()

@@ -128,10 +128,13 @@ var _epoch_label: Label  # the current epoch / civilization name (was the heir n
 ## the name text — so the name stays legible over the busy globe (Tim, 2026-07-01). Sized slightly
 ## larger than the name each frame in _layout_labels.
 var _epoch_name_backing: ColorRect
-## Alpha of that backing (Tim asked for "alpha 75" on the 0–255 scale) and how far it extends past
+## Alpha of that backing (Tim asked for "alpha 95" on the 0–255 scale) and how far it extends past
 ## the name on each side — only a small margin so the plate hugs the word.
-const EPOCH_BACKING_ALPHA := 75.0 / 255.0
+const EPOCH_BACKING_ALPHA := 95.0 / 255.0
 const EPOCH_BACKING_PAD := Vector2(8, 4)
+## Vertical-only scale of the backing about the name's center — 0.85 shrinks the plate's HEIGHT 15%
+## while its width stays at the name + padding (Tim, 2026-07-01).
+const EPOCH_BACKING_SCALE := 0.85
 
 # Frenzy glow: while a burn is active the ticket pulses toward red to signal the
 # accelerated state. Subtle — navy numerals stay readable over the tint.
@@ -429,10 +432,14 @@ func _layout_labels() -> void:
 		icon_baseline_y - _epoch_label.size.y
 	)
 
-	# The faint white backing tracks the name: same center, extended by EPOCH_BACKING_PAD on every
-	# side so it sits slightly larger than the text.
-	_epoch_name_backing.size = _epoch_label.size + EPOCH_BACKING_PAD * 2.0
-	_epoch_name_backing.position = _epoch_label.position - EPOCH_BACKING_PAD
+	# The faint white backing tracks the name: full name-plus-padding WIDTH, but its HEIGHT is
+	# scaled by EPOCH_BACKING_SCALE. Kept centered on the name.
+	var backing_size := Vector2(
+		_epoch_label.size.x + EPOCH_BACKING_PAD.x * 2.0,
+		(_epoch_label.size.y + EPOCH_BACKING_PAD.y * 2.0) * EPOCH_BACKING_SCALE
+	)
+	_epoch_name_backing.size = backing_size
+	_epoch_name_backing.position = _epoch_label.position + _epoch_label.size / 2.0 - backing_size / 2.0
 
 
 ## The mild flash: lift the panel's brightness for an instant, then ease it back

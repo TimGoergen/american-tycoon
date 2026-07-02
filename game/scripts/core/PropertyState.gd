@@ -39,6 +39,13 @@ var staff_income_multiplier: float = 1.0
 ## to 0 whenever the tier advances (a new epoch's staffer is a fresh hire — Tim 2026-06-27).
 var staff_level: int = 0
 
+## Permanent income + cycle-time bonus this property won from its First Contact minigame (GDD §5.5
+## site 2; alien properties only). 1.0/1.0 = base (the guaranteed floor — the minigame is upside-
+## only, never a penalty); a good negotiation raises the income multiplier and lowers the cycle
+## multiplier (faster cycles). Set once when the trade deal resolves and kept for the run.
+var first_contact_income_multiplier: float = 1.0
+var first_contact_cycle_multiplier: float = 1.0
+
 ## Whether ANY staffer is hired, enabling auto-cycle forever. Read-only: derived from
 ## staff_tier so the many places that ask "is this staffed?" keep working unchanged
 ## while the tier is the real stored fact.
@@ -181,6 +188,21 @@ func _effective_staff_multiplier() -> float:
 	return staff_income_multiplier * pow(1.0 + tuning.staff_level_step, float(staff_level))
 
 
+## This property's full income multiplier: the staffer bonus (tier entry × within-epoch levels)
+## AND the permanent First Contact minigame income bonus. Everything that pays or displays income
+## routes through here so both apply uniformly.
+func _effective_income_multiplier() -> float:
+	return _effective_staff_multiplier() * first_contact_income_multiplier
+
+
+## Apply this property's First Contact minigame result (income up, cycle down). Called once when the
+## alien trade deal resolves; both are floored at base (income ≥ 1.0×, cycle ≤ 1.0×) so a poor run
+## or a Skip never makes the property worse than its base — the minigame is upside-only.
+func set_first_contact_bonus(income_multiplier: float, cycle_multiplier: float) -> void:
+	first_contact_income_multiplier = maxf(1.0, income_multiplier)
+	first_contact_cycle_multiplier = clampf(cycle_multiplier, 0.01, 1.0)
+
+
 ## Set the Legacy cycle-speed multiplier and keep the in-flight cycle consistent.
 ## Because the effective cycle length shrinks as speed rises, an in-progress
 ## cycle could suddenly be "past the end"; we clamp progress so it simply
@@ -194,7 +216,9 @@ func set_cycle_speed_multiplier(multiplier: float) -> void:
 ## Legacy "Efficiency Experts" upgrade. Everything that measures cycle time goes
 ## through here so the speed bonus applies uniformly (completion, rush, rate).
 func _effective_cycle_length() -> float:
-	return cycle_length / cycle_speed_multiplier
+	# The First Contact cycle bonus (≤ 1.0) shortens the effective cycle, so a well-negotiated alien
+	# property also pays faster, not just more.
+	return cycle_length / cycle_speed_multiplier * first_contact_cycle_multiplier
 
 
 ## Public accessor for the effective (sped-up) cycle length, so the UI can size its
@@ -242,7 +266,9 @@ func restore(
 		p_staff_income_multiplier: float,
 		p_staff_level: int,
 		p_cycle_progress: float,
-		p_is_running: bool
+		p_is_running: bool,
+		p_first_contact_income_mult: float = 1.0,
+		p_first_contact_cycle_mult: float = 1.0
 ) -> void:
 	units_owned = 0
 	cost_product = 1.0
@@ -252,6 +278,8 @@ func restore(
 	staff_tier = 0
 	staff_income_multiplier = 1.0
 	staff_level = 0
+	first_contact_income_multiplier = 1.0
+	first_contact_cycle_multiplier = 1.0
 
 	if p_units > 0:
 		buy(p_units)
@@ -259,6 +287,9 @@ func restore(
 	staff_tier = p_staff_tier
 	staff_income_multiplier = p_staff_income_multiplier
 	staff_level = maxi(0, p_staff_level)
+	# Set the First Contact bonus before clamping cycle_progress — the cycle bonus shortens the
+	# effective length the clamp measures against.
+	set_first_contact_bonus(p_first_contact_income_mult, p_first_contact_cycle_mult)
 	cycle_progress = clampf(p_cycle_progress, 0.0, _effective_cycle_length())
 	is_cycle_running = (p_is_running or is_staffed) and units_owned > 0
 
@@ -325,7 +356,7 @@ func get_income_per_sec() -> float:
 	# Use the effective (sped-up) length so the Efficiency upgrade shows up as a
 	# higher income/sec, matching what the property actually pays over time. The staffer
 	# tier's multiplier is included so alien staff visibly raise this property's rate.
-	return floor(units_owned * income_per_unit * _effective_staff_multiplier()) / _effective_cycle_length()
+	return floor(units_owned * income_per_unit * _effective_income_multiplier()) / _effective_cycle_length()
 
 
 ## Cash paid out each time a full cycle completes, before frenzy/event
@@ -338,14 +369,14 @@ func get_income_per_cycle() -> float:
 	# Includes the staffer-tier multiplier AND the dynasty Family Fortune multiplier, so
 	# the displayed figure tracks a Legacy income upgrade (which the live tick also applies
 	# at payment). Frenzy/event multipliers still apply on top, at payment.
-	return floor(units_owned * income_per_unit * _effective_staff_multiplier() * legacy_income_multiplier)
+	return floor(units_owned * income_per_unit * _effective_income_multiplier() * legacy_income_multiplier)
 
 
 ## Cash a SINGLE unit of this property would pay per cycle right now (Family Fortune
 ## included). Shown grayed on a rung the player owns none of yet, so they can see what
 ## the next tier is worth before buying in (Tim 2026-06-17).
 func get_single_unit_income_per_cycle() -> float:
-	return floor(income_per_unit * _effective_staff_multiplier() * legacy_income_multiplier)
+	return floor(income_per_unit * _effective_income_multiplier() * legacy_income_multiplier)
 
 
 ## Current milestone band (how many bands have been crossed).
@@ -380,7 +411,7 @@ func _collect(income_multiplier: float = 1.0) -> float:
 	# _effective_staff_multiplier() is this property's own alien-staffer bonus (tier entry
 	# multiplier × within-epoch levels); the passed-in income_multiplier is the global
 	# frenzy × Legacy factor. Both apply here, at point of payment, then floor (Spec §1, §3.4).
-	return floorf(units_owned * income_per_unit * _effective_staff_multiplier() * income_multiplier)
+	return floorf(units_owned * income_per_unit * _effective_income_multiplier() * income_multiplier)
 
 
 ## Check whether a milestone has been crossed and apply the adaptive reward.

@@ -14,10 +14,12 @@ class_name GameState
 # (the alien-staffing system). v6 replaced the named-title wage ladder with a numeric clock-in
 # LEVEL (the wage save block now stores level + taps_into_level instead of a title index).
 # v7 added the per-property within-epoch staff_level (the per-epoch upgrade track).
+# v8 added the per-property permanent First Contact minigame bonus (income + cycle multipliers).
 # Older saves still load (missing fields default to a clean slate / zero earned; a v4
 # is_staffed:true becomes staff_tier 1; a pre-v6 save starts the wage at level 0; a pre-v7
-# save has every property's staff_level default to 0).
-const SAVE_VERSION := 7
+# save has every property's staff_level default to 0; a pre-v8 save has the First Contact bonus
+# default to 1.0 = base, no bonus).
+const SAVE_VERSION := 8
 
 var tuning: TuningConfig
 var economy: EconomyState
@@ -190,6 +192,10 @@ func to_save_dict() -> Dictionary:
 			"staff_tier": p.staff_tier,
 			# v7: within-epoch staff level (resets each epoch, so it is small and bounded).
 			"staff_level": p.staff_level,
+			# v8: the permanent First Contact minigame bonus (alien properties). Saved raw because
+			# it is won from minigame performance and can't be re-derived (GDD §5.5 site 2).
+			"first_contact_income_mult": p.first_contact_income_multiplier,
+			"first_contact_cycle_mult": p.first_contact_cycle_multiplier,
 			"cycle_progress": p.cycle_progress,
 			"is_cycle_running": p.is_cycle_running,
 		})
@@ -255,14 +261,21 @@ func load_save_dict(data: Dictionary) -> void:
 		# v5 stores staff_tier; a pre-v5 save only has the is_staffed bool, which maps to
 		# tier 1 (the Earth staffer) when true. The tier's multiplier is re-derived here.
 		var staff_tier := int(sp.get("staff_tier", 1 if bool(sp.get("is_staffed", false)) else 0))
-		# Pre-v7 saves have no staff_level; default 0 (the alien staffer starts un-leveled).
+		# Alien properties are automation-only (EconomyState.try_hire): their staffer multiplier is
+		# always 1.0, never the epoch 40× — so re-derive it alien-aware, not straight from the tier.
+		var is_alien := (prop.config as PropertyConfig).unlock_tier > 1
+		var staff_mult := 1.0 if is_alien else EpochCatalog.staff_income_multiplier(staff_tier)
+		# Pre-v7 saves have no staff_level; default 0. Pre-v8 saves have no First Contact bonus;
+		# default 1.0 (base — no bonus).
 		prop.restore(
 			int(sp.get("units_owned", 0)),
 			staff_tier,
-			EpochCatalog.staff_income_multiplier(staff_tier),
+			staff_mult,
 			int(sp.get("staff_level", 0)),
 			float(sp.get("cycle_progress", 0.0)),
-			bool(sp.get("is_cycle_running", false))
+			bool(sp.get("is_cycle_running", false)),
+			float(sp.get("first_contact_income_mult", 1.0)),
+			float(sp.get("first_contact_cycle_mult", 1.0))
 		)
 
 	var w: Dictionary = data.get("wage", {})

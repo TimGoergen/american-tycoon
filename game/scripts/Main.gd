@@ -836,10 +836,11 @@ func _on_contact_made(new_tier: int) -> void:
 	_first_contact_overlay.show_contact(new_tier)
 
 
-## The player answered the contact call (the overlay's "ANSWER THE CALL"). If this epoch opened
-## a new alien property type, negotiate the trade deal for it (GDD §5.5 site 2): the minigame's
-## performance becomes the player's head start (free starting units). Epochs with no new property
-## just resume play. With minigames opted out, we still grant the keep-floor head start directly.
+## The player answered the contact call (the overlay's "ANSWER THE CALL"). If this epoch opened a
+## new alien property type, negotiate the trade deal for it (GDD §5.5 site 2): the minigame's
+## performance sets a permanent, upside-only bonus on that property (income + cycle-time; the floor
+## is always its base income). Epochs with no new property just resume play. Opting out of minigames
+## simply forgoes the bonus — the property still unlocks at its base income, and you own none of it.
 func _on_contact_dismissed() -> void:
 	var tier := _pending_contact_tier
 	_pending_contact_tier = 0
@@ -848,16 +849,17 @@ func _on_contact_dismissed() -> void:
 		return  # no new business this epoch — nothing more to negotiate
 
 	if not game.ui_minigame_enabled:
-		# Opted out of minigames: bank the keep floor, matching the prestige/welcome-back rule.
-		var floor_units := int(floor(tuning.first_contact_starting_units * tuning.minigame_keep_floor))
-		game.economy.grant_starting_units(prop_index, floor_units)
+		# Opted out: the new property unlocks at base income; no minigame means no bonus. The bonus
+		# is upside-only, so opting out costs nothing but the potential upside. Nothing to grant.
 		return
 
-	var prop_name := (game.economy.properties[prop_index] as PropertyState).config.display_name
+	var prop := game.economy.properties[prop_index] as PropertyState
 	_minigame_site = MinigameSite.FIRST_CONTACT
 	_first_contact_prop_index = prop_index
+	# Frame the negotiation around the property's per-unit base income, so the result reads as the
+	# opening income you talked your way into rather than an abstract score.
 	_minigame_screen.start_game(
-		MinigameScreen.first_contact_reward(tuning.first_contact_starting_units, prop_name),
+		MinigameScreen.first_contact_reward(prop.get_single_unit_income_per_cycle(), prop.config.display_name),
 		dynasty.upgrades.minigame_bonus_max()
 	)
 
@@ -1016,17 +1018,34 @@ func _on_welcome_risk_pressed() -> void:
 	)
 
 
-## The First Contact negotiation produced `multiplier`: convert it to a count of free starting
-## units (the universal keep_floor..1+bonus curve scales the cap) and grant them on the new alien
-## property (GDD §5.5 site 2). The contact narration already played, so there is no closing beat —
-## the player drops back into the now-bigger game owning a head start on the new business. Save so
-## the granted units survive a crash before the next autosave.
+## The First Contact negotiation produced `multiplier`: map it to a permanent, upside-only bonus on
+## the new alien property (GDD §5.5 site 2). The contact narration already played, so there is no
+## closing beat — the player drops back into the now-bigger game with the property unlocked (owning
+## none) and its bonus set. Save so the bonus survives a crash before the next autosave.
 func _finish_first_contact_minigame(multiplier: float) -> void:
 	if _first_contact_prop_index >= 0:
-		var units := int(floor(tuning.first_contact_starting_units * multiplier))
-		game.economy.grant_starting_units(_first_contact_prop_index, units)
+		var prop := game.economy.properties[_first_contact_prop_index] as PropertyState
+		var bonus := _first_contact_bonus_for(multiplier)
+		prop.set_first_contact_bonus(bonus[0], bonus[1])
 		SaveManager.save_dict_to_file(dynasty.to_save_dict())
 	_first_contact_prop_index = -1
+
+
+## Map a First Contact minigame multiplier to the permanent property bonus, as
+## [income_multiplier, cycle_multiplier]. The floor is always base (1.0 / 1.0 — the minigame is
+## upside-only, never a penalty). A result above "full" (multiplier > 1.0) is sorted by how far into
+## the bonus band it reached, into three buckets — low / medium / high — each raising income and
+## shortening the cycle (Plans/First_Contact_Property_Reward.md).
+func _first_contact_bonus_for(multiplier: float) -> Array:
+	var bonus_max := dynasty.upgrades.minigame_bonus_max()
+	var into_bonus := (multiplier - 1.0) / maxf(0.0001, bonus_max)  # 0 at "full", 1 at the max bonus
+	if into_bonus <= 0.0:
+		return [1.0, 1.0]     # base — no bonus (a weak run or a Skip)
+	elif into_bonus <= 1.0 / 3.0:
+		return [1.15, 0.95]   # low
+	elif into_bonus <= 2.0 / 3.0:
+		return [1.40, 0.88]   # medium
+	return [1.80, 0.80]       # high
 
 
 ## The welcome-back minigame produced `multiplier`: the base pile was already banked, so we

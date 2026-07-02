@@ -84,9 +84,9 @@ const RUSH_CATCHUP_TAU := 0.12
 const SOLID_BAR_THRESHOLD_SEC := 0.25
 
 ## Once the EFFECTIVE cycle is shorter than this (seconds), the income readout over the bar switches
-## from a per-cycle figure tagged with its length ("$X/260S" = $X every 260 seconds) to a per-second
-## rate ("$X/s") — a sub-second cycle reads more naturally as a rate than as "per 0.4 seconds"
-## (Tim, 2026-07-01/02).
+## from a per-cycle figure tagged with its length ("$X/4.3M" = $X every 4.3 minutes; see
+## _format_cycle_duration) to a per-second rate ("$X/s") — a sub-second cycle reads more naturally as
+## a rate than as "per 0.4 seconds" (Tim, 2026-07-01/02).
 const PER_SECOND_READOUT_THRESHOLD_SEC := 1.0
 ## Which cycle-bar fill look is currently applied, so we only rebuild the stylebox on a
 ## change, not every frame (the same approach FrenzyBar uses for its burn-color swap):
@@ -465,13 +465,13 @@ func _refresh(delta: float) -> void:
 	var per_cycle := _prop.get_income_per_cycle() * _frenzy.get_multiplier() if owned \
 		else _prop.get_single_unit_income_per_cycle()
 	# Rate context on the payout (Tim, 2026-07-02): a cycle of a second or more shows the per-cycle
-	# payout WITH its cycle length — "$X/260S", i.e. $X every 260 seconds — so the figure is never an
-	# unlabeled amount. A sub-second cycle instead reads as a per-second rate ("$X/s"), the same
-	# per-cycle figure divided by the (tiny) cycle length.
+	# payout WITH its cycle length, scaled to a sensible unit — "$X/4.3M" is $X every 4.3 minutes —
+	# so the figure is never an unlabeled amount. A sub-second cycle instead reads as a per-second
+	# rate ("$X/s"), the same per-cycle figure divided by the (tiny) cycle length.
 	if effective_length > 0.0 and effective_length < PER_SECOND_READOUT_THRESHOLD_SEC:
 		_income_label.text = Money.of(per_cycle / effective_length).display() + "/s"
 	else:
-		_income_label.text = "%s/%dS" % [Money.of(per_cycle).display(), int(round(effective_length))]
+		_income_label.text = "%s/%s" % [Money.of(per_cycle).display(), _format_cycle_duration(effective_length)]
 
 	# Smooth, constant-velocity cycle bar (see _displayed_cycle_fraction above). Measured
 	# against the EFFECTIVE (sped-up) cycle length so the bar still fills all the way to the
@@ -539,6 +539,19 @@ func _set_cycle_color(rush_no_longer_option: bool, rush_held: bool) -> void:
 		fill = UiPalette.MONEY_GREEN.darkened(HELD_RUSH_DARKEN)
 		fill.s = minf(fill.s * HELD_RUSH_SATURATE, 1.0)
 	UiPalette.style_progress_bar(_cycle_bar, fill)
+
+
+## Format a cycle length (seconds) as a compact duration with one decimal and a unit scaled to size —
+## seconds (S), minutes (M), hours (H), or days (D) — for the "$X/<duration>" income readout (Tim,
+## 2026-07-02). Capital S here is the cycle DURATION, distinct from the lowercase "/s" per-second rate.
+func _format_cycle_duration(seconds: float) -> String:
+	if seconds >= 86400.0:
+		return "%.1fD" % (seconds / 86400.0)
+	elif seconds >= 3600.0:
+		return "%.1fH" % (seconds / 3600.0)
+	elif seconds >= 60.0:
+		return "%.1fM" % (seconds / 60.0)
+	return "%.1fS" % seconds
 
 
 ## Swap the row's panel background between the normal cream look (owned) and the drab gray

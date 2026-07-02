@@ -128,9 +128,10 @@ var _epoch_label: Label  # the current epoch / civilization name (was the heir n
 ## the name text — so the name stays legible over the busy globe (Tim, 2026-07-01). Sized slightly
 ## larger than the name each frame in _layout_labels.
 var _epoch_name_backing: ColorRect
-## Alpha of that backing (Tim asked for "alpha 95" on the 0–255 scale) and how far it extends past
-## the name on each side — only a small margin so the plate hugs the word.
-const EPOCH_BACKING_ALPHA := 95.0 / 255.0
+## Opacity of that backing: 0.80 = 20% transparent (Tim, 2026-07-01). Godot alpha is 0.0–1.0, not a
+## 0–255 or 0–100 value. Also: how far the plate extends past the name on each side (a small margin
+## so it hugs the word).
+const EPOCH_BACKING_ALPHA := 0.80
 const EPOCH_BACKING_PAD := Vector2(8, 4)
 ## Vertical-only scale of the backing about the name's center — 0.85 shrinks the plate's HEIGHT 15%
 ## while its width stays at the name + padding (Tim, 2026-07-01).

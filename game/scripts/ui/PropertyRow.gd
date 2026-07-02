@@ -83,9 +83,10 @@ const RUSH_CATCHUP_TAU := 0.12
 ## threshold, NOT an economy value, so it lives here in the UI rather than in tuning.tres.
 const SOLID_BAR_THRESHOLD_SEC := 0.25
 
-## Once the EFFECTIVE cycle is shorter than this (seconds), the income readout over the bar
-## switches from a plain per-cycle amount (no suffix) to a per-second rate with a "/s" suffix
-## (Tim, 2026-07-01). A sub-second cycle reads more naturally as a rate than as "per cycle".
+## Once the EFFECTIVE cycle is shorter than this (seconds), the income readout over the bar switches
+## from a per-cycle figure tagged with its length ("$X/260S" = $X every 260 seconds) to a per-second
+## rate ("$X/s") — a sub-second cycle reads more naturally as a rate than as "per 0.4 seconds"
+## (Tim, 2026-07-01/02).
 const PER_SECOND_READOUT_THRESHOLD_SEC := 1.0
 ## Which cycle-bar fill look is currently applied, so we only rebuild the stylebox on a
 ## change, not every frame (the same approach FrenzyBar uses for its burn-color swap):
@@ -463,13 +464,14 @@ func _refresh(delta: float) -> void:
 	# unit (a buy-in preview).
 	var per_cycle := _prop.get_income_per_cycle() * _frenzy.get_multiplier() if owned \
 		else _prop.get_single_unit_income_per_cycle()
-	# No "/cycle" suffix at all (Tim, 2026-07-01): show the bare per-cycle amount, UNTIL the cycle
-	# drops below a second, at which point it reads more naturally as a rate — the same per-cycle
-	# figure divided by the cycle length, tagged "/s".
+	# Rate context on the payout (Tim, 2026-07-02): a cycle of a second or more shows the per-cycle
+	# payout WITH its cycle length — "$X/260S", i.e. $X every 260 seconds — so the figure is never an
+	# unlabeled amount. A sub-second cycle instead reads as a per-second rate ("$X/s"), the same
+	# per-cycle figure divided by the (tiny) cycle length.
 	if effective_length > 0.0 and effective_length < PER_SECOND_READOUT_THRESHOLD_SEC:
 		_income_label.text = Money.of(per_cycle / effective_length).display() + "/s"
 	else:
-		_income_label.text = Money.of(per_cycle).display()
+		_income_label.text = "%s/%dS" % [Money.of(per_cycle).display(), int(round(effective_length))]
 
 	# Smooth, constant-velocity cycle bar (see _displayed_cycle_fraction above). Measured
 	# against the EFFECTIVE (sped-up) cycle length so the bar still fills all the way to the

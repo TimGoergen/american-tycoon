@@ -26,6 +26,13 @@ the sense of achievement in reaching the income to buy your first one.
    first one. Tune each alien property to feel **expensive relative to your progress at arrival** —
    a real stretch to afford the first unit — then it pays off big as its higher income compounds.
    (Delete the `first_contact_starting_units` grant path.)
+   - **Entry-cost premium (2026-07-02).** The first cut kept cost = income-parity (cost 30× / income
+     30× off Executive Assets), giving a ~one-cycle payback — so at epoch 2 the player could afford
+     ~4 Photon Exchange *immediately*, no accomplishment. Fixed by an **8× entry premium on cost
+     only** (base_cost now ~240× Exec, income still ~30×), so the FIRST unit is a save-up (~several
+     cycles' payback) while later units still snowball. First-pass 8×; feel-tune against real
+     arrival cash — the "right" wall depends on how much cash a player lands epoch 2 with, which
+     varies with how hard they bought into Earth.
 
 3. **The minigame is upside-only, bucketed.** The floor is always the property's **base income —
    the player never gets less, whatever the minigame result.** A bonus, if earned, is a **permanent

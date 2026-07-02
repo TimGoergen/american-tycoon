@@ -55,6 +55,13 @@ const PANEL_HEIGHT_FRACTION := 0.672  # 0.84 * 0.80  (20% shorter)
 ## bezel frame.
 const PANEL_BORDER_WIDTH := 8
 
+## The SKIP / DONE control floats BELOW the card in the scrim (Tim, 2026-07-02), sized relative to its
+## old in-card form: 40% taller than the old 72px, and 20% narrower than the card (a fraction of the
+## panel width), with a small gap under the panel's bottom edge.
+const SKIP_BUTTON_HEIGHT := 101              # 72 * 1.4 — 40% taller
+const SKIP_WIDTH_FRACTION_OF_PANEL := 0.80   # 20% less wide than the card
+const SKIP_GAP_BELOW_PANEL := 16.0
+
 ## How fast the spectrum bar's fill glides toward its true value (per-second lerp weight). The
 ## bar tracks a smoothed `_display_mult` rather than the raw live multiplier so it reads as a
 ## sweep, not a jitter — the single most-visible shared element, smoothed once here for all six
@@ -227,6 +234,29 @@ func _ready() -> void:
 	_begin_overlay = _build_begin_overlay()
 	panel.add_child(_begin_overlay)
 
+	# The SKIP / DONE control sits BELOW the card, in the scrim (Tim, 2026-07-02): 40% taller and 20%
+	# narrower than its old in-card form, anchored just under the panel's bottom edge and centered. It
+	# is a SIBLING of the card (added to the screen, not the card's column), so it floats beneath the
+	# frame; its visibility is toggled alongside the play view — shown only while a round is live, so
+	# it never appears during the Get Ready gate or the result screen.
+	_skip_button = Button.new()
+	UiPalette.style_button(_skip_button, false)
+	_skip_button.text = "SKIP"
+	_skip_button.pressed.connect(_on_skip_pressed)
+	var skip_half_w := (PANEL_WIDTH_FRACTION * SKIP_WIDTH_FRACTION_OF_PANEL) / 2.0
+	_skip_button.anchor_left = 0.5 - skip_half_w
+	_skip_button.anchor_right = 0.5 + skip_half_w
+	# Both vertical anchors pin to the panel's bottom edge; the offsets give the button a fixed height
+	# a small gap below it.
+	_skip_button.anchor_top = 0.5 + half_h
+	_skip_button.anchor_bottom = 0.5 + half_h
+	_skip_button.offset_left = 0.0
+	_skip_button.offset_right = 0.0
+	_skip_button.offset_top = SKIP_GAP_BELOW_PANEL
+	_skip_button.offset_bottom = SKIP_GAP_BELOW_PANEL + SKIP_BUTTON_HEIGHT
+	_skip_button.visible = false  # revealed on Begin (see _start_active_round)
+	add_child(_skip_button)
+
 
 ## The cream card that frames every minigame — and, shared, the Minigame Tuning list, so the two
 ## match exactly: cream fill at 70% alpha (so the themed backdrop reads through), a moderately thick
@@ -324,20 +354,24 @@ func _build_play_view() -> Control:
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 12)
 
-	# The top section is context-dependent: in the tuner it is a left-aligned Back button; in a
-	# live round it is a centered blurb naming the minigame's purpose. start_game toggles which.
-	_add_back_button(column)
+	# The first row carries two things side by side: the Back button (review mode only) on the left,
+	# and the round timer right-aligned. Sharing one row — instead of giving the timer a row of its
+	# own — frees that height for the game board (Tim, 2026-07-02). The centered purpose blurb (live
+	# rounds only) sits just below.
+	var top_row := _add_back_button(column)
+
+	# The timer stays the round's focal point (plan §1): big and faux-bold, escalating in color/scale
+	# as time runs low (see _refresh_timer). It now lives at the top-right of the first row — the
+	# spacer inside top_row pushes it to the right edge.
+	_timer_label = _make_label("0:30", UiPalette.FONT_DISPLAY, UiPalette.KETCHUP_RED)
+	_timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_timer_label.add_theme_font_override("font", UiPalette.make_bold_font())
+	top_row.add_child(_timer_label)
+
 	_purpose_label = _make_label(_purpose, UiPalette.FONT_HEADLINE, UiPalette.NAVY)
 	_purpose_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_purpose_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(_purpose_label)
-
-	# The timer is the round's focal point (plan §1): big, centered, faux-bold, so time pressure
-	# reads at a glance. Its color/scale escalate as time runs low (see _refresh_timer).
-	_timer_label = _make_label("0:30", UiPalette.FONT_DISPLAY, UiPalette.KETCHUP_RED)
-	_timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_timer_label.add_theme_font_override("font", UiPalette.make_bold_font())
-	column.add_child(_timer_label)
 
 	# Challenge Mode readouts (hidden in normal reward rounds): the live score, big and central like
 	# the timer it replaces, with the best-to-beat under it. start_challenge shows them; start_game
@@ -371,16 +405,8 @@ func _build_play_view() -> Control:
 	_play_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	column.add_child(_play_area)
 
-	# SKIP banks the keep floor immediately. Now that the spectrum bar shows no numbers, this
-	# button is the one place "what you'd keep" is made legible: start_game labels it with the
-	# concrete keep-floor reward (plan §1, decision 2026-06-29).
-	_skip_button = Button.new()
-	_skip_button.custom_minimum_size = Vector2(0, 72)
-	UiPalette.style_button(_skip_button, false)
-	_skip_button.text = "SKIP"
-	_skip_button.pressed.connect(_on_skip_pressed)
-	column.add_child(_skip_button)
-
+	# The SKIP / DONE control is NOT in this column — it floats BELOW the card in the scrim, built in
+	# _ready (Tim, 2026-07-02). Only the opt-out checkbox remains here, at the bottom of the card.
 	_opt_out_check = CheckBox.new()
 	_opt_out_check.text = "Skip minigames from now on"
 	_opt_out_check.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
@@ -494,8 +520,9 @@ func _build_begin_overlay() -> Control:
 
 ## Add a left-aligned Back button to the top of a view's column. Hidden by default; only
 ## review mode (start_game's review_mode flag) makes it visible. A short HBox keeps it from
-## stretching the full width — it sits in the top-left like a typical "back" affordance.
-func _add_back_button(column: VBoxContainer) -> void:
+## stretching the full width — it sits in the top-left like a typical "back" affordance. Returns the
+## row so a caller (the play view) can add the timer to it, right-aligned past the spacer.
+func _add_back_button(column: VBoxContainer) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	var back := Button.new()
 	back.text = "← BACK"
@@ -505,12 +532,14 @@ func _add_back_button(column: VBoxContainer) -> void:
 	back.visible = false
 	back.pressed.connect(_on_back_pressed)
 	row.add_child(back)
-	# A spacer eats the rest of the row so the button keeps its natural width on the left.
+	# A spacer eats the rest of the row so the button keeps its natural width on the left (and pushes
+	# anything added after it — the play view's timer — to the right edge).
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(spacer)
 	_back_buttons.append(back)
 	column.add_child(row)
+	return row
 
 
 func _make_label(text: String, font_size: int, color: Color) -> Label:
@@ -651,6 +680,7 @@ func start_game(
 	_play_view.modulate = Color.WHITE
 	_result_view.visible = false
 	_playing = false
+	_skip_button.visible = false  # revealed on Begin (see _start_active_round)
 	_timer_label.text = "0:%02d" % int(ceil(_seconds_left))
 	_timer_label.scale = Vector2.ONE
 
@@ -726,6 +756,7 @@ func start_challenge(type_script: Script) -> void:
 	_play_view.modulate = Color.WHITE
 	_result_view.visible = false
 	_playing = false
+	_skip_button.visible = false  # revealed on Begin (see _start_active_round)
 
 	_begin_title.text = _active_minigame.display_name()
 	_begin_howto.text = _active_minigame.how_to_play()
@@ -768,6 +799,7 @@ func _start_active_round() -> void:
 		return
 	_begin_overlay.visible = false
 	_play_view.visible = true  # reveal the game now that the gate is gone and the round goes live
+	_skip_button.visible = true  # the below-card SKIP / DONE control shows only during live play
 	_active_minigame.begin(_tuning)
 	_playing = true
 
@@ -993,6 +1025,7 @@ func _show_result(mult: float) -> void:
 	_result_summary_label.visible = summary != ""
 
 	_play_view.visible = false
+	_skip_button.visible = false  # the below-card control hides once the round resolves
 	_result_view.visible = true
 	visible = true
 	_animate_result()

@@ -124,14 +124,16 @@ var _cash_label: Label
 var _income_icon: TextureRect  # gold "$/s" symbol beneath the income number (was the "INCOME" word)
 var _cash_bill: TextureRect  # dollar-bill icon beneath the cash number, right-aligned (was beside "CASH")
 var _epoch_label: Label  # the current epoch / civilization name (was the heir name)
-## A faint white plate behind the civilization name — in FRONT of the planet watermark but BEHIND
-## the name text — so the name stays legible over the busy globe (Tim, 2026-07-01). Sized slightly
-## larger than the name each frame in _layout_labels.
-var _epoch_name_backing: ColorRect
-## Opacity of that backing: 0.80 = 20% transparent (Tim, 2026-07-01). Godot alpha is 0.0–1.0, not a
-## 0–255 or 0–100 value. Also: how far the plate extends past the name on each side (a small margin
-## so it hugs the word).
+## A soft white plate behind the civilization name — in FRONT of the planet watermark but BEHIND
+## the name text — so the name stays legible over the busy globe (Tim, 2026-07-01). It's a RADIAL
+## gradient: opaque white at the center fading to transparent at the edges. Sized to the name each
+## frame in _layout_labels; the gradient is resolution-independent so it just scales to that rect.
+var _epoch_name_backing: TextureRect
+## Center opacity of that backing (Godot alpha is 0.0–1.0). The gradient fades from this at the
+## middle to EPOCH_BACKING_EDGE_ALPHA at the edges.
 const EPOCH_BACKING_ALPHA := 0.80
+## Edge opacity of the radial backing — fully transparent, so the plate feathers out to nothing.
+const EPOCH_BACKING_EDGE_ALPHA := 0.0
 const EPOCH_BACKING_PAD := Vector2(8, 4)
 ## Vertical-only scale of the backing about the name's center — 0.85 shrinks the plate's HEIGHT 15%
 ## while its width stays at the name + padding (Tim, 2026-07-01).
@@ -207,11 +209,14 @@ func _ready() -> void:
 	_cash_bill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_content.add_child(_cash_bill)
 
-	# The faint white plate behind the civilization name. Added to _content (so it draws over the
+	# The soft radial plate behind the civilization name. Added to _content (so it draws over the
 	# planet watermark) but BEFORE the name label (so the name draws over it). Positioned/sized in
-	# _layout_labels. Ignores the mouse so it never intercepts input.
-	_epoch_name_backing = ColorRect.new()
-	_epoch_name_backing.color = Color(1, 1, 1, EPOCH_BACKING_ALPHA)
+	# _layout_labels. STRETCH_SCALE + EXPAND_IGNORE_SIZE let the gradient fill whatever rect we set
+	# without inflating the panel's minimum size. Ignores the mouse so it never intercepts input.
+	_epoch_name_backing = TextureRect.new()
+	_epoch_name_backing.texture = _make_radial_backing_texture()
+	_epoch_name_backing.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_epoch_name_backing.stretch_mode = TextureRect.STRETCH_SCALE
 	_epoch_name_backing.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_content.add_child(_epoch_name_backing)
 
@@ -231,6 +236,24 @@ func _make_label(color: Color, font_size: int, outline: int) -> Label:
 	label.add_theme_color_override("font_outline_color", color)
 	label.add_theme_constant_override("outline_size", outline)
 	return label
+
+
+## Build the radial white gradient used behind the civilization name: opaque-ish white at the center
+## fading to transparent at the edges. GradientTexture2D's radial fill works in normalized UV, so the
+## soft falloff stretches to whatever (wide, short) rect the backing is scaled to, feathering out on
+## all four sides. A modest texture size is plenty — it's scaled up and bilinear-filtered.
+func _make_radial_backing_texture() -> GradientTexture2D:
+	var gradient := Gradient.new()
+	gradient.set_color(0, Color(1, 1, 1, EPOCH_BACKING_ALPHA))       # center
+	gradient.set_color(1, Color(1, 1, 1, EPOCH_BACKING_EDGE_ALPHA))  # edge
+	var texture := GradientTexture2D.new()
+	texture.gradient = gradient
+	texture.fill = GradientTexture2D.FILL_RADIAL
+	texture.fill_from = Vector2(0.5, 0.5)   # center of the rect
+	texture.fill_to = Vector2(1.0, 0.5)     # radius reaches the edge (corners clamp to transparent)
+	texture.width = 128
+	texture.height = 128
+	return texture
 
 
 ## Record the latest income/sec. The label itself only repaints on the throttled

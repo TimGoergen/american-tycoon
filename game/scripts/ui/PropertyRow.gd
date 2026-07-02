@@ -83,6 +83,11 @@ const RUSH_CATCHUP_TAU := 0.12
 ## threshold, NOT an economy value, so it lives here in the UI rather than in tuning.tres.
 const SOLID_BAR_THRESHOLD_SEC := 0.25
 
+## The portrait/rush button is a square sized to a fraction of the panel's full height, centered
+## vertically (Tim, 2026-07-02): at 1.0 it filled the whole row; 0.9 trims it 10% so it no longer
+## dominates the panel while staying a comfortably large tap target.
+const PORTRAIT_HEIGHT_FRACTION := 0.9
+
 ## Once the EFFECTIVE cycle is shorter than this (seconds), the income readout over the bar switches
 ## from a per-cycle figure tagged with its length ("$X/4.3m" = $X every 4.3 minutes; see
 ## _format_cycle_duration) to a per-second rate ("$X/s") — a sub-second cycle reads more naturally as
@@ -167,7 +172,7 @@ func _ready() -> void:
 	add_child(outer_row)
 
 	_manager_circle = ManagerCircle.new()
-	_manager_circle.size_flags_vertical = Control.SIZE_FILL  # stretch to the whole panel height
+	_manager_circle.size_flags_vertical = Control.SIZE_SHRINK_CENTER  # sized in _refresh, centered
 	# The portrait IS the start/rush control now (the old START button is gone): a single tap
 	# starts an idle cycle (or rushes a running one); holding it auto-rushes (see _pump_held_rush).
 	_manager_circle.pressed.connect(func() -> void: tap_requested.emit(prop_index))
@@ -424,9 +429,12 @@ func _refresh(delta: float) -> void:
 	# owns at least one unit (Tim, 2026-06-28).
 	_cycle_bar.visible = owned
 
-	# Keep the portrait circle square and as tall as the whole panel: its height is already
-	# stretched to the full row by the layout, so we just match the width to it.
-	_manager_circle.custom_minimum_size.x = _manager_circle.size.y
+	# Keep the portrait circle square, sized to PORTRAIT_HEIGHT_FRACTION of the panel's full height
+	# and centered vertically. The row's height is driven by the column of rows to the right, so we
+	# read it back from the portrait's parent (the outer HBox) and shrink the square to fit.
+	var outer_row := _manager_circle.get_parent() as Control
+	var portrait_size: float = outer_row.size.y * PORTRAIT_HEIGHT_FRACTION
+	_manager_circle.custom_minimum_size = Vector2(portrait_size, portrait_size)
 
 	# The portrait is the start/rush control (ManagerCircle). Decide its look and whether it
 	# accepts input this frame:

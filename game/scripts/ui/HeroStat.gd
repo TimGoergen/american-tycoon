@@ -131,9 +131,10 @@ var _epoch_label: Label  # the current epoch / civilization name (was the heir n
 var _epoch_name_backing: TextureRect
 ## Center opacity of that backing (Godot alpha is 0.0–1.0). The gradient fades from this at the
 ## middle to EPOCH_BACKING_EDGE_ALPHA at the edges.
-const EPOCH_BACKING_ALPHA := 0.80
-## Edge opacity of the radial backing — fully transparent, so the plate feathers out to nothing.
-const EPOCH_BACKING_EDGE_ALPHA := 0.0
+const EPOCH_BACKING_ALPHA := 0.95
+## Edge opacity of the radial backing — kept low so the plate still feathers out, but no longer
+## fully transparent, so the whole plate reads more opaque (Tim, 2026-07-01).
+const EPOCH_BACKING_EDGE_ALPHA := 0.2
 const EPOCH_BACKING_PAD := Vector2(8, 4)
 ## Vertical-only scale of the backing about the name's center — 0.85 shrinks the plate's HEIGHT 15%
 ## while its width stays at the name + padding (Tim, 2026-07-01).

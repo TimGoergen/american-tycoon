@@ -562,9 +562,18 @@ func _apply_ownership_styling(owned: bool) -> void:
 ## (GDD §6.1). Used both to draw the button (_refresh_hire_button) and to route its press
 ## (_on_hire_pressed), so the two never disagree about which action the button performs.
 func _is_in_level_up_state() -> bool:
-	# Highest tier hireable right now: the reached epoch, capped at the defined epochs.
-	var max_tier := mini(_epoch.current_tier, EpochCatalog.tier_count())
+	# Highest tier hireable right now: the reached epoch, capped at the defined epochs. Alien
+	# properties are automation-only — capped at a single staffer (EconomyState.try_hire) — so their
+	# best tier is always 1: once hired they go straight to the level-up sink, never an upgrade
+	# (Tim, 2026-07-01).
+	var max_tier := 1 if _is_alien_property() else mini(_epoch.current_tier, EpochCatalog.tier_count())
 	return _prop.staff_tier >= 1 and _prop.staff_tier >= max_tier
+
+
+## True for an alien property type (unlock_tier > 1) — the ones added at First Contact, which staff
+## for automation only (no epoch multiplier), unlike the 12 Earth properties.
+func _is_alien_property() -> bool:
+	return (_prop.config as PropertyConfig).unlock_tier > 1
 
 
 ## The hire button's single `pressed` handler. It performs different actions depending on

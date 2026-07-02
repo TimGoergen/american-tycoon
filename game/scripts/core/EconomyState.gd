@@ -125,15 +125,22 @@ func get_property_index_for_unlock_tier(tier: int) -> int:
 ## already at the highest unlocked/defined tier or the player can't afford the next one.
 func try_hire(prop_index: int, max_tier: int) -> bool:
 	var prop := properties[prop_index] as PropertyState
+	# Alien properties (unlock_tier > 1) are AUTOMATION-ONLY: a single staffer that just runs them
+	# hands-off at ×1.0, never the 40×/epoch staff multiplier. Their epoch income leap lives in the
+	# property's own base magnitude (30×/tier) plus the First Contact minigame bonus, not in staffing
+	# (Tim, 2026-07-01; GDD §6.2 proposed change). So their staff caps at a single tier.
+	var is_alien := (prop.config as PropertyConfig).unlock_tier > 1
+	var effective_max := 1 if is_alien else mini(max_tier, EpochCatalog.tier_count())
 	var next_tier := prop.staff_tier + 1
-	if next_tier > max_tier or next_tier > EpochCatalog.tier_count():
+	if next_tier > effective_max:
 		return false
 	var cost := get_staff_cost(prop_index, next_tier)
 	if cash < cost:
 		return false
 	cash -= cost
 	spent_on_staff_this_gen += cost
-	prop.set_staff_tier(next_tier, EpochCatalog.staff_income_multiplier(next_tier))
+	var entry_multiplier := 1.0 if is_alien else EpochCatalog.staff_income_multiplier(next_tier)
+	prop.set_staff_tier(next_tier, entry_multiplier)
 	return true
 
 
@@ -148,6 +155,10 @@ func try_hire(prop_index: int, max_tier: int) -> bool:
 ## straight over, letting you afford some immediately). Rounded to match purchase prices.
 func get_staff_cost(prop_index: int, tier: int) -> float:
 	var prop := properties[prop_index] as PropertyState
+	# Alien properties are automation-only (see try_hire): their single staffer is priced like the
+	# Earth tier-1 staffer — a modest, property-scaled cost — not the epoch-anchored alien-staff price.
+	if (prop.config as PropertyConfig).unlock_tier > 1:
+		return prop.get_staff_cost()
 	if tier <= 1:
 		return prop.get_staff_cost()  # already includes the Legacy discount + rounding
 	# Tuning lives on the PropertyState (EconomyState has no direct handle to it).

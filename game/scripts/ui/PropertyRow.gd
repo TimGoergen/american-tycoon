@@ -101,8 +101,19 @@ const BUTTON_LABEL_FONT_SIZE := UiPalette.FONT_BUTTON
 ## Side length of the headshot icon that stands in for the word "HIRE"/"UPGRADE".
 const HIRE_ICON_SIZE := 56
 
+## Property-row readability pass (Tim, 2026-07-01): the row is taller and its labels bigger.
+## The property NAME reads in bold on the top line at this size.
+const NAME_FONT_SIZE := UiPalette.FONT_SUBHEAD
+## Shared height of the second row's two elements — the outlined "owned / next-threshold" count
+## panel and, to its right, the cycle progress bar — kept equal so they read as one aligned band.
+const SECOND_ROW_HEIGHT := 52
+## Font for the count-panel text and the per-cycle income readout above the bar.
+const SECOND_ROW_FONT_SIZE := UiPalette.FONT_BODY
+
 var _manager_circle: ManagerCircle
 var _name_label: Label
+## The "owned / next-milestone-threshold" readout, inside its own gray-outlined chip (Tim, 2026-07-01).
+var _count_label: Label
 var _income_label: Label
 var _cycle_bar: ProgressBar
 var _buy_button: Button
@@ -141,9 +152,9 @@ func _ready() -> void:
 	# The portrait/rush control sits on the LEFT as a single tall square spanning the WHOLE
 	# panel height (Tim, 2026-07-01): on device the old section-height circle was a hard tap
 	# target, so it now runs the full height of the row for a big, easy-to-hit button. To its
-	# right, a column holds the three stacked rows — name/income header, cycle progress bar,
-	# and the buy/hire buttons — each now a little narrower because the tall portrait claims
-	# the left edge. The circle's square size is set in _refresh to match its own height.
+	# right, a column holds the stacked rows — the bold NAME, then the "owned / threshold" count
+	# chip beside the income-over-progress-bar band, then the buy/hire buttons. The circle's
+	# square size is set in _refresh to match its own height.
 	var outer_row := HBoxContainer.new()
 	outer_row.add_theme_constant_override("separation", 12)
 	add_child(outer_row)
@@ -155,50 +166,79 @@ func _ready() -> void:
 	_manager_circle.pressed.connect(func() -> void: tap_requested.emit(prop_index))
 	outer_row.add_child(_manager_circle)
 
-	# The three stacked rows to the right of the tall portrait.
+	# The stacked rows to the right of the tall portrait.
 	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 6)
+	column.add_theme_constant_override("separation", 8)
 	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	outer_row.add_child(column)
 
-	# Header: name ×count on the left, income/sec on the right.
-	var header := HBoxContainer.new()
-	column.add_child(header)
-
+	# Row 1 — the property name, in bold.
 	_name_label = Label.new()
 	_name_label.add_theme_color_override("font_color", UiPalette.NAVY)
-	_name_label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
+	_name_label.add_theme_font_size_override("font_size", NAME_FONT_SIZE)
+	_name_label.add_theme_font_override("font", UiPalette.make_bold_font())
 	_name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	# Clip a long name rather than letting it force the whole row wider than the panel. Without
-	# this a long "Name ×count / next" sets the row's MINIMUM width; paired with the now-taller
-	# (and so wider) full-height portrait, that pushed the panel off the right edge of the screen
-	# (Tim, 2026-07-01). Clipping lets the row shrink to fit; the income label stays fully visible.
+	# Clip a long name rather than letting it force the whole row wider than the panel — otherwise a
+	# long name sets the row's MINIMUM width and, paired with the tall (so wide) portrait, pushes the
+	# panel off the right edge of the screen (Tim, 2026-07-01). Clipping lets the row shrink to fit.
 	_name_label.clip_text = true
-	header.add_child(_name_label)
+	column.add_child(_name_label)
 
+	# Row 2 — an outlined "owned / next-threshold" count chip on the LEFT, and to its right a band
+	# that fills the rest of the row: the per-cycle income (bold black, right-aligned) sitting ABOVE
+	# the live cycle progress bar. The chip and the bar are the same height so they read as one line.
+	var second_row := HBoxContainer.new()
+	second_row.add_theme_constant_override("separation", 10)
+	column.add_child(second_row)
+
+	# The count chip: a gray-outlined plate wrapping the "owned / threshold" readout. Transparent
+	# fill so only the outline shows, whatever the row's ownership background is. It takes only its
+	# own width (SHRINK_BEGIN) and bottom-aligns (SHRINK_END) so it sits level with the progress bar.
+	var count_chip := PanelContainer.new()
+	var chip_style := StyleBoxFlat.new()
+	chip_style.bg_color = Color.TRANSPARENT
+	chip_style.border_color = UiPalette.MID_GRAY
+	chip_style.set_border_width_all(2)
+	chip_style.set_corner_radius_all(4)
+	chip_style.set_content_margin(SIDE_LEFT, 16)
+	chip_style.set_content_margin(SIDE_RIGHT, 16)
+	count_chip.add_theme_stylebox_override("panel", chip_style)
+	count_chip.custom_minimum_size = Vector2(0, SECOND_ROW_HEIGHT)
+	count_chip.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	count_chip.size_flags_vertical = Control.SIZE_SHRINK_END
+	second_row.add_child(count_chip)
+
+	_count_label = Label.new()
+	_count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_count_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_count_label.add_theme_color_override("font_color", UiPalette.NAVY)
+	_count_label.add_theme_font_size_override("font_size", SECOND_ROW_FONT_SIZE)
+	count_chip.add_child(_count_label)
+
+	# The income-over-bar band fills the rest of the row.
+	var income_band := VBoxContainer.new()
+	income_band.add_theme_constant_override("separation", 2)
+	income_band.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	second_row.add_child(income_band)
+
+	# Per-cycle income: bold BLACK, right-aligned, sitting directly above the progress bar.
 	_income_label = Label.new()
-	# Darker green than the standard money-green, plus a same-color outline for faux
-	# weight (Tim's call: the per-cycle payout should read darker and bolder). The
-	# outline is the project-wide bold trick used until real bold fonts arrive in M3.
-	var income_green := UiPalette.MONEY_GREEN.darkened(0.4)
-	_income_label.add_theme_color_override("font_color", income_green)
-	_income_label.add_theme_color_override("font_outline_color", income_green)
-	_income_label.add_theme_constant_override("outline_size", 2)
-	_income_label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
-	header.add_child(_income_label)
+	_income_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_income_label.add_theme_font_size_override("font_size", SECOND_ROW_FONT_SIZE)
+	_income_label.add_theme_font_override("font", UiPalette.make_bold_font())
+	_income_label.add_theme_color_override("font_color", Color.BLACK)
+	income_band.add_child(_income_label)
 
-	# Cycle line: live cycle progress (Style Guide §9: the "spin" is the real cycle
-	# progress; placeholder bar until hero art). The old START/RUSH button is gone — the
-	# portrait circle on the left is now the start/rush control (see ManagerCircle).
+	# Cycle progress bar (Style Guide §9: the "spin" is the real cycle progress). Same height as the
+	# count chip so the two line up; fills the width to the right of the chip.
 	_cycle_bar = ProgressBar.new()
 	_cycle_bar.min_value = 0.0
 	_cycle_bar.max_value = 1.0
 	_cycle_bar.show_percentage = false
-	_cycle_bar.custom_minimum_size = Vector2(0, 26)
+	_cycle_bar.custom_minimum_size = Vector2(0, SECOND_ROW_HEIGHT)
 	_cycle_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_cycle_bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	UiPalette.style_progress_bar(_cycle_bar, UiPalette.MONEY_GREEN)
-	column.add_child(_cycle_bar)
+	income_band.add_child(_cycle_bar)
 
 	# Buy / hire buttons (bulk-buy is mandatory — GDD §3.1). The buy button's
 	# count follows the global buy-mode toggle.
@@ -344,14 +384,16 @@ func _refresh(delta: float) -> void:
 			or prop_index == _economy.get_cheapest_unaffordable_unowned_index(current_tier))
 
 	var config := _prop.config as PropertyConfig
-	# Name shows the owned count and, after the slash, the unit threshold of the next
-	# milestone tier (the old progress bar's information, folded into the title — Tim,
-	# 2026-06-29). Past the final milestone there is no next count, so we show "MAX".
+	# Row 1 is just the property name (bold). The owned-count and next-milestone threshold now live
+	# in their own outlined chip on row 2 (Tim, 2026-07-01), no longer folded into the title.
+	_name_label.text = config.display_name
+
+	# The count chip: "<owned> / <next milestone threshold>", or "<owned> / MAX" past the last tier.
 	var next_milestone := _prop.get_next_milestone_count()
 	if next_milestone <= 0:
-		_name_label.text = "%s  ×%d / MAX" % [config.display_name, _prop.units_owned]
+		_count_label.text = "%d / MAX" % _prop.units_owned
 	else:
-		_name_label.text = "%s  ×%d / %d" % [config.display_name, _prop.units_owned, next_milestone]
+		_count_label.text = "%d / %d" % [_prop.units_owned, next_milestone]
 
 	# A rung the player owns no units of yet gets a drab gray "locked" look; once a
 	# unit is bought it switches to the normal cream styling (applied on change).
@@ -487,15 +529,12 @@ func _apply_ownership_styling(owned: bool) -> void:
 	_ownership_style_applied = want
 	if owned:
 		add_theme_stylebox_override("panel", UiPalette.make_panel_style())
-		# Owned: the bold dark-money-green per-cycle payout.
-		var income_green := UiPalette.MONEY_GREEN.darkened(0.4)
-		_income_label.add_theme_color_override("font_color", income_green)
-		_income_label.add_theme_color_override("font_outline_color", income_green)
+		# Owned: the per-cycle payout in bold black (Tim, 2026-07-01).
+		_income_label.add_theme_color_override("font_color", Color.BLACK)
 	else:
 		add_theme_stylebox_override("panel", UiPalette.make_unowned_panel_style())
 		# Unowned: a drab dark-gray single-unit preview, matching the locked row look.
 		_income_label.add_theme_color_override("font_color", UiPalette.DARK_GRAY)
-		_income_label.add_theme_color_override("font_outline_color", UiPalette.DARK_GRAY)
 
 
 ## True once the property is staffed at the best tier this epoch allows. In that state the

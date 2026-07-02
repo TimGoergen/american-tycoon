@@ -436,7 +436,9 @@ func _build_result_view() -> Control:
 	_result_mult_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(_result_mult_label)
 
-	_result_amount_label = _make_label("", UiPalette.FONT_SUBHEAD, UiPalette.MONEY_GREEN)
+	# DARK_MONEY_GREEN (not MONEY_GREEN): the lighter cash green washes out against the cream result
+	# card and was hard to read (Tim, 2026-07-02); the darker green reads clearly on cream.
+	_result_amount_label = _make_label("", UiPalette.FONT_SUBHEAD, UiPalette.DARK_MONEY_GREEN)
 	_result_amount_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(_result_amount_label)
 
@@ -446,12 +448,37 @@ func _build_result_view() -> Control:
 	_result_summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(_result_summary_label)
 
+	# Push CONTINUE to the BOTTOM of the card: an expanding spacer eats the slack above it so the
+	# button sits at the panel's bottom edge instead of floating up under the summary text (Tim,
+	# 2026-07-02).
+	var bottom_spacer := Control.new()
+	bottom_spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	column.add_child(bottom_spacer)
+
+	# CONTINUE: 40% taller than the old 80px and 20% narrower than the card, centered. A 10 / 80 / 10
+	# HBox (equal expanding pads either side of an 8×-ratio button) gives it exactly 80% width with
+	# even margins (Tim, 2026-07-02) — mirroring the resized SKIP control on the play screen.
+	var continue_row := HBoxContainer.new()
+	var left_pad := Control.new()
+	left_pad.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left_pad.size_flags_stretch_ratio = 1.0
+	continue_row.add_child(left_pad)
+
 	var continue_button := Button.new()
-	continue_button.custom_minimum_size = Vector2(0, 80)
+	continue_button.custom_minimum_size = Vector2(0, 112)  # 80 * 1.4 — 40% taller
+	continue_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	continue_button.size_flags_stretch_ratio = 8.0  # 80% of the row (10 / 80 / 10 with the pads)
 	UiPalette.style_button(continue_button, true)
 	continue_button.text = "CONTINUE"
 	continue_button.pressed.connect(_on_continue_pressed)
-	column.add_child(continue_button)
+	continue_row.add_child(continue_button)
+
+	var right_pad := Control.new()
+	right_pad.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right_pad.size_flags_stretch_ratio = 1.0
+	continue_row.add_child(right_pad)
+
+	column.add_child(continue_row)
 
 	return column
 
@@ -1012,7 +1039,7 @@ func _show_result(mult: float) -> void:
 					[_format_amount(kept), _format_amount(_base_amount), _format_amount(kept - _base_amount)]
 		elif mult >= 1.0:
 			_result_mult_label.text = "FULL"
-			_result_mult_label.add_theme_color_override("font_color", UiPalette.MONEY_GREEN)
+			_result_mult_label.add_theme_color_override("font_color", UiPalette.DARK_MONEY_GREEN)
 			_result_amount_label.text = "+%s" % _format_amount(kept)
 		else:
 			_result_mult_label.text = "KEPT %d%%" % int(round(mult * 100.0))
@@ -1039,8 +1066,9 @@ func _set_first_contact_result_labels(mult: float) -> void:
 	var info: Dictionary = FIRST_CONTACT_BUCKETS[bucket]
 	_result_mult_label.text = String(info["label"])
 	# Base is calm green (no loss — it opens at its full base income); any bonus is the teal "extra".
+	# DARK_MONEY_GREEN so the base reads clearly on the cream card (Tim, 2026-07-02).
 	_result_mult_label.add_theme_color_override(
-		"font_color", UiPalette.MONEY_GREEN if bucket == 0 else UiPalette.ATOMIC_TEAL
+		"font_color", UiPalette.DARK_MONEY_GREEN if bucket == 0 else UiPalette.ATOMIC_TEAL
 	)
 	var income_mult := float(info["income"])
 	if bucket == 0:

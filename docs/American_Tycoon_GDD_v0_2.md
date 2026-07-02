@@ -198,29 +198,13 @@ screens shouldn't be dead air. This grew (Tim, 2026-06-22) into a **minigame fra
 
 **Usage sites (each rolls a random minigame type):**
 1. **Prestige / succession — multiplier on Legacy (BUILT).** See the match-3 below.
-2. **Epoch change / First Contact — reward = a NEW PROPERTY TYPE (BUILT 2026-06-28).** Theme:
-   *negotiating the alien trade deal*. Tim chose this over the earlier TBD options (entry income
-   boost / starting cash / first-staffer discount): winning the negotiation opens a genuinely new
-   *kind* of business in the bigger market, not just cash. Because a property is unlocked-or-not,
-   performance can't be the universal 0.5×→1.25× multiplier on the unlock; instead it scales the
-   **opening terms**: the player always gets the business, and the minigame decides their **head
-   start** — a count of free starting units already running. As-built model:
-   - **One new alien property per alien epoch** (`unlock_tier` on `PropertyConfig`): Photon
-     Exchange (epoch 2, Luminari), Data Foundry (3, Geth), Spore Bank (4, Mycelium), Prism Vault
-     (5, Quartzite), Time Bank (6, Chronophage). Each is a normal ladder rung — same milestones,
-     staffing, and per-epoch staff levels — just hidden and unbuyable until its epoch is reached.
-   - **Head start = starting units.** On answering the contact, the trade-deal minigame runs; the
-     granted units = `floor(first_contact_starting_units × multiplier)`. A full deal grants the
-     cap (8, dev-tunable); a skip / opt-out banks the **keep-floor share** (≈half), matching the
-     other sites — never zero, but real stakes. The units are *granted* (free), never counted as
-     estate spend. Flow: contact narration overlay → "Answer the Call" → negotiation minigame →
-     units granted on the new property → back into the now-bigger game.
-   - **Magnitude:** each alien property is a fixed flagship (~5× Earth's Executive Assets); its
-     epoch scaling comes purely from staffing, like every property (an early cut that scaled base
-     magnitude by `economy_scale` double-counted the epoch and let a few units clear it instantly).
-   All first-pass values; the at-scale feel is an on-device tuning pass (the sim can't reach
-   epoch 2 in its per-generation budget). Implemented in four phases; see
-   `Plans/First_Contact_Property_Reward.md`.
+2. **Epoch change / First Contact — reward = a NEW PROPERTY TYPE; minigame = upside-only bonus (REDESIGNED 2026-07-01 — supersedes the starting-units model).** Theme: *negotiating the alien trade deal*; winning opens a genuinely new *kind* of business in the bigger market.
+   - **One new alien property per alien epoch** (`unlock_tier` on `PropertyConfig`): Photon Exchange (epoch 2, Luminari), Data Foundry (3, Geth), Spore Bank (4, Mycelium), Prism Vault (5, Quartzite), Time Bank (6, Chronophage). Each is a normal ladder rung, hidden and unbuyable until its epoch is reached.
+   - **The property carries the epoch's income leap — not staff.** Each alien property's base magnitude scales with its epoch band (first-pass ~30×/tier, tracking `economy_scale = 30^(tier-1)`), and cycles stop lengthening. This reverses the earlier as-built "fixed ~5× flagship, epoch scaling from staffing only," which left every alien property *identical* (5× Executive Assets) and per-second **declining** down the ladder — so civ 2/3 felt far too small (Tim, 2026-07-01).
+   - **You start with ZERO of it (no free units).** At a new civilization the property unlocks but you own none. Each new property is deliberately **expensive relative to your current progress**, so earning the income to afford your *first* purchase is the achievement — then it pays off big as you scale in. (Directly reverses the old "starting units" head-start: owning several for free killed that sense of reaching a new tier.)
+   - **The minigame is upside-only.** The floor is always the property's **base income — the player never receives less, regardless of the result.** A good run adds a **permanent bonus** to that property's income-per-cycle *and* cycle-time, sorted into **three buckets — low / medium / high**. A poor run or a Skip simply grants no bonus (base only) — never a penalty. (This departs from the universal 0.5×→1.25× spectrum the other two sites use; First Contact is bonus-on-top-of-a-guaranteed-floor.)
+   - **Staff demoted from the epoch driver.** Staffing is no longer the epoch income multiplier; alien properties remain staffable for hands-off automation only (proposed default — see plan-doc open item). Broader §6 implications flagged in §6.2.
+   All first-pass values (the ~30×/tier magnitude and the low/med/high bonus sizes) need an on-device **and** sim tuning pass (the sim can't reach epoch 2 in its per-generation budget). Full design + open items: `Plans/First_Contact_Property_Reward.md`.
 3. **Welcome-back / offline return — multiplier on the offline pile (BUILT 2026-06-24).** A
    round scales the overnight pile: the base pile is banked on resume, the minigame credits the
    +/- delta (earned income), then the welcome screen shows the final haul. *(Watch: welcome-back
@@ -302,6 +286,8 @@ This is the diegetic engine behind the game's absurd scale: capitalism ran out o
 - **Named staffers in 50s-ad style, re-skinned per epoch.** Earth: the gleaming *ATM Technician*, the *NFT Community Manager*, up to the **Lobbyist** (Legislative Assets) and **Chief of Staff** (Executive Assets) — at that altitude even owning the government is delegated. Each later epoch renames the whole roster in its own flavor (the ATM Technician becomes the Luminari *Photon Teller*, then the Geth *Autonomous Teller Unit*, then the Mycelium *Spore-Cash Node*).
 
 ### 6.2 Epochs & First Contact
+
+> **PROPOSED CHANGE (2026-07-01) — epoch income driver moving from staff to the property.** The redesign in §5.5 site 2 makes each **alien property's own base magnitude** (scaling ~30×/tier) the epoch income leap, with the First Contact minigame adding an upside-only bonus. Staff is demoted: no longer the epoch multiplier, kept for hands-off automation only. The staff-tier `staff_income_multiplier` (40^(tier-1)) described below is therefore under review — it double-counts the epoch once the property scales on its own. The per-epoch staff **level-up** track (§6.1) and **retention** (§6.3) keep working but lose their epoch-scaling role. Full §6 rewrite deferred until the new model is feel-/sim-validated. Design of record: `Plans/First_Contact_Property_Reward.md`.
 
 Earth runs on **one currency — the dollar.** Alien civilizations are *flavor, magnitude bands, and a staff-tier gate*, never a second money type.
 

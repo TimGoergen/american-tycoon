@@ -1,6 +1,62 @@
 # First Contact Reward — New Alien Property Types
 
-**Status:** BUILT — all 4 phases complete 2026-06-28 (branch `feature/first-contact-property-reward`,
+**Status:** BUILT (starting-units model) — **but being REDESIGNED (2026-07-01).** See the redesign
+section immediately below; the original as-built model and plan follow it, kept for history.
+
+---
+
+## REDESIGN 2026-07-01 — property carries the epoch leap; minigame is an upside-only bonus
+
+**Why.** On device, civ 2/3 felt too small. The configs confirm it: **all five alien properties
+share the exact same base cost ($500B) and base income ($671.6B = 5× Executive Assets); only the
+cycle length changes, and it gets *longer* each tier** — so Data Foundry (tier 3) is no better than
+Photon Exchange (tier 2), and Time Bank (tier 6) pays *less per second* than the first alien
+property. There is zero income scaling across the alien ladder. Separately, the "starting units"
+head-start meant you already owned several of the new property the moment you arrived, which killed
+the sense of achievement in reaching the income to buy your first one.
+
+**New model (Tim's decisions, 2026-07-01):**
+
+1. **The epoch income leap now lives in the PROPERTY, not staff.** Each alien property's base
+   magnitude scales with its epoch band — **first-pass ~30×/tier**, tracking `economy_scale =
+   30^(tier-1)` — and cycle length stops growing (ideally shrinks) so per-second improves each
+   tier. Staff is demoted: it is no longer the epoch multiplier.
+
+2. **No starting units — you own ZERO at epoch start.** The property unlocks but you must *buy* your
+   first one. Tune each alien property to feel **expensive relative to your progress at arrival** —
+   a real stretch to afford the first unit — then it pays off big as its higher income compounds.
+   (Delete the `first_contact_starting_units` grant path.)
+
+3. **The minigame is upside-only, bucketed.** The floor is always the property's **base income —
+   the player never gets less, whatever the minigame result.** A bonus, if earned, is a **permanent
+   boost to that property's income-per-cycle AND cycle-time**, sorted into **three buckets: low /
+   medium / high**. A poor run or a Skip = base only, never a penalty. (This replaces the universal
+   0.5×→1.25× keep-floor spectrum for THIS site; it becomes bonus-on-top-of-a-guaranteed-floor.)
+
+**Decided (Tim, 2026-07-01):**
+- **Alien properties stay staffable for hands-off automation only** — staffing grants **no epoch
+  multiplier**; income scale is the base magnitude + the minigame bonus. (Full §6 staffing rewrite
+  deferred until this model is validated.)
+- **Bucket bonuses (first-pass, to feel-tune)** apply to **both income-per-cycle AND cycle-time**:
+  low **+15% income / −5% cycle**, medium **+40% / −12%**, high **+80% / −20%**. Floor = base
+  income with no bonus (poor run / Skip).
+
+**Work implied (not yet done):**
+- Re-tune the five alien property `.tres` magnitudes (cost + income) to the ~30×/tier ladder;
+  flatten or shrink `base_cycle_length` down the ladder.
+- Remove the starting-units grant; add the epoch minigame → 3-bucket permanent multiplier on the
+  new property (income + cycle-time), with a base-income floor.
+- Re-run the dynasty sim / epoch-timing study once the numbers land (it can't reach epoch 2 in a
+  per-generation budget, so a targeted harness or dev-jump is needed).
+
+**Open items:** the two defaults above (alien staffability, bucket values); exact per-tier magnitude
+multiplier (~30× is a starting point); whether cycle-time is part of the bonus or income-only.
+
+---
+
+## Original as-built model (starting units) — kept for history
+
+**Status (original):** BUILT — all 4 phases complete 2026-06-28 (branch `feature/first-contact-property-reward`,
 Phases 1–4 = commits 6b9f9ab, d694e48, 0c750d2, + copy/doc-sync). NOT yet merged to main;
 on-device feel-test (reach epoch 2 to play the negotiation) still owed.
 

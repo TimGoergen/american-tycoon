@@ -124,6 +124,14 @@ var _cash_label: Label
 var _income_icon: TextureRect  # gold "$/s" symbol beneath the income number (was the "INCOME" word)
 var _cash_bill: TextureRect  # dollar-bill icon beneath the cash number, right-aligned (was beside "CASH")
 var _epoch_label: Label  # the current epoch / civilization name (was the heir name)
+## A faint white plate behind the civilization name — in FRONT of the planet watermark but BEHIND
+## the name text — so the name stays legible over the busy globe (Tim, 2026-07-01). Sized slightly
+## larger than the name each frame in _layout_labels.
+var _epoch_name_backing: ColorRect
+## Alpha of that backing (Tim asked for "alpha 75" on the 0–255 scale) and how far it extends past
+## the name on each side — only a small margin so the plate hugs the word.
+const EPOCH_BACKING_ALPHA := 75.0 / 255.0
+const EPOCH_BACKING_PAD := Vector2(8, 4)
 
 # Frenzy glow: while a burn is active the ticket pulses toward red to signal the
 # accelerated state. Subtle — navy numerals stay readable over the tint.
@@ -194,6 +202,14 @@ func _ready() -> void:
 	_cash_bill.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_cash_bill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_content.add_child(_cash_bill)
+
+	# The faint white plate behind the civilization name. Added to _content (so it draws over the
+	# planet watermark) but BEFORE the name label (so the name draws over it). Positioned/sized in
+	# _layout_labels. Ignores the mouse so it never intercepts input.
+	_epoch_name_backing = ColorRect.new()
+	_epoch_name_backing.color = Color(1, 1, 1, EPOCH_BACKING_ALPHA)
+	_epoch_name_backing.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_content.add_child(_epoch_name_backing)
 
 	# The current epoch / civilization name, centered between the two edge values and laid
 	# out on the caption line (see _layout_labels). Navy to match the income side; Main feeds
@@ -412,6 +428,11 @@ func _layout_labels() -> void:
 		(area.x - _epoch_label.size.x) / 2.0,
 		icon_baseline_y - _epoch_label.size.y
 	)
+
+	# The faint white backing tracks the name: same center, extended by EPOCH_BACKING_PAD on every
+	# side so it sits slightly larger than the text.
+	_epoch_name_backing.size = _epoch_label.size + EPOCH_BACKING_PAD * 2.0
+	_epoch_name_backing.position = _epoch_label.position - EPOCH_BACKING_PAD
 
 
 ## The mild flash: lift the panel's brightness for an instant, then ease it back

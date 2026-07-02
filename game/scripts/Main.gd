@@ -385,7 +385,14 @@ func _build_ui() -> void:
 ## scrolling property ladder, and the wage button.
 func _build_property_tab() -> Control:
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 10)
+	# Match the vertical gaps between the action row, the ladder, and the wage panel to the tab
+	# panel's own 24px content margin (make_tab_panel_style). The tab panel already insets the
+	# content 24px on every outer side, so with this separation the top action row gets an equal
+	# 24px on ALL sides (its bottom gap now matches its top/left/right), and likewise the bottom
+	# clock-in wage panel gets an equal 24px on all sides (its top gap now matches). The two top
+	# buttons keep their own tighter 10px spacing — that's the action_row HBox below, not this gap
+	# (Tim, 2026-07-01: uniform margin around the button groups, but not between the two buttons).
+	v.add_theme_constant_override("separation", 24)
 
 	# Action row: the TURBO button (its background is the frenzy meter) takes the larger
 	# share; the buy-mode toggle takes the rest.

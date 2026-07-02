@@ -77,12 +77,16 @@ const HELD_RUSH_SATURATE := 1.4
 const RUSH_CATCHUP_TAU := 0.12
 
 ## Once a property's EFFECTIVE cycle is shorter than this (seconds), the cycle bar stops
-## animating and is pinned solid-full, and its readout switches from "/cycle" to a steady
-## "/sec" rate. Past this speed the bar would refill several times a second — a meaningless
-## strobe at 60fps — so we instead show the property as a continuously-paying business
-## (genre-standard, Tim 2026-06-25). This is a pure presentation / legibility threshold,
-## NOT an economy value, so it lives here in the UI rather than in tuning.tres.
+## animating and is pinned solid-full. Past this speed the bar would refill several times a
+## second — a meaningless strobe at 60fps — so we instead show the property as a continuously-
+## paying business (genre-standard, Tim 2026-06-25). This is a pure presentation / legibility
+## threshold, NOT an economy value, so it lives here in the UI rather than in tuning.tres.
 const SOLID_BAR_THRESHOLD_SEC := 0.25
+
+## Once the EFFECTIVE cycle is shorter than this (seconds), the income readout over the bar
+## switches from a plain per-cycle amount (no suffix) to a per-second rate with a "/s" suffix
+## (Tim, 2026-07-01). A sub-second cycle reads more naturally as a rate than as "per cycle".
+const PER_SECOND_READOUT_THRESHOLD_SEC := 1.0
 ## Which cycle-bar fill look is currently applied, so we only rebuild the stylebox on a
 ## change, not every frame (the same approach FrenzyBar uses for its burn-color swap):
 ##   0 = normal green (idle/running, rush available)
@@ -97,7 +101,9 @@ var _cycle_color_applied := -1
 # shows the verb/staffer on the left and the cost/tier on the right. The font is sized
 # to fill this fixed row height — see _add_split_button_labels.
 const BUTTON_ROW_HEIGHT := 80
-const BUTTON_LABEL_FONT_SIZE := UiPalette.FONT_BUTTON
+## A touch under FONT_BUTTON (34) so long cost numbers on the buy/hire buttons have more room
+## before the caption and cost start crowding each other (Tim, 2026-07-01).
+const BUTTON_LABEL_FONT_SIZE := 30
 ## Side length of the headshot icon that stands in for the word "HIRE"/"UPGRADE".
 const HIRE_ICON_SIZE := 56
 
@@ -184,9 +190,10 @@ func _ready() -> void:
 	_name_label.clip_text = true
 	column.add_child(_name_label)
 
-	# Row 2 — an outlined "owned / next-threshold" count chip on the LEFT, and to its right a band
-	# that fills the rest of the row: the per-cycle income (bold black, right-aligned) sitting ABOVE
-	# the live cycle progress bar. The chip and the bar are the same height so they read as one line.
+	# Row 2 — an outlined "owned / next-threshold" count chip on the LEFT, and to its right the live
+	# cycle progress bar filling the rest of the row, with the per-cycle income drawn ON TOP of the
+	# bar (bold black, right-aligned). The only text ABOVE the bar is the property name (row 1). The
+	# chip and the bar are the same height so they read as one line.
 	var second_row := HBoxContainer.new()
 	second_row.add_theme_constant_override("separation", 10)
 	column.add_child(second_row)
@@ -215,30 +222,42 @@ func _ready() -> void:
 	_count_label.add_theme_font_size_override("font_size", SECOND_ROW_FONT_SIZE)
 	count_chip.add_child(_count_label)
 
-	# The income-over-bar band fills the rest of the row.
-	var income_band := VBoxContainer.new()
-	income_band.add_theme_constant_override("separation", 2)
-	income_band.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	second_row.add_child(income_band)
+	# The right cell fills the rest of the row and holds the progress bar with the income drawn over
+	# it. A plain Control host (rather than parenting the income to the bar) keeps the income overlay
+	# visible even on an unowned "peek" row, where the bar itself is hidden — no cycle to run — but
+	# the single-unit income preview should still show. Same height as the count chip so they align.
+	var bar_cell := Control.new()
+	bar_cell.custom_minimum_size = Vector2(0, SECOND_ROW_HEIGHT)
+	bar_cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bar_cell.size_flags_vertical = Control.SIZE_SHRINK_END
+	second_row.add_child(bar_cell)
 
-	# Per-cycle income: bold BLACK, right-aligned, sitting directly above the progress bar.
-	_income_label = Label.new()
-	_income_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_income_label.add_theme_font_size_override("font_size", SECOND_ROW_FONT_SIZE)
-	_income_label.add_theme_font_override("font", UiPalette.make_bold_font())
-	_income_label.add_theme_color_override("font_color", Color.BLACK)
-	income_band.add_child(_income_label)
-
-	# Cycle progress bar (Style Guide §9: the "spin" is the real cycle progress). Same height as the
-	# count chip so the two line up; fills the width to the right of the chip.
+	# Cycle progress bar (Style Guide §9: the "spin" is the real cycle progress), filling the cell.
 	_cycle_bar = ProgressBar.new()
+	_cycle_bar.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_cycle_bar.min_value = 0.0
 	_cycle_bar.max_value = 1.0
 	_cycle_bar.show_percentage = false
-	_cycle_bar.custom_minimum_size = Vector2(0, SECOND_ROW_HEIGHT)
-	_cycle_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	UiPalette.style_progress_bar(_cycle_bar, UiPalette.MONEY_GREEN)
-	income_band.add_child(_cycle_bar)
+	bar_cell.add_child(_cycle_bar)
+
+	# Per-cycle income: bold BLACK, right-aligned, drawn ON TOP of the bar and vertically centered
+	# in it (Tim, 2026-07-01). A cream outline (the project's faux-weight trick) keeps it legible
+	# over both the green fill and the gray track. Inset a little from the cell's edges; ignores the
+	# mouse so a tap on the bar area is never eaten by the label.
+	_income_label = Label.new()
+	_income_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_income_label.offset_left = 12
+	_income_label.offset_right = -12
+	_income_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_income_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_income_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_income_label.add_theme_font_size_override("font_size", SECOND_ROW_FONT_SIZE)
+	_income_label.add_theme_font_override("font", UiPalette.make_bold_font())
+	_income_label.add_theme_color_override("font_color", Color.BLACK)
+	_income_label.add_theme_color_override("font_outline_color", UiPalette.CREAM)
+	_income_label.add_theme_constant_override("outline_size", 4)
+	bar_cell.add_child(_income_label)
 
 	# Buy / hire buttons (bulk-buy is mandatory — GDD §3.1). The buy button's
 	# count follows the global buy-mode toggle.
@@ -438,18 +457,19 @@ func _refresh(delta: float) -> void:
 	var effective_length := _prop.get_effective_cycle_length()
 	var bar_is_solid := owned and _prop.is_cycle_running \
 		and effective_length > 0.0 and effective_length < SOLID_BAR_THRESHOLD_SEC
-	if owned:
-		# get_income_per_cycle() already folds in the staffer and Family Fortune (Legacy)
-		# multipliers; frenzy is applied live on top, matching what the player receives.
-		var per_cycle := _prop.get_income_per_cycle() * _frenzy.get_multiplier()
-		if bar_is_solid:
-			# Derive the rate from the SAME per-cycle figure (not get_income_per_sec(),
-			# which omits legacy + frenzy) so "/sec" stays consistent with "/cycle".
-			_income_label.text = Money.of(per_cycle / effective_length).display() + "/sec"
-		else:
-			_income_label.text = Money.of(per_cycle).display() + "/cycle"
+	# The amount paid per completed cycle. For an OWNED rung get_income_per_cycle() already folds in
+	# the staffer and Family Fortune (Legacy) multipliers, with frenzy applied live on top so it
+	# matches what the player receives; for an UNOWNED rung it's the per-cycle value of a single
+	# unit (a buy-in preview).
+	var per_cycle := _prop.get_income_per_cycle() * _frenzy.get_multiplier() if owned \
+		else _prop.get_single_unit_income_per_cycle()
+	# No "/cycle" suffix at all (Tim, 2026-07-01): show the bare per-cycle amount, UNTIL the cycle
+	# drops below a second, at which point it reads more naturally as a rate — the same per-cycle
+	# figure divided by the cycle length, tagged "/s".
+	if effective_length > 0.0 and effective_length < PER_SECOND_READOUT_THRESHOLD_SEC:
+		_income_label.text = Money.of(per_cycle / effective_length).display() + "/s"
 	else:
-		_income_label.text = Money.of(_prop.get_single_unit_income_per_cycle()).display() + "/cycle"
+		_income_label.text = Money.of(per_cycle).display()
 
 	# Smooth, constant-velocity cycle bar (see _displayed_cycle_fraction above). Measured
 	# against the EFFECTIVE (sped-up) cycle length so the bar still fills all the way to the
@@ -674,33 +694,31 @@ func _set_split_label_color(left: Label, right: Label, color: Color) -> void:
 ## Update the buy button's caption, cost, and enabled state for the
 ## current global buy mode.
 func _refresh_buy_button() -> void:
+	# How many units this press would buy under the current mode. The left label just shows that
+	# count as "+N" (Tim, 2026-07-01) — no "BUY"/"MAX" wording, since the count alone reads as the
+	# purchase; the cost sits on the right.
 	var count := 0
-	var caption := ""
 	match _buy_mode:
 		BuyMode.ONE:
 			count = 1
-			caption = "BUY ×1"
 		BuyMode.TEN:
 			count = 10
-			caption = "BUY ×10"
 		BuyMode.HUNDRED:
 			count = 100
-			caption = "BUY ×100"
 		BuyMode.MAX:
 			count = _prop.get_max_affordable(_economy.cash)
-			caption = "MAX ×%d" % count
 
 	if count <= 0:
-		# MAX mode with nothing affordable yet: show the next single unit's cost so
-		# the player can see how close they are, instead of a blank "—".
-		_buy_caption_label.text = "MAX"
+		# MAX mode with nothing affordable yet: "+0", and show the next single unit's cost so the
+		# player can see how close they are, instead of a blank "—".
+		_buy_caption_label.text = "+0"
 		_buy_cost_label.text = Money.of(_prop.get_bulk_cost(1)).display()
 		_buy_button.disabled = true
 		_set_buy_label_colors()
 		return
 
 	var cost := _prop.get_bulk_cost(count)
-	_buy_caption_label.text = caption
+	_buy_caption_label.text = "+%d" % count
 	_buy_cost_label.text = Money.of(cost).display()
 	_buy_button.disabled = _economy.cash < cost
 	_set_buy_label_colors()

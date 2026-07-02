@@ -1032,20 +1032,14 @@ func _finish_first_contact_minigame(multiplier: float) -> void:
 
 
 ## Map a First Contact minigame multiplier to the permanent property bonus, as
-## [income_multiplier, cycle_multiplier]. The floor is always base (1.0 / 1.0 — the minigame is
-## upside-only, never a penalty). A result above "full" (multiplier > 1.0) is sorted by how far into
-## the bonus band it reached, into three buckets — low / medium / high — each raising income and
-## shortening the cycle (Plans/First_Contact_Property_Reward.md).
+## [income_multiplier, cycle_multiplier]. Reads the ONE shared table (MinigameScreen.FIRST_CONTACT_
+## BUCKETS) so the bonus applied here and the bucket the result screen announces can never disagree.
+## The floor is always base (1.0 / 1.0 — upside-only, never a penalty); a run into the bonus band is
+## sorted low / medium / high (Plans/First_Contact_Property_Reward.md).
 func _first_contact_bonus_for(multiplier: float) -> Array:
-	var bonus_max := dynasty.upgrades.minigame_bonus_max()
-	var into_bonus := (multiplier - 1.0) / maxf(0.0001, bonus_max)  # 0 at "full", 1 at the max bonus
-	if into_bonus <= 0.0:
-		return [1.0, 1.0]     # base — no bonus (a weak run or a Skip)
-	elif into_bonus <= 1.0 / 3.0:
-		return [1.15, 0.95]   # low
-	elif into_bonus <= 2.0 / 3.0:
-		return [1.40, 0.88]   # medium
-	return [1.80, 0.80]       # high
+	var bucket := MinigameScreen.first_contact_bucket(multiplier, dynasty.upgrades.minigame_bonus_max())
+	var info: Dictionary = MinigameScreen.FIRST_CONTACT_BUCKETS[bucket]
+	return [float(info["income"]), float(info["cycle"])]
 
 
 ## The welcome-back minigame produced `multiplier`: the base pile was already banked, so we

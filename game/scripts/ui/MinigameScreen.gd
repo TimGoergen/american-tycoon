@@ -76,6 +76,10 @@ var _base_amount: float = 0.0
 var _reward_noun: String = "Legacy"
 var _result_heading: String = "THE INHERITANCE"
 var _format_as_money: bool = false
+## Upside-only mode (First Contact, GDD §5.5 site 2): the floor is the base — a weak run or a Skip
+## costs nothing, and a good run adds a BUCKETED bonus (low/med/high) rather than a continuous
+## multiplier. Changes the SKIP label, the stakes blurb, and the result screen to match.
+var _upside_only: bool = false
 var _bonus_max: float = 0.25
 var _seconds_left: float = 0.0
 var _playing: bool = false
@@ -527,12 +531,39 @@ func _make_label(text: String, font_size: int, color: Color) -> Label:
 ## `noun` the singular reward word for plain counts ("Legacy"), `heading` the result-screen
 ## title, `purpose` the play-view blurb, and `format_as_money` formats amounts as dollars.
 static func make_reward(
-		base: float, noun: String, heading: String, purpose: String, format_as_money: bool
+		base: float, noun: String, heading: String, purpose: String, format_as_money: bool,
+		upside_only: bool = false
 ) -> Dictionary:
 	return {
 		"base": base, "noun": noun, "heading": heading,
-		"purpose": purpose, "as_money": format_as_money,
+		"purpose": purpose, "as_money": format_as_money, "upside_only": upside_only,
 	}
+
+
+## First Contact buckets its bonus (upside-only, GDD §5.5 site 2): a run at or below "full" earns
+## nothing (index 0 = base, no penalty), and a run into the bonus band is sorted by how deep into it,
+## as low / medium / high. Each bucket's permanent property bonus — income UP, cycle-time DOWN — and
+## its result-screen label live here so Main (which applies it) and the result view (which announces
+## it) read from ONE table and can never disagree about which bucket a run earned.
+const FIRST_CONTACT_BUCKETS := [
+	{"label": "NO BONUS", "income": 1.0, "cycle": 1.0},
+	{"label": "LOW BONUS", "income": 1.15, "cycle": 0.95},
+	{"label": "MEDIUM BONUS", "income": 1.40, "cycle": 0.88},
+	{"label": "HIGH BONUS", "income": 1.80, "cycle": 0.80},
+]
+
+
+## Which FIRST_CONTACT_BUCKETS index a finished minigame multiplier earns, given the bonus cap:
+## 0 at or below "full" (1.0), then low/medium/high by thirds of the bonus band above it.
+static func first_contact_bucket(multiplier: float, bonus_max: float) -> int:
+	var into_bonus := (multiplier - 1.0) / maxf(0.0001, bonus_max)
+	if into_bonus <= 0.0:
+		return 0
+	elif into_bonus <= 1.0 / 3.0:
+		return 1
+	elif into_bonus <= 2.0 / 3.0:
+		return 2
+	return 3
 
 
 ## The prestige/succession round: scales the heir's Legacy (a plain count).
@@ -554,7 +585,7 @@ static func offline_pile_reward(pile: float) -> Dictionary:
 static func first_contact_reward(base_income: float, property_name: String) -> Dictionary:
 	return make_reward(
 		base_income, "", property_name.to_upper(),
-		"Negotiate your opening terms in %s" % property_name, true
+		"Negotiate your opening terms in %s" % property_name, true, true  # as_money, upside_only
 	)
 
 
@@ -574,6 +605,7 @@ func start_game(
 	_reward_noun = String(reward.get("noun", "Legacy"))
 	_result_heading = String(reward.get("heading", "THE INHERITANCE"))
 	_format_as_money = bool(reward.get("as_money", false))
+	_upside_only = bool(reward.get("upside_only", false))
 	var purpose := String(reward.get("purpose", DEFAULT_PURPOSE))
 
 	_bonus_max = maxf(0.0, bonus_max)
@@ -630,15 +662,23 @@ func start_game(
 	_warn_phase = 0.0
 	_keep_bar.queue_redraw()
 
-	# Label SKIP with what skipping actually banks (the keep floor) — the one place the floor is
-	# made legible now that the spectrum bar carries no numbers.
-	var skip_amount := _base_amount * _tuning.minigame_keep_floor
-	_skip_button.text = "SKIP · keep %s" % _format_amount(skip_amount)
+	# Label SKIP with what skipping actually does. In the normal "scale an amount" sites it banks the
+	# keep floor; in upside-only First Contact there's no floor to lose — skipping just forgoes the
+	# bonus, so it says so plainly.
+	if _upside_only:
+		_skip_button.text = "SKIP · no bonus"
+	else:
+		var skip_amount := _base_amount * _tuning.minigame_keep_floor
+		_skip_button.text = "SKIP · keep %s" % _format_amount(skip_amount)
 
 	_begin_title.text = _active_minigame.display_name()
 	_begin_howto.text = _active_minigame.how_to_play()
-	# Reward stakes on the gate (Challenge Mode replaces this in start_challenge).
-	_begin_stakes.text = "Play well to keep MORE — a great round earns a bonus on top. A weak round or Skip keeps only the minimum."
+	# Reward stakes on the gate (Challenge Mode replaces this in start_challenge). Upside-only sites
+	# frame it as pure upside; the amount-scaling sites warn that a weak round keeps less.
+	if _upside_only:
+		_begin_stakes.text = "Play well to earn a BONUS on this business — more income, faster cycles. A weak round or Skip just opens it at its base income. No penalty."
+	else:
+		_begin_stakes.text = "Play well to keep MORE — a great round earns a bonus on top. A weak round or Skip keeps only the minimum."
 	_begin_stakes.visible = true
 	_begin_hint.text = "The clock starts when you press Begin."
 	_begin_hint.visible = true
@@ -929,20 +969,23 @@ func _end_round() -> void:
 
 
 func _show_result(mult: float) -> void:
-	var kept := _base_amount * mult
-	if mult > 1.0:
-		_result_mult_label.text = "+%d%% BONUS" % int(round((mult - 1.0) * 100.0))
-		_result_mult_label.add_theme_color_override("font_color", UiPalette.ATOMIC_TEAL)
-		_result_amount_label.text = "+%s  (%s +%s bonus)" % \
-				[_format_amount(kept), _format_amount(_base_amount), _format_amount(kept - _base_amount)]
-	elif mult >= 1.0:
-		_result_mult_label.text = "FULL"
-		_result_mult_label.add_theme_color_override("font_color", UiPalette.MONEY_GREEN)
-		_result_amount_label.text = "+%s" % _format_amount(kept)
+	if _upside_only:
+		_set_first_contact_result_labels(mult)
 	else:
-		_result_mult_label.text = "KEPT %d%%" % int(round(mult * 100.0))
-		_result_mult_label.add_theme_color_override("font_color", _keep_color(mult))
-		_result_amount_label.text = "+%s  (of %s)" % [_format_amount(kept), _format_amount(_base_amount)]
+		var kept := _base_amount * mult
+		if mult > 1.0:
+			_result_mult_label.text = "+%d%% BONUS" % int(round((mult - 1.0) * 100.0))
+			_result_mult_label.add_theme_color_override("font_color", UiPalette.ATOMIC_TEAL)
+			_result_amount_label.text = "+%s  (%s +%s bonus)" % \
+					[_format_amount(kept), _format_amount(_base_amount), _format_amount(kept - _base_amount)]
+		elif mult >= 1.0:
+			_result_mult_label.text = "FULL"
+			_result_mult_label.add_theme_color_override("font_color", UiPalette.MONEY_GREEN)
+			_result_amount_label.text = "+%s" % _format_amount(kept)
+		else:
+			_result_mult_label.text = "KEPT %d%%" % int(round(mult * 100.0))
+			_result_mult_label.add_theme_color_override("font_color", _keep_color(mult))
+			_result_amount_label.text = "+%s  (of %s)" % [_format_amount(kept), _format_amount(_base_amount)]
 
 	# The type's own summary of how the round was played (empty for types that provide none).
 	var summary := _active_minigame.result_summary() if _active_minigame != null else ""
@@ -953,6 +996,28 @@ func _show_result(mult: float) -> void:
 	_result_view.visible = true
 	visible = true
 	_animate_result()
+
+
+## Result labels for the upside-only First Contact round: announce the BUCKET the run earned (none /
+## low / medium / high) and the opening income it buys, matching exactly what Main applies to the
+## property (both read FIRST_CONTACT_BUCKETS). _base_amount is the property's per-unit base income.
+func _set_first_contact_result_labels(mult: float) -> void:
+	var bucket := first_contact_bucket(mult, _bonus_max)
+	var info: Dictionary = FIRST_CONTACT_BUCKETS[bucket]
+	_result_mult_label.text = String(info["label"])
+	# Base is calm green (no loss — it opens at its full base income); any bonus is the teal "extra".
+	_result_mult_label.add_theme_color_override(
+		"font_color", UiPalette.MONEY_GREEN if bucket == 0 else UiPalette.ATOMIC_TEAL
+	)
+	var income_mult := float(info["income"])
+	if bucket == 0:
+		_result_amount_label.text = "Opens at %s / cycle" % _format_amount(_base_amount)
+	else:
+		_result_amount_label.text = "%s / cycle  (+%d%% income, −%d%% cycle)" % [
+			_format_amount(_base_amount * income_mult),
+			int(round((income_mult - 1.0) * 100.0)),
+			int(round((1.0 - float(info["cycle"])) * 100.0)),
+		]
 
 
 ## The payoff beat (plan §1): fade the result view in, then bloom the multiplier and amount with a

@@ -112,6 +112,15 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	# Concurrent multi-touch on the property panel (PropertyRow reads raw touches for secondary
+	# fingers — hold rush while tapping/holding buy or hire): allow it ONLY while the Property tab is
+	# showing and no full-screen overlay is up, so a stray second finger can never trigger a buy on a
+	# row sitting behind a modal. Computed here every frame (before the freeze return below) so it
+	# always reflects the current screen, including while an overlay is up.
+	var overlay_up := _will_screen.visible or _dev_panel.visible or _first_contact_overlay.visible \
+			or _minigame_screen.visible or _minigame_review_screen.visible or _welcome_overlay.visible
+	PropertyRow.multitouch_enabled = _active_tab == TAB_PROPERTY and not overlay_up
+
 	# Freeze the economy while a full-screen MODAL overlay is up (the succession
 	# ceremony, the upgrade shop, the minigame, etc.): no ticks, no autosave. This keeps
 	# the will's numbers steady, avoids half-saving the generation swap mid-ceremony, and

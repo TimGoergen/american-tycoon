@@ -48,6 +48,37 @@ var _buy_hold_repeating := false
 var _hire_hold_accumulator := 0.0
 var _hire_hold_repeating := false
 
+# --- Concurrent multi-touch (Tim, 2026-07-02) ------------------------------------------------------
+# Godot converts only the FIRST finger of a touch gesture into a mouse event (project setting
+# input_devices/pointing/emulate_mouse_from_touch, on by default), and Buttons act on that single
+# emulated mouse. So while one finger holds the rush portrait, a second finger on Buy or Hire produces
+# NOTHING. To allow concurrent inputs — hold rush while tapping or holding buy/hire — this row also
+# reads RAW touch events in _input and drives its three controls from SECONDARY fingers directly.
+#
+# The FIRST finger of a gesture (the "primary") is left ENTIRELY to the existing Button path, so
+# single-touch behaviour is unchanged; only extra fingers are handled here, so there is never a
+# double-fire against the emulated mouse. See _input and the _pump_held_* functions.
+
+## Set by Main every frame: true only while the Property tab is showing and no full-screen overlay is
+## up, so a stray second finger can never trigger a buy on a row sitting behind a modal (minigame,
+## succession, settings, etc.). Static because it is a single app-wide condition shared by all rows.
+static var multitouch_enabled := false
+
+## Every finger currently on the screen (by index), primary and secondary alike. Used only to tell
+## whether a new touch is the FIRST of a gesture (→ primary, left to the Button path) or an extra
+## finger (→ secondary, handled here).
+var _active_fingers := {}
+## The primary finger's index — the one Godot emulates the mouse from. Tracked so its release is
+## recognised, but never acted on here. -1 when no gesture is in progress.
+var _primary_finger := -1
+## Active SECONDARY fingers → which control each is currently over ("rush" / "buy" / "hire"). A finger
+## over none of the three controls is simply absent. The hold pumps read this to tell when a second
+## finger is holding a control down.
+var _secondary_targets := {}
+## The portrait's interactivity as last computed in _refresh, so a secondary tap on it obeys the same
+## "rush allowed" rule the ManagerCircle uses (owned, and unstaffed or the single highest property).
+var _portrait_interactive := false
+
 # The cycle progress bar is driven by our own smooth, per-frame prediction rather
 # than the raw logic value. Logic ticks at LOGIC_HZ (10 Hz) while rendering runs
 # every frame (~60 Hz), so reading cycle_progress directly makes the bar lurch in
@@ -331,6 +362,88 @@ func _process(delta: float) -> void:
 	_pump_held_hire(delta)
 
 
+## Raw touch handling for CONCURRENT inputs (see the multi-touch note in the fields above). Only
+## SECONDARY fingers are acted on here; the primary finger is left to the normal Button / emulated-
+## mouse path, so single-touch behaviour is untouched and nothing ever double-fires.
+func _input(event: InputEvent) -> void:
+	var touch := event as InputEventScreenTouch
+	if touch != null:
+		if touch.pressed:
+			_on_touch_pressed(touch.index, touch.position)
+		else:
+			_on_touch_released(touch.index)
+		return
+	# A held secondary finger sliding: re-check which control it is over now, so sliding OFF a control
+	# cancels its hold (matching how lifting off a button stops the repeat).
+	var drag := event as InputEventScreenDrag
+	if drag != null and _secondary_targets.has(drag.index):
+		var target := _control_under_point(drag.position)
+		if target == "":
+			_secondary_targets.erase(drag.index)
+		else:
+			_secondary_targets[drag.index] = target
+
+
+func _on_touch_pressed(index: int, global_pos: Vector2) -> void:
+	# The first finger of a gesture is the one Godot emulates the mouse from — leave it entirely to the
+	# Button path. We still record it so its release is recognised, but we never act on it here.
+	var is_first_finger := _active_fingers.is_empty()
+	_active_fingers[index] = true
+	if is_first_finger:
+		_primary_finger = index
+		return
+	# A secondary finger: act only when the Property tab is live and this row is actually on screen,
+	# so a stray finger can't trigger a purchase on a row hidden behind a modal overlay.
+	if not multitouch_enabled or not is_visible_in_tree():
+		return
+	var control_id := _control_under_point(global_pos)
+	if control_id == "":
+		return
+	_secondary_targets[index] = control_id
+	_fire_secondary_action(control_id)
+
+
+func _on_touch_released(index: int) -> void:
+	_active_fingers.erase(index)
+	_secondary_targets.erase(index)
+	if index == _primary_finger:
+		_primary_finger = -1
+
+
+## Which of this row's three interactive controls, if any, sits under a global point — "" if none.
+## Respects each control's current eligibility (a disabled Buy/Hire, or a non-interactive portrait, is
+## not a target), so a secondary finger can only ever trigger what a primary finger could.
+func _control_under_point(global_pos: Vector2) -> String:
+	if _portrait_interactive and _manager_circle.is_visible_in_tree() \
+			and _manager_circle.get_global_rect().has_point(global_pos):
+		return "rush"
+	if not _buy_button.disabled and _buy_button.is_visible_in_tree() \
+			and _buy_button.get_global_rect().has_point(global_pos):
+		return "buy"
+	if not _hire_button.disabled and _hire_button.is_visible_in_tree() \
+			and _hire_button.get_global_rect().has_point(global_pos):
+		return "hire"
+	return ""
+
+
+## Fire the one-shot action for a secondary-finger PRESS on a control (the hold pumps add the repeats
+## afterward, exactly as they do for the primary finger's Button).
+func _fire_secondary_action(control_id: String) -> void:
+	match control_id:
+		"rush":
+			tap_requested.emit(prop_index)  # start an idle cycle, or land one rush
+		"buy":
+			buy_requested.emit(prop_index, _buy_mode)
+		"hire":
+			_on_hire_pressed()
+
+
+## True while any SECONDARY finger is currently holding the named control ("rush" / "buy" / "hire") —
+## the hold pumps OR this with the primary finger's Button state so either finger can drive a hold.
+func _secondary_held(control_id: String) -> bool:
+	return _secondary_targets.values().has(control_id)
+
+
 ## Holding the start/rush button continually drives the property at the tuning
 ## hold rate (UI notes §2): an idle cycle is STARTED on the first held pulse,
 ## then a running cycle is RUSHED on every pulse after. Both are gated behind the
@@ -339,7 +452,8 @@ func _process(delta: float) -> void:
 func _pump_held_rush(delta: float) -> void:
 	# is_held() is false whenever the portrait button is disabled (a locked rung, or an
 	# automated property that is not the player's top one), so those simply never auto-rush.
-	if not _manager_circle.is_held() or _prop.units_owned == 0:
+	# A secondary finger on the portrait (multi-touch) counts as held too.
+	if (not _manager_circle.is_held() and not _secondary_held("rush")) or _prop.units_owned == 0:
 		_hold_accumulator = 0.0
 		return
 	_hold_accumulator += delta
@@ -359,7 +473,8 @@ func _pump_held_rush(delta: float) -> void:
 ## while it stays held. Unaffordable pulses are skipped (the buy button disables itself), so
 ## a held button simply idles once the player runs out of cash rather than spamming failures.
 func _pump_held_buy(delta: float) -> void:
-	if not _buy_button.button_pressed:
+	# Held via the primary finger's Button, or a secondary finger resting on it (multi-touch).
+	if not _buy_button.button_pressed and not _secondary_held("buy"):
 		_buy_hold_accumulator = 0.0
 		_buy_hold_repeating = false
 		return
@@ -379,7 +494,8 @@ func _pump_held_buy(delta: float) -> void:
 ## skipped (the button disables itself), so a held button simply idles once the player runs out of
 ## cash rather than spamming failures — exactly like the buy button.
 func _pump_held_hire(delta: float) -> void:
-	if not _hire_button.button_pressed:
+	# Held via the primary finger's Button, or a secondary finger resting on it (multi-touch).
+	if not _hire_button.button_pressed and not _secondary_held("hire"):
 		_hire_hold_accumulator = 0.0
 		_hire_hold_repeating = false
 		return
@@ -447,10 +563,13 @@ func _refresh(delta: float) -> void:
 	var staffed := _prop.is_staffed
 	var is_highest_owned := _economy.get_highest_owned_index() == prop_index
 	var interactive := owned and (not staffed or is_highest_owned)
+	# Remembered for _control_under_point, so a secondary-finger rush obeys this same rule.
+	_portrait_interactive = interactive
 	var portrait_mode := ManagerCircle.PortraitMode.LOCKED
 	if owned:
 		portrait_mode = ManagerCircle.PortraitMode.STAFFED if staffed else ManagerCircle.PortraitMode.UNSTAFFED
-	var show_rush_icon := interactive and _manager_circle.is_held()
+	# The infinity "rushing" icon shows whether the primary Button or a secondary finger holds it.
+	var show_rush_icon := interactive and (_manager_circle.is_held() or _secondary_held("rush"))
 	_manager_circle.set_state(
 		portrait_mode, config.accent_color, config.manager_portrait, show_rush_icon, interactive
 	)

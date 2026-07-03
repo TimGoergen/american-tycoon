@@ -1,7 +1,9 @@
 # Core Pace Study — the two-clock tuning pass
 
 **Date:** 2026-07-03
-**Status:** BUILT (see `game/sim/PaceStudy.gd`) — awaiting Tim's candidate pick
+**Status:** DONE — Tim picked **candidate C (cycles 60s top + r0 1.09)** 2026-07-03; baked
+into the 17 property `.tres` files (Earth cycles+incomes rescaled together, r0 everywhere)
+and synced to GDD §4/§14 + Spec §3.2/§3.3
 **Trigger:** Tim's device feel-test verdict: *"the game progresses too fast, but the
 property cycle times feel too slow. I like the pace of mid-game Idle Slayer."*
 

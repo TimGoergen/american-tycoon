@@ -46,7 +46,8 @@ r_band(b)    = R0_i × BAND_STEP^b
   for the very first unit — e.g. the first ATM read $55 instead of $50.)
 - Prices are snapped to the nearest $5 (`round_nice`) so the player never sees odd
   numbers; the underlying geometric product is kept raw so the curve still climbs smoothly.
-- `R0_i` per property from config (genre-gentle, ~1.05–1.10 `TBD-SIM`).
+- `R0_i` per property from config. **Live: 1.09 on all 17 rungs** (2026-07-03 core pace pass,
+  was 1.07 — the progression brake chosen by the pace study, see §3.3).
 - `BAND_STEP` global (provisional 1.15 `TBD-SIM`).
 - Steepening applies only *after* each milestone is crossed — milestones stay reachable by construction.
 - **Simulator guard (hard requirement):** no reachable game state may exist where every property is band-walled and no action is affordable (GDD §0.1).
@@ -70,6 +71,17 @@ stretched tier's `base_income_per_unit` was scaled up by the same factor as its 
 so base income/sec (= income_per_cycle / cycle_length) is unchanged — only the cadence changes
 (longer waits, bigger lump sums, more speed-up halvings before the 1s floor). The fix is purely in
 `game/config/properties/07..12*.tres`; no formula change. (GDD §4's cycle column is now historical.)
+
+**Core pace pass — REVERSED the stretch 2026-07-03.** Device verdict: progression too fast,
+cycles too slow (the two clocks inverted vs. the mid-game Idle Slayer target). Cycles compressed
+back down via a geometric taper — tier 1 unchanged, tier 12 **272s → 60s**, intermediate tiers
+scaled by `(60/272)^(k/11)` — again strictly income-neutral (`base_income_per_unit` scaled by the
+same factor per tier; the pace study confirmed First Contact timing is bit-identical before/after).
+The progression brake moved to the cost curve: `r0` 1.07 → 1.09 on all 17 rungs (§3.2). Chosen as
+candidate C of the pace study (`game/sim/PaceStudy.gd`, `Plans/Core_Pace_Study.md`); study finding:
+cost steepening widens purchase cadence but cannot slow the macro arc (income is self-funding
+exponential; the epoch wall is earnings-gated) — a still-too-fast macro arc needs an income-side
+lever, not more `r0`.
 
 ### 3.4 Income
 ```

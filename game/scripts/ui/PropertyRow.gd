@@ -773,13 +773,16 @@ func _refresh_hire_button() -> void:
 
 	# Otherwise a tier is available to buy: tier 1 (HIRE) from unstaffed, or the next
 	# alien tier (UPGRADE) on an already-staffed property after a fresh contact. The headshot
-	# icon stands in for the verb (Tim, 2026-06-22), so the left label is blanked and the cost
-	# sits on the right.
+	# icon stands in for the verb (Tim, 2026-06-22), so the left label is normally blank and
+	# the cost sits on the right. But since the cumulative ladder (2026-07-02) staff levels
+	# PERSIST across contact and keep paying out, so an already-staffed property keeps showing
+	# its live "LVL n" during the save-up-for-the-new-staffer stretch — otherwise the level
+	# appears to vanish at First Contact and pop back after the upgrade (Tim's 2026-07-03 bug).
 	_apply_hire_styling(false)
 	var next_tier := tier + 1
 	var cost := _economy.get_staff_cost(prop_index, next_tier)
 	_hire_icon.visible = true
-	_hire_left_label.text = ""
+	_hire_left_label.text = "LVL %d" % (_prop.staff_level + 1) if tier >= 1 else ""
 	_hire_cost_label.text = Money.of(cost).display()
 	# A property with no units can't be staffed yet — a staffer needs something to run.
 	_hire_button.disabled = _economy.cash < cost or _prop.units_owned == 0

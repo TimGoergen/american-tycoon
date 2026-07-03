@@ -51,18 +51,20 @@ func is_gt(other: Money) -> bool:
 
 ## Format as a real-dollar string: $1,234 / $14.3K / $2.1M / $14.3B / $1.3T
 ## Never scientific notation (GDD §2).
-func display() -> String:
+## Pass max_decimals = 0 for a whole-number abbreviation ($14M, $2B) — used by the
+## property panels' income readout, which reads cleaner without the fractional part.
+func display(max_decimals: int = 1) -> String:
 	var v := absf(value)
 	var prefix := "-$" if value < 0.0 else "$"
 
 	if v >= 1_000_000_000_000.0:
-		return prefix + _trim(v / 1_000_000_000_000.0) + "T"
+		return prefix + _trim(v / 1_000_000_000_000.0, max_decimals) + "T"
 	elif v >= 1_000_000_000.0:
-		return prefix + _trim(v / 1_000_000_000.0) + "B"
+		return prefix + _trim(v / 1_000_000_000.0, max_decimals) + "B"
 	elif v >= 1_000_000.0:
-		return prefix + _trim(v / 1_000_000.0) + "M"
+		return prefix + _trim(v / 1_000_000.0, max_decimals) + "M"
 	elif v >= 1_000.0:
-		return prefix + _trim(v / 1_000.0) + "K"
+		return prefix + _trim(v / 1_000.0, max_decimals) + "K"
 	else:
 		return prefix + str(int(v))
 
@@ -110,8 +112,12 @@ static func _group_thousands(whole: int) -> String:
 	return grouped
 
 
-## Trim trailing zeros from a decimal string, keeping up to one decimal place.
-static func _trim(v: float) -> String:
+## Trim trailing zeros from a decimal string, keeping up to `decimals` decimal places
+## (only 0 or 1 are used today).
+static func _trim(v: float, decimals: int = 1) -> String:
+	if decimals <= 0:
+		# No decimal places: round to the nearest whole unit (14.7 → "15").
+		return str(int(round(v)))
 	# E.g. 14.300 → "14.3", 2.000 → "2", 1.050 → "1.1" (rounded to 1dp)
 	var rounded := snappedf(v, 0.1)
 	if fmod(rounded, 1.0) == 0.0:

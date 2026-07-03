@@ -230,7 +230,10 @@ func _apply_retained_staff(heir: GameState) -> void:
 		var tier := staff_retention.get_retained_tier(property_index)
 		if tier >= 1:
 			var prop := heir.economy.properties[property_index] as PropertyState
-			prop.set_staff_tier(tier, EpochCatalog.staff_income_multiplier(tier))
+			# Alien properties are automation-only — a retained alien staffer runs at ×1.0, never the
+			# epoch 40× (matching EconomyState.try_hire). Earth staff keep their tier multiplier.
+			var is_alien := (prop.config as PropertyConfig).unlock_tier > 1
+			prop.set_staff_tier(tier, 1.0 if is_alien else EpochCatalog.staff_income_multiplier(tier))
 
 
 ## Apply the purchased per-generation upgrade effects to a generation's state:

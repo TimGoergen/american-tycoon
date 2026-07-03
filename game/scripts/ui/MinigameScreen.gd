@@ -55,6 +55,13 @@ const PANEL_HEIGHT_FRACTION := 0.672  # 0.84 * 0.80  (20% shorter)
 ## bezel frame.
 const PANEL_BORDER_WIDTH := 8
 
+## The SKIP / DONE control floats BELOW the card in the scrim (Tim, 2026-07-02), sized relative to its
+## old in-card form: 40% taller than the old 72px, and 20% narrower than the card (a fraction of the
+## panel width), with a small gap under the panel's bottom edge.
+const SKIP_BUTTON_HEIGHT := 101              # 72 * 1.4 — 40% taller
+const SKIP_WIDTH_FRACTION_OF_PANEL := 0.80   # 20% less wide than the card
+const SKIP_GAP_BELOW_PANEL := 16.0
+
 ## How fast the spectrum bar's fill glides toward its true value (per-second lerp weight). The
 ## bar tracks a smoothed `_display_mult` rather than the raw live multiplier so it reads as a
 ## sweep, not a jitter — the single most-visible shared element, smoothed once here for all six
@@ -76,6 +83,10 @@ var _base_amount: float = 0.0
 var _reward_noun: String = "Legacy"
 var _result_heading: String = "THE INHERITANCE"
 var _format_as_money: bool = false
+## Upside-only mode (First Contact, GDD §5.5 site 2): the floor is the base — a weak run or a Skip
+## costs nothing, and a good run adds a BUCKETED bonus (low/med/high) rather than a continuous
+## multiplier. Changes the SKIP label, the stakes blurb, and the result screen to match.
+var _upside_only: bool = false
 var _bonus_max: float = 0.25
 var _seconds_left: float = 0.0
 var _playing: bool = false
@@ -223,6 +234,29 @@ func _ready() -> void:
 	_begin_overlay = _build_begin_overlay()
 	panel.add_child(_begin_overlay)
 
+	# The SKIP / DONE control sits BELOW the card, in the scrim (Tim, 2026-07-02): 40% taller and 20%
+	# narrower than its old in-card form, anchored just under the panel's bottom edge and centered. It
+	# is a SIBLING of the card (added to the screen, not the card's column), so it floats beneath the
+	# frame; its visibility is toggled alongside the play view — shown only while a round is live, so
+	# it never appears during the Get Ready gate or the result screen.
+	_skip_button = Button.new()
+	UiPalette.style_button(_skip_button, false)
+	_skip_button.text = "SKIP"
+	_skip_button.pressed.connect(_on_skip_pressed)
+	var skip_half_w := (PANEL_WIDTH_FRACTION * SKIP_WIDTH_FRACTION_OF_PANEL) / 2.0
+	_skip_button.anchor_left = 0.5 - skip_half_w
+	_skip_button.anchor_right = 0.5 + skip_half_w
+	# Both vertical anchors pin to the panel's bottom edge; the offsets give the button a fixed height
+	# a small gap below it.
+	_skip_button.anchor_top = 0.5 + half_h
+	_skip_button.anchor_bottom = 0.5 + half_h
+	_skip_button.offset_left = 0.0
+	_skip_button.offset_right = 0.0
+	_skip_button.offset_top = SKIP_GAP_BELOW_PANEL
+	_skip_button.offset_bottom = SKIP_GAP_BELOW_PANEL + SKIP_BUTTON_HEIGHT
+	_skip_button.visible = false  # revealed on Begin (see _start_active_round)
+	add_child(_skip_button)
+
 
 ## The cream card that frames every minigame — and, shared, the Minigame Tuning list, so the two
 ## match exactly: cream fill at 70% alpha (so the themed backdrop reads through), a moderately thick
@@ -320,20 +354,24 @@ func _build_play_view() -> Control:
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 12)
 
-	# The top section is context-dependent: in the tuner it is a left-aligned Back button; in a
-	# live round it is a centered blurb naming the minigame's purpose. start_game toggles which.
-	_add_back_button(column)
+	# The first row carries two things side by side: the Back button (review mode only) on the left,
+	# and the round timer right-aligned. Sharing one row — instead of giving the timer a row of its
+	# own — frees that height for the game board (Tim, 2026-07-02). The centered purpose blurb (live
+	# rounds only) sits just below.
+	var top_row := _add_back_button(column)
+
+	# The timer stays the round's focal point (plan §1): big and faux-bold, escalating in color/scale
+	# as time runs low (see _refresh_timer). It now lives at the top-right of the first row — the
+	# spacer inside top_row pushes it to the right edge.
+	_timer_label = _make_label("0:30", UiPalette.FONT_DISPLAY, UiPalette.KETCHUP_RED)
+	_timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_timer_label.add_theme_font_override("font", UiPalette.make_bold_font())
+	top_row.add_child(_timer_label)
+
 	_purpose_label = _make_label(_purpose, UiPalette.FONT_HEADLINE, UiPalette.NAVY)
 	_purpose_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_purpose_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(_purpose_label)
-
-	# The timer is the round's focal point (plan §1): big, centered, faux-bold, so time pressure
-	# reads at a glance. Its color/scale escalate as time runs low (see _refresh_timer).
-	_timer_label = _make_label("0:30", UiPalette.FONT_DISPLAY, UiPalette.KETCHUP_RED)
-	_timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_timer_label.add_theme_font_override("font", UiPalette.make_bold_font())
-	column.add_child(_timer_label)
 
 	# Challenge Mode readouts (hidden in normal reward rounds): the live score, big and central like
 	# the timer it replaces, with the best-to-beat under it. start_challenge shows them; start_game
@@ -367,16 +405,8 @@ func _build_play_view() -> Control:
 	_play_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	column.add_child(_play_area)
 
-	# SKIP banks the keep floor immediately. Now that the spectrum bar shows no numbers, this
-	# button is the one place "what you'd keep" is made legible: start_game labels it with the
-	# concrete keep-floor reward (plan §1, decision 2026-06-29).
-	_skip_button = Button.new()
-	_skip_button.custom_minimum_size = Vector2(0, 72)
-	UiPalette.style_button(_skip_button, false)
-	_skip_button.text = "SKIP"
-	_skip_button.pressed.connect(_on_skip_pressed)
-	column.add_child(_skip_button)
-
+	# The SKIP / DONE control is NOT in this column — it floats BELOW the card in the scrim, built in
+	# _ready (Tim, 2026-07-02). Only the opt-out checkbox remains here, at the bottom of the card.
 	_opt_out_check = CheckBox.new()
 	_opt_out_check.text = "Skip minigames from now on"
 	_opt_out_check.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
@@ -406,7 +436,9 @@ func _build_result_view() -> Control:
 	_result_mult_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(_result_mult_label)
 
-	_result_amount_label = _make_label("", UiPalette.FONT_SUBHEAD, UiPalette.MONEY_GREEN)
+	# DARK_MONEY_GREEN (not MONEY_GREEN): the lighter cash green washes out against the cream result
+	# card and was hard to read (Tim, 2026-07-02); the darker green reads clearly on cream.
+	_result_amount_label = _make_label("", UiPalette.FONT_SUBHEAD, UiPalette.DARK_MONEY_GREEN)
 	_result_amount_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(_result_amount_label)
 
@@ -416,12 +448,37 @@ func _build_result_view() -> Control:
 	_result_summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(_result_summary_label)
 
+	# Push CONTINUE to the BOTTOM of the card: an expanding spacer eats the slack above it so the
+	# button sits at the panel's bottom edge instead of floating up under the summary text (Tim,
+	# 2026-07-02).
+	var bottom_spacer := Control.new()
+	bottom_spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	column.add_child(bottom_spacer)
+
+	# CONTINUE: 40% taller than the old 80px and 20% narrower than the card, centered. A 10 / 80 / 10
+	# HBox (equal expanding pads either side of an 8×-ratio button) gives it exactly 80% width with
+	# even margins (Tim, 2026-07-02) — mirroring the resized SKIP control on the play screen.
+	var continue_row := HBoxContainer.new()
+	var left_pad := Control.new()
+	left_pad.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left_pad.size_flags_stretch_ratio = 1.0
+	continue_row.add_child(left_pad)
+
 	var continue_button := Button.new()
-	continue_button.custom_minimum_size = Vector2(0, 80)
+	continue_button.custom_minimum_size = Vector2(0, 112)  # 80 * 1.4 — 40% taller
+	continue_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	continue_button.size_flags_stretch_ratio = 8.0  # 80% of the row (10 / 80 / 10 with the pads)
 	UiPalette.style_button(continue_button, true)
 	continue_button.text = "CONTINUE"
 	continue_button.pressed.connect(_on_continue_pressed)
-	column.add_child(continue_button)
+	continue_row.add_child(continue_button)
+
+	var right_pad := Control.new()
+	right_pad.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right_pad.size_flags_stretch_ratio = 1.0
+	continue_row.add_child(right_pad)
+
+	column.add_child(continue_row)
 
 	return column
 
@@ -490,8 +547,9 @@ func _build_begin_overlay() -> Control:
 
 ## Add a left-aligned Back button to the top of a view's column. Hidden by default; only
 ## review mode (start_game's review_mode flag) makes it visible. A short HBox keeps it from
-## stretching the full width — it sits in the top-left like a typical "back" affordance.
-func _add_back_button(column: VBoxContainer) -> void:
+## stretching the full width — it sits in the top-left like a typical "back" affordance. Returns the
+## row so a caller (the play view) can add the timer to it, right-aligned past the spacer.
+func _add_back_button(column: VBoxContainer) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	var back := Button.new()
 	back.text = "← BACK"
@@ -501,12 +559,14 @@ func _add_back_button(column: VBoxContainer) -> void:
 	back.visible = false
 	back.pressed.connect(_on_back_pressed)
 	row.add_child(back)
-	# A spacer eats the rest of the row so the button keeps its natural width on the left.
+	# A spacer eats the rest of the row so the button keeps its natural width on the left (and pushes
+	# anything added after it — the play view's timer — to the right edge).
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(spacer)
 	_back_buttons.append(back)
 	column.add_child(row)
+	return row
 
 
 func _make_label(text: String, font_size: int, color: Color) -> Label:
@@ -527,12 +587,39 @@ func _make_label(text: String, font_size: int, color: Color) -> Label:
 ## `noun` the singular reward word for plain counts ("Legacy"), `heading` the result-screen
 ## title, `purpose` the play-view blurb, and `format_as_money` formats amounts as dollars.
 static func make_reward(
-		base: float, noun: String, heading: String, purpose: String, format_as_money: bool
+		base: float, noun: String, heading: String, purpose: String, format_as_money: bool,
+		upside_only: bool = false
 ) -> Dictionary:
 	return {
 		"base": base, "noun": noun, "heading": heading,
-		"purpose": purpose, "as_money": format_as_money,
+		"purpose": purpose, "as_money": format_as_money, "upside_only": upside_only,
 	}
+
+
+## First Contact buckets its bonus (upside-only, GDD §5.5 site 2): a run at or below "full" earns
+## nothing (index 0 = base, no penalty), and a run into the bonus band is sorted by how deep into it,
+## as low / medium / high. Each bucket's permanent property bonus — income UP, cycle-time DOWN — and
+## its result-screen label live here so Main (which applies it) and the result view (which announces
+## it) read from ONE table and can never disagree about which bucket a run earned.
+const FIRST_CONTACT_BUCKETS := [
+	{"label": "NO BONUS", "income": 1.0, "cycle": 1.0},
+	{"label": "LOW BONUS", "income": 1.15, "cycle": 0.95},
+	{"label": "MEDIUM BONUS", "income": 1.40, "cycle": 0.88},
+	{"label": "HIGH BONUS", "income": 1.80, "cycle": 0.80},
+]
+
+
+## Which FIRST_CONTACT_BUCKETS index a finished minigame multiplier earns, given the bonus cap:
+## 0 at or below "full" (1.0), then low/medium/high by thirds of the bonus band above it.
+static func first_contact_bucket(multiplier: float, bonus_max: float) -> int:
+	var into_bonus := (multiplier - 1.0) / maxf(0.0001, bonus_max)
+	if into_bonus <= 0.0:
+		return 0
+	elif into_bonus <= 1.0 / 3.0:
+		return 1
+	elif into_bonus <= 2.0 / 3.0:
+		return 2
+	return 3
 
 
 ## The prestige/succession round: scales the heir's Legacy (a plain count).
@@ -547,14 +634,14 @@ static func offline_pile_reward(pile: float) -> Dictionary:
 	)
 
 
-## The First Contact round (GDD §5.5 site 2): the alien trade negotiation. Unlike the other
-## two sites it does NOT scale money or Legacy — it scales the player's HEAD START on the new
-## alien property, a count of free starting units. `cap` is what a full negotiation grants;
-## `property_name` is the business being opened (shown as the result heading).
-static func first_contact_reward(cap: int, property_name: String) -> Dictionary:
+## The First Contact round (GDD §5.5 site 2): the alien trade negotiation. It sets a permanent,
+## upside-only bonus on the new alien property (income + cycle-time) — see Main._first_contact_bonus_for.
+## `base_income` is that property's per-unit base income per cycle, framed as money so the result reads
+## as the opening income you negotiated; `property_name` is the business being opened (result heading).
+static func first_contact_reward(base_income: float, property_name: String) -> Dictionary:
 	return make_reward(
-		float(cap), "units", property_name.to_upper(),
-		"Negotiate your opening stake in %s" % property_name, false
+		base_income, "", property_name.to_upper(),
+		"Negotiate your opening terms in %s" % property_name, true, true  # as_money, upside_only
 	)
 
 
@@ -574,6 +661,7 @@ func start_game(
 	_reward_noun = String(reward.get("noun", "Legacy"))
 	_result_heading = String(reward.get("heading", "THE INHERITANCE"))
 	_format_as_money = bool(reward.get("as_money", false))
+	_upside_only = bool(reward.get("upside_only", false))
 	var purpose := String(reward.get("purpose", DEFAULT_PURPOSE))
 
 	_bonus_max = maxf(0.0, bonus_max)
@@ -619,6 +707,7 @@ func start_game(
 	_play_view.modulate = Color.WHITE
 	_result_view.visible = false
 	_playing = false
+	_skip_button.visible = false  # revealed on Begin (see _start_active_round)
 	_timer_label.text = "0:%02d" % int(ceil(_seconds_left))
 	_timer_label.scale = Vector2.ONE
 
@@ -630,15 +719,23 @@ func start_game(
 	_warn_phase = 0.0
 	_keep_bar.queue_redraw()
 
-	# Label SKIP with what skipping actually banks (the keep floor) — the one place the floor is
-	# made legible now that the spectrum bar carries no numbers.
-	var skip_amount := _base_amount * _tuning.minigame_keep_floor
-	_skip_button.text = "SKIP · keep %s" % _format_amount(skip_amount)
+	# Label SKIP with what skipping actually does. In the normal "scale an amount" sites it banks the
+	# keep floor; in upside-only First Contact there's no floor to lose — skipping just forgoes the
+	# bonus, so it says so plainly.
+	if _upside_only:
+		_skip_button.text = "SKIP · no bonus"
+	else:
+		var skip_amount := _base_amount * _tuning.minigame_keep_floor
+		_skip_button.text = "SKIP · keep %s" % _format_amount(skip_amount)
 
 	_begin_title.text = _active_minigame.display_name()
 	_begin_howto.text = _active_minigame.how_to_play()
-	# Reward stakes on the gate (Challenge Mode replaces this in start_challenge).
-	_begin_stakes.text = "Play well to keep MORE — a great round earns a bonus on top. A weak round or Skip keeps only the minimum."
+	# Reward stakes on the gate (Challenge Mode replaces this in start_challenge). Upside-only sites
+	# frame it as pure upside; the amount-scaling sites warn that a weak round keeps less.
+	if _upside_only:
+		_begin_stakes.text = "Play well to earn a BONUS on this business — more income, faster cycles. A weak round or Skip just opens it at its base income. No penalty."
+	else:
+		_begin_stakes.text = "Play well to keep MORE — a great round earns a bonus on top. A weak round or Skip keeps only the minimum."
 	_begin_stakes.visible = true
 	_begin_hint.text = "The clock starts when you press Begin."
 	_begin_hint.visible = true
@@ -686,6 +783,7 @@ func start_challenge(type_script: Script) -> void:
 	_play_view.modulate = Color.WHITE
 	_result_view.visible = false
 	_playing = false
+	_skip_button.visible = false  # revealed on Begin (see _start_active_round)
 
 	_begin_title.text = _active_minigame.display_name()
 	_begin_howto.text = _active_minigame.how_to_play()
@@ -728,6 +826,7 @@ func _start_active_round() -> void:
 		return
 	_begin_overlay.visible = false
 	_play_view.visible = true  # reveal the game now that the gate is gone and the round goes live
+	_skip_button.visible = true  # the below-card SKIP / DONE control shows only during live play
 	_active_minigame.begin(_tuning)
 	_playing = true
 
@@ -929,20 +1028,23 @@ func _end_round() -> void:
 
 
 func _show_result(mult: float) -> void:
-	var kept := _base_amount * mult
-	if mult > 1.0:
-		_result_mult_label.text = "+%d%% BONUS" % int(round((mult - 1.0) * 100.0))
-		_result_mult_label.add_theme_color_override("font_color", UiPalette.ATOMIC_TEAL)
-		_result_amount_label.text = "+%s  (%s +%s bonus)" % \
-				[_format_amount(kept), _format_amount(_base_amount), _format_amount(kept - _base_amount)]
-	elif mult >= 1.0:
-		_result_mult_label.text = "FULL"
-		_result_mult_label.add_theme_color_override("font_color", UiPalette.MONEY_GREEN)
-		_result_amount_label.text = "+%s" % _format_amount(kept)
+	if _upside_only:
+		_set_first_contact_result_labels(mult)
 	else:
-		_result_mult_label.text = "KEPT %d%%" % int(round(mult * 100.0))
-		_result_mult_label.add_theme_color_override("font_color", _keep_color(mult))
-		_result_amount_label.text = "+%s  (of %s)" % [_format_amount(kept), _format_amount(_base_amount)]
+		var kept := _base_amount * mult
+		if mult > 1.0:
+			_result_mult_label.text = "+%d%% BONUS" % int(round((mult - 1.0) * 100.0))
+			_result_mult_label.add_theme_color_override("font_color", UiPalette.ATOMIC_TEAL)
+			_result_amount_label.text = "+%s  (%s +%s bonus)" % \
+					[_format_amount(kept), _format_amount(_base_amount), _format_amount(kept - _base_amount)]
+		elif mult >= 1.0:
+			_result_mult_label.text = "FULL"
+			_result_mult_label.add_theme_color_override("font_color", UiPalette.DARK_MONEY_GREEN)
+			_result_amount_label.text = "+%s" % _format_amount(kept)
+		else:
+			_result_mult_label.text = "KEPT %d%%" % int(round(mult * 100.0))
+			_result_mult_label.add_theme_color_override("font_color", _keep_color(mult))
+			_result_amount_label.text = "+%s  (of %s)" % [_format_amount(kept), _format_amount(_base_amount)]
 
 	# The type's own summary of how the round was played (empty for types that provide none).
 	var summary := _active_minigame.result_summary() if _active_minigame != null else ""
@@ -950,9 +1052,33 @@ func _show_result(mult: float) -> void:
 	_result_summary_label.visible = summary != ""
 
 	_play_view.visible = false
+	_skip_button.visible = false  # the below-card control hides once the round resolves
 	_result_view.visible = true
 	visible = true
 	_animate_result()
+
+
+## Result labels for the upside-only First Contact round: announce the BUCKET the run earned (none /
+## low / medium / high) and the opening income it buys, matching exactly what Main applies to the
+## property (both read FIRST_CONTACT_BUCKETS). _base_amount is the property's per-unit base income.
+func _set_first_contact_result_labels(mult: float) -> void:
+	var bucket := first_contact_bucket(mult, _bonus_max)
+	var info: Dictionary = FIRST_CONTACT_BUCKETS[bucket]
+	_result_mult_label.text = String(info["label"])
+	# Base is calm green (no loss — it opens at its full base income); any bonus is the teal "extra".
+	# DARK_MONEY_GREEN so the base reads clearly on the cream card (Tim, 2026-07-02).
+	_result_mult_label.add_theme_color_override(
+		"font_color", UiPalette.DARK_MONEY_GREEN if bucket == 0 else UiPalette.ATOMIC_TEAL
+	)
+	var income_mult := float(info["income"])
+	if bucket == 0:
+		_result_amount_label.text = "Opens at %s / cycle" % _format_amount(_base_amount)
+	else:
+		_result_amount_label.text = "%s / cycle  (+%d%% income, −%d%% cycle)" % [
+			_format_amount(_base_amount * income_mult),
+			int(round((income_mult - 1.0) * 100.0)),
+			int(round((1.0 - float(info["cycle"])) * 100.0)),
+		]
 
 
 ## The payoff beat (plan §1): fade the result view in, then bloom the multiplier and amount with a

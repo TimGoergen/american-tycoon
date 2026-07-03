@@ -34,13 +34,50 @@ var _buy_mode: BuyMode = BuyMode.ONE
 ## Accumulates held-down time on the tap button to pace auto-rush pulses.
 var _hold_accumulator := 0.0
 
-## Hold-to-buy pacing on the BUY button (Tim, 2026-06-22), mirroring the Estate shop: a
-## quick tap buys once; holding auto-repeats after a short initial delay so the player can
-## watch the cost climb and release when they want to stop.
+## Hold-to-buy pacing (Tim, 2026-06-22), mirroring the Estate shop: a quick tap acts once; holding
+## auto-repeats after a short initial delay so the player can watch the cost climb and release when
+## they want to stop. Shared by BOTH the buy button and the staff (hire/upgrade/level-up) button.
 const BUY_HOLD_INITIAL_DELAY := 0.45
 const BUY_HOLD_REPEAT_INTERVAL := 0.35
 var _buy_hold_accumulator := 0.0
 var _buy_hold_repeating := false
+
+## Hold-to-repeat state for the STAFF button (Tim, 2026-07-01): holding it keeps hiring/upgrading —
+## and then leveling up the staffer — until the player releases, using the same pacing as the buy
+## button above.
+var _hire_hold_accumulator := 0.0
+var _hire_hold_repeating := false
+
+# --- Concurrent multi-touch (Tim, 2026-07-02) ------------------------------------------------------
+# Godot converts only the FIRST finger of a touch gesture into a mouse event (project setting
+# input_devices/pointing/emulate_mouse_from_touch, on by default), and Buttons act on that single
+# emulated mouse. So while one finger holds the rush portrait, a second finger on Buy or Hire produces
+# NOTHING. To allow concurrent inputs — hold rush while tapping or holding buy/hire — this row also
+# reads RAW touch events in _input and drives its three controls from SECONDARY fingers directly.
+#
+# The FIRST finger of a gesture (the "primary") is left ENTIRELY to the existing Button path, so
+# single-touch behaviour is unchanged; only extra fingers are handled here, so there is never a
+# double-fire against the emulated mouse. See _input and the _pump_held_* functions.
+
+## Set by Main every frame: true only while the Property tab is showing and no full-screen overlay is
+## up, so a stray second finger can never trigger a buy on a row sitting behind a modal (minigame,
+## succession, settings, etc.). Static because it is a single app-wide condition shared by all rows.
+static var multitouch_enabled := false
+
+## Every finger currently on the screen (by index), primary and secondary alike. Used only to tell
+## whether a new touch is the FIRST of a gesture (→ primary, left to the Button path) or an extra
+## finger (→ secondary, handled here).
+var _active_fingers := {}
+## The primary finger's index — the one Godot emulates the mouse from. Tracked so its release is
+## recognised, but never acted on here. -1 when no gesture is in progress.
+var _primary_finger := -1
+## Active SECONDARY fingers → which control each is currently over ("rush" / "buy" / "hire"). A finger
+## over none of the three controls is simply absent. The hold pumps read this to tell when a second
+## finger is holding a control down.
+var _secondary_targets := {}
+## The portrait's interactivity as last computed in _refresh, so a secondary tap on it obeys the same
+## "rush allowed" rule the ManagerCircle uses (owned, and unstaffed or the single highest property).
+var _portrait_interactive := false
 
 # The cycle progress bar is driven by our own smooth, per-frame prediction rather
 # than the raw logic value. Logic ticks at LOGIC_HZ (10 Hz) while rendering runs
@@ -71,12 +108,22 @@ const HELD_RUSH_SATURATE := 1.4
 const RUSH_CATCHUP_TAU := 0.12
 
 ## Once a property's EFFECTIVE cycle is shorter than this (seconds), the cycle bar stops
-## animating and is pinned solid-full, and its readout switches from "/cycle" to a steady
-## "/sec" rate. Past this speed the bar would refill several times a second — a meaningless
-## strobe at 60fps — so we instead show the property as a continuously-paying business
-## (genre-standard, Tim 2026-06-25). This is a pure presentation / legibility threshold,
-## NOT an economy value, so it lives here in the UI rather than in tuning.tres.
+## animating and is pinned solid-full. Past this speed the bar would refill several times a
+## second — a meaningless strobe at 60fps — so we instead show the property as a continuously-
+## paying business (genre-standard, Tim 2026-06-25). This is a pure presentation / legibility
+## threshold, NOT an economy value, so it lives here in the UI rather than in tuning.tres.
 const SOLID_BAR_THRESHOLD_SEC := 0.25
+
+## The portrait/rush button is a square sized to a fraction of the panel's full height, centered
+## vertically (Tim, 2026-07-02): at 1.0 it filled the whole row; 0.9 trims it 10% so it no longer
+## dominates the panel while staying a comfortably large tap target.
+const PORTRAIT_HEIGHT_FRACTION := 0.9
+
+## Once the EFFECTIVE cycle is shorter than this (seconds), the income readout over the bar switches
+## from a per-cycle figure tagged with its length ("$X/4.3m" = $X every 4.3 minutes; see
+## _format_cycle_duration) to a per-second rate ("$X/s") — a sub-second cycle reads more naturally as
+## a rate than as "per 0.4 seconds" (Tim, 2026-07-01/02).
+const PER_SECOND_READOUT_THRESHOLD_SEC := 1.0
 ## Which cycle-bar fill look is currently applied, so we only rebuild the stylebox on a
 ## change, not every frame (the same approach FrenzyBar uses for its burn-color swap):
 ##   0 = normal green (idle/running, rush available)
@@ -91,12 +138,25 @@ var _cycle_color_applied := -1
 # shows the verb/staffer on the left and the cost/tier on the right. The font is sized
 # to fill this fixed row height — see _add_split_button_labels.
 const BUTTON_ROW_HEIGHT := 80
-const BUTTON_LABEL_FONT_SIZE := UiPalette.FONT_BUTTON
+## A touch under FONT_BUTTON (34) so long cost numbers on the buy/hire buttons have more room
+## before the caption and cost start crowding each other (Tim, 2026-07-01).
+const BUTTON_LABEL_FONT_SIZE := 30
 ## Side length of the headshot icon that stands in for the word "HIRE"/"UPGRADE".
 const HIRE_ICON_SIZE := 56
 
+## Property-row readability pass (Tim, 2026-07-01): the row is taller and its labels bigger.
+## The property NAME reads in bold on the top line at this size.
+const NAME_FONT_SIZE := UiPalette.FONT_SUBHEAD
+## Shared height of the second row's two elements — the outlined "owned / next-threshold" count
+## panel and, to its right, the cycle progress bar — kept equal so they read as one aligned band.
+const SECOND_ROW_HEIGHT := 52
+## Font for the count-panel text and the per-cycle income readout above the bar.
+const SECOND_ROW_FONT_SIZE := UiPalette.FONT_BODY
+
 var _manager_circle: ManagerCircle
 var _name_label: Label
+## The "owned / next-milestone-threshold" readout, inside its own gray-outlined chip (Tim, 2026-07-01).
+var _count_label: Label
 var _income_label: Label
 var _cycle_bar: ProgressBar
 var _buy_button: Button
@@ -132,65 +192,109 @@ func setup(p_index: int, prop: PropertyState, economy: EconomyState, frenzy: Fre
 func _ready() -> void:
 	add_theme_stylebox_override("panel", UiPalette.make_panel_style())
 
-	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 6)
-	add_child(column)
-
-	# Top of the row: a round manager-portrait slot on the left, and to its right a section
-	# holding the name, the cycle progress bar, AND the milestone (inventory count) bar. The
-	# circle is sized in _refresh to be a square as tall as that whole section (all three
-	# lines), so it reads as one tall portrait spanning them — and the milestone bar, now in
-	# that section, lines up with the cycle bar's width instead of running the full row (Tim,
-	# 2026-06-22).
-	var top_row := HBoxContainer.new()
-	top_row.add_theme_constant_override("separation", 12)
-	column.add_child(top_row)
+	# The portrait/rush control sits on the LEFT as a single tall square spanning the WHOLE
+	# panel height (Tim, 2026-07-01): on device the old section-height circle was a hard tap
+	# target, so it now runs the full height of the row for a big, easy-to-hit button. To its
+	# right, a column holds the stacked rows — the bold NAME, then the "owned / threshold" count
+	# chip beside the income-over-progress-bar band, then the buy/hire buttons. The circle's
+	# square size is set in _refresh to match its own height.
+	var outer_row := HBoxContainer.new()
+	outer_row.add_theme_constant_override("separation", 12)
+	add_child(outer_row)
 
 	_manager_circle = ManagerCircle.new()
-	_manager_circle.size_flags_vertical = Control.SIZE_FILL  # stretch to the section's height
+	_manager_circle.size_flags_vertical = Control.SIZE_SHRINK_CENTER  # sized in _refresh, centered
 	# The portrait IS the start/rush control now (the old START button is gone): a single tap
 	# starts an idle cycle (or rushes a running one); holding it auto-rushes (see _pump_held_rush).
 	_manager_circle.pressed.connect(func() -> void: tap_requested.emit(prop_index))
-	top_row.add_child(_manager_circle)
+	outer_row.add_child(_manager_circle)
 
-	var top_section := VBoxContainer.new()
-	top_section.add_theme_constant_override("separation", 6)
-	top_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	top_row.add_child(top_section)
+	# The stacked rows to the right of the tall portrait.
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 8)
+	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	outer_row.add_child(column)
 
-	# Header: name ×count on the left, income/sec on the right.
-	var header := HBoxContainer.new()
-	top_section.add_child(header)
-
+	# Row 1 — the property name, in bold.
 	_name_label = Label.new()
 	_name_label.add_theme_color_override("font_color", UiPalette.NAVY)
-	_name_label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
+	_name_label.add_theme_font_size_override("font_size", NAME_FONT_SIZE)
+	_name_label.add_theme_font_override("font", UiPalette.make_bold_font())
 	_name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	header.add_child(_name_label)
+	# Clip a long name rather than letting it force the whole row wider than the panel — otherwise a
+	# long name sets the row's MINIMUM width and, paired with the tall (so wide) portrait, pushes the
+	# panel off the right edge of the screen (Tim, 2026-07-01). Clipping lets the row shrink to fit.
+	_name_label.clip_text = true
+	column.add_child(_name_label)
 
-	_income_label = Label.new()
-	# Darker green than the standard money-green, plus a same-color outline for faux
-	# weight (Tim's call: the per-cycle payout should read darker and bolder). The
-	# outline is the project-wide bold trick used until real bold fonts arrive in M3.
-	var income_green := UiPalette.MONEY_GREEN.darkened(0.4)
-	_income_label.add_theme_color_override("font_color", income_green)
-	_income_label.add_theme_color_override("font_outline_color", income_green)
-	_income_label.add_theme_constant_override("outline_size", 2)
-	_income_label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
-	header.add_child(_income_label)
+	# Row 2 — an outlined "owned / next-threshold" count chip on the LEFT, and to its right the live
+	# cycle progress bar filling the rest of the row, with the per-cycle income drawn ON TOP of the
+	# bar (bold black, right-aligned). The only text ABOVE the bar is the property name (row 1). The
+	# chip and the bar are the same height so they read as one line.
+	var second_row := HBoxContainer.new()
+	second_row.add_theme_constant_override("separation", 10)
+	column.add_child(second_row)
 
-	# Cycle line: live cycle progress (Style Guide §9: the "spin" is the real cycle
-	# progress; placeholder bar until hero art). The old START/RUSH button is gone — the
-	# portrait circle on the left is now the start/rush control (see ManagerCircle).
+	# The count chip: a gray-outlined plate wrapping the "owned / threshold" readout. Transparent
+	# fill so only the outline shows, whatever the row's ownership background is. It takes only its
+	# own width (SHRINK_BEGIN) and bottom-aligns (SHRINK_END) so it sits level with the progress bar.
+	var count_chip := PanelContainer.new()
+	var chip_style := StyleBoxFlat.new()
+	chip_style.bg_color = Color.TRANSPARENT
+	chip_style.border_color = UiPalette.MID_GRAY
+	chip_style.set_border_width_all(2)
+	chip_style.set_corner_radius_all(4)
+	chip_style.set_content_margin(SIDE_LEFT, 16)
+	chip_style.set_content_margin(SIDE_RIGHT, 16)
+	count_chip.add_theme_stylebox_override("panel", chip_style)
+	count_chip.custom_minimum_size = Vector2(0, SECOND_ROW_HEIGHT)
+	count_chip.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	count_chip.size_flags_vertical = Control.SIZE_SHRINK_END
+	second_row.add_child(count_chip)
+
+	_count_label = Label.new()
+	_count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_count_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_count_label.add_theme_color_override("font_color", UiPalette.NAVY)
+	_count_label.add_theme_font_size_override("font_size", SECOND_ROW_FONT_SIZE)
+	count_chip.add_child(_count_label)
+
+	# The right cell fills the rest of the row and holds the progress bar with the income drawn over
+	# it. A plain Control host (rather than parenting the income to the bar) keeps the income overlay
+	# visible even on an unowned "peek" row, where the bar itself is hidden — no cycle to run — but
+	# the single-unit income preview should still show. Same height as the count chip so they align.
+	var bar_cell := Control.new()
+	bar_cell.custom_minimum_size = Vector2(0, SECOND_ROW_HEIGHT)
+	bar_cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bar_cell.size_flags_vertical = Control.SIZE_SHRINK_END
+	second_row.add_child(bar_cell)
+
+	# Cycle progress bar (Style Guide §9: the "spin" is the real cycle progress), filling the cell.
 	_cycle_bar = ProgressBar.new()
+	_cycle_bar.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_cycle_bar.min_value = 0.0
 	_cycle_bar.max_value = 1.0
 	_cycle_bar.show_percentage = false
-	_cycle_bar.custom_minimum_size = Vector2(0, 26)
-	_cycle_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_cycle_bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	UiPalette.style_progress_bar(_cycle_bar, UiPalette.MONEY_GREEN)
-	top_section.add_child(_cycle_bar)
+	bar_cell.add_child(_cycle_bar)
+
+	# Per-cycle income: bold BLACK, right-aligned, drawn ON TOP of the bar and vertically centered
+	# in it (Tim, 2026-07-01). A cream outline (the project's faux-weight trick) keeps it legible
+	# over both the green fill and the gray track. Inset a little from the cell's edges; ignores the
+	# mouse so a tap on the bar area is never eaten by the label.
+	_income_label = Label.new()
+	_income_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_income_label.offset_left = 12
+	_income_label.offset_right = -12
+	_income_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_income_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_income_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_income_label.add_theme_font_size_override("font_size", SECOND_ROW_FONT_SIZE)
+	_income_label.add_theme_font_override("font", UiPalette.make_bold_font())
+	_income_label.add_theme_color_override("font_color", Color.BLACK)
+	_income_label.add_theme_color_override("font_outline_color", UiPalette.CREAM)
+	_income_label.add_theme_constant_override("outline_size", 4)
+	bar_cell.add_child(_income_label)
 
 	# Buy / hire buttons (bulk-buy is mandatory — GDD §3.1). The buy button's
 	# count follows the global buy-mode toggle.
@@ -200,7 +304,11 @@ func _ready() -> void:
 
 	_buy_button = Button.new()
 	_buy_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	# Buy and hire each take half the panel width (default stretch ratio 1.0 on both).
+	# The hire button gets a slightly larger share of the row (Tim, 2026-07-01): both stretch
+	# to fill, but the buy button's stretch ratio is pulled a little below the hire button's
+	# default 1.0, so the split lands around 46% buy / 54% hire. (An earlier 0.65 ratio made
+	# the buy button too narrow — its "BUY ×N" and cost labels ran together.)
+	_buy_button.size_flags_stretch_ratio = 0.85
 	_buy_button.custom_minimum_size = Vector2(0, BUTTON_ROW_HEIGHT)
 	UiPalette.style_button(_buy_button, true)  # red: buying is a spend action (§8)
 	_buy_button.pressed.connect(func() -> void: buy_requested.emit(prop_index, _buy_mode))
@@ -251,6 +359,89 @@ func _process(delta: float) -> void:
 	_refresh(delta)
 	_pump_held_rush(delta)
 	_pump_held_buy(delta)
+	_pump_held_hire(delta)
+
+
+## Raw touch handling for CONCURRENT inputs (see the multi-touch note in the fields above). Only
+## SECONDARY fingers are acted on here; the primary finger is left to the normal Button / emulated-
+## mouse path, so single-touch behaviour is untouched and nothing ever double-fires.
+func _input(event: InputEvent) -> void:
+	var touch := event as InputEventScreenTouch
+	if touch != null:
+		if touch.pressed:
+			_on_touch_pressed(touch.index, touch.position)
+		else:
+			_on_touch_released(touch.index)
+		return
+	# A held secondary finger sliding: re-check which control it is over now, so sliding OFF a control
+	# cancels its hold (matching how lifting off a button stops the repeat).
+	var drag := event as InputEventScreenDrag
+	if drag != null and _secondary_targets.has(drag.index):
+		var target := _control_under_point(drag.position)
+		if target == "":
+			_secondary_targets.erase(drag.index)
+		else:
+			_secondary_targets[drag.index] = target
+
+
+func _on_touch_pressed(index: int, global_pos: Vector2) -> void:
+	# The first finger of a gesture is the one Godot emulates the mouse from — leave it entirely to the
+	# Button path. We still record it so its release is recognised, but we never act on it here.
+	var is_first_finger := _active_fingers.is_empty()
+	_active_fingers[index] = true
+	if is_first_finger:
+		_primary_finger = index
+		return
+	# A secondary finger: act only when the Property tab is live and this row is actually on screen,
+	# so a stray finger can't trigger a purchase on a row hidden behind a modal overlay.
+	if not multitouch_enabled or not is_visible_in_tree():
+		return
+	var control_id := _control_under_point(global_pos)
+	if control_id == "":
+		return
+	_secondary_targets[index] = control_id
+	_fire_secondary_action(control_id)
+
+
+func _on_touch_released(index: int) -> void:
+	_active_fingers.erase(index)
+	_secondary_targets.erase(index)
+	if index == _primary_finger:
+		_primary_finger = -1
+
+
+## Which of this row's three interactive controls, if any, sits under a global point — "" if none.
+## Respects each control's current eligibility (a disabled Buy/Hire, or a non-interactive portrait, is
+## not a target), so a secondary finger can only ever trigger what a primary finger could.
+func _control_under_point(global_pos: Vector2) -> String:
+	if _portrait_interactive and _manager_circle.is_visible_in_tree() \
+			and _manager_circle.get_global_rect().has_point(global_pos):
+		return "rush"
+	if not _buy_button.disabled and _buy_button.is_visible_in_tree() \
+			and _buy_button.get_global_rect().has_point(global_pos):
+		return "buy"
+	if not _hire_button.disabled and _hire_button.is_visible_in_tree() \
+			and _hire_button.get_global_rect().has_point(global_pos):
+		return "hire"
+	return ""
+
+
+## Fire the one-shot action for a secondary-finger PRESS on a control (the hold pumps add the repeats
+## afterward, exactly as they do for the primary finger's Button).
+func _fire_secondary_action(control_id: String) -> void:
+	match control_id:
+		"rush":
+			tap_requested.emit(prop_index)  # start an idle cycle, or land one rush
+		"buy":
+			buy_requested.emit(prop_index, _buy_mode)
+		"hire":
+			_on_hire_pressed()
+
+
+## True while any SECONDARY finger is currently holding the named control ("rush" / "buy" / "hire") —
+## the hold pumps OR this with the primary finger's Button state so either finger can drive a hold.
+func _secondary_held(control_id: String) -> bool:
+	return _secondary_targets.values().has(control_id)
 
 
 ## Holding the start/rush button continually drives the property at the tuning
@@ -261,7 +452,8 @@ func _process(delta: float) -> void:
 func _pump_held_rush(delta: float) -> void:
 	# is_held() is false whenever the portrait button is disabled (a locked rung, or an
 	# automated property that is not the player's top one), so those simply never auto-rush.
-	if not _manager_circle.is_held() or _prop.units_owned == 0:
+	# A secondary finger on the portrait (multi-touch) counts as held too.
+	if (not _manager_circle.is_held() and not _secondary_held("rush")) or _prop.units_owned == 0:
 		_hold_accumulator = 0.0
 		return
 	_hold_accumulator += delta
@@ -281,7 +473,8 @@ func _pump_held_rush(delta: float) -> void:
 ## while it stays held. Unaffordable pulses are skipped (the buy button disables itself), so
 ## a held button simply idles once the player runs out of cash rather than spamming failures.
 func _pump_held_buy(delta: float) -> void:
-	if not _buy_button.button_pressed:
+	# Held via the primary finger's Button, or a secondary finger resting on it (multi-touch).
+	if not _buy_button.button_pressed and not _secondary_held("buy"):
 		_buy_hold_accumulator = 0.0
 		_buy_hold_repeating = false
 		return
@@ -292,6 +485,27 @@ func _pump_held_buy(delta: float) -> void:
 		_buy_hold_repeating = true
 		if not _buy_button.disabled:
 			buy_requested.emit(prop_index, _buy_mode)
+
+
+## Holding the STAFF button keeps performing its current action on a calm cadence (Tim, 2026-07-01):
+## a quick tap is handled by the button's own `pressed` (one hire/upgrade/level-up); this only adds
+## the repeats while it stays held. It routes through _on_hire_pressed, so a held button naturally
+## flows from hiring to upgrading to leveling up as the state changes. Unaffordable pulses are
+## skipped (the button disables itself), so a held button simply idles once the player runs out of
+## cash rather than spamming failures — exactly like the buy button.
+func _pump_held_hire(delta: float) -> void:
+	# Held via the primary finger's Button, or a secondary finger resting on it (multi-touch).
+	if not _hire_button.button_pressed and not _secondary_held("hire"):
+		_hire_hold_accumulator = 0.0
+		_hire_hold_repeating = false
+		return
+	_hire_hold_accumulator += delta
+	var threshold := BUY_HOLD_REPEAT_INTERVAL if _hire_hold_repeating else BUY_HOLD_INITIAL_DELAY
+	if _hire_hold_accumulator >= threshold:
+		_hire_hold_accumulator = 0.0
+		_hire_hold_repeating = true
+		if not _hire_button.disabled:
+			_on_hire_pressed()
 
 
 func _refresh(delta: float) -> void:
@@ -311,14 +525,16 @@ func _refresh(delta: float) -> void:
 			or prop_index == _economy.get_cheapest_unaffordable_unowned_index(current_tier))
 
 	var config := _prop.config as PropertyConfig
-	# Name shows the owned count and, after the slash, the unit threshold of the next
-	# milestone tier (the old progress bar's information, folded into the title — Tim,
-	# 2026-06-29). Past the final milestone there is no next count, so we show "MAX".
+	# Row 1 is just the property name (bold). The owned-count and next-milestone threshold now live
+	# in their own outlined chip on row 2 (Tim, 2026-07-01), no longer folded into the title.
+	_name_label.text = config.display_name
+
+	# The count chip: "<owned> / <next milestone threshold>", or "<owned> / MAX" past the last tier.
 	var next_milestone := _prop.get_next_milestone_count()
 	if next_milestone <= 0:
-		_name_label.text = "%s  ×%d / MAX" % [config.display_name, _prop.units_owned]
+		_count_label.text = "%d / MAX" % _prop.units_owned
 	else:
-		_name_label.text = "%s  ×%d / %d" % [config.display_name, _prop.units_owned, next_milestone]
+		_count_label.text = "%d / %d" % [_prop.units_owned, next_milestone]
 
 	# A rung the player owns no units of yet gets a drab gray "locked" look; once a
 	# unit is bought it switches to the normal cream styling (applied on change).
@@ -329,9 +545,12 @@ func _refresh(delta: float) -> void:
 	# owns at least one unit (Tim, 2026-06-28).
 	_cycle_bar.visible = owned
 
-	# Keep the portrait circle square and as tall as this top section: its height is already
-	# stretched to the section by the layout, so we just match the width to it.
-	_manager_circle.custom_minimum_size.x = _manager_circle.size.y
+	# Keep the portrait circle square, sized to PORTRAIT_HEIGHT_FRACTION of the panel's full height
+	# and centered vertically. The row's height is driven by the column of rows to the right, so we
+	# read it back from the portrait's parent (the outer HBox) and shrink the square to fit.
+	var outer_row := _manager_circle.get_parent() as Control
+	var portrait_size: float = outer_row.size.y * PORTRAIT_HEIGHT_FRACTION
+	_manager_circle.custom_minimum_size = Vector2(portrait_size, portrait_size)
 
 	# The portrait is the start/rush control (ManagerCircle). Decide its look and whether it
 	# accepts input this frame:
@@ -344,10 +563,13 @@ func _refresh(delta: float) -> void:
 	var staffed := _prop.is_staffed
 	var is_highest_owned := _economy.get_highest_owned_index() == prop_index
 	var interactive := owned and (not staffed or is_highest_owned)
+	# Remembered for _control_under_point, so a secondary-finger rush obeys this same rule.
+	_portrait_interactive = interactive
 	var portrait_mode := ManagerCircle.PortraitMode.LOCKED
 	if owned:
 		portrait_mode = ManagerCircle.PortraitMode.STAFFED if staffed else ManagerCircle.PortraitMode.UNSTAFFED
-	var show_rush_icon := interactive and _manager_circle.is_held()
+	# The infinity "rushing" icon shows whether the primary Button or a secondary finger holds it.
+	var show_rush_icon := interactive and (_manager_circle.is_held() or _secondary_held("rush"))
 	_manager_circle.set_state(
 		portrait_mode, config.accent_color, config.manager_portrait, show_rush_icon, interactive
 	)
@@ -363,18 +585,20 @@ func _refresh(delta: float) -> void:
 	var effective_length := _prop.get_effective_cycle_length()
 	var bar_is_solid := owned and _prop.is_cycle_running \
 		and effective_length > 0.0 and effective_length < SOLID_BAR_THRESHOLD_SEC
-	if owned:
-		# get_income_per_cycle() already folds in the staffer and Family Fortune (Legacy)
-		# multipliers; frenzy is applied live on top, matching what the player receives.
-		var per_cycle := _prop.get_income_per_cycle() * _frenzy.get_multiplier()
-		if bar_is_solid:
-			# Derive the rate from the SAME per-cycle figure (not get_income_per_sec(),
-			# which omits legacy + frenzy) so "/sec" stays consistent with "/cycle".
-			_income_label.text = Money.of(per_cycle / effective_length).display() + "/sec"
-		else:
-			_income_label.text = Money.of(per_cycle).display() + "/cycle"
+	# The amount paid per completed cycle. For an OWNED rung get_income_per_cycle() already folds in
+	# the staffer and Family Fortune (Legacy) multipliers, with frenzy applied live on top so it
+	# matches what the player receives; for an UNOWNED rung it's the per-cycle value of a single
+	# unit (a buy-in preview).
+	var per_cycle := _prop.get_income_per_cycle() * _frenzy.get_multiplier() if owned \
+		else _prop.get_single_unit_income_per_cycle()
+	# Rate context on the payout (Tim, 2026-07-02): a cycle of a second or more shows the per-cycle
+	# payout WITH its cycle length, scaled to a sensible unit — "$X/4.3m" is $X every 4.3 minutes —
+	# so the figure is never an unlabeled amount. A sub-second cycle instead reads as a per-second
+	# rate ("$X/s"), the same per-cycle figure divided by the (tiny) cycle length.
+	if effective_length > 0.0 and effective_length < PER_SECOND_READOUT_THRESHOLD_SEC:
+		_income_label.text = Money.of(per_cycle / effective_length).display() + "/s"
 	else:
-		_income_label.text = Money.of(_prop.get_single_unit_income_per_cycle()).display() + "/cycle"
+		_income_label.text = "%s/%s" % [Money.of(per_cycle).display(), _format_cycle_duration(effective_length)]
 
 	# Smooth, constant-velocity cycle bar (see _displayed_cycle_fraction above). Measured
 	# against the EFFECTIVE (sped-up) cycle length so the bar still fills all the way to the
@@ -444,6 +668,19 @@ func _set_cycle_color(rush_no_longer_option: bool, rush_held: bool) -> void:
 	UiPalette.style_progress_bar(_cycle_bar, fill)
 
 
+## Format a cycle length (seconds) as a compact duration with one decimal and a unit scaled to size —
+## seconds (s), minutes (m), hours (h), or days (d) — for the "$X/<duration>" income readout (Tim,
+## 2026-07-02). Units are lowercase, matching the "/s" per-second rate.
+func _format_cycle_duration(seconds: float) -> String:
+	if seconds >= 86400.0:
+		return "%.1fd" % (seconds / 86400.0)
+	elif seconds >= 3600.0:
+		return "%.1fh" % (seconds / 3600.0)
+	elif seconds >= 60.0:
+		return "%.1fm" % (seconds / 60.0)
+	return "%.1fs" % seconds
+
+
 ## Swap the row's panel background between the normal cream look (owned) and the drab gray
 ## "locked" look (no units owned yet). Only rebuilds the styleboxes when the state actually
 ## flips, not every frame. (The portrait button's own look is set live by ManagerCircle.)
@@ -454,15 +691,12 @@ func _apply_ownership_styling(owned: bool) -> void:
 	_ownership_style_applied = want
 	if owned:
 		add_theme_stylebox_override("panel", UiPalette.make_panel_style())
-		# Owned: the bold dark-money-green per-cycle payout.
-		var income_green := UiPalette.MONEY_GREEN.darkened(0.4)
-		_income_label.add_theme_color_override("font_color", income_green)
-		_income_label.add_theme_color_override("font_outline_color", income_green)
+		# Owned: the per-cycle payout in bold black (Tim, 2026-07-01).
+		_income_label.add_theme_color_override("font_color", Color.BLACK)
 	else:
 		add_theme_stylebox_override("panel", UiPalette.make_unowned_panel_style())
 		# Unowned: a drab dark-gray single-unit preview, matching the locked row look.
 		_income_label.add_theme_color_override("font_color", UiPalette.DARK_GRAY)
-		_income_label.add_theme_color_override("font_outline_color", UiPalette.DARK_GRAY)
 
 
 ## True once the property is staffed at the best tier this epoch allows. In that state the
@@ -470,9 +704,18 @@ func _apply_ownership_styling(owned: bool) -> void:
 ## (GDD §6.1). Used both to draw the button (_refresh_hire_button) and to route its press
 ## (_on_hire_pressed), so the two never disagree about which action the button performs.
 func _is_in_level_up_state() -> bool:
-	# Highest tier hireable right now: the reached epoch, capped at the defined epochs.
-	var max_tier := mini(_epoch.current_tier, EpochCatalog.tier_count())
+	# Highest tier hireable right now: the reached epoch, capped at the defined epochs. Alien
+	# properties are automation-only — capped at a single staffer (EconomyState.try_hire) — so their
+	# best tier is always 1: once hired they go straight to the level-up sink, never an upgrade
+	# (Tim, 2026-07-01).
+	var max_tier := 1 if _is_alien_property() else mini(_epoch.current_tier, EpochCatalog.tier_count())
 	return _prop.staff_tier >= 1 and _prop.staff_tier >= max_tier
+
+
+## True for an alien property type (unlock_tier > 1) — the ones added at First Contact, which staff
+## for automation only (no epoch multiplier), unlike the 12 Earth properties.
+func _is_alien_property() -> bool:
+	return (_prop.config as PropertyConfig).unlock_tier > 1
 
 
 ## The hire button's single `pressed` handler. It performs different actions depending on
@@ -602,33 +845,31 @@ func _set_split_label_color(left: Label, right: Label, color: Color) -> void:
 ## Update the buy button's caption, cost, and enabled state for the
 ## current global buy mode.
 func _refresh_buy_button() -> void:
+	# How many units this press would buy under the current mode. The left label just shows that
+	# count as "+N" (Tim, 2026-07-01) — no "BUY"/"MAX" wording, since the count alone reads as the
+	# purchase; the cost sits on the right.
 	var count := 0
-	var caption := ""
 	match _buy_mode:
 		BuyMode.ONE:
 			count = 1
-			caption = "BUY ×1"
 		BuyMode.TEN:
 			count = 10
-			caption = "BUY ×10"
 		BuyMode.HUNDRED:
 			count = 100
-			caption = "BUY ×100"
 		BuyMode.MAX:
 			count = _prop.get_max_affordable(_economy.cash)
-			caption = "MAX ×%d" % count
 
 	if count <= 0:
-		# MAX mode with nothing affordable yet: show the next single unit's cost so
-		# the player can see how close they are, instead of a blank "—".
-		_buy_caption_label.text = "MAX"
+		# MAX mode with nothing affordable yet: "+0", and show the next single unit's cost so the
+		# player can see how close they are, instead of a blank "—".
+		_buy_caption_label.text = "+0"
 		_buy_cost_label.text = Money.of(_prop.get_bulk_cost(1)).display()
 		_buy_button.disabled = true
 		_set_buy_label_colors()
 		return
 
 	var cost := _prop.get_bulk_cost(count)
-	_buy_caption_label.text = caption
+	_buy_caption_label.text = "+%d" % count
 	_buy_cost_label.text = Money.of(cost).display()
 	_buy_button.disabled = _economy.cash < cost
 	_set_buy_label_colors()

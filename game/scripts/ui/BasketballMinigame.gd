@@ -59,13 +59,18 @@ const PULL_POWER := 15.0
 ## Hard cap on the resulting throw speed (px/sec).
 const MAX_THROW_SPEED := 2900.0
 
-## Aim-guide force colors (Tim, 2026-06-30): the force wedge is a SINGLE color that CHANGES with the
-## current pull's force — blue (low) → purple (medium) → bright red (high/maxed) — so the player
-## reads the power before releasing. Purple is a deliberate one-off exception to the §1 palette for
-## this force gauge (the same way ORANGE was added for the spectrum bar).
-const FORCE_COLOR_LOW := Color("#3A78D0")    # blue — low force
-const FORCE_COLOR_MED := Color("#8244C0")    # purple — medium force
-const FORCE_COLOR_HIGH := Color("#E23B2C")   # bright red — high / maxed force
+## Aim-guide force colors (Tim, 2026-06-30; extended to four stops 2026-07-01 for readability): the
+## force wedge is a SINGLE color that CHANGES with the current pull's force, climbing through a wider
+## ramp — green (low) → blue → purple → bright red (high/maxed) — so the power reads clearly before
+## release. Green, blue, and purple are deliberate one-off exceptions to the §1 palette for this
+## force gauge (the same way ORANGE was added for the spectrum bar). The stops are lerped in order
+## across the [0,1] force range by _force_color; add or reorder entries here to reshape the ramp.
+const FORCE_COLOR_RAMP := [
+	Color("#33B24D"),   # green — low force
+	Color("#3A78D0"),   # blue  — low-to-medium
+	Color("#8244C0"),   # purple — medium-to-high
+	Color("#E23B2C"),   # bright red — high / maxed force
+]
 ## The force wedge is a filled triangle with its POINT at the ball's launch location, FANNING OUT
 ## to a wide far end in the DIRECTION OF TRAVEL (opposite the pull) — like a beam showing where the
 ## ball will go (Tim, 2026-06-30). The wide end's width grows with force; the wedge's length grows
@@ -115,9 +120,8 @@ var _hoop_pos: Vector2 = Vector2.ZERO
 var _hoop_flash: float = 0.0       # brief brighten of the rim after a made basket, decays in _process
 
 # --- Celebration juice (polish pass, Tim 2026-06-29) -------------------------------------------
-# This pass adds NO difficulty change (Basketball "holds"); it only makes a made basket and a
-# near-miss rim clang feel good. All of the state below is purely cosmetic — it never touches
-# _baskets or get_performance().
+# This pass adds NO difficulty change (Basketball "holds"); it only makes a made basket feel good.
+# All of the state below is purely cosmetic — it never touches _baskets or get_performance().
 
 ## The aimed ball's draw scale, EASED toward its target each frame (1.0 normal, ~1.12 while held)
 ## so grabbing a ball blooms smoothly instead of snapping to 1.12x in one frame.
@@ -125,8 +129,9 @@ const AIM_SCALE_HELD := 1.12
 const AIM_SCALE_EASE := 14.0       # how fast the held-ball scale catches its target (per second)
 var _aim_scale: float = 1.0
 
-## Short-lived spray/clang particles: small circles flung from the hoop on a score and from a rim
-## post on a near-miss bounce. Each is { "pos", "vel", "life" (1->0), "color", "radius" }.
+## Short-lived spray particles flung from the hoop when a basket is made (Tim, 2026-07-01: sparks
+## are reserved for a score — a rim touch no longer sprays). Each is { "pos", "vel", "life" (1->0),
+## "color", "radius" }.
 var _particles: Array = []
 const PARTICLE_GRAVITY := 1400.0   # lighter than the ball's gravity — confetti floats a touch more
 const PARTICLE_FADE := 1.6         # life drained per second (so a spray lasts ~0.6s)
@@ -415,9 +420,8 @@ func _resolve_hoop(ball: Dictionary, prev: Vector2, bounds: Vector2) -> bool:
 			var into_post: float = ball["vel"].dot(normal)
 			if into_post < 0.0:  # only reflect if moving toward the post
 				ball["vel"] -= normal * into_post * (1.0 + RESTITUTION)
-				# A near-miss clang: splash a few gray sparks off the contact point so the rim-out
-				# reads as a real impact, not a silent deflection (plan §2.6).
-				_spawn_clang(ball["pos"], normal)
+				# No particles on a rim touch (Tim, 2026-07-01): the ball still bounces off the post,
+				# but sparks are reserved for a MADE basket only, so a spray always means "score".
 	return false
 
 
@@ -453,23 +457,6 @@ func _celebrate_basket() -> void:
 			"life": 1.0,
 			"color": colors[i % colors.size()],
 			"radius": _rng.randf_range(4.0, 8.0),
-		})
-
-
-## A near-miss rim clang: a few small gray sparks kicked off the post along the bounce normal, so a
-## rim-out has a readable little impact.
-func _spawn_clang(point: Vector2, normal: Vector2) -> void:
-	for i in range(6):
-		# Spread the sparks in a fan around the contact normal (away from the post).
-		var spread := _rng.randf_range(-PI * 0.5, PI * 0.5)
-		var direction := normal.rotated(spread)
-		var speed := _rng.randf_range(180.0, 360.0)
-		_particles.append({
-			"pos": point,
-			"vel": direction * speed,
-			"life": 1.0,
-			"color": UiPalette.LIGHT_GRAY,
-			"radius": _rng.randf_range(3.0, 5.0),
 		})
 
 
@@ -579,7 +566,7 @@ func _draw_play() -> void:
 	if _aim_index != -1:
 		_draw_aim_guide()
 
-	# The celebration layer (score rings + confetti/clang sparks), drawn over the play field but
+	# The celebration layer (score rings + basket confetti), drawn over the play field but
 	# under the board frame so it never spills past the walls visually.
 	_draw_celebration()
 
@@ -652,8 +639,8 @@ func _round_image_corners(image: Image, radius: int) -> void:
 ## FORCE WEDGE — a filled triangle with its POINT at the ball's launch location, fanning out to a
 ## WIDE far end in the DIRECTION OF TRAVEL (opposite the pull), like a beam showing where the ball
 ## will go. The wide end's width and the wedge's length grow with the pull's force, and its single
-## color CHANGES with force (blue → purple → bright red), so the player reads both power and aim
-## direction at a glance (Tim, 2026-06-30).
+## color CHANGES with force (green → blue → purple → bright red), so the player reads both power and
+## aim direction at a glance (Tim, 2026-06-30).
 func _draw_aim_guide() -> void:
 	var ball_pos: Vector2 = _balls[_aim_index]["pos"]
 	var pull := ball_pos - _aim_anchor
@@ -682,17 +669,21 @@ func _draw_aim_guide() -> void:
 	_play.draw_colored_polygon(wedge, _force_color(force))
 
 
-## Map a force fraction (0 = none, 1 = maxed) to the aim band's color ramp: blue → purple at the
-## halfway point → bright red at full. See FORCE_COLOR_* (purple is a deliberate palette exception).
+## Map a force fraction (0 = none, 1 = maxed) to the aim band's color ramp by walking the ordered
+## FORCE_COLOR_RAMP stops: green → blue → purple → bright red across [0,1]. The ramp is split into
+## equal segments (one per gap between stops), and the fraction is lerped within its segment.
 func _force_color(fraction: float) -> Color:
-	if fraction < 0.5:
-		return FORCE_COLOR_LOW.lerp(FORCE_COLOR_MED, fraction / 0.5)
-	return FORCE_COLOR_MED.lerp(FORCE_COLOR_HIGH, (fraction - 0.5) / 0.5)
+	var stops := FORCE_COLOR_RAMP
+	var segments := stops.size() - 1                       # gaps between the color stops
+	var scaled := clampf(fraction, 0.0, 1.0) * float(segments)
+	var index := mini(int(scaled), segments - 1)           # which segment we're in (clamped off the end)
+	var local := scaled - float(index)                     # position within that segment, 0..1
+	return (stops[index] as Color).lerp(stops[index + 1] as Color, local)
 
 
-## Draw the celebration layer: the expanding/fading score rings from a made basket, then the
-## confetti and clang sparks. Pure cosmetics; these read off _score_rings and _particles, which
-## _advance_celebration grows and fades.
+## Draw the celebration layer: the expanding/fading score rings from a made basket, then the basket
+## confetti. Pure cosmetics; these read off _score_rings and _particles, which _advance_celebration
+## grows and fades.
 func _draw_celebration() -> void:
 	# Score rings: a thin ring that expands outward from the hoop and fades as its life drains.
 	for ring in _score_rings:
@@ -702,7 +693,7 @@ func _draw_celebration() -> void:
 		ring_color.a = life  # fade out as it grows
 		_play.draw_arc(ring["pos"], radius, 0.0, TAU, 32, ring_color, 4.0, true)
 
-	# Confetti / clang sparks: little solid circles that fade with their life.
+	# Basket confetti: little solid circles that fade with their life.
 	for particle in _particles:
 		var spark_color: Color = particle["color"]
 		spark_color.a = clampf(particle["life"], 0.0, 1.0)

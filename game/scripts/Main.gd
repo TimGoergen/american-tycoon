@@ -112,6 +112,15 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	# Concurrent multi-touch on the property panel (PropertyRow reads raw touches for secondary
+	# fingers — hold rush while tapping/holding buy or hire): allow it ONLY while the Property tab is
+	# showing and no full-screen overlay is up, so a stray second finger can never trigger a buy on a
+	# row sitting behind a modal. Computed here every frame (before the freeze return below) so it
+	# always reflects the current screen, including while an overlay is up.
+	var overlay_up := _will_screen.visible or _dev_panel.visible or _first_contact_overlay.visible \
+			or _minigame_screen.visible or _minigame_review_screen.visible or _welcome_overlay.visible
+	PropertyRow.multitouch_enabled = _active_tab == TAB_PROPERTY and not overlay_up
+
 	# Freeze the economy while a full-screen MODAL overlay is up (the succession
 	# ceremony, the upgrade shop, the minigame, etc.): no ticks, no autosave. This keeps
 	# the will's numbers steady, avoids half-saving the generation swap mid-ceremony, and
@@ -385,7 +394,14 @@ func _build_ui() -> void:
 ## scrolling property ladder, and the wage button.
 func _build_property_tab() -> Control:
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 10)
+	# Match the vertical gaps between the action row, the ladder, and the wage panel to the tab
+	# panel's own 24px content margin (make_tab_panel_style). The tab panel already insets the
+	# content 24px on every outer side, so with this separation the top action row gets an equal
+	# 24px on ALL sides (its bottom gap now matches its top/left/right), and likewise the bottom
+	# clock-in wage panel gets an equal 24px on all sides (its top gap now matches). The two top
+	# buttons keep their own tighter 10px spacing — that's the action_row HBox below, not this gap
+	# (Tim, 2026-07-01: uniform margin around the button groups, but not between the two buttons).
+	v.add_theme_constant_override("separation", 24)
 
 	# Action row: the TURBO button (its background is the frenzy meter) takes the larger
 	# share; the buy-mode toggle takes the rest.
@@ -483,16 +499,17 @@ func _build_estate_tab() -> Control:
 	# The prestige exit, pinned to the BOTTOM of the tab (Tim, 2026-06-28): plan the estate,
 	# pass on, raise a faster heir. Red = big commit.
 	_plan_button = Button.new()
-	# ~35% shorter than its previous (taller) size, still fitting the bold label + inline gem
-	# (Tim, 2026-06-28).
-	_plan_button.custom_minimum_size = Vector2(0, int(UiPalette.STANDARD_BUTTON_HEIGHT * 0.88))
+	# As tall as the Settings tab's tuning buttons (STANDARD_BUTTON_HEIGHT × 1.4) so this
+	# prestige exit reads as an equally weighty, easy-to-hit control (Tim, 2026-07-01).
+	_plan_button.custom_minimum_size = Vector2(0, int(UiPalette.STANDARD_BUTTON_HEIGHT * 1.4))
 	UiPalette.style_button(_plan_button, true)
 	_plan_button.pressed.connect(_on_plan_estate_pressed)
 	v.add_child(_plan_button)
 
 	# The button's label is a RichTextLabel so the parenthetical can show the legacy-gem image
-	# inline (Tim, 2026-06-28). It is 40% larger than the standard label and bold. A CenterContainer
-	# centers it over the button; both ignore the mouse so the press still reaches the button.
+	# inline (Tim, 2026-06-28). It is bold and sized to match the Settings tuning buttons'
+	# font (Tim, 2026-07-01). A CenterContainer centers it over the button; both ignore the
+	# mouse so the press still reaches the button.
 	var plan_center := CenterContainer.new()
 	plan_center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	plan_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -505,7 +522,8 @@ func _build_estate_tab() -> Control:
 	_plan_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	_plan_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_plan_label.add_theme_font_override("normal_font", UiPalette.make_bold_font())
-	_plan_label.add_theme_font_size_override("normal_font_size", int(round(UiPalette.FONT_LABEL * 1.4)))
+	# Font size 50 — the same as the Settings tab's tuning buttons (TUNING_BUTTON_FONT).
+	_plan_label.add_theme_font_size_override("normal_font_size", 50)
 	_plan_label.add_theme_color_override("default_color", UiPalette.PALE_GOLD)
 	# Mipmapped filtering so the inline gem image downscales smoothly rather than aliasing.
 	_plan_label.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
@@ -809,7 +827,7 @@ func _update_plan_button() -> void:
 	_plan_button.disabled = not can_succeed
 	if can_succeed:
 		# "(+x [gem])" — the legacy-gem image stands in for the word "Legacy" inside the parens.
-		_plan_label.text = "[center]PASS THE TORCH  (+%d [img width=29 height=40]res://art/icons/legacy_gem.svg[/img])[/center]" % dynasty.projected_legacy_gain()
+		_plan_label.text = "[center]PASS THE TORCH  (+%d [img width=36 height=50]res://art/icons/legacy_gem.svg[/img])[/center]" % dynasty.projected_legacy_gain()
 	else:
 		_plan_label.text = "[center]PASS THE TORCH[/center]"
 
@@ -827,10 +845,11 @@ func _on_contact_made(new_tier: int) -> void:
 	_first_contact_overlay.show_contact(new_tier)
 
 
-## The player answered the contact call (the overlay's "ANSWER THE CALL"). If this epoch opened
-## a new alien property type, negotiate the trade deal for it (GDD §5.5 site 2): the minigame's
-## performance becomes the player's head start (free starting units). Epochs with no new property
-## just resume play. With minigames opted out, we still grant the keep-floor head start directly.
+## The player answered the contact call (the overlay's "ANSWER THE CALL"). If this epoch opened a
+## new alien property type, negotiate the trade deal for it (GDD §5.5 site 2): the minigame's
+## performance sets a permanent, upside-only bonus on that property (income + cycle-time; the floor
+## is always its base income). Epochs with no new property just resume play. Opting out of minigames
+## simply forgoes the bonus — the property still unlocks at its base income, and you own none of it.
 func _on_contact_dismissed() -> void:
 	var tier := _pending_contact_tier
 	_pending_contact_tier = 0
@@ -839,16 +858,17 @@ func _on_contact_dismissed() -> void:
 		return  # no new business this epoch — nothing more to negotiate
 
 	if not game.ui_minigame_enabled:
-		# Opted out of minigames: bank the keep floor, matching the prestige/welcome-back rule.
-		var floor_units := int(floor(tuning.first_contact_starting_units * tuning.minigame_keep_floor))
-		game.economy.grant_starting_units(prop_index, floor_units)
+		# Opted out: the new property unlocks at base income; no minigame means no bonus. The bonus
+		# is upside-only, so opting out costs nothing but the potential upside. Nothing to grant.
 		return
 
-	var prop_name := (game.economy.properties[prop_index] as PropertyState).config.display_name
+	var prop := game.economy.properties[prop_index] as PropertyState
 	_minigame_site = MinigameSite.FIRST_CONTACT
 	_first_contact_prop_index = prop_index
+	# Frame the negotiation around the property's per-unit base income, so the result reads as the
+	# opening income you talked your way into rather than an abstract score.
 	_minigame_screen.start_game(
-		MinigameScreen.first_contact_reward(tuning.first_contact_starting_units, prop_name),
+		MinigameScreen.first_contact_reward(prop.get_single_unit_income_per_cycle(), prop.config.display_name),
 		dynasty.upgrades.minigame_bonus_max()
 	)
 
@@ -1007,17 +1027,28 @@ func _on_welcome_risk_pressed() -> void:
 	)
 
 
-## The First Contact negotiation produced `multiplier`: convert it to a count of free starting
-## units (the universal keep_floor..1+bonus curve scales the cap) and grant them on the new alien
-## property (GDD §5.5 site 2). The contact narration already played, so there is no closing beat —
-## the player drops back into the now-bigger game owning a head start on the new business. Save so
-## the granted units survive a crash before the next autosave.
+## The First Contact negotiation produced `multiplier`: map it to a permanent, upside-only bonus on
+## the new alien property (GDD §5.5 site 2). The contact narration already played, so there is no
+## closing beat — the player drops back into the now-bigger game with the property unlocked (owning
+## none) and its bonus set. Save so the bonus survives a crash before the next autosave.
 func _finish_first_contact_minigame(multiplier: float) -> void:
 	if _first_contact_prop_index >= 0:
-		var units := int(floor(tuning.first_contact_starting_units * multiplier))
-		game.economy.grant_starting_units(_first_contact_prop_index, units)
+		var prop := game.economy.properties[_first_contact_prop_index] as PropertyState
+		var bonus := _first_contact_bonus_for(multiplier)
+		prop.set_first_contact_bonus(bonus[0], bonus[1])
 		SaveManager.save_dict_to_file(dynasty.to_save_dict())
 	_first_contact_prop_index = -1
+
+
+## Map a First Contact minigame multiplier to the permanent property bonus, as
+## [income_multiplier, cycle_multiplier]. Reads the ONE shared table (MinigameScreen.FIRST_CONTACT_
+## BUCKETS) so the bonus applied here and the bucket the result screen announces can never disagree.
+## The floor is always base (1.0 / 1.0 — upside-only, never a penalty); a run into the bonus band is
+## sorted low / medium / high (Plans/First_Contact_Property_Reward.md).
+func _first_contact_bonus_for(multiplier: float) -> Array:
+	var bucket := MinigameScreen.first_contact_bucket(multiplier, dynasty.upgrades.minigame_bonus_max())
+	var info: Dictionary = MinigameScreen.FIRST_CONTACT_BUCKETS[bucket]
+	return [float(info["income"]), float(info["cycle"])]
 
 
 ## The welcome-back minigame produced `multiplier`: the base pile was already banked, so we

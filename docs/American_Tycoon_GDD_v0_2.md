@@ -55,6 +55,29 @@ The satire lives in the mechanics, not the writing. In America, success is defin
 | Push notifications | **None. Ever.** | Principle 5. Also zero infrastructure. Old money doesn't chase you; a full offline cap is something you discover, like interest |
 | Balance tooling | **Headless balance simulator** (early build priority) | §0.1. The original spreadsheets were this instinct in embryo |
 
+### 2.1 Number formatting — one authority, named scale to sextillion+ (note added 2026-07-01)
+
+**Problem.** The current formatter (`Money.display()` / `display_cash()`) tops out at **Trillion** — anything past $1e12 just piles digits in front of "T" ("$1000000T"). But the epoch ladder already blows past that: tier-6's economy is ~24.3M × Earth ≈ **$2.5 sextillion** ($2.5e21), and the proposed meta-tier upgrades (§8.7, ×10/×100 leaps) push higher still. Currency must read cleanly all the way up.
+
+**Requirement 1 — extend the named-scale ladder.** Continue the short-scale suffixes past Trillion through at least **Decillion**, which covers the game's top scale with comfortable headroom:
+
+| Suffix | Magnitude | | Suffix | Magnitude |
+|---|---|---|---|---|
+| K | 1e3 | | Sx (Sextillion) | 1e21 |
+| M | 1e6 | | Sp (Septillion) | 1e24 |
+| B | 1e9 | | Oc (Octillion) | 1e27 |
+| T | 1e12 | | No (Nonillion) | 1e30 |
+| Qa (Quadrillion) | 1e15 | | Dc (Decillion) | 1e33 |
+| Qi (Quintillion) | 1e18 | | | |
+
+The exact abbreviations are fixed here so they're unambiguous (Qa vs Qi, Sx vs Sp). **Never scientific notation** (the §2 Numbers rule). Beyond Decillion is out of the planned range; a graceful overflow (extend the names, or an AdCap-style `aa/ab/ac…` scheme) is a minor open item, not a launch blocker.
+
+**Open decision — compact suffix vs. spelled word.** The §2 Numbers row states a deadpan preference for the readable real-dollar style ("$14.3 trillion") over obscure suffixes, yet the code uses compact suffixes ("$14.3T") to fit tight rows. Recommendation: keep **compact suffixes** in space-constrained UI (property costs, income/sec, buttons) and reserve the fuller style only where there's room (the cash hero, ceremony screens) — but the call is Tim's, and it bears on §14 readability (large text, imperfect vision). Whatever is chosen, the abbreviation set above is the canonical mapping.
+
+**Requirement 2 — one formatting authority, used everywhere.** Every currency amount on screen must route through `Money` (`display()` for compact, `display_cash()` for the watched balance) — no ad-hoc `"$" + "%.2f"` formatting anywhere. Most call sites already do this; the task is to (a) extend **both** `Money` methods over the **same** suffix table (ideally a single shared ladder so they can't drift), and (b) audit every currency display site to confirm none bypasses `Money`.
+
+**Underlying type.** `Money` wraps a float64, which loses *exact* integer precision beyond ~9e15 (2⁵³); amounts above that drift by dollars/thousands. For an idle game at this scale that display-only drift is standard and acceptable. If exactness ever matters, swap the internal representation to a mantissa+exponent big-number — the `Money` class already documents itself as that swap point, satisfying the §2 "big-number support from day one" intent for display today and precision later.
+
 ---
 
 ## 3. Core Loop Architecture — Three Nested Loops
@@ -175,29 +198,13 @@ screens shouldn't be dead air. This grew (Tim, 2026-06-22) into a **minigame fra
 
 **Usage sites (each rolls a random minigame type):**
 1. **Prestige / succession — multiplier on Legacy (BUILT).** See the match-3 below.
-2. **Epoch change / First Contact — reward = a NEW PROPERTY TYPE (BUILT 2026-06-28).** Theme:
-   *negotiating the alien trade deal*. Tim chose this over the earlier TBD options (entry income
-   boost / starting cash / first-staffer discount): winning the negotiation opens a genuinely new
-   *kind* of business in the bigger market, not just cash. Because a property is unlocked-or-not,
-   performance can't be the universal 0.5×→1.25× multiplier on the unlock; instead it scales the
-   **opening terms**: the player always gets the business, and the minigame decides their **head
-   start** — a count of free starting units already running. As-built model:
-   - **One new alien property per alien epoch** (`unlock_tier` on `PropertyConfig`): Photon
-     Exchange (epoch 2, Luminari), Data Foundry (3, Geth), Spore Bank (4, Mycelium), Prism Vault
-     (5, Quartzite), Time Bank (6, Chronophage). Each is a normal ladder rung — same milestones,
-     staffing, and per-epoch staff levels — just hidden and unbuyable until its epoch is reached.
-   - **Head start = starting units.** On answering the contact, the trade-deal minigame runs; the
-     granted units = `floor(first_contact_starting_units × multiplier)`. A full deal grants the
-     cap (8, dev-tunable); a skip / opt-out banks the **keep-floor share** (≈half), matching the
-     other sites — never zero, but real stakes. The units are *granted* (free), never counted as
-     estate spend. Flow: contact narration overlay → "Answer the Call" → negotiation minigame →
-     units granted on the new property → back into the now-bigger game.
-   - **Magnitude:** each alien property is a fixed flagship (~5× Earth's Executive Assets); its
-     epoch scaling comes purely from staffing, like every property (an early cut that scaled base
-     magnitude by `economy_scale` double-counted the epoch and let a few units clear it instantly).
-   All first-pass values; the at-scale feel is an on-device tuning pass (the sim can't reach
-   epoch 2 in its per-generation budget). Implemented in four phases; see
-   `Plans/First_Contact_Property_Reward.md`.
+2. **Epoch change / First Contact — reward = a NEW PROPERTY TYPE; minigame = upside-only bonus (REDESIGNED 2026-07-01 — supersedes the starting-units model).** Theme: *negotiating the alien trade deal*; winning opens a genuinely new *kind* of business in the bigger market.
+   - **One new alien property per alien epoch** (`unlock_tier` on `PropertyConfig`): Photon Exchange (epoch 2, Luminari), Data Foundry (3, Geth), Spore Bank (4, Mycelium), Prism Vault (5, Quartzite), Time Bank (6, Chronophage). Each is a normal ladder rung, hidden and unbuyable until its epoch is reached.
+   - **The property carries the epoch's income leap — not staff.** Each alien property's base magnitude scales with its epoch band (first-pass ~30×/tier, tracking `economy_scale = 30^(tier-1)`), and cycles stop lengthening. This reverses the earlier as-built "fixed ~5× flagship, epoch scaling from staffing only," which left every alien property *identical* (5× Executive Assets) and per-second **declining** down the ladder — so civ 2/3 felt far too small (Tim, 2026-07-01).
+   - **You start with ZERO of it (no free units).** At a new civilization the property unlocks but you own none. Each new property is deliberately **expensive relative to your current progress**, so earning the income to afford your *first* purchase is the achievement — then it pays off big as you scale in. (Directly reverses the old "starting units" head-start: owning several for free killed that sense of reaching a new tier.)
+   - **The minigame is upside-only.** The floor is always the property's **base income — the player never receives less, regardless of the result.** A good run adds a **permanent bonus** to that property's income-per-cycle *and* cycle-time, sorted into **three buckets — low / medium / high**. A poor run or a Skip simply grants no bonus (base only) — never a penalty. (This departs from the universal 0.5×→1.25× spectrum the other two sites use; First Contact is bonus-on-top-of-a-guaranteed-floor.)
+   - **Staff demoted from the epoch driver.** Staffing is no longer the epoch income multiplier; alien properties remain staffable for hands-off automation only (proposed default — see plan-doc open item). Broader §6 implications flagged in §6.2.
+   All first-pass values (the ~30×/tier magnitude and the low/med/high bonus sizes) need an on-device **and** sim tuning pass (the sim can't reach epoch 2 in its per-generation budget). Full design + open items: `Plans/First_Contact_Property_Reward.md`.
 3. **Welcome-back / offline return — multiplier on the offline pile (BUILT 2026-06-24).** A
    round scales the overnight pile: the base pile is banked on resume, the minigame credits the
    +/- delta (earned income), then the welcome screen shows the final haul. *(Watch: welcome-back
@@ -280,6 +287,8 @@ This is the diegetic engine behind the game's absurd scale: capitalism ran out o
 
 ### 6.2 Epochs & First Contact
 
+> **PROPOSED CHANGE (2026-07-01) — epoch income driver moving from staff to the property.** The redesign in §5.5 site 2 makes each **alien property's own base magnitude** (scaling ~30×/tier) the epoch income leap, with the First Contact minigame adding an upside-only bonus. Staff is demoted: no longer the epoch multiplier, kept for hands-off automation only. The staff-tier `staff_income_multiplier` (40^(tier-1)) described below is therefore under review — it double-counts the epoch once the property scales on its own. The per-epoch staff **level-up** track (§6.1) and **retention** (§6.3) keep working but lose their epoch-scaling role. Full §6 rewrite deferred until the new model is feel-/sim-validated. Design of record: `Plans/First_Contact_Property_Reward.md`.
+
 Earth runs on **one currency — the dollar.** Alien civilizations are *flavor, magnitude bands, and a staff-tier gate*, never a second money type.
 
 - **Epochs are reached within a run by consuming the entire current economy.** Each epoch has a total economic value; Earth's is the existing Earth target (~$103.6T — "buy the Earth", §10). Once a generation has *earned* that whole value, contact with the next civilization fires and the next, orders-of-magnitude-larger epoch opens. The threshold ladder *is* the scale justification: "you ran out of Earth to buy, so the galaxy opens."
@@ -307,6 +316,14 @@ Earth runs on **one currency — the dollar.** Alien civilizations are *flavor, 
 ### 6.4 Deferred satire — "the quiet ratio"
 
 A future staffer-card stat: one-time hire cost beside lifetime revenue generated — two numbers drifting apart by ten orders of magnitude, no commentary. The labor-vs-capital argument as a stat line. No longer the centerpiece now that staffing is a tiered track; tracked as a polish-phase addition.
+
+### 6.5 Staffer portraits — the layered generator (proposed 2026-07-01, M3)
+
+Every automated property shows a **face** in its portrait circle. There are ~100 role slots — **17 property rungs × 6 epoch tiers** — so portraits are generated **procedurally from stacked art layers** rather than hand-authored one by one. A `PortraitGenerator` composites each face from a base/hair/eyes/clothing/accessory stack, picking one variant per layer from a **seed derived from the role** (so a given staffer is stable across redraws, screens, and the run's lifetime), then **bakes it once** to a cached texture (the portrait circle redraws every frame, so per-frame compositing is out). Layers are authored **white and tinted at draw time** — the same trick the icon set already uses — so a few parts and a small palette yield thousands of recognizable faces.
+
+- **Per-epoch part sets.** The six tiers are different *kinds* of being (humans → light-beings → machines → fungal hive-mind → crystalloids → time-eaters, §6.2), so each tier draws from its own part set. Earth uses a full human paper-doll taxonomy; the alien tiers are expected to use a **cheaper, more abstract treatment** (a per-epoch silhouette + procedural accent patterns in that epoch's palette) since aliens don't need human features — this keeps the art bill for tiers 2–6 affordable while still distinct.
+- **Override hatch.** `PropertyConfig.manager_portrait`, when set, replaces the generated face — an escape hatch for a hand-authored hero portrait on a flagship role.
+- **Distinct from the dynasty heir** (§8.2), who stays portrait-less in v1. Full design + phasing (Earth-slice-first) and the three open decisions (seed basis, alien treatment, scope) live in `Plans/Layered_Staffer_Portrait_Generator.md`.
 
 ---
 
@@ -377,6 +394,18 @@ Legislative & Executive Assets unlock estate-tax erosion: raised exemptions, dyn
 
 **Credit comes to you.** Periodic take-it-or-leave-it loan offers; fixed principal; fixed milestone schedule; **one active loan at a time.** **Terms improve as you need them less:** payday-lender terms for the bootstrapper → prime rates on enormous sums → late-game *bailouts* ("you're load-bearing now"). Implementation: a data table of offer tiers + §8.5 plumbing.
 
+### 8.7 Meta-tier upgrades — the second-order prestige track (proposed 2026-07-01)
+
+> **PROPOSED — design note only, first-pass, no values or code.** Raised by Tim 2026-07-01. This deliberately **reopens the §14 / Future-Features decision that there is "exactly one spendable prestige currency"** (resolved 2026-06-14). See the "why this doesn't re-trigger the two-competing-tracks trap" note below; the reopening is intentional and flagged, not an oversight.
+
+Today's Legacy upgrades (§8.4 Estate Office; the `LegacyUpgradeCatalog`) are mostly **compounding, geometric-cost** perks — "effectively endless," but by design each successive level is a smaller *relative* dent against a steeper price, so deep into a dynasty the base shop stalls. The **meta tier** sits *above* that shop: a small set of **standalone order-of-magnitude upgrades** — ×10 / ×100 leaps applied to a whole domain at once (e.g. "×100 to all property income," "×10 to every wage source") rather than another +20%/level line. They are the late-run "the numbers jump a whole order again" beat, matching the absurd scale escalation the epochs already embrace (§6.2, top-epoch economy ~24M× Earth).
+
+- **Gated by epoch / First Contact.** The meta tier scales with the economy band: a given meta upgrade (or its next level) unlocks only once the run has reached the epoch it belongs to. This also gives First Contact a **lasting prestige reward** it currently lacks — today a contact grants a new property type (§5.5) and a staff tier (§6.2), but no persistent currency.
+- **A NEW meta-currency, earned separately from Legacy.** Legacy is earned **per death** (within a bloodline); the meta-currency is earned **per epoch / first contact** (across the run). *Different faucets is exactly what keeps the two tracks orthogonal rather than competing:* Legacy = accelerate a bloodline; meta = buy the next order of magnitude as the galaxy opens. Working name **TBD** (see §14 currency-name question — candidates: *Ascendancy*, *Influence*, *Standing*). The one-currency guarantee in Future Features is superseded *for this track only*; Legacy remains the sole *death→Estate-Office* currency.
+- **Kept small and legible.** A handful of headline leaps, not a second full catalog — the base Legacy shop stays the broad, textured one; the meta tier is a short list of big, expensive, epoch-gated jumps.
+
+**Open (to pin before building):** the meta-currency's name and earn formula (flat per contact? scaled by epoch economy?); how many meta upgrades and which domains they hit; whether meta upgrades persist across the whole dynasty (they should, being epoch-sourced) or reset; and the interaction with the base-catalog refinement below (§14 open item — some base upgrades merge/retire, some gaps like offline-cap extension get filled).
+
 ---
 
 ## 9. Rare Events (added v0.2)
@@ -427,7 +456,7 @@ The native visual language of the American Dream: 1950s advertising — the era 
 - **The joke is sincerity:** Money Laundering as a Maytag ad ("Freshness You Can Bank On!"); MLM as a Tupperware party; Legislative Assets as a handshake under bunting.
 - **Not a period setting.** NFTs and Day Trading rendered in 50s ad vocabulary — the anachronism is the gag. The aesthetic is the Dream's eternal branding.
 - **Evolving backdrops (added v0.2):** 6–8 painted mid-century backdrops per planet, crossfading at net-worth thresholds — Main Street diner-and-alley → suburban boomtown → downtown skyline → penthouse → marble lobby → the Capitol dome at golden hour. An ambient progress bar needing no numbers. Prestige interaction: each heir inherits post-tax, so the backdrop briefly regresses a tier and re-climbs visibly faster — "speeds up every time," rendered in scenery.
-- **Asset bill (Earth):** ~12 property hero illustrations, ~12 staffer cards, 6–8 backdrops, ad-styled UI chrome, ceremony screens (obituary/will, Final Dollar set).
+- **Asset bill (Earth):** ~12 property hero illustrations, 6–8 backdrops, ad-styled UI chrome, ceremony screens (obituary/will, Final Dollar set). **Staffer portraits are generated, not drawn one-by-one:** rather than ~100 hand-authored staffer cards (17 rungs × 6 epochs), a layered generator composites faces from a small per-epoch part library (§6.5, `Plans/Layered_Staffer_Portrait_Generator.md`) — the Earth human part set is the priority slice.
 - **Audio:** chipper exotica/muzak — the hold music of prosperity. (Winds down at the Final Dollar.)
 
 ---
@@ -564,7 +593,10 @@ own design pass before it becomes a milestone.
   conversion — not a second currency.** There remains exactly **one** spendable prestige
   currency (Legacy, spent in the Estate Office; §8.4, Mechanics Spec §9.3). Lifetime-earned is
   the *meter*; Legacy is the *currency* it converts into. This avoids the two-competing-tracks
-  trap. Mechanically:
+  trap. *(Amended 2026-07-01: the **meta-tier upgrade track (§8.7, proposed)** introduces a
+  second, epoch-sourced prestige currency above Legacy. It does not violate the intent here —
+  it is earned from a different faucet (per epoch/first contact, not per death), keeping the two
+  tracks orthogonal. This decision governs the death→Estate-Office track only.)* Mechanically:
   - The **dynasty** holds `lifetime_cash_earned`, a cumulative all-generations accumulator —
     the cross-epoch yardstick, the §8.3 obituary headline, and the Family Ledger career stat.
     It only ever grows; spending never reduces it.

@@ -192,16 +192,29 @@ static func style_button(button: Button, is_action: bool) -> void:
 	var plate := KETCHUP_RED if is_action else MUSTARD_GOLD
 	var pressed_plate := BRICK if is_action else PALE_GOLD
 	var label_color := PALE_GOLD if is_action else NAVY
+	_style_button_plates(button, plate, pressed_plate, label_color)
 
+
+## Style a Button with a blue plate (CYCLE_BLUE) and cream label. Used for the minigame tuning
+## screen's mode toggles so they read as a distinct kind of control, clearly apart from the gold
+## game buttons below them (Tim, 2026-07-01). Blue is not a §8 action color, so it stays reserved
+## for this "pick a mode" role rather than spend/act.
+static func style_blue_button(button: Button) -> void:
+	_style_button_plates(button, CYCLE_BLUE, CYCLE_BLUE.darkened(0.2), CREAM)
+
+
+## Shared plate/label wiring for the styled buttons above: the normal/hover plate, a darker
+## pressed plate, a cream disabled plate, and one label color that holds across every interactive
+## state so the text never flips color on click/hover/focus — only the disabled state dims it
+## (Tim, 2026-06-28).
+static func _style_button_plates(
+		button: Button, plate: Color, pressed_plate: Color, label_color: Color
+) -> void:
 	button.add_theme_stylebox_override("normal", _make_plate(plate, NAVY))
 	button.add_theme_stylebox_override("hover", _make_plate(plate, NAVY))
 	button.add_theme_stylebox_override("pressed", _make_plate(pressed_plate, NAVY))
 	button.add_theme_stylebox_override("disabled", _make_plate(CREAM, NAVY))
 
-	# The label color NEVER changes with interaction state (Tim, 2026-06-28): every interactive
-	# state — including focus (which a button keeps after a click on desktop) and pressed — uses
-	# the one label color, so the text doesn't flip color when clicked or hovered. Only the
-	# disabled state dims it.
 	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color",
 			"font_hover_pressed_color"]:
 		button.add_theme_color_override(state, label_color)

@@ -68,17 +68,20 @@ extends Resource
 # entry hire is the big tier jump (staff_cost_fraction above); levels are the small steps after.
 
 ## Income bonus per staff level, COMPOUNDING: a property's staffer multiplier is
-## staff_income_multiplier(tier) × (1 + this)^staff_level. Same "every level is the same
-## relative jump" feel as the Legacy Family Fortune upgrade (which uses 0.20).
-@export var staff_level_step: float = 0.25  # feel-tune
+## staff_income_multiplier(tier) × (1 + this)^staff_level. Raised 0.25 -> 0.33 (Tim, 2026-07-02):
+## a level felt weaker than buying a unit, so each level now accelerates the property harder — a
+## bit above the Legacy Family Fortune upgrade's 0.20 relative jump.
+@export var staff_level_step: float = 0.33  # feel-tune
 
 ## Cost of the FIRST staff level as a fraction of the current tier's entry-hire cost. Levels
-## start cheap relative to the hire you just paid, then climb by staff_level_cost_growth.
-@export var staff_level_cost_base: float = 0.10  # feel-tune
+## start cheap relative to the hire you just paid, then climb by staff_level_cost_growth. Cut
+## 0.10 -> 0.07 (Tim, 2026-07-02) so a level's ROI beats buying a unit rather than trailing it.
+@export var staff_level_cost_base: float = 0.07  # feel-tune
 
 ## Geometric growth of the staff-level cost: each level costs the previous × this. This is
-## the only brake on leveling (there is no hard cap), so the chase never runs out.
-@export var staff_level_cost_growth: float = 1.6  # feel-tune
+## the only brake on leveling (there is no hard cap), so the chase never runs out. Softened
+## 1.6 -> 1.5 (Tim, 2026-07-02) so deeper levels stay affordable and don't fall behind units.
+@export var staff_level_cost_growth: float = 1.5  # feel-tune
 
 ## Offline income efficiency vs. live play (0–1).
 @export var offline_efficiency: float = 0.5  # TBD-SIM
@@ -157,13 +160,6 @@ extends Resource
 ## (Tim, 2026-06-25) — scoring targets in each minigame assume this length.
 @export var minigame_duration_seconds: float = 20.0  # feel-tune
 
-# --- First Contact reward (GDD §5.5 site 2) ---
-
-## How many free starting units of a newly-opened alien property a FULL First Contact
-## negotiation grants. The minigame's universal multiplier (keep_floor..1+bonus) scales this:
-## a great deal hands you near this many units already running; a skip / opt-out banks the
-## keep_floor share. First-pass value — Phase 3 sim-tunes it against the epoch-2 economy.
-@export var first_contact_starting_units: int = 8  # feel-tune
 
 # --- Events (Spec §10) ---
 

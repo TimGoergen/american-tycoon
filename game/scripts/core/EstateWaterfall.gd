@@ -48,30 +48,28 @@ static func compute(
 # §9.3 — Legacy conversion (root function)
 # ---------------------------------------------------------------------------
 
-## Dollars below which an estate converts to no Legacy at all. The log curve is measured
-## in orders of magnitude ABOVE this floor, so the floor sets BOTH ends of the balance:
-## low enough ($1k) that a first prestige still yields a handful of Legacy (and the sim's
-## modest estates convert at all), yet because the curve is logarithmic a real
-## trillion-dollar run still only mints tens of Legacy, not the thousands the old power
-## curve produced.
+## Dollars below which an estate converts to no Legacy at all. The estate is measured
+## RELATIVE to this floor, so it sets the low end of the balance: low enough ($1k) that a
+## first prestige still yields a handful of Legacy (and the sim's modest estates convert at
+## all), while nothing below it converts.
 const LEGACY_BASE := 1_000.0
 
 ## Convert an estate's post-tax net into dynastic Legacy Gems (the estate currency).
 ##
-## legacy_gain = floor(K_LEGACY × log10(estate_net / LEGACY_BASE) ^ ALPHA).
+## legacy_gain = floor(K_LEGACY × (estate_net / LEGACY_BASE) ^ ALPHA).
 ##
-## Reworked 2026-06-17 from a plain power curve. A power curve calibrated for the sim's
-## tiny estates minted absurd Legacy at real scale (a single 20T run gave ~16k —
-## enough to buy out the whole shop). Measuring the estate in ORDERS OF MAGNITUDE above
-## the floor compresses the entire range into a sane handful of Legacy: each additional
-## 10× of estate adds only a little (≈ $1B→18, $8T→49, $1Q→72 at the default tuning),
-## and nothing converts below the floor. Legacy never spends down by this — it accumulates.
+## GENTLE POWER CURVE (Tim, 2026-07-02). The previous log² curve — floor(k × log10(net/base)²)
+## — was so flat that doubling a run's earnings added only ~3 Legacy, so out-earning a past run
+## felt unrewarded (it broke the core "better run → more prestige currency" loop). This restores
+## a power curve, but a DELIBERATELY GENTLE one: ALPHA ≈ 0.30 means gems roughly DOUBLE per 10×
+## of earnings (K solved from a $10T→45 anchor via sim/Sim.gd's conversion study). That is far
+## below the old runaway exponent — a genuine endgame run (a fully-consumed 6th epoch, ~$2.5
+## sextillion) mints ~15–20k gems, and the Legacy shop's geometric ×2 costs mean even that only
+## buys a few levels of one upgrade track, so it never "buys out the shop." Legacy accumulates.
 static func legacy_gain(estate_net: float, k_legacy: float, alpha: float) -> int:
 	if estate_net <= LEGACY_BASE:
 		return 0
-	# log10(x) = ln(x) / ln(10); GDScript's log() is the natural log.
-	var decades := log(estate_net / LEGACY_BASE) / log(10.0)
-	return int(floor(k_legacy * pow(decades, alpha)))
+	return int(floor(k_legacy * pow(estate_net / LEGACY_BASE, alpha)))
 
 # §9.4 note: Legacy is no longer applied as an automatic sprint/residual income
 # multiplier. The prestige reward is now a spendable currency — the player buys

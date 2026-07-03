@@ -595,12 +595,13 @@ func _refresh(delta: float) -> void:
 	# payout WITH its cycle length, scaled to a sensible unit — "$X/4.3m" is $X every 4.3 minutes —
 	# so the figure is never an unlabeled amount. A sub-second cycle instead reads as a per-second
 	# rate ("$X/s"), the same per-cycle figure divided by the (tiny) cycle length.
-	# The income amount reads as a whole number (display(0), no decimal place) with a space on
-	# either side of the slash (Tim, 2026-07-02) — "$14M / 4.3m" rather than "$14.3M/4.3m".
+	# The income amount shows a single decimal place only when it isn't zero (display()'s default —
+	# _trim drops a trailing ".0"), with a space on either side of the slash (Tim, 2026-07-02/03):
+	# "$14M / 4.3m" when whole, "$14.3M / 4.3m" when not.
 	if effective_length > 0.0 and effective_length < PER_SECOND_READOUT_THRESHOLD_SEC:
-		_income_label.text = Money.of(per_cycle / effective_length).display(0) + " / s"
+		_income_label.text = Money.of(per_cycle / effective_length).display() + " / s"
 	else:
-		_income_label.text = "%s / %s" % [Money.of(per_cycle).display(0), _format_cycle_duration(effective_length)]
+		_income_label.text = "%s / %s" % [Money.of(per_cycle).display(), _format_cycle_duration(effective_length)]
 
 	# Smooth, constant-velocity cycle bar (see _displayed_cycle_fraction above). Measured
 	# against the EFFECTIVE (sped-up) cycle length so the bar still fills all the way to the

@@ -62,6 +62,12 @@ func _initialize() -> void:
 	# the last? (The "second epoch stalls out" investigation, 2026-06-27.)
 	_run_epoch_timing_study()
 
+	# Legacy-gem conversion study: how many gems does a run of a given size mint,
+	# under the live curve vs candidate curves? (Tim 2026-07-02: "I rarely earn
+	# more than ~70 gems even when I out-earn a previous run" — the log² curve is
+	# too flat, so pick a replacement against data instead of another blind guess.)
+	_print_legacy_conversion_study()
+
 	quit()
 
 
@@ -759,6 +765,79 @@ func _print_epoch_projection(economy_scale: Array, staff_mult: Array, base_ips: 
 
 
 ## Compact magnitude label for the projection table (e.g. 1000 -> "1e3", 15 -> "15").
+## Legacy-gem conversion study. Prints how many gems a run of a given size mints under the LIVE
+## curve versus candidate replacements, across the reachable estate range and out to an absurd
+## "runaway check" value. Self-reporting: the NOW column calls the real EstateWaterfall.legacy_gain
+## with live tuning, so it never drifts from the shipped formula. Candidates are anchored to a
+## shared gem count at $10T so the columns start together and you can see how each rewards BIGGER
+## runs. Added for Tim's 2026-07-02 "better runs feel unrewarded" report.
+func _print_legacy_conversion_study() -> void:
+	var anchor_gems := 45              # every candidate passes through ~this many gems at $10T
+	var anchor_net := 1.0e13           # $10T — the shared low-end anchor point
+
+	print("\n=== Legacy-gem conversion study (Tim 2026-07-02: better runs feel unrewarded) ===")
+	print("Live curve: floor(k_legacy=%.3f × (log10(net/$1000))^alpha=%.2f) — too flat; out-earning" \
+		% [_tuning.k_legacy, _tuning.alpha_legacy])
+	print("a previous run barely moves the count. Candidates are anchored to ~%d gems at $10T so the" % anchor_gems)
+	print("columns start together and you can compare how each rewards a BIGGER run.\n")
+
+	# Power curves (gems = k × (net/$1000)^beta) track income MAGNITUDE, so a better run pays
+	# proportionally more; higher beta = steeper reward AND faster late growth. log^3 keeps the
+	# never-runaway log shape but steepens it. Each k is solved from the $10T anchor.
+	var anchor_base := anchor_net / EstateWaterfall.LEGACY_BASE
+	var anchor_decades := log(anchor_base) / log(10.0)
+	var k_pow30 := float(anchor_gems) / pow(anchor_base, 0.30)
+	var k_pow20 := float(anchor_gems) / pow(anchor_base, 0.20)
+	var k_pow15 := float(anchor_gems) / pow(anchor_base, 0.15)
+	var k_log3 := float(anchor_gems) / pow(anchor_decades, 3.0)
+
+	var estates := [1.0e11, 1.0e12, 1.0e13, 1.0e14, 6.0e14, 1.0e15, 1.0e16, 1.0e17, 1.0e21]
+	var labels := ["$100B", "$1T", "$10T", "$100T", "$600T", "$1Q", "$10Q", "$100Q", "$1 sext"]
+
+	print("%-9s | %5s | %6s | %6s | %6s | %6s" % ["estate", "NOW", "pow.30", "pow.20", "pow.15", "log^3"])
+	print("----------+-------+--------+--------+--------+-------")
+	for i in range(estates.size()):
+		var net: float = estates[i]
+		var now := EstateWaterfall.legacy_gain(net, _tuning.k_legacy, _tuning.alpha_legacy)
+		print("%-9s | %5d | %6d | %6d | %6d | %6d" % [
+			labels[i], now,
+			_power_gems(net, k_pow30, 0.30),
+			_power_gems(net, k_pow20, 0.20),
+			_power_gems(net, k_pow15, 0.15),
+			_log_gems(net, k_log3, 3.0),
+		])
+
+	# Sensitivity: how many MORE gems does DOUBLING a run's earnings mint, around the ~$600T band
+	# where Tim's runs land? This is the number that should feel rewarding — the live curve gives ~+3.
+	var lo := 6.0e14
+	var hi := 1.2e15
+	print("\nDoubling a run ($600T → $1.2Q) adds:")
+	print("  NOW    : +%d gems" % (EstateWaterfall.legacy_gain(hi, _tuning.k_legacy, _tuning.alpha_legacy) \
+		- EstateWaterfall.legacy_gain(lo, _tuning.k_legacy, _tuning.alpha_legacy)))
+	print("  pow.30 : +%d gems" % (_power_gems(hi, k_pow30, 0.30) - _power_gems(lo, k_pow30, 0.30)))
+	print("  pow.20 : +%d gems" % (_power_gems(hi, k_pow20, 0.20) - _power_gems(lo, k_pow20, 0.20)))
+	print("  pow.15 : +%d gems" % (_power_gems(hi, k_pow15, 0.15) - _power_gems(lo, k_pow15, 0.15)))
+	print("  log^3  : +%d gems" % (_log_gems(hi, k_log3, 3.0) - _log_gems(lo, k_log3, 3.0)))
+	print("\nThe $1 sext row is the runaway check: power curves keep climbing at absurd scale, the log")
+	print("curves stay tame. Solved k — pow.30=%.4f, pow.20=%.4f, pow.15=%.4f, log^3=%.4f." \
+		% [k_pow30, k_pow20, k_pow15, k_log3])
+
+
+## gems = k × (net/$1000)^beta — a candidate power curve for the conversion study.
+func _power_gems(net: float, k: float, beta: float) -> int:
+	if net <= EstateWaterfall.LEGACY_BASE:
+		return 0
+	return int(floor(k * pow(net / EstateWaterfall.LEGACY_BASE, beta)))
+
+
+## gems = k × (log10(net/$1000))^alpha — the live curve's shape, for candidate alpha values.
+func _log_gems(net: float, k: float, alpha: float) -> int:
+	if net <= EstateWaterfall.LEGACY_BASE:
+		return 0
+	var decades := log(net / EstateWaterfall.LEGACY_BASE) / log(10.0)
+	return int(floor(k * pow(decades, alpha)))
+
+
 func _format_scale(value: float) -> String:
 	if value >= 1000.0:
 		return "1e%d" % int(round(log(value) / log(10.0)))

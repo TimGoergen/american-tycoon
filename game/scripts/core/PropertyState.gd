@@ -167,9 +167,10 @@ func buy(count: int) -> void:
 func set_staff_tier(tier: int, income_multiplier: float) -> void:
 	staff_tier = tier
 	staff_income_multiplier = income_multiplier
-	# A new tier is a brand-new (alien) staffer, so the within-epoch level track restarts
-	# from scratch (Tim 2026-06-27: levels reset on contact; the tier jump is the payoff).
-	staff_level = 0
+	# staff_level is NOT reset here: it is one cumulative ladder that persists across contacts
+	# (Tim 2026-07-02, the cumulative-ladder redesign). Hiring a new tier still jumps the income
+	# via staff_income_multiplier; the levels you already bought carry straight over, and reaching
+	# the new epoch simply raises the level cap (EconomyState enforces staff_levels_per_epoch × epoch).
 	if staff_tier >= 1 and not is_cycle_running:
 		_start_cycle_internal()
 
@@ -180,12 +181,13 @@ func add_staff_level() -> void:
 	staff_level += 1
 
 
-## This property's full staffer income multiplier: the tier's entry multiplier compounded by
-## the within-epoch levels bought so far. Everything that pays or displays property income
-## routes through here so the level bonus applies uniformly (the same way _effective_cycle_length
-## centralizes the speed bonus).
+## This property's full staffer income multiplier: the tier's entry multiplier plus the cumulative
+## ladder of levels bought so far. The level bonus is ADDITIVE — (1 + step × level) — not compounding,
+## because staff_level is now one persistent 0..(20×epoch) ladder; compounding over 100+ levels would
+## blow up income. Everything that pays or displays property income routes through here so the bonus
+## applies uniformly (the same way _effective_cycle_length centralizes the speed bonus).
 func _effective_staff_multiplier() -> float:
-	return staff_income_multiplier * pow(1.0 + tuning.staff_level_step, float(staff_level))
+	return staff_income_multiplier * (1.0 + tuning.staff_level_step * float(staff_level))
 
 
 ## This property's full income multiplier: the staffer bonus (tier entry × within-epoch levels)

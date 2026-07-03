@@ -157,28 +157,50 @@ func get_staff_cost(prop_index: int, tier: int) -> float:
 	return CostCurve.round_nice(epoch_economy * fraction * prop.staff_cost_multiplier)
 
 
-## Cost to buy the NEXT within-epoch staff level for a property (the per-epoch upgrade track,
+## The hard cap on a property's cumulative staff_level: staff_levels_per_epoch × the epoch the
+## player has reached. Earth (tier 1) → 20; each first contact raises it by another block, up to
+## 120 at the sixth civilization. The cap only ever rises, so levels skipped in an earlier block
+## stay buyable later (Tim, 2026-07-02, the cumulative-ladder design).
+func get_staff_level_cap(reached_tier: int) -> int:
+	var tuning := (properties[0] as PropertyState).tuning
+	return tuning.staff_levels_per_epoch * maxi(1, reached_tier)
+
+
+## True when a property has bought every staff level the reached epoch allows — the next level is
+## gated behind the next first contact. Used to draw the "MAXED" button and to refuse the buy.
+func is_staff_level_maxed(prop_index: int, reached_tier: int) -> bool:
+	var prop := properties[prop_index] as PropertyState
+	return prop.staff_level >= get_staff_level_cap(reached_tier)
+
+
+## Cost to buy the NEXT within-epoch staff level for a property (the cumulative staff ladder,
 ## GDD §6.1). Anchored to the CURRENT tier's entry-hire cost so it inherits the same epoch +
-## per-property scaling: the first level is a small fraction of that hire, then each level
-## climbs geometrically (staff_level_cost_growth) so there is always a next one but never a
-## free one. Returns 0 if the property is not staffed yet (you must hire before you can level).
+## per-property scaling. The geometric climb (staff_level_cost_growth) is indexed by the level's
+## position WITHIN its 20-level epoch block (staff_level % staff_levels_per_epoch), not the raw
+## cumulative level — otherwise a 120-level ladder's exponent would make deep levels unbuyable.
+## Each new epoch's block therefore restarts cheap, but off a higher (current-tier) anchor.
+## Returns 0 if the property is not staffed yet (you must hire before you can level).
 func get_staff_level_cost(prop_index: int) -> float:
 	var prop := properties[prop_index] as PropertyState
 	if prop.staff_tier < 1:
 		return 0.0
 	var tuning := prop.tuning
 	var entry_cost := get_staff_cost(prop_index, prop.staff_tier)
+	var block_index := prop.staff_level % tuning.staff_levels_per_epoch
 	var level_factor := tuning.staff_level_cost_base \
-			* pow(tuning.staff_level_cost_growth, float(prop.staff_level))
+			* pow(tuning.staff_level_cost_growth, float(block_index))
 	return CostCurve.round_nice(entry_cost * level_factor)
 
 
-## Try to buy one within-epoch staff level for a property. Returns true on success; false if
-## the property is unstaffed or the player can't afford the next level. Like a hire, the spend
-## counts toward the generation's staff book value.
-func try_upgrade_staff_level(prop_index: int) -> bool:
+## Try to buy one staff level for a property. Returns true on success; false if the property is
+## unstaffed, already at the reached-epoch cap, or unaffordable. Like a hire, the spend counts
+## toward the generation's staff book value. `reached_tier` comes from the run's EpochState so the
+## cap tracks how far the player has advanced.
+func try_upgrade_staff_level(prop_index: int, reached_tier: int) -> bool:
 	var prop := properties[prop_index] as PropertyState
 	if prop.staff_tier < 1:
+		return false
+	if is_staff_level_maxed(prop_index, reached_tier):
 		return false
 	var cost := get_staff_level_cost(prop_index)
 	if cash < cost:

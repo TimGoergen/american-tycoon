@@ -315,6 +315,7 @@ func _run_dynasty_protocol() -> void:
 	# Set after generation 1 plays; 0 until then.
 	var founder_peak := 0.0
 	var previous_time_to_founder := -1.0
+	var last_estate_earned := 0.0    # the final generation's lifetime cash earned (for the scale note)
 
 	for _g in range(DYNASTY_GENERATIONS):
 		var generation := dynasty.generation
@@ -351,6 +352,8 @@ func _run_dynasty_protocol() -> void:
 			int(will["legacy_gain"]),
 		])
 
+		last_estate_earned = dynasty.current.economy.cash_earned_this_gen
+
 		# Freeze the founder's peak after generation 1; track the trend thereafter.
 		if founder_peak <= 0.0:
 			founder_peak = dynasty.current.peak_net_worth
@@ -358,6 +361,20 @@ func _run_dynasty_protocol() -> void:
 			previous_time_to_founder = time_to_founder
 
 		dynasty.perform_succession()
+
+	# The dynasty protocol plays only 180 s/gen, so its estates plateau around ~$10M — roughly EIGHT
+	# orders of magnitude below a real device run ($600T+). The Legacy curve is (correctly) calibrated
+	# for device scale, so at these toy estates it mints 0 gems; with no gems the heirs buy no upgrades
+	# and every generation is identical (flat times above). That is a sim-SCALE artifact, not a game
+	# regression: acceleration is validated on-device and by the conversion study's monotonic table.
+	# (Before the 2026-07-02 power-curve retune the old log² curve was generous enough at toy scale to
+	# mint ~7 gems here, which masked this gap.)
+	if dynasty.upgrades.earned_lifetime == 0:
+		print("")
+		print("NOTE: 0 gems minted across the bloodline — the 180 s/gen estates (~%s) are far below the" \
+			% Money.of(last_estate_earned).display())
+		print("device scale the Legacy curve targets, so the prestige loop can't bootstrap here. This is")
+		print("a sim-scale limitation (see the conversion study above for the real device behavior).")
 
 	print("")
 	print("Dynasty Legacy after %d generations: %d to spend, %d earned over the bloodline" % [
@@ -447,19 +464,19 @@ func _format_time_to_reference(time_to_reference: float, previous_time: float) -
 ## log-compressed Legacy curve (reworked 2026-06-17) returns a meaningful non-zero:
 ##   gross $2.0B, no debt, exemption $1.0M, rate 60%
 ##     -> after-credit $2.0B -> taxable $1.999B -> tax $1.1994B -> net $800.6M
-##     -> legacy = floor(K_LEGACY × log10(net / $1M) ^ ALPHA)
+##     -> legacy = floor(K_LEGACY × (net / LEGACY_BASE) ^ ALPHA)
 func _verify_waterfall_math() -> bool:
 	var will := EstateWaterfall.compute(2_000_000_000.0, 0.0, 1_000_000.0, 0.6)
 	# Typed bool: Dictionary lookups are Variants, so := would infer Variant here.
 	var ok: bool = will["taxable"] == 1_999_000_000.0 \
 			and will["tax"] == 1_199_400_000.0 \
 			and will["estate_net"] == 800_600_000.0
-	# Independently recompute the log-curve Legacy and compare to the function's output.
+	# Independently recompute the power-curve Legacy and compare to the function's output.
 	var net: float = will["estate_net"]
 	var expected_legacy := 0
 	if net > EstateWaterfall.LEGACY_BASE:
-		var decades := log(net / EstateWaterfall.LEGACY_BASE) / log(10.0)
-		expected_legacy = int(floor(_tuning.k_legacy * pow(decades, _tuning.alpha_legacy)))
+		expected_legacy = int(floor(_tuning.k_legacy \
+				* pow(net / EstateWaterfall.LEGACY_BASE, _tuning.alpha_legacy)))
 	var legacy := EstateWaterfall.legacy_gain(net, _tuning.k_legacy, _tuning.alpha_legacy)
 	ok = ok and legacy == expected_legacy
 	print("  Waterfall spot-check: net %s, +%d Legacy ... %s" % [

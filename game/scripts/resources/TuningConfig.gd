@@ -122,16 +122,16 @@ extends Resource
 
 # --- Legacy / prestige (Spec §9.3–9.4) ---
 
-## Scale for Legacy gain on the LOG-compressed curve (see EstateWaterfall.legacy_gain,
-## reworked 2026-06-17): legacy = floor(K_LEGACY × log10(estate_net / floor) ^ ALPHA),
-## where the floor is EstateWaterfall.LEGACY_BASE. A plain power curve minted absurd
-## Legacy at real trillion-dollar scale (a 20T run gave ~16k); the log keeps the whole
-## range to a sane handful (≈ $1B→18, $8T→49 at the defaults).
-@export var k_legacy: float = 0.5  # feel-tune
+## Coefficient on the Legacy gain curve (see EstateWaterfall.legacy_gain): legacy =
+## floor(K_LEGACY × (estate_net / floor) ^ ALPHA), where the floor is EstateWaterfall.LEGACY_BASE.
+## Solved from a $10T → ~45 gems anchor for the gentle power curve (Tim, 2026-07-02).
+@export var k_legacy: float = 0.045  # feel-tune
 
-## Exponent on the log-decades term of the Legacy curve (shapes how fast Legacy grows
-## with each order of magnitude of estate).
-@export var alpha_legacy: float = 2.0  # feel-tune
+## Exponent on the estate-magnitude term of the Legacy curve — how fast gems grow with earnings.
+## ~0.30 means gems roughly DOUBLE per 10× of estate, so a better run is clearly rewarded (the old
+## log² curve was ~flat: doubling a run added only ~3 gems). Higher = punchier AND faster late
+## growth; the Legacy shop's geometric costs are the real brake on any windfall (Tim, 2026-07-02).
+@export var alpha_legacy: float = 0.30  # feel-tune
 
 # Note: the old k_sprint / beta_sprint / k_residual constants were removed when
 # Legacy became a spendable upgrade currency. Per-level upgrade magnitudes and

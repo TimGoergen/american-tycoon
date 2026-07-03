@@ -738,18 +738,27 @@ func _refresh_hire_button() -> void:
 	var tier := _prop.staff_tier
 
 	if _is_in_level_up_state():
-		# Best tier for this epoch reached — the button now buys within-epoch staff levels,
-		# each compounding this property's income (GDD §6.1). It is a live action, so it uses
-		# the normal action styling, not the old faint-green disabled plate. The headshot icon
-		# stands in for the staffer (we no longer spell out the job title); the left label just
-		# shows the current level (Tim, 2026-06-29).
-		_apply_hire_styling(false)
+		# `staff_level` is stored 0-based (the count of level-ups bought; 0 = freshly hired). The
+		# player should read a freshly hired staffer as "LVL 1", so the label adds one — a pure
+		# display offset, the economy still anchors level 0 to the plain entry multiplier.
 		_hire_icon.visible = true
-		# `staff_level` is stored 0-based (the count of level-ups bought; 0 = freshly hired,
-		# no compounding bonus yet). The player should read a freshly hired staffer as "LVL 1",
-		# so the label adds one — a pure display offset, the economy still anchors level 0 to the
-		# plain entry multiplier (Tim, 2026-06-29).
 		_hire_left_label.text = "LVL %d" % (_prop.staff_level + 1)
+
+		# Cap reached: this property has bought every level the current epoch allows. The next block
+		# unlocks at the next first contact, so the button parks on the faint-green "staffed" plate
+		# showing MAX (not a cost) until then (Tim, 2026-07-02, the cumulative-ladder cap).
+		if _economy.is_staff_level_maxed(prop_index, _epoch.current_tier):
+			_apply_hire_styling(true)
+			_hire_cost_label.text = "MAX"
+			_hire_button.disabled = true
+			_set_split_label_color(_hire_left_label, _hire_cost_label, UiPalette.NAVY)
+			_hire_icon.modulate = UiPalette.NAVY
+			return
+
+		# Below the cap — the button buys the next staff level, adding to this property's income
+		# (GDD §6.1). It is a live action, so it uses the normal action styling; the headshot icon
+		# stands in for the staffer (we no longer spell out the job title).
+		_apply_hire_styling(false)
 		var level_cost := _economy.get_staff_level_cost(prop_index)
 		_hire_cost_label.text = Money.of(level_cost).display()
 		# Same gate as hiring: need the cash, and units for the staffer to run.

@@ -67,19 +67,29 @@ extends Resource
 # #3). Levels reset to 0 when you advance to the next epoch's staffer (a fresh hire). The
 # entry hire is the big tier jump (staff_cost_fraction above); levels are the small steps after.
 
-## Income bonus per staff level, COMPOUNDING: a property's staffer multiplier is
-## staff_income_multiplier(tier) × (1 + this)^staff_level. Raised 0.25 -> 0.33 (Tim, 2026-07-02):
-## a level felt weaker than buying a unit, so each level now accelerates the property harder — a
-## bit above the Legacy Family Fortune upgrade's 0.20 relative jump.
+## Income bonus per staff level, ADDITIVE: a property's staffer multiplier is
+## staff_income_multiplier(tier) × (1 + this × staff_level). Additive (not compounding) because
+## staff_level is now ONE cumulative 0..(20×epoch) ladder that persists across contacts (Tim,
+## 2026-07-02); compounding over 100+ persistent levels would explode income, so each level adds
+## a fixed step of the current tier's income instead. Step kept at 0.33 (its old compounding value)
+## as a first-pass; the sim will say if the cumulative ladder wants a different number.
 @export var staff_level_step: float = 0.33  # feel-tune
 
-## Cost of the FIRST staff level as a fraction of the current tier's entry-hire cost. Levels
-## start cheap relative to the hire you just paid, then climb by staff_level_cost_growth. Cut
-## 0.10 -> 0.07 (Tim, 2026-07-02) so a level's ROI beats buying a unit rather than trailing it.
+## How many staff levels each reached epoch unlocks. The hard cap on a property's cumulative
+## staff_level is this × the epoch you've reached (Earth=1 → 20, after first contact → 40, … up to
+## 120 at the sixth civilization). Levels you skip on Earth stay buyable later — the cap only ever
+## rises, never resets (Tim, 2026-07-02, the cumulative-ladder design).
+@export var staff_levels_per_epoch: int = 20  # feel-tune
+
+## Cost of the FIRST staff level of each epoch's block, as a fraction of the current tier's
+## entry-hire cost. Levels start cheap relative to the hire you just paid, then climb by
+## staff_level_cost_growth. Cut 0.10 -> 0.07 (Tim, 2026-07-02) so a level's ROI beats buying a unit.
 @export var staff_level_cost_base: float = 0.07  # feel-tune
 
-## Geometric growth of the staff-level cost: each level costs the previous × this. This is
-## the only brake on leveling (there is no hard cap), so the chase never runs out. Softened
+## Geometric growth of the staff-level cost WITHIN an epoch's 20-level block: each level costs the
+## previous × this. The climb RESETS at each new epoch's block (so a cumulative 120-level ladder
+## stays affordable — an un-reset exponent would make deep levels literally unbuyable), but the
+## per-block anchor (the entry hire) jumps each epoch, so absolute costs still trend up. Softened
 ## 1.6 -> 1.5 (Tim, 2026-07-02) so deeper levels stay affordable and don't fall behind units.
 @export var staff_level_cost_growth: float = 1.5  # feel-tune
 

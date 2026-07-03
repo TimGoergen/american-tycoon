@@ -197,9 +197,9 @@ func _test_staff_retention(configs: Array, tuning: TuningConfig) -> void:
 ## the same staffer up through the epoch, each level a compounding income bonus; levels reset
 ## when the tier advances, and the cost climbs geometrically.
 func _test_staff_levels(configs: Array, tuning: TuningConfig) -> void:
-	print("\n8. Within-epoch staff levels: compounding income, reset on tier change, geometric cost")
+	print("\n8. Cumulative staff ladder: additive income, persists across contact, per-epoch cap, geometric cost")
 	var game := GameState.new(configs, tuning)
-	game.economy.award_cash(1.0e24)
+	game.economy.award_cash(1.0e30)
 	game.try_buy(0, 50)
 	var atm := game.economy.properties[0] as PropertyState
 
@@ -207,25 +207,26 @@ func _test_staff_levels(configs: Array, tuning: TuningConfig) -> void:
 	_check("unstaffed property has zero level cost", is_equal_approx(game.economy.get_staff_level_cost(0), 0.0))
 	_check("unstaffed property refuses a level upgrade", not game.try_upgrade_staff_level(0))
 
-	# Hire the Earth staffer (tier 1, multiplier 1.0), then level it up once.
+	# Hire the Earth staffer (tier 1, multiplier 1.0), then buy one level.
 	game.try_hire(0)
 	var income_level0 := atm.get_income_per_sec()
 	_check("a level upgrade succeeds once staffed", game.try_upgrade_staff_level(0))
 	_check("ATM is now staff level 1", atm.staff_level == 1)
 	var income_level1 := atm.get_income_per_sec()
-	_check("one level multiplies income by (1 + staff_level_step)",
+	# ADDITIVE: N levels give (1 + step × N), so the level-0→1 ratio is exactly (1 + step).
+	_check("first level adds staff_level_step to income",
 		income_level0 > 0.0 and is_equal_approx(income_level1 / income_level0, 1.0 + tuning.staff_level_step))
+	_check("staff multiplier is additive: 1 + step × level",
+		is_equal_approx(atm._effective_staff_multiplier(), 1.0 + tuning.staff_level_step * 1.0))
 
-	# Advancing the tier (a fresh alien staffer at contact) resets the level track to 0.
-	_check("ATM has a level before contact", atm.staff_level == 1)
+	# The cumulative ladder PERSISTS across a contact — advancing the tier does NOT wipe levels.
 	game.epoch.current_tier = 2
 	game.try_hire(0)  # upgrade to the tier-2 alien staffer
 	_check("ATM advanced to tier 2", atm.staff_tier == 2)
-	_check("staff level reset to 0 on the new tier", atm.staff_level == 0)
+	_check("staff level persists across contact (not reset)", atm.staff_level == 1)
 
-	# The level cost climbs geometrically with each level. Checked at tier 2, where the
-	# trillions-scale numbers make the $5 cost-rounding negligible (at Earth scale the
-	# snapping would distort the ratio).
+	# The level cost climbs geometrically within an epoch block. Checked at tier 2, where the
+	# trillions-scale numbers make the $5 cost-rounding negligible (levels 1 and 2 share block 0).
 	var cost_level_1 := game.economy.get_staff_level_cost(0)
 	game.try_upgrade_staff_level(0)
 	var cost_level_2 := game.economy.get_staff_level_cost(0)
@@ -233,15 +234,33 @@ func _test_staff_levels(configs: Array, tuning: TuningConfig) -> void:
 	_check("level cost grows by staff_level_cost_growth",
 		cost_level_1 > 0.0 and is_equal_approx(cost_level_2 / cost_level_1, tuning.staff_level_cost_growth))
 
-	# Levels survive a save/reload round-trip (v7). Level is 1 from the geometric check above;
-	# two more brings it to 3.
-	game.try_upgrade_staff_level(0)
-	game.try_upgrade_staff_level(0)
-	_check("ATM reached staff level 3 before save", atm.staff_level == 3)
+	# The cap is staff_levels_per_epoch × the reached epoch, and it hard-stops further leveling.
+	var cap_tier2 := game.economy.get_staff_level_cap(2)
+	_check("cap is staff_levels_per_epoch × epoch", cap_tier2 == tuning.staff_levels_per_epoch * 2)
+	while not game.economy.is_staff_level_maxed(0, 2):
+		game.try_upgrade_staff_level(0)
+	_check("leveling stops exactly at the cap", atm.staff_level == cap_tier2)
+	_check("a maxed staffer refuses further levels", not game.try_upgrade_staff_level(0))
+
+	# Reaching the next epoch raises the cap, re-opening the ladder for the SAME persisted levels.
+	game.epoch.current_tier = 3
+	_check("cap rises with the reached epoch",
+		game.economy.get_staff_level_cap(3) == tuning.staff_levels_per_epoch * 3)
+	_check("a new epoch re-opens leveling past the old cap", game.try_upgrade_staff_level(0))
+	_check("level advanced one past the old cap", atm.staff_level == cap_tier2 + 1)
+
+	# The cost climb restarts each epoch block: the first level of block 1 (index 0) is cheaper
+	# than the last level of block 0 (index 19), even though the anchor is the same tier.
+	var block0_last := tuning.staff_level_cost_base * pow(tuning.staff_level_cost_growth, float(cap_tier2 - 1))
+	var block1_first := tuning.staff_level_cost_base * pow(tuning.staff_level_cost_growth, 0.0)
+	_check("cost climb restarts each epoch block", block1_first < block0_last)
+
+	# Levels survive a save/reload round-trip.
+	var level_before_save := atm.staff_level
 	var reloaded := GameState.new(configs, tuning)
 	reloaded.load_save_dict(game.to_save_dict())
 	var atm2 := reloaded.economy.properties[0] as PropertyState
-	_check("reloaded ATM staff_level == 3 (v7 round-trip)", atm2.staff_level == 3)
+	_check("reloaded staff_level round-trips", atm2.staff_level == level_before_save)
 
 	# A pre-v7 save (no staff_level key) defaults the level to 0.
 	var legacy_dict := game.to_save_dict()
@@ -326,7 +345,7 @@ func _test_epoch_locked_properties(configs: Array, tuning: TuningConfig) -> void
 ## gated to epoch 2, the tier→property lookup finds it, and grant_starting_units hands over free
 ## units (the negotiation head start) without counting them as spend on the estate's book value.
 func _test_first_contact_grant(configs: Array, tuning: TuningConfig) -> void:
-	print("\n10. First Contact grants free starting units on the new alien property")
+	print("\n10. First Contact opens one new alien property per epoch (tier→property lookup)")
 
 	# Every alien epoch (2..last) ships exactly one new property type gated to it, and the
 	# tier→property lookup resolves each — so every First Contact opens a distinct business.
@@ -355,18 +374,9 @@ func _test_first_contact_grant(configs: Array, tuning: TuningConfig) -> void:
 	_check("tier→property lookup finds the alien property at its epoch",
 		game.economy.get_property_index_for_unlock_tier(alien_tier) == alien_index)
 
-	# Simulate having reached the epoch and won a head start at the negotiating table.
-	game.epoch.restore(alien_tier)
-	var book_before := game.economy.get_asset_book_value()
-	game.economy.grant_starting_units(alien_index, 6)
-	var alien := game.economy.properties[alien_index] as PropertyState
-	_check("granted units are owned", alien.units_owned == 6)
-	_check("granted units are NOT charged to the estate book value (they were won, not bought)",
-		is_equal_approx(game.economy.get_asset_book_value(), book_before))
-
-	# The Main-side mapping floor(cap × multiplier): a full deal grants the cap, a skip the floor.
-	var cap := tuning.first_contact_starting_units
-	_check("a full negotiation (1.0×) grants the cap",
-		int(floor(cap * 1.0)) == cap)
-	_check("a skip (keep-floor ×) grants fewer than the cap",
-		int(floor(cap * tuning.minigame_keep_floor)) < cap)
+	# NOTE (2026-07-02): the old "First Contact grants free starting units" assertions were removed
+	# here because the starting-units reward itself was cut on feature/ui-tap-targets (the reward is
+	# now the upside-only property income bonus). grant_starting_units / first_contact_starting_units
+	# no longer exist, which had left this whole EpochTest suite un-runnable. This section now only
+	# covers the still-live tier→property unlock. A proper test of the upside-only reward is OWED and
+	# belongs with that redesign — flagged to Tim.

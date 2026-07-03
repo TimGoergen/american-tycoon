@@ -156,10 +156,11 @@ func try_hire(prop_index: int) -> bool:
 	return economy.try_hire(prop_index, epoch.current_tier)
 
 
-## Buy one within-epoch staff level for a property (the per-epoch upgrade track, GDD §6.1).
-## Returns false if the property is unstaffed or unaffordable.
+## Buy one staff level for a property (the cumulative staff ladder, GDD §6.1). Passes the reached
+## epoch so the cap (staff_levels_per_epoch × epoch) is enforced. Returns false if the property is
+## unstaffed, already at the cap, or unaffordable.
 func try_upgrade_staff_level(prop_index: int) -> bool:
-	return economy.try_upgrade_staff_level(prop_index)
+	return economy.try_upgrade_staff_level(prop_index, epoch.current_tier)
 
 
 # ---------------------------------------------------------------------------

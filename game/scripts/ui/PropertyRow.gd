@@ -34,17 +34,17 @@ var _buy_mode: BuyMode = BuyMode.ONE
 ## Accumulates held-down time on the tap button to pace auto-rush pulses.
 var _hold_accumulator := 0.0
 
-## Hold-to-buy pacing (Tim, 2026-06-22), mirroring the Estate shop: a quick tap acts once; holding
+## Hold-to-repeat pacing (Tim, 2026-06-22), mirroring the Estate shop: a quick tap acts once; holding
 ## auto-repeats after a short initial delay so the player can watch the cost climb and release when
-## they want to stop. Shared by BOTH the buy button and the staff (hire/upgrade/level-up) button.
-const BUY_HOLD_INITIAL_DELAY := 0.45
-const BUY_HOLD_REPEAT_INTERVAL := 0.35
+## they want to stop. The Buy button and the staff (hire/upgrade/level-up) button now have SEPARATE,
+## live-tunable pacing (Tim, 2026-07-03): the initial delay and repeat interval for each are read from
+## TuningConfig (buy_hold_* / hire_hold_*) so they can be felt out on device via the balance screen.
 var _buy_hold_accumulator := 0.0
 var _buy_hold_repeating := false
 
 ## Hold-to-repeat state for the STAFF button (Tim, 2026-07-01): holding it keeps hiring/upgrading —
-## and then leveling up the staffer — until the player releases, using the same pacing as the buy
-## button above.
+## and then leveling up the staffer — until the player releases, on its own hire_hold_* pacing
+## (separate from the buy button's, Tim 2026-07-03).
 var _hire_hold_accumulator := 0.0
 var _hire_hold_repeating := false
 
@@ -479,7 +479,8 @@ func _pump_held_buy(delta: float) -> void:
 		_buy_hold_repeating = false
 		return
 	_buy_hold_accumulator += delta
-	var threshold := BUY_HOLD_REPEAT_INTERVAL if _buy_hold_repeating else BUY_HOLD_INITIAL_DELAY
+	var threshold := _prop.tuning.buy_hold_repeat_interval if _buy_hold_repeating \
+		else _prop.tuning.buy_hold_initial_delay
 	if _buy_hold_accumulator >= threshold:
 		_buy_hold_accumulator = 0.0
 		_buy_hold_repeating = true
@@ -500,7 +501,8 @@ func _pump_held_hire(delta: float) -> void:
 		_hire_hold_repeating = false
 		return
 	_hire_hold_accumulator += delta
-	var threshold := BUY_HOLD_REPEAT_INTERVAL if _hire_hold_repeating else BUY_HOLD_INITIAL_DELAY
+	var threshold := _prop.tuning.hire_hold_repeat_interval if _hire_hold_repeating \
+		else _prop.tuning.hire_hold_initial_delay
 	if _hire_hold_accumulator >= threshold:
 		_hire_hold_accumulator = 0.0
 		_hire_hold_repeating = true

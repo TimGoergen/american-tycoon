@@ -124,6 +124,17 @@ var _cash_label: Label
 var _income_icon: TextureRect  # gold "$/s" symbol beneath the income number (was the "INCOME" word)
 var _cash_bill: TextureRect  # dollar-bill icon beneath the cash number, right-aligned (was beside "CASH")
 var _epoch_label: Label  # the current epoch / civilization name (was the heir name)
+## Contact-progress line above the civilization name: how much of this epoch's economy the
+## generation has consumed, e.g. "42% · $43.5T of $103.6T" (Tim, 2026-07-03 — the late-epoch
+## stretch had no visible progress at all, so the wait toward First Contact felt like a stall).
+## Fed by Main via set_epoch_progress each frame; repainted on the same throttle as income.
+var _progress_label: Label
+const PROGRESS_FONT_SIZE := UiPalette.FONT_BODY
+const PROGRESS_BOLD := 1
+## Gap between the progress line and the top of the civilization name beneath it.
+const PROGRESS_NAME_GAP := 2.0
+var _pending_progress_consumed := 0.0
+var _pending_progress_goal := 0.0  # <= 0 means "no next contact" -> the line hides
 ## A soft white plate behind the civilization name — in FRONT of the planet watermark but BEHIND
 ## the name text — so the name stays legible over the busy globe (Tim, 2026-07-01). It's a RADIAL
 ## gradient: opaque white at the center fading to transparent at the edges. Sized to the name each
@@ -227,6 +238,11 @@ func _ready() -> void:
 	_epoch_label = _make_label(UiPalette.NAVY, NAME_FONT_SIZE, NAME_BOLD)
 	_content.add_child(_epoch_label)
 
+	# The contact-progress line, directly above the name and sharing its radial backing
+	# (the backing rect is stretched to cover both in _layout_labels).
+	_progress_label = _make_label(UiPalette.NAVY, PROGRESS_FONT_SIZE, PROGRESS_BOLD)
+	_content.add_child(_progress_label)
+
 
 ## Build a large, faux-bold label in the given color. The bold weight is faked with
 ## a same-color outline (no bold font asset exists yet — they arrive in M3).
@@ -273,6 +289,37 @@ func set_cash(cash: float) -> void:
 ## UPPERCASE to match the ticket-plate convention. Replaced the heir name (Tim, 2026-06-27).
 func set_epoch_name(epoch_name: String) -> void:
 	_epoch_label.text = epoch_name.to_upper()
+
+
+## Progress toward the next First Contact: how much of the CURRENT epoch's economy this
+## generation has consumed so far, measured from the epoch's own starting line (Main passes
+## both values relative to the previous contact threshold, so every epoch reads 0% -> 100%).
+## Pass goal <= 0 when there is no further epoch — the line hides on the final civilization.
+## Values are recorded here and repainted on the income throttle in _process, so the fast-
+## moving dollar figure stays readable.
+func set_epoch_progress(consumed: float, goal: float) -> void:
+	_pending_progress_consumed = consumed
+	_pending_progress_goal = goal
+
+
+## Format the throttled progress line: "42% · $43.5T of $103.6T". The percentage gains
+## a decimal below 10% and reads "<1%" below one percent, so the early game still shows
+## a live number instead of a discouraging flat "0%".
+func _format_progress_text() -> String:
+	var consumed := maxf(0.0, _pending_progress_consumed)
+	var fraction := clampf(consumed / _pending_progress_goal, 0.0, 1.0)
+	var percent_text: String
+	if fraction >= 0.10:
+		percent_text = "%.0f%%" % (fraction * 100.0)
+	elif fraction >= 0.01:
+		percent_text = "%.1f%%" % (fraction * 100.0)
+	else:
+		percent_text = "<1%"
+	return "%s · %s of %s" % [
+		percent_text,
+		Money.of(consumed).display(),
+		Money.of(_pending_progress_goal).display(),
+	]
 
 
 ## Toggle the frenzy glow. Main drives this from the live frenzy state each frame.
@@ -393,6 +440,11 @@ func _process(delta: float) -> void:
 		# A bare "$" icon would read the same as the cash side's dollar bill, so the icon keeps
 		# its "/s"; printing "/s" on the number too would be redundant.
 		_income_label.text = Money.of(_pending_income_per_sec).display()
+		# The contact-progress line rides the same cadence — its dollar figure climbs as fast
+		# as income does, so it needs the same settling. Hidden on the final epoch (no goal).
+		_progress_label.visible = _pending_progress_goal > 0.0
+		if _progress_label.visible:
+			_progress_label.text = _format_progress_text()
 
 	# Frenzy glow: pulse the ticket background between white and a soft red while a burn is
 	# active; snap back to plain white the moment it ends. The glow shows through the planet
@@ -457,14 +509,30 @@ func _layout_labels() -> void:
 		icon_baseline_y - _epoch_label.size.y
 	)
 
-	# The faint white backing tracks the name: full name-plus-padding WIDTH, but its HEIGHT is
-	# scaled by EPOCH_BACKING_SCALE. Kept centered on the name.
-	var backing_size := Vector2(
-		_epoch_label.size.x + EPOCH_BACKING_PAD.x * 2.0,
-		(_epoch_label.size.y + EPOCH_BACKING_PAD.y * 2.0) * EPOCH_BACKING_SCALE
+	# The contact-progress line sits directly above the name, also centered, growing upward
+	# into the open middle of the plate (the name is bottom-anchored, so this space is free).
+	_progress_label.size = _progress_label.get_minimum_size()
+	_progress_label.position = Vector2(
+		(area.x - _progress_label.size.x) / 2.0,
+		_epoch_label.position.y - PROGRESS_NAME_GAP - _progress_label.size.y
 	)
+
+	# The faint white backing tracks the name — and stretches up to also carry the progress
+	# line when it is showing, so both read cleanly over the globe. Width fits the wider of
+	# the two; the height scale keeps the plate's feathered look.
+	var backed_width := _epoch_label.size.x
+	var backed_top := _epoch_label.position.y
+	if _progress_label.visible:
+		backed_width = maxf(backed_width, _progress_label.size.x)
+		backed_top = _progress_label.position.y
+	var backed_height := (_epoch_label.position.y + _epoch_label.size.y) - backed_top
+	var backing_size := Vector2(
+		backed_width + EPOCH_BACKING_PAD.x * 2.0,
+		(backed_height + EPOCH_BACKING_PAD.y * 2.0) * EPOCH_BACKING_SCALE
+	)
+	var backed_center := Vector2(area.x / 2.0, backed_top + backed_height / 2.0)
 	_epoch_name_backing.size = backing_size
-	_epoch_name_backing.position = _epoch_label.position + _epoch_label.size / 2.0 - backing_size / 2.0
+	_epoch_name_backing.position = backed_center - backing_size / 2.0
 
 
 ## The mild flash: lift the panel's brightness for an instant, then ease it back

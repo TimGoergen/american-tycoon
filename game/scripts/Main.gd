@@ -161,8 +161,29 @@ func _process(delta: float) -> void:
 	# the live state.
 	_hero_stat.set_epoch_name(EpochCatalog.civilization(game.epoch.current_tier))
 	_hero_stat.set_planet_tier(game.epoch.current_tier)
+	_refresh_contact_progress()
 	_update_plan_button()
 	_update_estate_badge()
+
+
+## Feed the hero stat's contact-progress line: how much of the CURRENT epoch's economy this
+## generation has consumed (Tim, 2026-07-03 — the run toward First Contact was invisible, so
+## the late-epoch stretch read as a stall). Both values are passed relative to the previous
+## contact threshold, so every epoch reads 0% -> 100% of ITS economy rather than resuming
+## partway (the consume thresholds are cumulative lifetime earnings, EpochState.update).
+func _refresh_contact_progress() -> void:
+	var tier := game.epoch.current_tier
+	if tier >= EpochCatalog.tier_count():
+		_hero_stat.set_epoch_progress(0.0, 0.0)  # final civilization — no next contact to chase
+		return
+	var goal := EpochCatalog.consume_threshold(tier, tuning.earth_economy_target)
+	var epoch_start := 0.0
+	if tier > 1:
+		epoch_start = EpochCatalog.consume_threshold(tier - 1, tuning.earth_economy_target)
+	_hero_stat.set_epoch_progress(
+		game.economy.cash_earned_this_gen - epoch_start,
+		goal - epoch_start
+	)
 
 
 func _notification(what: int) -> void:

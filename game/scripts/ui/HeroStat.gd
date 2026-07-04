@@ -81,11 +81,12 @@ const LABEL_LAYOUT_HEIGHT := 247
 #
 # FILL_FRACTION is how much of the plate's height the globe spans once scaled (1.0 = exactly
 # fits; above 1.0 it OVERFLOWS — the globe's top stays pinned to the plate top and the excess
-# runs off the plate bottom, clipped away). 1.5 = the planet reads a third bigger with its
-# bottom third gone off the panel's bottom edge (Tim, 2026-07-04). WATERMARK_ALPHA fades the
-# globe so it reads as a background, not a foreground graphic. Both are art-direction knobs for
-# Tim to eyeball — change them, not the layout code.
-const PLANET_FILL_FRACTION := 1.5
+# runs off the plate bottom, clipped away). 2.0 = the planet is twice the plate height, so
+# fully HALF of it hangs off the panel's bottom edge (Tim, 2026-07-04, second enlargement —
+# was 1.5/bottom-third). WATERMARK_ALPHA fades the globe so it reads as a background, not a
+# foreground graphic. Both are art-direction knobs for Tim to eyeball — change them, not the
+# layout code.
+const PLANET_FILL_FRACTION := 2.0
 const PLANET_WATERMARK_ALPHA := 0.6
 # Corner rounding baked into the watermark, in pixels. Matches the cream plate's own corners as
 # seen at the content rect: the plate rounds its TOP corners by SCREEN_CORNER_RADIUS and its

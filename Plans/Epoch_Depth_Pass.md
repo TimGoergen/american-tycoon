@@ -278,13 +278,14 @@ docs (GDD §5.5/§6, Spec §3.6/§6) sync at each phase like the epoch-staffing 
 
 ## 6. Open questions for Tim (blocking their phase, not the plan)
 
-1. **(Phase 1) Hire-as-level-1:** confirm folding the staffer hire into each block's
-   first level (one button, one ladder). Alternative kept on the table: hire stays a
-   separate beat but gets home-epoch pricing — fixes the shock, keeps the state machine.
-2. **(Phase 1) Block effect shape:** level 1 = big entry step + 19 equal steps
-   (recommended — preserves the "new staffer = felt jump" beat), or 20 equal steps?
+1. **(Phase 1) Hire-as-level-1 — DECIDED YES (Tim, 2026-07-04).** The staffer hire
+   folds into each block's first level: one button, one ladder.
+2. **(Phase 1) Block effect shape — DECIDED (Tim, 2026-07-04): big entry step.**
+   Level 1 of each block carries the large entry step (the "new staffer = felt jump"
+   beat); levels 2–20 are that block's equal smaller steps.
 3. **(Phase 1) Retention semantics at v9:** retained blocks translate to "heir starts
    at level `20 × blocks`" (full blocks) — confirm, or retain exact levels?
+   *(Answer pending, 2026-07-04.)*
 4. **(Phase 2) Cohort size four** (vs 3 or 5) and the first-pass names above — veto
    freely, they're placeholders.
 5. **(Phase 3) Duration target:** each epoch ≈ same length as the previous (flat), or

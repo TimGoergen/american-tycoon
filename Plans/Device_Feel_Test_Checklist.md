@@ -35,8 +35,11 @@ Everything else is polish on top of this. If any of these are off, fix them
 - [ ] **Solid-bar fast properties.** Once a cycle drops under the threshold the bar
       pins full and the readout switches to `$X / s`. Does a maxed property read as
       "humming," or does the frozen bar read as broken?
-- [ ] **Buy-mode + hold-to-buy pacing.** Holding Buy/Hire auto-repeats after a short
-      delay so you can watch the cost climb and release. Right speed? Too twitchy?
+- [ ] **Buy-mode + hold-to-buy/hire pacing.** Holding Buy or Hire auto-repeats after a
+      short delay so you can watch the cost climb and release. Buy and Hire now have
+      SEPARATE, live-tunable pacing (`buy_hold_*` / `hire_hold_*` on the Dev Tuning
+      screen). Feel out each: right initial delay? right repeat speed? Should Buy rip
+      faster than Hire, or do they want the same cadence? Too twitchy either way?
 - [ ] **Concurrent multi-touch** (`d003c45`). Hold rush with one finger while
       tapping Buy/Hire with another. Does it actually work reliably on the Pixel's
       digitizer, or does it drop the second finger?

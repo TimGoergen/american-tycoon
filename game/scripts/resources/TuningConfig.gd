@@ -44,6 +44,21 @@ extends Resource
 ## Holding is convenient, so it charges the meter slower than real tapping.
 @export var frenzy_fill_hold_factor: float = 0.6  # feel-tune M1
 
+# --- Hold-to-repeat purchasing (PropertyRow multi-purchase) ---
+# Holding the Buy or the Hire/Upgrade button repeats the action: a short initial delay
+# (so a normal tap acts only once), then a steady repeat cadence while held. Buy and Hire
+# have SEPARATE knobs (Tim, 2026-07-03) so each can be paced independently on device — a
+# held Buy may want to rip through units while a held Hire steps more deliberately.
+
+## Seconds a held BUY button waits before its first auto-repeat.
+@export var buy_hold_initial_delay: float = 0.45  # feel-tune
+## Seconds between each BUY auto-repeat after the first.
+@export var buy_hold_repeat_interval: float = 0.35  # feel-tune
+## Seconds a held HIRE/UPGRADE button waits before its first auto-repeat.
+@export var hire_hold_initial_delay: float = 0.45  # feel-tune
+## Seconds between each HIRE/UPGRADE auto-repeat after the first.
+@export var hire_hold_repeat_interval: float = 0.35  # feel-tune
+
 # --- Staffing & offline (Spec §6) ---
 
 ## Alien staff (tier 2+) ENTRY hire cost as a fraction of the TARGET epoch's whole economy

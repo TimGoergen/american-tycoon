@@ -79,11 +79,13 @@ const LABEL_LAYOUT_HEIGHT := 247
 #      not work when a SECOND clip_children group exists elsewhere in the tree (Main already has
 #      one). So we round the corners by writing transparency into the image's own alpha instead.
 #
-# FILL_FRACTION is how much of the plate the globe fills once scaled to fit (1.0 = as large as
-# fits with the whole globe still visible; smaller leaves a margin). WATERMARK_ALPHA fades the
+# FILL_FRACTION is how much of the plate's height the globe spans once scaled (1.0 = exactly
+# fits; above 1.0 it OVERFLOWS — the globe's top stays pinned to the plate top and the excess
+# runs off the plate bottom, clipped away). 1.5 = the planet reads a third bigger with its
+# bottom third gone off the panel's bottom edge (Tim, 2026-07-04). WATERMARK_ALPHA fades the
 # globe so it reads as a background, not a foreground graphic. Both are art-direction knobs for
 # Tim to eyeball — change them, not the layout code.
-const PLANET_FILL_FRACTION := 1.0
+const PLANET_FILL_FRACTION := 1.5
 const PLANET_WATERMARK_ALPHA := 0.6
 # Corner rounding baked into the watermark, in pixels. Matches the cream plate's own corners as
 # seen at the content rect: the plate rounds its TOP corners by SCREEN_CORNER_RADIUS and its
@@ -365,9 +367,10 @@ func _bake_planet_watermark(full_image: Image, plate_size: Vector2i) -> ImageTex
 	# note on texture sizing: always use it, the canvas carries varying transparent padding).
 	var globe := full_image.get_region(full_image.get_used_rect())
 
-	# 2. Scale the WHOLE globe to fit inside the plate (contain, preserving aspect) so most/all of
-	# it stays visible rather than zooming into one spot. The plate is far wider than it is tall,
-	# so this fits the globe to the height and centres it, leaving the sides clear.
+	# 2. Scale the globe against the plate (preserving aspect). At FILL_FRACTION 1.0 this is a
+	# classic "contain" fit; above 1.0 the globe is deliberately taller than the plate so its
+	# bottom overflows (step 3 clips it). The plate is far wider than it is tall, so the height
+	# ratio governs and the sides stay clear.
 	var fit_scale := minf(
 		float(plate_size.x) / globe.get_width(),
 		float(plate_size.y) / globe.get_height()
@@ -379,12 +382,16 @@ func _bake_planet_watermark(full_image: Image, plate_size: Vector2i) -> ImageTex
 	globe.resize(globe_size.x, globe_size.y, Image.INTERPOLATE_BILINEAR)
 	globe.convert(Image.FORMAT_RGBA8)  # ensure an alpha channel for the transparent surround
 
-	# 3. Compose the globe, centred, onto a transparent plate-sized canvas. The transparent
-	# surround lets the white plate (and the frenzy glow) show around the planet.
+	# 3. Compose the globe onto a transparent plate-sized canvas: centred horizontally, TOP
+	# PINNED to the plate top — so enlarging the globe grows it downward only, and whatever
+	# extends past the plate bottom is simply not blitted (the "bottom third runs off the
+	# panel" look, Tim 2026-07-04). The transparent surround lets the cream plate (and the
+	# frenzy glow) show around the planet.
 	var watermark := Image.create(plate_size.x, plate_size.y, false, Image.FORMAT_RGBA8)
 	watermark.fill(Color(0, 0, 0, 0))
-	var center_offset := (plate_size - globe_size) / 2
-	watermark.blit_rect(globe, Rect2i(Vector2i.ZERO, globe_size), center_offset)
+	var top_pinned_offset := Vector2i((plate_size.x - globe_size.x) / 2, 0)
+	var visible_globe := Vector2i(globe_size.x, mini(globe_size.y, plate_size.y))
+	watermark.blit_rect(globe, Rect2i(Vector2i.ZERO, visible_globe), top_pinned_offset)
 
 	# 4. Round the corners by clearing the alpha outside the rounded rectangle, so the watermark
 	# matches the white plate's curved corners (clip_children can't do this here — see the header).

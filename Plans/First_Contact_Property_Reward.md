@@ -5,6 +5,28 @@ section immediately below; the original as-built model and plan follow it, kept 
 
 ---
 
+## ADDENDUM 2026-07-03 — 3–5 new properties per epoch (playtest directive, design pending)
+
+Tim's first playthrough across the Earth → epoch 2 boundary: **"having only a single
+additional property feels cheap, there should be at least 3 to 5 new properties per
+epoch."** This supersedes the ONE-property-per-epoch premise that everything below is
+built on. It also serves the pacing complaint (GDD §6.2 playtest verdict: post-Earth
+epochs land way too fast) — a ladder of 3–5 buys per epoch stretches the epoch with
+real content instead of only re-tuning the duration math.
+
+**To design before building (talk-through with Tim pending):**
+- How the 3–5 stagger across the epoch's magnitude band — likely a mini-Earth ladder
+  (ascending cost/income bands within the epoch) so they come online sequentially, not
+  all at once.
+- Does First Contact unlock all of them at once (priced to arrive in sequence) or do
+  later ones unlock partway through the epoch?
+- What the First Contact minigame's low/med/high bonus now applies to — the first
+  property only, or the whole epoch cohort?
+- Content cost: 5 epochs × 3–5 properties = 15–25 new alien `PropertyConfig`s (names,
+  flavor, magnitudes) instead of 5; `alien_civilizations.md` has flavor to draw from.
+
+---
+
 ## REDESIGN 2026-07-01 — property carries the epoch leap; minigame is an upside-only bonus
 
 **Why.** On device, civ 2/3 felt too small. The configs confirm it: **all five alien properties

@@ -227,3 +227,25 @@ the income per second panel should update once every 100ms to avoid being distra
 
 # all minigames
 each minigame should generally shoot for a 20 second game, and scoring should take that into account
+
+# 20260703 — early-game playthrough feedback
+
+## game progression feel
+- the latest changes make the early game feel good. with active play, I got to the stall point relatively quickly during the earth epoch, and then prestiged for what felt like a noticeable improvement. that is perfect.
+
+## epoch progression feel
+- the time to reach the first epoch seems good, maybe slightly fast. but after that, each subsequent epoch lands way too fast. having only a single additional property feels cheap, there should be at least 3 to 5 new properties per epoch
+- the first contact screen at the end of earth renders weird, the first line is too low and is behind the next line.
+- all epoch transition screens should use larger and more contrasting font to improve readability
+
+## staff legacy
+- in my last playthrough, after i reached the end of earth and started the next epoch, the hire buttons were disabled and had labels with amounts much higher than it had read prior to transition.
+- each staff upgrade should be static in effect, not relative to the current epoch.
+- each 20 staff upgrades are specific to the epoch in which they became available, and that levels effects should be based on the epoch in which it became available rather than when it was purchased
+
+## ui polish
+- on any screen, any amount of currency or cycle/rate should only have a decimal place if the decimal is not zero
+- on the property panel, if the cycle rate display is based on per/second rather than cycle time, then it should say " / s" rather than " / 1s"
+- rather than showing a text block to describe the players progress in the current economy, a green progress bar should be pinned to the bottom of the income panel, have the same red outline as the income panel, with only a single instance of that line between the income panel and the economy progress bar
+-- on all progress bars, small gold bubble particles should move left to right with up and down sway
+-- speed of gold particles should be twice the speed of the progress bar

@@ -95,6 +95,10 @@ Art Style Guide.
 - **Don't over-commit to vertical.** Portrait makes a stacked vertical layout tempting,
   but sometimes labels + data belong **packed on a single row** to use real estate
   better. Decide per element, not by reflex.
+- **No trailing-zero decimals (Tim, 2026-07-03).** On any screen, any currency amount or
+  cycle/rate value shows a decimal place **only when the decimal is non-zero** — "$4.50"
+  and "$4.5B" are fine, "$4.0B" and "2.0s" are defects. Applies everywhere numbers are
+  formatted (likely one shared formatting helper to enforce it).
 
 ### Chunkier UI pass — global Theme + targeted (Tim, 2026-06-21, post-vacation roadmap)
 
@@ -145,6 +149,11 @@ theme + targeted pass.**
 - **Frenzy glow (Tim, 2026-06-13).** While a frenzy burn is active, the income ticket
   pulses its background toward red (subtle, ~2.5 Hz, up to 30% tint) to signal the
   accelerated state. Snaps back to plain cream when the burn ends.
+- **Economy progress bar replaces the progress text block (Tim, 2026-07-03).** The text
+  block describing progress through the current economy goes away. Instead, a **green
+  progress bar pinned to the bottom of the income panel**, sharing the income panel's
+  red outline, with **only a single instance of that outline line** between the income
+  panel and the bar (no doubled border where they meet).
 
 ### Frenzy bar
 - **TURBO button = the meter (Tim, 2026-06-21) — DONE.** The separate frenzy progress bar is
@@ -180,6 +189,17 @@ theme + targeted pass.**
 - **Staffed hire button is faint green (Tim, 2026-06-13).** Once a property is staffed,
   its hire button turns a faint green (`UiPalette.make_staffed_style`) instead of the
   default disabled cream, so automated properties read at a glance.
+- **Cycle-rate unit reads "/ s", not "/ 1s" (Tim, 2026-07-03).** When a property's rate
+  display is per-second (rather than a cycle time), the unit suffix is **" / s"** —
+  "/ 1s" is a defect.
+
+### First Contact / epoch transition screens
+- **First Contact render bug (Tim, 2026-07-03).** At the end of Earth, the First Contact
+  screen renders wrong: the first line sits too low and is **behind/overlapped by the
+  next line**. Needs a layout fix.
+- **Larger, higher-contrast fonts on ALL epoch transition screens (Tim, 2026-07-03).**
+  These are celebration beats; the type should be big and strongly contrasting against
+  the backdrop, per the §1b readability guardrail.
 
 ### Buy-mode toggle & buy buttons
 - **Buy / hire split 50/50 (Tim, 2026-06-21) — DONE.** The buy and hire buttons now each take
@@ -237,7 +257,11 @@ theme + targeted pass.**
 > Cross-reference: Art Style Guide §9 (stamps, not bounces; cycle spin tied to real
 > cycle progress). Log feel notes that refine or extend it.
 
--
+- **Gold bubble particles on ALL progress bars (Tim, 2026-07-03).** Every progress bar
+  in the game gets small gold bubble particles drifting **left to right with an up-and-
+  down sway**. Particle travel speed = **2× the bar's fill speed**, so the bars feel
+  alive even when filling slowly. (Perf note for implementation: many bars are on screen
+  at once on the property ladder — keep the particle count per bar tiny and pooled.)
 
 ---
 

@@ -1,8 +1,58 @@
 # Per-Epoch Upgrade Track — Design Note
 
-**Status:** design proposal, NOT built. Written 2026-06-27.
+**Status:** Option A BUILT (2026-06-27, GDD §6.1). **Superseded in part 2026-07-03 — see addendum below.**
 **Author:** Claude (for Tim's review).
 **Companion to:** `Epoch_Staffing_System.md` (the system this extends), the 2026-06-27 epoch-pacing rework (GDD §6.2 "Epoch pacing — the law").
+
+---
+
+## ADDENDUM 2026-07-03 — epoch-anchored 20-level blocks (Tim's playtest directive)
+
+Tim's first real playthrough across an epoch boundary surfaced a problem with the
+as-built track and a replacement model.
+
+**What happened in play:** crossing from Earth into epoch 2, the hire/upgrade buttons
+went **disabled, showing amounts far higher than they read moments before the
+transition**. Under the as-built design that's "correct" — tier-2 entry hires and the
+level track re-anchor to the epoch-2 economy — but to the player the buttons they were
+saving toward silently repriced out of reach. It reads as a bug even where it isn't one.
+
+**The new model (Tim, 2026-07-03):**
+
+1. **Static effects.** Each staff upgrade grants a fixed, defined effect. No upgrade's
+   effect is computed relative to whatever epoch the player happens to be in.
+2. **20 upgrades per epoch.** Staff levels come in blocks of 20; each block belongs to
+   the epoch in which it became available (Earth block = levels 1–20, Luminari block =
+   21–40, and so on).
+3. **Home-epoch anchoring.** A level's cost AND effect are set by the epoch its block
+   unlocked in — not by when the player buys it. Missed Earth levels remain purchasable
+   at Earth prices (with Earth-scale effects) after contact; the new epoch's block opens
+   expensive relative to the player's fresh position in that economy.
+
+This directly realizes the earlier dev-thoughts note: *"Costs should be low relative to
+that epoch's economy, you should not be able to afford any staff upgrades at the very
+beginning of an epoch unless there were missed upgrades from the previous epoch."* The
+missed-upgrade backlog is now a first-class feature, and the transition repricing shock
+disappears (old buttons keep their old prices; the expensive entries are visibly *new*).
+
+**What this replaces from the as-built Option A:** the uncapped geometric per-epoch
+track that resets on tier advance. Under the new model levels don't reset — they
+accumulate across blocks, capped at 20 per epoch reached.
+
+**Open questions to settle before building (talk-through with Tim pending):**
+- What is a "static effect" concretely — a flat income *add* per level (dollars/cycle,
+  anchored to the home epoch's band) or a fixed *multiplier* step whose size is defined
+  by the home epoch? (Multiplier steps compound across 120 levels × 6 epochs; adds are
+  tamer and more literally "static.")
+- Cost curve *within* a 20-level block: flat, or gently rising toward the block's end?
+- Does the whole track still reset on prestige (assumed YES — staff resets on
+  succession, GDD §6.3 unchanged)?
+- Does hiring (tier entry) stay separate from the level blocks, and does the tier-entry
+  hire also need home-epoch anchoring for its label/affordability story?
+- Pacing-law interaction: the sim's epoch-timing study must be re-derived — a capped,
+  epoch-anchored track changes end-of-epoch income vs. the uncapped geometric model.
+
+---
 
 ---
 

@@ -143,6 +143,19 @@ From the original `AmericanTycoon_PropertyTypeConfig.xlsx`, Sheet2. **Not one ru
 > business collapses once maxed. (`.tres` values updated; this table's cycle column is now
 > historical — see the configs for live values.)
 >
+> **Core pace pass — REVERSED the stretch 2026-07-03.** Device feel-test verdict: the game
+> *progresses* too fast but *cycles* feel too slow — the two clocks were inverted vs. Tim's
+> mid-game Idle Slayer target (fast feedback, slow progression). Per the pace study
+> (`game/sim/PaceStudy.gd`, `Plans/Core_Pace_Study.md`), cycles were **compressed back down,
+> income-neutral** (a geometric taper: tier 1 unchanged, tier 12 **272s → 60s**; each tier's
+> `base_income_per_unit` scaled by the same factor, so income/sec — and the tuned epoch/Legacy
+> pacing — is untouched). The progression brake moved to the cost curve instead: **`r0`
+> 1.07 → 1.09 on all 17 rungs**. Study finding worth keeping: cost steepening widens the
+> moment-to-moment purchase cadence but *cannot* slow the macro arc — income is self-funding
+> exponential and the epoch wall is earnings-gated — so if the game still progresses too fast
+> on device, the next lever is income-side (per-rung ~5× income step, milestone ×2 rewards),
+> not more `r0`.
+>
 > **Milestone cadence — switched to AdCap 25/50/100/200/300/400 (Tim, 2026-06-22).** Replaces
 > the old `20 × 2^k` (unbounded) with AdVenture Capitalist's six fixed milestones, after which a
 > property is maxed (no further beat). `CostCurve.MILESTONE_THRESHOLDS`. **Known tradeoff (sim-
@@ -647,6 +660,9 @@ own design pass before it becomes a milestone.
   define a **target payback period** per property (flat-to-rising across a band) and let the
   balance simulator (§13 / Mechanics Spec §13) solve `r0` against it, preserving the
   "milestones stay reachable" guarantee (§3.2). A `TBD-SIM` tuning pass, not scheduled now.
+  *(Partial progress 2026-07-03: the core pace pass bumped `r0` 1.07 → 1.09 everywhere —
+  chosen from the pace study's candidate table for purchase cadence, not solved against a
+  payback target, so this guardrail item remains open.)*
 
 ---
 

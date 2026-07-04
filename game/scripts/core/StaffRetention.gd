@@ -20,6 +20,13 @@ class_name StaffRetention
 ## many ladder levels.
 var retained_levels: Dictionary = {}
 
+## Per-property HIGHEST ladder level any generation of the bloodline has ever reached,
+## keyed by property index. This is what retention can be bought UP TO (Tim, 2026-07-04):
+## the bloodline's achievement, not the (reset) living ladder — so after a prestige the
+## Estate Office still offers every staffer and level ever earned. DynastyState records
+## each life's ladder here at succession; during a life the live ladder counts too.
+var ladder_highs: Dictionary = {}
+
 # Cost model (first-pass — meant for on-device feel-tuning, not final balance).
 # Legacy is a small-scale currency, so the first retained levels cost a single point
 # and each further level grows a gentle 12%: the whole Earth block retains for ~70
@@ -58,6 +65,18 @@ func set_retained_levels(property_index: int, levels: int) -> void:
 		retained_levels[property_index] = levels
 
 
+## The highest ladder level the bloodline has ever reached on a property (0 = never staffed).
+func get_ladder_high(property_index: int) -> int:
+	return int(ladder_highs.get(property_index, 0))
+
+
+## Record a life's ladder position; only ever raises the stored high (a later life that
+## climbs less can never lower the bloodline's achievement).
+func record_ladder_high(property_index: int, level: int) -> void:
+	if level > get_ladder_high(property_index):
+		ladder_highs[property_index] = level
+
+
 # ---------------------------------------------------------------------------
 # Save / load
 # ---------------------------------------------------------------------------
@@ -68,18 +87,29 @@ const LEVELS_PER_LEGACY_TIER := 20
 
 
 func to_save_dict() -> Dictionary:
-	return {"retained_levels": retained_levels.duplicate()}
+	return {
+		"retained_levels": retained_levels.duplicate(),
+		"ladder_highs": ladder_highs.duplicate(),
+	}
 
 
 func load_save_dict(data: Dictionary) -> void:
 	retained_levels = {}
+	ladder_highs = {}
 	# JSON object keys load back as strings; normalize them to int property indices so
 	# lookups by integer index (the way the rest of the code keys properties) hit.
 	var saved: Dictionary = data.get("retained_levels", {})
 	for key in saved:
 		retained_levels[int(key)] = int(saved[key])
+	var highs: Dictionary = data.get("ladder_highs", {})
+	for key in highs:
+		ladder_highs[int(key)] = int(highs[key])
 	# Pre-redesign saves stored whole retained TIERS under "retained_tiers"; each old
 	# tier becomes a full block's worth of retained levels (a one-time migration).
 	var legacy_tiers: Dictionary = data.get("retained_tiers", {})
 	for key in legacy_tiers:
 		retained_levels[int(key)] = int(legacy_tiers[key]) * LEVELS_PER_LEGACY_TIER
+	# Whatever is retained was certainly reached — seed the highs so an older save's
+	# retention options never shrink below its own purchases.
+	for key in retained_levels:
+		record_ladder_high(int(key), int(retained_levels[key]))

@@ -913,33 +913,34 @@ func _background_path_for_tier(tier: int) -> String:
 ## no Main-screen button to reveal.
 
 
-## Snapshot of the living generation's staff ladder vs. the dynasty's retained levels,
-## for the Estate Office's Household Staff section (GDD §6.3). Lists only properties that
-## have a staffer now or retained levels — the actual household worth willing to an heir.
+## Snapshot of the bloodline's staff-ladder achievements vs. the dynasty's retained
+## levels, for the Estate Office's Household Staff section (GDD §6.3). Retention is
+## bought against the highest level ANY generation ever reached (Tim, 2026-07-04) —
+## prestige resets the living ladder, not the family's record — so this lists every
+## property the bloodline has ever staffed, and it never empties after a succession.
 func _build_retention_entries() -> Array:
 	var entries: Array = []
 	for i in range(game.economy.properties.size()):
 		var prop := game.economy.properties[i] as PropertyState
 		var retained_levels := dynasty.staff_retention.get_retained_levels(i)
-		if not prop.is_staffed and retained_levels < 1:
+		var best_levels := maxi(prop.staff_level, dynasty.staff_retention.get_ladder_high(i))
+		if best_levels < 1 and retained_levels < 1:
 			continue
-		# Retention climbs the same ladder the dollars did, one level at a time, capped
-		# at the live ladder ("you can only will what you have"); -1 = nothing to buy.
+		# One level at a time, up to the bloodline's best; -1 = nothing left to buy.
 		var next_level := retained_levels + 1
 		var cost := -1
 		var can_afford := false
-		if next_level <= prop.staff_level:
+		if next_level <= best_levels:
 			cost = dynasty.staff_retention.cost_for_level(next_level)
 			can_afford = dynasty.upgrades.available >= cost
-		# Show the roster's face: the staffer of the deepest block on the job (live or
-		# retained), named by that block's absolute epoch on this property's ladder.
-		var shown_blocks := maxi(prop.staff_blocks_entered(),
-				prop.staff_block_of_level(maxi(retained_levels, 1)))
+		# Show the roster's face: the staffer of the deepest block the bloodline has
+		# reached, named by that block's absolute epoch on this property's ladder.
+		var shown_blocks := prop.staff_block_of_level(maxi(maxi(best_levels, retained_levels), 1))
 		entries.append({
 			"index": i,
 			"property_name": (prop.config as PropertyConfig).display_name,
 			"staffer_name": EpochCatalog.staffer_name(prop.staff_block_epoch(shown_blocks), i),
-			"current_levels": prop.staff_level,
+			"best_levels": best_levels,
 			"retained_levels": retained_levels,
 			"cost": cost,
 			"can_afford": can_afford,
@@ -947,12 +948,14 @@ func _build_retention_entries() -> Array:
 	return entries
 
 
-## Player bought a tier of staffer retention in the Estate Office. Spend the Legacy,
-## refresh the shop (wallet, upgrade cards, and the staff rows), and persist.
+## Player bought one level of staffer retention in the Estate Office. Spend the Legacy,
+## refresh the shop (wallet, upgrade cards, and the staff rows), and persist. The staff
+## rows are updated IN PLACE (not rebuilt) so a held RETAIN button survives the refresh —
+## rebuilding would free the very button under the player's finger and break the hold.
 func _on_retain_requested(property_index: int) -> void:
 	if dynasty.buy_staff_retention(property_index):
 		_legacy_screen.refresh()
-		_legacy_screen.set_retention_entries(_build_retention_entries())
+		_legacy_screen.update_retention_entries(_build_retention_entries())
 		SaveManager.save_dict_to_file(dynasty.to_save_dict())
 
 

@@ -89,14 +89,16 @@ func get_legacy_income_multiplier() -> float:
 # ---------------------------------------------------------------------------
 
 ## Buy one more LEVEL of staff retention for a property, spending Legacy from the
-## wallet. Retention climbs the same ladder the dollars did, one step at a time, and
-## you can only retain up to the level the living generation actually holds ("you can
-## only will what you have"). Returns true on success; false if there is no higher
-## level to retain or the player can't afford the next one.
+## wallet. Retention climbs the same ladder the dollars did, one step at a time, up to
+## the highest level ANY generation of the bloodline has ever reached on that property
+## (Tim, 2026-07-04) — a prestige resets the living ladder, but not the family's
+## achievement, so the Estate Office keeps offering every level ever earned. Returns
+## true on success; false if there is no higher earned level or it is unaffordable.
 func buy_staff_retention(property_index: int) -> bool:
 	var prop := current.economy.properties[property_index] as PropertyState
 	var next_level := staff_retention.next_retention_level(property_index)
-	if next_level > prop.staff_level:
+	var bloodline_best := maxi(prop.staff_level, staff_retention.get_ladder_high(property_index))
+	if next_level > bloodline_best:
 		return false
 	var cost := staff_retention.cost_for_level(next_level)
 	if upgrades.available < cost:
@@ -189,6 +191,12 @@ func perform_succession(
 	})
 	dynastic_taps = current.wage.lifetime_taps
 	generation += 1
+
+	# Record this life's staff ladders as the bloodline's achievement BEFORE the reset —
+	# retention can be bought up to these highs forever after (GDD §6.3, Tim 2026-07-04).
+	for i in range(current.economy.properties.size()):
+		var prop := current.economy.properties[i] as PropertyState
+		staff_retention.record_ladder_high(i, prop.staff_level)
 
 	current = _new_generation()
 	return will

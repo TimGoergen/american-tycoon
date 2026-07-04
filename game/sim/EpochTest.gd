@@ -213,31 +213,39 @@ func _test_staff_retention(configs: Array, tuning: TuningConfig) -> void:
 	_check("Legacy wallet was charged the three levels' cost",
 		dynasty.upgrades.available == wallet_before - expected_spend)
 
-	# Retention is capped at the living ladder: retain the last two live levels, then refuse.
-	_check("retaining up to the live level succeeds",
-		dynasty.buy_staff_retention(0) and dynasty.buy_staff_retention(0))
-	_check("retention refused past the live ladder level", not dynasty.buy_staff_retention(0))
-
-	# Pass on. The heir is born with the ATM's ladder at the 5 retained levels — no units.
+	# Pass on with only 3 of the 5 levels retained. The heir is born at the 3 retained
+	# levels — no units — and the bloodline records the ancestor's best (5) forever.
 	dynasty.perform_succession()
 	var heir_atm := dynasty.current.economy.properties[0] as PropertyState
-	_check("heir is born with the 5 retained ladder levels", heir_atm.staff_level == 5)
-	_check("heir's retained ladder carries its full multiplier",
-		is_equal_approx(heir_atm._effective_staff_multiplier(), atm._effective_staff_multiplier()))
+	_check("heir is born with the 3 retained ladder levels", heir_atm.staff_level == 3)
+	_check("heir's retained ladder carries its multiplier (level 3 = 2 small steps)",
+		is_equal_approx(heir_atm._effective_staff_multiplier(), 1.0 + tuning.staff_level_step * 2.0))
 	_check("heir starts with no ATM units (only the ladder is retained, not holdings)",
 		heir_atm.units_owned == 0)
 
-	# Retention survives a dynasty save round-trip, and pre-redesign retained TIERS
-	# migrate to a full block's worth of levels each.
+	# EVER-REACHED rule (Tim, 2026-07-04): prestige reset the living ladder, but the
+	# Estate Office still sells retention up to the bloodline's best (5) — not merely
+	# the heir's current 3 — so levels 4 and 5 remain buyable, and level 6 does not.
+	_check("bloodline best survives prestige", dynasty.staff_retention.get_ladder_high(0) == 5)
+	_check("post-prestige retention reaches the ancestor's best",
+		dynasty.buy_staff_retention(0) and dynasty.buy_staff_retention(0))
+	_check("retention refused past the bloodline's best", not dynasty.buy_staff_retention(0))
+
+	# Retention + the bloodline record survive a dynasty save round-trip, and
+	# pre-redesign retained TIERS migrate to a full block's worth of levels each.
 	var data := dynasty.to_save_dict()
 	var reloaded := DynastyState.new(configs, tuning)
 	reloaded.load_save_dict(data)
 	_check("retained levels survive a dynasty save round-trip",
 		reloaded.staff_retention.get_retained_levels(0) == 5)
+	_check("the bloodline's ladder high survives a dynasty save round-trip",
+		reloaded.staff_retention.get_ladder_high(0) == 5)
 	var legacy_retention := StaffRetention.new()
 	legacy_retention.load_save_dict({"retained_tiers": {"0": 2}})
 	_check("a pre-redesign retained tier migrates to a full block of levels",
 		legacy_retention.get_retained_levels(0) == 2 * StaffRetention.LEVELS_PER_LEGACY_TIER)
+	_check("migrated retention seeds the bloodline high too",
+		legacy_retention.get_ladder_high(0) == 2 * StaffRetention.LEVELS_PER_LEGACY_TIER)
 
 
 ## HOME-EPOCH cost anchoring — the regression test for Tim's 2026-07-03 transition bug:

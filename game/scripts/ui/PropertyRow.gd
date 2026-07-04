@@ -75,8 +75,8 @@ var _primary_finger := -1
 ## over none of the three controls is simply absent. The hold pumps read this to tell when a second
 ## finger is holding a control down.
 var _secondary_targets := {}
-## The portrait's interactivity as last computed in _refresh, so a secondary tap on it obeys the same
-## "rush allowed" rule the ManagerCircle uses (owned, and unstaffed or the single highest property).
+## The portrait's interactivity as last computed in _refresh, so a secondary tap on it obeys the
+## same "rush allowed" rule the ManagerCircle uses (any owned property, staffed or not).
 var _portrait_interactive := false
 
 # The cycle progress bar is driven by our own smooth, per-frame prediction rather
@@ -557,14 +557,16 @@ func _refresh(delta: float) -> void:
 	# The portrait is the start/rush control (ManagerCircle). Decide its look and whether it
 	# accepts input this frame:
 	#   • LOCKED   — no units owned yet (drab, inert).
-	#   • STAFFED  — automated; shows the property accent + staffer headshot. Interactive ONLY
-	#                if it is the player's single highest-owned property — rush stays hands-on
-	#                there, while every other automated property runs itself hands-off (GDD §6).
-	#   • UNSTAFFED — owned but not automated; silver restart plate, always interactive.
+	#   • STAFFED  — automated; shows the property accent + staffer headshot. Still rushable:
+	#                the staffer runs it, but the boss can always lean on it (Tim, 2026-07-03 —
+	#                was "only the single highest property"; opened to every owned row because
+	#                rush is self-limiting economically: 5% of a short cycle is worth nothing,
+	#                so only the long-cycle rows reward the attention, and a same-looking disc
+	#                that ignored touches read as broken rather than automated).
+	#   • UNSTAFFED — owned but not automated; silver restart plate.
 	# The infinity icon shows whenever an interactive portrait is actively held (being rushed).
 	var staffed := _prop.is_staffed
-	var is_highest_owned := _economy.get_highest_owned_index() == prop_index
-	var interactive := owned and (not staffed or is_highest_owned)
+	var interactive := owned
 	# Remembered for _control_under_point, so a secondary-finger rush obeys this same rule.
 	_portrait_interactive = interactive
 	var portrait_mode := ManagerCircle.PortraitMode.LOCKED

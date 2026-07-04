@@ -14,14 +14,19 @@ built on. It also serves the pacing complaint (GDD §6.2 playtest verdict: post-
 epochs land way too fast) — a ladder of 3–5 buys per epoch stretches the epoch with
 real content instead of only re-tuning the duration math.
 
-**To design before building (talk-through with Tim pending):**
+**DECIDED (Tim, 2026-07-03, follow-up):**
+- **Staged unlocks, "consistent with the rest of the game."** The cohort does NOT all
+  open at contact; later members arrive as the player progresses through the epoch —
+  the same reveal feel as Earth's ladder (ascending price bands + the existing
+  visibility/peek rule). Exact staging mechanism (pure price-band reveal vs. explicit
+  mid-epoch unlock thresholds) is a build-time design detail.
+- **The First Contact minigame bonus applies to the WHOLE COHORT** — the negotiation
+  sets the terms of the relationship with the civilization, so the low/med/high bonus
+  covers every property of that epoch, including ones that stage in later.
+
+**To design before building:**
 - How the 3–5 stagger across the epoch's magnitude band — likely a mini-Earth ladder
-  (ascending cost/income bands within the epoch) so they come online sequentially, not
-  all at once.
-- Does First Contact unlock all of them at once (priced to arrive in sequence) or do
-  later ones unlock partway through the epoch?
-- What the First Contact minigame's low/med/high bonus now applies to — the first
-  property only, or the whole epoch cohort?
+  (ascending cost/income bands within the epoch) so they come online sequentially.
 - Content cost: 5 epochs × 3–5 properties = 15–25 new alien `PropertyConfig`s (names,
   flavor, magnitudes) instead of 5; `alien_civilizations.md` has flavor to draw from.
 

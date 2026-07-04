@@ -39,16 +39,24 @@ disappears (old buttons keep their old prices; the expensive entries are visibly
 track that resets on tier advance. Under the new model levels don't reset — they
 accumulate across blocks, capped at 20 per epoch reached.
 
-**Open questions to settle before building (talk-through with Tim pending):**
-- What is a "static effect" concretely — a flat income *add* per level (dollars/cycle,
-  anchored to the home epoch's band) or a fixed *multiplier* step whose size is defined
-  by the home epoch? (Multiplier steps compound across 120 levels × 6 epochs; adds are
-  tamer and more literally "static.")
+**DECIDED (Tim, 2026-07-03, follow-up):**
+- **"Static effect" means defined-at-availability.** Each level's relative impact (its
+  multiplier step, etc.) is fixed at the moment its block becomes available — anchored to
+  the home epoch and never recomputed against whatever epoch the player is in later.
+- **The track is ONE SEQUENTIAL LADDER.** Levels must be progressed through **in order**;
+  a later epoch's block can only be climbed after buying through all earlier levels. So
+  the 6 × 20 blocks form a continuous 120-rung ladder: reaching an epoch makes its block
+  *available*, but order makes it *reachable* — arriving at epoch 2 with unfinished Earth
+  levels means finishing the (cheap) Earth backlog first, exactly the missed-upgrade
+  catch-up the model wants.
+
+**Still open (settle at build time):**
 - Cost curve *within* a 20-level block: flat, or gently rising toward the block's end?
 - Does the whole track still reset on prestige (assumed YES — staff resets on
   succession, GDD §6.3 unchanged)?
-- Does hiring (tier entry) stay separate from the level blocks, and does the tier-entry
-  hire also need home-epoch anchoring for its label/affordability story?
+- How the tier-entry hire folds into the sequential ladder — is "hire the epoch's
+  staffer" simply level 1 of that epoch's block, or a separate purchase that gates the
+  block? (The sequential rule suggests folding it in; confirm when designing.)
 - Pacing-law interaction: the sim's epoch-timing study must be re-derived — a capped,
   epoch-anchored track changes end-of-epoch income vs. the uncapped geometric model.
 

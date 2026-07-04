@@ -72,6 +72,14 @@ The satire lives in the mechanics, not the writing. In America, success is defin
 
 The exact abbreviations are fixed here so they're unambiguous (Qa vs Qi, Sx vs Sp). **Never scientific notation** (the §2 Numbers rule). Beyond Decillion is out of the planned range; a graceful overflow (extend the names, or an AdCap-style `aa/ab/ac…` scheme) is a minor open item, not a launch blocker.
 
+> **IMPLEMENTED 2026-07-03** (Tim confirmed real abbreviations over letter schemes; the epoch
+> roadmap may grow past 6, so headroom matters). `Money.SUFFIXES` is one shared ladder driving
+> both `display()` and `display_cash()` (Requirement 2's "can't drift" form), running K → **Dd
+> (duodecillion, 1e39)** — two rungs of extra headroom past this table's Decillion, covering
+> roughly a 17-epoch ladder at ×30/epoch. Pinned by `sim/MoneyTest.gd`. The call-site audit
+> found no ad-hoc currency formatting outside `Money`. The compact-vs-spelled-word open
+> decision above stands unchanged (compact everywhere today).
+
 **Open decision — compact suffix vs. spelled word.** The §2 Numbers row states a deadpan preference for the readable real-dollar style ("$14.3 trillion") over obscure suffixes, yet the code uses compact suffixes ("$14.3T") to fit tight rows. Recommendation: keep **compact suffixes** in space-constrained UI (property costs, income/sec, buttons) and reserve the fuller style only where there's room (the cash hero, ceremony screens) — but the call is Tim's, and it bears on §14 readability (large text, imperfect vision). Whatever is chosen, the abbreviation set above is the canonical mapping.
 
 **Requirement 2 — one formatting authority, used everywhere.** Every currency amount on screen must route through `Money` (`display()` for compact, `display_cash()` for the watched balance) — no ad-hoc `"$" + "%.2f"` formatting anywhere. Most call sites already do this; the task is to (a) extend **both** `Money` methods over the **same** suffix table (ideally a single shared ladder so they can't drift), and (b) audit every currency display site to confirm none bypasses `Money`.

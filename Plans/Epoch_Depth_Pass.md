@@ -283,9 +283,14 @@ docs (GDD §5.5/§6, Spec §3.6/§6) sync at each phase like the epoch-staffing 
 2. **(Phase 1) Block effect shape — DECIDED (Tim, 2026-07-04): big entry step.**
    Level 1 of each block carries the large entry step (the "new staffer = felt jump"
    beat); levels 2–20 are that block's equal smaller steps.
-3. **(Phase 1) Retention semantics at v9:** retained blocks translate to "heir starts
-   at level `20 × blocks`" (full blocks) — confirm, or retain exact levels?
-   *(Answer pending, 2026-07-04.)*
+3. **(Phase 1) Retention semantics at v9 — DECIDED (Tim, 2026-07-04): retention
+   mirrors the ladder.** Retention is bought per BLOCK, in order, and **each
+   additional retained block costs more Legacy** — the same escalating-path shape as
+   the staff ladder itself. The heir starts the property at the top of its retained
+   blocks (`staff_level = 20 × retained_blocks`), automation on if ≥ 1 block
+   retained. This extends today's "buy retention again to raise the retained tier"
+   behavior with an escalating per-block Legacy cost curve (curve values TBD-SIM
+   alongside the Phase 3 retune).
 4. **(Phase 2) Cohort size four** (vs 3 or 5) and the first-pass names above — veto
    freely, they're placeholders.
 5. **(Phase 3) Duration target:** each epoch ≈ same length as the previous (flat), or

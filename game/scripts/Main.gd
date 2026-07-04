@@ -913,34 +913,34 @@ func _background_path_for_tier(tier: int) -> String:
 ## no Main-screen button to reveal.
 
 
-## Snapshot of the living generation's staff ladder vs. the dynasty's retained blocks,
+## Snapshot of the living generation's staff ladder vs. the dynasty's retained levels,
 ## for the Estate Office's Household Staff section (GDD §6.3). Lists only properties that
-## have a staffer now or retained blocks — the actual household worth willing to an heir.
+## have a staffer now or retained levels — the actual household worth willing to an heir.
 func _build_retention_entries() -> Array:
 	var entries: Array = []
 	for i in range(game.economy.properties.size()):
 		var prop := game.economy.properties[i] as PropertyState
-		var completed_blocks := prop.staff_blocks_completed()
-		var retained_blocks := dynasty.staff_retention.get_retained_blocks(i)
-		if not prop.is_staffed and retained_blocks < 1:
+		var retained_levels := dynasty.staff_retention.get_retained_levels(i)
+		if not prop.is_staffed and retained_levels < 1:
 			continue
-		# Only a fully COMPLETED block can be retained ("you can only will a finished
-		# roster" — DynastyState.buy_staff_retention); -1 means nothing to buy yet.
-		var next_block := retained_blocks + 1
+		# Retention climbs the same ladder the dollars did, one level at a time, capped
+		# at the live ladder ("you can only will what you have"); -1 = nothing to buy.
+		var next_level := retained_levels + 1
 		var cost := -1
 		var can_afford := false
-		if next_block <= completed_blocks:
-			cost = dynasty.staff_retention.cost_for_block(next_block)
+		if next_level <= prop.staff_level:
+			cost = dynasty.staff_retention.cost_for_level(next_level)
 			can_afford = dynasty.upgrades.available >= cost
 		# Show the roster's face: the staffer of the deepest block on the job (live or
 		# retained), named by that block's absolute epoch on this property's ladder.
-		var shown_blocks := maxi(prop.staff_blocks_entered(), retained_blocks)
+		var shown_blocks := maxi(prop.staff_blocks_entered(),
+				prop.staff_block_of_level(maxi(retained_levels, 1)))
 		entries.append({
 			"index": i,
 			"property_name": (prop.config as PropertyConfig).display_name,
 			"staffer_name": EpochCatalog.staffer_name(prop.staff_block_epoch(shown_blocks), i),
-			"current_blocks": completed_blocks,
-			"retained_blocks": retained_blocks,
+			"current_levels": prop.staff_level,
+			"retained_levels": retained_levels,
 			"cost": cost,
 			"can_afford": can_afford,
 		})

@@ -88,22 +88,21 @@ func get_legacy_income_multiplier() -> float:
 # "staff reset on prestige" default.
 # ---------------------------------------------------------------------------
 
-## Buy one more BLOCK of staff retention for a property, spending Legacy from the
-## wallet. You can only retain blocks the living generation has fully COMPLETED —
-## all 20 levels bought ("you can only will a finished roster"; a partial block would
-## let retention grant the heir more ladder than the ancestor ever climbed). Returns
-## true on success; false if there is no completed block left to retain or the player
-## can't afford the next one.
+## Buy one more LEVEL of staff retention for a property, spending Legacy from the
+## wallet. Retention climbs the same ladder the dollars did, one step at a time, and
+## you can only retain up to the level the living generation actually holds ("you can
+## only will what you have"). Returns true on success; false if there is no higher
+## level to retain or the player can't afford the next one.
 func buy_staff_retention(property_index: int) -> bool:
 	var prop := current.economy.properties[property_index] as PropertyState
-	var next_block := staff_retention.next_retention_block(property_index)
-	if next_block > prop.staff_blocks_completed():
+	var next_level := staff_retention.next_retention_level(property_index)
+	if next_level > prop.staff_level:
 		return false
-	var cost := staff_retention.cost_for_block(next_block)
+	var cost := staff_retention.cost_for_level(next_level)
 	if upgrades.available < cost:
 		return false
 	upgrades.available -= cost
-	staff_retention.set_retained_blocks(property_index, next_block)
+	staff_retention.set_retained_levels(property_index, next_level)
 	return true
 
 
@@ -220,18 +219,18 @@ func _new_generation() -> GameState:
 	return heir
 
 
-## Seed an heir with the staff ladder the dynasty has paid (in Legacy) to retain
-## (GDD §6.3): 20 levels per retained block. Units do NOT carry over — only the ladder —
-## so the heir is born with the staffer roster in place but no properties yet; the first
-## unit they buy auto-cycles at the retained ladder's full multiplier. Retained blocks
-## can sit above the heir's current epoch: that is the whole point of prestige — willing
-## an heir alien staff before it has earned its way back to that epoch.
+## Seed an heir with the staff-ladder levels the dynasty has paid (in Legacy) to retain
+## (GDD §6.3). Units do NOT carry over — only the ladder — so the heir is born with the
+## staffer roster in place but no properties yet; the first unit they buy auto-cycles at
+## the retained ladder's full multiplier. Retained levels can reach above the heir's
+## current epoch: that is the whole point of prestige — willing an heir alien staff
+## before it has earned its way back to that epoch.
 func _apply_retained_staff(heir: GameState) -> void:
-	for property_index in staff_retention.retained_blocks:
-		var blocks := staff_retention.get_retained_blocks(property_index)
-		if blocks >= 1:
+	for property_index in staff_retention.retained_levels:
+		var levels := staff_retention.get_retained_levels(property_index)
+		if levels >= 1:
 			var prop := heir.economy.properties[property_index] as PropertyState
-			prop.will_staff_levels(blocks * tuning.staff_levels_per_epoch)
+			prop.will_staff_levels(levels)
 
 
 ## Apply the purchased per-generation upgrade effects to a generation's state:

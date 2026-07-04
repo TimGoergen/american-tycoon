@@ -186,13 +186,6 @@ func staff_blocks_entered() -> int:
 	return staff_block_of_level(staff_level)
 
 
-## How many blocks this property has fully COMPLETED (all 20 levels bought).
-## Staff retention can only will complete blocks to an heir (GDD §6.3 / plan §6 Q3).
-func staff_blocks_completed() -> int:
-	@warning_ignore("integer_division")
-	return staff_level / tuning.staff_levels_per_epoch
-
-
 ## The ABSOLUTE epoch a block belongs to: block 1 is this property's unlock epoch,
 ## each further block the next epoch. Anchors that block's costs (EconomyState) and
 ## picks its staffer name.

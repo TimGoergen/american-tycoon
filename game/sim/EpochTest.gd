@@ -178,60 +178,66 @@ func _test_save_round_trip(configs: Array, tuning: TuningConfig) -> void:
 	_check("pre-v5 save defaults to epoch 1", migrated.epoch.current_tier == 1)
 
 
-## Retention wills COMPLETE staff-ladder blocks across prestige (GDD §6.3, decision
-## 2026-07-04): blocks retain in order, each additional block costs more Legacy, and
-## only a finished 20-level block can be retained at all.
+## Retention wills the staff ladder across prestige ONE LEVEL AT A TIME (GDD §6.3,
+## decision 2026-07-04, clarified: individual steps, not whole blocks): levels retain
+## in order, capped at the living ladder, each additional level costing more Legacy.
 func _test_staff_retention(configs: Array, tuning: TuningConfig) -> void:
-	print("\n6. Retention wills complete blocks across prestige, escalating Legacy cost")
+	print("\n6. Retention wills the ladder level-by-level, escalating Legacy cost")
 	var dynasty := DynastyState.new(configs, tuning)
 	var game := dynasty.current
 	game.economy.award_cash(1.0e30)
 	game.try_buy(0, 50)              # own some ATMs so the staffer earns
-	game.epoch.current_tier = 2      # pretend Luminari contact, so two blocks are open
-	var per_block := tuning.staff_levels_per_epoch
 
-	# A PARTIAL block cannot be retained — only a finished roster can be willed.
+	# Climb the ATM's ladder to level 5 this life.
 	for _i in range(5):
 		game.try_buy_staff_level(0)
-	dynasty.upgrades.award(100)
-	_check("retention refused while the first block is incomplete",
-		not dynasty.buy_staff_retention(0))
-
-	# Complete both open blocks (Earth + Luminari) on the ATM's ladder.
 	var atm := game.economy.properties[0] as PropertyState
-	while not game.economy.is_staff_level_maxed(0, 2):
-		game.try_buy_staff_level(0)
-	_check("ATM completed two blocks this life", atm.staff_blocks_completed() == 2)
+	_check("ATM climbed to ladder level 5 this life", atm.staff_level == 5)
 
-	# Blocks retain in order; the third is refused (not completed — not even open).
+	# Retention is refused with no Legacy in the wallet.
+	_check("retention refused when wallet is empty", not dynasty.buy_staff_retention(0))
+
+	# Bank Legacy, then retain the first three levels — one purchase per level.
+	dynasty.upgrades.award(1000)
 	var wallet_before := dynasty.upgrades.available
-	_check("retaining block 1 succeeds", dynasty.buy_staff_retention(0))
-	_check("retaining block 2 succeeds", dynasty.buy_staff_retention(0))
-	_check("ATM retained blocks == 2", dynasty.staff_retention.get_retained_blocks(0) == 2)
-	_check("retention refused past the completed blocks", not dynasty.buy_staff_retention(0))
+	for _i in range(3):
+		_check("retaining the next level succeeds", dynasty.buy_staff_retention(0))
+	_check("ATM retained levels == 3", dynasty.staff_retention.get_retained_levels(0) == 3)
 
-	# Each additional block costs more (the escalating path, mirroring the ladder).
-	var cost_1 := dynasty.staff_retention.cost_for_block(1)
-	var cost_2 := dynasty.staff_retention.cost_for_block(2)
-	_check("block 2 retention costs more Legacy than block 1", cost_2 > cost_1)
-	_check("Legacy wallet was charged both blocks' cost",
-		dynasty.upgrades.available == wallet_before - cost_1 - cost_2)
+	# Each additional level costs more (the escalating path, mirroring the ladder).
+	var expected_spend := 0
+	for level in range(1, 4):
+		expected_spend += dynasty.staff_retention.cost_for_level(level)
+	_check("a deep level costs more Legacy than an early one",
+		dynasty.staff_retention.cost_for_level(30) > dynasty.staff_retention.cost_for_level(1))
+	_check("Legacy wallet was charged the three levels' cost",
+		dynasty.upgrades.available == wallet_before - expected_spend)
 
-	# Pass on. The heir is born with the ATM's ladder at 2 full blocks — and no units.
+	# Retention is capped at the living ladder: retain the last two live levels, then refuse.
+	_check("retaining up to the live level succeeds",
+		dynasty.buy_staff_retention(0) and dynasty.buy_staff_retention(0))
+	_check("retention refused past the live ladder level", not dynasty.buy_staff_retention(0))
+
+	# Pass on. The heir is born with the ATM's ladder at the 5 retained levels — no units.
 	dynasty.perform_succession()
 	var heir_atm := dynasty.current.economy.properties[0] as PropertyState
-	_check("heir is born with 2 retained blocks of ladder", heir_atm.staff_level == per_block * 2)
+	_check("heir is born with the 5 retained ladder levels", heir_atm.staff_level == 5)
 	_check("heir's retained ladder carries its full multiplier",
 		is_equal_approx(heir_atm._effective_staff_multiplier(), atm._effective_staff_multiplier()))
 	_check("heir starts with no ATM units (only the ladder is retained, not holdings)",
 		heir_atm.units_owned == 0)
 
-	# Retention survives a dynasty save round-trip.
+	# Retention survives a dynasty save round-trip, and pre-redesign retained TIERS
+	# migrate to a full block's worth of levels each.
 	var data := dynasty.to_save_dict()
 	var reloaded := DynastyState.new(configs, tuning)
 	reloaded.load_save_dict(data)
-	_check("retained blocks survive a dynasty save round-trip",
-		reloaded.staff_retention.get_retained_blocks(0) == 2)
+	_check("retained levels survive a dynasty save round-trip",
+		reloaded.staff_retention.get_retained_levels(0) == 5)
+	var legacy_retention := StaffRetention.new()
+	legacy_retention.load_save_dict({"retained_tiers": {"0": 2}})
+	_check("a pre-redesign retained tier migrates to a full block of levels",
+		legacy_retention.get_retained_levels(0) == 2 * StaffRetention.LEVELS_PER_LEGACY_TIER)
 
 
 ## HOME-EPOCH cost anchoring — the regression test for Tim's 2026-07-03 transition bug:

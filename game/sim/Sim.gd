@@ -148,7 +148,8 @@ func _run_hiring_phase(game: GameState) -> void:
 		if prop.units_owned == 0 or prop.is_staffed:
 			continue
 		var cost := prop.get_staff_cost()
-		if game.try_hire(i):
+		# Hiring is level 1 of the property's staff ladder (the epoch-depth redesign).
+		if game.try_buy_staff_level(i):
 			print("  Hired %s for %s" % [
 				(prop.config as PropertyConfig).staffer_name,
 				Money.of(cost).display(),
@@ -646,8 +647,10 @@ func _print_staff_economics() -> void:
 	var economy := EconomyState.new(_property_configs, _tuning)
 	for tier in range(2, EpochCatalog.tier_count() + 1):
 		var epoch_econ := _tuning.earth_economy_target * EpochCatalog.economy_scale(tier)
-		var hire_cheap := economy.get_staff_cost(0, tier)
-		var hire_dear := economy.get_staff_cost(11, tier)
+		# For an Earth property (unlock tier 1) block N sits at epoch N, so the block
+		# anchor at `tier` is exactly the old tier-N entry-hire price.
+		var hire_cheap := economy.get_staff_block_anchor(0, tier)
+		var hire_dear := economy.get_staff_block_anchor(11, tier)
 		var pct := (hire_cheap / epoch_econ * 100.0) if epoch_econ > 0.0 else 0.0
 		# First level (staff_level 0) costs the entry hire × staff_level_cost_base.
 		var first_level := CostCurve.round_nice(hire_cheap * _tuning.staff_level_cost_base)
@@ -685,10 +688,10 @@ func _print_alien_property_economics() -> void:
 		var epoch_econ := _tuning.earth_economy_target * EpochCatalog.economy_scale(tier)
 		var ratio := cfg.base_income_per_unit / cfg.base_cost if cfg.base_cost > 0.0 else 0.0
 		var pct := cfg.base_cost / epoch_econ * 100.0 if epoch_econ > 0.0 else 0.0
-		# Income/sec of ONE unit staffed at this epoch's entry tier (level 0), then how long ten
-		# such units would take alone to earn the epoch's whole consume threshold.
-		var staffed_unit_ips := cfg.base_income_per_unit * EpochCatalog.staff_income_multiplier(tier) \
-				/ cfg.base_cycle_length
+		# Income/sec of ONE staffed unit. A property's FIRST staff level is automation only
+		# (entry step 0 — the epoch leap lives in the alien property's base magnitude), so
+		# a freshly-staffed unit earns exactly its base rate.
+		var staffed_unit_ips := cfg.base_income_per_unit / cfg.base_cycle_length
 		var threshold := EpochCatalog.consume_threshold(tier, _tuning.earth_economy_target)
 		var clear_seconds := threshold / (10.0 * staffed_unit_ips) if staffed_unit_ips > 0.0 else 0.0
 		print("    %-18s  %4d   %12s   %13s   %5.2fx   %6.3f%%   %15s" % [
@@ -722,13 +725,13 @@ func _measure_tier1_plateau_income() -> float:
 			next_wage_tap += WAGE_TAP_PERIOD
 		game.pop_frenzy()
 		_greedy_buy_spree(game)
-		# Keep every owned property staffed at tier 1 (the Earth automation tier)
-		# and restart anything idle — we want the dependable passive plateau.
+		# Keep every owned property staffed at its FIRST ladder level (automation on,
+		# no further levels) and restart anything idle — the dependable passive plateau.
 		for i in range(game.economy.properties.size()):
 			var prop := game.economy.properties[i] as PropertyState
 			if prop.units_owned > 0:
-				if prop.staff_tier < 1:
-					game.try_hire(i)
+				if not prop.is_staffed:
+					game.try_buy_staff_level(i)
 				if not prop.is_cycle_running:
 					game.tap_property(i)
 		dynasty.tick(TICK_SIZE)

@@ -21,22 +21,17 @@ var cycle_length: float = 0.0
 ## Maintained incrementally so cost lookups stay O(1).
 var cost_product: float = 1.0
 
-## Which staffer tier is currently hired for this property (0 = none, 1 = Earth
-## staffer, 2+ = an alien-tech staffer unlocked by a later epoch — see EpochCatalog).
-## A higher tier replaces the previous staffer and raises staff_income_multiplier.
-var staff_tier: int = 0
-
-## Income multiplier granted by the current staffer tier (1.0 when unstaffed or at the
-## Earth tier). This is the ENTRY multiplier for the tier (the big jump at first contact);
-## the within-epoch staff levels below compound on top of it. Set by set_staff_tier from
-## EpochCatalog; applied at point of payment in _collect alongside the global frenzy/Legacy
-## multiplier, so alien staff are what scale a property's income into absurd ranges.
-var staff_income_multiplier: float = 1.0
-
-## How many times the current epoch's staffer has been LEVELED UP (the per-epoch upgrade
-## track, GDD §6.1). Each level multiplies this property's income by (1 + staff_level_step),
-## compounding — the steady "always a next upgrade to chase" sink that fills an epoch. RESETS
-## to 0 whenever the tier advances (a new epoch's staffer is a fresh hire — Tim 2026-06-27).
+## This property's position on its SINGLE sequential staff ladder (the epoch-depth
+## redesign, GDD §6.1 / Plans/Epoch_Depth_Pass.md, Tim 2026-07-04). The ladder is one
+## cumulative counter divided into 20-level BLOCKS; each block belongs to one epoch,
+## starting at this property's unlock epoch (block 1 = home epoch, block 2 = the next
+## epoch, …). Level 1 of every block IS that epoch's staffer hire: it swaps the staffer
+## and carries the block's big entry step; levels 2–20 are that staffer's smaller equal
+## steps. Both a block's costs and its effects are constants of the block — defined by
+## the epoch it belongs to, never recomputed against the player's current epoch — so
+## prices can never silently jump at a contact (the 2026-07-03 transition bug).
+## Levels must be bought strictly in order; the cap (20 × blocks reached) is the only
+## other gate. 0 = no staff at all (unstaffed, cycles need manual starts).
 var staff_level: int = 0
 
 ## Permanent income + cycle-time bonus this property won from its First Contact minigame (GDD §5.5
@@ -47,11 +42,22 @@ var first_contact_income_multiplier: float = 1.0
 var first_contact_cycle_multiplier: float = 1.0
 
 ## Whether ANY staffer is hired, enabling auto-cycle forever. Read-only: derived from
-## staff_tier so the many places that ask "is this staffed?" keep working unchanged
-## while the tier is the real stored fact.
+## the staff ladder (level 1 of the first block IS the hire) so the many places that
+## ask "is this staffed?" keep working while the level is the real stored fact.
 var is_staffed: bool:
 	get:
-		return staff_tier >= 1
+		return staff_level >= 1
+
+## The ABSOLUTE epoch tier of the staffer currently on the job (0 = unstaffed). Derived,
+## never stored: the latest block this property has entered, mapped to its epoch. An Earth
+## property on levels 21–40 is staffed at tier 2 (the Luminari staffer); an alien property
+## born at epoch 3 starts its very first block at tier 3. Drives staffer-name lookups
+## (EpochCatalog.staffer_name) and the Estate Office roster display.
+var staff_tier: int:
+	get:
+		if staff_level < 1:
+			return 0
+		return staff_block_epoch(staff_blocks_entered())
 
 ## How far through the current cycle (in seconds, 0 → cycle_length).
 var cycle_progress: float = 0.0
@@ -159,35 +165,99 @@ func buy(count: int) -> void:
 		_start_cycle_internal()
 
 
-## Hire or upgrade this property's staffer to `tier`, applying that tier's income
-## multiplier (looked up by the caller from EpochCatalog). Caller must verify the tier
-## is unlocked and affordable. Tier 1 is the Earth staffer (multiplier 1.0); higher
-## tiers replace it with progressively larger alien-tech multipliers. Hiring at all
-## starts the auto-cycle.
-func set_staff_tier(tier: int, income_multiplier: float) -> void:
-	staff_tier = tier
-	staff_income_multiplier = income_multiplier
-	# staff_level is NOT reset here: it is one cumulative ladder that persists across contacts
-	# (Tim 2026-07-02, the cumulative-ladder redesign). Hiring a new tier still jumps the income
-	# via staff_income_multiplier; the levels you already bought carry straight over, and reaching
-	# the new epoch simply raises the level cap (EconomyState enforces staff_levels_per_epoch × epoch).
-	if staff_tier >= 1 and not is_cycle_running:
+# ---------------------------------------------------------------------------
+# The staff ladder — block arithmetic
+# ---------------------------------------------------------------------------
+# One sequential ladder of 20-level blocks (see the staff_level doc above). These
+# helpers are the single home of the block math; EconomyState (costs) and the UI
+# (button labels) route through them so no one can disagree about which block a
+# level belongs to.
+
+## Which 1-based block a 1-based ladder level belongs to (levels 1–20 → block 1, …).
+func staff_block_of_level(level: int) -> int:
+	@warning_ignore("integer_division")
+	return (level - 1) / tuning.staff_levels_per_epoch + 1
+
+
+## How many blocks this property has ENTERED (bought at least level 1 of). 0 = unstaffed.
+func staff_blocks_entered() -> int:
+	if staff_level < 1:
+		return 0
+	return staff_block_of_level(staff_level)
+
+
+## How many blocks this property has fully COMPLETED (all 20 levels bought).
+## Staff retention can only will complete blocks to an heir (GDD §6.3 / plan §6 Q3).
+func staff_blocks_completed() -> int:
+	@warning_ignore("integer_division")
+	return staff_level / tuning.staff_levels_per_epoch
+
+
+## The ABSOLUTE epoch a block belongs to: block 1 is this property's unlock epoch,
+## each further block the next epoch. Anchors that block's costs (EconomyState) and
+## picks its staffer name.
+func staff_block_epoch(block: int) -> int:
+	return config.unlock_tier + block - 1
+
+
+## How many blocks the run has made available to this property: one per epoch from its
+## unlock epoch up to the reached epoch, capped at the defined epochs. 0 while the
+## property itself is still locked. The level cap is 20 × this.
+func staff_blocks_available(reached_tier: int) -> int:
+	var last_defined_block := EpochCatalog.tier_count() - config.unlock_tier + 1
+	return clampi(reached_tier - config.unlock_tier + 1, 0, last_defined_block)
+
+
+## Buy the next ladder level. Caller (EconomyState) verifies order, cap, and cash.
+## Level 1 is the first hire: automation switches on and the cycle starts.
+func add_staff_level() -> void:
+	staff_level += 1
+	if is_staffed and not is_cycle_running and units_owned > 0:
 		_start_cycle_internal()
 
 
-## Buy one within-epoch level for the current staffer (the per-epoch upgrade track).
-## Caller (EconomyState) must verify the property is staffed and the level is affordable.
-func add_staff_level() -> void:
-	staff_level += 1
+## Grant ladder levels outright (dynastic staff retention seeding an heir, GDD §6.3).
+## Never lowers an existing level. Starts the cycle if the property can already run.
+func will_staff_levels(level: int) -> void:
+	staff_level = maxi(staff_level, level)
+	if is_staffed and not is_cycle_running and units_owned > 0:
+		_start_cycle_internal()
 
 
-## This property's full staffer income multiplier: the tier's entry multiplier plus the cumulative
-## ladder of levels bought so far. The level bonus is ADDITIVE — (1 + step × level) — not compounding,
-## because staff_level is now one persistent 0..(20×epoch) ladder; compounding over 100+ levels would
-## blow up income. Everything that pays or displays property income routes through here so the bonus
-## applies uniformly (the same way _effective_cycle_length centralizes the speed bonus).
+## A block's ENTRY step — the big income jump its level 1 (the staffer hire) adds. Blocks
+## reuse the catalog's 40^(n−1) staff ladder as per-block DELTAS, indexed by the block's
+## position on THIS property's ladder (block 1 = 0: a first hire is automation only, no
+## jump — true for Earth's tier-1 staffer and for alien properties alike, whose epoch leap
+## lives in their base magnitude). Relative-to-this-property steps are how "effects are
+## defined by the block's epoch" stays true for aliens too: their base income is already
+## home-epoch sized, so a relative step is a home-epoch-sized absolute effect.
+## First-pass values pending the Phase 3 pacing retune (Plans/Epoch_Depth_Pass.md §4).
+func staff_entry_step(block: int) -> float:
+	if block <= 1:
+		return 0.0
+	return EpochCatalog.staff_income_multiplier(block) - EpochCatalog.staff_income_multiplier(block - 1)
+
+
+## A block's per-level step — what each of its levels 2–20 adds. Scaled to the block the
+## same way the entry step is, so every block's 19 small steps are sized to its epoch.
+## Earth block 1 comes out at the plain staff_level_step (0.33), today's live value.
+func staff_small_step(block: int) -> float:
+	return tuning.staff_level_step * EpochCatalog.staff_income_multiplier(block)
+
+
+## This property's full staffer income multiplier: 1 plus every ladder step bought so far —
+## each entered block's entry step, plus its small step × the further levels bought in it.
+## ADDITIVE (never compounding: 120 compounding levels would blow up income), with the step
+## SIZES growing per block, so later blocks matter without runaway. Everything that pays or
+## displays property income routes through here so the bonus applies uniformly (the same way
+## _effective_cycle_length centralizes the speed bonus).
 func _effective_staff_multiplier() -> float:
-	return staff_income_multiplier * (1.0 + tuning.staff_level_step * float(staff_level))
+	var multiplier := 1.0
+	var per_block := tuning.staff_levels_per_epoch
+	for block in range(1, staff_blocks_entered() + 1):
+		var levels_in_block := mini(staff_level - (block - 1) * per_block, per_block)
+		multiplier += staff_entry_step(block) + staff_small_step(block) * float(levels_in_block - 1)
+	return multiplier
 
 
 ## This property's full income multiplier: the staffer bonus (tier entry × within-epoch levels)
@@ -258,14 +328,12 @@ func get_staff_cost() -> float:
 # Save / load
 # ---------------------------------------------------------------------------
 
-## Rebuild state from a save file. Only raw facts are restored (unit count,
-## staffing, in-flight cycle); cost_product, cycle_length, income_per_unit,
-## and the milestone count are recomputed by replaying the purchases, so
-## derived values can never drift from the math that produced them.
+## Rebuild state from a save file. Only raw facts are restored (unit count, the
+## staff-ladder level, in-flight cycle); cost_product, cycle_length, income_per_unit,
+## the milestone count, and every staff multiplier are recomputed from those facts,
+## so derived values can never drift from the math that produced them.
 func restore(
 		p_units: int,
-		p_staff_tier: int,
-		p_staff_income_multiplier: float,
 		p_staff_level: int,
 		p_cycle_progress: float,
 		p_is_running: bool,
@@ -277,8 +345,6 @@ func restore(
 	income_per_unit = config.base_income_per_unit
 	cycle_length = config.base_cycle_length
 	_milestones_crossed = 0
-	staff_tier = 0
-	staff_income_multiplier = 1.0
 	staff_level = 0
 	first_contact_income_multiplier = 1.0
 	first_contact_cycle_multiplier = 1.0
@@ -286,8 +352,6 @@ func restore(
 	if p_units > 0:
 		buy(p_units)
 
-	staff_tier = p_staff_tier
-	staff_income_multiplier = p_staff_income_multiplier
 	staff_level = maxi(0, p_staff_level)
 	# Set the First Contact bonus before clamping cycle_progress — the cycle bonus shortens the
 	# effective length the clamp measures against.

@@ -14,11 +14,10 @@ enum BuyMode { ONE, TEN, HUNDRED, MAX }
 signal buy_requested(prop_index: int, mode: BuyMode)
 signal tap_requested(prop_index: int)
 signal hold_rush_requested(prop_index: int)
+## The staff button was pressed. There is only ONE staff action now — buy the next rung of
+## the property's sequential staff ladder (hiring a staffer IS level 1 of each 20-level
+## block, GDD §6.1 epoch-depth redesign) — so the button needs no state dispatch.
 signal hire_requested(prop_index: int)
-## Emitted when the staff button is pressed in its LEVEL UP state — i.e. the property is
-## already staffed at the best tier this epoch allows, so the button now buys a within-epoch
-## staff level (the continuous upgrade sink, GDD §6.1) instead of a tier hire/upgrade.
-signal level_up_requested(prop_index: int)
 
 var prop_index: int = -1
 
@@ -706,93 +705,41 @@ func _apply_ownership_styling(owned: bool) -> void:
 		_income_label.add_theme_color_override("font_color", UiPalette.DARK_GRAY)
 
 
-## True once the property is staffed at the best tier this epoch allows. In that state the
-## hire button stops being a tier hire/upgrade and becomes the within-epoch LEVEL UP sink
-## (GDD §6.1). Used both to draw the button (_refresh_hire_button) and to route its press
-## (_on_hire_pressed), so the two never disagree about which action the button performs.
-func _is_in_level_up_state() -> bool:
-	# Highest tier hireable right now: the reached epoch, capped at the defined epochs. Alien
-	# properties are automation-only — capped at a single staffer (EconomyState.try_hire) — so their
-	# best tier is always 1: once hired they go straight to the level-up sink, never an upgrade
-	# (Tim, 2026-07-01).
-	var max_tier := 1 if _is_alien_property() else mini(_epoch.current_tier, EpochCatalog.tier_count())
-	return _prop.staff_tier >= 1 and _prop.staff_tier >= max_tier
-
-
-## True for an alien property type (unlock_tier > 1) — the ones added at First Contact, which staff
-## for automation only (no epoch multiplier), unlike the 12 Earth properties.
-func _is_alien_property() -> bool:
-	return (_prop.config as PropertyConfig).unlock_tier > 1
-
-
-## The hire button's single `pressed` handler. It performs different actions depending on
-## the staff state, so we dispatch here rather than reconnecting the signal each frame.
+## The staff button's `pressed` handler. One action only — buy the next ladder rung —
+## so no state dispatch (the pre-redesign HIRE/UPGRADE/LEVEL-UP state machine is gone).
 func _on_hire_pressed() -> void:
-	if _is_in_level_up_state():
-		level_up_requested.emit(prop_index)
-	else:
-		hire_requested.emit(prop_index)
+	hire_requested.emit(prop_index)
 
 
-## Update the hire/upgrade/level-up button for the property's current staff tier and the
-## reached epoch (the alien-staffing track, GDD §6). Three states:
-##   • tier 0 → HIRE the Earth staffer (tier 1).
-##   • a higher tier is unlocked by the reached epoch → UPGRADE to the next alien tier.
-##   • staffed at the best tier this epoch allows → a live LEVEL UP button buying
-##     within-epoch staff levels (the continuous upgrade sink), until the next first
-##     contact unlocks a better tier and resets the level.
+## Update the staff button for the property's sequential ladder (GDD §6.1, epoch-depth
+## redesign). ONE live state — "LVL n · $cost" for the next rung — plus a faint-green
+## MAX park when every level the reached epoch allows has been bought. Because each
+## block's price is fixed by its own epoch, the number on this button can never silently
+## jump at a first contact; a new block's bigger price only appears once the player has
+## actually climbed to it (the fix for Tim's 2026-07-03 transition-shock bug).
 func _refresh_hire_button() -> void:
-	var tier := _prop.staff_tier
+	# The NEXT rung to buy, shown 1-based ("LVL 1" = the first hire).
+	_hire_icon.visible = true
+	_hire_left_label.text = "LVL %d" % (_prop.staff_level + 1)
 
-	if _is_in_level_up_state():
-		# `staff_level` is stored 0-based (the count of level-ups bought; 0 = freshly hired). The
-		# player should read a freshly hired staffer as "LVL 1", so the label adds one — a pure
-		# display offset, the economy still anchors level 0 to the plain entry multiplier.
-		_hire_icon.visible = true
-		_hire_left_label.text = "LVL %d" % (_prop.staff_level + 1)
-
-		# Cap reached: this property has bought every level the current epoch allows. The next block
-		# unlocks at the next first contact, so the button parks on the faint-green "staffed" plate
-		# showing MAX (not a cost) until then (Tim, 2026-07-02, the cumulative-ladder cap).
-		if _economy.is_staff_level_maxed(prop_index, _epoch.current_tier):
-			_apply_hire_styling(true)
-			_hire_cost_label.text = "MAX"
-			_hire_button.disabled = true
-			_set_split_label_color(_hire_left_label, _hire_cost_label, UiPalette.NAVY)
-			_hire_icon.modulate = UiPalette.NAVY
-			return
-
-		# Below the cap — the button buys the next staff level, adding to this property's income
-		# (GDD §6.1). It is a live action, so it uses the normal action styling; the headshot icon
-		# stands in for the staffer (we no longer spell out the job title).
-		_apply_hire_styling(false)
-		var level_cost := _economy.get_staff_level_cost(prop_index)
-		_hire_cost_label.text = Money.of(level_cost).display()
-		# Same gate as hiring: need the cash, and units for the staffer to run.
-		_hire_button.disabled = _economy.cash < level_cost or _prop.units_owned == 0
-		# Full navy when affordable; dimmed navy when not — matching the HIRE/UPGRADE state.
-		var level_color := Color(UiPalette.NAVY, 0.45) if _hire_button.disabled else UiPalette.NAVY
-		_set_split_label_color(_hire_left_label, _hire_cost_label, level_color)
-		_hire_icon.modulate = level_color
+	# Cap reached: every level the reached epoch allows is bought. The next block unlocks
+	# at the next first contact, so the button parks on the faint-green "staffed" plate.
+	if _economy.is_staff_level_maxed(prop_index, _epoch.current_tier):
+		_apply_hire_styling(true)
+		_hire_left_label.text = "LVL %d" % _prop.staff_level
+		_hire_cost_label.text = "MAX"
+		_hire_button.disabled = true
+		_set_split_label_color(_hire_left_label, _hire_cost_label, UiPalette.NAVY)
+		_hire_icon.modulate = UiPalette.NAVY
 		return
 
-	# Otherwise a tier is available to buy: tier 1 (HIRE) from unstaffed, or the next
-	# alien tier (UPGRADE) on an already-staffed property after a fresh contact. The headshot
-	# icon stands in for the verb (Tim, 2026-06-22), so the left label is normally blank and
-	# the cost sits on the right. But since the cumulative ladder (2026-07-02) staff levels
-	# PERSIST across contact and keep paying out, so an already-staffed property keeps showing
-	# its live "LVL n" during the save-up-for-the-new-staffer stretch — otherwise the level
-	# appears to vanish at First Contact and pop back after the upgrade (Tim's 2026-07-03 bug).
 	_apply_hire_styling(false)
-	var next_tier := tier + 1
-	var cost := _economy.get_staff_cost(prop_index, next_tier)
-	_hire_icon.visible = true
-	_hire_left_label.text = "LVL %d" % (_prop.staff_level + 1) if tier >= 1 else ""
+	var cost := _economy.get_next_staff_level_cost(prop_index)
 	_hire_cost_label.text = Money.of(cost).display()
-	# A property with no units can't be staffed yet — a staffer needs something to run.
+	# A property with no units can't be staffed — a staffer needs something to run.
 	_hire_button.disabled = _economy.cash < cost or _prop.units_owned == 0
 	# Navy on the live mustard plate, dimmed to match the disabled cream plate — applied to
-	# both the cost label and the headshot icon so they read as one.
+	# both labels and the headshot icon so they read as one.
 	var hire_color := Color(UiPalette.NAVY, 0.45) if _hire_button.disabled else UiPalette.NAVY
 	_set_split_label_color(_hire_left_label, _hire_cost_label, hire_color)
 	_hire_icon.modulate = hire_color

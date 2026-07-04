@@ -480,7 +480,6 @@ func _build_property_tab() -> Control:
 		row.tap_requested.connect(_on_tap_requested)
 		row.hold_rush_requested.connect(_on_hold_rush_requested)
 		row.hire_requested.connect(_on_hire_requested)
-		row.level_up_requested.connect(_on_level_up_requested)
 		row.set_buy_mode(_buy_mode)
 		ladder.add_child(row)
 		_rows.append(row)
@@ -767,15 +766,11 @@ func _on_hold_rush_requested(prop_index: int) -> void:
 	game.hold_rush_property(prop_index)
 
 
+## Player pressed a row's staff button: buy the next rung of that property's sequential
+## staff ladder (hiring IS level 1 of each block — GDD §6.1, epoch-depth redesign). The
+## row re-reads game state every frame, so a purchase shows on the next _process refresh.
 func _on_hire_requested(prop_index: int) -> void:
-	game.try_hire(prop_index)
-
-
-## Player pressed the staff button in its LEVEL UP state: buy one within-epoch staff level
-## (the continuous upgrade sink). Mirrors _on_hire_requested — the row re-reads game state
-## every frame, so a successful purchase shows up on the next _process refresh.
-func _on_level_up_requested(prop_index: int) -> void:
-	game.try_upgrade_staff_level(prop_index)
+	game.try_buy_staff_level(prop_index)
 
 
 func _on_wage_tapped() -> void:
@@ -918,30 +913,34 @@ func _background_path_for_tier(tier: int) -> String:
 ## no Main-screen button to reveal.
 
 
-## Snapshot of the living generation's staff vs. the dynasty's retained tiers, for the
-## Estate Office's Household Staff section (GDD §6.3). Lists only properties that have a
-## staffer now or a retained one — i.e. the actual household worth willing to an heir.
+## Snapshot of the living generation's staff ladder vs. the dynasty's retained blocks,
+## for the Estate Office's Household Staff section (GDD §6.3). Lists only properties that
+## have a staffer now or retained blocks — the actual household worth willing to an heir.
 func _build_retention_entries() -> Array:
 	var entries: Array = []
 	for i in range(game.economy.properties.size()):
 		var prop := game.economy.properties[i] as PropertyState
-		var current_tier := prop.staff_tier
-		var retained_tier := dynasty.staff_retention.get_retained_tier(i)
-		if current_tier < 1 and retained_tier < 1:
+		var completed_blocks := prop.staff_blocks_completed()
+		var retained_blocks := dynasty.staff_retention.get_retained_blocks(i)
+		if not prop.is_staffed and retained_blocks < 1:
 			continue
-		# You can only retain up to the staffer's live tier; -1 means nothing to buy.
-		var next_tier := retained_tier + 1
+		# Only a fully COMPLETED block can be retained ("you can only will a finished
+		# roster" — DynastyState.buy_staff_retention); -1 means nothing to buy yet.
+		var next_block := retained_blocks + 1
 		var cost := -1
 		var can_afford := false
-		if next_tier <= current_tier:
-			cost = dynasty.staff_retention.cost_for_tier(next_tier)
+		if next_block <= completed_blocks:
+			cost = dynasty.staff_retention.cost_for_block(next_block)
 			can_afford = dynasty.upgrades.available >= cost
+		# Show the roster's face: the staffer of the deepest block on the job (live or
+		# retained), named by that block's absolute epoch on this property's ladder.
+		var shown_blocks := maxi(prop.staff_blocks_entered(), retained_blocks)
 		entries.append({
 			"index": i,
 			"property_name": (prop.config as PropertyConfig).display_name,
-			"staffer_name": EpochCatalog.staffer_name(maxi(current_tier, retained_tier), i),
-			"current_tier": current_tier,
-			"retained_tier": retained_tier,
+			"staffer_name": EpochCatalog.staffer_name(prop.staff_block_epoch(shown_blocks), i),
+			"current_blocks": completed_blocks,
+			"retained_blocks": retained_blocks,
 			"cost": cost,
 			"can_afford": can_afford,
 		})

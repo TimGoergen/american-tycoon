@@ -495,9 +495,9 @@ func _add_upgrade_card(parent: VBoxContainer, definition: Dictionary, accent: Co
 # ---------------------------------------------------------------------------
 
 ## Rebuild the Household Staff rows from Main's snapshot of the living generation's
-## staff vs. the dynasty's retained tiers. Each entry is a Dictionary:
-##   { index, property_name, staffer_name, current_tier, retained_tier, cost, can_afford }
-## cost < 0 means there is nothing to buy (unstaffed, or already fully retained).
+## staff ladder vs. the dynasty's retained BLOCKS (20 ladder levels each). Each entry:
+##   { index, property_name, staffer_name, current_blocks, retained_blocks, cost, can_afford }
+## cost < 0 means there is nothing to buy (no completed block, or already fully retained).
 func set_retention_entries(entries: Array) -> void:
 	for child in _staff_list.get_children():
 		child.queue_free()
@@ -547,8 +547,10 @@ func _add_retention_row(entry: Dictionary) -> void:
 	var status := Label.new()
 	status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	status.text = "Now tier %d  ·  Retained tier %d" % [
-		int(entry["current_tier"]), int(entry["retained_tier"])
+	# "Tier" stays the player-facing word for a 20-level staff block (block = one
+	# epoch's roster entry), counting COMPLETED blocks — only those can be willed.
+	status.text = "Tiers done %d  ·  Retained %d" % [
+		int(entry["current_blocks"]), int(entry["retained_blocks"])
 	]
 	status.add_theme_color_override("font_color", UiPalette.MONEY_GREEN)
 	status.add_theme_font_size_override("font_size", CARD_BODY_SIZE)
@@ -563,11 +565,11 @@ func _add_retention_row(entry: Dictionary) -> void:
 	UiPalette.style_button(button, true)  # red: spends Legacy
 	var cost := int(entry["cost"])
 	if cost < 0:
-		# Nothing to buy: either unstaffed, or already retained at the live tier.
+		# Nothing to buy: no completed block yet, or already retained up to the live ladder.
 		button.text = "RETAINED"
 		button.disabled = true
 	else:
-		button.text = "RETAIN TIER %d\n%d Gems" % [int(entry["retained_tier"]) + 1, cost]
+		button.text = "RETAIN TIER %d\n%d Gems" % [int(entry["retained_blocks"]) + 1, cost]
 		button.disabled = not bool(entry["can_afford"])
 		button.pressed.connect(func() -> void: retain_requested.emit(index))
 	bottom.add_child(button)

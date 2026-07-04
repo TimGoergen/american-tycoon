@@ -10,9 +10,9 @@ extends Control
 #       Tapping it starts a cycle; holding it rushes (UI notes §2). While the player is
 #       actively rushing, the restart icon swaps to an infinity icon.
 #   • STAFFED  — automated: the disc fills with the PROPERTY'S accent color and shows a
-#       large dark-gray headshot (the staffer running it). A staffed property auto-cycles,
-#       so it is NOT interactive — EXCEPT the single highest property the player owns, which
-#       always stays hands-on and can still be rushed (then it, too, shows the infinity icon).
+#       large dark-gray headshot (the staffer running it). A staffed property auto-cycles AND
+#       stays rushable — holding it pushes the cycle along and shows the infinity icon (Tim,
+#       2026-07-03; was rushable only on the single highest owned property).
 #
 # Input is handled by a transparent Button laid over the whole circle (the same "art is the
 # button" pattern the wage/turbo meters use). The circle's own `_draw` paints the state; the

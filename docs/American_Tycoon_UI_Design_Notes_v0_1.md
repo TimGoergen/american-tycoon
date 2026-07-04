@@ -159,6 +159,14 @@ theme + targeted pass.**
     "BUY MODE: ×100" caption may clip — revisit font size or shorten the caption then.
 
 ### Property ladder / property row
+- **Every owned property is rushable, staffed or not (Tim, 2026-07-03).** The portrait
+  disc accepts tap/hold on any owned row. Supersedes the earlier rule (dev-thoughts §
+  "staff image as button": automated properties lost rush except the single highest
+  owned). Rationale: rush is self-limiting economically — 5% of a short cycle is worth
+  nothing, so only long-cycle rows reward the attention — and a disc that looks identical
+  but ignores touches read as broken rather than automated. Matches GDD §5 Layer 2
+  ("rewards an active thumb but never demands one"). Watch on device: more rush targets
+  charge TURBO faster (`frenzy_fill_per_tap` / `frenzy_fill_hold_factor` are the knobs).
 - **Hold START/RUSH to auto-repeat.** Click-and-hold on the start/rush button should
   continually execute the next action (Tim, 2026-06-13). Note: hold-to-rush already exists
   for a *running* cycle (`PropertyRow._pump_held_rush`, rate `hold_rush_per_second`). The

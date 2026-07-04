@@ -10,7 +10,7 @@
 ## 1. Currency & Numbers
 
 - **Per-planet currency scale.** Each planet's economy resets the displayed scale (GDD §3); Earth's full arc fits comfortably in double precision (~$1e14 target vs. ~1e15 safe integer threshold). `[ENG]` Implement a `Money` wrapper type from day one (internally double for Earth) so a later mantissa+exponent backend for large planets is a drop-in, not a refactor.
-- **Display:** real-dollar formatting throughout — `$#,##0` below $1M; named suffixes above ($14.27M / B / T). Never scientific notation, never "quadragintillion" (GDD §2).
+- **Display:** real-dollar formatting throughout — `$#,##0` below $1M; named suffixes above ($14.27M / B / T / Qa / Qi / Sx / Sp / Oc / No / Dc / Ud / Dd — the full ladder is the canonical table in GDD §2, implemented 2026-07-03 as `Money.SUFFIXES`, one shared ladder for both `display()` and `display_cash()`; pinned by `sim/MoneyTest.gd`). Never scientific notation, never "quadragintillion" (GDD §2).
 - **All currency math floors** at the point of award/charge (matches 2022 code's `Mathf.Floor` convention).
 
 ## 2. Time & Tick Architecture `[ENG]`

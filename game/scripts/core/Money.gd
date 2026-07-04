@@ -49,7 +49,36 @@ func is_gt(other: Money) -> bool:
 	return value > other.value
 
 
-## Format as a real-dollar string: $1,234 / $14.3K / $2.1M / $14.3B / $1.3T
+# The abbreviation ladder, LARGEST first (display walks it top-down and takes the first
+# threshold the value clears). Real short-scale dollar names, per the GDD §2 convention
+# (real-dollar formatting, never scientific notation) — extended past T on 2026-07-03
+# because deep alien epochs blew past it and rendered as digit-piles like "$25174800T".
+# Two-letter forms so neighbors can't be misread for each other (Qa ≠ Qi, Sx ≠ Sp):
+#   K  thousand      M  million        B  billion       T  trillion
+#   Qa quadrillion   Qi quintillion    Sx sextillion    Sp septillion
+#   Oc octillion     No nonillion      Dc decillion     Ud undecillion
+#   Dd duodecillion (1e39)
+# Each epoch is ~×30 (economy_scale), so this ladder covers roughly epoch 17+ before a
+# value would pile up multipliers on "Dd" the way it used to on "T" — extend it here
+# (one line per rung) if the epoch roadmap ever gets that deep.
+const SUFFIXES := [
+	{"scale": 1e39, "suffix": "Dd"},
+	{"scale": 1e36, "suffix": "Ud"},
+	{"scale": 1e33, "suffix": "Dc"},
+	{"scale": 1e30, "suffix": "No"},
+	{"scale": 1e27, "suffix": "Oc"},
+	{"scale": 1e24, "suffix": "Sp"},
+	{"scale": 1e21, "suffix": "Sx"},
+	{"scale": 1e18, "suffix": "Qi"},
+	{"scale": 1e15, "suffix": "Qa"},
+	{"scale": 1e12, "suffix": "T"},
+	{"scale": 1e9, "suffix": "B"},
+	{"scale": 1e6, "suffix": "M"},
+	{"scale": 1e3, "suffix": "K"},
+]
+
+
+## Format as a real-dollar string: $1,234 / $14.3K / $2.1M / $14.3B / $1.3T / $4.2Qa …
 ## Never scientific notation (GDD §2).
 ## Pass max_decimals = 0 for a whole-number abbreviation ($14M, $2B) — used by the
 ## property panels' income readout, which reads cleaner without the fractional part.
@@ -57,16 +86,10 @@ func display(max_decimals: int = 1) -> String:
 	var v := absf(value)
 	var prefix := "-$" if value < 0.0 else "$"
 
-	if v >= 1_000_000_000_000.0:
-		return prefix + _trim(v / 1_000_000_000_000.0, max_decimals) + "T"
-	elif v >= 1_000_000_000.0:
-		return prefix + _trim(v / 1_000_000_000.0, max_decimals) + "B"
-	elif v >= 1_000_000.0:
-		return prefix + _trim(v / 1_000_000.0, max_decimals) + "M"
-	elif v >= 1_000.0:
-		return prefix + _trim(v / 1_000.0, max_decimals) + "K"
-	else:
-		return prefix + str(int(v))
+	for rung in SUFFIXES:
+		if v >= rung["scale"]:
+			return prefix + _trim(v / rung["scale"], max_decimals) + rung["suffix"]
+	return prefix + str(int(v))
 
 
 ## Format specifically for the player's CASH BALANCE (Tim, 2026-06-14). This is more
@@ -80,13 +103,13 @@ func display_cash() -> String:
 	var v := absf(value)
 	var prefix := "-$" if value < 0.0 else "$"
 
-	if v >= 1_000_000_000_000.0:
-		return prefix + ("%.2f" % (v / 1_000_000_000_000.0)) + " T"
-	elif v >= 1_000_000_000.0:
-		return prefix + ("%.2f" % (v / 1_000_000_000.0)) + " B"
-	elif v >= 1_000_000.0:
-		return prefix + ("%.2f" % (v / 1_000_000.0)) + " M"
-	elif v >= 1_000.0:
+	if v >= 1_000_000.0:
+		# Abbreviated range: two decimals and a spaced suffix, from the same ladder
+		# display() uses so the two formats can never disagree on a suffix.
+		for rung in SUFFIXES:
+			if v >= rung["scale"]:
+				return prefix + ("%.2f" % (v / rung["scale"])) + " " + rung["suffix"]
+	if v >= 1_000.0:
 		# Thousands range: the whole number with comma separators, cents dropped.
 		return prefix + _group_thousands(int(floor(v)))
 	elif v == floor(v):

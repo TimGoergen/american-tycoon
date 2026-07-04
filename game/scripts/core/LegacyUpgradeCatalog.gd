@@ -205,29 +205,30 @@ static func describe_effect(id: String, level: int) -> String:
 
 	# The three compounding accelerators show their TOTAL multiplier at this level
 	# (e.g. "×6.19 property income"), since (1 + per_level) ^ level is what the
-	# LegacyUpgrades getters actually apply. The additive upgrades keep the "+X%" /
-	# "+$X" wording, which reads true for their linear formula.
+	# LegacyUpgrades getters actually apply — up to two decimals, trailing zeros
+	# dropped ("×2", never "×2.00"; Tim, 2026-07-03). The additive upgrades keep the
+	# "+X%" / "+$X" wording, which reads true for their linear formula.
 	match id:
 		SEED_CAPITAL:
 			var bonus := per_level * float(shown_level)
 			return "+%s starting cash" % Money.of(bonus).display()
 		FAMILY_FORTUNE:
-			return "×%.2f property income" % pow(1.0 + per_level, float(shown_level))
+			return "×%s property income" % Money.trim(pow(1.0 + per_level, float(shown_level)), 2)
 		EFFICIENCY:
-			return "×%.2f cycle speed" % pow(1.0 + per_level, float(shown_level))
+			return "×%s cycle speed" % Money.trim(pow(1.0 + per_level, float(shown_level)), 2)
 		LOYAL_STAFF:
 			return "−%d%% staff hiring cost" % int(round(per_level * 100.0 * float(shown_level)))
 		CONNECTIONS:
-			return "×%.2f wage per tap" % pow(1.0 + per_level, float(shown_level))
+			return "×%s wage per tap" % Money.trim(pow(1.0 + per_level, float(shown_level)), 2)
 		ESTATE_LAWYERS:
 			return "+%d%% Legacy per succession" % int(round(per_level * 100.0 * float(shown_level)))
 		MINIGAME_BONUS:
 			# Total cap = the 0.25 base + 5%/level (kept in sync with LegacyUpgrades).
 			return "up to +%d%% inheritance bonus" % int(round(25.0 + per_level * 100.0 * float(shown_level)))
 		AUTO_CLICK_SPEED:
-			return "×%.2f auto-tap / auto-rush speed" % pow(1.0 + per_level, float(shown_level))
+			return "×%s auto-tap / auto-rush speed" % Money.trim(pow(1.0 + per_level, float(shown_level)), 2)
 		AUTO_CLICK_POWER:
-			return "×%.2f wage per held auto-tap" % pow(1.0 + per_level, float(shown_level))
+			return "×%s wage per held auto-tap" % Money.trim(pow(1.0 + per_level, float(shown_level)), 2)
 		RUSH_POWER:
-			return "×%.2f rush advance" % pow(1.0 + per_level, float(shown_level))
+			return "×%s rush advance" % Money.trim(pow(1.0 + per_level, float(shown_level)), 2)
 	return ""

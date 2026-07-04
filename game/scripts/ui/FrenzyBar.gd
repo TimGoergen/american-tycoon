@@ -50,6 +50,12 @@ func _ready() -> void:
 	size_flags_vertical = Control.SIZE_FILL
 	UiPalette.style_framed_progress(self, UiPalette.MUSTARD_GOLD, UiPalette.PROGRESS_TRACK_GRAY)
 
+	# Gold bubbles drifting through the fill — every progress bar carries them (Tim,
+	# 2026-07-03). Added BEFORE the button/label overlay so the readout draws over them.
+	var bubbles := GoldBubbles.new()
+	bubbles.edge_inset = 3.0  # match the framed fill's 3px inset (style_framed_progress)
+	add_child(bubbles)
+
 	# Transparent button overlaying the meter: the gold/red fill shows through, and only
 	# the tap belongs to the button. Empty styleboxes in every state keep the meter visible
 	# (a Button's default plate is opaque and would hide the fill).
@@ -110,16 +116,17 @@ func _process(delta: float) -> void:
 	if _frenzy.mode == FrenzyState.Mode.BURNING:
 		_set_burn_style(true)
 		var seconds_left := _frenzy.meter * _tuning.frenzy_burn_duration
-		# Multiplier reads "2.4×" (the × trails the number) per Tim's call. The icon on the
+		# Multiplier reads "2.4×" (the × trails the number) per Tim's call — via Money.trim
+		# so a whole multiplier reads "2×", never "2.0×" (Tim, 2026-07-03). The icon on the
 		# left already conveys "TURBO", so the readout is just the reward.
-		_label.text = "%.1f× — %ds left" % [_frenzy.locked_multiplier, int(seconds_left)]
+		_label.text = "%s× — %ds left" % [Money.trim(_frenzy.locked_multiplier, 1), int(seconds_left)]
 		_button.disabled = true
 	else:
 		_set_burn_style(false)
 		# Live preview of what a pop right now would lock in.
 		var preview_mult := 1.0 + (_tuning.frenzy_max_multiplier - 1.0) * _frenzy.meter
 		var preview_secs := _frenzy.meter * _tuning.frenzy_burn_duration
-		_label.text = "%.1f× for %ds" % [preview_mult, int(preview_secs)]
+		_label.text = "%s× for %ds" % [Money.trim(preview_mult, 1), int(preview_secs)]
 		_button.disabled = not _frenzy.can_pop()
 
 

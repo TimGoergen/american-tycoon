@@ -88,7 +88,7 @@ func display(max_decimals: int = 1) -> String:
 
 	for rung in SUFFIXES:
 		if v >= rung["scale"]:
-			return prefix + _trim(v / rung["scale"], max_decimals) + rung["suffix"]
+			return prefix + trim(v / rung["scale"], max_decimals) + rung["suffix"]
 	return prefix + str(int(v))
 
 
@@ -97,18 +97,19 @@ func display(max_decimals: int = 1) -> String:
 ## watches grow, so it reads in full until it gets genuinely large:
 ##   • below $1,000:        exact, with cents only when there are any   ($950, $5.50)
 ##   • $1,000 – $999,999:   full number with comma separators, no cents ($1,250)
-##   • $1,000,000 and up:   abbreviated to two decimals with a space     ($1.00 M)
+##   • $1,000,000 and up:   abbreviated, up to two decimals, spaced      ($1.25 M, $2 B)
 ## (Costs and income/sec keep the compact display() above so they fit in tight rows.)
 func display_cash() -> String:
 	var v := absf(value)
 	var prefix := "-$" if value < 0.0 else "$"
 
 	if v >= 1_000_000.0:
-		# Abbreviated range: two decimals and a spaced suffix, from the same ladder
-		# display() uses so the two formats can never disagree on a suffix.
+		# Abbreviated range: up to two decimals (trailing zeros dropped — "$1.5 M",
+		# never "$1.50 M" or "$1.00 M"; Tim, 2026-07-03) and a spaced suffix, from the
+		# same ladder display() uses so the two formats can never disagree on a suffix.
 		for rung in SUFFIXES:
 			if v >= rung["scale"]:
-				return prefix + ("%.2f" % (v / rung["scale"])) + " " + rung["suffix"]
+				return prefix + trim(v / rung["scale"], 2) + " " + rung["suffix"]
 	if v >= 1_000.0:
 		# Thousands range: the whole number with comma separators, cents dropped.
 		return prefix + _group_thousands(int(floor(v)))
@@ -135,14 +136,18 @@ static func _group_thousands(whole: int) -> String:
 	return grouped
 
 
-## Trim trailing zeros from a decimal string, keeping up to `decimals` decimal places
-## (only 0 or 1 are used today).
-static func _trim(v: float, decimals: int = 1) -> String:
+## Format a number to at most `decimals` decimal places, then drop any trailing zeros
+## (and a bare trailing point), so a whole number never shows a pointless ".0":
+##   trim(14.30, 1) → "14.3"    trim(2.00, 1) → "2"    trim(1.50, 2) → "1.5"
+## Public and shared: EVERY on-screen number rule is "a decimal place only when the
+## decimal is not zero" (Tim, 2026-07-03), so other scripts format through this too.
+static func trim(v: float, decimals: int = 1) -> String:
 	if decimals <= 0:
-		# No decimal places: round to the nearest whole unit (14.7 → "15").
+		# No decimal places allowed: round to the nearest whole unit (14.7 → "15").
 		return str(int(round(v)))
-	# E.g. 14.300 → "14.3", 2.000 → "2", 1.050 → "1.1" (rounded to 1dp)
-	var rounded := snappedf(v, 0.1)
-	if fmod(rounded, 1.0) == 0.0:
-		return str(int(rounded))
-	return "%.1f" % rounded
+	var text := "%.*f" % [decimals, v]
+	while text.ends_with("0"):
+		text = text.substr(0, text.length() - 1)
+	if text.ends_with("."):
+		text = text.substr(0, text.length() - 1)
+	return text

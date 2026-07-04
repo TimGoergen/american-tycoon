@@ -33,12 +33,23 @@ func _initialize() -> void:
 	_check(Money.of(14_700_000.0).display(0), "$15M", "display(0) rounds to whole units")
 	_check(Money.of(2.5e21).display(0), "$3Sx", "display(0) rounds past T too")
 
-	# display_cash(): the balance format — spaced suffix, two decimals.
+	# display_cash(): the balance format — spaced suffix, up to two decimals with
+	# trailing zeros dropped (no ".0"/".00" noise anywhere on screen; Tim, 2026-07-03).
+	# Cents under $1,000 keep their conventional two digits ($5.50, not $5.5).
 	_check(Money.of(5.5).display_cash(), "$5.50", "cash shows cents under $1,000")
 	_check(Money.of(1_250.0).display_cash(), "$1,250", "cash groups thousands")
-	_check(Money.of(1_000_000.0).display_cash(), "$1.00 M", "cash abbreviates at $1M")
+	_check(Money.of(1_000_000.0).display_cash(), "$1 M", "whole cash drops the decimals")
+	_check(Money.of(1_500_000.0).display_cash(), "$1.5 M", "cash drops only trailing zeros")
 	_check(Money.of(1.23e15).display_cash(), "$1.23 Qa", "cash uses the extended ladder")
-	_check(Money.of(2.5e21).display_cash(), "$2.50 Sx", "cash agrees with display on suffixes")
+	_check(Money.of(2.5e21).display_cash(), "$2.5 Sx", "cash agrees with display on suffixes")
+
+	# trim(): the shared "decimal only when it's non-zero" formatter every other
+	# on-screen number routes through (cycle durations, TURBO multipliers, ×N effects).
+	_check(Money.trim(2.0, 1), "2", "trim drops a whole number's .0")
+	_check(Money.trim(4.3, 1), "4.3", "trim keeps a real decimal")
+	_check(Money.trim(1.5, 2), "1.5", "trim(2dp) drops only the trailing zero")
+	_check(Money.trim(1.06, 2), "1.06", "trim(2dp) keeps two real decimals")
+	_check(Money.trim(14.7, 0), "15", "trim(0dp) rounds to whole")
 
 	if _failures == 0:
 		print("ALL CHECKS PASSED")

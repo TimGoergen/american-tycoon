@@ -36,6 +36,17 @@ const OUTLINE_WIDTH := 2.0
 ## centered and a little inside the outline ring.
 const ICON_DIAMETER_FRACTION := 0.58
 
+# The staff LEVEL readout lives inside the disc (Tim, 2026-07-05: the portrait shows the
+# CURRENT level; the hire button beside it is a pure buy action). When a level shows, the
+# staffer art shrinks a touch and rises to make room, and "LVL n" draws in black beneath
+# it. The disc's SIZE never changes — it is also the start/rush tap target — only the art
+# inside rearranges. All fractions are of the circle's radius/diameter.
+const LEVELED_ICON_DIAMETER_FRACTION := 0.50      # slightly smaller icon when the level shows
+const LEVELED_PORTRAIT_DIAMETER_FRACTION := 0.78  # authored portraits fill the disc normally; less when leveled
+const LEVELED_ICON_RAISE_FRACTION := 0.18         # how far (× radius) the art rises
+const LEVEL_TEXT_BASELINE_FRACTION := 0.62        # text baseline below center (× radius)
+const LEVEL_FONT_FRACTION := 0.30                 # font size (× radius)
+
 enum PortraitMode { LOCKED, UNSTAFFED, STAFFED }
 
 var _mode: int = PortraitMode.LOCKED
@@ -44,6 +55,8 @@ var _portrait: Texture2D
 ## True while the player is actively rushing this property (button held on an interactive
 ## portrait): the state icon becomes the infinity symbol regardless of staffed/unstaffed.
 var _show_rush_icon := false
+## The property's current staff-ladder level, shown inside the disc (0 = hidden).
+var _staff_level := 0
 
 ## The transparent button overlaying the circle — the actual tap/hold target.
 var _button: Button
@@ -66,17 +79,20 @@ func _ready() -> void:
 ##   portrait     — authored head-shot texture, or null to fall back to the headshot icon.
 ##   show_rush_icon — draw the infinity icon (player is actively rushing).
 ##   interactive  — whether taps/holds are accepted (start/rush allowed right now).
+##   staff_level  — the current staff-ladder level, drawn inside the disc (0 = none).
 func set_state(
 		mode: int,
 		accent: Color,
 		portrait: Texture2D,
 		show_rush_icon: bool,
-		interactive: bool
+		interactive: bool,
+		staff_level: int
 ) -> void:
 	_mode = mode
 	_accent = accent
 	_portrait = portrait
 	_show_rush_icon = show_rush_icon
+	_staff_level = staff_level
 	# A non-interactive portrait (locked, or an automated non-top property) must not eat
 	# taps OR scroll drags, so disable it AND let pointer events pass through to the ladder.
 	_button.disabled = not interactive
@@ -106,26 +122,50 @@ func _draw() -> void:
 	var background := _accent if _mode == PortraitMode.STAFFED else UiPalette.SILVER
 	draw_circle(center, radius - OUTLINE_WIDTH, background)
 
+	# When a staff level shows, the art shrinks and rises so the "LVL n" text fits
+	# beneath it. The level stays visible in EVERY state — including while rushing —
+	# so the value never blinks away under the player's finger (Tim, 2026-07-05).
+	var show_level := _staff_level >= 1
+	var icon_center := center
+	var icon_fraction := ICON_DIAMETER_FRACTION
+	if show_level:
+		icon_center = center - Vector2(0.0, radius * LEVELED_ICON_RAISE_FRACTION)
+		icon_fraction = LEVELED_ICON_DIAMETER_FRACTION
+
 	# Icon on top. Actively rushing always shows the infinity symbol; otherwise a staffed
 	# property shows its staffer (authored portrait, or the dark-gray headshot fallback) and
 	# an unstaffed one shows the restart icon.
 	if _show_rush_icon:
-		_draw_icon(INFINITY_TEX, UiPalette.NAVY, radius, center)
+		_draw_icon(INFINITY_TEX, UiPalette.NAVY, radius * icon_fraction, icon_center)
 	elif _mode == PortraitMode.STAFFED:
 		if _portrait != null:
-			var box := Rect2(center - Vector2(radius, radius), Vector2(radius, radius) * 2.0)
+			# An authored portrait fills the whole disc normally; when the level shows it
+			# follows the same shrink-and-raise as the icons (at its own, larger fraction —
+			# portrait art is composed to be seen full-bleed, unlike the padded glyph icons).
+			var portrait_side := radius * 2.0 \
+					* (LEVELED_PORTRAIT_DIAMETER_FRACTION if show_level else 1.0)
+			var box := Rect2(icon_center - Vector2(portrait_side, portrait_side) / 2.0,
+					Vector2(portrait_side, portrait_side))
 			draw_texture_rect(_portrait, box, false)
 		else:
-			_draw_icon(HEADSHOT_TEX, UiPalette.DARK_GRAY, radius, center)
+			_draw_icon(HEADSHOT_TEX, UiPalette.DARK_GRAY, radius * icon_fraction, icon_center)
 	else:
-		_draw_icon(RESTART_TEX, UiPalette.NAVY, radius, center)
+		_draw_icon(RESTART_TEX, UiPalette.NAVY, radius * icon_fraction, icon_center)
+
+	if show_level:
+		var font := get_theme_default_font()
+		var font_size := maxi(14, int(radius * LEVEL_FONT_FRACTION))
+		var baseline_y := center.y + radius * LEVEL_TEXT_BASELINE_FRACTION
+		draw_string(font, Vector2(0.0, baseline_y), "LVL %d" % _staff_level,
+				HORIZONTAL_ALIGNMENT_CENTER, size.x, font_size, Color.BLACK)
 
 	# Navy outline ring on top, so the edge stays crisp over any fill or icon.
 	draw_arc(center, radius - OUTLINE_WIDTH, 0.0, TAU, 64, UiPalette.NAVY, OUTLINE_WIDTH, true)
 
 
-## Draw one white-authored state icon, tinted to `color`, centered in the circle.
-func _draw_icon(texture: Texture2D, color: Color, radius: float, center: Vector2) -> void:
-	var box_side := radius * 2.0 * ICON_DIAMETER_FRACTION
+## Draw one white-authored state icon, tinted to `color`, in a box whose side is the
+## given half-diameter × 2 (the caller pre-scales for the leveled/plain layouts).
+func _draw_icon(texture: Texture2D, color: Color, half_side: float, center: Vector2) -> void:
+	var box_side := half_side * 2.0
 	var box := Rect2(center - Vector2(box_side, box_side) / 2.0, Vector2(box_side, box_side))
 	draw_texture_rect(texture, box, false, color)

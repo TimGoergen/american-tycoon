@@ -140,11 +140,6 @@ const BUTTON_ROW_HEIGHT := 80
 ## A touch under FONT_BUTTON (34) so long cost numbers on the buy/hire buttons have more room
 ## before the caption and cost start crowding each other (Tim, 2026-07-01).
 const BUTTON_LABEL_FONT_SIZE := 30
-## Side length of the headshot icon that stands in for the word "HIRE"/"UPGRADE".
-const HIRE_ICON_SIZE := 56
-## The permanent "+" beside the hire button's headshot — bigger than the cost text so
-## icon + plus read together as one "add staff" symbol (Tim, 2026-07-05).
-const HIRE_PLUS_FONT_SIZE := 42
 
 ## Property-row readability pass (Tim, 2026-07-01): the row is taller and its labels bigger.
 ## The property NAME reads in bold on the top line at this size.
@@ -165,11 +160,9 @@ var _buy_button: Button
 var _buy_caption_label: Label
 var _buy_cost_label: Label
 var _hire_button: Button
-## The permanent "+" between the hire button's headshot icon and its price.
-var _hire_plus_label: Label
 var _hire_cost_label: Label
-## Small headshot icon on the hire button, standing in for the word "HIRE" (Tim, 2026-06-22).
-var _hire_icon: TextureRect
+## The hire button's hand-drawn "add staff" symbol: headshot + "+" (see StaffHireGlyph).
+var _hire_glyph: StaffHireGlyph
 
 ## Which hire-button look is currently applied, so the stylebox is only rebuilt when
 ## the state flips, not every frame. -1 = not yet applied, 0 = action (HIRE/UPGRADE,
@@ -320,46 +313,20 @@ func _ready() -> void:
 	# Connected ONCE here (a per-refresh reconnect would stack handlers and double-fire).
 	_hire_button.pressed.connect(_on_hire_pressed)
 	var hire_labels := _add_split_button_labels(_hire_button)
-	_hire_plus_label = hire_labels[0]
+	var unused_left_label := hire_labels[0] as Label
+	unused_left_label.queue_free()  # the headshot+plus glyph below replaces the left caption
 	_hire_cost_label = hire_labels[1]
-	# The left label is a permanent "+" beside the headshot — together they read "add
-	# staff". Larger than the button's cost text so the glyph carries as a symbol.
-	_hire_plus_label.text = "+"
-	_hire_plus_label.add_theme_font_size_override("font_size", HIRE_PLUS_FONT_SIZE)
 
-	# Headshot icon standing in for the "HIRE" word (Tim, 2026-06-22). Reuses the
-	# white-authored headshot, tinted navy to match the plate's text.
-	_hire_icon = TextureRect.new()
-	_hire_icon.texture = ManagerCircle.HEADSHOT_TEX
-	_hire_icon.custom_minimum_size = Vector2(HIRE_ICON_SIZE, HIRE_ICON_SIZE)
-	_hire_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_hire_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_hire_icon.modulate = UiPalette.NAVY
-	_hire_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-	# Icon + plus sit as one TIGHT, TOP-ALIGNED pair (Tim, 2026-07-05): a nested box
-	# centers the pair vertically as a unit, and inside it the "+" hangs from the pair's
-	# top so its top edge lines up with the icon's. The pair takes the button's leftover
-	# width (replacing the plus label's old expand), keeping the cost right-aligned.
-	var staff_glyph := HBoxContainer.new()
-	staff_glyph.add_theme_constant_override("separation", 2)
-	staff_glyph.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	staff_glyph.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	staff_glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var hire_row := _hire_plus_label.get_parent() as HBoxContainer
-	hire_row.add_child(staff_glyph)
-	hire_row.move_child(staff_glyph, 0)  # the pair first, then the cost label
-	staff_glyph.add_child(_hire_icon)
-	hire_row.remove_child(_hire_plus_label)
-	staff_glyph.add_child(_hire_plus_label)
-	_hire_plus_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
-	_hire_plus_label.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	_hire_plus_label.size_flags_horizontal = 0  # shrink to the glyph; the pair box expands instead
-	# The split-label helper sets clip_text (so a caption yields to the cost), but a
-	# clipping label reports ZERO minimum width — with the expand flag gone above, the
-	# "+" collapsed to nothing (the invisible-plus bug, Tim 2026-07-05). The plus must
-	# claim its glyph's width instead.
-	_hire_plus_label.clip_text = false
+	# The "add staff" glyph — headshot + "+" — is DRAWN, not composed from nodes: a
+	# Label's line box carries dead ascent above the "+" glyph and the headshot SVG
+	# carries transparent padding, so container layout could neither top-align the pair
+	# nor pull them close (Tim, 2026-07-05). See StaffHireGlyph at the end of this file.
+	_hire_glyph = StaffHireGlyph.new()
+	_hire_glyph.size_flags_horizontal = Control.SIZE_EXPAND_FILL   # pushes the cost right
+	_hire_glyph.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var hire_row := _hire_cost_label.get_parent() as HBoxContainer
+	hire_row.add_child(_hire_glyph)
+	hire_row.move_child(_hire_glyph, 0)  # the glyph first, then the cost label
 	button_line.add_child(_hire_button)
 
 	_buy_button = Button.new()
@@ -760,8 +727,8 @@ func _refresh_hire_button() -> void:
 		_apply_hire_styling(true)
 		_hire_cost_label.text = "MAX"
 		_hire_button.disabled = true
-		_set_split_label_color(_hire_plus_label, _hire_cost_label, UiPalette.NAVY)
-		_hire_icon.modulate = UiPalette.NAVY
+		_hire_cost_label.add_theme_color_override("font_color", UiPalette.NAVY)
+		_hire_glyph.tint = UiPalette.NAVY
 		return
 
 	_apply_hire_styling(false)
@@ -770,10 +737,10 @@ func _refresh_hire_button() -> void:
 	# A property with no units can't be staffed — a staffer needs something to run.
 	_hire_button.disabled = _economy.cash < cost or _prop.units_owned == 0
 	# Navy on the live mustard plate, dimmed to match the disabled cream plate — applied to
-	# both labels and the headshot icon so they read as one.
+	# the cost and the headshot+plus glyph together so they read as one.
 	var hire_color := Color(UiPalette.NAVY, 0.45) if _hire_button.disabled else UiPalette.NAVY
-	_set_split_label_color(_hire_plus_label, _hire_cost_label, hire_color)
-	_hire_icon.modulate = hire_color
+	_hire_cost_label.add_theme_color_override("font_color", hire_color)
+	_hire_glyph.tint = hire_color
 
 
 ## Swap the hire button between the normal action look (HIRE/UPGRADE) and the faint-
@@ -879,3 +846,64 @@ func _set_buy_label_colors() -> void:
 		_set_split_label_color(_buy_caption_label, _buy_cost_label, Color(UiPalette.NAVY, 0.45))
 	else:
 		_set_split_label_color(_buy_caption_label, _buy_cost_label, UiPalette.PALE_GOLD)
+
+
+# ---------------------------------------------------------------------------
+# The hire button's "add staff" glyph
+# ---------------------------------------------------------------------------
+
+## The headshot icon with a large "+" tucked tight against its top-right, drawn as ONE
+## control. Hand-drawn because node layout could not deliver "top-aligned and close"
+## (Tim, 2026-07-05): a Label's line box carries dead ascent above the "+" glyph, and
+## the headshot SVG carries transparent padding in its canvas — so container-aligned
+## boxes left the plus visually low and far from the face. Drawing lets the plus hug
+## the icon's VISIBLE bounds (get_used_rect — see the texture-sizing memory note).
+class StaffHireGlyph extends Control:
+	## Side of the square box the headshot canvas is fitted into.
+	const ICON_SIZE := 56.0
+	## The plus is bigger than the button's cost text so it carries as a symbol.
+	const PLUS_FONT_SIZE := 42
+	## Gap between the face's visible right edge and the plus.
+	const PAIR_GAP := 3.0
+	## Distance from the "+" glyph's VISUAL top down to its text baseline, as a fraction
+	## of the font size ("+" spans roughly the x-height band in most fonts). Art knob:
+	## raise to push the plus down, lower to lift it.
+	const PLUS_TOP_TO_BASELINE := 0.60
+
+	## Tint for the whole glyph (navy live, dimmed navy when the button is disabled).
+	var tint := Color.WHITE:
+		set(value):
+			if value != tint:
+				tint = value
+				queue_redraw()
+
+	## The headshot art's opaque bounds inside its canvas, computed ONCE for all rows
+	## (get_used_rect is a CPU pixel scan; the canvas carries transparent padding).
+	static var _icon_used_rect := Rect2()
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		if _icon_used_rect.size == Vector2.ZERO:
+			_icon_used_rect = Rect2(ManagerCircle.HEADSHOT_TEX.get_image().get_used_rect())
+		var font := get_theme_default_font()
+		var plus_width := font.get_string_size("+", HORIZONTAL_ALIGNMENT_LEFT, -1.0, PLUS_FONT_SIZE).x
+		custom_minimum_size = Vector2(ICON_SIZE + PAIR_GAP + plus_width, ICON_SIZE)
+
+	func _draw() -> void:
+		# Fit the icon canvas into its square box preserving aspect (what the old
+		# TextureRect's KEEP_ASPECT did), pinned LEFT and vertically centered.
+		var tex := ManagerCircle.HEADSHOT_TEX
+		var tex_size := Vector2(tex.get_size())
+		var fit := minf(ICON_SIZE / tex_size.x, ICON_SIZE / tex_size.y)
+		var canvas_size := tex_size * fit
+		var canvas_pos := Vector2(0.0, (size.y - canvas_size.y) / 2.0)
+		draw_texture_rect(tex, Rect2(canvas_pos, canvas_size), false, tint)
+
+		# The face's VISIBLE bounds within that canvas — what the plus aligns against.
+		var face_top := canvas_pos.y + _icon_used_rect.position.y * fit
+		var face_right := canvas_pos.x + _icon_used_rect.end.x * fit
+
+		var font := get_theme_default_font()
+		var baseline_y := face_top + PLUS_FONT_SIZE * PLUS_TOP_TO_BASELINE
+		draw_string(font, Vector2(face_right + PAIR_GAP, baseline_y), "+",
+				HORIZONTAL_ALIGNMENT_LEFT, -1.0, PLUS_FONT_SIZE, tint)

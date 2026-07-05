@@ -1,11 +1,14 @@
 class_name GoldBubbles
 extends Control
 
-# Small gold "bubble" particles that drift left-to-right across a progress bar's
-# FILLED region, with a gentle up-and-down sway — every progress bar in the game
-# carries them so the bars read as alive (Tim, 2026-07-03). Their travel speed is
-# tied to the bar's own fill speed: bubbles move at twice the rate the fill edge
-# does (Tim's spec), so a fast-cycling bar shimmers busily and a slow one drifts.
+# A crowd of small gold bubbles swirling through a progress bar's FILLED region, like
+# carbonation in a liquid that is flowing to the right (Tim, 2026-07-03; reworked
+# 2026-07-05: many small varied bubbles that swirl, not one blob). Their base drift is
+# tied to the bar's own fill speed — bubbles flow at twice the rate the fill edge moves
+# — with a floor so a still bar keeps gently fizzing.
+#
+# NOT for gold-filled bars (the wage and TURBO meters): gold bubbles are invisible on a
+# gold fill and only read where they brush the frame (Tim, 2026-07-05).
 #
 # Usage — one line per bar:
 #   bar.add_child(GoldBubbles.new())          # bar is a ProgressBar (or any Range)
@@ -15,34 +18,51 @@ extends Control
 #
 # Deliberately cheap: a handful of circles per bar, no Particles2D nodes, no
 # textures — many rows can be on screen at once on the property ladder.
+#
+# Each bubble's position along the fill is stored NORMALIZED (0–1 of the filled width),
+# not in pixels: when the fill is a narrow sliver the bubbles stay evenly spread through
+# it instead of being clamped into one overlapping clump (the "single gold thing" bug on
+# the economy bar). Every bubble also gets its own size, speed, opacity, and swirl phase
+# from a fixed golden-ratio sequence, so the crowd never marches in lockstep yet looks
+# identical across identical bars.
 
-## How many bubbles ride each bar. Kept tiny for the ladder's dozen simultaneous bars.
-const BUBBLE_COUNT := 5
-## Bubble radius range in pixels; each bubble picks a size in this band so they
-## don't read as a mechanical row of identical dots.
-const RADIUS_MIN := 3.0
-const RADIUS_MAX := 5.0
-## Bubble travel speed = this × the bar's fill speed (Tim's spec: twice the bar).
+## The full bubble crowd. Narrow fills show a subset (see BUBBLE_SPACING_PX).
+const BUBBLE_COUNT := 12
+## One bubble becomes active per this many pixels of filled width (min 2), so a sliver
+## of fill fizzes with a couple of distinct bubbles instead of a crammed dozen.
+const BUBBLE_SPACING_PX := 22.0
+## Bubble radius range in pixels — small, like carbonation, not coins.
+const RADIUS_MIN := 1.6
+const RADIUS_MAX := 3.4
+## Bubble drift = this × the bar's fill speed (Tim's spec: twice the bar)…
 const SPEED_VS_BAR := 2.0
-## Floor drift (px/s) so a bar that is full or barely moving (the TURBO meter at
-## rest, the slow economy bar) still shimmers instead of freezing. Art knob —
-## set to 0.0 for strictly-spec "frozen when the bar is frozen" behavior.
+## …with a floor (px/s) so a full or barely-moving bar still fizzes. Art knob —
+## 0.0 restores strictly "frozen when the bar is frozen".
 const MIN_DRIFT_PX_PER_SEC := 14.0
-## Vertical sway: amplitude as a fraction of the bar's height, and sway speed (Hz).
-const SWAY_FRACTION := 0.22
-const SWAY_HZ := 0.9
-## Bubble color: bright gold, translucent so it tints rather than covers the fill.
-const BUBBLE_COLOR := Color(1.0, 0.85, 0.35, 0.75)
+## Per-bubble drift variation: each bubble moves at base speed × (1 ± this), so the
+## crowd spreads out over time instead of traveling as one body.
+const SPEED_SPREAD := 0.45
+## The swirl: two stacked sine waves on the vertical axis (a slow deep one and a faster
+## shallow one, at incommensurate rates) plus a small horizontal wobble — the combined
+## path traces loose loops, reading as bubbles tumbling in moving liquid.
+const SWAY_FRACTION := 0.26        # primary vertical amplitude, × bar height
+const SWAY_HZ := 0.55
+const SWIRL_FRACTION := 0.12       # secondary vertical amplitude, × bar height
+const SWIRL_HZ := 1.7
+const WOBBLE_PX := 2.5             # horizontal wobble amplitude
+const WOBBLE_HZ := 1.1
+## Bubble color: bright gold; each bubble's own alpha varies around this (see _alpha_of).
+const BUBBLE_COLOR := Color(1.0, 0.85, 0.35, 1.0)
+const ALPHA_MIN := 0.45
+const ALPHA_MAX := 0.85
 ## Smoothing time constant for the measured fill speed, so one jumpy frame (a rush,
 ## a snap-back) doesn't make the bubbles lurch.
 const SPEED_SMOOTH_TAU := 0.35
-## Hide bubbles entirely when the filled region is narrower than this — a sliver of
-## fill with dots crammed in reads as noise, not life.
-const MIN_FILLED_WIDTH_PX := 36.0
+## Hide bubbles entirely when the filled region is narrower than this.
+const MIN_FILLED_WIDTH_PX := 14.0
 
-## Left/right inset of the fill inside the bar, in pixels. Framed meters (TURBO, the
-## wage button) draw their fill inset by the frame's border width — match it here so
-## bubbles never ride over the frame. 0 for plain bars.
+## Left/right inset of the fill inside the bar, in pixels (framed meters draw their
+## fill inset by the frame's border width). 0 for plain bars.
 var edge_inset := 0.0
 
 ## Explicitly-fed fill fraction for hand-drawn bars; < 0 means "not fed — read the
@@ -52,23 +72,26 @@ var _explicit_fraction := -1.0
 var _time := 0.0
 var _last_fraction := 0.0
 var _smoothed_speed_px := 0.0  # measured fill-edge speed, px/s, smoothed
-## Per-bubble state: horizontal position (px) and a phase offset that staggers both
-## the sway and the wrap point so the bubbles never march in lockstep.
-var _bubble_x: Array[float] = []
-var _bubble_phase: Array[float] = []
-var _bubble_radius: Array[float] = []
+## Per-bubble position along the filled region, NORMALIZED 0–1 (see the class header).
+var _bubble_pos: Array[float] = []
 
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	# Stagger the bubbles evenly along the bar with fixed (not random) phases, so
-	# every bar looks organic but identical rows stay visually consistent.
 	for i in range(BUBBLE_COUNT):
-		var spread := float(i) / float(BUBBLE_COUNT)
-		_bubble_x.append(spread * 200.0)  # provisional; wraps into the live width below
-		_bubble_phase.append(spread * TAU)
-		_bubble_radius.append(lerpf(RADIUS_MIN, RADIUS_MAX, fmod(spread * 2.61803, 1.0)))
+		_bubble_pos.append(float(i) / float(BUBBLE_COUNT))
+
+
+## A stable per-bubble pseudo-random in [0,1) — the golden-ratio (Weyl) sequence, offset
+## per use (`salt`) so a bubble's size, speed, phase, and alpha are independent of each
+## other. Fixed, not random: identical bars look identical, and redraws never reshuffle.
+func _variant(index: int, salt: float) -> float:
+	return fmod(float(index) * 0.61803 + salt, 1.0)
+
+
+func _alpha_of(index: int) -> float:
+	return lerpf(ALPHA_MIN, ALPHA_MAX, _variant(index, 0.71))
 
 
 ## Feed the fill fraction (0–1) for a bar this node can't read on its own (a bar
@@ -87,6 +110,11 @@ func _current_fraction() -> float:
 	return 0.0
 
 
+## How many bubbles a fill this wide can host without crowding.
+func _active_count(filled_width: float) -> int:
+	return clampi(int(filled_width / BUBBLE_SPACING_PX), 2, BUBBLE_COUNT)
+
+
 func _process(delta: float) -> void:
 	if delta <= 0.0:
 		return
@@ -103,13 +131,17 @@ func _process(delta: float) -> void:
 	var blend := 1.0 - exp(-delta / SPEED_SMOOTH_TAU)
 	_smoothed_speed_px = lerpf(_smoothed_speed_px, raw_speed_px, blend)
 
-	# Twice the bar's speed (the spec), with a small floor so still bars shimmer.
-	var bubble_speed := maxf(_smoothed_speed_px * SPEED_VS_BAR, MIN_DRIFT_PX_PER_SEC)
+	# Twice the bar's speed (the spec), with a small floor so still bars keep fizzing.
+	var base_speed := maxf(_smoothed_speed_px * SPEED_VS_BAR, MIN_DRIFT_PX_PER_SEC)
 
 	var filled_width := fraction * track_width
 	if filled_width >= MIN_FILLED_WIDTH_PX:
 		for i in range(BUBBLE_COUNT):
-			_bubble_x[i] = fmod(_bubble_x[i] + bubble_speed * delta, filled_width)
+			# Each bubble drifts at its own rate around the base, so the crowd spreads
+			# out instead of traveling as one body. Positions advance in normalized
+			# space: the same px/s reads as a bigger step through a narrower fill.
+			var speed_px := base_speed * (1.0 + SPEED_SPREAD * (2.0 * _variant(i, 0.37) - 1.0))
+			_bubble_pos[i] = fmod(_bubble_pos[i] + speed_px * delta / filled_width, 1.0)
 	queue_redraw()
 
 
@@ -120,10 +152,17 @@ func _draw() -> void:
 	if filled_width < MIN_FILLED_WIDTH_PX:
 		return
 	var mid_y := size.y / 2.0
-	var sway_amp := size.y * SWAY_FRACTION
-	for i in range(BUBBLE_COUNT):
-		var radius := _bubble_radius[i]
-		# Keep the whole circle inside the filled region horizontally.
-		var x := edge_inset + clampf(_bubble_x[i], radius, filled_width - radius)
-		var y := mid_y + sin(_time * TAU * SWAY_HZ + _bubble_phase[i]) * sway_amp
-		draw_circle(Vector2(x, y), radius, BUBBLE_COLOR)
+	for i in range(_active_count(filled_width)):
+		var radius := lerpf(RADIUS_MIN, RADIUS_MAX, _variant(i, 0.13))
+		var phase := _variant(i, 0.53) * TAU
+		# Loose looping path: two vertical sines at incommensurate rates + a small
+		# horizontal wobble — carbonation tumbling in a current, not beads on a wire.
+		var sway := sin(_time * TAU * SWAY_HZ + phase) * size.y * SWAY_FRACTION \
+				+ sin(_time * TAU * SWIRL_HZ + phase * 2.0) * size.y * SWIRL_FRACTION
+		var wobble := sin(_time * TAU * WOBBLE_HZ + phase * 3.0) * WOBBLE_PX
+		# Map the normalized position into the filled region, keeping the circle inside.
+		var x := edge_inset + radius + _bubble_pos[i] * (filled_width - radius * 2.0) + wobble
+		x = clampf(x, edge_inset + radius, edge_inset + filled_width - radius)
+		var color := BUBBLE_COLOR
+		color.a = _alpha_of(i)
+		draw_circle(Vector2(x, mid_y + sway), radius, color)

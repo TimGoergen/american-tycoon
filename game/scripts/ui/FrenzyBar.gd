@@ -49,12 +49,8 @@ func _ready() -> void:
 	custom_minimum_size = Vector2(0, UiPalette.STANDARD_BUTTON_HEIGHT)
 	size_flags_vertical = Control.SIZE_FILL
 	UiPalette.style_framed_progress(self, UiPalette.MUSTARD_GOLD, UiPalette.PROGRESS_TRACK_GRAY)
-
-	# Gold bubbles drifting through the fill — every progress bar carries them (Tim,
-	# 2026-07-03). Added BEFORE the button/label overlay so the readout draws over them.
-	var bubbles := GoldBubbles.new()
-	bubbles.edge_inset = 3.0  # match the framed fill's 3px inset (style_framed_progress)
-	add_child(bubbles)
+	# No GoldBubbles here: the meter's fill is itself gold, so gold bubbles were invisible
+	# against it — they only read where they brushed the frame (Tim, 2026-07-05).
 
 	# Transparent button overlaying the meter: the gold/red fill shows through, and only
 	# the tap belongs to the button. Empty styleboxes in every state keep the meter visible

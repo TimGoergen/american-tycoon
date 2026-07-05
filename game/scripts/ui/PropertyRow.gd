@@ -355,6 +355,11 @@ func _ready() -> void:
 	_hire_plus_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 	_hire_plus_label.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	_hire_plus_label.size_flags_horizontal = 0  # shrink to the glyph; the pair box expands instead
+	# The split-label helper sets clip_text (so a caption yields to the cost), but a
+	# clipping label reports ZERO minimum width — with the expand flag gone above, the
+	# "+" collapsed to nothing (the invisible-plus bug, Tim 2026-07-05). The plus must
+	# claim its glyph's width instead.
+	_hire_plus_label.clip_text = false
 	button_line.add_child(_hire_button)
 
 	_buy_button = Button.new()

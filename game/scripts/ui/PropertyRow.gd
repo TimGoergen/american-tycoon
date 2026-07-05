@@ -325,9 +325,8 @@ func _ready() -> void:
 	_hire_plus_label.text = "+"
 	_hire_plus_label.add_theme_font_size_override("font_size", HIRE_PLUS_FONT_SIZE)
 
-	# Headshot icon at the left of the hire button, standing in for the "HIRE"/"UPGRADE"
-	# word (Tim, 2026-06-22). Reuses the white-authored headshot, tinted navy to match
-	# the plate's text.
+	# Headshot icon standing in for the "HIRE" word (Tim, 2026-06-22). Reuses the
+	# white-authored headshot, tinted navy to match the plate's text.
 	_hire_icon = TextureRect.new()
 	_hire_icon.texture = ManagerCircle.HEADSHOT_TEX
 	_hire_icon.custom_minimum_size = Vector2(HIRE_ICON_SIZE, HIRE_ICON_SIZE)
@@ -335,9 +334,25 @@ func _ready() -> void:
 	_hire_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_hire_icon.modulate = UiPalette.NAVY
 	_hire_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# Icon + plus sit as one TIGHT, TOP-ALIGNED pair (Tim, 2026-07-05): a nested box
+	# centers the pair vertically as a unit, and inside it the "+" hangs from the pair's
+	# top so its top edge lines up with the icon's. The pair takes the button's leftover
+	# width (replacing the plus label's old expand), keeping the cost right-aligned.
+	var staff_glyph := HBoxContainer.new()
+	staff_glyph.add_theme_constant_override("separation", 2)
+	staff_glyph.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	staff_glyph.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	staff_glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var hire_row := _hire_plus_label.get_parent() as HBoxContainer
-	hire_row.add_child(_hire_icon)
-	hire_row.move_child(_hire_icon, 0)  # icon first, then the "+", then the cost
+	hire_row.add_child(staff_glyph)
+	hire_row.move_child(staff_glyph, 0)  # the pair first, then the cost label
+	staff_glyph.add_child(_hire_icon)
+	hire_row.remove_child(_hire_plus_label)
+	staff_glyph.add_child(_hire_plus_label)
+	_hire_plus_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	_hire_plus_label.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	_hire_plus_label.size_flags_horizontal = 0  # shrink to the glyph; the pair box expands instead
 	button_line.add_child(_hire_button)
 
 	_buy_button = Button.new()

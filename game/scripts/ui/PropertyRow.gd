@@ -712,21 +712,23 @@ func _on_hire_pressed() -> void:
 
 
 ## Update the staff button for the property's sequential ladder (GDD §6.1, epoch-depth
-## redesign). ONE live state — "LVL n · $cost" for the next rung — plus a faint-green
-## MAX park when every level the reached epoch allows has been bought. Because each
-## block's price is fixed by its own epoch, the number on this button can never silently
-## jump at a first contact; a new block's bigger price only appears once the player has
-## actually climbed to it (the fix for Tim's 2026-07-03 transition-shock bug).
+## redesign). ONE live state — the CURRENT level on the left, the NEXT rung's price on
+## the right — plus a faint-green MAX park when every level the reached epoch allows
+## has been bought. Because each block's price is fixed by its own epoch, the number on
+## this button can never silently jump at a first contact; a new block's bigger price
+## only appears once the player has actually climbed to it (the 2026-07-03 bug fix).
 func _refresh_hire_button() -> void:
-	# The NEXT rung to buy, shown 1-based ("LVL 1" = the first hire).
+	# The label reads where the staffer STANDS ("LVL n" = levels already bought), never
+	# the rung being sold — a staffing-level button should show the current level (Tim,
+	# 2026-07-05; it previously showed the next purchasable one). Blank while unstaffed
+	# ("LVL 0" would read oddly); the cost on the right always prices the NEXT rung.
 	_hire_icon.visible = true
-	_hire_left_label.text = "LVL %d" % (_prop.staff_level + 1)
+	_hire_left_label.text = "LVL %d" % _prop.staff_level if _prop.staff_level >= 1 else ""
 
 	# Cap reached: every level the reached epoch allows is bought. The next block unlocks
 	# at the next first contact, so the button parks on the faint-green "staffed" plate.
 	if _economy.is_staff_level_maxed(prop_index, _epoch.current_tier):
 		_apply_hire_styling(true)
-		_hire_left_label.text = "LVL %d" % _prop.staff_level
 		_hire_cost_label.text = "MAX"
 		_hire_button.disabled = true
 		_set_split_label_color(_hire_left_label, _hire_cost_label, UiPalette.NAVY)

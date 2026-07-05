@@ -110,6 +110,10 @@ var _timer_label: Label
 ## The spectrum bar communicates by fill + color ONLY — no numeric "kept" readout (plan §1,
 ## decision 2026-06-29). What you'd keep on a skip is made legible on the SKIP button instead.
 var _keep_bar: Control
+## The gold-bubble drift riding the spectrum bar's fill (every progress bar carries them,
+## Tim 2026-07-03). The bar draws by hand, so the fill fraction is fed to the bubbles
+## explicitly each refresh rather than read from a ProgressBar.
+var _keep_bar_bubbles: GoldBubbles
 ## The skip control, kept as a field so start_game can label it with the concrete reward a skip
 ## banks (the keep floor), now that the spectrum bar shows no numbers.
 var _skip_button: Button
@@ -394,6 +398,9 @@ func _build_play_view() -> Control:
 	_keep_bar.custom_minimum_size = Vector2(0, 34)
 	_keep_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_keep_bar.draw.connect(_draw_keep_bar)
+	_keep_bar_bubbles = GoldBubbles.new()
+	_keep_bar_bubbles.edge_inset = 2.0  # stay inside the bar's 2px navy outline
+	_keep_bar.add_child(_keep_bar_bubbles)
 	column.add_child(_keep_bar)
 
 	# The chosen minigame TYPE fills this area each round. A modest minimum keeps it from
@@ -981,7 +988,16 @@ func _refresh_keep_bar(delta: float) -> void:
 	elif _was_at_least_full and _display_mult < 1.0:
 		_was_at_least_full = false
 	_full_flash = maxf(0.0, _full_flash - delta * 2.5)
+	_keep_bar_bubbles.set_fill_fraction(_keep_bar_fill_fraction())
 	_keep_bar.queue_redraw()
+
+
+## The spectrum bar's current 0–1 fill, from the smoothed multiplier — shared by the
+## draw pass and the gold-bubble overlay so the two can never disagree.
+func _keep_bar_fill_fraction() -> float:
+	var floor_mult := _tuning.minigame_keep_floor
+	var span := maxf(0.0001, (1.0 + _bonus_max) - floor_mult)
+	return clampf((_display_mult - floor_mult) / span, 0.0, 1.0)
 
 
 func _draw_keep_bar() -> void:
@@ -989,11 +1005,9 @@ func _draw_keep_bar() -> void:
 	var h := _keep_bar.size.y
 	if w <= 0.0 or h <= 0.0:
 		return
-	var floor_mult := _tuning.minigame_keep_floor
-	var span := maxf(0.0001, (1.0 + _bonus_max) - floor_mult)
 	# Draw the SMOOTHED multiplier so the fill glides rather than jumps (see _refresh_keep_bar).
 	var mult := _display_mult
-	var fill_frac := clampf((mult - floor_mult) / span, 0.0, 1.0)
+	var fill_frac := _keep_bar_fill_fraction()
 
 	_keep_bar.draw_rect(Rect2(0, 0, w, h), UiPalette.INK_NAVY)
 	_keep_bar.draw_rect(Rect2(0, 0, fill_frac * w, h), _keep_color(mult))

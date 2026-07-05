@@ -156,6 +156,10 @@ func _ready() -> void:
 	_wage_meter.show_percentage = false
 	_wage_meter.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	UiPalette.style_gold_progress(_wage_meter)
+	# Gold bubbles drifting through the fill — every progress bar carries them (Tim, 2026-07-03).
+	var meter_bubbles := GoldBubbles.new()
+	meter_bubbles.edge_inset = 8.0  # match style_gold_progress's heavier 8px frame inset
+	_wage_meter.add_child(meter_bubbles)
 	# Capture the gold styleboxes so the click-impact flash can lighten them in place.
 	_fill_style = _wage_meter.get_theme_stylebox("fill") as StyleBoxFlat
 	_track_style = _wage_meter.get_theme_stylebox("background") as StyleBoxFlat

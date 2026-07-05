@@ -67,11 +67,15 @@ func _ready() -> void:
 	# Eyebrow: a blinking "incoming transmission" line so the screen reads as a live event
 	# breaking in, not a quiet notice (Tim 2026-06-17). Its alpha pulses in _process; the
 	# reveal sequence fades the WHOLE label in first, then the blink takes over.
+	# Epoch-transition type is LARGE and HIGH-CONTRAST (Tim, 2026-07-03: these screens'
+	# fonts were too small and too low-contrast to read comfortably): every line stepped
+	# up a size, and the gold lines carry a NAVY outline — gold-on-gold outlines vanished
+	# into the cream plate, navy makes the gold pop off it.
 	_eyebrow_label = Label.new()
 	_eyebrow_label.text = "◄  INCOMING TRANSMISSION  ►"
 	_eyebrow_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_eyebrow_label.add_theme_color_override("font_color", UiPalette.KETCHUP_RED)
-	_eyebrow_label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
+	_eyebrow_label.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
 	column.add_child(_eyebrow_label)
 
 	_headline_label = Label.new()
@@ -79,8 +83,8 @@ func _ready() -> void:
 	_headline_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	# Gold: this is a celebratory milestone, like the Legacy reward chrome.
 	_headline_label.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD)
-	_headline_label.add_theme_color_override("font_outline_color", UiPalette.MUSTARD_GOLD)
-	_headline_label.add_theme_constant_override("outline_size", 3)
+	_headline_label.add_theme_color_override("font_outline_color", UiPalette.NAVY)
+	_headline_label.add_theme_constant_override("outline_size", 5)
 	_headline_label.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
 	column.add_child(_headline_label)
 
@@ -91,7 +95,7 @@ func _ready() -> void:
 	_civ_label.custom_minimum_size = Vector2(760, 0)
 	_civ_label.add_theme_color_override("font_color", UiPalette.NAVY)
 	_civ_label.add_theme_color_override("font_outline_color", UiPalette.NAVY)
-	_civ_label.add_theme_constant_override("outline_size", 2)
+	_civ_label.add_theme_constant_override("outline_size", 3)
 	_civ_label.add_theme_font_size_override("font_size", UiPalette.FONT_DISPLAY)
 	column.add_child(_civ_label)
 
@@ -99,13 +103,14 @@ func _ready() -> void:
 	_planet_label = Label.new()
 	_planet_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_planet_label.add_theme_color_override("font_color", UiPalette.NAVY)
-	_planet_label.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
+	_planet_label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
 	column.add_child(_planet_label)
 
 	_flavor_label = Label.new()
 	_flavor_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_flavor_label.add_theme_color_override("font_color", UiPalette.MONEY_GREEN.darkened(0.2))
-	_flavor_label.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
+	# Darkened harder than the palette green so it holds contrast on the cream plate.
+	_flavor_label.add_theme_color_override("font_color", UiPalette.MONEY_GREEN.darkened(0.35))
+	_flavor_label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
 	column.add_child(_flavor_label)
 
 	# The headline payoff: how many times larger the new market is. Big and gold, so the
@@ -114,8 +119,8 @@ func _ready() -> void:
 	_market_label = Label.new()
 	_market_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_market_label.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD)
-	_market_label.add_theme_color_override("font_outline_color", UiPalette.MUSTARD_GOLD)
-	_market_label.add_theme_constant_override("outline_size", 2)
+	_market_label.add_theme_color_override("font_outline_color", UiPalette.NAVY)
+	_market_label.add_theme_constant_override("outline_size", 5)
 	_market_label.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
 	# Scale the label around its own center so the pop grows from the middle, not the
 	# top-left corner (pivot defaults to (0,0)). We set the real pivot once the label has
@@ -128,7 +133,7 @@ func _ready() -> void:
 	_narration_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_narration_label.custom_minimum_size = Vector2(760, 0)
 	_narration_label.add_theme_color_override("font_color", UiPalette.NAVY)
-	_narration_label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
+	_narration_label.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
 	column.add_child(_narration_label)
 
 	var note := Label.new()
@@ -140,7 +145,7 @@ func _ready() -> void:
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	note.custom_minimum_size = Vector2(760, 0)
 	note.add_theme_color_override("font_color", UiPalette.NAVY)
-	note.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
+	note.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
 	column.add_child(note)
 
 	_proceed_button = Button.new()
@@ -245,8 +250,13 @@ func _play_reveal() -> void:
 	#    so "FIRST CONTACT" punches onto the card.
 	_pop_in_step(_headline_label, 0.45, 0.6)
 
-	# 3) Civilization name slides up into place as it fades in.
-	_slide_in_step(_civ_label, 0.40, 26.0)
+	# 3) Civilization name pops in gently (a mild scale-up + fade). This used to be a
+	#    slide (animating position.y), but a VBoxContainer owns its children's positions:
+	#    the slide captured the label's y from a layout computed BEFORE the new civ text
+	#    resized it, so the tween could park the name too low, overlapping the line below
+	#    (the render bug Tim hit at the end of Earth, 2026-07-03). Scale doesn't touch
+	#    layout, so the pop can never fight the container.
+	_pop_in_step(_civ_label, 0.40, 0.85)
 
 	# 4) Home world and 5) currency flavor arrive as quick quiet fades.
 	_fade_in_step(_planet_label, 0.30)
@@ -288,20 +298,12 @@ func _pop_in_step(node: Control, duration: float, start_scale: float) -> void:
 	_reveal_tween.parallel().tween_property(node, "modulate:a", 1.0, duration)
 
 
-## Fade in while sliding up by `rise` pixels (the node starts nudged down and rises into
-## place). Position is animated, so we offset and restore the node's position:y.
-func _slide_in_step(node: Control, duration: float, rise: float) -> void:
-	var settled_y := node.position.y
-	node.position.y = settled_y + rise
-	_reveal_tween.parallel().tween_property(node, "position:y", settled_y, duration)
-	_reveal_tween.parallel().tween_property(node, "modulate:a", 1.0, duration)
-
-
 ## Set the scale pivot of the labels we pop/pulse to their own center, so they grow from the
 ## middle instead of the top-left corner. Called on the first tween frame, once layout has
 ## given the labels a real size.
 func _set_center_pivots() -> void:
 	_headline_label.pivot_offset = _headline_label.size / 2.0
+	_civ_label.pivot_offset = _civ_label.size / 2.0
 	_market_label.pivot_offset = _market_label.size / 2.0
 
 

@@ -93,7 +93,8 @@ func _ready() -> void:
 ## initial welcome (when transition minigames are on), false on the post-minigame result.
 func show_pile(pile: float, hours_away: float, allow_risk: bool = false) -> void:
 	_pile_label.text = Money.of(pile).display()
-	_away_label.text = "You were away %.1f hours." % hours_away
+	# Money.trim drops a whole number's ".0" — "away 2 hours", not "away 2.0 hours".
+	_away_label.text = "You were away %s hours." % Money.trim(hours_away, 1)
 	_risk_button.visible = allow_risk
 	visible = true
 

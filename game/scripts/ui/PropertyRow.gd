@@ -276,6 +276,8 @@ func _ready() -> void:
 	_cycle_bar.max_value = 1.0
 	_cycle_bar.show_percentage = false
 	UiPalette.style_progress_bar(_cycle_bar, UiPalette.MONEY_GREEN)
+	# Gold bubbles drifting through the fill — every progress bar carries them (Tim, 2026-07-03).
+	_cycle_bar.add_child(GoldBubbles.new())
 	bar_cell.add_child(_cycle_bar)
 
 	# Per-cycle income: bold BLACK, right-aligned, drawn ON TOP of the bar and vertically centered
@@ -602,7 +604,10 @@ func _refresh(delta: float) -> void:
 	# The income amount shows a single decimal place only when it isn't zero (display()'s default —
 	# _trim drops a trailing ".0"), with a space on either side of the slash (Tim, 2026-07-02/03):
 	# "$14M / 4.3m" when whole, "$14.3M / 4.3m" when not.
-	if effective_length > 0.0 and effective_length < PER_SECOND_READOUT_THRESHOLD_SEC:
+	# "<=" so a cycle of EXACTLY one second also reads as the per-second rate " / s" —
+	# per-cycle and per-second are the same number at 1s, and "$X / 1s" read as a defect
+	# (Tim, 2026-07-03: a per-second rate says "/ s", never "/ 1s").
+	if effective_length > 0.0 and effective_length <= PER_SECOND_READOUT_THRESHOLD_SEC:
 		_income_label.text = Money.of(per_cycle / effective_length).display() + " / s"
 	else:
 		_income_label.text = "%s / %s" % [Money.of(per_cycle).display(), _format_cycle_duration(effective_length)]
@@ -675,17 +680,18 @@ func _set_cycle_color(rush_no_longer_option: bool, rush_held: bool) -> void:
 	UiPalette.style_progress_bar(_cycle_bar, fill)
 
 
-## Format a cycle length (seconds) as a compact duration with one decimal and a unit scaled to size —
+## Format a cycle length (seconds) as a compact duration with a unit scaled to size —
 ## seconds (s), minutes (m), hours (h), or days (d) — for the "$X/<duration>" income readout (Tim,
-## 2026-07-02). Units are lowercase, matching the "/s" per-second rate.
+## 2026-07-02). Units are lowercase, matching the "/s" per-second rate. At most one decimal,
+## and only when it is non-zero (Money.trim): "4.3m" but "2m", never "2.0m" (Tim, 2026-07-03).
 func _format_cycle_duration(seconds: float) -> String:
 	if seconds >= 86400.0:
-		return "%.1fd" % (seconds / 86400.0)
+		return Money.trim(seconds / 86400.0, 1) + "d"
 	elif seconds >= 3600.0:
-		return "%.1fh" % (seconds / 3600.0)
+		return Money.trim(seconds / 3600.0, 1) + "h"
 	elif seconds >= 60.0:
-		return "%.1fm" % (seconds / 60.0)
-	return "%.1fs" % seconds
+		return Money.trim(seconds / 60.0, 1) + "m"
+	return Money.trim(seconds, 1) + "s"
 
 
 ## Swap the row's panel background between the normal cream look (owned) and the drab gray

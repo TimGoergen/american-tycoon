@@ -76,36 +76,36 @@ extends Resource
 ## higher rung multiplies by this, so pricier properties cost proportionally more to staff.
 @export var staff_cost_property_growth: float = 1.4  # feel-tune
 
-# --- Within-epoch staff levels (the per-epoch upgrade track, GDD §6.1 / Plans/Per_Epoch_Upgrade_Track.md) ---
-# After hiring an epoch's staffer, you keep LEVELING that staffer up through the epoch —
-# the continuous "there's always a next upgrade to chase" sink that fills an epoch (criterion
-# #3). Levels reset to 0 when you advance to the next epoch's staffer (a fresh hire). The
-# entry hire is the big tier jump (staff_cost_fraction above); levels are the small steps after.
+# --- The staff ladder (GDD §6.1 / Plans/Epoch_Depth_Pass.md, redesigned 2026-07-04) ---
+# One sequential ladder per property, in blocks of staff_levels_per_epoch. Level 1 of each
+# block IS that epoch's staffer hire (priced at the block's full anchor, carrying the block's
+# big entry step); the rest are the staffer's smaller equal steps. A block's costs and
+# effects are constants of ITS epoch — set when the block became available, never recomputed
+# — so a first contact can never silently reprice the button (Tim's 2026-07-03 directive).
 
-## Income bonus per staff level, ADDITIVE: a property's staffer multiplier is
-## staff_income_multiplier(tier) × (1 + this × staff_level). Additive (not compounding) because
-## staff_level is now ONE cumulative 0..(20×epoch) ladder that persists across contacts (Tim,
-## 2026-07-02); compounding over 100+ persistent levels would explode income, so each level adds
-## a fixed step of the current tier's income instead. Step kept at 0.33 (its old compounding value)
-## as a first-pass; the sim will say if the cumulative ladder wants a different number.
+## Base income step per staff level, ADDITIVE. Each block's actual per-level step is this ×
+## that block's catalog multiplier (PropertyState.staff_small_step), so later blocks' steps
+## are sized to their epoch while Earth's block 1 keeps exactly this value. Additive (not
+## compounding) because 120 compounding levels would explode income. First-pass value —
+## the Phase 3 pacing retune owns the final numbers (Plans/Epoch_Depth_Pass.md §4).
 @export var staff_level_step: float = 0.33  # feel-tune
 
-## How many staff levels each reached epoch unlocks. The hard cap on a property's cumulative
-## staff_level is this × the epoch you've reached (Earth=1 → 20, after first contact → 40, … up to
-## 120 at the sixth civilization). Levels you skip on Earth stay buyable later — the cap only ever
-## rises, never resets (Tim, 2026-07-02, the cumulative-ladder design).
+## Levels per block — one block per epoch from the property's unlock epoch onward. The hard
+## cap on staff_level is this × the blocks the run has opened for that property; the cap only
+## ever rises, and the ladder is strictly sequential, so levels skipped earlier are always
+## the next (cheap) rung rather than lost.
 @export var staff_levels_per_epoch: int = 20  # feel-tune
 
-## Cost of the FIRST staff level of each epoch's block, as a fraction of the current tier's
-## entry-hire cost. Levels start cheap relative to the hire you just paid, then climb by
-## staff_level_cost_growth. Cut 0.10 -> 0.07 (Tim, 2026-07-02) so a level's ROI beats buying a unit.
+## Cost of a block's SECOND level (the first small step after the hire), as a fraction of
+## that block's own anchor (its hire price). Steps start cheap relative to the hire just
+## paid, then climb by staff_level_cost_growth. Cut 0.10 -> 0.07 (Tim, 2026-07-02) so a
+## level's ROI beats buying a unit.
 @export var staff_level_cost_base: float = 0.07  # feel-tune
 
-## Geometric growth of the staff-level cost WITHIN an epoch's 20-level block: each level costs the
-## previous × this. The climb RESETS at each new epoch's block (so a cumulative 120-level ladder
-## stays affordable — an un-reset exponent would make deep levels literally unbuyable), but the
-## per-block anchor (the entry hire) jumps each epoch, so absolute costs still trend up. Softened
-## 1.6 -> 1.5 (Tim, 2026-07-02) so deeper levels stay affordable and don't fall behind units.
+## Geometric growth of the step cost WITHIN a block: each level costs the previous × this.
+## The climb restarts every block (an un-reset exponent would make a 120-level ladder
+## literally unbuyable), but each block's anchor is ~economy_scale higher than the last,
+## so absolute costs still trend up. Softened 1.6 -> 1.5 (Tim, 2026-07-02).
 @export var staff_level_cost_growth: float = 1.5  # feel-tune
 
 ## Offline income efficiency vs. live play (0–1).

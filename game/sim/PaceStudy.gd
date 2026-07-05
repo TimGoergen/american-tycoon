@@ -190,12 +190,13 @@ func _play_pace_session(candidate: Dictionary) -> Dictionary:
 		if sim_time >= next_action:
 			_greedy_buy_spree(game)
 
-			# Greedy hires: a staffer means the property runs itself, always
-			# worth it — and a hire is one of the meaningful purchases we count.
+			# Greedy hires: a staffer means the property runs itself, always worth it —
+			# and a hire is one of the meaningful purchases we count. (Hiring is level 1
+			# of the staff ladder; deeper levels stay a known scope cut — see header.)
 			for i in range(prop_count):
 				var prop := game.economy.properties[i] as PropertyState
 				if prop.units_owned > 0 and not prop.is_staffed:
-					if game.try_hire(i):
+					if game.try_buy_staff_level(i):
 						hire_count += 1
 						event_times.append(sim_time)
 

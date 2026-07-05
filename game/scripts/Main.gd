@@ -480,7 +480,6 @@ func _build_property_tab() -> Control:
 		row.tap_requested.connect(_on_tap_requested)
 		row.hold_rush_requested.connect(_on_hold_rush_requested)
 		row.hire_requested.connect(_on_hire_requested)
-		row.level_up_requested.connect(_on_level_up_requested)
 		row.set_buy_mode(_buy_mode)
 		ladder.add_child(row)
 		_rows.append(row)
@@ -767,15 +766,11 @@ func _on_hold_rush_requested(prop_index: int) -> void:
 	game.hold_rush_property(prop_index)
 
 
+## Player pressed a row's staff button: buy the next rung of that property's sequential
+## staff ladder (hiring IS level 1 of each block — GDD §6.1, epoch-depth redesign). The
+## row re-reads game state every frame, so a purchase shows on the next _process refresh.
 func _on_hire_requested(prop_index: int) -> void:
-	game.try_hire(prop_index)
-
-
-## Player pressed the staff button in its LEVEL UP state: buy one within-epoch staff level
-## (the continuous upgrade sink). Mirrors _on_hire_requested — the row re-reads game state
-## every frame, so a successful purchase shows up on the next _process refresh.
-func _on_level_up_requested(prop_index: int) -> void:
-	game.try_upgrade_staff_level(prop_index)
+	game.try_buy_staff_level(prop_index)
 
 
 func _on_wage_tapped() -> void:
@@ -918,42 +913,49 @@ func _background_path_for_tier(tier: int) -> String:
 ## no Main-screen button to reveal.
 
 
-## Snapshot of the living generation's staff vs. the dynasty's retained tiers, for the
-## Estate Office's Household Staff section (GDD §6.3). Lists only properties that have a
-## staffer now or a retained one — i.e. the actual household worth willing to an heir.
+## Snapshot of the bloodline's staff-ladder achievements vs. the dynasty's retained
+## levels, for the Estate Office's Household Staff section (GDD §6.3). Retention is
+## bought against the highest level ANY generation ever reached (Tim, 2026-07-04) —
+## prestige resets the living ladder, not the family's record — so this lists every
+## property the bloodline has ever staffed, and it never empties after a succession.
 func _build_retention_entries() -> Array:
 	var entries: Array = []
 	for i in range(game.economy.properties.size()):
 		var prop := game.economy.properties[i] as PropertyState
-		var current_tier := prop.staff_tier
-		var retained_tier := dynasty.staff_retention.get_retained_tier(i)
-		if current_tier < 1 and retained_tier < 1:
+		var retained_levels := dynasty.staff_retention.get_retained_levels(i)
+		var best_levels := maxi(prop.staff_level, dynasty.staff_retention.get_ladder_high(i))
+		if best_levels < 1 and retained_levels < 1:
 			continue
-		# You can only retain up to the staffer's live tier; -1 means nothing to buy.
-		var next_tier := retained_tier + 1
+		# One level at a time, up to the bloodline's best; -1 = nothing left to buy.
+		var next_level := retained_levels + 1
 		var cost := -1
 		var can_afford := false
-		if next_tier <= current_tier:
-			cost = dynasty.staff_retention.cost_for_tier(next_tier)
+		if next_level <= best_levels:
+			cost = dynasty.staff_retention.cost_for_level(next_level)
 			can_afford = dynasty.upgrades.available >= cost
+		# Show the roster's face: the staffer of the deepest block the bloodline has
+		# reached, named by that block's absolute epoch on this property's ladder.
+		var shown_blocks := prop.staff_block_of_level(maxi(maxi(best_levels, retained_levels), 1))
 		entries.append({
 			"index": i,
 			"property_name": (prop.config as PropertyConfig).display_name,
-			"staffer_name": EpochCatalog.staffer_name(maxi(current_tier, retained_tier), i),
-			"current_tier": current_tier,
-			"retained_tier": retained_tier,
+			"staffer_name": EpochCatalog.staffer_name(prop.staff_block_epoch(shown_blocks), i),
+			"best_levels": best_levels,
+			"retained_levels": retained_levels,
 			"cost": cost,
 			"can_afford": can_afford,
 		})
 	return entries
 
 
-## Player bought a tier of staffer retention in the Estate Office. Spend the Legacy,
-## refresh the shop (wallet, upgrade cards, and the staff rows), and persist.
+## Player bought one level of staffer retention in the Estate Office. Spend the Legacy,
+## refresh the shop (wallet, upgrade cards, and the staff rows), and persist. The staff
+## rows are updated IN PLACE (not rebuilt) so a held RETAIN button survives the refresh —
+## rebuilding would free the very button under the player's finger and break the hold.
 func _on_retain_requested(property_index: int) -> void:
 	if dynasty.buy_staff_retention(property_index):
 		_legacy_screen.refresh()
-		_legacy_screen.set_retention_entries(_build_retention_entries())
+		_legacy_screen.update_retention_entries(_build_retention_entries())
 		SaveManager.save_dict_to_file(dynasty.to_save_dict())
 
 

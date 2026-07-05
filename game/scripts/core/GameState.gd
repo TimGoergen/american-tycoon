@@ -15,11 +15,13 @@ class_name GameState
 # LEVEL (the wage save block now stores level + taps_into_level instead of a title index).
 # v7 added the per-property within-epoch staff_level (the per-epoch upgrade track).
 # v8 added the per-property permanent First Contact minigame bonus (income + cycle multipliers).
-# Older saves still load (missing fields default to a clean slate / zero earned; a v4
-# is_staffed:true becomes staff_tier 1; a pre-v6 save starts the wage at level 0; a pre-v7
-# save has every property's staff_level default to 0; a pre-v8 save has the First Contact bonus
-# default to 1.0 = base, no bonus).
-const SAVE_VERSION := 8
+# v9 collapsed staffing to the SINGLE sequential staff ladder (the epoch-depth redesign):
+# staff_tier is no longer stored — hiring is level 1 of each 20-level block, so staff_level
+# alone reconstructs everything. Older saves still load (missing fields default to a clean
+# slate / zero earned; a v4 is_staffed:true becomes one hire; a pre-v6 save starts the wage at
+# level 0; pre-v9 staff_tier + staff_level pairs are merged onto the one ladder — each old
+# tier hire counts as one ladder level; see the migration in load_save_dict).
+const SAVE_VERSION := 9
 
 var tuning: TuningConfig
 var economy: EconomyState
@@ -150,17 +152,11 @@ func try_buy(prop_index: int, count: int) -> bool:
 	return economy.try_buy(prop_index, count, epoch.current_tier)
 
 
-## Hire or upgrade a property's staffer one tier, capped at the epoch reached this run.
-## Returns false if unaffordable or already at the highest unlocked/defined tier.
-func try_hire(prop_index: int) -> bool:
-	return economy.try_hire(prop_index, epoch.current_tier)
-
-
-## Buy one staff level for a property (the cumulative staff ladder, GDD §6.1). Passes the reached
-## epoch so the cap (staff_levels_per_epoch × epoch) is enforced. Returns false if the property is
-## unstaffed, already at the cap, or unaffordable.
-func try_upgrade_staff_level(prop_index: int) -> bool:
-	return economy.try_upgrade_staff_level(prop_index, epoch.current_tier)
+## Buy the next staff-ladder level for a property — the one staff verb (hiring a staffer
+## IS level 1 of each 20-level block, GDD §6.1). Passes the reached epoch so the cap
+## (20 × blocks opened) is enforced. Returns false at the cap or if unaffordable.
+func try_buy_staff_level(prop_index: int) -> bool:
+	return economy.try_buy_staff_level(prop_index, epoch.current_tier)
 
 
 # ---------------------------------------------------------------------------
@@ -187,11 +183,9 @@ func to_save_dict() -> Dictionary:
 		var p := prop as PropertyState
 		props.append({
 			"units_owned": p.units_owned,
-			# v5: the staffer TIER (0 none, 1 Earth, 2+ alien). The multiplier is not
-			# saved — it is re-derived from the tier via EpochCatalog on load, so the two
-			# can never drift (same principle as recomputing cost_product from purchases).
-			"staff_tier": p.staff_tier,
-			# v7: within-epoch staff level (resets each epoch, so it is small and bounded).
+			# v9: the property's position on its single sequential staff ladder. This is the
+			# ONLY staffing fact saved — the staffer tier and every multiplier are derived
+			# from it (same principle as recomputing cost_product from purchases).
 			"staff_level": p.staff_level,
 			# v8: the permanent First Contact minigame bonus (alien properties). Saved raw because
 			# it is won from minigame performance and can't be re-derived (GDD §5.5 site 2).
@@ -259,20 +253,27 @@ func load_save_dict(data: Dictionary) -> void:
 	for i in range(mini(saved_props.size(), economy.properties.size())):
 		var sp: Dictionary = saved_props[i]
 		var prop := economy.properties[i] as PropertyState
-		# v5 stores staff_tier; a pre-v5 save only has the is_staffed bool, which maps to
-		# tier 1 (the Earth staffer) when true. The tier's multiplier is re-derived here.
-		var staff_tier := int(sp.get("staff_tier", 1 if bool(sp.get("is_staffed", false)) else 0))
-		# Alien properties are automation-only (EconomyState.try_hire): their staffer multiplier is
-		# always 1.0, never the epoch 40× — so re-derive it alien-aware, not straight from the tier.
-		var is_alien := (prop.config as PropertyConfig).unlock_tier > 1
-		var staff_mult := 1.0 if is_alien else EpochCatalog.staff_income_multiplier(staff_tier)
-		# Pre-v7 saves have no staff_level; default 0. Pre-v8 saves have no First Contact bonus;
-		# default 1.0 (base — no bonus).
+		var staff_level := int(sp.get("staff_level", 0))
+		# Pre-v9 migration: older saves stored staffing as a TIER (separate hire purchases)
+		# plus the level ladder. On the v9 unified ladder each of those hires is itself one
+		# ladder level (level 1 of its block), so an old save's ladder position is its level
+		# count plus its hire count, clamped to the blocks its reached epoch had opened.
+		# (Pre-v5 saves only have is_staffed, which was already mapped to tier 1.) The
+		# clamp makes the mapping safe rather than exact — old block boundaries counted 20
+		# levels PLUS a hire, v9 blocks are 20 including the hire — a one-level generosity
+		# at full blocks, accepted for a one-time migration.
+		if version <= 8 or sp.has("staff_tier"):
+			var old_tier := int(sp.get("staff_tier", 1 if bool(sp.get("is_staffed", false)) else 0))
+			if old_tier <= 0:
+				staff_level = 0
+			else:
+				var cap := prop.tuning.staff_levels_per_epoch \
+						* prop.staff_blocks_available(epoch.current_tier)
+				staff_level = mini(staff_level + old_tier, maxi(cap, 1))
+		# Pre-v8 saves have no First Contact bonus; default 1.0 (base — no bonus).
 		prop.restore(
 			int(sp.get("units_owned", 0)),
-			staff_tier,
-			staff_mult,
-			int(sp.get("staff_level", 0)),
+			staff_level,
 			float(sp.get("cycle_progress", 0.0)),
 			bool(sp.get("is_cycle_running", false)),
 			float(sp.get("first_contact_income_mult", 1.0)),

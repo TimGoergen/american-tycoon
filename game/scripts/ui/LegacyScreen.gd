@@ -80,6 +80,17 @@ var _held_buy_id := ""
 var _hold_elapsed := 0.0
 var _hold_repeating := false
 
+# Per-property live controls of the Household Staff rows, keyed by property index, so a
+# retention purchase can update each row IN PLACE (update_retention_entries). Rebuilding
+# the rows on every purchase would free the button under a held finger and break the
+# hold-to-retain repeat.
+var _retention_rows: Dictionary = {}
+
+# Hold-to-retain state, mirroring the upgrade cards' hold-to-buy (-1 = none held).
+var _held_retain_index := -1
+var _retain_hold_elapsed := 0.0
+var _retain_hold_repeating := false
+
 
 ## Store the state and build the (static) card layout once.
 func setup(upgrades: LegacyUpgrades) -> void:
@@ -494,13 +505,16 @@ func _add_upgrade_card(parent: VBoxContainer, definition: Dictionary, accent: Co
 # Household Staff retention rows (dynamic)
 # ---------------------------------------------------------------------------
 
-## Rebuild the Household Staff rows from Main's snapshot of the living generation's
-## staff vs. the dynasty's retained tiers. Each entry is a Dictionary:
-##   { index, property_name, staffer_name, current_tier, retained_tier, cost, can_afford }
-## cost < 0 means there is nothing to buy (unstaffed, or already fully retained).
+## Rebuild the Household Staff rows from Main's snapshot of the bloodline's staff-ladder
+## achievements vs. the dynasty's retained ladder LEVELS. Each entry:
+##   { index, property_name, staffer_name, best_levels, retained_levels, cost, can_afford }
+## cost < 0 means there is nothing to buy (never staffed, or already retained to the
+## bloodline's best level).
 func set_retention_entries(entries: Array) -> void:
 	for child in _staff_list.get_children():
 		child.queue_free()
+	_retention_rows = {}
+	_held_retain_index = -1  # any held button is being freed — stop its repeat
 
 	if entries.is_empty():
 		var none := Label.new()
@@ -516,6 +530,22 @@ func set_retention_entries(entries: Array) -> void:
 	# Newly-created rows need the scroll-drag-through filter applied too (the one-time
 	# call in _build_ui only covered the static controls).
 	UiPalette.allow_scroll_drag_through(_staff_list)
+
+
+## Refresh the Household Staff rows IN PLACE after a retention purchase, so a held
+## RETAIN button keeps existing (and repeating). Falls back to a full rebuild if the
+## row set itself changed (a property staffed for the first time adds a row).
+func update_retention_entries(entries: Array) -> void:
+	if entries.size() != _retention_rows.size():
+		set_retention_entries(entries)
+		return
+	for entry_variant in entries:
+		var entry := entry_variant as Dictionary
+		if not _retention_rows.has(int(entry["index"])):
+			set_retention_entries(entries)
+			return
+	for entry_variant in entries:
+		_apply_retention_entry(entry_variant as Dictionary)
 
 
 ## One Household Staff card: property + current staffer on top, the now/retained tiers
@@ -547,9 +577,6 @@ func _add_retention_row(entry: Dictionary) -> void:
 	var status := Label.new()
 	status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	status.text = "Now tier %d  ·  Retained tier %d" % [
-		int(entry["current_tier"]), int(entry["retained_tier"])
-	]
 	status.add_theme_color_override("font_color", UiPalette.MONEY_GREEN)
 	status.add_theme_font_size_override("font_size", CARD_BODY_SIZE)
 	bottom.add_child(status)
@@ -557,20 +584,40 @@ func _add_retention_row(entry: Dictionary) -> void:
 	var button := Button.new()
 	# Flexible width (was a fixed 440 that overflowed the framed viewport), matching the
 	# upgrade cards' RETAIN/BUY buttons. ~35% shorter (Tim, 2026-06-28); a smaller font so the
-	# two-line "RETAIN TIER n / n Gems" still fits the shorter button.
+	# two-line "RETAIN LVL n / n Gems" still fits the shorter button.
 	button.custom_minimum_size = Vector2(240, 80)
 	button.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
 	UiPalette.style_button(button, true)  # red: spends Legacy
+	# button_down/button_up (not `pressed`) so holding auto-repeats, exactly like the
+	# upgrade cards' hold-to-buy: the down fires the first purchase, _process repeats it.
+	button.button_down.connect(_on_retain_down.bind(index))
+	button.button_up.connect(_on_retain_up)
+	bottom.add_child(button)
+
+	_retention_rows[index] = {"status": status, "button": button}
+	_apply_retention_entry(entry)
+
+
+## Paint one Household Staff row's live values (status line + RETAIN button) from its
+## entry. Shared by the initial build and the in-place update so they can never disagree.
+func _apply_retention_entry(entry: Dictionary) -> void:
+	var row: Dictionary = _retention_rows[int(entry["index"])]
+	var status := row["status"] as Label
+	# "Best" is the deepest level any generation ever reached — retention shops against
+	# the bloodline's record, not the living (resettable) ladder. LVL numbers match the
+	# property row's readout, so the two screens agree.
+	status.text = "Best LVL %d  ·  Retained LVL %d" % [
+		int(entry["best_levels"]), int(entry["retained_levels"])
+	]
+	var button := row["button"] as Button
 	var cost := int(entry["cost"])
 	if cost < 0:
-		# Nothing to buy: either unstaffed, or already retained at the live tier.
+		# Nothing to buy: already retained up to the bloodline's best level.
 		button.text = "RETAINED"
 		button.disabled = true
 	else:
-		button.text = "RETAIN TIER %d\n%d Gems" % [int(entry["retained_tier"]) + 1, cost]
+		button.text = "RETAIN LVL %d\n%d Gems" % [int(entry["retained_levels"]) + 1, cost]
 		button.disabled = not bool(entry["can_afford"])
-		button.pressed.connect(func() -> void: retain_requested.emit(index))
-	bottom.add_child(button)
 
 
 # ---------------------------------------------------------------------------
@@ -626,18 +673,46 @@ func _on_buy_up() -> void:
 	_held_buy_id = ""
 
 
-## While a buy button is held, keep purchasing on a calm cadence (after an initial delay)
-## until the player releases or the upgrade can no longer be bought (maxed / unaffordable).
+## While a buy or retain button is held, keep purchasing on a calm cadence (after an
+## initial delay) until the player releases or nothing more can be bought.
 func _process(delta: float) -> void:
-	if _held_buy_id == "":
-		return
-	_hold_elapsed += delta
-	var threshold := HOLD_REPEAT_INTERVAL if _hold_repeating else HOLD_INITIAL_DELAY
-	if _hold_elapsed >= threshold:
-		_hold_elapsed = 0.0
-		_hold_repeating = true
-		if not _attempt_buy(_held_buy_id):
-			_held_buy_id = ""  # nothing left to buy — stop repeating
+	if _held_buy_id != "":
+		_hold_elapsed += delta
+		var threshold := HOLD_REPEAT_INTERVAL if _hold_repeating else HOLD_INITIAL_DELAY
+		if _hold_elapsed >= threshold:
+			_hold_elapsed = 0.0
+			_hold_repeating = true
+			if not _attempt_buy(_held_buy_id):
+				_held_buy_id = ""  # nothing left to buy — stop repeating
+
+	if _held_retain_index >= 0:
+		_retain_hold_elapsed += delta
+		var retain_threshold := HOLD_REPEAT_INTERVAL if _retain_hold_repeating else HOLD_INITIAL_DELAY
+		if _retain_hold_elapsed >= retain_threshold:
+			_retain_hold_elapsed = 0.0
+			_retain_hold_repeating = true
+			# Main performs the purchase and updates this row in place; once the button
+			# reads disabled (fully retained / unaffordable) the repeat stops itself.
+			var row: Dictionary = _retention_rows.get(_held_retain_index, {})
+			if row.is_empty() or (row["button"] as Button).disabled:
+				_held_retain_index = -1
+			else:
+				retain_requested.emit(_held_retain_index)
+
+
+## Press on a RETAIN button: buy the first level immediately, then arm the auto-repeat
+## (mirrors _on_buy_down). Holding retains level after level at the hold-to-buy cadence —
+## deep retention is many steps, so tapping each one would be a chore (Tim, 2026-07-04).
+func _on_retain_down(property_index: int) -> void:
+	_held_retain_index = property_index
+	_retain_hold_elapsed = 0.0
+	_retain_hold_repeating = false
+	retain_requested.emit(property_index)
+
+
+## Release: stop the retain auto-repeat.
+func _on_retain_up() -> void:
+	_held_retain_index = -1
 
 
 ## Buy one level of an upgrade, refresh the shop, and notify Main. Returns whether the

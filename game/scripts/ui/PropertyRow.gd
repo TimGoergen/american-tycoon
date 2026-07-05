@@ -14,11 +14,10 @@ enum BuyMode { ONE, TEN, HUNDRED, MAX }
 signal buy_requested(prop_index: int, mode: BuyMode)
 signal tap_requested(prop_index: int)
 signal hold_rush_requested(prop_index: int)
+## The staff button was pressed. There is only ONE staff action now — buy the next rung of
+## the property's sequential staff ladder (hiring a staffer IS level 1 of each 20-level
+## block, GDD §6.1 epoch-depth redesign) — so the button needs no state dispatch.
 signal hire_requested(prop_index: int)
-## Emitted when the staff button is pressed in its LEVEL UP state — i.e. the property is
-## already staffed at the best tier this epoch allows, so the button now buys a within-epoch
-## staff level (the continuous upgrade sink, GDD §6.1) instead of a tier hire/upgrade.
-signal level_up_requested(prop_index: int)
 
 var prop_index: int = -1
 
@@ -143,6 +142,9 @@ const BUTTON_ROW_HEIGHT := 80
 const BUTTON_LABEL_FONT_SIZE := 30
 ## Side length of the headshot icon that stands in for the word "HIRE"/"UPGRADE".
 const HIRE_ICON_SIZE := 56
+## The permanent "+" beside the hire button's headshot — bigger than the cost text so
+## icon + plus read together as one "add staff" symbol (Tim, 2026-07-05).
+const HIRE_PLUS_FONT_SIZE := 42
 
 ## Property-row readability pass (Tim, 2026-07-01): the row is taller and its labels bigger.
 ## The property NAME reads in bold on the top line at this size.
@@ -163,10 +165,10 @@ var _buy_button: Button
 var _buy_caption_label: Label
 var _buy_cost_label: Label
 var _hire_button: Button
-var _hire_left_label: Label
+## The permanent "+" between the hire button's headshot icon and its price.
+var _hire_plus_label: Label
 var _hire_cost_label: Label
-## Small headshot icon shown on the hire button in place of the word "HIRE"/"UPGRADE"
-## (Tim, 2026-06-22); hidden in the fully-staffed state, where the staffer name shows.
+## Small headshot icon on the hire button, standing in for the word "HIRE" (Tim, 2026-06-22).
 var _hire_icon: TextureRect
 
 ## Which hire-button look is currently applied, so the stylebox is only rebuilt when
@@ -304,36 +306,29 @@ func _ready() -> void:
 	button_line.add_theme_constant_override("separation", 8)
 	column.add_child(button_line)
 
-	_buy_button = Button.new()
-	_buy_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	# The hire button gets a slightly larger share of the row (Tim, 2026-07-01): both stretch
-	# to fill, but the buy button's stretch ratio is pulled a little below the hire button's
-	# default 1.0, so the split lands around 46% buy / 54% hire. (An earlier 0.65 ratio made
-	# the buy button too narrow — its "BUY ×N" and cost labels ran together.)
-	_buy_button.size_flags_stretch_ratio = 0.85
-	_buy_button.custom_minimum_size = Vector2(0, BUTTON_ROW_HEIGHT)
-	UiPalette.style_button(_buy_button, true)  # red: buying is a spend action (§8)
-	_buy_button.pressed.connect(func() -> void: buy_requested.emit(prop_index, _buy_mode))
-	var buy_labels := _add_split_button_labels(_buy_button)
-	_buy_caption_label = buy_labels[0]
-	_buy_cost_label = buy_labels[1]
-	button_line.add_child(_buy_button)
-
+	# The HIRE button sits FIRST — next to the staff portrait — so everything staff-related
+	# groups on the row's left side (Tim, 2026-07-05: portrait shows who + their level, the
+	# button beside it grows them). It reads as a pure action: the headshot icon, a plus
+	# sign, and the next rung's price — the level readout itself lives in the portrait now.
 	_hire_button = Button.new()
 	_hire_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# A little narrower than the buy button (0.85 : 1.0 ≈ a 46/54 split) — the freed width
+	# goes to BUY, whose "BUY ×N" + cost labels are the longer text (Tim, 2026-07-05).
+	_hire_button.size_flags_stretch_ratio = 0.85
 	_hire_button.custom_minimum_size = Vector2(0, BUTTON_ROW_HEIGHT)
 	UiPalette.style_button(_hire_button, false)
-	# The hire button does double duty (hire/upgrade a tier, then level up within the epoch),
-	# so its single `pressed` is connected ONCE here and routed by state in _on_hire_pressed.
-	# Reconnecting it per-state would stack handlers and fire the action twice.
+	# Connected ONCE here (a per-refresh reconnect would stack handlers and double-fire).
 	_hire_button.pressed.connect(_on_hire_pressed)
 	var hire_labels := _add_split_button_labels(_hire_button)
-	_hire_left_label = hire_labels[0]
+	_hire_plus_label = hire_labels[0]
 	_hire_cost_label = hire_labels[1]
+	# The left label is a permanent "+" beside the headshot — together they read "add
+	# staff". Larger than the button's cost text so the glyph carries as a symbol.
+	_hire_plus_label.text = "+"
+	_hire_plus_label.add_theme_font_size_override("font_size", HIRE_PLUS_FONT_SIZE)
 
-	# Headshot icon at the left of the hire button, standing in for the "HIRE"/"UPGRADE"
-	# word (Tim, 2026-06-22). Reuses the white-authored headshot, tinted navy to match the
-	# plate's text; hidden in the fully-staffed state (where the staffer name is shown).
+	# Headshot icon standing in for the "HIRE" word (Tim, 2026-06-22). Reuses the
+	# white-authored headshot, tinted navy to match the plate's text.
 	_hire_icon = TextureRect.new()
 	_hire_icon.texture = ManagerCircle.HEADSHOT_TEX
 	_hire_icon.custom_minimum_size = Vector2(HIRE_ICON_SIZE, HIRE_ICON_SIZE)
@@ -341,10 +336,36 @@ func _ready() -> void:
 	_hire_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_hire_icon.modulate = UiPalette.NAVY
 	_hire_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var hire_row := _hire_left_label.get_parent() as HBoxContainer
-	hire_row.add_child(_hire_icon)
-	hire_row.move_child(_hire_icon, 0)  # sit it before the (now empty) left label
+
+	# Icon + plus sit as one TIGHT, TOP-ALIGNED pair (Tim, 2026-07-05): a nested box
+	# centers the pair vertically as a unit, and inside it the "+" hangs from the pair's
+	# top so its top edge lines up with the icon's. The pair takes the button's leftover
+	# width (replacing the plus label's old expand), keeping the cost right-aligned.
+	var staff_glyph := HBoxContainer.new()
+	staff_glyph.add_theme_constant_override("separation", 2)
+	staff_glyph.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	staff_glyph.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	staff_glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var hire_row := _hire_plus_label.get_parent() as HBoxContainer
+	hire_row.add_child(staff_glyph)
+	hire_row.move_child(staff_glyph, 0)  # the pair first, then the cost label
+	staff_glyph.add_child(_hire_icon)
+	hire_row.remove_child(_hire_plus_label)
+	staff_glyph.add_child(_hire_plus_label)
+	_hire_plus_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	_hire_plus_label.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	_hire_plus_label.size_flags_horizontal = 0  # shrink to the glyph; the pair box expands instead
 	button_line.add_child(_hire_button)
+
+	_buy_button = Button.new()
+	_buy_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_buy_button.custom_minimum_size = Vector2(0, BUTTON_ROW_HEIGHT)
+	UiPalette.style_button(_buy_button, true)  # red: buying is a spend action (§8)
+	_buy_button.pressed.connect(func() -> void: buy_requested.emit(prop_index, _buy_mode))
+	var buy_labels := _add_split_button_labels(_buy_button)
+	_buy_caption_label = buy_labels[0]
+	_buy_cost_label = buy_labels[1]
+	button_line.add_child(_buy_button)
 
 	# Let a swipe that lands anywhere on the row (the panel, labels, or progress
 	# bars — anything that isn't one of the buttons above) scroll the ladder,
@@ -577,7 +598,8 @@ func _refresh(delta: float) -> void:
 	# The infinity "rushing" icon shows whether the primary Button or a secondary finger holds it.
 	var show_rush_icon := interactive and (_manager_circle.is_held() or _secondary_held("rush"))
 	_manager_circle.set_state(
-		portrait_mode, config.accent_color, config.manager_portrait, show_rush_icon, interactive
+		portrait_mode, config.accent_color, config.manager_portrait, show_rush_icon,
+		interactive, _prop.staff_level
 	)
 	# Income readout. For an OWNED rung: the cash paid each time the bar fills (per cycle),
 	# lit by the live frenzy multiplier so it matches what the player actually receives.
@@ -712,95 +734,40 @@ func _apply_ownership_styling(owned: bool) -> void:
 		_income_label.add_theme_color_override("font_color", UiPalette.DARK_GRAY)
 
 
-## True once the property is staffed at the best tier this epoch allows. In that state the
-## hire button stops being a tier hire/upgrade and becomes the within-epoch LEVEL UP sink
-## (GDD §6.1). Used both to draw the button (_refresh_hire_button) and to route its press
-## (_on_hire_pressed), so the two never disagree about which action the button performs.
-func _is_in_level_up_state() -> bool:
-	# Highest tier hireable right now: the reached epoch, capped at the defined epochs. Alien
-	# properties are automation-only — capped at a single staffer (EconomyState.try_hire) — so their
-	# best tier is always 1: once hired they go straight to the level-up sink, never an upgrade
-	# (Tim, 2026-07-01).
-	var max_tier := 1 if _is_alien_property() else mini(_epoch.current_tier, EpochCatalog.tier_count())
-	return _prop.staff_tier >= 1 and _prop.staff_tier >= max_tier
-
-
-## True for an alien property type (unlock_tier > 1) — the ones added at First Contact, which staff
-## for automation only (no epoch multiplier), unlike the 12 Earth properties.
-func _is_alien_property() -> bool:
-	return (_prop.config as PropertyConfig).unlock_tier > 1
-
-
-## The hire button's single `pressed` handler. It performs different actions depending on
-## the staff state, so we dispatch here rather than reconnecting the signal each frame.
+## The staff button's `pressed` handler. One action only — buy the next ladder rung —
+## so no state dispatch (the pre-redesign HIRE/UPGRADE/LEVEL-UP state machine is gone).
 func _on_hire_pressed() -> void:
-	if _is_in_level_up_state():
-		level_up_requested.emit(prop_index)
-	else:
-		hire_requested.emit(prop_index)
+	hire_requested.emit(prop_index)
 
 
-## Update the hire/upgrade/level-up button for the property's current staff tier and the
-## reached epoch (the alien-staffing track, GDD §6). Three states:
-##   • tier 0 → HIRE the Earth staffer (tier 1).
-##   • a higher tier is unlocked by the reached epoch → UPGRADE to the next alien tier.
-##   • staffed at the best tier this epoch allows → a live LEVEL UP button buying
-##     within-epoch staff levels (the continuous upgrade sink), until the next first
-##     contact unlocks a better tier and resets the level.
+## Update the staff button for the property's sequential ladder (GDD §6.1, epoch-depth
+## redesign). The button is a pure BUY action — headshot + "+" on the left, the NEXT
+## rung's price on the right (the current level shows in the portrait disc instead,
+## Tim 2026-07-05) — plus a faint-green MAX park when every level the reached epoch
+## allows has been bought. Because each block's price is fixed by its own epoch, the
+## number here can never silently jump at a first contact; a new block's bigger price
+## only appears once the player has actually climbed to it (the 2026-07-03 bug fix).
 func _refresh_hire_button() -> void:
-	var tier := _prop.staff_tier
-
-	if _is_in_level_up_state():
-		# `staff_level` is stored 0-based (the count of level-ups bought; 0 = freshly hired). The
-		# player should read a freshly hired staffer as "LVL 1", so the label adds one — a pure
-		# display offset, the economy still anchors level 0 to the plain entry multiplier.
-		_hire_icon.visible = true
-		_hire_left_label.text = "LVL %d" % (_prop.staff_level + 1)
-
-		# Cap reached: this property has bought every level the current epoch allows. The next block
-		# unlocks at the next first contact, so the button parks on the faint-green "staffed" plate
-		# showing MAX (not a cost) until then (Tim, 2026-07-02, the cumulative-ladder cap).
-		if _economy.is_staff_level_maxed(prop_index, _epoch.current_tier):
-			_apply_hire_styling(true)
-			_hire_cost_label.text = "MAX"
-			_hire_button.disabled = true
-			_set_split_label_color(_hire_left_label, _hire_cost_label, UiPalette.NAVY)
-			_hire_icon.modulate = UiPalette.NAVY
-			return
-
-		# Below the cap — the button buys the next staff level, adding to this property's income
-		# (GDD §6.1). It is a live action, so it uses the normal action styling; the headshot icon
-		# stands in for the staffer (we no longer spell out the job title).
-		_apply_hire_styling(false)
-		var level_cost := _economy.get_staff_level_cost(prop_index)
-		_hire_cost_label.text = Money.of(level_cost).display()
-		# Same gate as hiring: need the cash, and units for the staffer to run.
-		_hire_button.disabled = _economy.cash < level_cost or _prop.units_owned == 0
-		# Full navy when affordable; dimmed navy when not — matching the HIRE/UPGRADE state.
-		var level_color := Color(UiPalette.NAVY, 0.45) if _hire_button.disabled else UiPalette.NAVY
-		_set_split_label_color(_hire_left_label, _hire_cost_label, level_color)
-		_hire_icon.modulate = level_color
+	# Cap reached: every level the reached epoch allows is bought. The next block unlocks
+	# at the next first contact, so the button parks on the faint-green "staffed" plate
+	# with the icon + plus grayed and "MAX" where the price was.
+	if _economy.is_staff_level_maxed(prop_index, _epoch.current_tier):
+		_apply_hire_styling(true)
+		_hire_cost_label.text = "MAX"
+		_hire_button.disabled = true
+		_set_split_label_color(_hire_plus_label, _hire_cost_label, UiPalette.NAVY)
+		_hire_icon.modulate = UiPalette.NAVY
 		return
 
-	# Otherwise a tier is available to buy: tier 1 (HIRE) from unstaffed, or the next
-	# alien tier (UPGRADE) on an already-staffed property after a fresh contact. The headshot
-	# icon stands in for the verb (Tim, 2026-06-22), so the left label is normally blank and
-	# the cost sits on the right. But since the cumulative ladder (2026-07-02) staff levels
-	# PERSIST across contact and keep paying out, so an already-staffed property keeps showing
-	# its live "LVL n" during the save-up-for-the-new-staffer stretch — otherwise the level
-	# appears to vanish at First Contact and pop back after the upgrade (Tim's 2026-07-03 bug).
 	_apply_hire_styling(false)
-	var next_tier := tier + 1
-	var cost := _economy.get_staff_cost(prop_index, next_tier)
-	_hire_icon.visible = true
-	_hire_left_label.text = "LVL %d" % (_prop.staff_level + 1) if tier >= 1 else ""
+	var cost := _economy.get_next_staff_level_cost(prop_index)
 	_hire_cost_label.text = Money.of(cost).display()
-	# A property with no units can't be staffed yet — a staffer needs something to run.
+	# A property with no units can't be staffed — a staffer needs something to run.
 	_hire_button.disabled = _economy.cash < cost or _prop.units_owned == 0
 	# Navy on the live mustard plate, dimmed to match the disabled cream plate — applied to
-	# both the cost label and the headshot icon so they read as one.
+	# both labels and the headshot icon so they read as one.
 	var hire_color := Color(UiPalette.NAVY, 0.45) if _hire_button.disabled else UiPalette.NAVY
-	_set_split_label_color(_hire_left_label, _hire_cost_label, hire_color)
+	_set_split_label_color(_hire_plus_label, _hire_cost_label, hire_color)
 	_hire_icon.modulate = hire_color
 
 

@@ -222,17 +222,29 @@ func _ready() -> void:
 	_name_label.clip_text = true
 	column.add_child(_name_label)
 
-	# Row 2 — an outlined "owned / next-threshold" count chip on the LEFT, and to its right the live
-	# cycle progress bar filling the rest of the row, with the per-cycle income drawn ON TOP of the
-	# bar (bold black, right-aligned). The only text ABOVE the bar is the property name (row 1). The
-	# chip and the bar are the same height so they read as one line.
+	# Row 2 — the live cycle progress bar on the LEFT (with the per-cycle income drawn ON
+	# TOP of it, bold black), and the outlined "owned / next-threshold" count chip on the
+	# RIGHT — sitting directly above the buy button, since the count is exactly what that
+	# button grows (Tim, 2026-07-05; mirrors the staff column, where the portrait's level
+	# sits above the hire button). The chip and the bar share a height so they read as
+	# one line.
 	var second_row := HBoxContainer.new()
 	second_row.add_theme_constant_override("separation", 10)
 	column.add_child(second_row)
 
+	# The bar cell fills the row's leftover width and holds the progress bar with the income drawn
+	# over it. A plain Control host (rather than parenting the income to the bar) keeps the income
+	# overlay visible even on an unowned "peek" row, where the bar itself is hidden — no cycle to
+	# run — but the single-unit income preview should still show.
+	var bar_cell := Control.new()
+	bar_cell.custom_minimum_size = Vector2(0, SECOND_ROW_HEIGHT)
+	bar_cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bar_cell.size_flags_vertical = Control.SIZE_SHRINK_END
+	second_row.add_child(bar_cell)
+
 	# The count chip: a gray-outlined plate wrapping the "owned / threshold" readout. Transparent
 	# fill so only the outline shows, whatever the row's ownership background is. It takes only its
-	# own width (SHRINK_BEGIN) and bottom-aligns (SHRINK_END) so it sits level with the progress bar.
+	# own width (SHRINK_END pins it right) and bottom-aligns so it sits level with the progress bar.
 	var count_chip := PanelContainer.new()
 	var chip_style := StyleBoxFlat.new()
 	chip_style.bg_color = Color.TRANSPARENT
@@ -243,7 +255,7 @@ func _ready() -> void:
 	chip_style.set_content_margin(SIDE_RIGHT, 16)
 	count_chip.add_theme_stylebox_override("panel", chip_style)
 	count_chip.custom_minimum_size = Vector2(0, SECOND_ROW_HEIGHT)
-	count_chip.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	count_chip.size_flags_horizontal = Control.SIZE_SHRINK_END
 	count_chip.size_flags_vertical = Control.SIZE_SHRINK_END
 	second_row.add_child(count_chip)
 
@@ -253,16 +265,6 @@ func _ready() -> void:
 	_count_label.add_theme_color_override("font_color", UiPalette.NAVY)
 	_count_label.add_theme_font_size_override("font_size", SECOND_ROW_FONT_SIZE)
 	count_chip.add_child(_count_label)
-
-	# The right cell fills the rest of the row and holds the progress bar with the income drawn over
-	# it. A plain Control host (rather than parenting the income to the bar) keeps the income overlay
-	# visible even on an unowned "peek" row, where the bar itself is hidden — no cycle to run — but
-	# the single-unit income preview should still show. Same height as the count chip so they align.
-	var bar_cell := Control.new()
-	bar_cell.custom_minimum_size = Vector2(0, SECOND_ROW_HEIGHT)
-	bar_cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	bar_cell.size_flags_vertical = Control.SIZE_SHRINK_END
-	second_row.add_child(bar_cell)
 
 	# Cycle progress bar (Style Guide §9: the "spin" is the real cycle progress), filling the cell.
 	_cycle_bar = ProgressBar.new()
@@ -275,15 +277,17 @@ func _ready() -> void:
 	_cycle_bar.add_child(GoldBubbles.new())
 	bar_cell.add_child(_cycle_bar)
 
-	# Per-cycle income: bold BLACK, right-aligned, drawn ON TOP of the bar and vertically centered
-	# in it (Tim, 2026-07-01). A cream outline (the project's faux-weight trick) keeps it legible
-	# over both the green fill and the gray track. Inset a little from the cell's edges; ignores the
-	# mouse so a tap on the bar area is never eaten by the label.
+	# Per-cycle income: bold BLACK, LEFT-aligned, drawn ON TOP of the bar and vertically centered
+	# in it (Tim, 2026-07-01; flipped left 2026-07-05 when the count chip moved to the row's right
+	# — right-aligned it would butt against the chip and the two number groups would read as one
+	# jumble). A cream outline (the project's faux-weight trick) keeps it legible over both the
+	# green fill and the gray track. Inset a little from the cell's edges; ignores the mouse so a
+	# tap on the bar area is never eaten by the label.
 	_income_label = Label.new()
 	_income_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_income_label.offset_left = 12
 	_income_label.offset_right = -12
-	_income_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_income_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	_income_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_income_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_income_label.add_theme_font_size_override("font_size", SECOND_ROW_FONT_SIZE)

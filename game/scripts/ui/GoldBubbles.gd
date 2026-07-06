@@ -26,7 +26,7 @@ extends Control
 # Each bubble's position along the fill is stored NORMALIZED (0–1 of the filled width),
 # not in pixels: when the fill is a narrow sliver the bubbles stay evenly spread through
 # it instead of being clamped into one overlapping clump (the "single gold thing" bug on
-# the economy bar). Every bubble also gets its own size, speed, opacity, and swirl phase
+# the economy bar). Every bubble also gets its own size, speed, opacity, and sway rate/phase
 # from a fixed golden-ratio sequence, so the crowd never marches in lockstep yet looks
 # identical across identical bars.
 
@@ -55,15 +55,14 @@ const MIN_DRIFT_PX_PER_SEC := 14.0
 ## SLOW_UPPER_MULT × the base instead.
 const SPEED_SPREAD := 0.45
 const SLOW_UPPER_MULT := 4.5  # raised from 3.0 (Tim, 2026-07-05)
-## The swirl: two stacked sine waves on the vertical axis (a slow deep one and a faster
-## shallow one, at incommensurate rates) plus a small horizontal wobble — the combined
-## path traces loose loops, reading as bubbles tumbling in moving liquid.
-const SWAY_FRACTION := 0.26        # primary vertical amplitude, × bar height
-const SWAY_HZ := 0.55
-const SWIRL_FRACTION := 0.12       # secondary vertical amplitude, × bar height
-const SWIRL_HZ := 1.7
-const WOBBLE_PX := 2.5             # horizontal wobble amplitude
-const WOBBLE_HZ := 1.1
+## The sway: ONE smooth sine per bubble across the bar's height. Earlier versions stacked
+## a second faster sine plus a horizontal wobble on top for a "tumbling" look, but the
+## extra waves superimposed small jitters on the main back-and-forth and read as awkward,
+## not liquid (Tim, 2026-07-06). Variety now comes from each bubble's own rate and phase,
+## not from a busier path.
+const SWAY_FRACTION := 0.30        # vertical amplitude, × bar height
+const SWAY_HZ_MIN := 0.40          # each bubble sways at its own fixed rate in this range
+const SWAY_HZ_MAX := 0.70
 ## Default bubble color: bright gold (see the `bubble_color` property for per-bar tints —
 ## a GOLD-filled bar wants DARK gold bubbles instead, Tim 2026-07-05). Each bubble's own
 ## alpha varies around it (see _alpha_of).
@@ -242,15 +241,14 @@ func _draw() -> void:
 func _bubble_point(index: int, radius: float, filled_width: float, seconds_ago: float) -> Vector2:
 	var at_time := _time - seconds_ago
 	var phase := _variant(index, 0.53) * TAU
-	# Loose looping path: two vertical sines at incommensurate rates + a small
-	# horizontal wobble — carbonation tumbling in a current, not beads on a wire.
-	var sway := sin(at_time * TAU * SWAY_HZ + phase) * size.y * SWAY_FRACTION \
-			+ sin(at_time * TAU * SWIRL_HZ + phase * 2.0) * size.y * SWIRL_FRACTION
-	var wobble := sin(at_time * TAU * WOBBLE_HZ + phase * 3.0) * WOBBLE_PX
+	# One clean sine across the bar's height, at this bubble's own fixed rate and phase.
+	# Deliberately NOT a stack of waves — see the SWAY_* comment above.
+	var sway_hz := lerpf(SWAY_HZ_MIN, SWAY_HZ_MAX, _variant(index, 0.29))
+	var sway := sin(at_time * TAU * sway_hz + phase) * size.y * SWAY_FRACTION
 	# Map the normalized position into the filled region, rolled back along the drift.
 	# NOT clamped here: the head clamps itself in _draw, while out-of-fill ghosts are
 	# dropped by the caller (clamping them would pile the wake up at the fill's edge).
 	var drift_px := _bubble_pos[index] * (filled_width - radius * 2.0) \
 			- _bubble_speed_px(index) * seconds_ago
-	var x := edge_inset + radius + drift_px + wobble
+	var x := edge_inset + radius + drift_px
 	return Vector2(x, size.y / 2.0 + sway)

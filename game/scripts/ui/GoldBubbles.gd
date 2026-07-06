@@ -83,9 +83,9 @@ const ALPHA_MAX := 0.85
 ## step, a slow bar's samples all landed within a pixel of the head and hid underneath
 ## it — no visible trail at all (Tim, 2026-07-06). Distance spacing converts to each
 ## bubble's own seconds-ago via its drift speed, so the tail clears the head at any pace.
-const TRACER_COUNT := 9             # path samples in the tail (its length; now cheap to raise)
+const TRACER_COUNT := 20            # path samples in the tail (its length; cheap since the polyline rework)
 const TRACER_GAP_PX := 3.0          # drift distance between samples
-const TRACER_ALPHA_FALLOFF := 0.735 # each sample's alpha vs the one ahead of it
+const TRACER_ALPHA_FALLOFF := 0.87  # each sample's alpha vs the one ahead of it (retuned with the count so the fade spans the full tail)
 ## Tail width as a fraction of the bubble's radius. A polyline has ONE width for its
 ## whole run (Godot draws no tapered lines), so the taper is carried by alpha alone.
 const TRACER_WIDTH_VS_RADIUS := 1.4

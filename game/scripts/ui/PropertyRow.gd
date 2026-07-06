@@ -149,10 +149,11 @@ const BUTTON_LABEL_FONT_SIZE := 30
 const NAME_FONT_SIZE := UiPalette.FONT_SUBHEAD
 ## Shared height of the second row's two elements — the cycle progress bar and the outlined
 ## "owned / next-threshold" count chip — kept equal so they read as one aligned band.
-## Raised 52 → 60 in the taller-panel pass (Tim, 2026-07-05).
-const SECOND_ROW_HEIGHT := 60
+## Raised 52 → 60 (2026-07-05 taller-panel pass), then +50% → 90 (Tim, same day).
+const SECOND_ROW_HEIGHT := 90
 ## Font for the count-panel text and the per-cycle income readout above the bar.
-const SECOND_ROW_FONT_SIZE := UiPalette.FONT_BODY
+## Stepped up FONT_BODY (32) → FONT_SUBHEAD (41) with the 50%-taller band (Tim, 2026-07-05).
+const SECOND_ROW_FONT_SIZE := UiPalette.FONT_SUBHEAD
 
 var _manager_circle: ManagerCircle
 var _name_label: Label
@@ -255,8 +256,9 @@ func _ready() -> void:
 	chip_style.border_color = UiPalette.MID_GRAY
 	chip_style.set_border_width_all(2)
 	chip_style.set_corner_radius_all(4)
-	chip_style.set_content_margin(SIDE_LEFT, 16)
-	chip_style.set_content_margin(SIDE_RIGHT, 16)
+	# Side padding widened 16 → 26 so the chip reads a little roomier (Tim, 2026-07-05).
+	chip_style.set_content_margin(SIDE_LEFT, 26)
+	chip_style.set_content_margin(SIDE_RIGHT, 26)
 	count_chip.add_theme_stylebox_override("panel", chip_style)
 	count_chip.custom_minimum_size = Vector2(0, SECOND_ROW_HEIGHT)
 	count_chip.size_flags_horizontal = Control.SIZE_SHRINK_END

@@ -81,12 +81,13 @@ const ALPHA_MAX := 0.85
 ## step, a slow bar's ghosts all sampled within a pixel of the head and hid underneath
 ## it — no visible trail at all (Tim, 2026-07-06). Distance spacing converts to each
 ## bubble's own seconds-ago via its drift speed, so the tail clears the head at any pace.
-## Doubled 2026-07-06 (Tim): twice the ghosts at the same spacing, with falloffs eased
-## to their square roots so the tail fades to the same end size/alpha over the longer run.
-const TRACER_COUNT := 8
+## Doubled twice 2026-07-06 (Tim): 4x the original ghosts at the same spacing, falloffs
+## eased to their fourth roots so the tail fades to the same end size/alpha over the
+## longer run instead of dying out early.
+const TRACER_COUNT := 16
 const TRACER_GAP_PX := 3.0          # drift distance between ghost samples
-const TRACER_RADIUS_FALLOFF := 0.894 # each ghost's radius vs the one ahead of it
-const TRACER_ALPHA_FALLOFF := 0.707  # each ghost's alpha vs the one ahead of it
+const TRACER_RADIUS_FALLOFF := 0.946 # each ghost's radius vs the one ahead of it
+const TRACER_ALPHA_FALLOFF := 0.841  # each ghost's alpha vs the one ahead of it
 ## Smoothing time constant for the measured fill speed, so one jumpy frame (a rush,
 ## a snap-back) doesn't make the bubbles lurch.
 const SPEED_SMOOTH_TAU := 0.35

@@ -28,12 +28,11 @@ Everything else is polish on top of this. If any of these are off, fix them
 
 - [x] ~~**Cycle times across tiers.**~~ **KEEP (2026-07-06).** The 7–12 stretch to a
       180s top cycle feels right on device.
-- [ ] **Rush / hold-to-rush feel.** **TWEAK (2026-07-06).** The finishing-lap fix
-      helped, but the bar still clips early under held rush — it's moving too fast to
-      follow. Diagnosis: a held rush drives the COMPLETION CADENCE sub-second while the
-      nominal cycle stays long, so the bar animates laps it can't finish; the solid-bar
-      rule keys on effective cycle length and never notices. Fix candidate: pin the bar
-      solid (or equivalent) based on actual wrap cadence, not just cycle length.
+- [ ] **Rush / hold-to-rush feel.** **TWEAK (2026-07-06) — FIX SHIPPED, re-verify.**
+      The bar now pins solid when completions arrive faster than one per 0.6s (the
+      wrap-cadence rule), with the briskest carbonation on screen (faster still while
+      rush is held) as the "it's working" signal. Tim confirmed the jank itself is
+      fixed; the remaining question is whether the solid+fizz read feels right.
 - [ ] **Solid-bar fast properties.** Once a cycle drops under the threshold the bar
       pins full and the readout switches to `$X / s`. Does a maxed property read as
       "humming," or does the frozen bar read as broken? *(Not yet tested 2026-07-06 —
@@ -95,11 +94,12 @@ performance item at the end of this section before feel-verdicting anything here
 - [ ] **Result screen** — spectrum bar (red→gold→green→teal) + Legacy-with-bonus
       readout. Does a bad/skipped result clearly communicate the Legacy *lost*?
       (This is deliberately not upside-only — confirm that reads as intended.)
-- [ ] **NEW — Minigame screen performance (2026-07-06).** Noticeable lag on the
-      minigame screen even after the bubble-trail polyline rework fixed the game tab.
-      Investigate what the minigame screen renders per frame (keep-bar GoldBubbles is
-      one suspect, but the game tab runs many more bubble bars smoothly — likely
-      something screen-specific). Performance blocks feel-verdicts for this section.
+- [ ] **NEW — Minigame screen performance (2026-07-06) — FIX SHIPPED, re-verify.**
+      Root cause: the whole game screen kept drawing at 60fps beneath the opaque
+      modal (economy-freezing modals now hide the covered layers), plus per-frame
+      hot-path cleanups in basketball/catch/timing-bar/host. Re-test on device —
+      basketball mid-celebration is the stress case. If smooth, this unblocks
+      feel-verdicts for the whole section.
 
 ## 5. UI readability & polish (validate against the large-text/large-target rule)
 

@@ -58,11 +58,17 @@ const SLOW_UPPER_MULT := 4.5  # raised from 3.0 (Tim, 2026-07-05)
 ## The sway: ONE smooth sine per bubble across the bar's height. Earlier versions stacked
 ## a second faster sine plus a horizontal wobble on top for a "tumbling" look, but the
 ## extra waves superimposed small jitters on the main back-and-forth and read as awkward,
-## not liquid (Tim, 2026-07-06). Variety now comes from each bubble's own rate and phase,
-## not from a busier path.
-const SWAY_FRACTION := 0.30        # vertical amplitude, × bar height
+## not liquid (Tim, 2026-07-06). Variety comes from each bubble's own rate, phase,
+## amplitude, and lane — with one shared amplitude every bubble traced the same-sized
+## wave and the crowd still read as one path (Tim, 2026-07-06). Now some bubbles barely
+## leave their lane while others sweep wide, like carbonation at different depths.
+const SWAY_FRACTION_MIN := 0.08    # vertical amplitude range, × bar height
+const SWAY_FRACTION_MAX := 0.32
 const SWAY_HZ_MIN := 0.40          # each bubble sways at its own fixed rate in this range
 const SWAY_HZ_MAX := 0.70
+## Each bubble's resting lane sits up to this far off the bar's center line (× bar
+## height, either side), so small-amplitude bubbles aren't all pinned to dead center.
+const LANE_OFFSET_FRACTION := 0.12
 ## Default bubble color: bright gold (see the `bubble_color` property for per-bar tints —
 ## a GOLD-filled bar wants DARK gold bubbles instead, Tim 2026-07-05). Each bubble's own
 ## alpha varies around it (see _alpha_of).
@@ -247,14 +253,17 @@ func _draw() -> void:
 func _bubble_point(index: int, radius: float, filled_width: float, seconds_ago: float) -> Vector2:
 	var at_time := _time - seconds_ago
 	var phase := _variant(index, 0.53) * TAU
-	# One clean sine across the bar's height, at this bubble's own fixed rate and phase.
-	# Deliberately NOT a stack of waves — see the SWAY_* comment above.
+	# One clean sine at this bubble's own fixed rate, phase, and amplitude, around its own
+	# lane. Deliberately NOT a stack of waves — see the SWAY_* comment above.
 	var sway_hz := lerpf(SWAY_HZ_MIN, SWAY_HZ_MAX, _variant(index, 0.29))
-	var sway := sin(at_time * TAU * sway_hz + phase) * size.y * SWAY_FRACTION
+	var sway_fraction := lerpf(SWAY_FRACTION_MIN, SWAY_FRACTION_MAX, _variant(index, 0.83))
+	var sway := sin(at_time * TAU * sway_hz + phase) * size.y * sway_fraction
+	# The lane: -1..+1 from the hash, scaled to the offset limit.
+	var lane := (_variant(index, 0.91) * 2.0 - 1.0) * size.y * LANE_OFFSET_FRACTION
 	# Map the normalized position into the filled region, rolled back along the drift.
 	# NOT clamped here: the head clamps itself in _draw, while out-of-fill ghosts are
 	# dropped by the caller (clamping them would pile the wake up at the fill's edge).
 	var drift_px := _bubble_pos[index] * (filled_width - radius * 2.0) \
 			- _bubble_speed_px(index) * seconds_ago
 	var x := edge_inset + radius + drift_px
-	return Vector2(x, size.y / 2.0 + sway)
+	return Vector2(x, size.y / 2.0 + lane + sway)

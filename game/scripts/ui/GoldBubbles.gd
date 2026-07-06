@@ -127,6 +127,16 @@ var _explicit_fraction := -1.0
 ## screen. The row commands the flow directly instead (Tim, 2026-07-06).
 var flow_override_px := -1.0
 
+## Scales the size of the bubble crowd (both the width-based count and its cap).
+## 1.0 = the full crowd; the TURBO meter halves it while charging, where the full
+## crowd read as too busy on the gold fill (Tim, 2026-07-06).
+var density_scale := 1.0
+
+## When true the liquid flows right-to-left — for bars that DRAIN rather than fill,
+## like the TURBO meter while burning, where the movement's direction is leftward
+## (Tim, 2026-07-06). Tracer tails trail to the right accordingly.
+var flow_reversed := false
+
 var _time := 0.0
 var _last_fraction := 0.0
 var _smoothed_speed_px := 0.0  # measured fill-edge speed, px/s, smoothed
@@ -187,9 +197,10 @@ func _current_fraction() -> float:
 	return 0.0
 
 
-## How many bubbles a fill this wide can host without crowding.
+## How many bubbles a fill this wide can host without crowding (scaled by density_scale).
 func _active_count(filled_width: float) -> int:
-	return clampi(int(filled_width / BUBBLE_SPACING_PX), 2, BUBBLE_COUNT)
+	var cap := maxi(2, int(round(BUBBLE_COUNT * density_scale)))
+	return clampi(int(filled_width / BUBBLE_SPACING_PX * density_scale), 2, cap)
 
 
 func _process(delta: float) -> void:
@@ -227,8 +238,12 @@ func _process(delta: float) -> void:
 			# Each bubble drifts at its own rate between the lower bound and the (speed-
 			# dependent) upper bound, so the crowd spreads out instead of traveling as one
 			# body. Positions advance in normalized space: the same px/s reads as a bigger
-			# step through a narrower fill.
-			_bubble_pos[i] = fmod(_bubble_pos[i] + _bubble_speed_px(i) * delta / filled_width, 1.0)
+			# step through a narrower fill. fposmod (not fmod) so a reversed flow wraps
+			# cleanly from 0 back to 1.
+			var step := _bubble_speed_px(i) * delta / filled_width
+			if flow_reversed:
+				step = -step
+			_bubble_pos[i] = fposmod(_bubble_pos[i] + step, 1.0)
 	queue_redraw()
 
 
@@ -269,8 +284,13 @@ func _draw() -> void:
 		for sample in range(1, TRACER_COUNT + 1):
 			sample_alpha *= TRACER_ALPHA_FALLOFF
 			var point := _bubble_point(i, radius, filled_width, float(sample) * seconds_per_gap)
-			if point.x < edge_inset + tail_width / 2.0:
-				break  # the wake would poke out of the fill's left edge — stop the tail
+			# The wake trails opposite the flow, so it pokes out of the fill's TRAILING
+			# edge — right when the flow is reversed, left otherwise. Stop the tail there.
+			if flow_reversed:
+				if point.x > edge_inset + filled_width - tail_width / 2.0:
+					break
+			elif point.x < edge_inset + tail_width / 2.0:
+				break
 			tail_points.append(point)
 			var sample_color := bubble_color
 			sample_color.a = sample_alpha
@@ -331,10 +351,13 @@ func _bubble_point(index: int, radius: float, filled_width: float, seconds_ago: 
 	var sway := sin(at_time * TAU * sway_hz + phase) * size.y * sway_fraction
 	# The lane: -1..+1 from the hash, scaled to the offset limit.
 	var lane := (_variant(index, 0.91) * 2.0 - 1.0) * size.y * LANE_OFFSET_FRACTION
-	# Map the normalized position into the filled region, rolled back along the drift.
-	# NOT clamped here: the head clamps itself in _draw, while out-of-fill tail samples
-	# are dropped by the caller (clamping them would pile the wake up at the fill's edge).
-	var drift_px := _bubble_pos[index] * (filled_width - radius * 2.0) \
-			- _bubble_speed_px(index) * seconds_ago
+	# Map the normalized position into the filled region, rolled back along the drift —
+	# backward is rightward when the flow is reversed. NOT clamped here: the head clamps
+	# itself in _draw, while out-of-fill tail samples are dropped by the caller (clamping
+	# them would pile the wake up at the fill's edge).
+	var rollback := _bubble_speed_px(index) * seconds_ago
+	if flow_reversed:
+		rollback = -rollback
+	var drift_px := _bubble_pos[index] * (filled_width - radius * 2.0) - rollback
 	var x := edge_inset + radius + drift_px
 	return Vector2(x, size.y / 2.0 + lane + sway)

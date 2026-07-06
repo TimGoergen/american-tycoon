@@ -154,9 +154,9 @@ const NAME_FONT_SIZE := 51
 ## Raised 52 → 60 (2026-07-05 taller-panel pass), then +50% → 90 (Tim, same day).
 const SECOND_ROW_HEIGHT := 90
 ## Font for the count-panel text and the per-cycle income readout above the bar.
-## FONT_BODY (32) → FONT_SUBHEAD (41) with the 50%-taller band, then +25% in the
-## all-panel-text-larger pass (→ 51, Tim 2026-07-05).
-const SECOND_ROW_FONT_SIZE := 51
+## FONT_BODY (32) → 41 with the 50%-taller band, +25% to 51 in the all-panel-text pass,
+## then −20% back to 41 for this band specifically (Tim, 2026-07-05).
+const SECOND_ROW_FONT_SIZE := 41
 
 var _manager_circle: ManagerCircle
 var _name_label: Label

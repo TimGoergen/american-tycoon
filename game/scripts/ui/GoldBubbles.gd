@@ -54,7 +54,7 @@ const MIN_DRIFT_PX_PER_SEC := 14.0
 ## like one speed — so a crawling bar lets its quickest bubbles run up to
 ## SLOW_UPPER_MULT × the base instead.
 const SPEED_SPREAD := 0.45
-const SLOW_UPPER_MULT := 4.5  # raised from 3.0 (Tim, 2026-07-05)
+const SLOW_UPPER_MULT := 3.0  # 3.0 -> 4.5 -> back to 3.0 (Tim, 2026-07-06)
 ## The sway: ONE smooth sine per bubble across the bar's height. Earlier versions stacked
 ## a second faster sine plus a horizontal wobble on top for a "tumbling" look, but the
 ## extra waves superimposed small jitters on the main back-and-forth and read as awkward,

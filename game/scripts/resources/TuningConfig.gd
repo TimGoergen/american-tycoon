@@ -40,6 +40,14 @@ extends Resource
 ## upgrades later (configurable by upgrades — GDD §8.4 loophole/upgrade catalog).
 @export var wage_hold_taps_per_second: float = 2.5  # feel-tune
 
+## The "executive compensation" wage floor: one clock-in tap pays at least this many
+## SECONDS of the empire's passive income, whenever that beats the ladder wage (see
+## WageState). Keeps clocking in a viable active play at every scale of the economy;
+## without it the fixed ladder died the moment the first ATM was staffed (Tim,
+## 2026-07-05). At 0.25 and a deliberate ~3 taps/sec, active clocking adds ~+75%
+## on top of passive income.
+@export var wage_passive_fraction: float = 0.25  # feel-tune
+
 ## Frenzy fill per held-rush pulse, as a fraction of a manual tap's fill.
 ## Holding is convenient, so it charges the meter slower than real tapping.
 @export var frenzy_fill_hold_factor: float = 0.6  # feel-tune M1

@@ -9,6 +9,14 @@ class_name WageState
 # first level, then 20 for the next, then 30, and so on (advancing from level N costs
 # (N+1)×10 clicks). The level is exactly the number of times the player has completed a
 # level's click requirement.
+#
+# EXECUTIVE COMPENSATION (Tim, 2026-07-05): the ladder alone died the moment the first
+# ATM was bought — a fixed dollar ladder can never keep pace with a per-second-compounding
+# economy, so clocking in stopped being a viable play within minutes. A tap therefore pays
+# the ladder wage OR a fraction of a second of the empire's passive income, whichever is
+# GREATER (executive_wage_floor below, fed by GameState each tick). Early on it is an
+# honest hourly wage; once you own the economy, "clocking in" is the tycoon awarding
+# himself executive compensation — the number grows with the empire, and so does the joke.
 
 
 ## Clicks the FIRST level-up costs; each later level costs this much more — 10, 20, 30, …
@@ -49,6 +57,13 @@ var auto_tap_speed_multiplier: float = 1.0
 ## Applied in GameState.hold_tap_wage. Set by DynastyState.
 var auto_tap_power_multiplier: float = 1.0
 
+## The "executive compensation" floor: a fraction of a second of the empire's passive
+## income (tuning.wage_passive_fraction × passive income/sec), refreshed by GameState
+## every tick. A tap pays this whenever it beats the ladder wage, so clocking in stays a
+## viable active-income verb at every scale of the economy (see the class header). Held
+## here — not looked up — so WageState keeps zero dependencies on the economy.
+var executive_wage_floor: float = 0.0
+
 
 ## Tap the wage button. Earns the current level's wage (floored at award, Spec §1), banks the
 ## click toward the next level-up, and levels up — carrying any surplus clicks — once the
@@ -67,9 +82,12 @@ func tap_wage(income_multiplier: float = 1.0) -> float:
 	return earned
 
 
-## The base wage one tap earns at the CURRENT level, before frenzy / Legacy multipliers.
+## The base wage one tap earns right now, before frenzy / Legacy multipliers: the
+## CURRENT level's ladder wage, or the executive-compensation floor once the empire's
+## passive income outgrows the ladder — whichever is greater. Payment (tap_wage) and
+## the clock-in button's "+$x / tap" display both read this, so they can never disagree.
 func current_wage_per_tap() -> float:
-	return wage_per_tap_at_level(level)
+	return maxf(wage_per_tap_at_level(level), executive_wage_floor)
 
 
 ## The base wage one tap earns at `at_level`: base × growth^level (the per-level ramp).

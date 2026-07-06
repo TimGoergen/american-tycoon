@@ -83,12 +83,12 @@ const ALPHA_MAX := 0.85
 ## bubble's own seconds-ago via its drift speed, so the tail clears the head at any pace.
 ## Count history (Tim, 2026-07-06): 4 -> 16 in two doublings, then 16 made the app crawl
 ## (every ghost is its own antialiased draw_circle, times every bubble on every bar), so
-## cut 30% to 11. Falloffs are always retuned with the count so the tail fades to the
-## SAME end size/alpha regardless of ghost count — only the length changes.
-const TRACER_COUNT := 11
+## cut to 11, then 9 (still slow). Falloffs are always retuned with the count so the tail
+## fades to the SAME end size/alpha regardless of ghost count — only the length changes.
+const TRACER_COUNT := 9
 const TRACER_GAP_PX := 3.0          # drift distance between ghost samples
-const TRACER_RADIUS_FALLOFF := 0.922 # each ghost's radius vs the one ahead of it
-const TRACER_ALPHA_FALLOFF := 0.777  # each ghost's alpha vs the one ahead of it
+const TRACER_RADIUS_FALLOFF := 0.906 # each ghost's radius vs the one ahead of it
+const TRACER_ALPHA_FALLOFF := 0.735  # each ghost's alpha vs the one ahead of it
 ## Smoothing time constant for the measured fill speed, so one jumpy frame (a rush,
 ## a snap-back) doesn't make the bubbles lurch.
 const SPEED_SMOOTH_TAU := 0.35

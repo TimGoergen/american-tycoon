@@ -86,8 +86,13 @@ func _ready() -> void:
 	# drew as specks pinned to the top edge (Tim, 2026-07-05; proven by sim/BubbleProbe).
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Starting positions come from the golden-ratio sequence, NOT even i/COUNT spacing:
+	# narrow fills draw only the first N bubbles, and with even spacing those N all sat
+	# in the first N/12th of the fill — a clump that a slow bar took ages to shake out
+	# (Tim, 2026-07-05). A Weyl sequence is evenly spread for EVERY prefix, so whatever
+	# subset is active starts well distributed through the fill.
 	for i in range(BUBBLE_COUNT):
-		_bubble_pos.append(float(i) / float(BUBBLE_COUNT))
+		_bubble_pos.append(_variant(i, 0.0))
 
 
 ## A stable per-bubble pseudo-random in [0,1) — the golden-ratio (Weyl) sequence, offset

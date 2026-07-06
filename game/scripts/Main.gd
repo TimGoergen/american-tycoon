@@ -199,12 +199,19 @@ func _update_ladder_edge_fade() -> void:
 		# the scroll offset (the ladder column sits at the scroll content's origin).
 		var row_top := row.position.y - float(_ladder_scroll.scroll_vertical)
 		var alpha := 1.0
+		# Each fading edge is measured from the INNER edge of its ScrollEdgeArrows strip,
+		# not the viewport itself: the strip shows under the same "more content this way"
+		# condition and covers the rows beneath it, so fading against the raw viewport
+		# left rows behind the strip looking solid-but-buried (Tim, 2026-07-06). The strip
+		# and the fade agree on where the visible window starts.
 		if more_above:
-			# Fraction of the row below the viewport's top edge (its visible share).
-			alpha = minf(alpha, clampf((row_top + row.size.y) / row.size.y, 0.0, 1.0))
+			# Fraction of the row below the top strip (its visible share).
+			var below_strip := row_top + row.size.y - ScrollEdgeArrows.STRIP_HEIGHT
+			alpha = minf(alpha, clampf(below_strip / row.size.y, 0.0, 1.0))
 		if more_below:
-			# Fraction of the row above the viewport's bottom edge (its visible share).
-			alpha = minf(alpha, clampf((view_height - row_top) / row.size.y, 0.0, 1.0))
+			# Fraction of the row above the bottom strip (its visible share).
+			var above_strip := view_height - ScrollEdgeArrows.STRIP_HEIGHT - row_top
+			alpha = minf(alpha, clampf(above_strip / row.size.y, 0.0, 1.0))
 		row.modulate.a = alpha
 
 

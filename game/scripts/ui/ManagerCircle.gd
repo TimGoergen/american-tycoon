@@ -45,7 +45,7 @@ const LEVELED_ICON_DIAMETER_FRACTION := 0.50      # slightly smaller icon when t
 const LEVELED_PORTRAIT_DIAMETER_FRACTION := 0.78  # authored portraits fill the disc normally; less when leveled
 const LEVELED_ICON_RAISE_FRACTION := 0.18         # how far (× radius) the art rises
 const LEVEL_TEXT_BASELINE_FRACTION := 0.62        # text baseline below center (× radius)
-const LEVEL_FONT_FRACTION := 0.30                 # font size (× radius)
+const LEVEL_FONT_FRACTION := 0.375                # font size (× radius); +25% (Tim, 2026-07-05)
 
 enum PortraitMode { LOCKED, UNSTAFFED, STAFFED }
 

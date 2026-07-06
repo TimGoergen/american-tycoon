@@ -140,20 +140,22 @@ var _cycle_color_applied := -1
 ## its rows, so growing the two row constants grows the whole panel (and the portrait
 ## disc with it, via PORTRAIT_HEIGHT_FRACTION).
 const BUTTON_ROW_HEIGHT := 92
-## A touch under FONT_BUTTON (34) so long cost numbers on the buy/hire buttons have more room
-## before the caption and cost start crowding each other (Tim, 2026-07-01).
-const BUTTON_LABEL_FONT_SIZE := 30
+## Buy/hire button label size. Was a touch under FONT_BUTTON so long costs had room
+## (Tim, 2026-07-01); +25% in the all-panel-text-larger pass (30 → 38, Tim 2026-07-05).
+const BUTTON_LABEL_FONT_SIZE := 38
 
 ## Property-row readability pass (Tim, 2026-07-01): the row is taller and its labels bigger.
-## The property NAME reads in bold on the top line at this size.
-const NAME_FONT_SIZE := UiPalette.FONT_SUBHEAD
+## The property NAME reads in bold on the top line at this size — FONT_SUBHEAD (41) + 25%
+## from the all-panel-text-larger pass (Tim, 2026-07-05).
+const NAME_FONT_SIZE := 51
 ## Shared height of the second row's two elements — the cycle progress bar and the outlined
 ## "owned / next-threshold" count chip — kept equal so they read as one aligned band.
 ## Raised 52 → 60 (2026-07-05 taller-panel pass), then +50% → 90 (Tim, same day).
 const SECOND_ROW_HEIGHT := 90
 ## Font for the count-panel text and the per-cycle income readout above the bar.
-## Stepped up FONT_BODY (32) → FONT_SUBHEAD (41) with the 50%-taller band (Tim, 2026-07-05).
-const SECOND_ROW_FONT_SIZE := UiPalette.FONT_SUBHEAD
+## FONT_BODY (32) → FONT_SUBHEAD (41) with the 50%-taller band, then +25% in the
+## all-panel-text-larger pass (→ 51, Tim 2026-07-05).
+const SECOND_ROW_FONT_SIZE := 51
 
 var _manager_circle: ManagerCircle
 var _name_label: Label
@@ -878,7 +880,8 @@ class StaffHireGlyph extends Control:
 	## 56 → 62 in the taller-panel pass (Tim, 2026-07-05).
 	const ICON_SIZE := 62.0
 	## The plus is bigger than the button's cost text so it carries as a symbol.
-	const PLUS_FONT_SIZE := 42
+	## +25% in the all-panel-text-larger pass (42 → 52, Tim 2026-07-05).
+	const PLUS_FONT_SIZE := 52
 	## Gap between the face's visible right edge and the plus.
 	const PAIR_GAP := 3.0
 	## Distance from the "+" glyph's VISUAL top down to its text baseline, as a fraction

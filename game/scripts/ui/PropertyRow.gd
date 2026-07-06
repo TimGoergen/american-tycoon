@@ -141,8 +141,9 @@ var _cycle_color_applied := -1
 ## disc with it, via PORTRAIT_HEIGHT_FRACTION).
 const BUTTON_ROW_HEIGHT := 92
 ## Buy/hire button label size. Was a touch under FONT_BUTTON so long costs had room
-## (Tim, 2026-07-01); +25% in the all-panel-text-larger pass (30 → 38, Tim 2026-07-05).
-const BUTTON_LABEL_FONT_SIZE := 38
+## (Tim, 2026-07-01); +25% in the all-panel-text-larger pass (30 → 38), then a further
+## +20% for the buttons specifically (38 → 46, Tim 2026-07-05).
+const BUTTON_LABEL_FONT_SIZE := 46
 
 ## Property-row readability pass (Tim, 2026-07-01): the row is taller and its labels bigger.
 ## The property NAME reads in bold on the top line at this size — FONT_SUBHEAD (41) + 25%

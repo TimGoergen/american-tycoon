@@ -47,6 +47,11 @@ var _plan_button: Button
 ## Rich-text content overlaid on the plan button so the "(+x [gem])" parenthetical can show the
 ## legacy-gem image inline (a plain Button can't put an image mid-text). _update_plan_button drives it.
 var _plan_label: RichTextLabel
+## The dynasty's lifetime-earned Legacy readout above the plan button ("[gem] Lifetime
+## Earned: x"). Driven by _update_plan_button; _shown_lifetime_earned caches the last
+## painted value so the rich text isn't reparsed every frame.
+var _lifetime_earned_label: RichTextLabel
+var _shown_lifetime_earned := -1
 var _rows: Array = []
 
 # Bottom tab bar (UI Notes §7). The four surfaces share one content slot; one is
@@ -527,6 +532,24 @@ func _build_estate_tab() -> Control:
 	_legacy_screen.set_retention_entries(_build_retention_entries())
 	_legacy_screen.refresh()
 
+	# The dynasty's long-arc score, just above the prestige exit (Tim, 2026-07-05):
+	# every Legacy gem the bloodline has ever banked, across all successions. A
+	# RichTextLabel so the gem image stands in for the word "Legacy" (the same inline-
+	# image pattern the plan button uses). Refreshed by _update_plan_button.
+	_lifetime_earned_label = RichTextLabel.new()
+	_lifetime_earned_label.bbcode_enabled = true
+	_lifetime_earned_label.fit_content = true
+	_lifetime_earned_label.scroll_active = false
+	_lifetime_earned_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	_lifetime_earned_label.add_theme_font_override("normal_font", UiPalette.make_bold_font())
+	_lifetime_earned_label.add_theme_font_size_override("normal_font_size", UiPalette.FONT_SUBHEAD)
+	_lifetime_earned_label.add_theme_color_override("default_color", UiPalette.DARK_GOLD)
+	# Mipmapped filtering so the inline gem image downscales smoothly rather than aliasing.
+	_lifetime_earned_label.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	# RichTextLabels need a real minimum size or they render as stray pixels (memory note).
+	_lifetime_earned_label.custom_minimum_size = Vector2(0, 56)
+	v.add_child(_lifetime_earned_label)
+
 	# The prestige exit, pinned to the BOTTOM of the tab (Tim, 2026-06-28): plan the estate,
 	# pass on, raise a faster heir. Red = big commit.
 	_plan_button = Button.new()
@@ -857,6 +880,12 @@ func _update_plan_button() -> void:
 		_plan_label.text = "[center]PASS THE TORCH  (+%d [img width=36 height=50]res://art/icons/legacy_gem.svg[/img])[/center]" % dynasty.projected_legacy_gain()
 	else:
 		_plan_label.text = "[center]PASS THE TORCH[/center]"
+
+	# The lifetime-earned line above the button (Tim, 2026-07-05). Repainted only when the
+	# value actually changes — rebuilding rich text every frame would be wasted parsing.
+	if dynasty.upgrades.earned_lifetime != _shown_lifetime_earned:
+		_shown_lifetime_earned = dynasty.upgrades.earned_lifetime
+		_lifetime_earned_label.text = "[center][img width=30 height=42]res://art/icons/legacy_gem.svg[/img] Lifetime Earned: %d[/center]" % _shown_lifetime_earned
 
 
 ## First contact: a new epoch was reached this tick. Show the beat (Main's _process

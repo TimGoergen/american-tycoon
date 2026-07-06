@@ -42,9 +42,15 @@ const SPEED_VS_BAR := 1.0
 ## …with a floor (px/s) so a full or barely-moving bar still fizzes. Art knob —
 ## 0.0 restores strictly "frozen when the bar is frozen".
 const MIN_DRIFT_PX_PER_SEC := 14.0
-## Per-bubble drift variation: each bubble moves at base speed × (1 ± this), so the
-## crowd spreads out over time instead of traveling as one body.
+## Per-bubble drift variation: each bubble moves at base speed × a factor between
+## (1 − SPEED_SPREAD) and an upper limit, so the crowd spreads out over time instead of
+## traveling as one body. The UPPER limit widens as the bar slows (Tim, 2026-07-05): at
+## a fast bar's pace ±45% is plenty of visible variety, but near the idle-drift floor
+## the absolute px/s differences it produces are too small to read — everything looks
+## like one speed — so a crawling bar lets its quickest bubbles run up to
+## SLOW_UPPER_MULT × the base instead.
 const SPEED_SPREAD := 0.45
+const SLOW_UPPER_MULT := 3.0
 ## The swirl: two stacked sine waves on the vertical axis (a slow deep one and a faster
 ## shallow one, at incommensurate rates) plus a small horizontal wobble — the combined
 ## path traces loose loops, reading as bubbles tumbling in moving liquid.
@@ -143,16 +149,23 @@ func _process(delta: float) -> void:
 	var blend := 1.0 - exp(-delta / SPEED_SMOOTH_TAU)
 	_smoothed_speed_px = lerpf(_smoothed_speed_px, raw_speed_px, blend)
 
-	# Twice the bar's speed (the spec), with a small floor so still bars keep fizzing.
+	# The bar's own speed, with a small floor so still bars keep fizzing.
 	var base_speed := maxf(_smoothed_speed_px * SPEED_VS_BAR, MIN_DRIFT_PX_PER_SEC)
+
+	# How close the bar is to a crawl: 1.0 at (or below) the idle-drift floor, fading to
+	# 0.0 as the bar speeds up. Widens the per-bubble speed range on slow bars (see the
+	# SPEED_SPREAD / SLOW_UPPER_MULT comment).
+	var slowness := clampf(MIN_DRIFT_PX_PER_SEC / base_speed, 0.0, 1.0)
+	var upper_mult := lerpf(1.0 + SPEED_SPREAD, SLOW_UPPER_MULT, slowness)
 
 	var filled_width := fraction * track_width
 	if filled_width >= MIN_FILLED_WIDTH_PX:
 		for i in range(BUBBLE_COUNT):
-			# Each bubble drifts at its own rate around the base, so the crowd spreads
-			# out instead of traveling as one body. Positions advance in normalized
-			# space: the same px/s reads as a bigger step through a narrower fill.
-			var speed_px := base_speed * (1.0 + SPEED_SPREAD * (2.0 * _variant(i, 0.37) - 1.0))
+			# Each bubble drifts at its own rate between the lower bound and the (speed-
+			# dependent) upper bound, so the crowd spreads out instead of traveling as one
+			# body. Positions advance in normalized space: the same px/s reads as a bigger
+			# step through a narrower fill.
+			var speed_px := base_speed * lerpf(1.0 - SPEED_SPREAD, upper_mult, _variant(i, 0.37))
 			_bubble_pos[i] = fmod(_bubble_pos[i] + speed_px * delta / filled_width, 1.0)
 	queue_redraw()
 

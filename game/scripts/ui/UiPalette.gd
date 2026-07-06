@@ -153,8 +153,9 @@ static func make_panel_style() -> StyleBoxFlat:
 	return _make_plate(CREAM, NAVY)
 
 
-## Edge gap that floats each tab's content panel clear of the screen — the same inset the
-## settings tab established, now shared by every tab.
+## Vertical gap that floats each tab's content panel between the hero stat above and the
+## tab bar below. TOP/BOTTOM only since 2026-07-06 (Tim): the panel's left/right edges
+## now sit flush with the hero stat panel and the tab buttons, full column width.
 const TAB_PANEL_EDGE_MARGIN := 40
 
 
@@ -176,7 +177,7 @@ static func make_tab_panel_style() -> StyleBoxFlat:
 ## MarginContainer; the caller drops THAT into the tab-content slot in place of the bare content.
 static func wrap_in_tab_panel(content: Control) -> MarginContainer:
 	var margin := MarginContainer.new()
-	for side in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
+	for side in ["margin_top", "margin_bottom"]:
 		margin.add_theme_constant_override(side, TAB_PANEL_EDGE_MARGIN)
 	var panel := PanelContainer.new()
 	panel.add_theme_stylebox_override("panel", make_tab_panel_style())

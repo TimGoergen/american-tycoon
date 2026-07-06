@@ -77,8 +77,12 @@ const ALPHA_MIN := 0.45
 const ALPHA_MAX := 0.85
 ## Tracers: each bubble trails a few fading, shrinking ghosts of itself sampled a moment
 ## back along its own path (Tim, 2026-07-05) — a comet tail in the liquid's flow.
+## Ghosts are spaced by DISTANCE along the drift, not by a fixed time step: with a time
+## step, a slow bar's ghosts all sampled within a pixel of the head and hid underneath
+## it — no visible trail at all (Tim, 2026-07-06). Distance spacing converts to each
+## bubble's own seconds-ago via its drift speed, so the tail clears the head at any pace.
 const TRACER_COUNT := 4
-const TRACER_SPACING_SEC := 0.05   # how far apart (in time) the ghosts sample the path
+const TRACER_GAP_PX := 3.0         # drift distance between ghost samples
 const TRACER_RADIUS_FALLOFF := 0.8 # each ghost's radius vs the one ahead of it
 const TRACER_ALPHA_FALLOFF := 0.5  # each ghost's alpha vs the one ahead of it
 ## Smoothing time constant for the measured fill speed, so one jumpy frame (a rush,
@@ -227,12 +231,15 @@ func _draw() -> void:
 
 		# Tracers first (so the head draws over them): fading, shrinking ghosts sampled a
 		# moment back along the bubble's own path — the wake it just swirled through.
+		# TRACER_GAP_PX of drift converts to this bubble's own seconds-ago (see the
+		# TRACER_* comment for why distance, not time).
+		var seconds_per_gap := TRACER_GAP_PX / _bubble_speed_px(i)
 		var ghost_radius := radius
 		var ghost_alpha := head_alpha
 		for ghost in range(1, TRACER_COUNT + 1):
 			ghost_radius *= TRACER_RADIUS_FALLOFF
 			ghost_alpha *= TRACER_ALPHA_FALLOFF
-			var point := _bubble_point(i, radius, filled_width, float(ghost) * TRACER_SPACING_SEC)
+			var point := _bubble_point(i, radius, filled_width, float(ghost) * seconds_per_gap)
 			if point.x < edge_inset + ghost_radius:
 				break  # the wake would poke out of the fill's left edge — stop the tail
 			var ghost_color := bubble_color

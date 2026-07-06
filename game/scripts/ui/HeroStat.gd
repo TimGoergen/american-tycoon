@@ -137,7 +137,7 @@ var _economy_bar: ProgressBar
 var _economy_divider: ColorRect
 ## Height of the economy bar strip, and of the red divider above it (the divider matches
 ## the panel frame's 12px thickness so it reads as the same line).
-const ECONOMY_BAR_HEIGHT := 26
+const ECONOMY_BAR_HEIGHT := 34  # 26 + 30% (Tim, 2026-07-06)
 const ECONOMY_DIVIDER_HEIGHT := 12
 ## A soft white plate behind the civilization name — in FRONT of the planet watermark but BEHIND
 ## the name text — so the name stays legible over the busy globe (Tim, 2026-07-01). It's a RADIAL

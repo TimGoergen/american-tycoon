@@ -89,8 +89,16 @@ var _portrait_interactive := false
 var _displayed_cycle_fraction := 0.0
 
 ## Last frame's true cycle fraction. Cycle progress only ever decreases when a
-## cycle completes and restarts, so a drop tells us to snap the bar back to zero.
+## cycle completes and restarts, so a drop tells us the cycle wrapped.
 var _last_true_cycle_fraction := 0.0
+
+## True while the displayed bar still owes a trip to the right edge for a cycle that
+## already completed. The displayed fraction lags the true one (rush catch-up easing,
+## 10 Hz logic ticks), so snapping to the new cycle's progress the moment the true value
+## wraps reset the bar from mid-fill without ever reaching the right edge — worst under a
+## held rush, where the lag is largest and wraps are constant (Tim, 2026-07-06). Instead
+## the bar keeps filling to 1.0 first, then wraps and chases the new cycle.
+var _finish_lap_pending := false
 
 ## While the player holds the rush button, the cycle bar fills in a deeper, more vivid
 ## green to signal the active push (Tim, 2026-06-23 — was a lighter tint, now darker and
@@ -631,24 +639,36 @@ func _refresh(delta: float) -> void:
 		# predictor entirely (see SOLID_BAR_THRESHOLD_SEC). The "/sec" readout above
 		# carries the information now; the bar just reads as "maxed and humming".
 		_displayed_cycle_fraction = 1.0
+		_finish_lap_pending = false
 	elif not _prop.is_cycle_running or _prop.units_owned == 0:
 		# Idle or empty: nothing is advancing, so just mirror the true value exactly.
 		_displayed_cycle_fraction = true_fraction
-	elif true_fraction < _last_true_cycle_fraction:
-		# The cycle just completed and restarted — snap back so the bar refills from
-		# the start rather than sliding backward.
-		_displayed_cycle_fraction = true_fraction
+		_finish_lap_pending = false
 	else:
-		# Running: advance at the real fill rate. If the true progress has jumped
-		# ahead of that prediction — a rush, or several per second while the rush
-		# button is held — ease the bar UP toward it instead of snapping, so a held
-		# rush reads as smooth acceleration rather than a stutter of discrete jumps.
+		# A drop in true progress means the cycle completed and restarted. The displayed
+		# bar usually hasn't reached the right edge yet (it lags — see
+		# _finish_lap_pending), so it owes a finishing lap rather than a snap-back.
+		if true_fraction < _last_true_cycle_fraction:
+			_finish_lap_pending = true
+		# While a lap is owed, the chase target sits one full bar ahead of the true
+		# progress: the bar fills through 1.0, then wraps onto the new cycle below.
+		var target := true_fraction + (1.0 if _finish_lap_pending else 0.0)
+		# Running: advance at the real fill rate. If the target has jumped ahead of that
+		# prediction — a rush, or several per second while the rush button is held —
+		# ease the bar UP toward it instead of snapping, so a held rush reads as smooth
+		# acceleration rather than a stutter of discrete jumps.
 		var advanced := _displayed_cycle_fraction + delta / effective_length
-		if true_fraction > advanced:
+		if target > advanced:
 			var catchup := 1.0 - exp(-delta / RUSH_CATCHUP_TAU)
-			_displayed_cycle_fraction = clampf(lerpf(advanced, true_fraction, catchup), 0.0, 1.0)
+			_displayed_cycle_fraction = lerpf(advanced, target, catchup)
 		else:
-			_displayed_cycle_fraction = clampf(advanced, 0.0, 1.0)
+			_displayed_cycle_fraction = advanced
+		if _finish_lap_pending and _displayed_cycle_fraction >= 1.0:
+			# The bar visibly touched the right edge — wrap onto the new cycle, carrying
+			# any overshoot so the motion stays continuous.
+			_finish_lap_pending = false
+			_displayed_cycle_fraction -= 1.0
+		_displayed_cycle_fraction = clampf(_displayed_cycle_fraction, 0.0, 1.0)
 	_last_true_cycle_fraction = true_fraction
 	_cycle_bar.value = _displayed_cycle_fraction
 

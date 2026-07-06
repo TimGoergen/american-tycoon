@@ -85,6 +85,10 @@ var _estate_badge_dismissed := false
 ## Global buy mode — one toggle drives every row's buy button.
 var _buy_mode: PropertyRow.BuyMode = PropertyRow.BuyMode.ONE
 
+## The property ladder's ScrollContainer, kept for the edge fade below
+## (Tim, 2026-07-06; chosen over an outline, which would have nested a third frame).
+var _ladder_scroll: ScrollContainer
+
 ## Wall-clock seconds since the loaded save was written (0 on a fresh run).
 var _elapsed_since_save := 0.0
 
@@ -169,6 +173,46 @@ func _process(delta: float) -> void:
 	_refresh_contact_progress()
 	_update_plan_button()
 	_update_estate_badge()
+	_update_ladder_edge_fade()
+
+
+## Apply the ladder's edge fade: a property row the scroll viewport is clipping shows at
+## the alpha of its VISIBLE FRACTION — half-clipped means half-faded, dissolving to
+## nothing as it slides fully out — but only on an edge that actually has more content
+## beyond it. A dissolving row says "the list continues" without drawing extra chrome.
+## (First cut faded over a fixed 48px zone measured from the row's far edge, which only
+## triggered on the last sliver of a ~150px row — invisible in practice, Tim 2026-07-06.)
+func _update_ladder_edge_fade() -> void:
+	if _active_tab != TAB_PROPERTY:
+		return
+	var view_height := _ladder_scroll.size.y
+	var scroll_bar := _ladder_scroll.get_v_scroll_bar()
+	var more_above := _ladder_scroll.scroll_vertical > 0
+	# The furthest scroll_vertical can go is the content height minus one page; anything
+	# less than that (with 1px slack for rounding) means content is clipped below.
+	var more_below := float(_ladder_scroll.scroll_vertical) < scroll_bar.max_value - scroll_bar.page - 1.0
+	for row_node in _rows:
+		var row := row_node as PropertyRow
+		if row.size.y <= 0.0:
+			continue
+		# The row's top edge in viewport space: its position in the ladder, shifted up by
+		# the scroll offset (the ladder column sits at the scroll content's origin).
+		var row_top := row.position.y - float(_ladder_scroll.scroll_vertical)
+		var alpha := 1.0
+		# Each fading edge is measured from the INNER edge of its ScrollEdgeArrows strip,
+		# not the viewport itself: the strip shows under the same "more content this way"
+		# condition and covers the rows beneath it, so fading against the raw viewport
+		# left rows behind the strip looking solid-but-buried (Tim, 2026-07-06). The strip
+		# and the fade agree on where the visible window starts.
+		if more_above:
+			# Fraction of the row below the top strip (its visible share).
+			var below_strip := row_top + row.size.y - ScrollEdgeArrows.STRIP_HEIGHT
+			alpha = minf(alpha, clampf(below_strip / row.size.y, 0.0, 1.0))
+		if more_below:
+			# Fraction of the row above the bottom strip (its visible share).
+			var above_strip := view_height - ScrollEdgeArrows.STRIP_HEIGHT - row_top
+			alpha = minf(alpha, clampf(above_strip / row.size.y, 0.0, 1.0))
+		row.modulate.a = alpha
 
 
 ## Feed the hero stat's contact-progress line: how much of the CURRENT epoch's economy this
@@ -469,6 +513,7 @@ func _build_property_tab() -> Control:
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_RESERVE
 	ladder_area.add_child(scroll)
 	UiPalette.style_vscrollbar(scroll.get_v_scroll_bar())
+	_ladder_scroll = scroll
 
 	var ladder_arrows := ScrollEdgeArrows.new()
 	ladder_arrows.setup(scroll)

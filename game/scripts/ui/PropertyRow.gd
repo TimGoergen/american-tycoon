@@ -134,7 +134,9 @@ const RAPID_WRAP_EXIT_SEC := 1.2
 ## Deliberately brisk: solid means "cycling faster than the eye", so the MOST active
 ## property should carry the most active fizz — not sink to the idle drift a motionless
 ## fill edge would otherwise measure (Tim, 2026-07-06). Holding rush multiplies it, so
-## rushing a solid bar has a visible effect beyond the color swap.
+## rushing a solid bar has a visible effect beyond the color swap. These two are the
+## TOP rungs of the carbonation speed ladder: every measured (non-solid) bar is capped
+## below them by GoldBubbles.MEASURED_FLOW_CAP_PX.
 const SOLID_FLOW_PX := 110.0
 const SOLID_FLOW_RUSH_MULT := 1.6
 

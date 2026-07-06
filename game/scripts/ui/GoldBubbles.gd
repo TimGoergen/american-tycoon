@@ -46,6 +46,12 @@ const SPEED_VS_BAR := 1.0
 ## …with a floor (px/s) so a full or barely-moving bar still fizzes. Art knob —
 ## 0.0 restores strictly "frozen when the bar is frozen".
 const MIN_DRIFT_PX_PER_SEC := 14.0
+## …and a CEILING on the measured flow (Tim, 2026-07-06): carbonation speed is a ranked
+## signal — the fastest liquid belongs to a solid bar under rush, second to a solid bar
+## (both host-COMMANDED via flow_override_px, which this cap deliberately does not touch;
+## see PropertyRow.SOLID_FLOW_PX = 110, ×1.6 rushed), and every ordinary moving bar sits
+## below both: still proportional to its fill speed, but never past this.
+const MEASURED_FLOW_CAP_PX := 80.0
 ## Per-bubble drift variation: each bubble moves at base speed × a factor between
 ## (1 − SPEED_SPREAD) and an upper limit, so the crowd spreads out over time instead of
 ## traveling as one body. The UPPER limit widens as the bar slows (Tim, 2026-07-05): at
@@ -219,12 +225,15 @@ func _process(delta: float) -> void:
 	var blend := 1.0 - exp(-delta / SPEED_SMOOTH_TAU)
 	_smoothed_speed_px = lerpf(_smoothed_speed_px, raw_speed_px, blend)
 
-	# The bar's own speed, with a small floor so still bars keep fizzing — unless the
-	# host commanded a flow directly (see flow_override_px).
+	# The bar's own speed, floored so still bars keep fizzing and CAPPED below the
+	# commanded solid-bar speeds (see MEASURED_FLOW_CAP_PX) — unless the host commanded
+	# a flow directly (flow_override_px), which is exempt: those ARE the top rungs.
 	if flow_override_px >= 0.0:
 		_base_speed_px = flow_override_px
 	else:
-		_base_speed_px = maxf(_smoothed_speed_px * SPEED_VS_BAR, MIN_DRIFT_PX_PER_SEC)
+		_base_speed_px = clampf(
+			_smoothed_speed_px * SPEED_VS_BAR, MIN_DRIFT_PX_PER_SEC, MEASURED_FLOW_CAP_PX
+		)
 
 	# How close the bar is to a crawl: 1.0 at (or below) the idle-drift floor, fading to
 	# 0.0 as the bar speeds up. Widens the per-bubble speed range on slow bars (see the

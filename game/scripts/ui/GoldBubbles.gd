@@ -77,7 +77,11 @@ var _bubble_pos: Array[float] = []
 
 
 func _ready() -> void:
-	set_anchors_preset(Control.PRESET_FULL_RECT)
+	# set_anchors_AND_OFFSETS_preset, not set_anchors_preset: the latter only moves the
+	# anchors and leaves the offsets compensating for the parent's size at call time, so
+	# this control ended up with a ZERO-HEIGHT rect hugging the bar's top — the bubbles
+	# drew as specks pinned to the top edge (Tim, 2026-07-05; proven by sim/BubbleProbe).
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	for i in range(BUBBLE_COUNT):
 		_bubble_pos.append(float(i) / float(BUBBLE_COUNT))

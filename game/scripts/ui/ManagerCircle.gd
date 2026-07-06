@@ -58,6 +58,10 @@ var _show_rush_icon := false
 ## The property's current staff-ladder level, shown inside the disc (0 = hidden).
 var _staff_level := 0
 
+## The bold face the level text draws in (all property-panel text is bold, Tim
+## 2026-07-05) — cached: building a FontVariation per frame in _draw would be wasteful.
+static var _level_font: FontVariation
+
 ## The transparent button overlaying the circle — the actual tap/hold target.
 var _button: Button
 
@@ -153,10 +157,11 @@ func _draw() -> void:
 		_draw_icon(RESTART_TEX, UiPalette.NAVY, radius * icon_fraction, icon_center)
 
 	if show_level:
-		var font := get_theme_default_font()
+		if _level_font == null:
+			_level_font = UiPalette.make_bold_font()
 		var font_size := maxi(14, int(radius * LEVEL_FONT_FRACTION))
 		var baseline_y := center.y + radius * LEVEL_TEXT_BASELINE_FRACTION
-		draw_string(font, Vector2(0.0, baseline_y), "LVL %d" % _staff_level,
+		draw_string(_level_font, Vector2(0.0, baseline_y), "LVL %d" % _staff_level,
 				HORIZONTAL_ALIGNMENT_CENTER, size.x, font_size, Color.BLACK)
 
 	# Navy outline ring on top, so the edge stays crisp over any fill or icon.

@@ -136,7 +136,10 @@ var _cycle_color_applied := -1
 # The buy button shows "BUY ×N" on the left and the cost on the right; the hire button
 # shows the verb/staffer on the left and the cost/tier on the right. The font is sized
 # to fill this fixed row height — see _add_split_button_labels.
-const BUTTON_ROW_HEIGHT := 80
+## Raised 80 → 92 in the taller-panel pass (Tim, 2026-07-05) — the panel's height follows
+## its rows, so growing the two row constants grows the whole panel (and the portrait
+## disc with it, via PORTRAIT_HEIGHT_FRACTION).
+const BUTTON_ROW_HEIGHT := 92
 ## A touch under FONT_BUTTON (34) so long cost numbers on the buy/hire buttons have more room
 ## before the caption and cost start crowding each other (Tim, 2026-07-01).
 const BUTTON_LABEL_FONT_SIZE := 30
@@ -144,9 +147,10 @@ const BUTTON_LABEL_FONT_SIZE := 30
 ## Property-row readability pass (Tim, 2026-07-01): the row is taller and its labels bigger.
 ## The property NAME reads in bold on the top line at this size.
 const NAME_FONT_SIZE := UiPalette.FONT_SUBHEAD
-## Shared height of the second row's two elements — the outlined "owned / next-threshold" count
-## panel and, to its right, the cycle progress bar — kept equal so they read as one aligned band.
-const SECOND_ROW_HEIGHT := 52
+## Shared height of the second row's two elements — the cycle progress bar and the outlined
+## "owned / next-threshold" count chip — kept equal so they read as one aligned band.
+## Raised 52 → 60 in the taller-panel pass (Tim, 2026-07-05).
+const SECOND_ROW_HEIGHT := 60
 ## Font for the count-panel text and the per-cycle income readout above the bar.
 const SECOND_ROW_FONT_SIZE := UiPalette.FONT_BODY
 
@@ -264,6 +268,8 @@ func _ready() -> void:
 	_count_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_count_label.add_theme_color_override("font_color", UiPalette.NAVY)
 	_count_label.add_theme_font_size_override("font_size", SECOND_ROW_FONT_SIZE)
+	# Every text on the panel reads bold (Tim, 2026-07-05).
+	_count_label.add_theme_font_override("font", UiPalette.make_bold_font())
 	count_chip.add_child(_count_label)
 
 	# Cycle progress bar (Style Guide §9: the "spin" is the real cycle progress), filling the cell.
@@ -788,6 +794,8 @@ func _add_split_button_labels(button: Button) -> Array:
 	left.size_flags_vertical = Control.SIZE_FILL
 	left.clip_text = true  # if the two strings ever collide, the caption yields, never the cost
 	left.add_theme_font_size_override("font_size", BUTTON_LABEL_FONT_SIZE)
+	# Every text on the panel reads bold (Tim, 2026-07-05).
+	left.add_theme_font_override("font", UiPalette.make_bold_font())
 	left.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(left)
 
@@ -796,6 +804,7 @@ func _add_split_button_labels(button: Button) -> Array:
 	right.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	right.size_flags_vertical = Control.SIZE_FILL
 	right.add_theme_font_size_override("font_size", BUTTON_LABEL_FONT_SIZE)
+	right.add_theme_font_override("font", UiPalette.make_bold_font())
 	right.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(right)
 
@@ -864,7 +873,8 @@ func _set_buy_label_colors() -> void:
 ## the icon's VISIBLE bounds (get_used_rect — see the texture-sizing memory note).
 class StaffHireGlyph extends Control:
 	## Side of the square box the headshot canvas is fitted into.
-	const ICON_SIZE := 56.0
+	## 56 → 62 in the taller-panel pass (Tim, 2026-07-05).
+	const ICON_SIZE := 62.0
 	## The plus is bigger than the button's cost text so it carries as a symbol.
 	const PLUS_FONT_SIZE := 42
 	## Gap between the face's visible right edge and the plus.
@@ -884,13 +894,17 @@ class StaffHireGlyph extends Control:
 	## The headshot art's opaque bounds inside its canvas, computed ONCE for all rows
 	## (get_used_rect is a CPU pixel scan; the canvas carries transparent padding).
 	static var _icon_used_rect := Rect2()
+	## The bold face the "+" draws in (all panel text is bold, Tim 2026-07-05) —
+	## cached: building a FontVariation per frame in _draw would be wasteful.
+	static var _plus_font: FontVariation
 
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 		if _icon_used_rect.size == Vector2.ZERO:
 			_icon_used_rect = Rect2(ManagerCircle.HEADSHOT_TEX.get_image().get_used_rect())
-		var font := get_theme_default_font()
-		var plus_width := font.get_string_size("+", HORIZONTAL_ALIGNMENT_LEFT, -1.0, PLUS_FONT_SIZE).x
+		if _plus_font == null:
+			_plus_font = UiPalette.make_bold_font()
+		var plus_width := _plus_font.get_string_size("+", HORIZONTAL_ALIGNMENT_LEFT, -1.0, PLUS_FONT_SIZE).x
 		custom_minimum_size = Vector2(ICON_SIZE + PAIR_GAP + plus_width, ICON_SIZE)
 
 	func _draw() -> void:
@@ -907,7 +921,6 @@ class StaffHireGlyph extends Control:
 		var face_top := canvas_pos.y + _icon_used_rect.position.y * fit
 		var face_right := canvas_pos.x + _icon_used_rect.end.x * fit
 
-		var font := get_theme_default_font()
 		var baseline_y := face_top + PLUS_FONT_SIZE * PLUS_TOP_TO_BASELINE
-		draw_string(font, Vector2(face_right + PAIR_GAP, baseline_y), "+",
+		draw_string(_plus_font, Vector2(face_right + PAIR_GAP, baseline_y), "+",
 				HORIZONTAL_ALIGNMENT_LEFT, -1.0, PLUS_FONT_SIZE, tint)

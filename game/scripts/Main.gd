@@ -554,9 +554,9 @@ func _build_estate_tab() -> Control:
 	# The prestige exit, pinned to the BOTTOM of the tab (Tim, 2026-06-28): plan the estate,
 	# pass on, raise a faster heir. Red = big commit.
 	_plan_button = Button.new()
-	# As tall as the Settings tab's tuning buttons (STANDARD_BUTTON_HEIGHT × 1.4) so this
-	# prestige exit reads as an equally weighty, easy-to-hit control (Tim, 2026-07-01).
-	_plan_button.custom_minimum_size = Vector2(0, int(UiPalette.STANDARD_BUTTON_HEIGHT * 1.4))
+	# Was STANDARD_BUTTON_HEIGHT × 1.4 (matching the Settings tuning buttons); raised to
+	# × 2.0 for the two-row label — PASS THE TORCH over the gem count (Tim, 2026-07-05).
+	_plan_button.custom_minimum_size = Vector2(0, int(UiPalette.STANDARD_BUTTON_HEIGHT * 2.0))
 	UiPalette.style_button(_plan_button, true)
 	_plan_button.pressed.connect(_on_plan_estate_pressed)
 	v.add_child(_plan_button)
@@ -577,8 +577,8 @@ func _build_estate_tab() -> Control:
 	_plan_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	_plan_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_plan_label.add_theme_font_override("normal_font", UiPalette.make_bold_font())
-	# Font size 50 — the same as the Settings tab's tuning buttons (TUNING_BUTTON_FONT).
-	_plan_label.add_theme_font_size_override("normal_font_size", 50)
+	# Was 50 (the Settings tuning buttons' size); +40% → 70 (Tim, 2026-07-05).
+	_plan_label.add_theme_font_size_override("normal_font_size", 70)
 	_plan_label.add_theme_color_override("default_color", UiPalette.PALE_GOLD)
 	# Mipmapped filtering so the inline gem image downscales smoothly rather than aliasing.
 	_plan_label.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
@@ -877,8 +877,9 @@ func _update_plan_button() -> void:
 	_plan_button.visible = dynasty.upgrades.earned_lifetime > 0 or can_succeed
 	_plan_button.disabled = not can_succeed
 	if can_succeed:
-		# "(+x [gem])" — the legacy-gem image stands in for the word "Legacy" inside the parens.
-		_plan_label.text = "[center]PASS THE TORCH  (+%d [img width=36 height=50]res://art/icons/legacy_gem.svg[/img])[/center]" % dynasty.projected_legacy_gain()
+		# Two centered rows (Tim, 2026-07-05): the verb on top, the banked gems beneath —
+		# "(+x [gem])", the legacy-gem image standing in for the word "Legacy".
+		_plan_label.text = "[center]PASS THE TORCH\n+%d [img width=50 height=70]res://art/icons/legacy_gem.svg[/img][/center]" % dynasty.projected_legacy_gain()
 	else:
 		_plan_label.text = "[center]PASS THE TORCH[/center]"
 

@@ -75,20 +75,20 @@ const LANE_OFFSET_FRACTION := 0.12
 const DEFAULT_GOLD := Color(1.0, 0.85, 0.35, 1.0)
 const ALPHA_MIN := 0.45
 const ALPHA_MAX := 0.85
-## Tracers: each bubble trails a few fading, shrinking ghosts of itself sampled a moment
-## back along its own path (Tim, 2026-07-05) — a comet tail in the liquid's flow.
-## Ghosts are spaced by DISTANCE along the drift, not by a fixed time step: with a time
-## step, a slow bar's ghosts all sampled within a pixel of the head and hid underneath
+## Tracers: each bubble trails a fading comet tail sampled back along its own path
+## (Tim, 2026-07-05). The tail is ONE antialiased polyline per bubble with per-point
+## alpha, not a chain of ghost circles: the circle version cost a draw call per ghost per
+## bubble per bar and dragged the app to a crawl at long tail lengths (Tim, 2026-07-06).
+## Samples are spaced by DISTANCE along the drift, not by a fixed time step: with a time
+## step, a slow bar's samples all landed within a pixel of the head and hid underneath
 ## it — no visible trail at all (Tim, 2026-07-06). Distance spacing converts to each
 ## bubble's own seconds-ago via its drift speed, so the tail clears the head at any pace.
-## Count history (Tim, 2026-07-06): 4 -> 16 in two doublings, then 16 made the app crawl
-## (every ghost is its own antialiased draw_circle, times every bubble on every bar), so
-## cut to 11, then 9 (still slow). Falloffs are always retuned with the count so the tail
-## fades to the SAME end size/alpha regardless of ghost count — only the length changes.
-const TRACER_COUNT := 9
-const TRACER_GAP_PX := 3.0          # drift distance between ghost samples
-const TRACER_RADIUS_FALLOFF := 0.906 # each ghost's radius vs the one ahead of it
-const TRACER_ALPHA_FALLOFF := 0.735  # each ghost's alpha vs the one ahead of it
+const TRACER_COUNT := 9             # path samples in the tail (its length; now cheap to raise)
+const TRACER_GAP_PX := 3.0          # drift distance between samples
+const TRACER_ALPHA_FALLOFF := 0.735 # each sample's alpha vs the one ahead of it
+## Tail width as a fraction of the bubble's radius. A polyline has ONE width for its
+## whole run (Godot draws no tapered lines), so the taper is carried by alpha alone.
+const TRACER_WIDTH_VS_RADIUS := 1.4
 ## Smoothing time constant for the measured fill speed, so one jumpy frame (a rush,
 ## a snap-back) doesn't make the bubbles lurch.
 const SPEED_SMOOTH_TAU := 0.35
@@ -228,27 +228,35 @@ func _draw() -> void:
 	for i in range(_active_count(filled_width)):
 		var radius := lerpf(RADIUS_MIN, RADIUS_MAX, _variant(i, 0.13))
 		var head := _bubble_point(i, radius, filled_width, 0.0)
-		# Only the head clamps into the fill; ghosts that fall outside are dropped instead
-		# (a clamped ghost would pile up at the edge rather than trail behind).
+		# Only the head clamps into the fill; tail samples that fall outside are dropped
+		# instead (a clamped sample would pile up at the edge rather than trail behind).
 		head.x = clampf(head.x, edge_inset + radius, edge_inset + filled_width - radius)
 		var head_alpha := _alpha_of(i)
 
-		# Tracers first (so the head draws over them): fading, shrinking ghosts sampled a
-		# moment back along the bubble's own path — the wake it just swirled through.
-		# TRACER_GAP_PX of drift converts to this bubble's own seconds-ago (see the
-		# TRACER_* comment for why distance, not time).
+		# Tail first (so the head draws over it): ONE antialiased polyline back along the
+		# bubble's own path — the wake it just swirled through — with per-point alpha
+		# fading toward the end. TRACER_GAP_PX of drift converts to this bubble's own
+		# seconds-ago (see the TRACER_* comment for why distance, not time).
 		var seconds_per_gap := TRACER_GAP_PX / _bubble_speed_px(i)
-		var ghost_radius := radius
-		var ghost_alpha := head_alpha
-		for ghost in range(1, TRACER_COUNT + 1):
-			ghost_radius *= TRACER_RADIUS_FALLOFF
-			ghost_alpha *= TRACER_ALPHA_FALLOFF
-			var point := _bubble_point(i, radius, filled_width, float(ghost) * seconds_per_gap)
-			if point.x < edge_inset + ghost_radius:
+		var tail_width := radius * TRACER_WIDTH_VS_RADIUS
+		var tail_points := PackedVector2Array()
+		var tail_colors := PackedColorArray()
+		var head_point_color := bubble_color
+		head_point_color.a = head_alpha
+		tail_points.append(head)
+		tail_colors.append(head_point_color)
+		var sample_alpha := head_alpha
+		for sample in range(1, TRACER_COUNT + 1):
+			sample_alpha *= TRACER_ALPHA_FALLOFF
+			var point := _bubble_point(i, radius, filled_width, float(sample) * seconds_per_gap)
+			if point.x < edge_inset + tail_width / 2.0:
 				break  # the wake would poke out of the fill's left edge — stop the tail
-			var ghost_color := bubble_color
-			ghost_color.a = ghost_alpha
-			draw_circle(point, ghost_radius, ghost_color, true, -1.0, true)
+			tail_points.append(point)
+			var sample_color := bubble_color
+			sample_color.a = sample_alpha
+			tail_colors.append(sample_color)
+		if tail_points.size() >= 2:
+			draw_polyline_colors(tail_points, tail_colors, tail_width, true)
 
 		var color := bubble_color
 		color.a = head_alpha
@@ -259,8 +267,8 @@ func _draw() -> void:
 
 
 ## Where bubble `index` sat `seconds_ago` on its path (0.0 = right now): the drift
-## position rolled back by its own speed, with the sway/swirl/wobble sines evaluated at
-## that earlier time. Analytic, so tracers need no stored position history.
+## position rolled back by its own speed, with the sway sine evaluated at that earlier
+## time. Analytic, so tracers need no stored position history.
 func _bubble_point(index: int, radius: float, filled_width: float, seconds_ago: float) -> Vector2:
 	var at_time := _time - seconds_ago
 	var phase := _variant(index, 0.53) * TAU
@@ -272,8 +280,8 @@ func _bubble_point(index: int, radius: float, filled_width: float, seconds_ago: 
 	# The lane: -1..+1 from the hash, scaled to the offset limit.
 	var lane := (_variant(index, 0.91) * 2.0 - 1.0) * size.y * LANE_OFFSET_FRACTION
 	# Map the normalized position into the filled region, rolled back along the drift.
-	# NOT clamped here: the head clamps itself in _draw, while out-of-fill ghosts are
-	# dropped by the caller (clamping them would pile the wake up at the fill's edge).
+	# NOT clamped here: the head clamps itself in _draw, while out-of-fill tail samples
+	# are dropped by the caller (clamping them would pile the wake up at the fill's edge).
 	var drift_px := _bubble_pos[index] * (filled_width - radius * 2.0) \
 			- _bubble_speed_px(index) * seconds_ago
 	var x := edge_inset + radius + drift_px

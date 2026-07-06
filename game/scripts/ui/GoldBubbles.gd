@@ -31,10 +31,10 @@ extends Control
 # identical across identical bars.
 
 ## The full bubble crowd. Narrow fills show a subset (see BUBBLE_SPACING_PX).
-const BUBBLE_COUNT := 15  # +25% (Tim, 2026-07-05)
+const BUBBLE_COUNT := 24  # +25% (Tim, 2026-07-05), then +60% (Tim, 2026-07-06)
 ## One bubble becomes active per this many pixels of filled width (min 2), so a sliver
 ## of fill fizzes with a couple of distinct bubbles instead of a crammed dozen.
-const BUBBLE_SPACING_PX := 22.0
+const BUBBLE_SPACING_PX := 13.75  # 22.0 / 1.6 — scaled with the +60% count (Tim, 2026-07-06)
 ## Bubble radius range in pixels — small, like carbonation, not coins.
 ## Enlarged 5% at the small end, 15% at the large end (Tim, 2026-07-05).
 const RADIUS_MIN := 1.7

@@ -226,11 +226,14 @@ func _draw() -> void:
 				break  # the wake would poke out of the fill's left edge — stop the tail
 			var ghost_color := bubble_color
 			ghost_color.a = ghost_alpha
-			draw_circle(point, ghost_radius, ghost_color)
+			draw_circle(point, ghost_radius, ghost_color, true, -1.0, true)
 
 		var color := bubble_color
 		color.a = head_alpha
-		draw_circle(head, radius, color)
+		# antialiased = true (the last argument): the bubbles move fractions of a pixel per
+		# frame, and without AA a circle only visibly moves when it crosses a whole pixel —
+		# the drift and wobble read as discrete hops instead of liquid motion (Tim, 2026-07-06).
+		draw_circle(head, radius, color, true, -1.0, true)
 
 
 ## Where bubble `index` sat `seconds_ago` on its path (0.0 = right now): the drift

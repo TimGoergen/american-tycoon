@@ -121,6 +121,20 @@ const RUSH_CATCHUP_TAU := 0.12
 ## threshold, NOT an economy value, so it lives here in the UI rather than in tuning.tres.
 const SOLID_BAR_THRESHOLD_SEC := 0.25
 
+## The same "faster than the eye" rule, but measured on the ACTUAL completion cadence
+## instead of the nominal cycle length (Tim, 2026-07-06): a held rush can complete a
+## nominally-long cycle several times a second, and the finishing-lap animation turns
+## into a strobe of back-to-back sprints. While completions arrive faster than one per
+## RAPID_WRAP_SOLID_SEC (smoothed), the bar pins solid-full, exactly like a sub-threshold
+## cycle; it resumes animating once no completion lands for RAPID_WRAP_EXIT_SEC.
+const RAPID_WRAP_SOLID_SEC := 0.6
+const RAPID_WRAP_EXIT_SEC := 1.2
+
+## Completion-cadence tracking for the rapid-wrap rule above.
+var _seconds_since_wrap := 999.0
+var _wrap_interval_smoothed := 999.0
+var _rapid_wraps := false
+
 ## The portrait/rush button is a square sized to a fraction of the panel's full height, centered
 ## vertically (Tim, 2026-07-02): at 1.0 it filled the whole row; 0.9 trims it 10% so it no longer
 ## dominates the panel while staying a comfortably large tap target.
@@ -634,10 +648,36 @@ func _refresh(delta: float) -> void:
 	# fills faster (Tim 2026-06-17). Measuring against the raw length capped the fill at
 	# 1 / cycle_speed_multiplier, so it stopped short of the right edge.
 	var true_fraction := _prop.cycle_progress / effective_length if effective_length > 0.0 else 0.0
-	if bar_is_solid:
-		# Cycles faster than the eye/bar can follow — pin it full and skip the easing
-		# predictor entirely (see SOLID_BAR_THRESHOLD_SEC). The "/sec" readout above
-		# carries the information now; the bar just reads as "maxed and humming".
+
+	# Track how often cycles actually COMPLETE (a drop in true progress = a wrap), for
+	# the rapid-wrap rule: cadence is what a held rush changes, not the cycle length.
+	var wrapped := true_fraction < _last_true_cycle_fraction
+	_seconds_since_wrap += delta
+	if wrapped:
+		if _wrap_interval_smoothed > 900.0:
+			_wrap_interval_smoothed = _seconds_since_wrap  # first-ever wrap: no history to blend
+		else:
+			_wrap_interval_smoothed = lerpf(_wrap_interval_smoothed, _seconds_since_wrap, 0.6)
+		_seconds_since_wrap = 0.0
+	var was_rapid := _rapid_wraps
+	if _rapid_wraps:
+		# Stay solid until the churn clearly stops (no completion for the exit window).
+		_rapid_wraps = _seconds_since_wrap < RAPID_WRAP_EXIT_SEC
+	else:
+		# Enter only ON a completion, so a stale smoothed interval can't trigger it.
+		_rapid_wraps = wrapped and _wrap_interval_smoothed < RAPID_WRAP_SOLID_SEC
+	if was_rapid and not _rapid_wraps:
+		# Leaving the churn: restart the visible lap from empty and let the easing below
+		# chase the real progress — holding at full would freeze the bar until the next
+		# natural completion, minutes away on a long cycle.
+		_displayed_cycle_fraction = 0.0
+		_finish_lap_pending = false
+
+	if bar_is_solid or _rapid_wraps:
+		# Cycles faster than the eye/bar can follow — by nominal length (bar_is_solid) or
+		# by actual completion cadence (_rapid_wraps, e.g. a held rush) — pin it full and
+		# skip the easing predictor entirely. The income readout carries the information
+		# now; the bar just reads as "maxed and humming".
 		_displayed_cycle_fraction = 1.0
 		_finish_lap_pending = false
 	elif not _prop.is_cycle_running or _prop.units_owned == 0:
@@ -645,10 +685,10 @@ func _refresh(delta: float) -> void:
 		_displayed_cycle_fraction = true_fraction
 		_finish_lap_pending = false
 	else:
-		# A drop in true progress means the cycle completed and restarted. The displayed
-		# bar usually hasn't reached the right edge yet (it lags — see
-		# _finish_lap_pending), so it owes a finishing lap rather than a snap-back.
-		if true_fraction < _last_true_cycle_fraction:
+		# A completed cycle (detected above) means the displayed bar usually hasn't
+		# reached the right edge yet (it lags — see _finish_lap_pending), so it owes a
+		# finishing lap rather than a snap-back.
+		if wrapped:
 			_finish_lap_pending = true
 		# While a lap is owed, the chase target sits one full bar ahead of the true
 		# progress: the bar fills through 1.0, then wraps onto the new cycle below.

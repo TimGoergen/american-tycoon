@@ -4,8 +4,9 @@ extends Control
 # A crowd of small gold bubbles swirling through a progress bar's FILLED region, like
 # carbonation in a liquid that is flowing to the right (Tim, 2026-07-03; reworked
 # 2026-07-05: many small varied bubbles that swirl, not one blob). Their base drift is
-# tied to the bar's own fill speed — bubbles flow at twice the rate the fill edge moves
-# — with a floor so a still bar keeps gently fizzing.
+# tied to the bar's own fill speed — the liquid flows at the same rate the fill edge
+# moves, individual bubbles a little over or under it — with a floor so a still bar
+# keeps gently fizzing.
 #
 # NOT for gold-filled bars (the wage and TURBO meters): gold bubbles are invisible on a
 # gold fill and only read where they brush the frame (Tim, 2026-07-05).
@@ -34,8 +35,10 @@ const BUBBLE_SPACING_PX := 22.0
 ## Bubble radius range in pixels — small, like carbonation, not coins.
 const RADIUS_MIN := 1.6
 const RADIUS_MAX := 3.4
-## Bubble drift = this × the bar's fill speed (Tim's spec: twice the bar)…
-const SPEED_VS_BAR := 2.0
+## Bubble drift = this × the bar's fill speed. 1.0 = the liquid flows WITH the bar
+## (Tim, 2026-07-05: 2× read as too fast — and the per-bubble spread below already
+## puts individual bubbles both above and below the target)…
+const SPEED_VS_BAR := 1.0
 ## …with a floor (px/s) so a full or barely-moving bar still fizzes. Art knob —
 ## 0.0 restores strictly "frozen when the bar is frozen".
 const MIN_DRIFT_PX_PER_SEC := 14.0

@@ -265,15 +265,18 @@ theme + targeted pass.**
 > Cross-reference: Art Style Guide §9 (stamps, not bounces; cycle spin tied to real
 > cycle progress). Log feel notes that refine or extend it.
 
-- **Gold bubble particles on ALL progress bars (Tim, 2026-07-03) — BUILT
-  (feature/ui-polish).** Shared `GoldBubbles.gd`: 5 hand-drawn gold circles per bar
-  drifting left→right with a sine sway, clipped to the filled region, speed = **2× the
-  bar's measured fill speed** with a small `MIN_DRIFT_PX_PER_SEC` floor so a full/idle bar
-  still shimmers (art knob — set to 0 for strictly-frozen-when-the-bar-is-frozen).
-  Attached to: property cycle bars, TURBO meter, wage clock-in meter, the new economy bar,
-  and the minigame spectrum bar. No Particles2D nodes — cheap enough for a ladder of rows.
-  In-minigame gameplay bars (e.g. Balance's target meter) deliberately left plain so play
-  reads clean; extend later if wanted.
+- **Gold bubble "carbonation" on progress bars (Tim, 2026-07-03; iterated 2026-07-05) —
+  BUILT.** Shared `GoldBubbles.gd`: a crowd of 15 small hand-drawn bubbles swirling
+  through the filled region (two-sine loops + wobble), each with its own size, speed,
+  opacity, and a fading tracer wake, drifting at the bar's own fill speed (idle-drift
+  floor keeps still bars fizzing; speed variety widens on slow bars). No Particles2D —
+  cheap enough for a ladder of rows.
+  **PLACEMENT RULE (Tim, 2026-07-05): carbonation cues AUTOMATIC activity** — a value
+  accruing on its own — never a response to the player's own events. Carries it:
+  property cycle bars, the economy bar, the TURBO meter (dark-gold bubbles on its gold
+  charging fill, bright gold on the red burn — on gold fills plain gold vanishes), and
+  the minigame spectrum bar. Does NOT: the wage clock-in meter (moves only because the
+  player taps) and in-minigame gameplay bars (play must read clean).
 
 ---
 

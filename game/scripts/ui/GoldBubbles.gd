@@ -8,8 +8,11 @@ extends Control
 # moves, individual bubbles a little over or under it — with a floor so a still bar
 # keeps gently fizzing.
 #
-# NOT for gold-filled bars (the wage and TURBO meters): gold bubbles are invisible on a
-# gold fill and only read where they brush the frame (Tim, 2026-07-05).
+# PLACEMENT RULE (Tim, 2026-07-05): carbonation is the visual cue that something is
+# happening AUTOMATICALLY — a value accruing on its own — never a response to the
+# player's own events. So the property cycle bars, economy bar, and TURBO meter carry
+# it, while the wage clock-in meter (which only moves because the player taps) does not.
+# On gold-filled bars use a DARK gold `bubble_color`, or the bubbles vanish into the fill.
 #
 # Usage — one line per bar:
 #   bar.add_child(GoldBubbles.new())          # bar is a ProgressBar (or any Range)

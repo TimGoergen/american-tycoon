@@ -21,10 +21,11 @@ extends Control
 const ARROW_UP_TEX := preload("res://art/icons/arrow_up.svg")
 const ARROW_DOWN_TEX := preload("res://art/icons/arrow_down.svg")
 
-## Strip height — deliberately slim; the strips overlay tappable rows beneath.
-const STRIP_HEIGHT := 40.0
-## Icon height inside the strip.
-const ICON_HEIGHT := 26.0
+## Strip height — slim-ish (they overlay tappable rows beneath); 40 → 60 (+50%) for a
+## comfier tap target (Tim, 2026-07-05).
+const STRIP_HEIGHT := 60.0
+## Icon height inside the strip (scaled with the taller strip).
+const ICON_HEIGHT := 38.0
 ## How far one tap pages the list, as a fraction of the visible viewport — a bit under
 ## a full screen so the last row before the fold stays visible as a continuity anchor.
 const PAGE_FRACTION := 0.8
@@ -32,8 +33,9 @@ const PAGE_FRACTION := 0.8
 const SCROLL_SECONDS := 0.25
 ## Strip plate: translucent mustard (the utility-button gold the navy arrows were
 ## authored against), so the strip reads over the cream rows without hiding them.
-const STRIP_ALPHA := 0.55
-const STRIP_PRESSED_ALPHA := 0.8
+## Opacity raised 0.55 → 0.7 so the strip reads more clearly as a button (Tim, 2026-07-05).
+const STRIP_ALPHA := 0.7
+const STRIP_PRESSED_ALPHA := 0.9
 ## A strip hides when less than this much content (px) remains in its direction.
 const EDGE_SLACK_PX := 2.0
 

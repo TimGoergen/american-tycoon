@@ -120,6 +120,13 @@ var bubble_color := DEFAULT_GOLD:
 ## parent Range instead" (the normal ProgressBar case).
 var _explicit_fraction := -1.0
 
+## Externally-commanded liquid flow (px/s); < 0 means "measure the parent bar's own fill
+## speed" (the normal case). A bar PINNED full while cycling faster than the eye
+## (PropertyRow's solid/rapid states) has a zero-motion fill edge, so its carbonation
+## sank to the idle-drift floor — the MOST active property read as the laziest fizz on
+## screen. The row commands the flow directly instead (Tim, 2026-07-06).
+var flow_override_px := -1.0
+
 var _time := 0.0
 var _last_fraction := 0.0
 var _smoothed_speed_px := 0.0  # measured fill-edge speed, px/s, smoothed
@@ -201,8 +208,12 @@ func _process(delta: float) -> void:
 	var blend := 1.0 - exp(-delta / SPEED_SMOOTH_TAU)
 	_smoothed_speed_px = lerpf(_smoothed_speed_px, raw_speed_px, blend)
 
-	# The bar's own speed, with a small floor so still bars keep fizzing.
-	_base_speed_px = maxf(_smoothed_speed_px * SPEED_VS_BAR, MIN_DRIFT_PX_PER_SEC)
+	# The bar's own speed, with a small floor so still bars keep fizzing — unless the
+	# host commanded a flow directly (see flow_override_px).
+	if flow_override_px >= 0.0:
+		_base_speed_px = flow_override_px
+	else:
+		_base_speed_px = maxf(_smoothed_speed_px * SPEED_VS_BAR, MIN_DRIFT_PX_PER_SEC)
 
 	# How close the bar is to a crawl: 1.0 at (or below) the idle-drift floor, fading to
 	# 0.0 as the bar speeds up. Widens the per-bubble speed range on slow bars (see the

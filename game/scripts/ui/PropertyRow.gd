@@ -130,6 +130,14 @@ const SOLID_BAR_THRESHOLD_SEC := 0.25
 const RAPID_WRAP_SOLID_SEC := 0.6
 const RAPID_WRAP_EXIT_SEC := 1.2
 
+## A pinned-solid bar's commanded liquid flow (px/s), fed to its GoldBubbles overlay.
+## Deliberately brisk: solid means "cycling faster than the eye", so the MOST active
+## property should carry the most active fizz — not sink to the idle drift a motionless
+## fill edge would otherwise measure (Tim, 2026-07-06). Holding rush multiplies it, so
+## rushing a solid bar has a visible effect beyond the color swap.
+const SOLID_FLOW_PX := 110.0
+const SOLID_FLOW_RUSH_MULT := 1.6
+
 ## Completion-cadence tracking for the rapid-wrap rule above.
 var _seconds_since_wrap := 999.0
 var _wrap_interval_smoothed := 999.0
@@ -185,6 +193,7 @@ var _name_label: Label
 var _count_label: Label
 var _income_label: Label
 var _cycle_bar: ProgressBar
+var _cycle_bubbles: GoldBubbles
 var _buy_button: Button
 var _buy_caption_label: Label
 var _buy_cost_label: Label
@@ -306,7 +315,9 @@ func _ready() -> void:
 	_cycle_bar.show_percentage = false
 	UiPalette.style_progress_bar(_cycle_bar, UiPalette.MONEY_GREEN)
 	# Gold bubbles drifting through the fill — every progress bar carries them (Tim, 2026-07-03).
-	_cycle_bar.add_child(GoldBubbles.new())
+	# Kept as a member: the refresh commands their flow speed while the bar is pinned solid.
+	_cycle_bubbles = GoldBubbles.new()
+	_cycle_bar.add_child(_cycle_bubbles)
 	bar_cell.add_child(_cycle_bar)
 
 	# Per-cycle income: bold BLACK, LEFT-aligned, drawn ON TOP of the bar and vertically centered
@@ -719,6 +730,15 @@ func _refresh(delta: float) -> void:
 	var rush_no_longer_option := staffed and not interactive
 	var rush_held := _manager_circle.is_held() and _prop.units_owned > 0
 	_set_cycle_color(rush_no_longer_option, rush_held)
+
+	# Carbonation on a pinned-solid bar: the fill edge isn't moving, so the bubbles
+	# would sink to their idle drift — command a brisk flow instead (faster still while
+	# rush is held), so the busiest property carries the busiest fizz and rushing a
+	# solid bar visibly does something (see SOLID_FLOW_PX).
+	if bar_is_solid or _rapid_wraps:
+		_cycle_bubbles.flow_override_px = SOLID_FLOW_PX * (SOLID_FLOW_RUSH_MULT if rush_held else 1.0)
+	else:
+		_cycle_bubbles.flow_override_px = -1.0
 
 	_refresh_buy_button()
 	_refresh_hire_button()

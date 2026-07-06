@@ -542,12 +542,13 @@ func _build_estate_tab() -> Control:
 	_lifetime_earned_label.scroll_active = false
 	_lifetime_earned_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	_lifetime_earned_label.add_theme_font_override("normal_font", UiPalette.make_bold_font())
-	_lifetime_earned_label.add_theme_font_size_override("normal_font_size", UiPalette.FONT_SUBHEAD)
+	# FONT_SUBHEAD (41) + 60% ≈ 66 (Tim, 2026-07-05).
+	_lifetime_earned_label.add_theme_font_size_override("normal_font_size", 66)
 	_lifetime_earned_label.add_theme_color_override("default_color", UiPalette.DARK_GOLD)
 	# Mipmapped filtering so the inline gem image downscales smoothly rather than aliasing.
 	_lifetime_earned_label.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	# RichTextLabels need a real minimum size or they render as stray pixels (memory note).
-	_lifetime_earned_label.custom_minimum_size = Vector2(0, 56)
+	_lifetime_earned_label.custom_minimum_size = Vector2(0, 88)
 	v.add_child(_lifetime_earned_label)
 
 	# The prestige exit, pinned to the BOTTOM of the tab (Tim, 2026-06-28): plan the estate,
@@ -885,7 +886,8 @@ func _update_plan_button() -> void:
 	# value actually changes — rebuilding rich text every frame would be wasted parsing.
 	if dynasty.upgrades.earned_lifetime != _shown_lifetime_earned:
 		_shown_lifetime_earned = dynasty.upgrades.earned_lifetime
-		_lifetime_earned_label.text = "[center][img width=30 height=42]res://art/icons/legacy_gem.svg[/img] Lifetime Earned: %d[/center]" % _shown_lifetime_earned
+		# Gem image scaled with the 66px text so the pair keeps its proportions.
+		_lifetime_earned_label.text = "[center][img width=48 height=67]res://art/icons/legacy_gem.svg[/img] Lifetime Earned: %d[/center]" % _shown_lifetime_earned
 
 
 ## First contact: a new epoch was reached this tick. Show the beat (Main's _process

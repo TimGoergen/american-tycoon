@@ -85,13 +85,9 @@ var _estate_badge_dismissed := false
 ## Global buy mode — one toggle drives every row's buy button.
 var _buy_mode: PropertyRow.BuyMode = PropertyRow.BuyMode.ONE
 
-## The property ladder's ScrollContainer, kept for the edge fade below.
-var _ladder_scroll: ScrollContainer
-## Property rows dissolve (modulate alpha) over this many pixels as they slide into the
-## ladder's top/bottom edges — but only on an edge with more content beyond it, so the
-## fade doubles as a "more this way" cue and a fully-scrolled edge stays solid
+## The property ladder's ScrollContainer, kept for the edge fade below
 ## (Tim, 2026-07-06; chosen over an outline, which would have nested a third frame).
-const LADDER_EDGE_FADE_PX := 48.0
+var _ladder_scroll: ScrollContainer
 
 ## Wall-clock seconds since the loaded save was written (0 on a fresh run).
 var _elapsed_since_save := 0.0
@@ -180,10 +176,12 @@ func _process(delta: float) -> void:
 	_update_ladder_edge_fade()
 
 
-## Apply the ladder's edge fade (see LADDER_EDGE_FADE_PX): each property row's alpha
-## drops as it slides into the scroll viewport's top or bottom edge, but only on an edge
-## that actually has more content beyond it. A half-clipped row dissolving says "the list
-## continues" without drawing any extra chrome.
+## Apply the ladder's edge fade: a property row the scroll viewport is clipping shows at
+## the alpha of its VISIBLE FRACTION — half-clipped means half-faded, dissolving to
+## nothing as it slides fully out — but only on an edge that actually has more content
+## beyond it. A dissolving row says "the list continues" without drawing extra chrome.
+## (First cut faded over a fixed 48px zone measured from the row's far edge, which only
+## triggered on the last sliver of a ~150px row — invisible in practice, Tim 2026-07-06.)
 func _update_ladder_edge_fade() -> void:
 	if _active_tab != TAB_PROPERTY:
 		return
@@ -195,16 +193,18 @@ func _update_ladder_edge_fade() -> void:
 	var more_below := float(_ladder_scroll.scroll_vertical) < scroll_bar.max_value - scroll_bar.page - 1.0
 	for row_node in _rows:
 		var row := row_node as PropertyRow
+		if row.size.y <= 0.0:
+			continue
 		# The row's top edge in viewport space: its position in the ladder, shifted up by
 		# the scroll offset (the ladder column sits at the scroll content's origin).
 		var row_top := row.position.y - float(_ladder_scroll.scroll_vertical)
 		var alpha := 1.0
 		if more_above:
-			# How far the row's BOTTOM edge has emerged below the viewport's top edge.
-			alpha = minf(alpha, clampf((row_top + row.size.y) / LADDER_EDGE_FADE_PX, 0.0, 1.0))
+			# Fraction of the row below the viewport's top edge (its visible share).
+			alpha = minf(alpha, clampf((row_top + row.size.y) / row.size.y, 0.0, 1.0))
 		if more_below:
-			# How far the row's TOP edge sits above the viewport's bottom edge.
-			alpha = minf(alpha, clampf((view_height - row_top) / LADDER_EDGE_FADE_PX, 0.0, 1.0))
+			# Fraction of the row above the viewport's bottom edge (its visible share).
+			alpha = minf(alpha, clampf((view_height - row_top) / row.size.y, 0.0, 1.0))
 		row.modulate.a = alpha
 
 

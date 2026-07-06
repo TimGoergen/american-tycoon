@@ -136,13 +136,16 @@ func _process(delta: float) -> void:
 			_spawn_coin(area_size.x)
 
 	# Fall; a coin past the bottom is a miss — it costs points (see get_performance), shows the
-	# miss cue, and is freed.
-	for coin in _coins.duplicate():
+	# miss cue, and is freed. Walked backward so remove_at can't skip the next coin —
+	# this loop used to iterate a duplicate() of the array, a fresh copy every frame
+	# (minigame lag pass, Tim 2026-07-06).
+	for i in range(_coins.size() - 1, -1, -1):
+		var coin: Control = _coins[i]
 		coin.position.y += FALL_SPEED * delta
 		if coin.position.y > area_size.y:
 			_missed += 1
 			var drop_center := Vector2(coin.position.x + coin.size.x / 2.0, area_size.y)
-			_coins.erase(coin)
+			_coins.remove_at(i)
 			coin.queue_free()
 			_spawn_miss_effect(drop_center)
 

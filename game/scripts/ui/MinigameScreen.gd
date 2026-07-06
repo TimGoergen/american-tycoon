@@ -945,7 +945,7 @@ func _refresh_timer(delta: float, busy: bool) -> void:
 	var secs := int(ceil(_seconds_left))
 	if busy:
 		_timer_label.text = "0:%02d  ⏸" % secs
-		_timer_label.add_theme_color_override("font_color", UiPalette.NAVY)
+		_set_timer_color(UiPalette.NAVY)
 		_set_timer_scale(1.0)
 		return
 
@@ -962,8 +962,18 @@ func _refresh_timer(delta: float, busy: bool) -> void:
 		var beat := 0.5 + 0.5 * sin(_warn_phase * 8.0)
 		color = UiPalette.KETCHUP_RED.lerp(UiPalette.MUSTARD_GOLD, beat * 0.5)
 		pulse = 1.0 + 0.05 * beat
-	_timer_label.add_theme_color_override("font_color", color)
+	_set_timer_color(color)
 	_set_timer_scale(pulse)
+
+
+## Apply the timer's font color only when it actually changed — re-applying a theme
+## override every frame rebuilds the label's theme cache for nothing (minigame lag
+## pass, Tim 2026-07-06). Outside the warn/critical pulse the color is constant.
+var _timer_color := Color.TRANSPARENT
+func _set_timer_color(color: Color) -> void:
+	if color != _timer_color:
+		_timer_color = color
+		_timer_label.add_theme_color_override("font_color", color)
 
 
 ## Scale the timer label about its own center (a Label scales from its top-left by default, which

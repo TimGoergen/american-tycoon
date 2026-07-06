@@ -168,10 +168,14 @@ func _process(delta: float) -> void:
 		return
 	_flash = maxf(0.0, _flash - delta * 4.0)
 	_miss_flash = maxf(0.0, _miss_flash - delta * 4.0)
-	# Age the click-feedback lines and drop any that have fully faded.
-	for mark in _click_marks:
+	# Age the click-feedback lines and drop any that have fully faded — removed in-place,
+	# walking backward, instead of filter() rebuilding the array every frame (minigame
+	# lag pass, Tim 2026-07-06).
+	for i in range(_click_marks.size() - 1, -1, -1):
+		var mark: Dictionary = _click_marks[i]
 		mark["age"] += delta
-	_click_marks = _click_marks.filter(func(m: Dictionary) -> bool: return m["age"] < CLICK_MARK_FADE)
+		if mark["age"] >= CLICK_MARK_FADE:
+			_click_marks.remove_at(i)
 	# Fade the "it just shrank" outline.
 	_zone_ghost_left = maxf(0.0, _zone_ghost_left - delta)
 	_marker_pos += _marker_dir * _marker_speed * delta

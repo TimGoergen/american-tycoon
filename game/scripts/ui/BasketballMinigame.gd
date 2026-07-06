@@ -158,6 +158,9 @@ var _play: Control
 ## rounded outline) and cached; re-baked only when the board size changes.
 var _board_bg: ImageTexture
 var _board_bg_size: Vector2 = Vector2.ZERO
+## The board's black rounded outline, built once and reused — it was being allocated
+## fresh inside the draw pass every frame (minigame lag pass, Tim 2026-07-06).
+var _board_border: StyleBoxFlat
 
 # Drawn each frame; preloaded so the texture is ready the instant play begins. The hoop is drawn
 # with plain shapes (an ellipse rim + a net), so only the ball needs a texture.
@@ -280,16 +283,23 @@ func _advance_celebration(delta: float) -> void:
 	_aim_scale = lerpf(_aim_scale, target_scale, clampf(delta * AIM_SCALE_EASE, 0.0, 1.0))
 
 	# Spray particles fall under a light gravity and fade out; drop the dead ones.
-	for particle in _particles:
+	# Dead entries are removed in-place, walking backward so removal doesn't skip the
+	# next entry — filter() rebuilt the whole array every frame (minigame lag pass,
+	# Tim 2026-07-06).
+	for i in range(_particles.size() - 1, -1, -1):
+		var particle: Dictionary = _particles[i]
 		particle["vel"].y += PARTICLE_GRAVITY * delta
 		particle["pos"] += particle["vel"] * delta
 		particle["life"] -= PARTICLE_FADE * delta
-	_particles = _particles.filter(func(p: Dictionary) -> bool: return p["life"] > 0.0)
+		if particle["life"] <= 0.0:
+			_particles.remove_at(i)
 
 	# Score rings just fade (their radius is derived from remaining life in the draw).
-	for ring in _score_rings:
+	for i in range(_score_rings.size() - 1, -1, -1):
+		var ring: Dictionary = _score_rings[i]
 		ring["life"] -= SCORE_RING_FADE * delta
-	_score_rings = _score_rings.filter(func(r: Dictionary) -> bool: return r["life"] > 0.0)
+		if ring["life"] <= 0.0:
+			_score_rings.remove_at(i)
 
 	# The net swing winds down to rest.
 	_net_swing_time = maxf(0.0, _net_swing_time - delta)
@@ -573,13 +583,15 @@ func _draw_play() -> void:
 	# The board outline: a thick BLACK, ROUNDED-corner border drawn last so it reads as a solid
 	# boundary in front of a ball pressed against it (Tim, 2026-06-30). A StyleBoxFlat gives the
 	# rounded corners a plain draw_rect can't; its border grows inward from the board rect, matching
-	# the WALL_THICKNESS the physics uses for the wall inset.
-	var border := StyleBoxFlat.new()
-	border.bg_color = Color.TRANSPARENT
-	border.border_color = Color.BLACK
-	border.set_border_width_all(int(WALL_THICKNESS))
-	border.set_corner_radius_all(BOARD_CORNER_RADIUS)
-	_play.draw_style_box(border, Rect2(Vector2.ZERO, bounds))
+	# the WALL_THICKNESS the physics uses for the wall inset. Built lazily ONCE (its
+	# settings never change) — see _board_border.
+	if _board_border == null:
+		_board_border = StyleBoxFlat.new()
+		_board_border.bg_color = Color.TRANSPARENT
+		_board_border.border_color = Color.BLACK
+		_board_border.set_border_width_all(int(WALL_THICKNESS))
+		_board_border.set_corner_radius_all(BOARD_CORNER_RADIUS)
+	_play.draw_style_box(_board_border, Rect2(Vector2.ZERO, bounds))
 
 
 ## Bake the gym backdrop to the current board size with rounded corners, cached until the size

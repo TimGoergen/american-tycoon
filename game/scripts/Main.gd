@@ -89,6 +89,10 @@ var _buy_mode: PropertyRow.BuyMode = PropertyRow.BuyMode.ONE
 ## (Tim, 2026-07-06; chosen over an outline, which would have nested a third frame).
 var _ladder_scroll: ScrollContainer
 
+## The game screen's drawing layers (backdrop mask + viewing area), hidden while an
+## economy-freezing modal covers them so they stop costing draw time (see _process).
+var _covered_game_layers: Array = []
+
 ## Wall-clock seconds since the loaded save was written (0 on a fresh run).
 var _elapsed_since_save := 0.0
 
@@ -126,17 +130,26 @@ func _process(delta: float) -> void:
 	# showing and no full-screen overlay is up, so a stray second finger can never trigger a buy on a
 	# row sitting behind a modal. Computed here every frame (before the freeze return below) so it
 	# always reflects the current screen, including while an overlay is up.
-	var overlay_up := _will_screen.visible or _dev_panel.visible or _first_contact_overlay.visible \
-			or _minigame_screen.visible or _minigame_review_screen.visible or _welcome_overlay.visible
+	var modal_up := _will_screen.visible or _dev_panel.visible or _first_contact_overlay.visible \
+			or _minigame_screen.visible or _minigame_review_screen.visible
+	var overlay_up := modal_up or _welcome_overlay.visible
 	PropertyRow.multitouch_enabled = _active_tab == TAB_PROPERTY and not overlay_up
+
+	# A modal that freezes the economy also HIDES the game screen beneath it (Tim,
+	# 2026-07-06): the modals are opaque and full-screen, but a covered Control still
+	# draws every frame — the property ladder's bubble bars alone are a real per-frame
+	# GPU spend, and paying it under the minigame screen showed up as minigame lag.
+	# Hidden Controls skip _draw but their _process still runs, so the bubbles simply
+	# resume where they left off when the modal closes.
+	for layer in _covered_game_layers:
+		(layer as Control).visible = not modal_up
 
 	# Freeze the economy while a full-screen MODAL overlay is up (the succession
 	# ceremony, the upgrade shop, the minigame, etc.): no ticks, no autosave. This keeps
 	# the will's numbers steady, avoids half-saving the generation swap mid-ceremony, and
 	# lets the shop spend Legacy against a steady balance. NOTE: switching TABS does NOT
 	# freeze — an idle game keeps earning no matter which tab you're reading.
-	if _will_screen.visible or _dev_panel.visible or _first_contact_overlay.visible \
-			or _minigame_screen.visible or _minigame_review_screen.visible:
+	if modal_up:
 		return
 
 	# Fixed-timestep logic (Spec §2): accumulate render time and tick in

@@ -28,13 +28,14 @@ extends Control
 # identical across identical bars.
 
 ## The full bubble crowd. Narrow fills show a subset (see BUBBLE_SPACING_PX).
-const BUBBLE_COUNT := 12
+const BUBBLE_COUNT := 15  # +25% (Tim, 2026-07-05)
 ## One bubble becomes active per this many pixels of filled width (min 2), so a sliver
 ## of fill fizzes with a couple of distinct bubbles instead of a crammed dozen.
 const BUBBLE_SPACING_PX := 22.0
 ## Bubble radius range in pixels — small, like carbonation, not coins.
-const RADIUS_MIN := 1.6
-const RADIUS_MAX := 3.4
+## Enlarged 5% at the small end, 15% at the large end (Tim, 2026-07-05).
+const RADIUS_MIN := 1.7
+const RADIUS_MAX := 3.9
 ## Bubble drift = this × the bar's fill speed. 1.0 = the liquid flows WITH the bar
 ## (Tim, 2026-07-05: 2× read as too fast — and the per-bubble spread below already
 ## puts individual bubbles both above and below the target)…
@@ -50,7 +51,7 @@ const MIN_DRIFT_PX_PER_SEC := 14.0
 ## like one speed — so a crawling bar lets its quickest bubbles run up to
 ## SLOW_UPPER_MULT × the base instead.
 const SPEED_SPREAD := 0.45
-const SLOW_UPPER_MULT := 3.0
+const SLOW_UPPER_MULT := 4.5  # raised from 3.0 (Tim, 2026-07-05)
 ## The swirl: two stacked sine waves on the vertical axis (a slow deep one and a faster
 ## shallow one, at incommensurate rates) plus a small horizontal wobble — the combined
 ## path traces loose loops, reading as bubbles tumbling in moving liquid.

@@ -27,6 +27,8 @@ var _button: Button
 ## The reward readout drawn on the right of the button (the icon stands in for the
 ## word "TURBO" on the left). Set live in _process.
 var _label: Label
+## The carbonation overlay — kept so _set_burn_style can retint the bubbles with the fill.
+var _bubbles: GoldBubbles
 var _showing_burn_style := false
 
 ## Eased fill shown on the bar. The true meter is driven by the 10 Hz logic tick,
@@ -49,8 +51,15 @@ func _ready() -> void:
 	custom_minimum_size = Vector2(0, UiPalette.STANDARD_BUTTON_HEIGHT)
 	size_flags_vertical = Control.SIZE_FILL
 	UiPalette.style_framed_progress(self, UiPalette.MUSTARD_GOLD, UiPalette.PROGRESS_TRACK_GRAY)
-	# No GoldBubbles here: the meter's fill is itself gold, so gold bubbles were invisible
-	# against it — they only read where they brushed the frame (Tim, 2026-07-05).
+
+	# Carbonation in the meter (Tim, 2026-07-05 — re-added after a brief removal): the
+	# bubbles tint against the fill so they always read — DARK gold on the charging GOLD
+	# fill, bright gold on the burning RED fill (_set_burn_style swaps them with the fill).
+	# Added BEFORE the button/label overlay so the readout draws over them.
+	_bubbles = GoldBubbles.new()
+	_bubbles.edge_inset = 3.0  # match the framed fill's 3px inset (style_framed_progress)
+	_bubbles.bubble_color = UiPalette.DARK_GOLD
+	add_child(_bubbles)
 
 	# Transparent button overlaying the meter: the gold/red fill shows through, and only
 	# the tap belongs to the button. Empty styleboxes in every state keep the meter visible
@@ -134,3 +143,6 @@ func _set_burn_style(burning: bool) -> void:
 	_showing_burn_style = burning
 	var fill := UiPalette.KETCHUP_RED if burning else UiPalette.MUSTARD_GOLD
 	UiPalette.style_framed_progress(self, fill, UiPalette.PROGRESS_TRACK_GRAY)
+	# Retint the carbonation with the fill so the bubbles always contrast: bright gold
+	# reads on the burning red, dark gold on the charging gold (Tim, 2026-07-05).
+	_bubbles.bubble_color = GoldBubbles.DEFAULT_GOLD if burning else UiPalette.DARK_GOLD

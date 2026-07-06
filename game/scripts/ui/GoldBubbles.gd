@@ -61,10 +61,18 @@ const SWIRL_FRACTION := 0.12       # secondary vertical amplitude, × bar height
 const SWIRL_HZ := 1.7
 const WOBBLE_PX := 2.5             # horizontal wobble amplitude
 const WOBBLE_HZ := 1.1
-## Bubble color: bright gold; each bubble's own alpha varies around this (see _alpha_of).
-const BUBBLE_COLOR := Color(1.0, 0.85, 0.35, 1.0)
+## Default bubble color: bright gold (see the `bubble_color` property for per-bar tints —
+## a GOLD-filled bar wants DARK gold bubbles instead, Tim 2026-07-05). Each bubble's own
+## alpha varies around it (see _alpha_of).
+const DEFAULT_GOLD := Color(1.0, 0.85, 0.35, 1.0)
 const ALPHA_MIN := 0.45
 const ALPHA_MAX := 0.85
+## Tracers: each bubble trails a few fading, shrinking ghosts of itself sampled a moment
+## back along its own path (Tim, 2026-07-05) — a comet tail in the liquid's flow.
+const TRACER_COUNT := 4
+const TRACER_SPACING_SEC := 0.05   # how far apart (in time) the ghosts sample the path
+const TRACER_RADIUS_FALLOFF := 0.8 # each ghost's radius vs the one ahead of it
+const TRACER_ALPHA_FALLOFF := 0.5  # each ghost's alpha vs the one ahead of it
 ## Smoothing time constant for the measured fill speed, so one jumpy frame (a rush,
 ## a snap-back) doesn't make the bubbles lurch.
 const SPEED_SMOOTH_TAU := 0.35
@@ -75,6 +83,15 @@ const MIN_FILLED_WIDTH_PX := 14.0
 ## fill inset by the frame's border width). 0 for plain bars.
 var edge_inset := 0.0
 
+## The bubble tint. Bright gold by default; bars whose FILL is itself gold set this to a
+## dark gold so the bubbles still read (Tim, 2026-07-05 — the TURBO meter swaps it live
+## between its charging-gold and burning-red states).
+var bubble_color := DEFAULT_GOLD:
+	set(value):
+		if value != bubble_color:
+			bubble_color = value
+			queue_redraw()
+
 ## Explicitly-fed fill fraction for hand-drawn bars; < 0 means "not fed — read the
 ## parent Range instead" (the normal ProgressBar case).
 var _explicit_fraction := -1.0
@@ -84,6 +101,10 @@ var _last_fraction := 0.0
 var _smoothed_speed_px := 0.0  # measured fill-edge speed, px/s, smoothed
 ## Per-bubble position along the filled region, NORMALIZED 0–1 (see the class header).
 var _bubble_pos: Array[float] = []
+## The crowd's base drift and slow-bar speed ceiling, cached each _process so _draw can
+## recompute any bubble's own speed when laying its tracer ghosts back along its path.
+var _base_speed_px := MIN_DRIFT_PX_PER_SEC
+var _upper_mult := 1.0 + SPEED_SPREAD
 
 
 func _ready() -> void:
@@ -151,13 +172,13 @@ func _process(delta: float) -> void:
 	_smoothed_speed_px = lerpf(_smoothed_speed_px, raw_speed_px, blend)
 
 	# The bar's own speed, with a small floor so still bars keep fizzing.
-	var base_speed := maxf(_smoothed_speed_px * SPEED_VS_BAR, MIN_DRIFT_PX_PER_SEC)
+	_base_speed_px = maxf(_smoothed_speed_px * SPEED_VS_BAR, MIN_DRIFT_PX_PER_SEC)
 
 	# How close the bar is to a crawl: 1.0 at (or below) the idle-drift floor, fading to
 	# 0.0 as the bar speeds up. Widens the per-bubble speed range on slow bars (see the
 	# SPEED_SPREAD / SLOW_UPPER_MULT comment).
-	var slowness := clampf(MIN_DRIFT_PX_PER_SEC / base_speed, 0.0, 1.0)
-	var upper_mult := lerpf(1.0 + SPEED_SPREAD, SLOW_UPPER_MULT, slowness)
+	var slowness := clampf(MIN_DRIFT_PX_PER_SEC / _base_speed_px, 0.0, 1.0)
+	_upper_mult = lerpf(1.0 + SPEED_SPREAD, SLOW_UPPER_MULT, slowness)
 
 	var filled_width := fraction * track_width
 	if filled_width >= MIN_FILLED_WIDTH_PX:
@@ -166,9 +187,14 @@ func _process(delta: float) -> void:
 			# dependent) upper bound, so the crowd spreads out instead of traveling as one
 			# body. Positions advance in normalized space: the same px/s reads as a bigger
 			# step through a narrower fill.
-			var speed_px := base_speed * lerpf(1.0 - SPEED_SPREAD, upper_mult, _variant(i, 0.37))
-			_bubble_pos[i] = fmod(_bubble_pos[i] + speed_px * delta / filled_width, 1.0)
+			_bubble_pos[i] = fmod(_bubble_pos[i] + _bubble_speed_px(i) * delta / filled_width, 1.0)
 	queue_redraw()
+
+
+## One bubble's own drift speed (px/s), between the lower bound and the slow-bar-aware
+## upper bound. Shared by the position advance and the tracer path so they always agree.
+func _bubble_speed_px(index: int) -> float:
+	return _base_speed_px * lerpf(1.0 - SPEED_SPREAD, _upper_mult, _variant(index, 0.37))
 
 
 func _draw() -> void:
@@ -177,18 +203,48 @@ func _draw() -> void:
 	var filled_width := fraction * track_width
 	if filled_width < MIN_FILLED_WIDTH_PX:
 		return
-	var mid_y := size.y / 2.0
 	for i in range(_active_count(filled_width)):
 		var radius := lerpf(RADIUS_MIN, RADIUS_MAX, _variant(i, 0.13))
-		var phase := _variant(i, 0.53) * TAU
-		# Loose looping path: two vertical sines at incommensurate rates + a small
-		# horizontal wobble — carbonation tumbling in a current, not beads on a wire.
-		var sway := sin(_time * TAU * SWAY_HZ + phase) * size.y * SWAY_FRACTION \
-				+ sin(_time * TAU * SWIRL_HZ + phase * 2.0) * size.y * SWIRL_FRACTION
-		var wobble := sin(_time * TAU * WOBBLE_HZ + phase * 3.0) * WOBBLE_PX
-		# Map the normalized position into the filled region, keeping the circle inside.
-		var x := edge_inset + radius + _bubble_pos[i] * (filled_width - radius * 2.0) + wobble
-		x = clampf(x, edge_inset + radius, edge_inset + filled_width - radius)
-		var color := BUBBLE_COLOR
-		color.a = _alpha_of(i)
-		draw_circle(Vector2(x, mid_y + sway), radius, color)
+		var head := _bubble_point(i, radius, filled_width, 0.0)
+		# Only the head clamps into the fill; ghosts that fall outside are dropped instead
+		# (a clamped ghost would pile up at the edge rather than trail behind).
+		head.x = clampf(head.x, edge_inset + radius, edge_inset + filled_width - radius)
+		var head_alpha := _alpha_of(i)
+
+		# Tracers first (so the head draws over them): fading, shrinking ghosts sampled a
+		# moment back along the bubble's own path — the wake it just swirled through.
+		var ghost_radius := radius
+		var ghost_alpha := head_alpha
+		for ghost in range(1, TRACER_COUNT + 1):
+			ghost_radius *= TRACER_RADIUS_FALLOFF
+			ghost_alpha *= TRACER_ALPHA_FALLOFF
+			var point := _bubble_point(i, radius, filled_width, float(ghost) * TRACER_SPACING_SEC)
+			if point.x < edge_inset + ghost_radius:
+				break  # the wake would poke out of the fill's left edge — stop the tail
+			var ghost_color := bubble_color
+			ghost_color.a = ghost_alpha
+			draw_circle(point, ghost_radius, ghost_color)
+
+		var color := bubble_color
+		color.a = head_alpha
+		draw_circle(head, radius, color)
+
+
+## Where bubble `index` sat `seconds_ago` on its path (0.0 = right now): the drift
+## position rolled back by its own speed, with the sway/swirl/wobble sines evaluated at
+## that earlier time. Analytic, so tracers need no stored position history.
+func _bubble_point(index: int, radius: float, filled_width: float, seconds_ago: float) -> Vector2:
+	var at_time := _time - seconds_ago
+	var phase := _variant(index, 0.53) * TAU
+	# Loose looping path: two vertical sines at incommensurate rates + a small
+	# horizontal wobble — carbonation tumbling in a current, not beads on a wire.
+	var sway := sin(at_time * TAU * SWAY_HZ + phase) * size.y * SWAY_FRACTION \
+			+ sin(at_time * TAU * SWIRL_HZ + phase * 2.0) * size.y * SWIRL_FRACTION
+	var wobble := sin(at_time * TAU * WOBBLE_HZ + phase * 3.0) * WOBBLE_PX
+	# Map the normalized position into the filled region, rolled back along the drift.
+	# NOT clamped here: the head clamps itself in _draw, while out-of-fill ghosts are
+	# dropped by the caller (clamping them would pile the wake up at the fill's edge).
+	var drift_px := _bubble_pos[index] * (filled_width - radius * 2.0) \
+			- _bubble_speed_px(index) * seconds_ago
+	var x := edge_inset + radius + drift_px + wobble
+	return Vector2(x, size.y / 2.0 + sway)

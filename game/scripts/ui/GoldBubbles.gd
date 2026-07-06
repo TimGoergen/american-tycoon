@@ -95,6 +95,14 @@ const SPEED_SMOOTH_TAU := 0.35
 ## Hide bubbles entirely when the filled region is narrower than this.
 const MIN_FILLED_WIDTH_PX := 14.0
 
+## Liquid shading over the filled region (Tim, 2026-07-06): the top and bottom edges
+## darken a touch and the center line brightens, like light falling through a tube of
+## liquid — reinforcing the carbonation read on every bar that carries it. Drawn as four
+## vertical-gradient bands (dark→clear, clear→bright, bright→clear, clear→dark), each a
+## quarter of the bar's height.
+const LIQUID_EDGE_DARKEN_ALPHA := 0.16
+const LIQUID_CENTER_BRIGHT_ALPHA := 0.10
+
 ## Left/right inset of the fill inside the bar, in pixels (framed meters draw their
 ## fill inset by the frame's border width). 0 for plain bars.
 var edge_inset := 0.0
@@ -225,6 +233,7 @@ func _draw() -> void:
 	var filled_width := fraction * track_width
 	if filled_width < MIN_FILLED_WIDTH_PX:
 		return
+	_draw_liquid_shading(filled_width)
 	for i in range(_active_count(filled_width)):
 		var radius := lerpf(RADIUS_MIN, RADIUS_MAX, _variant(i, 0.13))
 		var head := _bubble_point(i, radius, filled_width, 0.0)
@@ -264,6 +273,38 @@ func _draw() -> void:
 		# frame, and without AA a circle only visibly moves when it crosses a whole pixel —
 		# the drift and wobble read as discrete hops instead of liquid motion (Tim, 2026-07-06).
 		draw_circle(head, radius, color, true, -1.0, true)
+
+
+## The liquid shading (see the LIQUID_* constants): four stacked vertical-gradient bands
+## over the filled region — edges fading in dark, center fading in bright. Drawn UNDER
+## the bubbles, so they read as floating in the lit liquid.
+func _draw_liquid_shading(filled_width: float) -> void:
+	var left := edge_inset
+	var right := edge_inset + filled_width
+	var quarter := size.y / 4.0
+	var dark := Color(0.0, 0.0, 0.0, LIQUID_EDGE_DARKEN_ALPHA)
+	var dark_clear := Color(0.0, 0.0, 0.0, 0.0)
+	var bright := Color(1.0, 1.0, 1.0, LIQUID_CENTER_BRIGHT_ALPHA)
+	var bright_clear := Color(1.0, 1.0, 1.0, 0.0)
+	_draw_vertical_gradient(left, right, 0.0, quarter, dark, dark_clear)
+	_draw_vertical_gradient(left, right, quarter, quarter * 2.0, bright_clear, bright)
+	_draw_vertical_gradient(left, right, quarter * 2.0, quarter * 3.0, bright, bright_clear)
+	_draw_vertical_gradient(left, right, quarter * 3.0, size.y, dark_clear, dark)
+
+
+## One rectangle whose color blends vertically from `top_color` to `bottom_color`
+## (draw_polygon interpolates per-vertex colors across the face).
+func _draw_vertical_gradient(
+	left: float, right: float, top: float, bottom: float,
+	top_color: Color, bottom_color: Color
+) -> void:
+	draw_polygon(
+		PackedVector2Array([
+			Vector2(left, top), Vector2(right, top),
+			Vector2(right, bottom), Vector2(left, bottom),
+		]),
+		PackedColorArray([top_color, top_color, bottom_color, bottom_color])
+	)
 
 
 ## Where bubble `index` sat `seconds_ago` on its path (0.0 = right now): the drift

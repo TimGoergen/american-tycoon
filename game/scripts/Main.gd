@@ -449,14 +449,25 @@ func _build_property_tab() -> Control:
 	_buy_mode_button.pressed.connect(_on_buy_mode_toggled)
 	action_row.add_child(_buy_mode_button)
 
-	# The property ladder: 12 rows in a vertical scroll (GDD §2). The vertical scrollbar gets
-	# the styled wide-handle / narrow-track look (UiPalette.style_vscrollbar).
+	# The property ladder: the rows in a vertical scroll (GDD §2), hosted in a plain
+	# Control so the ScrollEdgeArrows overlay can sit ON the list (top/bottom paging
+	# strips that double as "more content this way" cues — Tim, 2026-07-05) without
+	# reserving any layout space. The vertical scrollbar gets the styled wide-handle /
+	# narrow-track look (UiPalette.style_vscrollbar).
+	var ladder_area := Control.new()
+	ladder_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	v.add_child(ladder_area)
+
 	var scroll := ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_RESERVE
-	v.add_child(scroll)
+	ladder_area.add_child(scroll)
 	UiPalette.style_vscrollbar(scroll.get_v_scroll_bar())
+
+	var ladder_arrows := ScrollEdgeArrows.new()
+	ladder_arrows.setup(scroll)
+	ladder_area.add_child(ladder_arrows)
 
 	# A right margin narrows the property rows so a visible gap sits between their right edge and
 	# the scrollbar handle (Tim, 2026-06-28). The ScrollContainer does NOT reserve a gutter here

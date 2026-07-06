@@ -20,6 +20,10 @@ const TURBO_TEX := preload("res://art/icons/turbo.svg")
 ## sized to nearly fill the button so the symbol reads large (Tim, 2026-06-29).
 const TURBO_ICON_SIZE := 90
 
+## Bubble crowd size while CHARGING (the gold fill), as a fraction of the full crowd —
+## the full crowd read as too busy there (Tim, 2026-07-06). Burning uses the full crowd.
+const CHARGING_BUBBLE_DENSITY := 0.5
+
 var _frenzy: FrenzyState
 var _tuning: TuningConfig
 
@@ -59,6 +63,7 @@ func _ready() -> void:
 	_bubbles = GoldBubbles.new()
 	_bubbles.edge_inset = 3.0  # match the framed fill's 3px inset (style_framed_progress)
 	_bubbles.bubble_color = UiPalette.DARK_GOLD
+	_bubbles.density_scale = CHARGING_BUBBLE_DENSITY  # the meter starts in the charging state
 	add_child(_bubbles)
 
 	# Transparent button overlaying the meter: the gold/red fill shows through, and only
@@ -146,3 +151,7 @@ func _set_burn_style(burning: bool) -> void:
 	# Retint the carbonation with the fill so the bubbles always contrast: bright gold
 	# reads on the burning red, dark gold on the charging gold (Tim, 2026-07-05).
 	_bubbles.bubble_color = GoldBubbles.DEFAULT_GOLD if burning else UiPalette.DARK_GOLD
+	# Burning drains the meter right-to-left, so the liquid flows that way too, with the
+	# full crowd; charging fills left-to-right with the reduced crowd (Tim, 2026-07-06).
+	_bubbles.flow_reversed = burning
+	_bubbles.density_scale = 1.0 if burning else CHARGING_BUBBLE_DENSITY

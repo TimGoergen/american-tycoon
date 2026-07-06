@@ -27,7 +27,7 @@ extends Control
 # not in pixels: when the fill is a narrow sliver the bubbles stay evenly spread through
 # it instead of being clamped into one overlapping clump (the "single gold thing" bug on
 # the economy bar). Every bubble also gets its own size, speed, opacity, and sway rate/phase
-# from a fixed golden-ratio sequence, so the crowd never marches in lockstep yet looks
+# from a fixed per-bubble hash, so the crowd never marches in lockstep yet looks
 # identical across identical bars.
 
 ## The full bubble crowd. Narrow fills show a subset (see BUBBLE_SPACING_PX).
@@ -120,16 +120,22 @@ func _ready() -> void:
 	# narrow fills draw only the first N bubbles, and with even spacing those N all sat
 	# in the first N/12th of the fill — a clump that a slow bar took ages to shake out
 	# (Tim, 2026-07-05). A Weyl sequence is evenly spread for EVERY prefix, so whatever
-	# subset is active starts well distributed through the fill.
+	# subset is active starts well distributed through the fill. This is the ONE place the
+	# golden-ratio sequence is used directly — every other per-bubble trait comes from the
+	# _variant hash, so traits are independent of position (see _variant's comment).
 	for i in range(BUBBLE_COUNT):
-		_bubble_pos.append(_variant(i, 0.0))
+		_bubble_pos.append(fmod(float(i) * 0.61803, 1.0))
 
 
-## A stable per-bubble pseudo-random in [0,1) — the golden-ratio (Weyl) sequence, offset
-## per use (`salt`) so a bubble's size, speed, phase, and alpha are independent of each
-## other. Fixed, not random: identical bars look identical, and redraws never reshuffle.
+## A stable per-bubble pseudo-random in [0,1), hashed from (index, salt). Fixed, not
+## random: identical bars look identical, and redraws never reshuffle. This MUST be a
+## hash, not a shared sequence offset per salt: an earlier version returned
+## fmod(index * 0.61803 + salt, 1.0), where every salt just shifts the SAME sequence —
+## so phase, speed, and size were all linearly tied to a bubble's start position, and
+## the crowd moved as one coherent wave rolling along the bar (Tim, 2026-07-06).
 func _variant(index: int, salt: float) -> float:
-	return fmod(float(index) * 0.61803 + salt, 1.0)
+	# The classic sin-based hash; fposmod (not fmod) because sin's product can be negative.
+	return fposmod(sin(float(index) * 127.1 + salt * 311.7) * 43758.5453, 1.0)
 
 
 func _alpha_of(index: int) -> float:

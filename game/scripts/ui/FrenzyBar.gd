@@ -112,8 +112,10 @@ func _ready() -> void:
 	_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	# Larger + bold readout (Tim, 2026-06-25), white in all states so a tap never recolors it.
-	_label.add_theme_font_size_override("font_size", UiPalette.FONT_BUTTON)
+	# Larger + bold readout (Tim, 2026-06-25), white in all states so a tap never recolors
+	# it. FONT_SUBHEAD, deliberately matching the buy-mode button sharing its row — the
+	# two were resized together (Tim, 2026-07-07; both had been FONT_BUTTON and read small).
+	_label.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
 	_label.add_theme_font_override("font", UiPalette.make_bold_font())
 	_label.add_theme_color_override("font_color", Color.WHITE)
 	row.add_child(_label)

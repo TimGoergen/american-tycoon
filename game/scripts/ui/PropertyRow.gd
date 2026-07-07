@@ -9,7 +9,9 @@ extends PanelContainer
 # Each row has a single buy button; what it buys is set by the global
 # buy-mode toggle on the Main screen (×1 / ×10 / ×100 / MAX).
 
-enum BuyMode { ONE, TEN, HUNDRED, MAX }
+# NEXT_TIER buys exactly enough units to reach the next milestone threshold (replaced
+# ×100, Tim 2026-07-07). It keeps ×100's ordinal slot so saved ui_buy_mode ints stay valid.
+enum BuyMode { ONE, TEN, NEXT_TIER, MAX }
 
 signal buy_requested(prop_index: int, mode: BuyMode)
 signal tap_requested(prop_index: int)
@@ -919,14 +921,17 @@ func _refresh_buy_button() -> void:
 			count = 1
 		BuyMode.TEN:
 			count = 10
-		BuyMode.HUNDRED:
-			count = 100
+		BuyMode.NEXT_TIER:
+			# Exactly enough to reach the next milestone threshold; 0 past the last tier
+			# (get_next_milestone_count returns <= 0 there).
+			count = maxi(0, _prop.get_next_milestone_count() - _prop.units_owned)
 		BuyMode.MAX:
 			count = _prop.get_max_affordable(_economy.cash)
 
 	if count <= 0:
-		# MAX mode with nothing affordable yet: "+0", and show the next single unit's cost so the
-		# player can see how close they are, instead of a blank "—".
+		# MAX mode with nothing affordable yet (or NEXT TIER past the last tier): "+0", and
+		# show the next single unit's cost so the player can see how close they are,
+		# instead of a blank "—".
 		_buy_caption_label.text = "+0"
 		_buy_cost_label.text = Money.of(_prop.get_bulk_cost(1)).display()
 		_buy_button.disabled = true

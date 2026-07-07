@@ -495,15 +495,16 @@ func _build_property_tab() -> Control:
 	_frenzy_bar.size_flags_stretch_ratio = 2.0  # TURBO ~2/3, buy-mode ~1/3
 	action_row.add_child(_frenzy_bar)
 
-	# Global buy-mode toggle: one button cycles ×1 → ×10 → ×100 → MAX; every row follows.
+	# Global buy-mode toggle: one button cycles ×1 → ×10 → NEXT TIER → MAX; every row follows.
 	_buy_mode_button = Button.new()
 	_buy_mode_button.custom_minimum_size = Vector2(0, UiPalette.STANDARD_BUTTON_HEIGHT)
 	_buy_mode_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	# Larger + bold BUY MODE label (Tim, 2026-06-25): 30% over the old FONT_SMALL lands at FONT_BUTTON.
-	_buy_mode_button.add_theme_font_size_override("font_size", UiPalette.FONT_BUTTON)
+	# FONT_SUBHEAD, deliberately matching the TURBO button's readout beside it — the two
+	# were resized together (Tim, 2026-07-07; both had been FONT_BUTTON and read small).
+	_buy_mode_button.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
 	_buy_mode_button.add_theme_font_override("font", UiPalette.make_bold_font())
 	UiPalette.style_button(_buy_mode_button, false)
-	_buy_mode_button.text = "BUY MODE: " + _buy_mode_caption(_buy_mode)
+	_buy_mode_button.text = "BUY: " + _buy_mode_caption(_buy_mode)
 	_buy_mode_button.pressed.connect(_on_buy_mode_toggled)
 	action_row.add_child(_buy_mode_button)
 
@@ -857,8 +858,9 @@ func _on_buy_requested(prop_index: int, mode: PropertyRow.BuyMode) -> void:
 			count = 1
 		PropertyRow.BuyMode.TEN:
 			count = 10
-		PropertyRow.BuyMode.HUNDRED:
-			count = 100
+		PropertyRow.BuyMode.NEXT_TIER:
+			# Exactly enough to reach the next milestone threshold (0 past the last tier).
+			count = maxi(0, prop.get_next_milestone_count() - prop.units_owned)
 		PropertyRow.BuyMode.MAX:
 			count = prop.get_max_affordable(game.economy.cash)
 	if count <= 0:
@@ -1227,7 +1229,7 @@ func _on_heir_begin_pressed() -> void:
 func _on_buy_mode_toggled() -> void:
 	_buy_mode = ((_buy_mode + 1) % PropertyRow.BuyMode.size()) as PropertyRow.BuyMode
 	game.ui_buy_mode = _buy_mode  # persisted on the next autosave / on background
-	_buy_mode_button.text = "BUY MODE: " + _buy_mode_caption(_buy_mode)
+	_buy_mode_button.text = "BUY: " + _buy_mode_caption(_buy_mode)
 	for row in _rows:
 		(row as PropertyRow).set_buy_mode(_buy_mode)
 
@@ -1238,8 +1240,8 @@ func _buy_mode_caption(mode: PropertyRow.BuyMode) -> String:
 			return "×1"
 		PropertyRow.BuyMode.TEN:
 			return "×10"
-		PropertyRow.BuyMode.HUNDRED:
-			return "×100"
+		PropertyRow.BuyMode.NEXT_TIER:
+			return "NEXT TIER"
 		PropertyRow.BuyMode.MAX:
 			return "MAX"
 	return "×1"

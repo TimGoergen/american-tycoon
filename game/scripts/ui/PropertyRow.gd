@@ -674,8 +674,14 @@ func _refresh(delta: float) -> void:
 		_seconds_since_wrap = 0.0
 	var was_rapid := _rapid_wraps
 	if _rapid_wraps:
-		# Stay solid until the churn clearly stops (no completion for the exit window).
-		_rapid_wraps = _seconds_since_wrap < RAPID_WRAP_EXIT_SEC
+		# Stay solid only while the churn is genuinely ongoing: completions still
+		# arriving (the exit window) AND still arriving FAST (the smoothed cadence).
+		# Without the cadence check, a natural cycle just longer than the entry
+		# threshold — a fresh ATM completes about every second — kept re-arming the
+		# exit window after rush ended, and the bar stayed solid forever
+		# (Tim, 2026-07-06).
+		_rapid_wraps = _seconds_since_wrap < RAPID_WRAP_EXIT_SEC \
+				and _wrap_interval_smoothed < RAPID_WRAP_SOLID_SEC
 	else:
 		# Enter only ON a completion, so a stale smoothed interval can't trigger it.
 		_rapid_wraps = wrapped and _wrap_interval_smoothed < RAPID_WRAP_SOLID_SEC

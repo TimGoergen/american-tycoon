@@ -74,6 +74,9 @@ func _ready() -> void:
 	for state in ["normal", "hover", "pressed", "focus", "disabled"]:
 		_button.add_theme_stylebox_override(state, StyleBoxEmpty.new())
 	_button.pressed.connect(func() -> void: pop_requested.emit())
+	# A second finger can pop TURBO while the first holds a rush (Tim, 2026-07-07); the
+	# disabled state (mid-burn / below the pop floor) blocks it the same as a primary tap.
+	_button.add_child(SecondaryTapButton.new())
 	add_child(_button)
 
 	# Overlay sitting on top of the button: the icon on the left, the reward text on the

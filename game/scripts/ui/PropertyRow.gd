@@ -60,10 +60,9 @@ var _hire_hold_repeating := false
 # single-touch behaviour is unchanged; only extra fingers are handled here, so there is never a
 # double-fire against the emulated mouse. See _input and the _pump_held_* functions.
 
-## Set by Main every frame: true only while the Property tab is showing and no full-screen overlay is
-## up, so a stray second finger can never trigger a buy on a row sitting behind a modal (minigame,
-## succession, settings, etc.). Static because it is a single app-wide condition shared by all rows.
-static var multitouch_enabled := false
+# The app-wide "secondary fingers allowed" gate lives on SecondaryTapButton.enabled
+# (Main sets it every frame) — shared with the buy-mode / TURBO / clock-in buttons so
+# every secondary-finger input obeys one rule (Tim, 2026-07-07; was a static here).
 
 ## Every finger currently on the screen (by index), primary and secondary alike. Used only to tell
 ## whether a new touch is the FIRST of a gesture (→ primary, left to the Button path) or an extra
@@ -444,7 +443,7 @@ func _on_touch_pressed(index: int, global_pos: Vector2) -> void:
 		return
 	# A secondary finger: act only when the Property tab is live and this row is actually on screen,
 	# so a stray finger can't trigger a purchase on a row hidden behind a modal overlay.
-	if not multitouch_enabled or not is_visible_in_tree():
+	if not SecondaryTapButton.enabled or not is_visible_in_tree():
 		return
 	var control_id := _control_under_point(global_pos)
 	if control_id == "":

@@ -128,17 +128,18 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	# Concurrent multi-touch on the property panel (PropertyRow reads raw touches for secondary
-	# fingers — hold rush while tapping/holding buy or hire): allow it ONLY while the Property tab is
-	# showing and no full-screen overlay is up, so a stray second finger can never trigger a buy on a
-	# row sitting behind a modal. Computed here every frame (before the freeze return below) so it
-	# always reflects the current screen, including while an overlay is up.
+	# Concurrent multi-touch on the property tab (secondary fingers drive the rows'
+	# rush/buy/hire plus the buy-mode, TURBO, and clock-in buttons — see
+	# SecondaryTapButton): allow it ONLY while the Property tab is showing and no
+	# full-screen overlay is up, so a stray second finger can never press a control
+	# sitting behind a modal. Computed here every frame (before the freeze return
+	# below) so it always reflects the current screen, including while an overlay is up.
 	# (The Balance Tuning panel is no longer in this list: embedded in the Settings tab,
 	# it neither covers the game nor needs the freeze — Apply saves and reloads anyway.)
 	var modal_up := _will_screen.visible or _first_contact_overlay.visible \
 			or _minigame_screen.visible or _minigame_review_screen.visible
 	var overlay_up := modal_up or _welcome_overlay.visible
-	PropertyRow.multitouch_enabled = _active_tab == TAB_PROPERTY and not overlay_up
+	SecondaryTapButton.enabled = _active_tab == TAB_PROPERTY and not overlay_up
 
 	# A modal that freezes the economy also HIDES the game screen beneath it (Tim,
 	# 2026-07-06): the modals are opaque and full-screen, but a covered Control still
@@ -506,6 +507,8 @@ func _build_property_tab() -> Control:
 	UiPalette.style_button(_buy_mode_button, false)
 	_buy_mode_button.text = "BUY: " + _buy_mode_caption(_buy_mode)
 	_buy_mode_button.pressed.connect(_on_buy_mode_toggled)
+	# A second finger can cycle the buy mode while the first holds a rush (Tim, 2026-07-07).
+	_buy_mode_button.add_child(SecondaryTapButton.new())
 	action_row.add_child(_buy_mode_button)
 
 	# The property ladder: the rows in a vertical scroll (GDD §2), hosted in a plain

@@ -1,7 +1,13 @@
 # Concurrent Multi-Touch on the Property Panel
 
-**Status:** BUILT 2026-07-02 (branch `feature/ui-tap-targets`). NOT yet device-tested — multi-touch
-cannot be verified headless; needs an on-device check on the Pixel.
+**Status:** BUILT 2026-07-02 (branch `feature/ui-tap-targets`); device-tested 2026-07-06 — works,
+but Tim expects secondary fingers on ALL Property-tab controls, not just the rows.
+**EXPANDED 2026-07-07 (branch `feature/multitouch-all-controls`):** new reusable
+`SecondaryTapButton` node (child of any Button; secondary press emits the Button's own `pressed`
+signal, `is_secondary_held()` for hold pumps) attached to the buy-mode toggle, the TURBO meter, and
+the clock-in button (whose auto-tap pump and sweep glow treat a secondary hold as held). The
+app-wide gate moved from `PropertyRow.multitouch_enabled` to `SecondaryTapButton.enabled`; the rows'
+bespoke three-target handler is otherwise unchanged.
 
 ## The problem
 

@@ -134,6 +134,10 @@ var _wage_amount_label: Label
 ## gliding highlight band is drawn while the button is held.
 var _sweep_overlay: Control
 
+## Secondary-finger driver on the clock-in button (see SecondaryTapButton) — the hold
+## pump and plate glow treat a secondary hold exactly like the button being pressed.
+var _secondary_taps: SecondaryTapButton
+
 
 ## Call before adding to the tree.
 func setup(wage: WageState, tuning: TuningConfig, frenzy: FrenzyState) -> void:
@@ -220,6 +224,11 @@ func _ready() -> void:
 		wage_tapped.emit()
 		_pulse_impact()
 		_spawn_income_float(_current_tap_income()))
+	# A second finger can tap or HOLD clock-in while the first holds a rush (Tim,
+	# 2026-07-07). Kept as a member: the hold pump and the plate glow OR the button's own
+	# pressed state with is_secondary_held() so either finger drives the hold.
+	_secondary_taps = SecondaryTapButton.new()
+	_wage_button.add_child(_secondary_taps)
 	_wage_meter.add_child(_wage_button)
 
 	# The button's content, laid over the meter in three parts (Tim, 2026-06-22). It is added
@@ -369,7 +378,7 @@ func _blink_level_up() -> void:
 ## one still fires on release via the button's pressed signal). Auto-taps go out
 ## as wage_hold_tapped so GameState can charge frenzy at the reduced hold factor.
 func _pump_auto_tap(delta: float) -> void:
-	if not _wage_button.button_pressed:
+	if not _clock_in_held():
 		_hold_accumulator = 0.0
 		return
 	# The Legacy auto-click SPEED upgrade scales the held auto-tap rate.
@@ -405,12 +414,18 @@ func _update_plate_glow(delta: float) -> void:
 
 	# Held highlight: advance its glide phase only while held, and ease its fade
 	# envelope toward shown/hidden so it ramps in on press and out on release.
-	if _wage_button.button_pressed:
+	if _clock_in_held():
 		_pulse_phase += delta
-	var target := 1.0 if _wage_button.button_pressed else 0.0
+	var target := 1.0 if _clock_in_held() else 0.0
 	var ramp := 1.0 - exp(-delta / PULSE_RAMP_TAU)
 	_pulse_level += (target - _pulse_level) * ramp
 	_sweep_overlay.queue_redraw()
+
+
+## Whether ANY finger is holding the clock-in button: the primary via the Button's own
+## pressed state, or a secondary via the SecondaryTapButton driver.
+func _clock_in_held() -> bool:
+	return _wage_button.button_pressed or _secondary_taps.is_secondary_held()
 
 
 ## Paint the gliding highlight band onto the overlay. The band's center sweeps

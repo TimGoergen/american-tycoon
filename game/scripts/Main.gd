@@ -1241,7 +1241,9 @@ func _buy_mode_caption(mode: PropertyRow.BuyMode) -> String:
 		PropertyRow.BuyMode.TEN:
 			return "×10"
 		PropertyRow.BuyMode.NEXT_TIER:
-			return "NEXT TIER"
+			# "NEXT", not "NEXT TIER": the longer caption widened the button and shifted
+			# the action row's layout as the modes cycled (Tim, 2026-07-07).
+			return "NEXT"
 		PropertyRow.BuyMode.MAX:
 			return "MAX"
 	return "×1"

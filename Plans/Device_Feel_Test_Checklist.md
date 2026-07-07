@@ -94,12 +94,11 @@ performance item at the end of this section before feel-verdicting anything here
 - [ ] **Result screen** — spectrum bar (red→gold→green→teal) + Legacy-with-bonus
       readout. Does a bad/skipped result clearly communicate the Legacy *lost*?
       (This is deliberately not upside-only — confirm that reads as intended.)
-- [ ] **NEW — Minigame screen performance (2026-07-06) — FIX SHIPPED, re-verify.**
-      Root cause: the whole game screen kept drawing at 60fps beneath the opaque
-      modal (economy-freezing modals now hide the covered layers), plus per-frame
-      hot-path cleanups in basketball/catch/timing-bar/host. Re-test on device —
-      basketball mid-celebration is the stress case. If smooth, this unblocks
-      feel-verdicts for the whole section.
+- [x] ~~**Minigame screen performance (2026-07-06).**~~ **FIXED, device-verified
+      (Tim, 2026-07-07: "totally fixed").** Root cause: the whole game screen kept
+      drawing at 60fps beneath the opaque modal (economy-freezing modals now hide the
+      covered layers), plus per-frame hot-path cleanups in basketball/catch/timing-
+      bar/host. Feel-verdicts for this section are now unblocked.
 
 ## 5. UI readability & polish (validate against the large-text/large-target rule)
 

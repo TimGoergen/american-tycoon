@@ -105,8 +105,9 @@ performance item at the end of this section before feel-verdicting anything here
 Lower stakes, but this is where most recent commits live — so confirm they were
 worth it. Check on the actual Pixel, at arm's length.
 
-- [ ] **Global UI theme pass** (UiPalette FONT_* scale). **TWEAK (2026-07-06):** the
-      TURBO button text is still too small at arm's length; everything else reads.
+- [x] ~~**Global UI theme pass** (UiPalette FONT_* scale).~~ **KEEP (2026-07-07).** The
+      one TWEAK (TURBO button text too small) is fixed: TURBO readout + buy-mode button
+      matched at FONT_SUBHEAD, device-verified. Everything else already read well.
 - [ ] **Bottom tab bar** — **KEEP layout, wants real icon art (2026-07-06).** Structure,
       size, and reachability are right; the placeholder SVGs are the remaining gap.
 - [x] ~~**Property panel**~~ **KEEP (2026-07-06).** Tap targets and readouts confirmed

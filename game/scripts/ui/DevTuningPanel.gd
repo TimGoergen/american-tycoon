@@ -114,6 +114,7 @@ const DISPLAY_NAMES := {
 	"m1_starting_cash": "Starting Cash",
 	"rush_pct": "Rush Percent",
 	"k_legacy": "Legacy Payout Scale",
+	"alpha_legacy": "Legacy Payout Curve",
 }
 
 

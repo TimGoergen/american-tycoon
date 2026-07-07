@@ -74,6 +74,9 @@ var _tab_panels: Array = []   # the four content Controls, indexed by TAB_*
 var _tab_buttons: Array = []  # the four bottom icon Buttons, indexed by TAB_*
 var _active_tab: int = TAB_PROPERTY
 var _minigame_check: CheckBox  # the Settings-tab "play the minigame" toggle
+## The Settings tab's normal page — hidden while the embedded Balance Tuning panel
+## (_dev_panel) is swapped into the tab's slot, restored on its Close.
+var _settings_page: Control
 
 ## Red-dot badge on the Estate tab button: shown when the current run has earned claimable
 ## Legacy (a succession right now would yield ≥1), and cleared the moment the player opens
@@ -130,7 +133,9 @@ func _process(delta: float) -> void:
 	# showing and no full-screen overlay is up, so a stray second finger can never trigger a buy on a
 	# row sitting behind a modal. Computed here every frame (before the freeze return below) so it
 	# always reflects the current screen, including while an overlay is up.
-	var modal_up := _will_screen.visible or _dev_panel.visible or _first_contact_overlay.visible \
+	# (The Balance Tuning panel is no longer in this list: embedded in the Settings tab,
+	# it neither covers the game nor needs the freeze — Apply saves and reloads anyway.)
+	var modal_up := _will_screen.visible or _first_contact_overlay.visible \
 			or _minigame_screen.visible or _minigame_review_screen.visible
 	var overlay_up := modal_up or _welcome_overlay.visible
 	PropertyRow.multitouch_enabled = _active_tab == TAB_PROPERTY and not overlay_up
@@ -437,17 +442,8 @@ func _build_ui() -> void:
 	_will_screen.cancelled.connect(_on_will_cancelled)
 	add_child(_will_screen)
 
-	# The dev tuning panel (GDD §13), above everything and hidden until the DEV
-	# button opens it. Main freezes the economy while it is up, applies its edits
-	# by saving overrides + reloading the scene, and routes its save-wipe action.
-	_dev_panel = DevTuningPanel.new()
-	_dev_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_dev_panel.setup()
-	_dev_panel.apply_requested.connect(_on_dev_apply_requested)
-	_dev_panel.defaults_requested.connect(_on_dev_defaults_requested)
-	_dev_panel.reset_dynasty_requested.connect(_on_dev_reset_dynasty_requested)
-	_dev_panel.closed.connect(_on_dev_closed)
-	add_child(_dev_panel)
+	# (The Balance Tuning panel now lives inside the Settings tab — see
+	# _build_settings_tab — rather than as a full-screen overlay here.)
 
 	# The prestige minigame (GDD §5.5): a match-3 played mid-succession (after the will,
 	# before the heir reveal) whose score grants an upside-only multiplier on the run's
@@ -657,7 +653,14 @@ func _build_settings_tab() -> Control:
 	# (UiPalette.wrap_in_tab_panel), which supplies the edge margin, gray outline, and inner
 	# padding this tab used to build for itself — so every tab is framed identically. Everything,
 	# including the bottom tuning buttons, lives inside that one panel.
+	#
+	# The tab holds TWO pages sharing one slot (Tim, 2026-07-06): the normal settings page,
+	# and the Balance Tuning panel the BALANCE TUNING button swaps in (its Close swaps back).
+	# It used to be a full-screen overlay; embedded, it reads as part of Settings.
+	var stack := Control.new()
+
 	var v := VBoxContainer.new()
+	v.set_anchors_preset(Control.PRESET_FULL_RECT)
 	v.add_theme_constant_override("separation", 24)
 
 	# The shared tab-title style (UiPalette.make_tab_title) — the same centered, faux-bold,
@@ -719,7 +722,21 @@ func _build_settings_tab() -> Control:
 	minigame_tuning_button.pressed.connect(_on_minigame_tuning_pressed)
 	bottom_buttons.add_child(minigame_tuning_button)
 
-	return v
+	stack.add_child(v)
+	_settings_page = v
+
+	# The Balance Tuning panel, hidden until its button swaps it in. Main applies its
+	# edits by saving overrides + reloading the scene, and routes its save-wipe action.
+	_dev_panel = DevTuningPanel.new()
+	_dev_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_dev_panel.setup()
+	_dev_panel.apply_requested.connect(_on_dev_apply_requested)
+	_dev_panel.defaults_requested.connect(_on_dev_defaults_requested)
+	_dev_panel.reset_dynasty_requested.connect(_on_dev_reset_dynasty_requested)
+	_dev_panel.closed.connect(_on_dev_closed)
+	stack.add_child(_dev_panel)
+
+	return stack
 
 
 ## Build the bottom tab bar: four equal icon buttons pinned along the bottom.
@@ -878,10 +895,11 @@ func _on_pop_requested() -> void:
 	game.pop_frenzy()
 
 
-## Player opened the dev tuning panel: seed it with the live config (baked
-## defaults + any active overrides) for the editor values, plus a pristine baked
-## copy so it can tell which constants are overridden and diff edits on Apply.
+## Player opened Balance Tuning: swap it into the Settings tab's slot, seeded with the
+## live config (baked defaults + any active overrides) for the editor values, plus a
+## pristine baked copy so it can tell which constants are overridden and diff on Apply.
 func _on_dev_pressed() -> void:
+	_settings_page.visible = false
 	_dev_panel.open(tuning, ConfigLoader.load_tuning(false))
 
 
@@ -914,8 +932,10 @@ func _on_dev_reset_dynasty_requested() -> void:
 	get_tree().reload_current_scene()
 
 
+## Balance Tuning closed without applying: restore the Settings tab's normal page.
+## (Apply/Defaults/Wipe reload the whole scene, which rebuilds everything anyway.)
 func _on_dev_closed() -> void:
-	pass
+	_settings_page.visible = true
 
 
 # ---------------------------------------------------------------------------

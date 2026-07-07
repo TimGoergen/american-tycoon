@@ -1,10 +1,15 @@
 class_name DevTuningPanel
-extends ColorRect
+extends Control
 
-# The dev-facing balance tuning panel (GDD §13 "Balance config screen") — a
-# developer tool, not a player screen. It lists every numeric constant in
-# TuningConfig and lets them be edited on-device, so balance can be felt on real
-# hardware instead of only in the headless simulator.
+# The "Balance Tuning" panel (GDD §13 "Balance config screen") — a developer tool,
+# not a player screen. It lists every numeric constant in TuningConfig and lets
+# them be edited on-device, so balance can be felt on real hardware instead of
+# only in the headless simulator.
+#
+# It lives INSIDE the Settings tab (Tim, 2026-07-06 — was a full-screen overlay):
+# the Balance Tuning button swaps the tab's normal content for this panel, and
+# Close swaps back. The tab's shared cream panel supplies the frame, so this
+# control builds only its own content.
 #
 # How a change takes effect: the panel does not mutate the running game live —
 # many constants are read once at startup, so a half-applied change would be
@@ -46,18 +51,14 @@ const ROW_DESC_SIZE := UiPalette.FONT_LABEL
 const ROW_VALUE_SIZE := UiPalette.FONT_SUBHEAD
 const BUTTON_SIZE := UiPalette.FONT_SUBHEAD
 
-## Top inset (in the 1080×1920 design space) clearing the phone camera cut-out,
-## matching the other full-screen overlays.
-const CAMERA_CUTOUT_INSET := 130
-
 ## Fixed width (px) of the value editor column, so the constant names line up.
 const VALUE_COLUMN_WIDTH := 400
 ## Minimum height (px) of a value editor — a comfortable thumb target.
 const VALUE_HEIGHT := 72
-
-## Vertical breathing room above the title and below the footer buttons (Tim, 2026-06-22):
-## pulls both in from the screen edges. The scrollable list (which expands) shrinks to fit.
-const EDGE_SPACE := 48
+## Clearance between each row's right edge and the scroll's overlaid scrollbar: the
+## full scrollbar width plus a visible gap, or the bar sits ON the value field and the
+## end of the text can't be tapped (Tim, 2026-07-06 — same rule as the property ladder).
+const SCROLLBAR_GAP := UiPalette.SCROLLBAR_WIDTH + 16
 
 ## One concise, plain-language description per tuning constant, shown beneath its
 ## name so the panel is legible without cross-referencing TuningConfig.gd. Keyed by
@@ -105,6 +106,18 @@ const DESCRIPTIONS := {
 }
 
 
+## Display-name overrides for constants whose variable name doesn't read well through
+## plain capitalize() (Tim, 2026-07-07): dev jargon ("M1", the "K" coefficient) and
+## abbreviations get intuitive names here. Everything else falls back to capitalize().
+## Keyed by the exact variable name, like DESCRIPTIONS.
+const DISPLAY_NAMES := {
+	"m1_starting_cash": "Starting Cash",
+	"rush_pct": "Rush Percent",
+	"k_legacy": "Legacy Payout Scale",
+	"alpha_legacy": "Legacy Payout Curve",
+}
+
+
 # One LineEdit per constant, keyed by constant name, read back on Apply.
 var _value_edits: Dictionary = {}
 # The constant's declared type (TYPE_INT / TYPE_FLOAT), keyed by name.
@@ -125,9 +138,8 @@ func setup() -> void:
 
 
 func _ready() -> void:
-	# Black field framing a cream rounded viewing area that matches the main game (Tim,
-	# 2026-06-22). Main freezes the economy while it is visible (the full-page convention).
-	color = Color.BLACK
+	# Hidden until the Settings tab's Balance Tuning button opens it; the tab's shared
+	# cream panel provides all the framing.
 	visible = false
 
 
@@ -136,24 +148,14 @@ func _ready() -> void:
 # ---------------------------------------------------------------------------
 
 func _build_chrome() -> void:
-	# The cream rounded viewing area, framed by the black field — the same shared frame the
-	# main game uses (UiPalette), so the panel sits in an identical bezel and rounded plate.
-	var viewing_area := PanelContainer.new()
-	UiPalette.apply_screen_bezel(viewing_area)
-	viewing_area.add_theme_stylebox_override("panel", UiPalette.make_screen_panel_style())
-	add_child(viewing_area)
-
+	# The content column fills whatever slot hosts the panel (the Settings tab page).
 	var column := VBoxContainer.new()
+	column.set_anchors_preset(Control.PRESET_FULL_RECT)
 	column.add_theme_constant_override("separation", 10)
-	viewing_area.add_child(column)
-
-	# Push the title down from the top edge (the scroll list below shrinks to fill the rest).
-	var top_space := Control.new()
-	top_space.custom_minimum_size = Vector2(0, EDGE_SPACE)
-	column.add_child(top_space)
+	add_child(column)
 
 	var title := Label.new()
-	title.text = "Dev Tuning"
+	title.text = "Balance Tuning"
 	title.add_theme_color_override("font_color", UiPalette.NAVY)
 	title.add_theme_font_size_override("font_size", TITLE_SIZE)
 	column.add_child(title)
@@ -172,10 +174,16 @@ func _build_chrome() -> void:
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_RESERVE
 	column.add_child(scroll)
 
+	# Right margin keeping every row clear of the overlaid scrollbar (see SCROLLBAR_GAP).
+	var list_margin := MarginContainer.new()
+	list_margin.add_theme_constant_override("margin_right", SCROLLBAR_GAP)
+	list_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(list_margin)
+
 	_list = VBoxContainer.new()
 	_list.add_theme_constant_override("separation", 14)
 	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(_list)
+	list_margin.add_child(_list)
 
 	# ── Footer: two button rows ──
 	var top_buttons := HBoxContainer.new()
@@ -204,11 +212,6 @@ func _build_chrome() -> void:
 	var close_button := _make_button("CLOSE", false)
 	close_button.pressed.connect(_on_close_pressed)
 	bottom_buttons.add_child(close_button)
-
-	# Lift the footer buttons up off the bottom edge (the scroll list shrinks to make room).
-	var bottom_space := Control.new()
-	bottom_space.custom_minimum_size = Vector2(0, EDGE_SPACE)
-	column.add_child(bottom_space)
 
 
 ## A footer button sized for thumbs (UI notes §1), expanding to share its row.
@@ -274,7 +277,13 @@ func _add_constant_row(name: String, type: int, current_value: Variant, baked_va
 	row.add_child(text_column)
 
 	var label := Label.new()
-	label.text = ("● " if is_overridden else "") + name
+	# Plain-language name: capitalize() turns the constant's snake_case into spaced
+	# Pascal Case ("wage_hold_taps_per_second" → "Wage Hold Taps Per Second"), so the
+	# list reads like settings, not source code (Tim, 2026-07-06); a few jargon-y names
+	# get hand-picked replacements instead (DISPLAY_NAMES). The exact variable name
+	# still keys everything internally (edits, overrides, descriptions).
+	var display_name: String = DISPLAY_NAMES.get(name, name.capitalize())
+	label.text = ("● " if is_overridden else "") + display_name
 	label.add_theme_color_override(
 		"font_color", UiPalette.MUSTARD_GOLD if is_overridden else UiPalette.NAVY)
 	label.add_theme_font_size_override("font_size", ROW_LABEL_SIZE)
@@ -296,8 +305,10 @@ func _add_constant_row(name: String, type: int, current_value: Variant, baked_va
 	edit.alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	edit.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	edit.add_theme_font_size_override("font_size", ROW_VALUE_SIZE)
-	# Decimal numeric keypad on the phone — every tuning constant is a number.
-	edit.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_NUMBER_DECIMAL
+	# The STANDARD phone keyboard, not the numeric keypad: the values are numbers, but
+	# the numeric keypad has no arrow keys, which made moving the caret inside a long
+	# value nearly impossible (Tim, 2026-07-06).
+	edit.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_DEFAULT
 	row.add_child(edit)
 
 	_value_edits[name] = edit

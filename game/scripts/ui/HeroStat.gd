@@ -137,7 +137,7 @@ var _economy_bar: ProgressBar
 var _economy_divider: ColorRect
 ## Height of the economy bar strip, and of the red divider above it (the divider matches
 ## the panel frame's 12px thickness so it reads as the same line).
-const ECONOMY_BAR_HEIGHT := 34  # 26 + 30% (Tim, 2026-07-06)
+const ECONOMY_BAR_HEIGHT := 54  # 26 + 30% -> 34, then +60% -> 54 (Tim, 2026-07-06)
 const ECONOMY_DIVIDER_HEIGHT := 12
 ## A soft white plate behind the civilization name — in FRONT of the planet watermark but BEHIND
 ## the name text — so the name stays legible over the busy globe (Tim, 2026-07-01). It's a RADIAL
@@ -256,9 +256,12 @@ func _ready() -> void:
 	_economy_bar.max_value = 1.0
 	_economy_bar.show_percentage = false
 	_economy_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiPalette.style_progress_bar(_economy_bar, UiPalette.MONEY_GREEN)
-	# Gold bubbles drifting through the fill — every progress bar carries them (Tim, 2026-07-03).
-	_economy_bar.add_child(GoldBubbles.new())
+	# Blue theme (Tim, 2026-07-06): CYCLE_BLUE fill with NEON_BLUE carbonation, setting
+	# the economy bar apart from the green property cycle bars below it.
+	UiPalette.style_progress_bar(_economy_bar, UiPalette.CYCLE_BLUE)
+	var bubbles := GoldBubbles.new()
+	bubbles.bubble_color = UiPalette.NEON_BLUE
+	_economy_bar.add_child(bubbles)
 	_content.add_child(_economy_bar)
 
 

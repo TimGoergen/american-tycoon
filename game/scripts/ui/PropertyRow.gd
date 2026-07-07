@@ -121,14 +121,20 @@ const RUSH_CATCHUP_TAU := 0.12
 ## threshold, NOT an economy value, so it lives here in the UI rather than in tuning.tres.
 const SOLID_BAR_THRESHOLD_SEC := 0.25
 
-## The same "faster than the eye" rule, but measured on the ACTUAL completion cadence
-## instead of the nominal cycle length (Tim, 2026-07-06): a held rush can complete a
-## nominally-long cycle several times a second, and the finishing-lap animation turns
-## into a strobe of back-to-back sprints. While completions arrive faster than one per
-## RAPID_WRAP_SOLID_SEC (smoothed), the bar pins solid-full, exactly like a sub-threshold
-## cycle; it resumes animating once no completion lands for RAPID_WRAP_EXIT_SEC.
-const RAPID_WRAP_SOLID_SEC := 0.6
-const RAPID_WRAP_EXIT_SEC := 1.2
+## The same "faster than the eye" rule for a HELD RUSH (Tim, 2026-07-06 — replaced a
+## measured completion-cadence rule that stuck and unstuck unpredictably): while rushing,
+## the bar counts as solid if the COMPUTED cycle-under-rush time (natural fill plus the
+## held-rush pulses) is at or under this. Deliberately more lenient than
+## SOLID_BAR_THRESHOLD_SEC — a rushed sub-second lap is a strobe of back-to-back
+## finishing-lap sprints, so it pins earlier than a natural cycle would.
+## 0.6 → 0.4 (Tim, 2026-07-07): pin less often, keeping visible motion the norm under
+## rush; solid is reserved for genuinely strobe-fast laps.
+const RUSHED_SOLID_THRESHOLD_SEC := 0.4
+
+## How fast the bar fills the rest of the way when it BECOMES pinned (fractions of the
+## full bar per second): a quick sprint to the right edge, then hold — snapping straight
+## to solid read as sudden (Tim, 2026-07-07). 3.0 = the remaining lap in ⅓s at most.
+const PIN_FILL_PER_SEC := 3.0
 
 ## A pinned-solid bar's commanded liquid flow (px/s), fed to its GoldBubbles overlay.
 ## Deliberately brisk: solid means "cycling faster than the eye", so the MOST active
@@ -140,10 +146,8 @@ const RAPID_WRAP_EXIT_SEC := 1.2
 const SOLID_FLOW_PX := 110.0
 const SOLID_FLOW_RUSH_MULT := 1.6
 
-## Completion-cadence tracking for the rapid-wrap rule above.
-var _seconds_since_wrap := 999.0
-var _wrap_interval_smoothed := 999.0
-var _rapid_wraps := false
+## Whether the bar was pinned solid last frame — unpinning restarts the visible lap.
+var _was_pinned := false
 
 ## The portrait/rush button is a square sized to a fraction of the panel's full height, centered
 ## vertically (Tim, 2026-07-02): at 1.0 it filled the whole row; 0.9 trims it 10% so it no longer
@@ -661,37 +665,36 @@ func _refresh(delta: float) -> void:
 	# fills faster (Tim 2026-06-17). Measuring against the raw length capped the fill at
 	# 1 / cycle_speed_multiplier, so it stopped short of the right edge.
 	var true_fraction := _prop.cycle_progress / effective_length if effective_length > 0.0 else 0.0
-
-	# Track how often cycles actually COMPLETE (a drop in true progress = a wrap), for
-	# the rapid-wrap rule: cadence is what a held rush changes, not the cycle length.
 	var wrapped := true_fraction < _last_true_cycle_fraction
-	_seconds_since_wrap += delta
-	if wrapped:
-		if _wrap_interval_smoothed > 900.0:
-			_wrap_interval_smoothed = _seconds_since_wrap  # first-ever wrap: no history to blend
-		else:
-			_wrap_interval_smoothed = lerpf(_wrap_interval_smoothed, _seconds_since_wrap, 0.6)
-		_seconds_since_wrap = 0.0
-	var was_rapid := _rapid_wraps
-	if _rapid_wraps:
-		# Stay solid until the churn clearly stops (no completion for the exit window).
-		_rapid_wraps = _seconds_since_wrap < RAPID_WRAP_EXIT_SEC
-	else:
-		# Enter only ON a completion, so a stale smoothed interval can't trigger it.
-		_rapid_wraps = wrapped and _wrap_interval_smoothed < RAPID_WRAP_SOLID_SEC
-	if was_rapid and not _rapid_wraps:
-		# Leaving the churn: restart the visible lap from empty and let the easing below
-		# chase the real progress — holding at full would freeze the bar until the next
-		# natural completion, minutes away on a long cycle.
+
+	# Deterministic solid rule (Tim, 2026-07-06 — replaced a measured completion-cadence
+	# rule that could stick and unstick unpredictably): the bar is solid exactly when the
+	# CURRENT completion time is too short to watch. Not rushing, that's the effective
+	# cycle length (bar_is_solid). While rush is HELD, it's the computed cycle-under-rush
+	# time: natural progress plus hold_rush_per_second pulses each advancing rush_pct
+	# (× the Strong-Arm rush-power upgrade) of the cycle. In any other circumstance the
+	# bar animates normally.
+	var rush_held := _manager_circle.is_held() and _prop.units_owned > 0
+	var rushed_solid := false
+	if rush_held and _prop.is_cycle_running and effective_length > 0.0:
+		var fractions_per_second := 1.0 / effective_length \
+				+ _prop.tuning.hold_rush_per_second * _prop.tuning.rush_pct * _prop.rush_power_multiplier
+		rushed_solid = 1.0 / fractions_per_second <= RUSHED_SOLID_THRESHOLD_SEC
+	var pinned := bar_is_solid or rushed_solid
+	if _was_pinned and not pinned:
+		# Unpinning (rush released, usually): restart the visible lap from empty and let
+		# the easing below chase the real progress — holding at full would freeze the
+		# bar until the next natural completion.
 		_displayed_cycle_fraction = 0.0
 		_finish_lap_pending = false
+	_was_pinned = pinned
 
-	if bar_is_solid or _rapid_wraps:
-		# Cycles faster than the eye/bar can follow — by nominal length (bar_is_solid) or
-		# by actual completion cadence (_rapid_wraps, e.g. a held rush) — pin it full and
-		# skip the easing predictor entirely. The income readout carries the information
-		# now; the bar just reads as "maxed and humming".
-		_displayed_cycle_fraction = 1.0
+	if pinned:
+		# Cycles complete faster than the eye/bar can follow — fill the rest of the way
+		# in a quick sprint (see PIN_FILL_PER_SEC; snapping straight to full read as
+		# sudden), then hold there. The income readout carries the information now; the
+		# bar just reads as "maxed and humming".
+		_displayed_cycle_fraction = minf(_displayed_cycle_fraction + delta * PIN_FILL_PER_SEC, 1.0)
 		_finish_lap_pending = false
 	elif not _prop.is_cycle_running or _prop.units_owned == 0:
 		# Idle or empty: nothing is advancing, so just mirror the true value exactly.
@@ -730,14 +733,13 @@ func _refresh(delta: float) -> void:
 	# rushable — see `interactive` above), so the bar drops its active green for a calm
 	# blue. Otherwise it stays green, brightening while the rush button is actively held.
 	var rush_no_longer_option := staffed and not interactive
-	var rush_held := _manager_circle.is_held() and _prop.units_owned > 0
 	_set_cycle_color(rush_no_longer_option, rush_held)
 
 	# Carbonation on a pinned-solid bar: the fill edge isn't moving, so the bubbles
 	# would sink to their idle drift — command a brisk flow instead (faster still while
 	# rush is held), so the busiest property carries the busiest fizz and rushing a
 	# solid bar visibly does something (see SOLID_FLOW_PX).
-	if bar_is_solid or _rapid_wraps:
+	if pinned:
 		_cycle_bubbles.flow_override_px = SOLID_FLOW_PX * (SOLID_FLOW_RUSH_MULT if rush_held else 1.0)
 	else:
 		_cycle_bubbles.flow_override_px = -1.0

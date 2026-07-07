@@ -47,6 +47,9 @@ const PROGRESS_TRACK_GRAY := Color("#B6BAC0")
 ## as a steady, automated meter. Tuned to the same muted value as MONEY_GREEN so the two
 ## states sit in the same family. (Tim, 2026-06-23.)
 const CYCLE_BLUE := Color("#5E86B8")
+## Bright electric blue for the economy bar's carbonation — deliberately outside the
+## era palette so the bubbles glow against the CYCLE_BLUE fill (Tim, 2026-07-06).
+const NEON_BLUE := Color("#4DE8FF")
 
 # ---------------------------------------------------------------------------
 # Type scale — the single source of truth for UI font sizes (Tim's "chunkier UI"

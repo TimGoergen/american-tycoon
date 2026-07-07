@@ -127,7 +127,14 @@ const SOLID_BAR_THRESHOLD_SEC := 0.25
 ## held-rush pulses) is at or under this. Deliberately more lenient than
 ## SOLID_BAR_THRESHOLD_SEC — a rushed sub-second lap is a strobe of back-to-back
 ## finishing-lap sprints, so it pins earlier than a natural cycle would.
-const RUSHED_SOLID_THRESHOLD_SEC := 0.6
+## 0.6 → 0.4 (Tim, 2026-07-07): pin less often, keeping visible motion the norm under
+## rush; solid is reserved for genuinely strobe-fast laps.
+const RUSHED_SOLID_THRESHOLD_SEC := 0.4
+
+## How fast the bar fills the rest of the way when it BECOMES pinned (fractions of the
+## full bar per second): a quick sprint to the right edge, then hold — snapping straight
+## to solid read as sudden (Tim, 2026-07-07). 3.0 = the remaining lap in ⅓s at most.
+const PIN_FILL_PER_SEC := 3.0
 
 ## A pinned-solid bar's commanded liquid flow (px/s), fed to its GoldBubbles overlay.
 ## Deliberately brisk: solid means "cycling faster than the eye", so the MOST active
@@ -683,10 +690,11 @@ func _refresh(delta: float) -> void:
 	_was_pinned = pinned
 
 	if pinned:
-		# Cycles complete faster than the eye/bar can follow — pin it full and skip the
-		# easing predictor entirely. The income readout carries the information now; the
+		# Cycles complete faster than the eye/bar can follow — fill the rest of the way
+		# in a quick sprint (see PIN_FILL_PER_SEC; snapping straight to full read as
+		# sudden), then hold there. The income readout carries the information now; the
 		# bar just reads as "maxed and humming".
-		_displayed_cycle_fraction = 1.0
+		_displayed_cycle_fraction = minf(_displayed_cycle_fraction + delta * PIN_FILL_PER_SEC, 1.0)
 		_finish_lap_pending = false
 	elif not _prop.is_cycle_running or _prop.units_owned == 0:
 		# Idle or empty: nothing is advancing, so just mirror the true value exactly.

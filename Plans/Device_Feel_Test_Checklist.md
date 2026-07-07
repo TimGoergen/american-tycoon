@@ -33,11 +33,10 @@ Everything else is polish on top of this. If any of these are off, fix them
       when the COMPUTED cycle-under-rush time is under 0.4s, entering via a quick
       sprint-to-full instead of a snap. Tim: "feels much better." Solid bars carry the
       briskest carbonation (faster under rush) as the "it's working" signal.
-- [ ] **Solid-bar fast properties.** Once a cycle drops under the threshold the bar
-      pins full and the readout switches to `$X / s`. Does a maxed property read as
-      "humming," or does the frozen bar read as broken? *(Not yet tested 2026-07-06 —
-      and directly related to the rush TWEAK above: rush-driven completion should
-      probably qualify for the same solid treatment.)*
+- [x] ~~**Solid-bar fast properties.**~~ **KEEP (2026-07-07).** A pinned bar reads as
+      humming, not broken — helped by the week's additions: the brisk solid-bar
+      carbonation (briskest on screen, faster under rush) and the sprint-to-full pin
+      transition. The `$X / s` readout carries the rate.
 - [x] ~~**Buy-mode + hold-to-buy/hire pacing.**~~ **KEEP both (2026-07-06).** Initial
       delay and repeat speed feel right for Buy and Hire as tuned.
 - [x] ~~**Concurrent multi-touch.**~~ **KEEP (2026-07-07).** Scope expanded via the

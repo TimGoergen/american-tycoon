@@ -43,6 +43,25 @@ Everything else is polish on top of this. If any of these are off, fix them
       reusable SecondaryTapButton node: second finger now works on buy-mode, TURBO,
       and clock-in (tap + hold) as well as the rows' rush/Buy/Hire. Device-verified.
 
+## How to run the §2–4 focused pass (protocol, 2026-07-07)
+
+Three sittings. **A (§2, 45–60 min):** prestige into a fresh generation and note the
+clock at: first staffed property / "opens up" / first nothing-in-reach stretch /
+prestige tempting. Moments 3→4 = the mid-game drag zone. Something (milestone, buy,
+hire) should land every couple of minutes through tiers 5–9; a 5–10 min dead stretch is
+the finding — note epoch, cash magnitude, minutes-in. Do TWO successions (one short,
+one long run): does the heir's first 10 min FEEL faster, and does the longer run pay
+off visibly? Occasionally ask: Buy units or staff level — if staff level never tempts,
+the sink is dead. Use Balance Tuning to probe suspect knobs live. **B (§3, end of the
+same run):** in the last ~20% before contact, are you doing things or waiting? Does the
+contact moment land? Time the 8× save-up (decision or parking lot?). Do the reward
+minigame + 30× magnitudes still read? **C (§4, ~30 min):** Minigame Tuning, Challenge
+OFF (matches real transition rounds). Each game twice — once to win, once deliberately
+badly: input feel, reachable-but-hard goal, and does the bad result make the Legacy
+LOST unmistakable? Then Challenge ON, one game, 10 min: do you chase the score even
+once? Glance the backdrops/cards (§5) while there. Log one-word verdicts + specific
+notes ("tier 7, ~$40M, 8 min with nothing to buy" is actionable; "feels slow" isn't).
+
 ## 2. Economy pacing — the long arc
 
 *Status (2026-07-06): touched this pass and feeling good provisionally, but needs a

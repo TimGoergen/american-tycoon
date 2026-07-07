@@ -40,10 +40,9 @@ Everything else is polish on top of this. If any of these are off, fix them
       probably qualify for the same solid treatment.)*
 - [x] ~~**Buy-mode + hold-to-buy/hire pacing.**~~ **KEEP both (2026-07-06).** Initial
       delay and repeat speed feel right for Buy and Hire as tuned.
-- [ ] **Concurrent multi-touch** (`d003c45`). **TWEAK — scope (2026-07-06).** Works
-      where it's wired, but it's limited to certain controls; expectation is that a
-      second finger works across ALL same-tab controls (buy mode, TURBO, clock-in,
-      etc.), not just rush + Buy/Hire.
+- [x] ~~**Concurrent multi-touch.**~~ **KEEP (2026-07-07).** Scope expanded via the
+      reusable SecondaryTapButton node: second finger now works on buy-mode, TURBO,
+      and clock-in (tap + hold) as well as the rows' rush/Buy/Hire. Device-verified.
 
 ## 2. Economy pacing — the long arc
 

@@ -28,11 +28,11 @@ Everything else is polish on top of this. If any of these are off, fix them
 
 - [x] ~~**Cycle times across tiers.**~~ **KEEP (2026-07-06).** The 7–12 stretch to a
       180s top cycle feels right on device.
-- [ ] **Rush / hold-to-rush feel.** **TWEAK (2026-07-06) — FIX SHIPPED, re-verify.**
-      The bar now pins solid when completions arrive faster than one per 0.6s (the
-      wrap-cadence rule), with the briskest carbonation on screen (faster still while
-      rush is held) as the "it's working" signal. Tim confirmed the jank itself is
-      fixed; the remaining question is whether the solid+fizz read feels right.
+- [x] ~~**Rush / hold-to-rush feel.**~~ **KEEP (2026-07-07).** Landed on a deterministic
+      solid rule: not rushing = solid under a 0.25s effective cycle; rush held = solid
+      when the COMPUTED cycle-under-rush time is under 0.4s, entering via a quick
+      sprint-to-full instead of a snap. Tim: "feels much better." Solid bars carry the
+      briskest carbonation (faster under rush) as the "it's working" signal.
 - [ ] **Solid-bar fast properties.** Once a cycle drops under the threshold the bar
       pins full and the readout switches to `$X / s`. Does a maxed property read as
       "humming," or does the frozen bar read as broken? *(Not yet tested 2026-07-06 —

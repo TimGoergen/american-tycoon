@@ -106,6 +106,17 @@ const DESCRIPTIONS := {
 }
 
 
+## Display-name overrides for constants whose variable name doesn't read well through
+## plain capitalize() (Tim, 2026-07-07): dev jargon ("M1", the "K" coefficient) and
+## abbreviations get intuitive names here. Everything else falls back to capitalize().
+## Keyed by the exact variable name, like DESCRIPTIONS.
+const DISPLAY_NAMES := {
+	"m1_starting_cash": "Starting Cash",
+	"rush_pct": "Rush Percent",
+	"k_legacy": "Legacy Payout Scale",
+}
+
+
 # One LineEdit per constant, keyed by constant name, read back on Apply.
 var _value_edits: Dictionary = {}
 # The constant's declared type (TYPE_INT / TYPE_FLOAT), keyed by name.
@@ -267,9 +278,11 @@ func _add_constant_row(name: String, type: int, current_value: Variant, baked_va
 	var label := Label.new()
 	# Plain-language name: capitalize() turns the constant's snake_case into spaced
 	# Pascal Case ("wage_hold_taps_per_second" → "Wage Hold Taps Per Second"), so the
-	# list reads like settings, not source code (Tim, 2026-07-06). The exact variable
-	# name still keys everything internally (edits, overrides, descriptions).
-	label.text = ("● " if is_overridden else "") + name.capitalize()
+	# list reads like settings, not source code (Tim, 2026-07-06); a few jargon-y names
+	# get hand-picked replacements instead (DISPLAY_NAMES). The exact variable name
+	# still keys everything internally (edits, overrides, descriptions).
+	var display_name: String = DISPLAY_NAMES.get(name, name.capitalize())
+	label.text = ("● " if is_overridden else "") + display_name
 	label.add_theme_color_override(
 		"font_color", UiPalette.MUSTARD_GOLD if is_overridden else UiPalette.NAVY)
 	label.add_theme_font_size_override("font_size", ROW_LABEL_SIZE)

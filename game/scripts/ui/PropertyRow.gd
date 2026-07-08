@@ -676,8 +676,13 @@ func _refresh(delta: float) -> void:
 	# looked at the Button, so a rushed row didn't always present as rushing).
 	var rush_held := (_manager_circle.is_held() or _secondary_held("rush")) \
 			and _prop.units_owned > 0
+	# Deliberately NOT gated on is_cycle_running: an UNSTAFFED property's cycle stops the
+	# instant it pays out and only restarts on the next held-rush pulse, so gating on it
+	# made the readout (and the solid pin) flicker back to the calm display for a few
+	# frames at the end of every cycle (Tim, 2026-07-08). While rush is held the restart
+	# is guaranteed, so the rushed rate stays honest across that momentary gap.
 	var rushed_fractions_per_second := 0.0
-	if rush_held and _prop.is_cycle_running and effective_length > 0.0:
+	if rush_held and effective_length > 0.0:
 		rushed_fractions_per_second = 1.0 / effective_length \
 				+ _prop.tuning.hold_rush_per_second * _prop.tuning.rush_pct * _prop.rush_power_multiplier
 	if rushed_fractions_per_second > 0.0:

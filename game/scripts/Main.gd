@@ -173,13 +173,16 @@ func _process(delta: float) -> void:
 		_autosave_timer = 0.0
 		SaveManager.save_dict_to_file(dynasty.to_save_dict())
 
-	# Headline income/sec: a STABLE, theoretical rate computed from current assets (not a
-	# measurement of recent cash inflow, which swung wildly between lumpy cycle payouts).
-	# Refreshed on a calm 100 ms cadence so the panel never flickers (Tim, 2026-06-24).
+	# Headline income/sec: the simple SUM of the rate each property row currently
+	# displays — rush-boosted while rush is held (Tim, 2026-07-07) — so the panel always
+	# equals the rows beneath it. Still a computed rate (not an inflow measurement, which
+	# swung wildly between lumpy payouts) on the calm 100 ms cadence (Tim, 2026-06-24).
+	# The core's game.displayed_income_per_sec (theoretical staffed-passive rate) still
+	# drives the executive wage floor, untouched.
 	_income_display_timer += delta
 	if _income_display_timer >= INCOME_DISPLAY_INTERVAL:
 		_income_display_timer = 0.0
-		_hero_stat.set_income_per_sec(game.displayed_income_per_sec)
+		_hero_stat.set_income_per_sec(_sum_displayed_property_income())
 	# Cash keeps updating every frame so the balance still counts up smoothly.
 	_hero_stat.set_cash(game.economy.cash)
 	_hero_stat.set_frenzy_glow(game.frenzy.get_multiplier() > 1.0)
@@ -852,6 +855,15 @@ func _style_tab_button(button: Button, active: bool, index: int) -> void:
 # ---------------------------------------------------------------------------
 # UI verb handlers — every player action flows through GameState
 # ---------------------------------------------------------------------------
+
+## The hero panel's income headline: the sum of the per-second rate each property row
+## currently shows (see PropertyRow.get_displayed_income_per_sec).
+func _sum_displayed_property_income() -> float:
+	var total := 0.0
+	for row in _rows:
+		total += (row as PropertyRow).get_displayed_income_per_sec()
+	return total
+
 
 func _on_buy_requested(prop_index: int, mode: PropertyRow.BuyMode) -> void:
 	var prop := game.economy.properties[prop_index] as PropertyState

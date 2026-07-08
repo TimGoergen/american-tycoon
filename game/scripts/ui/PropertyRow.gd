@@ -370,8 +370,17 @@ func _ready() -> void:
 	# be matched to WHICH parameter actually moved (Tim, 2026-07-08 — the frenzy edge
 	# burst survived several model-based fixes; this ends the guessing).
 	_carb_debug_label = Label.new()
-	_carb_debug_label.add_theme_font_size_override("font_size", 20)
-	_carb_debug_label.add_theme_color_override("font_color", Color.BLACK)
+	_carb_debug_label.add_theme_font_size_override("font_size", 22)
+	# White with a navy outline so it reads on ANY fill color — the first pass was
+	# plain black at the bar's top-left, exactly where the income label already draws.
+	_carb_debug_label.add_theme_color_override("font_color", Color.WHITE)
+	_carb_debug_label.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
+	_carb_debug_label.add_theme_constant_override("outline_size", 6)
+	_carb_debug_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	# Pinned along the bar's TOP-RIGHT, clear of the left-aligned income readout.
+	_carb_debug_label.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_carb_debug_label.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_carb_debug_label.position.y = 2
 	_carb_debug_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_carb_debug_label.visible = false
 	_cycle_bar.add_child(_carb_debug_label)

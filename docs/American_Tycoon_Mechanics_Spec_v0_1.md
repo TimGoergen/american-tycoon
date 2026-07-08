@@ -51,7 +51,7 @@ r_band(b)    = R0_i × BAND_STEP^b
 - `BAND_STEP` global (provisional 1.15 `TBD-SIM`).
 - Steepening applies only *after* each milestone is crossed — milestones stay reachable by construction.
 - **Simulator guard (hard requirement):** no reachable game state may exist where every property is band-walled and no action is affordable (GDD §0.1).
-- Bulk-buy costs = exact sum of per-unit costs (fixes the 2022 MAX double-count bug). Buttons: **+1 / +10 / +to-next-milestone / MAX** (GDD §3.1).
+- Bulk-buy costs = exact sum of per-unit costs (fixes the 2022 MAX double-count bug). Buttons: **+1 / +10 / +to-next-milestone / MAX** (GDD §3.1). **The to-next-milestone mode landed 2026-07-07** as `BuyMode.NEXT_TIER` (caption "BUY: NEXT"), replacing an interim ×100 in the same enum slot (saved mode prefs stay valid): `count = max(0, next_milestone_threshold − units_owned)`, **all-or-nothing** — the button disables until the full jump is affordable, and reads +0 past the last milestone (like MAX when broke).
 
 ### 3.3 Milestone reward — adaptive
 On crossing each milestone, the property receives, in priority order:
@@ -92,6 +92,11 @@ Global multipliers (frenzy §7, sprint/residual §9.4, event modifiers §10) mul
 
 ### 3.5 Per-property UI
 Milestone progress slider per property: min = last milestone, max = next (recovered 2022 design, kept — it feeds the return spike: "the pile can push me over 40").
+
+**Cycle-bar display rules (presentation only, settled 2026-07-06/07 after the rush-jank passes):**
+- **Solid pin — deterministic.** The bar pins solid-full (no animation; the income readout carries the rate) exactly when the CURRENT completion time is too short to watch: effective cycle `< 0.25s` when not rushing, or — while rush is HELD — when the computed cycle-under-rush time `1 / (1/L + hold_rush_per_second × rush_pct × rush_power) ≤ 0.4s`. No measured cadence, no hysteresis (a measured-wraps rule stuck/unstuck unpredictably and was replaced).
+- **Pin transitions.** Entering the pin sprints the bar to full at 3 bars/sec (snapping read as sudden); unpinning restarts the visible lap from empty and chases the true progress.
+- **Rushed income readout (2026-07-07).** While rush is held a row's income label quotes the effective rate — `per_cycle × the completion rate above` — as `$X / s` (not gated on `is_cycle_running`: an unstaffed cycle stops momentarily at each payout and would flicker the readout). The hero panel's headline is the **simple sum of the rates the rows currently display** (unowned rows' buy-previews contribute 0), so it rises live under rush/frenzy; the core's `displayed_income_per_sec` (theoretical staffed-passive rate) is unchanged and still drives the executive wage floor (§5).
 
 ### 3.6 Alien property types — epoch unlock + First Contact reward (built 2026-06-28, GDD §5.5 site 2)
 The ladder is **17** `PropertyConfig`s: the 12 Earth properties plus 5 alien property types, one per alien epoch — Photon Exchange (epoch 2), Data Foundry (3), Spore Bank (4), Prism Vault (5), Time Bank (6).
@@ -224,9 +229,30 @@ The same minigame host (`MinigameScreen`) serves **three sites** (GDD §5.5), ea
 universal multiplier for a different reward: this prestige round (scales Legacy), the welcome-back
 round (scales the offline pile, §6), and First Contact (scales starting units on a new alien
 property, §3.6). The host is reward-agnostic — it only emits the multiplier; the caller decides
-what it scales and how it's worded.
+what it scales and how it's worded. **Framing (2026-07-08):** the reward context (`make_reward`)
+also carries a per-site `framing` string — one sentence of fiction on the Get Ready gate saying
+WHY this round is happening (the heir proving themselves at succession; one bold move before the
+overnight pile banks; opening terms with a new civilization). Hidden in Challenge Mode and the
+review tuner.
 
-Displayed as **brackets** (thresholds where legacy_gain crosses integers / named tiers); advisor announces bracket crossings. Total Legacy is dynastic and never spent down by conversion — Legacy *upgrades* cost Legacy per the upgrade table (content pass). The catalog includes **per-staffer retention** (GDD §6.3): spend Legacy to keep a specific property's staffer at its tier across the prestige reset, so the heir starts pre-staffed there. *(This is distinct from the existing "Loyal Staff" upgrade, which only discounts hire cost. Staff otherwise reset on prestige.)*
+**PLANNED, not built (2026-07-07 debrief, work item 4):** reshape the outcome curve so STANDARD
+play is neutral — a flat middle band mapping to 1.0, a modest downside floor for genuinely bad
+play, a modest upside for great play, and skip/opt-out landing at exactly 1.0 (replacing the
+keep_floor-0.5 stakes model above, where a skipped round cost half the award). To land together
+with a match-3 difficulty raise (Tim maxes the 200-cleared perfect almost every round; a ceiling
+most rounds touch would make the new upside effectively flat). All band numbers to be TuningConfig
+exports.
+
+Displayed as **brackets** (thresholds where legacy_gain crosses integers / named tiers); advisor announces bracket crossings. Total Legacy is dynastic and never spent down by conversion — Legacy *upgrades* cost Legacy per the upgrade table (content pass). The catalog includes **per-staffer retention** (GDD §6.3): spend Legacy to carry a property's staff ladder across the prestige reset **one LEVEL at a time** (2026-07-04 redesign), buyable up to the bloodline's ever-reached best on that property. *(Distinct from the "Loyal Staff" upgrade, which only discounts hire cost. Staff otherwise reset on prestige.)*
+
+**Retention pricing (REPRICED 2026-07-07 — the "second prestige felt too big" fix):**
+```
+retention_cost(property, level) = ceil( retention_base_cost
+                                        × retention_property_step ^ property_index
+                                        × retention_cost_growth  ^ (level − 1) )
+defaults: base 1.0 · property_step 1.5 · level_growth 1.25
+```
+The per-property term is the point: protecting a top earner costs like a top earner (ATM level 1 = 1 Legacy; Executive Assets level 1 ≈ 87). The old model — flat `ceil(1.0 × 1.12^(level−1))`, no property term — priced the ATM's staff like Executive Assets' and made deep retention near-free at a ~350-gem prestige. All three knobs are `TuningConfig` exports (`retention_*`) editable live from the Balance Tuning screen; `StaffRetention` stays tuning-free (DynastyState copies them in on construction and load).
 
 ### 9.4 Legacy application — catch-up sprint + residual
 ```
@@ -272,6 +298,7 @@ Godot Resources (the 2022 ScriptableObject pattern, ported):
 | LOOPHOLE_RATE_FLOOR | 5% | TBD-SIM |
 | K_LEGACY / ALPHA / LEGACY_BASE (log curve) | 0.5 / 2 / $1k | feel-tune |
 | minigame keep_floor / full_score / extra_score / duration | 0.5 / 100 / 200 / 20s | TBD-SIM |
+| retention_base_cost / retention_property_step / retention_cost_growth | 1.0 / 1.5 / 1.25 | feel-tune (Balance Tuning) |
 | minigame extra bonus cap (Family Reputation) | 0.25 + 0.05/level | TBD-SIM |
 | K_SPRINT / BETA / K_RES | tune / 0.5 / tune | TBD-SIM |
 | CRASH_MULT / CRASH_DUR | 0.5 / 10 active-min | TBD-SIM |

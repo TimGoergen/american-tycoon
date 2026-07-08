@@ -103,6 +103,16 @@ Art Style Guide.
   (`WelcomeBackOverlay`), ×N effect strings (`LegacyUpgradeCatalog`). Exception kept: real
   cents under $1,000 stay two digits ("$5.50"). Pinned by `sim/MoneyTest.gd`.
 
+- **Icon renders must not distort the source canvas (Tim, 2026-07-08).** RichText
+  `[img width= height=]` tags FORCE their box — a square-canvas SVG (the legacy gem is
+  252×252) squishes if the tag isn't square. Rule: img dims match the canvas aspect;
+  `TextureRect`s keep aspect. This is how the gem now renders identically in the Estate
+  wallet, the Pass-the-Torch button, the Lifetime Earned line, and the Estate tab icon.
+- **Minigame intro labels REQUIRE autowrap (2026-07-08).** A Label without autowrap
+  demands its full text width as a MINIMUM and propagates it up the containers — longer
+  guidance copy widened the whole card past the screen and put Catch-the-Money coins
+  off-screen. Any new in-game text label defaults to `AUTOWRAP_WORD_SMART`.
+
 ### Chunkier UI pass — global Theme + targeted (Tim, 2026-06-21, post-vacation roadmap)
 
 Playing on vacation, Tim wanted the UI **chunkier overall**: larger text, slightly larger
@@ -159,6 +169,18 @@ theme + targeted pass.**
   frame closes the other three sides — exactly one line between panel and bar. The panel
   grew by the strip's height so the numerals didn't move; the bar hides on the final
   epoch (no next contact). `HeroStat.gd`.
+- **Economy bar: taller + blue theme (Tim, 2026-07-07/08) — BUILT.** Now 54px (26 → 34 →
+  54 across two asks), `CYCLE_BLUE` fill with **NEON_BLUE** carbonation (`#4DE8FF`,
+  deliberately outside the era palette so the bubbles glow) — visually separating the
+  epoch-economy bar from the green property cycle bars.
+- **Income headline = the sum of the rows (Tim, 2026-07-07) — BUILT.** The hero panel's
+  income/sec is now the simple SUM of the per-second rate each property row currently
+  displays — **rush-boosted while rush is held**, frenzy included, unowned buy-previews
+  contributing zero — so the panel always equals the rows beneath it and visibly jumps
+  during a rush or a TURBO burn. (Each row's own label quotes its effective
+  cycle-under-rush rate as "$X / s" while held.) Supersedes the EMA
+  `effective_income_per_sec` note above and the later stable-theoretical-rate model;
+  the core's theoretical rate still drives the executive wage floor, untouched.
 
 ### Frenzy bar
 - **TURBO button = the meter (Tim, 2026-06-21) — DONE.** The separate frenzy progress bar is
@@ -171,8 +193,40 @@ theme + targeted pass.**
   (HBox stretch ratios 2 : 1 : 1). `Main.gd` / `FrenzyBar.gd`.
   - *Watch on the chunkier-UI pass:* at 25% width on a narrow portrait screen the
     "BUY MODE: ×100" caption may clip — revisit font size or shorten the caption then.
+- **TURBO readout + buy-mode text matched at FONT_SUBHEAD (Tim, 2026-07-07) — BUILT.**
+  Both had been FONT_BUTTON (34) and read small; now 41, deliberately paired (they share
+  the action row — resize together).
+- **Buy-mode caption shortened (Tim, 2026-07-07) — BUILT.** The button reads
+  **"BUY: ×1 / ×10 / NEXT / MAX"** — the word MODE dropped, ×100 replaced by NEXT
+  (buys exactly to the next milestone threshold, all-or-nothing), and "NEXT TIER"
+  shortened to "NEXT" so the button width stays stable as modes cycle. This resolves
+  the caption-clipping watch item above.
 
 ### Property ladder / property row
+- **Native scrollbar REMOVED — ghost handle instead (Tim, 2026-07-08) — BUILT.** The
+  always-visible ladder scrollbar spent horizontal space on a control nobody drags on a
+  phone; the rows now take its full width. `GhostScrollBar.gd` overlays a **transient
+  handle** — a 16px translucent navy pill (0.6 alpha) hugging the right edge — that
+  fades in only while the list is actually scrolling (0.6s hold, 0.4s fade), draws no
+  track/background, ignores the mouse (flicking is the interaction), and never appears
+  when everything fits on screen.
+- **Edge fade at the scroll edges (Tim, 2026-07-06) — BUILT.** Rows dissolve (modulate
+  alpha = their visible fraction) as they clip into the viewport's top/bottom — but only
+  on an edge with more content beyond it, so a fully-scrolled edge stays solid. Chosen
+  over an outline, which would have nested a third frame. Measured from the INNER edge
+  of the ScrollEdgeArrows strips, so the fade and the paging strips agree on where the
+  visible window starts.
+- **Tab pages run full column width (Tim, 2026-07-06) — BUILT.** `wrap_in_tab_panel`
+  keeps its 40px float margin on top/bottom only; every tab panel now sits flush with
+  the hero stat panel and the tab buttons.
+- **Second-finger play works across ALL Property-tab controls (Tim, 2026-07-07) —
+  BUILT.** Reusable `SecondaryTapButton` (child of any Button; a secondary press emits
+  the Button's own `pressed` signal so both input paths share one handler;
+  `is_secondary_held()` feeds hold pumps) on the buy-mode toggle, TURBO, and clock-in
+  (tap AND hold) — plus the rows' bespoke rush/buy/hire handler. One app-wide gate
+  (`SecondaryTapButton.enabled`). A secondary-finger rush **presents identically** to a
+  primary one: saturated green fill, rush-boosted income rate, solid-pin eligibility,
+  agitated carbonation.
 - **Every owned property is rushable, staffed or not (Tim, 2026-07-03).** The portrait
   disc accepts tap/hold on any owned row. Supersedes the earlier rule (dev-thoughts §
   "staff image as button": automated properties lost rush except the single highest
@@ -265,18 +319,30 @@ theme + targeted pass.**
 > Cross-reference: Art Style Guide §9 (stamps, not bounces; cycle spin tied to real
 > cycle progress). Log feel notes that refine or extend it.
 
-- **Gold bubble "carbonation" on progress bars (Tim, 2026-07-03; iterated 2026-07-05) —
-  BUILT.** Shared `GoldBubbles.gd`: a crowd of 15 small hand-drawn bubbles swirling
-  through the filled region (two-sine loops + wobble), each with its own size, speed,
-  opacity, and a fading tracer wake, drifting at the bar's own fill speed (idle-drift
-  floor keeps still bars fizzing; speed variety widens on slow bars). No Particles2D —
-  cheap enough for a ladder of rows.
+- **Gold bubble "carbonation" on progress bars (Tim, 2026-07-03; reworked through
+  2026-07-08) — BUILT.** Shared `GoldBubbles.gd`, now a full liquid system:
+  - **Motion:** each of 24 bubbles swims ONE clean sine (no stacked waves — those read
+    as jitter), with its own rate, phase, amplitude, and off-center lane from a
+    per-bubble **hash** (a salted-Weyl sequence correlated the traits and the crowd
+    rolled as one visible wave). Antialiased draws, or sub-pixel drift steps.
+  - **Trails:** each bubble drags a comet tail — ONE `draw_polyline_colors` per bubble
+    with per-point alpha (ghost circles cost a draw call each and lagged the app).
+  - **Liquid shading:** the filled region darkens at its top/bottom edges and brightens
+    at the center line — light through a tube of liquid (4 gradient bands).
+  - **Governed speed ladder (Tim, 2026-07-07):** carbonation speed is a ranked signal —
+    a solid bar under held rush is the fastest liquid on screen (176 px/s), a solid bar
+    second (110), every measured bar below both (capped 80), idle floor 14.
+  - **Excitement knob (0–1, work item 5, first-pass — device pass owed):** rush-held
+    rows agitate the liquid — +50% crowd, floor rises to 40 and the measured cap to 100
+    (still under the solid speeds), sway rates up to +45%, and a small churn wobble
+    that exists ONLY in proportion to excitement (calm bars keep the clean path).
+  - **TURBO meter:** half the crowd while charging (full read as busy on gold); the full
+    crowd flowing **right-to-left** while burning — the drain's direction.
   **PLACEMENT RULE (Tim, 2026-07-05): carbonation cues AUTOMATIC activity** — a value
   accruing on its own — never a response to the player's own events. Carries it:
-  property cycle bars, the economy bar, the TURBO meter (dark-gold bubbles on its gold
-  charging fill, bright gold on the red burn — on gold fills plain gold vanishes), and
-  the minigame spectrum bar. Does NOT: the wage clock-in meter (moves only because the
-  player taps) and in-minigame gameplay bars (play must read clean).
+  property cycle bars, the economy bar, the TURBO meter, and the minigame spectrum bar.
+  Does NOT: the wage clock-in meter (moves only because the player taps) and
+  in-minigame gameplay bars (play must read clean).
 
 ---
 
@@ -311,6 +377,20 @@ theme + targeted pass.**
 > in `game/art/icons/`. **Still to do:** real icon art; embed the live draft will in the
 > Estate tab; possibly embed the Estate Office shop rather than open it modally; on-device
 > layout pass. (Original proposal below.)
+
+> **Addendum (2026-07-07/08):**
+> - **Estate tab icon = the legacy gem** (`legacy_gem.svg`, Tim's own art) — the same
+>   image as the wallet/torch/lifetime renders, so the tab's identity matches what
+>   lives inside it. It's the one tab icon that DOWNSCALES (252px art → 113px slot), so
+>   it takes the mipmapped filter; the other three tabs still carry placeholder glyphs
+>   (real art owed).
+> - **Balance Tuning lives INSIDE the Settings tab** (was a full-screen overlay): the
+>   BALANCE TUNING button swaps the tab's normal page for the panel, CLOSE swaps back.
+>   Retitled "Balance Tuning" to match its button; rows read in plain language
+>   (`capitalize()` + hand-picked DISPLAY_NAMES: Starting Cash, Rush Percent, Legacy
+>   Payout Scale, Legacy Payout Curve); value fields clear the overlaid scrollbar and
+>   raise the STANDARD phone keyboard (the numeric pad has no arrow keys). The economy
+>   no longer freezes while tuning is open — Apply saves and reloads anyway.
 
 Replace the single stacked Main screen with a **bottom tab bar** (pinned to the screen
 bottom, thumb-reachable) switching between four tabs. Reason: more real estate per screen
@@ -396,3 +476,33 @@ The shared minigame host (`MinigameScreen`) and the Minigame Tuning review scree
   outline**, and a gym backdrop (`art/backgrounds/basketball_court.png`) inside the rounded
   corners. The aim guide is a **force wedge** — point at the ball, fanning out toward the shot
   direction, size + a single blue→purple→red color scaling with pull force (red = maxed).
+
+### Addendum (2026-07-07/08): framing, performance, and the Balance rework
+
+- **Get Ready gate gains a WHY line (work item 3).** A muted-navy framing sentence under
+  GET READY explains each round's place in the story, carried by the reward context:
+  succession — *"The will is read. Before the fortune passes, the heir must show the
+  estate what kind of tycoon they are."*; welcome-back — *"The empire earned this while
+  you were away. One bold move before it banks."*; First Contact — *"Across the table: a
+  civilization that has never seen a human make a deal…"*. Hidden in Challenge Mode and
+  the review tuner. Every `how_to_play()` line also grew from a fragment into real
+  guidance (match-3 now explains the AVOID gem in words; no exact numbers — tunable).
+  Tim (2026-07-08): good shape; the art pass defines the true content.
+- **Minigame-screen performance, root-caused (2026-07-06→08).** Three layered fixes:
+  (1) economy-freezing modals now HIDE the covered game screen (it kept drawing at 60fps
+  beneath the opaque overlay — the game tab's bubble bars billed their GPU cost to the
+  minigame); (2) per-frame hot-path cleanups (a StyleBoxFlat allocated in basketball's
+  draw pass, `filter()`/`duplicate()` array rebuilds, theme-override churn); (3) the
+  backdrop bakes (minigame screen + basketball board) key their caches on **±1px
+  tolerance**, not float equality — sub-pixel layout jitter across an integer boundary
+  re-ran the full CPU image bake every frame — and cache their decompressed source
+  images. Basketball also **substeps its physics** (≤24px of ball travel per collision
+  pass) so a fast ball can never tunnel through the rim posts at any framerate.
+- **Balance the Books REWORKED (work item 6, first-pass — device verdict owed).**
+  Vertical, single-input, Stardew-fishing-shaped: HOLD anywhere to lift the marker,
+  release and gravity drops it, keep it inside the gold zone drifting up and down the
+  track; soft bounce at floor/ceiling punishes slamming an edge. Scoring unchanged
+  (banked time-in-zone vs the fixed round; Challenge score = seconds in zone). Kept from
+  the old game: wandering-zone easing, boundary warning glow, in-zone bounce, motion
+  trail. Replaces the horizontal two-button version, which "didn't work and lagged"
+  (Tim, 2026-07-07).

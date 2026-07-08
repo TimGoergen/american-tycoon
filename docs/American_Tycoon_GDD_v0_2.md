@@ -102,7 +102,7 @@ The designer's peak dopamine moment is the **return spike**: spending offline-ba
 
 - **Offline accrual tuned to purchase thresholds, not just time:** a typical away-period banks roughly enough to cross at least one threshold (tier, hire, or count milestone).
 - **Offline earnings unlock in the first session** — the peak moment cannot be gated late.
-- **Bulk-buy UI is mandatory:** ×10, ×25, and "×to-next-milestone" buttons, so the pile converts to a spike in one or two taps.
+- **Bulk-buy UI is mandatory:** ×10, ×25, and "×to-next-milestone" buttons, so the pile converts to a spike in one or two taps. *(As shipped 2026-07-07: one global toggle cycling ×1 / ×10 / **NEXT** / MAX — NEXT buys exactly enough units to reach the next milestone threshold, all-or-nothing, replacing an earlier ×100 mode; this realizes the "×to-next-milestone" intent.)*
 - **Income/sec is the hero stat:** big, top-of-screen; every purchase animates the jump with a flashed delta ("**+38%**"), weight, sound, haptic.
 - **Welcome-back is a two-beat ritual:** (1) the cheerful pile — *Hours worked: 0* — then (2) hand-off directly into the spending spree, not a menu.
 
@@ -236,7 +236,9 @@ screens shouldn't be dead air. This grew (Tim, 2026-06-22) into a **minigame fra
 **Player setting:** a persisted toggle (`GameState.ui_minigame_enabled`). **Default:
 mandatory.** **Opting out — or tapping Skip — banks the keep floor** (the worst result, not a
 safe 100%), so skipping has a real cost. A per-round Skip is always available. (At First Contact
-with minigames off, the keep-floor head start is granted directly, no screen.)
+with minigames off, the keep-floor head start is granted directly, no screen.) *(Slated to
+change: the parked reward-curve reshape below makes skip/opt-out exactly neutral — see the
+work-item-4 note after the Balance rework.)*
 
 **Built 2026-06-22 — match-3 type (the first of the library):** drag a gem to swap; matches
 flash with a size badge, clear, and survivors + new gems fall in.
@@ -279,6 +281,31 @@ single blue→purple→red color both scaling with the pull's force (red = maxed
 raised so a short drag reaches the hoop (the ball rests near the floor with little room to pull).
 The board has a generous margin, a **thick black rounded outline**, and a **gym backdrop**
 (`art/backgrounds/basketball_court.png`) inside the rounded corners.
+
+**Balance the Books — REWORKED 2026-07-08 (playtest verdict: the horizontal two-button version
+"doesn't work," work item 6).** Now **vertical and single-input**, in the shape of Stardew
+Valley's fishing minigame: hold anywhere to lift the marker, release and gravity drops it, and
+the gold zone drifts up and down the track on its own — keep the marker inside it and the score
+banks every moment it stays in (same banked time-in-zone scoring as before; Challenge score =
+seconds in zone). A soft bounce at the track's floor/ceiling punishes slamming an edge.
+First-pass physics values; **not yet device-verified.**
+
+**Transition framing — WHY a minigame is happening (shipped 2026-07-08, work item 3).** The
+2026-07-07 playtest found nothing in the game explains why a minigame suddenly plays at a
+transition. The Get Ready gate now opens with a one-line **framing** per launch site — at
+succession the heir proves what kind of tycoon they are before the fortune passes; at
+welcome-back it's one bold move before the overnight pile banks; at First Contact it's the
+opening of the trade negotiation — and every game's goal line grew from a fragment into real
+guidance (match-3's now actually explains the avoid-gem mechanic). Framing is copy-first: the
+**art pass is where the true transition content gets defined** (Tim, 2026-07-08).
+
+**Reward curve reshape — DESIGNED, NOT BUILT (work item 4, parked pending Tim's feel pass).**
+Direction from the 2026-07-07 debrief: replace the keep-floor model (bad/skip = 0.5×) with
+**standard play ≈ neutral 1.0** (a flat middle band), a modest downside only for genuinely bad
+play, a modest upside for great play — and **Skip/opt-out land at exactly 1.0** (free, not
+penalized). Couples with a match-3 difficulty raise (Tim maxes its score almost every round;
+once great play is the only upside, a reachable ceiling makes the bonus effectively flat). All
+band numbers to live in TuningConfig.
 
 **Build phasing:** (1) **framework** — a host that picks a random minigame type and maps its
 [0,1] performance to the universal multiplier; refactor match-3 into the first type; route
@@ -327,6 +354,7 @@ Earth runs on **one currency — the dollar.** Alien civilizations are *flavor, 
 
 - **Epochs are reached within a run by consuming the entire current economy.** Each epoch has a total economic value; Earth's is the existing Earth target (~$103.6T — "buy the Earth", §10). Once a generation has *earned* that whole value, contact with the next civilization fires and the next, orders-of-magnitude-larger epoch opens. The threshold ladder *is* the scale justification: "you ran out of Earth to buy, so the galaxy opens."
 - **First Contact is a beat,** not just a number crossing: it names the civilization, its home world and tech, and declares new markets open. Each contact also unlocks the next staffer tier for every property.
+  - **Each civilization SPEAKS (shipped 2026-07-08; copy approved).** The 2026-07-07 playtest found the contacts read samey — the narrator lines shared one cadence, so the second contact felt like the first. Every civilization now has a **hail**: its own first words, in a sharply distinct register (the Luminari radiant and faintly condescending; the Geth in machine-log fragments; the Mycelium a creeping lowercase whisper; the Quartzite a cold appraisal; the Chronophage politely quoting your remaining lifespan). The contact card's typewriter types the *hail* — the "INCOMING TRANSMISSION" eyebrow finally delivers an actual transmission — with the narrator's line rewritten as a short deadpan capper after the market-growth payoff. Each civ also carries an **accent color** tinting its name and hail, so contacts differ visually as well as verbally. Real art remains M3; per Tim, the copy is the interim carrier of the moment.
 - **v1 epoch ladder** (Earth + 5 alien epochs shipped; more can be added as data rows):
 
   | Tier | Civilization | Economy vs. Earth | Staffer income ×| Flavor |
@@ -346,6 +374,7 @@ Earth runs on **one currency — the dollar.** Alien civilizations are *flavor, 
 
 - **Staff reset on prestige by default.** A new founder starts unstaffed, at the beginning of Earth (§8). Prestige is *how a juiced-up heir punches deeper into the epoch ladder than the last life did* (§5.1).
 - **Every staffer is individually retainable via a Legacy upgrade.** Spend Legacy to keep a specific property's staffer at its tier across the reset, so the heir's empire starts pre-staffed exactly where you chose to invest. Buying retention again raises the retained tier. Inherited staff are dynastic infrastructure, front-loading each heir's acceleration. *(This is distinct from the existing "Loyal Staff" Legacy upgrade, which only discounts hire cost.)*
+  - **Repriced 2026-07-07 (playtest verdict: the second prestige felt TOO BIG, and retention was the root cause — device-verified fixed).** The old flat pricing had **no property term** — retaining the ATM's staff cost the same as retaining Executive Assets' — and its level growth was so gentle that deep retention was near-free at a ~350-gem prestige. The rule now: **protecting a top earner costs like a top earner.** Cost scales geometrically per property rung *and* per retained level (formula in the Mechanics Spec; all three knobs live in the Balance Tuning screen), so the ATM anchor stays a 1-gem starter buy while willing a top property's staff deep is a genuine multi-prestige dynastic investment.
 
 ### 6.4 Deferred satire — "the quiet ratio"
 
@@ -518,6 +547,10 @@ against current work rather than a specific plateau:
   bar as the Settings tab — UI Notes §7.)*
 - **Balance config screen** — a dev-facing tuning panel that reads/writes the `/config`
   values, so balance can be exercised on-device, not just in the headless simulator.
+  *(BUILT; reworked 2026-07-07 as **"Balance Tuning"**: it now lives embedded inside the
+  Settings tab — the button swaps it into the tab's slot, Close swaps back — with
+  plain-language entry names instead of raw constant names, and the standard phone
+  keyboard on value fields.)*
 - **Bottom tab bar navigation (proposed 2026-06-22, UI Notes §7).** Four icon-only (SVG)
   bottom-pinned tabs — Property / Estate Planning / Settings / Family Ledger — replacing
   the single stacked Main screen for readability. Realizes the already-designed Estate

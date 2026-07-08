@@ -781,6 +781,9 @@ func _refresh(delta: float) -> void:
 		_cycle_bubbles.flow_override_px = SOLID_FLOW_PX * (SOLID_FLOW_RUSH_MULT if rush_held else 1.0)
 	else:
 		_cycle_bubbles.flow_override_px = -1.0
+	# Rush agitates the liquid itself (work item 5): the excitement knob scales the
+	# whole package — denser crowd, faster floor/cap, livelier sway, churn wobble.
+	_cycle_bubbles.excitement = 1.0 if rush_held else 0.0
 
 	_refresh_buy_button()
 	_refresh_hire_button()

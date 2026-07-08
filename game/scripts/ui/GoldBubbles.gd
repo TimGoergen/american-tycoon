@@ -162,8 +162,18 @@ const EXCITED_FLOOR_PX := 40.0          # the 14 px idle-drift floor rises to th
 ## the commanded solid-bar speeds (110 / 176), preserving the governed speed ladder.
 const EXCITED_MEASURED_CAP_PX := 100.0
 const EXCITED_SWAY_HZ_BOOST := 0.45     # sway rates run up to this much faster
-const EXCITED_WOBBLE_PX := 3.0          # horizontal agitation wobble amplitude
+## The agitation wobble's amplitude at the excited FLOOR speed; it scales UP with the
+## flow (see _bubble_point) because a fixed few pixels of jiggle is invisible inside
+## 100 px/s of streaming — which made the frenzy look like it "calmed down" the moment
+## the flow reached full speed (Tim, 2026-07-08: chaos must scale with speed).
+const EXCITED_WOBBLE_PX := 3.0
 const EXCITED_WOBBLE_HZ := 2.3
+const EXCITED_WOBBLE_SPEED_SCALE_MAX := 3.0  # wobble amplitude cap: ×3 at high flow
+## While excited, the per-bubble speed spread's LOWER bound drops to this, so the crowd
+## is a chaotic mix of crawlers and streakers instead of a uniform stream — sustained
+## chaos that reads at any flow speed. The UPPER bound is untouched: the fastest
+## bubbles never exceed what the governed speed ladder already allows.
+const EXCITED_SPREAD_LOWER := 0.25
 ## An excited fill keeps at least this many bubbles no matter how NARROW it is. Without
 ## a floor the crowd is proportional to filled width, so the moment a rushed bar
 ## wrapped, the count collapsed to a handful for most of each lap — every agitation
@@ -297,8 +307,11 @@ func _process(delta: float) -> void:
 
 ## One bubble's own drift speed (px/s), between the lower bound and the slow-bar-aware
 ## upper bound. Shared by the position advance and the tracer path so they always agree.
+## Excitement WIDENS the spread downward (see EXCITED_SPREAD_LOWER): an agitated crowd
+## mixes crawlers with streakers instead of streaming uniformly.
 func _bubble_speed_px(index: int) -> float:
-	return _base_speed_px * lerpf(1.0 - SPEED_SPREAD, _upper_mult, _variant(index, 0.37))
+	var lower := lerpf(1.0 - SPEED_SPREAD, EXCITED_SPREAD_LOWER, _excitement_level)
+	return _base_speed_px * lerpf(lower, _upper_mult, _variant(index, 0.37))
 
 
 func _draw() -> void:
@@ -401,10 +414,13 @@ func _bubble_point(index: int, radius: float, filled_width: float, seconds_ago: 
 	var sway := sin(at_time * TAU * sway_hz + phase) * size.y * sway_fraction
 	# The lane: -1..+1 from the hash, scaled to the offset limit.
 	var lane := (_variant(index, 0.91) * 2.0 - 1.0) * size.y * LANE_OFFSET_FRACTION
-	# The agitation wobble: a small horizontal jitter that scales with excitement, so a
-	# rushed bar's liquid visibly churns while a calm bar keeps its clean path.
+	# The agitation wobble: horizontal churn that scales with excitement AND with the
+	# flow speed — fixed-size jiggle disappears inside fast streaming, so the amplitude
+	# grows with the liquid's speed (capped) to stay visible at full flow.
+	var wobble_amp := EXCITED_WOBBLE_PX \
+			* clampf(_base_speed_px / EXCITED_FLOOR_PX, 1.0, EXCITED_WOBBLE_SPEED_SCALE_MAX)
 	var wobble := sin(at_time * TAU * EXCITED_WOBBLE_HZ + phase * 3.0) \
-			* EXCITED_WOBBLE_PX * _excitement_level
+			* wobble_amp * _excitement_level
 	# Map the normalized position into the filled region, rolled back along the drift —
 	# backward is rightward when the flow is reversed. NOT clamped here: the head clamps
 	# itself in _draw, while out-of-fill tail samples are dropped by the caller (clamping

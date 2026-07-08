@@ -515,10 +515,11 @@ func _build_property_tab() -> Control:
 	action_row.add_child(_buy_mode_button)
 
 	# The property ladder: the rows in a vertical scroll (GDD §2), hosted in a plain
-	# Control so the ScrollEdgeArrows overlay can sit ON the list (top/bottom paging
-	# strips that double as "more content this way" cues — Tim, 2026-07-05) without
-	# reserving any layout space. The vertical scrollbar gets the styled wide-handle /
-	# narrow-track look (UiPalette.style_vscrollbar).
+	# Control so the two overlays can sit ON the list without reserving layout space:
+	# the ScrollEdgeArrows paging strips (Tim, 2026-07-05), and the GhostScrollBar.
+	# The native scrollbar is gone entirely (Tim, 2026-07-08) — it spent horizontal
+	# space on a control nobody drags on a phone. The rows take its full width, and the
+	# ghost handle fades in over them only while the list is actually scrolling.
 	var ladder_area := Control.new()
 	ladder_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(ladder_area)
@@ -526,29 +527,23 @@ func _build_property_tab() -> Control:
 	var scroll := ScrollContainer.new()
 	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_RESERVE
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
 	ladder_area.add_child(scroll)
-	UiPalette.style_vscrollbar(scroll.get_v_scroll_bar())
 	_ladder_scroll = scroll
 
 	var ladder_arrows := ScrollEdgeArrows.new()
 	ladder_arrows.setup(scroll)
 	ladder_area.add_child(ladder_arrows)
 
-	# A right margin narrows the property rows so a visible gap sits between their right edge and
-	# the scrollbar handle (Tim, 2026-06-28). The ScrollContainer does NOT reserve a gutter here
-	# (the bar overlays the right edge), so the margin must clear the FULL scrollbar width and then
-	# leave a visible gap beyond it — hence scrollbar width + a 16px gap.
-	const LADDER_SCROLLBAR_GAP := UiPalette.SCROLLBAR_WIDTH + 16
-	var ladder_margin := MarginContainer.new()
-	ladder_margin.add_theme_constant_override("margin_right", LADDER_SCROLLBAR_GAP)
-	ladder_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(ladder_margin)
+	# The transient scroll-position indicator, drawn over everything on the right edge.
+	var ghost_bar := GhostScrollBar.new()
+	ghost_bar.setup(scroll)
+	ladder_area.add_child(ghost_bar)
 
 	var ladder := VBoxContainer.new()
 	ladder.add_theme_constant_override("separation", 10)
 	ladder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	ladder_margin.add_child(ladder)
+	scroll.add_child(ladder)
 
 	for i in range(game.economy.properties.size()):
 		var row := PropertyRow.new()

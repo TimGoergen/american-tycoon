@@ -25,6 +25,10 @@ var _headline_label: Label
 var _civ_label: Label
 var _planet_label: Label
 var _flavor_label: Label
+## The civilization's own first words (EpochCatalog.hail) — the actual transmission,
+## typewritten in the civ's accent color so every contact sounds and looks different
+## (Tim, 2026-07-07: the contacts read samey).
+var _hail_label: Label
 var _market_label: Label
 var _narration_label: Label
 var _proceed_button: Button
@@ -36,8 +40,10 @@ var _staged_nodes: Array[Control] = []
 ## Drives the eyebrow's slow blink so the moment reads as a live, urgent transmission.
 var _blink_time := 0.0
 
-## The full narrator line; revealed one character at a time by the typewriter step.
-var _narration_full_text := ""
+## The full hail (the civilization's words); revealed one character at a time by the
+## typewriter step — it IS the incoming transmission the eyebrow promises. The
+## narrator's capper fades in afterward as plain text.
+var _hail_full_text := ""
 
 ## The single tween that runs the whole reveal. Stored so a re-entrant show_contact()
 ## can .kill() it before starting over (Godot tweens keep running on their own once
@@ -113,6 +119,16 @@ func _ready() -> void:
 	_flavor_label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
 	column.add_child(_flavor_label)
 
+	# The civilization's OWN first words — the transmission itself, typewritten in the
+	# civ's accent color (set per show_contact). Quoted so it clearly reads as them
+	# speaking, distinct from the narrator's capper below the market line.
+	_hail_label = Label.new()
+	_hail_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_hail_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_hail_label.custom_minimum_size = Vector2(760, 0)
+	_hail_label.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
+	column.add_child(_hail_label)
+
 	# The headline payoff: how many times larger the new market is. Big and gold, so the
 	# scale jump lands as the reason this is worth celebrating. This is the element the
 	# reveal punches hardest (an overshoot scale-in pop).
@@ -165,6 +181,7 @@ func _ready() -> void:
 		_civ_label,
 		_planet_label,
 		_flavor_label,
+		_hail_label,
 		_market_label,
 		_narration_label,
 	]
@@ -200,15 +217,22 @@ func show_contact(tier: int) -> void:
 	_civ_label.text = String(epoch["civilization"])
 	_planet_label.text = "Home world: %s" % String(epoch["home_planet"])
 	_flavor_label.text = "They trade in %s." % String(epoch["currency_flavor"])
+	# The civ's accent color tints its name and its words, so each contact is visually
+	# distinct as well as verbally (Tim, 2026-07-07).
+	var accent := EpochCatalog.accent_color(tier)
+	_civ_label.add_theme_color_override("font_color", accent)
+	_hail_label.add_theme_color_override("font_color", accent)
 	# How many times larger the new market is than the one just consumed (the scale jump
 	# between this epoch and the previous one) — the celebratory payoff line.
 	var growth := EpochCatalog.economy_scale(tier) / EpochCatalog.economy_scale(tier - 1)
 	_market_label.text = "THE MARKET JUST GREW ×%s" % _format_multiplier(growth)
 
-	# The narrator line is held in full and revealed letter by letter during the sequence,
-	# so the label starts empty.
-	_narration_full_text = EpochCatalog.contact_line(tier)
-	_narration_label.text = ""
+	# The hail (their words) is held in full and revealed letter by letter during the
+	# sequence, so its label starts empty; the narrator's capper is plain text that
+	# simply fades in near the end.
+	_hail_full_text = "“%s”" % EpochCatalog.hail(tier)
+	_hail_label.text = ""
+	_narration_label.text = EpochCatalog.contact_line(tier)
 
 	_blink_time = 0.0
 	visible = true
@@ -262,7 +286,18 @@ func _play_reveal() -> void:
 	_fade_in_step(_planet_label, 0.30)
 	_fade_in_step(_flavor_label, 0.30)
 
-	# 6) THE PAYOFF: the market-growth line pops hardest — a bigger overshoot from a smaller
+	# 6) THE TRANSMISSION: the civilization's own first words typewrite in, in their
+	#    accent color — this is the payoff the blinking "INCOMING TRANSMISSION" eyebrow
+	#    promised (it used to typewrite the narrator's commentary instead).
+	_fade_in_step(_hail_label, 0.25)
+	_reveal_tween.tween_callback(_start_typewriter)
+	# Hold the timeline open for the typewriter, which runs on its OWN tween. Time it from
+	# the text length at a steady characters-per-second so the next beat always waits for
+	# the line to finish (and there is always an end, so the player is never stuck).
+	var typewriter_seconds := _typewriter_duration()
+	_reveal_tween.tween_interval(typewriter_seconds)
+
+	# 7) THE PAYOFF: the market-growth line pops hardest — a bigger overshoot from a smaller
 	#    start, so the scale jump is the visual climax of the card.
 	_pop_in_step(_market_label, 0.55, 0.4)
 	# A brief follow-up pulse on the payoff line (up past full, settle back to full) so it
@@ -270,16 +305,10 @@ func _play_reveal() -> void:
 	_reveal_tween.tween_property(_market_label, "scale", Vector2(1.12, 1.12), 0.12)
 	_reveal_tween.tween_property(_market_label, "scale", Vector2.ONE, 0.18)
 
-	# 7) Narrator line: fade the (empty) label in, then typewrite the text across it.
-	_fade_in_step(_narration_label, 0.25)
-	_reveal_tween.tween_callback(_start_typewriter)
-	# Hold the timeline open for the typewriter, which runs on its OWN tween. Time it from
-	# the text length at a steady characters-per-second so the button always waits for the
-	# line to finish (and there is always an end, so the player is never stuck).
-	var typewriter_seconds := _typewriter_duration()
-	_reveal_tween.tween_interval(typewriter_seconds)
+	# 8) The narrator's deadpan capper fades in under the payoff.
+	_fade_in_step(_narration_label, 0.30)
 
-	# 8) Finally, reveal the "ANSWER THE CALL" button so the player can move on.
+	# 9) Finally, reveal the "ANSWER THE CALL" button so the player can move on.
 	_reveal_tween.tween_callback(_reveal_proceed_button)
 
 
@@ -307,24 +336,24 @@ func _set_center_pivots() -> void:
 	_market_label.pivot_offset = _market_label.size / 2.0
 
 
-## How long the typewriter should take, derived from the line length at a steady pace. The
-## reveal tween waits exactly this long before showing the button, so the button always
-## appears once the line finishes — there is no way to leave the player stuck.
+## How long the typewriter should take, derived from the hail's length at a steady pace.
+## The reveal tween waits exactly this long before the next beat, so the sequence always
+## resumes once the line finishes — there is no way to leave the player stuck.
 func _typewriter_duration() -> float:
 	var characters_per_second := 45.0
-	return float(_narration_full_text.length()) / characters_per_second
+	return float(_hail_full_text.length()) / characters_per_second
 
 
-## Reveal the narrator line one character at a time. Godot's visible_ratio on a Label draws
+## Reveal the hail one character at a time. Godot's visible_ratio on a Label draws
 ## only the first `ratio` fraction of the text — so tweening it 0 -> 1 is a clean typewriter
 ## with no string-slicing. We set the full text now (it was empty during the fade) and let
 ## the ratio walk it open. This runs on its OWN short-lived tween so it can outlive a single
 ## step of the main timeline; the main timeline waits for it via _typewriter_duration().
 func _start_typewriter() -> void:
-	_narration_label.text = _narration_full_text
-	_narration_label.visible_ratio = 0.0
+	_hail_label.text = _hail_full_text
+	_hail_label.visible_ratio = 0.0
 	var typer := create_tween()
-	typer.tween_property(_narration_label, "visible_ratio", 1.0, _typewriter_duration())
+	typer.tween_property(_hail_label, "visible_ratio", 1.0, _typewriter_duration())
 
 
 ## The reveal is over: fade the button up and enable it. From here the player can answer.

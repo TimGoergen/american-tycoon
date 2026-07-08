@@ -84,9 +84,15 @@ const EPOCHS := [
 		"currency_flavor": "Photons",
 		"economy_scale": 30.0,
 		"staff_income_multiplier": 40.0,
-		"contact_line": "You bought the Earth. The Luminari Collective noticed. " \
-			+ "Now your money moves at the speed of light — and so does everyone else's.",
-		# Energy/light beings — money now moves at the speed of light.
+		# Energy/light beings — money now moves at the speed of light. The hail is THEIR
+		# first words (radiant, warm, faintly condescending); the contact_line is our
+		# narrator's deadpan capper. Each civilization gets its own voice + accent color
+		# so no two contacts read alike (Tim, 2026-07-07).
+		"hail": "Your little sun is charming. We measured your fortune the moment " \
+			+ "it crossed the void — such a lovely flicker. Come. Shine with us.",
+		"contact_line": "Beings of living light, and they still noticed your money first. " \
+			+ "Everything moves at lightspeed here. Including mistakes.",
+		"accent_color": Color("#B8730A"),  # solar amber
 		"staffer_names": [
 			"Photon Teller", "Solar Cultivator", "Lumen Curator",
 			"Flux Auditor", "Lightstream Courier", "Radiance Cleaner",
@@ -103,9 +109,13 @@ const EPOCHS := [
 		"currency_flavor": "Logic Nodes",
 		"economy_scale": 900.0,
 		"staff_income_multiplier": 1_600.0,
-		"contact_line": "The Geth-Sentinel Grid comes online. Every trade, every fund, " \
-			+ "every hustle — handed to machines that never sleep, never quit, never ask why.",
-		# Cybernetic collective — finance run entirely by machines.
+		# Cybernetic collective — finance run entirely by machines. Hail = machine-log
+		# fragments, all protocol, no warmth.
+		"hail": "HANDSHAKE ACCEPTED. ASSETS: CATALOGUED. OWNER: DESIGNATED " \
+			+ "‘THE VARIABLE.’ SENTIMENT: NOT FOUND. COMMENCING COMMERCE.",
+		"contact_line": "Machines that never sleep, never quit, never ask why. " \
+			+ "Your money just stopped asking, too.",
+		"accent_color": Color("#1F7A85"),  # circuit teal
 		"staffer_names": [
 			"Autonomous Teller Unit", "Cultivation Algorithm", "Mint Subroutine",
 			"Tax Optimization Daemon", "Logistics Mainframe", "Laundering Protocol",
@@ -122,9 +132,13 @@ const EPOCHS := [
 		"currency_flavor": "Spores",
 		"economy_scale": 27_000.0,
 		"staff_income_multiplier": 64_000.0,
-		"contact_line": "The Mycelium Unity spreads into your holdings. Money that grows " \
-			+ "itself now — branching through the dark, feeding on everything it touches.",
-		# Fungal hive-mind — money that literally spreads and self-replicates.
+		# Fungal hive-mind — money that literally spreads and self-replicates. Hail =
+		# a creeping lowercase whisper, plural and patient.
+		"hail": "we felt you buying… through the roots… through the dark… " \
+			+ "everything joins the network, eventually… grow with us… grow…",
+		"contact_line": "Money that grows itself, branching through the dark, " \
+			+ "feeding on everything it touches. Best not to ask what it eats.",
+		"accent_color": Color("#6E4B8E"),  # spore violet
 		"staffer_names": [
 			"Spore-Cash Node", "Mycelial Grove-Tender", "Fungal Token Bloom",
 			"Rhizome Financier", "Spore-Drift Network", "Decomposition Specialist",
@@ -141,9 +155,12 @@ const EPOCHS := [
 		"currency_flavor": "Prisms",
 		"economy_scale": 810_000.0,
 		"staff_income_multiplier": 2_560_000.0,
-		"contact_line": "The Quartzite Conglomerate refracts your fortune. Wealth, " \
-			+ "crystallized — harder than diamond, and just as cold.",
 		# Crystalloid life — capital made permanent, faceted, light bent to its will.
+		# Hail = a cold appraisal, unimpressed and precise.
+		"hail": "Appraisal complete. Your empire is… adequate. Inclusions detected. " \
+			+ "We will permit it to be cut, faceted, and polished.",
+		"contact_line": "Wealth, crystallized. Harder than diamond, and exactly as warm.",
+		"accent_color": Color("#3E6FA8"),  # crystal blue
 		"staffer_names": [
 			"Prism Teller", "Crystal Cultivator", "Geode Curator",
 			"Refraction Auditor", "Lattice Courier", "Facet Cleaner",
@@ -160,10 +177,14 @@ const EPOCHS := [
 		"currency_flavor": "Seconds",
 		"economy_scale": 24_300_000.0,
 		"staff_income_multiplier": 102_400_000.0,
-		"contact_line": "The Chronophage Enclave opens the quarter. They sell you time " \
-			+ "itself, by the second — at a markup you will never live long enough to repay.",
 		# Time-eaters — they trade in stolen moments; your money compounds across hours
-		# that were taken from someone else.
+		# that were taken from someone else. Hail = politely terrifying, and it knows
+		# exactly how much of you is left.
+		"hail": "Good afternoon. You have approximately 1.4 billion seconds remaining. " \
+			+ "Would you care to spend them profitably? Interest accrues… momentarily.",
+		"contact_line": "They sell time itself, by the second — at a markup you will " \
+			+ "never live long enough to repay.",
+		"accent_color": Color("#8E2F45"),  # hourglass maroon
 		"staffer_names": [
 			"Second-Hand Teller", "Chrono Cultivator", "Moment Curator",
 			"Hourglass Auditor", "Timeline Courier", "Era Cleaner",
@@ -239,3 +260,20 @@ static func civilization(tier: int) -> String:
 static func contact_line(tier: int) -> String:
 	var epoch := get_epoch(tier)
 	return String(epoch.get("contact_line", "")) if not epoch.is_empty() else ""
+
+
+## The civilization's own first words — the typewritten transmission on the contact
+## card, in that race's distinct voice (Tim, 2026-07-07). Empty for Earth/unknown tiers.
+static func hail(tier: int) -> String:
+	var epoch := get_epoch(tier)
+	return String(epoch.get("hail", "")) if not epoch.is_empty() else ""
+
+
+## The civilization's accent color: the contact card tints the civ name and hail with
+## it, so each contact reads visually distinct too. Navy (the default text color) for
+## Earth/unknown tiers.
+static func accent_color(tier: int) -> Color:
+	var epoch := get_epoch(tier)
+	if epoch.is_empty():
+		return Color("#1D2D50")  # UiPalette.NAVY, restated: core stays UI-import-free
+	return epoch.get("accent_color", Color("#1D2D50"))

@@ -55,7 +55,8 @@ func display_name() -> String:
 
 
 func how_to_play() -> String:
-	return "Watch the sequence, then tap it back."
+	return "Watch the tiles light up, then tap them back in the same order. " \
+		+ "Each round adds a step — the deeper you go, the more it pays."
 
 
 func begin(_tuning: TuningConfig) -> void:
@@ -66,6 +67,10 @@ func begin(_tuning: TuningConfig) -> void:
 	var intro := Label.new()
 	intro.text = how_to_play()
 	intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# AUTOWRAP is load-bearing: without it the label's MIN WIDTH is the full text width,
+	# which propagates up the containers and widens the whole card past the screen
+	# (see CatchMoneyMinigame — the same bug put its coins off-screen, Tim 2026-07-08).
+	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	intro.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
 	intro.add_theme_color_override("font_color", UiPalette.NAVY)
 

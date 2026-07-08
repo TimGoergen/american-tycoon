@@ -56,7 +56,10 @@ func display_name() -> String:
 
 
 func how_to_play() -> String:
-	return "Hold the arrows to keep the marker in the gold zone."
+	# Light copy touch only — this game is queued for the vertical single-input
+	# Stardew-fishing rework (work item 6), which will rewrite this line anyway.
+	return "Hold the arrows to steer the marker; score builds while it stays inside " \
+		+ "the drifting gold zone."
 
 
 func begin(tuning: TuningConfig) -> void:

@@ -81,7 +81,8 @@ func display_name() -> String:
 
 
 func how_to_play() -> String:
-	return "Tap LOCK when the marker hits the gold zone."
+	return "Tap LOCK as the sweeping marker crosses the gold zone — dead center pays " \
+		+ "best, and the zone shrinks after every hit."
 
 
 func begin(_tuning: TuningConfig) -> void:

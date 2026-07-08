@@ -179,7 +179,9 @@ func display_name() -> String:
 
 
 func how_to_play() -> String:
-	return "Pull the ball back and release to sling it through the hoop. Tap it any time — even mid-air — to freeze it and shoot again from there!"
+	return "Pull the ball back and release to sling it through the hoop — the hoop " \
+		+ "moves after every basket. Tap the ball any time, even mid-air, to freeze " \
+		+ "it and shoot again from there."
 
 
 ## Slingshot aiming and bouncing shots take a beat longer to line up than the tap-based types, so

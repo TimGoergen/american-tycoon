@@ -150,6 +150,16 @@ const SOLID_FLOW_RUSH_MULT := 1.6
 ## Whether the bar was pinned solid last frame — unpinning restarts the visible lap.
 var _was_pinned := false
 
+## The per-second rate this row's income label currently shows (rush-boosted while rush
+## is held; 0 for an unowned row's buy-in preview). Cached each _refresh; Main sums it
+## across rows for the hero panel's income headline (Tim, 2026-07-07).
+var _displayed_income_per_sec := 0.0
+
+
+## The per-second income rate currently displayed on this row (see above).
+func get_displayed_income_per_sec() -> float:
+	return _displayed_income_per_sec
+
 ## The portrait/rush button is a square sized to a fraction of the panel's full height, centered
 ## vertically (Tim, 2026-07-02): at 1.0 it filled the whole row; 0.9 trims it 10% so it no longer
 ## dominates the panel while staying a comfortably large tap target.
@@ -671,6 +681,16 @@ func _refresh(delta: float) -> void:
 		_income_label.text = Money.of(per_cycle / effective_length).display() + " / s"
 	else:
 		_income_label.text = "%s / %s" % [Money.of(per_cycle).display(), _format_cycle_duration(effective_length)]
+	# Cache the per-second equivalent of whatever the label just showed (rush-boosted
+	# while held) — Main sums these across rows for the hero panel's income headline
+	# (Tim, 2026-07-07), so the headline always equals the sum of the visible rows.
+	# Unowned rows show a buy-in PREVIEW, which is not income — they contribute 0.
+	if not owned or effective_length <= 0.0:
+		_displayed_income_per_sec = 0.0
+	elif rushed_fractions_per_second > 0.0:
+		_displayed_income_per_sec = per_cycle * rushed_fractions_per_second
+	else:
+		_displayed_income_per_sec = per_cycle / effective_length
 
 	# Smooth, constant-velocity cycle bar (see _displayed_cycle_fraction above). Measured
 	# against the EFFECTIVE (sped-up) cycle length so the bar still fills all the way to the

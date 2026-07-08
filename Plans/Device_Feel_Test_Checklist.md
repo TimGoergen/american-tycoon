@@ -204,6 +204,18 @@ priority raised by the §3 "epoch over too quickly" finding.
 Smaller per-game TWEAKs (basketball backboard + launch curve, memory scoring, match-3
 items, catch/timing polish) ride along when their game is touched.
 
+### Parked design ideas (2026-07-07, not yet scheduled)
+
+- **Epoch-tech currency:** a small grant of alien technology each time a NEW epoch is
+  reached, with very high impact on speed/income. Design WITH Epoch Depth Phase 2
+  (both rebuild the epoch-arrival moment). Identity guardrails: few-and-huge grants
+  (not another incremental shop), and scope it apart from Legacy — e.g. run/epoch-
+  scoped rocket fuel vs gems' permanent floor, or effects gems never touch.
+- **Rush limiter:** evaluate constraining rush (currently always-correct to hold) via
+  a cooldown reducible with Legacy gems. Lean toward a STAMINA METER (drain + refill,
+  gems extend tank/rate) over a hard lockout, so it reads as a resource to spend, not
+  a dead button. Prototype behind a tuning flag after the current economy items land.
+
 ---
 
 ## Untested-backlog ledger

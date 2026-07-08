@@ -95,10 +95,10 @@ middle doesn't drag on a focused pass before verdicting.*
       single property per post-Earth epoch, the shape is: save-up wall → brief burst →
       epoch over too quickly. The 4-property cohort design is the fix; its priority
       rises. (Save-up itself read as "a little time," not a hard wall.)
-- [ ] **Contact overlay / moment.** **TWEAK (2026-07-07, work item 2).** Underwhelming:
-      flavor text reads samey between civilizations, so the second contact doesn't feel
-      different from the first. Fix now: distinct per-civilization voice in the contact
-      lines (+ maybe a per-civ accent color); real art stays M3.
+- [ ] **Contact overlay / moment.** **FIX SHIPPED (work item 2, merged 2d4de8b; copy
+      approved by Tim 2026-07-08).** Each civ now SPEAKS: a typewritten hail in its own
+      voice + accent color, market pop, rewritten narrator capper. Re-judge the moment
+      at the next real contact on device; real art stays M3.
 - [ ] **Transition minigame rewards & framing.** **TWEAK (2026-07-07, work items 3+4).**
       Functionally good overall, but (a) nothing explains WHY a minigame plays at a
       transition — needs framing copy in the Get Ready gate; (b) reshape rewards:

@@ -71,6 +71,11 @@ func begin(_tuning: TuningConfig) -> void:
 	var intro := Label.new()
 	intro.text = how_to_play()
 	intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# AUTOWRAP is load-bearing: without it the label's MIN WIDTH is the full text width,
+	# which propagates up the containers — the text ran off the screen edge AND the play
+	# area widened past the visible card, so coins spawned off-screen (Tim, 2026-07-08,
+	# after the guidance lines grew).
+	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	intro.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
 	intro.add_theme_color_override("font_color", UiPalette.NAVY)
 

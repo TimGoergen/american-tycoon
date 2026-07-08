@@ -1069,7 +1069,7 @@ func _build_retention_entries() -> Array:
 		var cost := -1
 		var can_afford := false
 		if next_level <= best_levels:
-			cost = dynasty.staff_retention.cost_for_level(next_level)
+			cost = dynasty.staff_retention.cost_for_level(i, next_level)
 			can_afford = dynasty.upgrades.available >= cost
 		# Show the roster's face: the staffer of the deepest block the bloodline has
 		# reached, named by that block's absolute epoch on this property's ladder.

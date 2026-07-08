@@ -204,12 +204,16 @@ func _test_staff_retention(configs: Array, tuning: TuningConfig) -> void:
 		_check("retaining the next level succeeds", dynasty.buy_staff_retention(0))
 	_check("ATM retained levels == 3", dynasty.staff_retention.get_retained_levels(0) == 3)
 
-	# Each additional level costs more (the escalating path, mirroring the ladder).
+	# Each additional level costs more (the escalating path, mirroring the ladder), and
+	# a higher property's retention costs more than the same level on a lower one (the
+	# per-property term added in the 2026-07-07 repricing).
 	var expected_spend := 0
 	for level in range(1, 4):
-		expected_spend += dynasty.staff_retention.cost_for_level(level)
+		expected_spend += dynasty.staff_retention.cost_for_level(0, level)
 	_check("a deep level costs more Legacy than an early one",
-		dynasty.staff_retention.cost_for_level(30) > dynasty.staff_retention.cost_for_level(1))
+		dynasty.staff_retention.cost_for_level(0, 30) > dynasty.staff_retention.cost_for_level(0, 1))
+	_check("a higher property's retention costs more than a lower one's",
+		dynasty.staff_retention.cost_for_level(11, 1) > dynasty.staff_retention.cost_for_level(0, 1))
 	_check("Legacy wallet was charged the three levels' cost",
 		dynasty.upgrades.available == wallet_before - expected_spend)
 

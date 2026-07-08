@@ -116,6 +116,24 @@ extends Resource
 ## so absolute costs still trend up. Softened 1.6 -> 1.5 (Tim, 2026-07-02).
 @export var staff_level_cost_growth: float = 1.5  # feel-tune
 
+# --- Staff RETENTION pricing (the Estate Office "will your staff to the heir" buys) ---
+# Repriced 2026-07-07 after Tim's playtest: the old flat model (1 Legacy × 1.12^level,
+# no property term) made deep retention near-free at a 350-gem prestige and priced
+# retaining the ATM the same as retaining Executive Assets — a big part of why the
+# second prestige felt too big. Cost = base × property_step^property_index × growth^(level-1).
+
+## Legacy to retain the FIRST ladder level of the FIRST property (the ATM anchor).
+@export var retention_base_cost: float = 1.0  # feel-tune
+
+## Per-LEVEL geometric growth of retention cost within a property (was 1.12 — so flat
+## that levels 1-7 all cost 1 Legacy; 1.25 makes each further step a visible commitment).
+@export var retention_cost_growth: float = 1.25  # feel-tune
+
+## Per-PROPERTY geometric step: each higher property multiplies retention cost by this,
+## so protecting a top earner costs like a top earner (ATM ×1, Executive Assets
+## ×1.5^11 ≈ ×87). The missing term the playtest exposed.
+@export var retention_property_step: float = 1.5  # feel-tune
+
 ## Offline income efficiency vs. live play (0–1).
 @export var offline_efficiency: float = 0.5  # TBD-SIM
 

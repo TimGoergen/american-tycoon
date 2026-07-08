@@ -286,8 +286,13 @@ static func make_card_style() -> StyleBoxFlat:
 func _rebake_backdrop() -> void:
 	if _backdrop == null:
 		return
-	var target := Vector2i(int(_backdrop.size.x), int(_backdrop.size.y))
-	if target.x < 1 or target.y < 1 or target == _baked_backdrop_px:
+	var target := Vector2i(roundi(_backdrop.size.x), roundi(_backdrop.size.y))
+	if target.x < 1 or target.y < 1:
+		return
+	# TOLERANCE, not equality: float layout jitter can wobble the size across an integer
+	# boundary, alternating the rounded key every frame — which re-ran the bake every
+	# frame (the basketball lag trap, Tim 2026-07-08). A ≤1px mismatch is invisible.
+	if absi(target.x - _baked_backdrop_px.x) <= 1 and absi(target.y - _baked_backdrop_px.y) <= 1:
 		return
 	_baked_backdrop_px = target
 	var texture := bake_rounded_backdrop(target, UiPalette.SCREEN_CORNER_RADIUS)
@@ -299,18 +304,26 @@ func _rebake_backdrop() -> void:
 ## STRETCH_KEEP_ASPECT_COVERED), and round its four corners to `radius`. Returns a ready-to-assign
 ## texture, or null if the image can't be loaded. Static + shared so the minigame screen and the
 ## Minigame Tuning screen produce the identical rounded backdrop from one place.
+## The decompressed source image, cached after the first bake: load + decompress +
+## convert is the expensive front half of a bake, and it never changes between bakes.
+static var _backdrop_source: Image = null
+
+
 static func bake_rounded_backdrop(size: Vector2i, radius: int) -> ImageTexture:
 	if size.x < 1 or size.y < 1:
 		return null
-	var source: Texture2D = load(BACKGROUND_IMAGE)
-	if source == null:
-		return null
-	var image := source.get_image()
-	# Editing pixels needs an uncompressed RGBA image (the source PNG imports as RGB / possibly VRAM
-	# compressed); convert so we can crop, resize, and write transparent corners.
-	if image.is_compressed():
-		image.decompress()
-	image.convert(Image.FORMAT_RGBA8)
+	if _backdrop_source == null:
+		var source: Texture2D = load(BACKGROUND_IMAGE)
+		if source == null:
+			return null
+		# Editing pixels needs an uncompressed RGBA image (the source PNG imports as RGB /
+		# possibly VRAM compressed); convert so we can crop, resize, and write corners.
+		_backdrop_source = source.get_image()
+		if _backdrop_source.is_compressed():
+			_backdrop_source.decompress()
+		_backdrop_source.convert(Image.FORMAT_RGBA8)
+	# Work on a copy — resize/crop mutate, and the pristine source is the cache.
+	var image := _backdrop_source.duplicate() as Image
 
 	# Scale to COVER the target rect (fill fully, crop the overflow), then center-crop to size.
 	var cover := maxf(float(size.x) / image.get_width(), float(size.y) / image.get_height())

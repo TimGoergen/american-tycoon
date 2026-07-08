@@ -655,7 +655,19 @@ func _refresh(delta: float) -> void:
 	# "<=" so a cycle of EXACTLY one second also reads as the per-second rate " / s" —
 	# per-cycle and per-second are the same number at 1s, and "$X / 1s" read as a defect
 	# (Tim, 2026-07-03: a per-second rate says "/ s", never "/ 1s").
-	if effective_length > 0.0 and effective_length <= PER_SECOND_READOUT_THRESHOLD_SEC:
+	#
+	# While rush is HELD the readout instead quotes the effective rate the rush is
+	# actually producing (Tim, 2026-07-07 — rushing changed no number on screen):
+	# per-cycle income × the computed cycle-under-rush completion rate. The same rate
+	# feeds the solid-bar rule below, so the number and the bar always agree.
+	var rush_held := _manager_circle.is_held() and _prop.units_owned > 0
+	var rushed_fractions_per_second := 0.0
+	if rush_held and _prop.is_cycle_running and effective_length > 0.0:
+		rushed_fractions_per_second = 1.0 / effective_length \
+				+ _prop.tuning.hold_rush_per_second * _prop.tuning.rush_pct * _prop.rush_power_multiplier
+	if rushed_fractions_per_second > 0.0:
+		_income_label.text = Money.of(per_cycle * rushed_fractions_per_second).display() + " / s"
+	elif effective_length > 0.0 and effective_length <= PER_SECOND_READOUT_THRESHOLD_SEC:
 		_income_label.text = Money.of(per_cycle / effective_length).display() + " / s"
 	else:
 		_income_label.text = "%s / %s" % [Money.of(per_cycle).display(), _format_cycle_duration(effective_length)]
@@ -672,15 +684,10 @@ func _refresh(delta: float) -> void:
 	# rule that could stick and unstick unpredictably): the bar is solid exactly when the
 	# CURRENT completion time is too short to watch. Not rushing, that's the effective
 	# cycle length (bar_is_solid). While rush is HELD, it's the computed cycle-under-rush
-	# time: natural progress plus hold_rush_per_second pulses each advancing rush_pct
-	# (× the Strong-Arm rush-power upgrade) of the cycle. In any other circumstance the
-	# bar animates normally.
-	var rush_held := _manager_circle.is_held() and _prop.units_owned > 0
-	var rushed_solid := false
-	if rush_held and _prop.is_cycle_running and effective_length > 0.0:
-		var fractions_per_second := 1.0 / effective_length \
-				+ _prop.tuning.hold_rush_per_second * _prop.tuning.rush_pct * _prop.rush_power_multiplier
-		rushed_solid = 1.0 / fractions_per_second <= RUSHED_SOLID_THRESHOLD_SEC
+	# time (rushed_fractions_per_second, computed with the income readout above). In any
+	# other circumstance the bar animates normally.
+	var rushed_solid := rushed_fractions_per_second > 0.0 \
+			and 1.0 / rushed_fractions_per_second <= RUSHED_SOLID_THRESHOLD_SEC
 	var pinned := bar_is_solid or rushed_solid
 	if _was_pinned and not pinned:
 		# Unpinning (rush released, usually): restart the visible lap from empty and let

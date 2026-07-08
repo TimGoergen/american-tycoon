@@ -75,11 +75,10 @@ once) — the active-player reading, which is the design's target.*
       progression constant through Earth; slowdown arrives only at the last Earth
       property — which reads as the prestige invitation, not drag. Run 2's Earth was
       materially faster in a good way.
-- [ ] **Legacy / prestige payoff.** **SPLIT (2026-07-07):** first prestige (~60 gems
-      into cycle/income upgrades) KEEP — "doesn't look like much but feels like an
-      acceleration." Second prestige (350+) felt TOO BIG — root cause is retention
-      pricing (work item 1 below), not the payout curve; re-judge the 60→350 rate and
-      Estate Office choice pressure after the repricing lands.
+- [x] ~~**Legacy / prestige payoff.**~~ **KEEP (2026-07-07).** First prestige KEEP
+      ("feels like an acceleration"); the too-big second prestige was retention
+      pricing, fixed by work item 1 (per-property cost term, merged dd3e4ff) and
+      device-verified. Knobs (retention_*) live in Balance Tuning for future nudging.
 - [x] ~~**Staff level-up ROI.**~~ **KEEP at the frontier (2026-07-07).** Good value on
       current properties. Design note (not a TWEAK): trailing-property staff become
       dead value (maxing the ATM at millions/s income) — genre-normal; revisit only if

@@ -670,7 +670,12 @@ func _refresh(delta: float) -> void:
 	# actually producing (Tim, 2026-07-07 — rushing changed no number on screen):
 	# per-cycle income × the computed cycle-under-rush completion rate. The same rate
 	# feeds the solid-bar rule below, so the number and the bar always agree.
-	var rush_held := _manager_circle.is_held() and _prop.units_owned > 0
+	# Held by EITHER path: the primary finger on the portrait Button, or a secondary
+	# finger via the raw-touch handler (Tim, 2026-07-07 — rushing two properties at once
+	# left the secondary one with the calm color/rate: it pumped, but this flag only
+	# looked at the Button, so a rushed row didn't always present as rushing).
+	var rush_held := (_manager_circle.is_held() or _secondary_held("rush")) \
+			and _prop.units_owned > 0
 	var rushed_fractions_per_second := 0.0
 	if rush_held and _prop.is_cycle_running and effective_length > 0.0:
 		rushed_fractions_per_second = 1.0 / effective_length \

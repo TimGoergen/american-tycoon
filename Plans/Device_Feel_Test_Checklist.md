@@ -120,9 +120,12 @@ performance item at the end of this section before feel-verdicting anything here
 
 *Per-game verdicts from the 2026-07-07 debrief ("overall I like them"):*
 
-- [ ] **Match-3** — **KEEP w/ TWEAKs:** good; wants element resizing, art, a tweak to
-      the gem-avoidance effect (Tim to specify the current behavior when built), and
-      guidance/context copy.
+- [ ] **Match-3** — **KEEP w/ TWEAKs:** good; wants element resizing, art, and
+      guidance/context copy. **Avoid-gem clarified (2026-07-07):** the numbers are fine
+      (clean ×1.15 / avoid-match ×0.40) but there's no per-match feedback — a docked
+      match flashes identically to a clean one, so the −60% is imperceptible. Fix =
+      distinct match feedback: red flash + docked score float on avoid matches, normal
+      "+N" float on clean ones (make the impact visible, not bigger).
 - [ ] **Basketball** — **KEEP w/ TWEAKs:** really good; add a backboard, and the launch
       strength isn't linear — it ramps too strong too fast (remap drag distance →
       force).

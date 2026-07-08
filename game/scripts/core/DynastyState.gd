@@ -62,6 +62,7 @@ func _init(property_configs: Array, p_tuning: TuningConfig) -> void:
 	tuning = p_tuning
 	upgrades = LegacyUpgrades.new()
 	staff_retention = StaffRetention.new()
+	_configure_retention_pricing()
 	current = _new_generation()
 
 
@@ -100,12 +101,22 @@ func buy_staff_retention(property_index: int) -> bool:
 	var bloodline_best := maxi(prop.staff_level, staff_retention.get_ladder_high(property_index))
 	if next_level > bloodline_best:
 		return false
-	var cost := staff_retention.cost_for_level(next_level)
+	var cost := staff_retention.cost_for_level(property_index, next_level)
 	if upgrades.available < cost:
 		return false
 	upgrades.available -= cost
 	staff_retention.set_retained_levels(property_index, next_level)
 	return true
+
+
+## Copy the retention pricing knobs from tuning into the (tuning-free) StaffRetention.
+## Called on construction and again on load, since load rebuilds the object.
+func _configure_retention_pricing() -> void:
+	staff_retention.configure(
+		tuning.retention_base_cost,
+		tuning.retention_cost_growth,
+		tuning.retention_property_step
+	)
 
 
 # ---------------------------------------------------------------------------
@@ -312,6 +323,7 @@ func load_save_dict(data: Dictionary) -> void:
 
 	# Per-staffer retention (GDD §6.3); pre-retention saves default to nothing retained.
 	staff_retention = StaffRetention.new()
+	_configure_retention_pricing()
 	if data.has("staff_retention"):
 		staff_retention.load_save_dict(data["staff_retention"])
 

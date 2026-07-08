@@ -27,14 +27,23 @@ var retained_levels: Dictionary = {}
 ## each life's ladder here at succession; during a life the live ladder counts too.
 var ladder_highs: Dictionary = {}
 
-# Cost model (first-pass — meant for on-device feel-tuning, not final balance).
-# Legacy is a small-scale currency, so the first retained levels cost a single point
-# and each further level grows a gentle 12%: the whole Earth block retains for ~70
-# Legacy, while willing deep alien-tech levels is a real dynastic investment. The
-# strictly-rising per-level cost is what keeps deep retention a meaningful choice —
-# the same escalating-path shape as the dollar ladder itself.
-const BASE_COST := 1.0      # Legacy to retain a property's first ladder level
-const COST_GROWTH := 1.12   # each additional retained level costs the previous × this
+# Cost model: base × property_step^property_index × growth^(level-1). Repriced
+# 2026-07-07 (Tim's playtest): the old flat model (1 × 1.12^level, no property term)
+# priced the ATM's staff like Executive Assets' and made deep retention near-free at a
+# 350-gem prestige. Now protecting a top earner costs like a top earner, and each
+# further level is a visible commitment. The three knobs live in TuningConfig
+# (retention_*) so they are editable from the Balance Tuning screen; DynastyState
+# copies them in via configure() — this class stays scene-free and tuning-free.
+var base_cost := 1.0        # Legacy for the FIRST property's FIRST level
+var cost_growth := 1.25     # each additional level costs the previous × this
+var property_step := 1.5    # each higher property multiplies cost by this
+
+
+## Copy the pricing knobs from tuning (called by DynastyState on construction and load).
+func configure(p_base_cost: float, p_cost_growth: float, p_property_step: float) -> void:
+	base_cost = p_base_cost
+	cost_growth = p_cost_growth
+	property_step = p_property_step
 
 
 ## The retained ladder-level count for a property (0 if nothing is retained yet).
@@ -47,14 +56,18 @@ func next_retention_level(property_index: int) -> int:
 	return get_retained_levels(property_index) + 1
 
 
-## Legacy cost to retain a property's Nth ladder level (the geometric curve above).
-## Level 1 costs BASE_COST; each further level multiplies by COST_GROWTH, rounded up
-## so the price always rises by at least a whole point eventually. Returns 0 for an
-## invalid level so callers never charge a bogus price.
-func cost_for_level(level: int) -> int:
-	if level < 1:
+## Legacy cost to retain a property's Nth ladder level (the two-term geometric curve
+## above): the property term prices WHICH staff is being protected, the level term
+## prices HOW DEEP. Rounded up so the price always rises by at least a whole point
+## eventually. Returns 0 for an invalid level so callers never charge a bogus price.
+func cost_for_level(property_index: int, level: int) -> int:
+	if level < 1 or property_index < 0:
 		return 0
-	return int(ceil(BASE_COST * pow(COST_GROWTH, float(level - 1))))
+	return int(ceil(
+		base_cost
+		* pow(property_step, float(property_index))
+		* pow(cost_growth, float(level - 1))
+	))
 
 
 ## Record a property's retained level count directly (used by the buy path and on load).

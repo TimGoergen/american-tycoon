@@ -67,29 +67,48 @@ notes ("tier 7, ~$40M, 8 min with nothing to buy" is actionable; "feels slow" is
 *Status (2026-07-06): touched this pass and feeling good provisionally, but needs a
 focused pass to confirm the MID-GAME stretch doesn't drag before any item is verdicted.*
 
-- [ ] **Milestone cadence** (25/50/100/200/300/400, ~38% slower economy). Does
-      progress feel earned or grindy in the early-to-mid game?
-- [ ] **Legacy / prestige payoff.** The retune (`pow .30` gentle power curve) is the
-      open trajectory-gap item. Does a *better* run visibly pay off at succession,
-      or does prestige feel flat? This is the highest-stakes feel question after the
-      core loop.
-- [ ] **Staff level-up ROI** (`e7e447d`). Bigger income step, cheaper levels. Does
-      leveling a staffer feel like a live, tempting sink, or an afterthought?
-- [ ] **Cumulative staff ladder** (`6dcce4c`, 0..20×epoch). Does the single
-      persistent track read clearly as continuous progress?
+*Full-session debrief 2026-07-07: three epochs reached across three runs, two
+successions. Caveat on all §2 verdicts: Tim plays rush-heavy (often two properties at
+once) — the active-player reading, which is the design's target.*
+
+- [x] ~~**Milestone cadence.**~~ **KEEP (2026-07-07).** First staff in ~2 min,
+      progression constant through Earth; slowdown arrives only at the last Earth
+      property — which reads as the prestige invitation, not drag. Run 2's Earth was
+      materially faster in a good way.
+- [ ] **Legacy / prestige payoff.** **SPLIT (2026-07-07):** first prestige (~60 gems
+      into cycle/income upgrades) KEEP — "doesn't look like much but feels like an
+      acceleration." Second prestige (350+) felt TOO BIG — root cause is retention
+      pricing (work item 1 below), not the payout curve; re-judge the 60→350 rate and
+      Estate Office choice pressure after the repricing lands.
+- [x] ~~**Staff level-up ROI.**~~ **KEEP at the frontier (2026-07-07).** Good value on
+      current properties. Design note (not a TWEAK): trailing-property staff become
+      dead value (maxing the ATM at millions/s income) — genre-normal; revisit only if
+      the UI seems to pressure those buys.
+- [x] ~~**Cumulative staff ladder.**~~ **KEEP (2026-07-07).** Levels and block
+      boundaries read clearly across epochs.
 
 ## 3. First Contact / alien epoch
 
 *Status (2026-07-06): touched this pass, seems good — same caveat as §2: confirm the
 middle doesn't drag on a focused pass before verdicting.*
 
-- [ ] **The leap.** Property carries the epoch jump; entry cost is an 8× save-up
-      premium. Does the first alien-property purchase feel like a big, deliberate
-      moment, or a wall?
-- [ ] **Upside-only reward minigame.** No starting units; 3-bucket property bonus.
-      Does "upside only" read as a reward, or as confusing (no downside to grasp)?
-- [ ] **Alien scale** (30×/tier magnitudes, automation-only staff). Do the numbers
-      feel appropriately alien-scale without becoming meaningless?
+- [ ] **The leap.** **TWEAK (2026-07-07) — confirms Epoch_Depth_Pass Phase 2.** With a
+      single property per post-Earth epoch, the shape is: save-up wall → brief burst →
+      epoch over too quickly. The 4-property cohort design is the fix; its priority
+      rises. (Save-up itself read as "a little time," not a hard wall.)
+- [ ] **Contact overlay / moment.** **TWEAK (2026-07-07, work item 2).** Underwhelming:
+      flavor text reads samey between civilizations, so the second contact doesn't feel
+      different from the first. Fix now: distinct per-civilization voice in the contact
+      lines (+ maybe a per-civ accent color); real art stays M3.
+- [ ] **Transition minigame rewards & framing.** **TWEAK (2026-07-07, work items 3+4).**
+      Functionally good overall, but (a) nothing explains WHY a minigame plays at a
+      transition — needs framing copy in the Get Ready gate; (b) reshape rewards:
+      standard play = neutral 1.0, modest downside for bad play, modest upside for
+      great play; skip/opt-out must land exactly at 1.0. (Replaces the old keep_floor
+      0.5 model where a bad/skipped round cost half the inheritance.)
+- [x] ~~**Alien scale.**~~ **KEEP (2026-07-07).** Fully legible at 900× Earth; the
+      magnitude *feeling* is mild-but-present — art/style (M3) and Phase 2 cohorts are
+      expected to carry the "different world" sensation.
 
 ## 4. Minigames (host + 6 games)
 
@@ -99,18 +118,27 @@ the score→Legacy mapping *feels* fair in both directions.
 *Status (2026-07-06): touched this pass, seems good provisionally — but see the NEW
 performance item at the end of this section before feel-verdicting anything here.*
 
-- [ ] **Get Ready gate** — does showing goal + stakes up front land, or add friction?
-- [ ] **Match-3** — swap/clear/fall animation feel; is "perfect = 200 cleared"
-      reachable-but-hard?
-- [ ] **Timing bar** — gold-zone lock feel.
-- [ ] **Basketball** — the big rework (force-wedge aim, stronger pull, roomier
-      board). Does aiming feel good on a touch screen?
-- [ ] **Catch money / Balance / Memory** — each feels distinct and fair.
-- [ ] **Challenge mode** — endless free play + per-game high scores. Is it a fun
-      side-mode or a dead toggle?
-- [ ] **Result screen** — spectrum bar (red→gold→green→teal) + Legacy-with-bonus
-      readout. Does a bad/skipped result clearly communicate the Legacy *lost*?
-      (This is deliberately not upside-only — confirm that reads as intended.)
+*Per-game verdicts from the 2026-07-07 debrief ("overall I like them"):*
+
+- [ ] **Match-3** — **KEEP w/ TWEAKs:** good; wants element resizing, art, a tweak to
+      the gem-avoidance effect (Tim to specify the current behavior when built), and
+      guidance/context copy.
+- [ ] **Basketball** — **KEEP w/ TWEAKs:** really good; add a backboard, and the launch
+      strength isn't linear — it ramps too strong too fast (remap drag distance →
+      force).
+- [ ] **Catch money** — **KEEP:** simple but serviceable; needs art + copy (polish
+      pass, not mechanics).
+- [ ] **Timing bar** — **KEEP:** serviceable; needs polish (same class as Catch).
+- [ ] **Memory** — **TWEAK:** works, but the time limit makes a good score feel out of
+      the player's control — rethink scoring (accuracy/moves rather than raw time?).
+- [ ] **Balance the books** — **REWORK (work item 6):** doesn't work and lags. Redesign
+      as VERTICAL, single-input, Stardew-fishing-style: hold to raise the marker,
+      gravity pulls it down, keep it inside a drifting target zone to bank score.
+- [ ] **Get Ready gate** — not separately verdicted; gains the work-item-3 framing copy
+      ("why the heir plays this"), re-judge after.
+- [ ] **Challenge mode** — not separately verdicted this session.
+- [ ] **Result screen** — re-judge after the work-item-4 reward reshape (the "Legacy
+      lost" framing changes when standard play becomes neutral).
 - [x] ~~**Minigame screen performance (2026-07-06).**~~ **FIXED, device-verified
       (Tim, 2026-07-07: "totally fixed").** Root cause: the whole game screen kept
       drawing at 60fps beneath the opaque modal (economy-freezing modals now hide the
@@ -132,12 +160,39 @@ worth it. Check on the actual Pixel, at arm's length.
 - [ ] **Themed minigame backdrops + 70% cards.** Legible, or busy?
 - [x] ~~**Estate Planning / Family Ledger embedded tabs**~~ **KEEP (2026-07-06).**
       Both read cleanly and refresh correctly.
-- [ ] **NEW — Carbonation + liquid polish batch (2026-07-06, `feature/addl-ui-polish`).**
-      Smooth single-sine sway w/ per-bubble amplitude+lane, trait hash, polyline trails,
-      liquid shading, 3× slow-bar speed cap, ladder edge fade (strip-aware), full-width
-      tab pages, +30% economy bar, cycle-bar finishing lap. **Verdict on the game tab:
-      looks and works great (KEEP-leaning).** Held open for: minigame-screen lag (§4
-      NEW item) and the rush-bar TWEAK (§1).
+- [x] ~~**Carbonation + liquid polish batch (2026-07-06).**~~ **KEEP (2026-07-07).**
+      Both holds released: minigame lag fixed and the rush-bar rule verdicted KEEP.
+      One follow-up spun out: rush should agitate the carbonation more (work item 5).
+
+---
+
+## Work queue from the 2026-07-07 full-session debrief
+
+In build order (1–5 small/medium, then the big one):
+
+1. **Retention repricing** — add a per-property cost term (cost scales with property
+   index) and steepen per-level growth; move BASE/GROWTH/STEP into TuningConfig so
+   they're live-tunable from Balance Tuning. Root cause of "second prestige too big."
+2. **Contact-moment differentiation** — distinct per-civilization voice in each
+   `contact_line` (source: docs/alien_civilizations.md), optional per-civ accent color
+   on the overlay. Art itself stays M3.
+3. **Transition framing copy** — Get Ready gate explains WHY the minigame plays (the
+   heir proving themselves at succession; risking the pile on welcome-back).
+4. **Reward curve reshape** — standard performance = neutral 1.0 (flat middle band),
+   modest downside floor for bad play, modest upside for great play; skip/opt-out
+   exactly 1.0; all band numbers in TuningConfig.
+5. **Rush excitement package** — a single 0–1 "excitement" knob on GoldBubbles scaling
+   density + flow + sway variety (+ maybe trails, a rush-scoped secondary wobble);
+   rows drive it to 1.0 while rush is held.
+6. **Balance the books REWORK** — vertical, single-input, Stardew-fishing mechanic
+   (hold to raise, gravity pulls down, bank score while inside the drifting zone);
+   also clears its lag.
+
+**Big build behind them: Epoch_Depth_Pass Phase 2** (4-property cohorts per epoch) —
+priority raised by the §3 "epoch over too quickly" finding.
+
+Smaller per-game TWEAKs (basketball backboard + launch curve, memory scoring, match-3
+items, catch/timing polish) ride along when their game is touched.
 
 ---
 

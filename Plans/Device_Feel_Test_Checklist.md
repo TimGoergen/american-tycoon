@@ -214,7 +214,10 @@ items, catch/timing polish) ride along when their game is touched.
 - **Rush limiter:** evaluate constraining rush (currently always-correct to hold) via
   a cooldown reducible with Legacy gems. Lean toward a STAMINA METER (drain + refill,
   gems extend tank/rate) over a hard lockout, so it reads as a resource to spend, not
-  a dead button. Prototype behind a tuning flag after the current economy items land.
+  a dead button. **Envisioned PER PROPERTY (Tim, 2026-07-07):** each property's crew
+  tires independently, so constant rushing becomes a rotation across the ladder —
+  rewarding active two-handed play instead of parking on one button. Prototype behind
+  a tuning flag after the current economy items land.
 
 ---
 

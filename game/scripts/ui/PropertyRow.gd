@@ -788,8 +788,13 @@ func _refresh(delta: float) -> void:
 		# bar just reads as "maxed and humming".
 		_displayed_cycle_fraction = minf(_displayed_cycle_fraction + delta * PIN_FILL_PER_SEC, 1.0)
 		_finish_lap_pending = false
-	elif not _prop.is_cycle_running or _prop.units_owned == 0:
+	elif (not _prop.is_cycle_running and not rush_engaged) or _prop.units_owned == 0:
 		# Idle or empty: nothing is advancing, so just mirror the true value exactly.
+		# An ENGAGED rush is never idle: an unstaffed cycle stops for a few frames at
+		# every payout until the next pulse restarts it, and routing those frames here
+		# hard-reset the eased sweep to natural — so the "constant" rushed sweep was
+		# actually a sawtooth re-accelerating from scratch every lap (caught red-handed
+		# by Tim's debug-overlay data, 2026-07-08: swp cycled 17→283 within each lap).
 		_displayed_cycle_fraction = true_fraction
 		_finish_lap_pending = false
 		# Park the eased sweep at the natural rate so a later start doesn't inherit

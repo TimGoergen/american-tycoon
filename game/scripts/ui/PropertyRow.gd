@@ -757,11 +757,17 @@ func _refresh(delta: float) -> void:
 		# While a lap is owed, the chase target sits one full bar ahead of the true
 		# progress: the bar fills through 1.0, then wraps onto the new cycle below.
 		var target := true_fraction + (1.0 if _finish_lap_pending else 0.0)
-		# Running: advance at the real fill rate. If the target has jumped ahead of that
-		# prediction — a rush, or several per second while the rush button is held —
-		# ease the bar UP toward it instead of snapping, so a held rush reads as smooth
-		# acceleration rather than a stutter of discrete jumps.
-		var advanced := _displayed_cycle_fraction + delta / effective_length
+		# Running: advance at the real fill rate — the DETERMINISTIC rushed rate while
+		# rush is held (the same number the income readout shows). The old natural-rate-
+		# plus-catch-up chase made a held rush sweep in a surge-and-crawl per lap, and
+		# since the bubble field rides the fill, those surges read as frenzy bursts at
+		# the hold's edges no matter how constant the bubbles themselves were (Tim,
+		# 2026-07-08). One constant sweep speed = one constant frenzy. The catch-up
+		# easing below still handles single rush taps and the initial engage.
+		var advance_rate := 1.0 / effective_length
+		if rushed_fractions_per_second > 0.0:
+			advance_rate = rushed_fractions_per_second
+		var advanced := _displayed_cycle_fraction + delta * advance_rate
 		if target > advanced:
 			var catchup := 1.0 - exp(-delta / RUSH_CATCHUP_TAU)
 			_displayed_cycle_fraction = lerpf(advanced, target, catchup)

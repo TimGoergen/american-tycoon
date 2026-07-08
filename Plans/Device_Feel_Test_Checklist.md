@@ -118,7 +118,9 @@ the score→Legacy mapping *feels* fair in both directions.
 *Status (2026-07-06): touched this pass, seems good provisionally — but see the NEW
 performance item at the end of this section before feel-verdicting anything here.*
 
-*Per-game verdicts from the 2026-07-07 debrief ("overall I like them"):*
+*Per-game verdicts from the 2026-07-07 debrief ("overall I like them"). Blanket note:
+the art / polish / copy needs called out below apply to ALL six games — copy/guidance
+can land now (rides work item 3's framing pass); real art stays M3.*
 
 - [ ] **Match-3** — **KEEP w/ TWEAKs:** good; wants element resizing, art, and
       guidance/context copy. **Avoid-gem clarified (2026-07-07):** the numbers are fine
@@ -126,6 +128,11 @@ performance item at the end of this section before feel-verdicting anything here
       match flashes identically to a clean one, so the −60% is imperceptible. Fix =
       distinct match feedback: red flash + docked score float on avoid matches, normal
       "+N" float on clean ones (make the impact visible, not bigger).
+      **TOO EASY (2026-07-07):** Tim (a match-3 fan) maxes the score almost every
+      round — the skill ceiling must be real once work item 4 makes great play the only
+      upside, or the bonus is effectively flat. Levers to feel-tune (land WITH item 4):
+      perfect threshold up from 200, tighter clock, or +1 gem color; put the threshold
+      in TuningConfig.
 - [ ] **Basketball** — **KEEP w/ TWEAKs:** really good; add a backboard, and the launch
       strength isn't linear — it ramps too strong too fast (remap drag distance →
       force).

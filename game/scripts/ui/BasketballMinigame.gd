@@ -163,6 +163,8 @@ var _play: Control
 ## through the rim).
 var _board_bg: ImageTexture
 var _board_bg_px: Vector2i = Vector2i.ZERO
+## The gym image decompressed once — rebakes duplicate this instead of re-loading.
+var _board_source: Image = null
 ## The board's black rounded outline, built once and reused — it was being allocated
 ## fresh inside the draw pass every frame (minigame lag pass, Tim 2026-07-06).
 var _board_border: StyleBoxFlat
@@ -627,19 +629,29 @@ func _draw_play() -> void:
 ## changes. We CPU-bake (rather than clip_children) because the project supports only one clip
 ## stencil at a time and Main already owns it (see MinigameScreen for the full note).
 func _ensure_board_bg(size: Vector2) -> void:
-	# Integer-pixel cache key — see _board_bg_px for why a float compare was a per-frame
-	# lag disaster here.
-	var target := Vector2i(int(size.x), int(size.y))
-	if target.x < 1 or target.y < 1 or (_board_bg != null and target == _board_bg_px):
+	var target := Vector2i(roundi(size.x), roundi(size.y))
+	if target.x < 1 or target.y < 1:
+		return
+	# TOLERANCE, not equality — see _board_bg_px. The first integer-key fix still
+	# thrashed when float jitter wobbled the size ACROSS an integer boundary
+	# (719.999 ↔ 720.001 alternates the key every frame): basketball lagged again
+	# (Tim, 2026-07-08). A ≤1px mismatch is invisible — the texture is drawn
+	# stretched to the board rect regardless.
+	if _board_bg != null \
+			and absi(target.x - _board_bg_px.x) <= 1 and absi(target.y - _board_bg_px.y) <= 1:
 		return
 	_board_bg_px = target
-	var source: Texture2D = load(BOARD_IMAGE)
-	if source == null:
-		return
-	var image := source.get_image()
-	if image.is_compressed():
-		image.decompress()
-	image.convert(Image.FORMAT_RGBA8)
+	# The decompressed source is cached after the first bake — load + decompress +
+	# convert never changes, so a legitimate rebake only pays for resize + crop.
+	if _board_source == null:
+		var source: Texture2D = load(BOARD_IMAGE)
+		if source == null:
+			return
+		_board_source = source.get_image()
+		if _board_source.is_compressed():
+			_board_source.decompress()
+		_board_source.convert(Image.FORMAT_RGBA8)
+	var image := _board_source.duplicate() as Image
 	# Scale to COVER the board (fill fully, crop the overflow), then center-crop to size.
 	var cover := maxf(float(target.x) / image.get_width(), float(target.y) / image.get_height())
 	image.resize(

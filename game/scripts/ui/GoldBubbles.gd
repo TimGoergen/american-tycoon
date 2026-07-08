@@ -157,18 +157,19 @@ var excitement := 0.0
 var _excitement_level := 0.0
 const EXCITEMENT_EASE_TAU := 0.25
 const EXCITED_DENSITY_BOOST := 0.5      # +50% crowd at full excitement
-const EXCITED_FLOOR_PX := 40.0          # the 14 px idle-drift floor rises to this
-## The measured-flow cap rises to this at full excitement — deliberately still BELOW
-## the commanded solid-bar speeds (110 / 176), preserving the governed speed ladder.
-const EXCITED_MEASURED_CAP_PX := 100.0
+## The COMMANDED flow while agitated. Excitement bypasses the measured fill speed
+## entirely (blended in by the eased level): the measured path ramps at every press
+## and release, and since the chaos CHARACTER depends on speed (slow bubbles coil
+## their tails into squiggles, fast ones stretch them straight), those ramps made the
+## frenzy look twice as wild at the edges as in the sustained middle (Tim, 2026-07-08:
+## the frenzy must be CONSTANT from start to end). Still below the solid-bar speeds
+## (110 / 176), preserving the governed ladder.
+const EXCITED_FLOW_PX := 90.0
 const EXCITED_SWAY_HZ_BOOST := 0.45     # sway rates run up to this much faster
-## The agitation wobble's amplitude at the excited FLOOR speed; it scales UP with the
-## flow (see _bubble_point) because a fixed few pixels of jiggle is invisible inside
-## 100 px/s of streaming — which made the frenzy look like it "calmed down" the moment
-## the flow reached full speed (Tim, 2026-07-08: chaos must scale with speed).
-const EXCITED_WOBBLE_PX := 3.0
+## The agitation wobble: sized to stay visible inside EXCITED_FLOW_PX of streaming
+## (3px vanished under the motion). Constant while excited, like everything else.
+const EXCITED_WOBBLE_PX := 7.0
 const EXCITED_WOBBLE_HZ := 2.3
-const EXCITED_WOBBLE_SPEED_SCALE_MAX := 3.0  # wobble amplitude cap: ×3 at high flow
 ## While excited, the per-bubble speed spread's LOWER bound drops to this, so the crowd
 ## is a chaotic mix of crawlers and streakers instead of a uniform stream — sustained
 ## chaos that reads at any flow speed. The UPPER bound is untouched: the fastest
@@ -276,13 +277,16 @@ func _process(delta: float) -> void:
 	# The bar's own speed, floored so still bars keep fizzing and CAPPED below the
 	# commanded solid-bar speeds (see MEASURED_FLOW_CAP_PX) — unless the host commanded
 	# a flow directly (flow_override_px), which is exempt: those ARE the top rungs.
-	# Excitement raises both the floor and the cap (still under the solid speeds).
+	# Excitement BLENDS toward its own commanded flow (see EXCITED_FLOW_PX): at full
+	# agitation the speed is a constant, immune to the measured ramps and catch-up
+	# spikes at a hold's edges, so the frenzy looks the same from engage to release.
 	if flow_override_px >= 0.0:
 		_base_speed_px = flow_override_px
 	else:
-		var floor_px := lerpf(MIN_DRIFT_PX_PER_SEC, EXCITED_FLOOR_PX, _excitement_level)
-		var cap_px := lerpf(MEASURED_FLOW_CAP_PX, EXCITED_MEASURED_CAP_PX, _excitement_level)
-		_base_speed_px = clampf(_smoothed_speed_px * SPEED_VS_BAR, floor_px, cap_px)
+		var measured := clampf(
+			_smoothed_speed_px * SPEED_VS_BAR, MIN_DRIFT_PX_PER_SEC, MEASURED_FLOW_CAP_PX
+		)
+		_base_speed_px = lerpf(measured, EXCITED_FLOW_PX, _excitement_level)
 
 	# How close the bar is to a crawl: 1.0 at (or below) the idle-drift floor, fading to
 	# 0.0 as the bar speeds up. Widens the per-bubble speed range on slow bars (see the
@@ -414,13 +418,10 @@ func _bubble_point(index: int, radius: float, filled_width: float, seconds_ago: 
 	var sway := sin(at_time * TAU * sway_hz + phase) * size.y * sway_fraction
 	# The lane: -1..+1 from the hash, scaled to the offset limit.
 	var lane := (_variant(index, 0.91) * 2.0 - 1.0) * size.y * LANE_OFFSET_FRACTION
-	# The agitation wobble: horizontal churn that scales with excitement AND with the
-	# flow speed — fixed-size jiggle disappears inside fast streaming, so the amplitude
-	# grows with the liquid's speed (capped) to stay visible at full flow.
-	var wobble_amp := EXCITED_WOBBLE_PX \
-			* clampf(_base_speed_px / EXCITED_FLOOR_PX, 1.0, EXCITED_WOBBLE_SPEED_SCALE_MAX)
+	# The agitation wobble: horizontal churn, scaled purely by the eased excitement —
+	# the flow itself is a constant while excited, so the whole look holds steady.
 	var wobble := sin(at_time * TAU * EXCITED_WOBBLE_HZ + phase * 3.0) \
-			* wobble_amp * _excitement_level
+			* EXCITED_WOBBLE_PX * _excitement_level
 	# Map the normalized position into the filled region, rolled back along the drift —
 	# backward is rightward when the flow is reversed. NOT clamped here: the head clamps
 	# itself in _draw, while out-of-fill tail samples are dropped by the caller (clamping

@@ -13,15 +13,16 @@ extends Control
 #   ghost.setup(scroll)
 #   host.add_child(ghost)
 
-## Handle geometry: a slim rounded pill hugging the right edge.
-const HANDLE_WIDTH := 10.0
+## Handle geometry: a rounded pill hugging the right edge. Widened 10 → 16 and made
+## less transparent 0.45 → 0.6 — the first pass was hard to see (Tim, 2026-07-08).
+const HANDLE_WIDTH := 16.0
 const HANDLE_MIN_HEIGHT := 48.0  # never shrinks into an unreadable speck on long lists
 const EDGE_INSET := 4.0          # gap between the handle and the area's right edge
-const CORNER_RADIUS := 5         # half the width — full pill ends
+const CORNER_RADIUS := 8         # half the width — full pill ends
 
 ## Visibility envelope: fully visible while scrolling and for HOLD_SECONDS after the
 ## last movement, then fading out over FADE_SECONDS.
-const HANDLE_ALPHA := 0.45
+const HANDLE_ALPHA := 0.6
 const HOLD_SECONDS := 0.6
 const FADE_SECONDS := 0.4
 

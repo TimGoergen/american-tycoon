@@ -150,10 +150,12 @@ const RUSH_ENGAGE_SEC := 0.3
 ## sprint at the hold's edges (Tim, 2026-07-08: the frenzy must be constant).
 const SWEEP_EASE_TAU := 0.3
 
-## Ceiling on how fast the catch-up easing may move the bar (bars per second): the
-## release's owed finishing lap and a tap's jump-chase finish at a brisk-but-bounded
-## pace instead of the unbounded tau-sprint that read as one more frenzy burst.
-const CATCHUP_MAX_BAR_PER_SEC := 0.35
+## The catch-up may move the bar at most this multiple of the CURRENT sweep rate.
+## Any fixed catch-up speed above the sustained rushed sweep IS an edge burst (the
+## 0.35 bars/s cap ran ~30% hotter than the ~0.27 sweep — Tim clocked it, 2026-07-08);
+## a 15% headroom is imperceptible as motion but still re-syncs the displayed bar's
+## phase with the true cycle over the following seconds.
+const CATCHUP_RATE_HEADROOM := 1.15
 
 ## A pinned-solid bar's commanded liquid flow (px/s), fed to its GoldBubbles overlay.
 ## Deliberately brisk: solid means "cycling faster than the eye", so the MOST active
@@ -793,12 +795,13 @@ func _refresh(delta: float) -> void:
 		_sweep_rate = lerpf(_sweep_rate, target_rate, 1.0 - exp(-delta / SWEEP_EASE_TAU))
 		var advanced := _displayed_cycle_fraction + delta * _sweep_rate
 		if target > advanced:
-			# Catch-up easing (single rush taps, the engage moment, the owed lap after a
-			# release) — CAPPED so it finishes briskly rather than sprinting (the
-			# unbounded tau-sprint was one more edge burst).
+			# Catch-up (single rush taps, the engage moment, the owed lap after a
+			# release): capped at a small headroom over the CURRENT sweep rate, so
+			# closing the gap never moves the fill visibly faster than the sweep
+			# itself — the gap absorbs as a phase drift over seconds, not a sprint.
 			var catchup := 1.0 - exp(-delta / RUSH_CATCHUP_TAU)
 			var candidate := lerpf(advanced, target, catchup)
-			var max_step := maxf(_sweep_rate, CATCHUP_MAX_BAR_PER_SEC) * delta
+			var max_step := _sweep_rate * CATCHUP_RATE_HEADROOM * delta
 			_displayed_cycle_fraction = minf(candidate, _displayed_cycle_fraction + max_step)
 		else:
 			_displayed_cycle_fraction = advanced

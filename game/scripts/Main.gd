@@ -754,7 +754,9 @@ func _build_tab_bar(column: VBoxContainer) -> void:
 
 	var icons := [
 		"res://art/icons/tab_property.svg",
-		"res://art/icons/tab_estate.svg",
+		# The legacy gem IS the Estate tab's identity — the same art as the wallet and
+		# the Pass-the-Torch button, replacing the placeholder glyph (Tim, 2026-07-08).
+		"res://art/icons/legacy_gem.svg",
 		"res://art/icons/tab_ledger.svg",
 		"res://art/icons/tab_settings.svg",
 	]
@@ -772,9 +774,13 @@ func _build_tab_bar(column: VBoxContainer) -> void:
 		b.pressed.connect(_show_tab.bind(i))
 		bar.add_child(b)
 		_tab_buttons.append(b)
-		# The Estate tab carries the "you have Legacy to claim" red-dot badge.
+		# The Estate tab carries the "you have Legacy to claim" red-dot badge. Its gem
+		# icon also DOWNSCALES (252px art → 113px slot, unlike the 81px placeholder
+		# glyphs that scale up), so it needs the mipmapped filter to avoid aliasing —
+		# the same fix every other gem render uses.
 		if i == TAB_ESTATE:
 			_estate_badge = _make_estate_badge(b)
+			b.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 
 
 ## Build the Estate tab's red-dot badge: a small red circle pinned to the button's top-right
@@ -971,10 +977,13 @@ func _update_plan_button() -> void:
 	var can_succeed := dynasty.can_perform_succession()
 	_plan_button.visible = dynasty.upgrades.earned_lifetime > 0 or can_succeed
 	_plan_button.disabled = not can_succeed
+	# SQUARE img dims below: the gem SVG's canvas is square (252×252), so the old forced
+	# non-square boxes (50×70, 48×67) squished the gem ~28% narrower than the Estate
+	# tab's aspect-keeping wallet icon — the mismatch Tim spotted (2026-07-08).
 	if can_succeed:
 		# Two centered rows (Tim, 2026-07-05): the verb on top, the banked gems beneath —
 		# "(+x [gem])", the legacy-gem image standing in for the word "Legacy".
-		_plan_label.text = "[center]PASS THE TORCH\n+%d [img width=50 height=70]res://art/icons/legacy_gem.svg[/img][/center]" % dynasty.projected_legacy_gain()
+		_plan_label.text = "[center]PASS THE TORCH\n+%d [img width=70 height=70]res://art/icons/legacy_gem.svg[/img][/center]" % dynasty.projected_legacy_gain()
 	else:
 		_plan_label.text = "[center]PASS THE TORCH[/center]"
 
@@ -983,7 +992,7 @@ func _update_plan_button() -> void:
 	if dynasty.upgrades.earned_lifetime != _shown_lifetime_earned:
 		_shown_lifetime_earned = dynasty.upgrades.earned_lifetime
 		# Gem image scaled with the 66px text so the pair keeps its proportions.
-		_lifetime_earned_label.text = "[center][img width=48 height=67]res://art/icons/legacy_gem.svg[/img] Lifetime Earned: %d[/center]" % _shown_lifetime_earned
+		_lifetime_earned_label.text = "[center][img width=67 height=67]res://art/icons/legacy_gem.svg[/img] Lifetime Earned: %d[/center]" % _shown_lifetime_earned
 
 
 ## First contact: a new epoch was reached this tick. Show the beat (Main's _process

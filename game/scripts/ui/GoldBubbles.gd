@@ -337,15 +337,23 @@ func _draw() -> void:
 		# bubble's own path — the wake it just swirled through — with per-point alpha
 		# fading toward the end. TRACER_GAP_PX of drift converts to this bubble's own
 		# seconds-ago (see the TRACER_* comment for why distance, not time).
+		#
+		# Tails are SUPPRESSED while excited (faded by the eased level): a tail's curl
+		# is inversely proportional to its bubble's speed, so the engage/release ramps —
+		# which necessarily pass through low speeds with agitation already active —
+		# rendered every tail 2–3× curlier than the sustained state, the edge burst
+		# that survived every rate-shaping fix (Tim, 2026-07-08). Frenzy is the swarm;
+		# calm is the comets.
+		var tail_visibility := 1.0 - _excitement_level
 		var seconds_per_gap := TRACER_GAP_PX / _bubble_speed_px(i)
 		var tail_width := radius * TRACER_WIDTH_VS_RADIUS
 		var tail_points := PackedVector2Array()
 		var tail_colors := PackedColorArray()
 		var head_point_color := bubble_color
-		head_point_color.a = head_alpha
+		head_point_color.a = head_alpha * tail_visibility
 		tail_points.append(head)
 		tail_colors.append(head_point_color)
-		var sample_alpha := head_alpha
+		var sample_alpha := head_alpha * tail_visibility
 		for sample in range(1, TRACER_COUNT + 1):
 			sample_alpha *= TRACER_ALPHA_FALLOFF
 			var point := _bubble_point(i, radius, filled_width, float(sample) * seconds_per_gap)
@@ -360,7 +368,7 @@ func _draw() -> void:
 			var sample_color := bubble_color
 			sample_color.a = sample_alpha
 			tail_colors.append(sample_color)
-		if tail_points.size() >= 2:
+		if tail_points.size() >= 2 and tail_visibility > 0.02:
 			draw_polyline_colors(tail_points, tail_colors, tail_width, true)
 
 		var color := bubble_color

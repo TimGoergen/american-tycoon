@@ -238,6 +238,8 @@ var _count_label: Label
 var _income_label: Label
 var _cycle_bar: ProgressBar
 var _cycle_bubbles: GoldBubbles
+## Diagnosis readout over the bar, shown when tuning.carb_debug_overlay = 1.
+var _carb_debug_label: Label
 var _buy_button: Button
 var _buy_caption_label: Label
 var _buy_cost_label: Label
@@ -362,6 +364,17 @@ func _ready() -> void:
 	# Kept as a member: the refresh commands their flow speed while the bar is pinned solid.
 	_cycle_bubbles = GoldBubbles.new()
 	_cycle_bar.add_child(_cycle_bubbles)
+
+	# Tiny diagnosis readout over the bar (tuning.carb_debug_overlay = 1 in Balance
+	# Tuning): the live numbers driving the carbonation, so an on-device eye report can
+	# be matched to WHICH parameter actually moved (Tim, 2026-07-08 — the frenzy edge
+	# burst survived several model-based fixes; this ends the guessing).
+	_carb_debug_label = Label.new()
+	_carb_debug_label.add_theme_font_size_override("font_size", 20)
+	_carb_debug_label.add_theme_color_override("font_color", Color.BLACK)
+	_carb_debug_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_carb_debug_label.visible = false
+	_cycle_bar.add_child(_carb_debug_label)
 	bar_cell.add_child(_cycle_bar)
 
 	# Per-cycle income: bold BLACK, LEFT-aligned, drawn ON TOP of the bar and vertically centered
@@ -832,6 +845,22 @@ func _refresh(delta: float) -> void:
 	# Rush agitates the liquid itself (work item 5): the excitement knob scales the
 	# whole package — denser crowd, commanded flow, livelier sway, churn wobble.
 	_cycle_bubbles.excitement = 1.0 if rush_engaged else 0.0
+	# Push the live-tunable frenzy knobs in (Balance Tuning edits these on device, so
+	# the frenzy's elements can be isolated without a rebuild).
+	_cycle_bubbles.excited_flow_px = _prop.tuning.carb_excited_flow
+	_cycle_bubbles.excited_wobble_px = _prop.tuning.carb_excited_wobble
+	_cycle_bubbles.excited_spread_lower = _prop.tuning.carb_excited_spread_lower
+	_cycle_bubbles.excited_tail_visibility = _prop.tuning.carb_excited_tails
+
+	# The diagnosis overlay: live values driving this row's carbonation (reading the
+	# bubbles' internals directly is fine here — this label exists only to expose them).
+	var debug_on := _prop.tuning.carb_debug_overlay > 0.5 and owned
+	_carb_debug_label.visible = debug_on
+	if debug_on:
+		_carb_debug_label.text = "lv %.2f  bub %d  fill %d  swp %d px/s" % [
+			_cycle_bubbles._excitement_level, int(_cycle_bubbles._base_speed_px),
+			int(_cycle_bubbles._smoothed_speed_px), int(_sweep_rate * _cycle_bar.size.x),
+		]
 
 	_refresh_buy_button()
 	_refresh_hire_button()

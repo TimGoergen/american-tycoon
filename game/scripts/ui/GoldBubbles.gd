@@ -164,17 +164,23 @@ const EXCITED_DENSITY_BOOST := 0.5      # +50% crowd at full excitement
 ## frenzy look twice as wild at the edges as in the sustained middle (Tim, 2026-07-08:
 ## the frenzy must be CONSTANT from start to end). Still below the solid-bar speeds
 ## (110 / 176), preserving the governed ladder.
-const EXCITED_FLOW_PX := 90.0
+## VARS, not consts (Tim, 2026-07-08): the hosts push the carb_excited_* tuning knobs
+## in each frame, so the frenzy's elements can be isolated and tuned live ON DEVICE
+## from the Balance Tuning screen — the edge burst kept surviving blind fixes.
+var excited_flow_px := 90.0
 const EXCITED_SWAY_HZ_BOOST := 0.45     # sway rates run up to this much faster
-## The agitation wobble: sized to stay visible inside EXCITED_FLOW_PX of streaming
+## The agitation wobble: sized to stay visible inside the excited flow's streaming
 ## (3px vanished under the motion). Constant while excited, like everything else.
-const EXCITED_WOBBLE_PX := 7.0
+var excited_wobble_px := 7.0
 const EXCITED_WOBBLE_HZ := 2.3
 ## While excited, the per-bubble speed spread's LOWER bound drops to this, so the crowd
 ## is a chaotic mix of crawlers and streakers instead of a uniform stream — sustained
 ## chaos that reads at any flow speed. The UPPER bound is untouched: the fastest
 ## bubbles never exceed what the governed speed ladder already allows.
-const EXCITED_SPREAD_LOWER := 0.25
+var excited_spread_lower := 0.25
+## Comet-tail visibility at FULL excitement (0 = suppressed, 1 = full tails). Tails
+## curl inversely with speed, which contributed the edge bursts; partial by default.
+var excited_tail_visibility := 0.3
 ## An excited fill keeps at least this many bubbles no matter how NARROW it is. Without
 ## a floor the crowd is proportional to filled width, so the moment a rushed bar
 ## wrapped, the count collapsed to a handful for most of each lap — every agitation
@@ -286,7 +292,7 @@ func _process(delta: float) -> void:
 		var measured := clampf(
 			_smoothed_speed_px * SPEED_VS_BAR, MIN_DRIFT_PX_PER_SEC, MEASURED_FLOW_CAP_PX
 		)
-		_base_speed_px = lerpf(measured, EXCITED_FLOW_PX, _excitement_level)
+		_base_speed_px = lerpf(measured, excited_flow_px, _excitement_level)
 
 	# How close the bar is to a crawl: 1.0 at (or below) the idle-drift floor, fading to
 	# 0.0 as the bar speeds up. Widens the per-bubble speed range on slow bars (see the
@@ -314,7 +320,7 @@ func _process(delta: float) -> void:
 ## Excitement WIDENS the spread downward (see EXCITED_SPREAD_LOWER): an agitated crowd
 ## mixes crawlers with streakers instead of streaming uniformly.
 func _bubble_speed_px(index: int) -> float:
-	var lower := lerpf(1.0 - SPEED_SPREAD, EXCITED_SPREAD_LOWER, _excitement_level)
+	var lower := lerpf(1.0 - SPEED_SPREAD, excited_spread_lower, _excitement_level)
 	return _base_speed_px * lerpf(lower, _upper_mult, _variant(index, 0.37))
 
 
@@ -344,7 +350,7 @@ func _draw() -> void:
 		# rendered every tail 2–3× curlier than the sustained state, the edge burst
 		# that survived every rate-shaping fix (Tim, 2026-07-08). Frenzy is the swarm;
 		# calm is the comets.
-		var tail_visibility := 1.0 - _excitement_level
+		var tail_visibility := lerpf(1.0, excited_tail_visibility, _excitement_level)
 		var seconds_per_gap := TRACER_GAP_PX / _bubble_speed_px(i)
 		var tail_width := radius * TRACER_WIDTH_VS_RADIUS
 		var tail_points := PackedVector2Array()
@@ -429,7 +435,7 @@ func _bubble_point(index: int, radius: float, filled_width: float, seconds_ago: 
 	# The agitation wobble: horizontal churn, scaled purely by the eased excitement —
 	# the flow itself is a constant while excited, so the whole look holds steady.
 	var wobble := sin(at_time * TAU * EXCITED_WOBBLE_HZ + phase * 3.0) \
-			* EXCITED_WOBBLE_PX * _excitement_level
+			* excited_wobble_px * _excitement_level
 	# Map the normalized position into the filled region, rolled back along the drift —
 	# backward is rightward when the flow is reversed. NOT clamped here: the head clamps
 	# itself in _draw, while out-of-fill tail samples are dropped by the caller (clamping

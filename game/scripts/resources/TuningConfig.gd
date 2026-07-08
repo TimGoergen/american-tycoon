@@ -134,6 +134,27 @@ extends Resource
 ## ×1.5^11 ≈ ×87). The missing term the playtest exposed.
 @export var retention_property_step: float = 1.5  # feel-tune
 
+# --- Carbonation frenzy (diagnosis + feel knobs, Tim 2026-07-08) ---
+# The rush "frenzy" state on property bars, live-tunable from Balance Tuning so its
+# elements can be isolated ON DEVICE (an edge burst kept surviving blind fixes).
+
+## 1 = show a tiny per-row debug readout of the live carbonation numbers (excitement
+## level, bubble base speed, measured fill speed, commanded sweep). 0 = off.
+@export var carb_debug_overlay: float = 0.0
+
+## The commanded liquid speed (px/s) while a rush frenzy is engaged.
+@export var carb_excited_flow: float = 90.0  # feel-tune
+
+## Horizontal churn wobble amplitude (px) at full frenzy.
+@export var carb_excited_wobble: float = 7.0  # feel-tune
+
+## Per-bubble speed spread's LOWER bound at full frenzy (the crawler/streaker mix).
+@export var carb_excited_spread_lower: float = 0.25  # feel-tune
+
+## Comet-tail visibility during frenzy (0 = suppressed, 1 = full tails). Tails curl
+## more at low speeds, which contributed edge bursts; partial by default.
+@export var carb_excited_tails: float = 0.3  # feel-tune
+
 ## Offline income efficiency vs. live play (0–1).
 @export var offline_efficiency: float = 0.5  # TBD-SIM
 

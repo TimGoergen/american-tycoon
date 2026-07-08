@@ -164,6 +164,13 @@ const EXCITED_MEASURED_CAP_PX := 100.0
 const EXCITED_SWAY_HZ_BOOST := 0.45     # sway rates run up to this much faster
 const EXCITED_WOBBLE_PX := 3.0          # horizontal agitation wobble amplitude
 const EXCITED_WOBBLE_HZ := 2.3
+## An excited fill keeps at least this many bubbles no matter how NARROW it is. Without
+## a floor the crowd is proportional to filled width, so the moment a rushed bar
+## wrapped, the count collapsed to a handful for most of each lap — every agitation
+## parameter was maxed but there was nothing on screen to show it, which read as the
+## frenzy "fading" within a cycle (Tim, 2026-07-08). A cramped fast-wrapping swarm in a
+## narrow fill is exactly the churn agitation should look like.
+const EXCITED_MIN_ACTIVE := 12
 
 var _time := 0.0
 var _last_fraction := 0.0
@@ -227,11 +234,13 @@ func _current_fraction() -> float:
 
 
 ## How many bubbles a fill this wide can host without crowding (scaled by density_scale,
-## and boosted while excited — an agitated liquid froths with a bigger crowd).
+## and boosted while excited — an agitated liquid froths with a bigger crowd, and never
+## thins below EXCITED_MIN_ACTIVE while agitated, however narrow the fill).
 func _active_count(filled_width: float) -> int:
 	var density := density_scale * (1.0 + EXCITED_DENSITY_BOOST * _excitement_level)
 	var cap := clampi(int(round(BUBBLE_COUNT * density)), 2, MAX_BUBBLE_COUNT)
-	return clampi(int(filled_width / BUBBLE_SPACING_PX * density), 2, cap)
+	var min_active := 2 + int(round((float(EXCITED_MIN_ACTIVE) - 2.0) * _excitement_level))
+	return clampi(int(filled_width / BUBBLE_SPACING_PX * density), mini(min_active, cap), cap)
 
 
 func _process(delta: float) -> void:

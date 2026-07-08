@@ -140,7 +140,12 @@ func display_name() -> String:
 
 
 func how_to_play() -> String:
-	return "Match gems to score. Clean matches pay MORE — AVOID matching the marked gem!"
+	# Spells out the avoid-gem mechanic in words (work item 3): the old one-liner never
+	# said what avoiding earns or costs (Tim, 2026-07-07). Deliberately no exact
+	# numbers — those are tunable constants and copy would drift.
+	return "Drag a gem onto a neighbor to swap; line up 3 or more to clear them. " \
+		+ "Clean matches earn a bonus — any match containing the marked AVOID gem " \
+		+ "loses most of its points. Steer around it."
 
 
 func begin(_tuning: TuningConfig) -> void:

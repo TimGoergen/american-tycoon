@@ -173,6 +173,10 @@ var _active_type_key: String = ""
 ## set the wording per mode (reward stakes vs. "play as long as you like").
 var _begin_stakes: Label
 var _begin_hint: Label
+## The WHY line under GET READY — the round's fiction (from the reward's `framing`), so
+## the player knows what this game IS in the story before the mechanics (work item 3).
+## Hidden in Challenge Mode and the review tuner, which need no fiction.
+var _begin_framing: Label
 
 
 func setup(tuning: TuningConfig) -> void:
@@ -532,6 +536,13 @@ func _build_begin_overlay() -> Control:
 	ready.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(ready)
 
+	# The WHY line — this round's place in the story, before any mechanics. Slightly
+	# muted so it reads as narration above the gold game title.
+	_begin_framing = _make_label("", UiPalette.FONT_CARD_BODY, Color(UiPalette.NAVY, 0.85))
+	_begin_framing.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_begin_framing.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(_begin_framing)
+
 	# Names the randomly drawn type so the player knows what they're about to play.
 	_begin_title = _make_label("", UiPalette.FONT_DISPLAY, UiPalette.MUSTARD_GOLD)
 	_begin_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -609,13 +620,18 @@ func _make_label(text: String, font_size: int, color: Color) -> Label:
 ## Legacy at prestige and the cash pile at welcome-back. `base` is the pre-minigame amount,
 ## `noun` the singular reward word for plain counts ("Legacy"), `heading` the result-screen
 ## title, `purpose` the play-view blurb, and `format_as_money` formats amounts as dollars.
+## `framing` is the WHY line on the Get Ready gate — one sentence of fiction explaining
+## what this round is in the story (the heir proving themselves, risking the overnight
+## pile, negotiating with aliens). Nothing in the game explained why a minigame was
+## suddenly happening (Tim, 2026-07-07 debrief, work item 3).
 static func make_reward(
 		base: float, noun: String, heading: String, purpose: String, format_as_money: bool,
-		upside_only: bool = false
+		upside_only: bool = false, framing: String = ""
 ) -> Dictionary:
 	return {
 		"base": base, "noun": noun, "heading": heading,
 		"purpose": purpose, "as_money": format_as_money, "upside_only": upside_only,
+		"framing": framing,
 	}
 
 
@@ -647,13 +663,18 @@ static func first_contact_bucket(multiplier: float, bonus_max: float) -> int:
 
 ## The prestige/succession round: scales the heir's Legacy (a plain count).
 static func legacy_reward(base_legacy: int) -> Dictionary:
-	return make_reward(float(base_legacy), "Legacy", "THE INHERITANCE", DEFAULT_PURPOSE, false)
+	return make_reward(
+		float(base_legacy), "Legacy", "THE INHERITANCE", DEFAULT_PURPOSE, false, false,
+		"The will is read. Before the fortune passes, the heir must show the estate "
+		+ "what kind of tycoon they are."
+	)
 
 
 ## The welcome-back round (GDD §5.5 site 3): scales the overnight cash pile (money).
 static func offline_pile_reward(pile: float) -> Dictionary:
 	return make_reward(
-		pile, "", "THE OVERNIGHT HAUL", "Make the most of your time away", true
+		pile, "", "THE OVERNIGHT HAUL", "Make the most of your time away", true, false,
+		"The empire earned this while you were away. One bold move before it banks."
 	)
 
 
@@ -664,7 +685,9 @@ static func offline_pile_reward(pile: float) -> Dictionary:
 static func first_contact_reward(base_income: float, property_name: String) -> Dictionary:
 	return make_reward(
 		base_income, "", property_name.to_upper(),
-		"Negotiate your opening terms in %s" % property_name, true, true  # as_money, upside_only
+		"Negotiate your opening terms in %s" % property_name, true, true,  # as_money, upside_only
+		"Across the table: a civilization that has never seen a human make a deal. "
+		+ "Open strong, and the terms favor you for good."
 	)
 
 
@@ -751,6 +774,12 @@ func start_game(
 		var skip_amount := _base_amount * _tuning.minigame_keep_floor
 		_skip_button.text = "SKIP · keep %s" % _format_amount(skip_amount)
 
+	# The round's fiction: shown in live play, hidden in the review tuner (a practice
+	# round has no story) and whenever a site provides none.
+	var framing := String(reward.get("framing", ""))
+	_begin_framing.text = framing
+	_begin_framing.visible = framing != "" and not review_mode
+
 	_begin_title.text = _active_minigame.display_name()
 	_begin_howto.text = _active_minigame.how_to_play()
 	# Reward stakes on the gate (Challenge Mode replaces this in start_challenge). Upside-only sites
@@ -810,6 +839,7 @@ func start_challenge(type_script: Script) -> void:
 
 	_begin_title.text = _active_minigame.display_name()
 	_begin_howto.text = _active_minigame.how_to_play()
+	_begin_framing.visible = false  # free play has no story to frame
 	_begin_stakes.text = "Challenge Mode — no timer, play as long as you like. Beat your best score!"
 	_begin_stakes.visible = true
 	_begin_hint.visible = false

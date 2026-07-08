@@ -55,7 +55,8 @@ func display_name() -> String:
 
 
 func how_to_play() -> String:
-	return "Watch the sequence, then tap it back."
+	return "Watch the tiles light up, then tap them back in the same order. " \
+		+ "Each round adds a step — the deeper you go, the more it pays."
 
 
 func begin(_tuning: TuningConfig) -> void:

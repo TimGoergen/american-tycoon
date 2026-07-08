@@ -59,7 +59,8 @@ func display_name() -> String:
 
 
 func how_to_play() -> String:
-	return "Tap the falling money to catch it!"
+	return "Tap every falling coin before it hits the floor. Catches score, " \
+		+ "misses cost — and they fall faster as you go."
 
 
 func begin(_tuning: TuningConfig) -> void:

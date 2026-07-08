@@ -137,6 +137,12 @@ const RUSHED_SOLID_THRESHOLD_SEC := 0.4
 ## to solid read as sudden (Tim, 2026-07-07). 3.0 = the remaining lap in ⅓s at most.
 const PIN_FILL_PER_SEC := 3.0
 
+## The excitement knob engages only after the rush has been HELD this long — a mere
+## START/rush tap presses the same button for a few frames, which flashed a frenzy
+## burst on every tap (Tim, 2026-07-08). A real hold reaches this within its first
+## pulse; a tap never does.
+const EXCITEMENT_ENGAGE_SEC := 0.3
+
 ## A pinned-solid bar's commanded liquid flow (px/s), fed to its GoldBubbles overlay.
 ## Deliberately brisk: solid means "cycling faster than the eye", so the MOST active
 ## property should carry the most active fizz — not sink to the idle drift a motionless
@@ -149,6 +155,10 @@ const SOLID_FLOW_RUSH_MULT := 1.6
 
 ## Whether the bar was pinned solid last frame — unpinning restarts the visible lap.
 var _was_pinned := false
+
+## Seconds the rush has been continuously held (0 when not held) — gates the
+## excitement knob past EXCITEMENT_ENGAGE_SEC so taps don't flash the frenzy.
+var _rush_hold_seconds := 0.0
 
 ## The per-second rate this row's income label currently shows (rush-boosted while rush
 ## is held; 0 for an unowned row's buy-in preview). Cached each _refresh; Main sums it
@@ -783,7 +793,11 @@ func _refresh(delta: float) -> void:
 		_cycle_bubbles.flow_override_px = -1.0
 	# Rush agitates the liquid itself (work item 5): the excitement knob scales the
 	# whole package — denser crowd, faster floor/cap, livelier sway, churn wobble.
-	_cycle_bubbles.excitement = 1.0 if rush_held else 0.0
+	# Gated on a sustained hold (EXCITEMENT_ENGAGE_SEC) so a START/rush TAP — which
+	# presses the same button for a few frames — doesn't flash the frenzy.
+	_rush_hold_seconds = (_rush_hold_seconds + delta) if rush_held else 0.0
+	_cycle_bubbles.excitement = \
+			1.0 if _rush_hold_seconds >= EXCITEMENT_ENGAGE_SEC else 0.0
 
 	_refresh_buy_button()
 	_refresh_hire_button()

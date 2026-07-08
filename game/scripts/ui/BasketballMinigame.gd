@@ -155,9 +155,14 @@ var _aim_anchor: Vector2 = Vector2.ZERO
 
 var _play: Control
 ## The gym backdrop, CPU-baked to the board size with rounded corners (so it nests inside the
-## rounded outline) and cached; re-baked only when the board size changes.
+## rounded outline) and cached; re-baked only when the board's WHOLE-PIXEL size changes.
+## The cache key is integer pixels, NOT the float size (Tim, 2026-07-07): sub-pixel layout
+## jitter — e.g. Challenge Mode's per-frame score label re-layout nudging ancestors by
+## fractions — defeated an exact float compare and re-ran this very expensive bake every
+## frame, dragging the whole game down (and the huge frame deltas then tunneled the ball
+## through the rim).
 var _board_bg: ImageTexture
-var _board_bg_size: Vector2 = Vector2.ZERO
+var _board_bg_px: Vector2i = Vector2i.ZERO
 ## The board's black rounded outline, built once and reused — it was being allocated
 ## fresh inside the draw pass every frame (minigame lag pass, Tim 2026-07-06).
 var _board_border: StyleBoxFlat
@@ -332,12 +337,36 @@ func _move_hoop(bounds: Vector2) -> void:
 	)
 
 
-## Advance the simulation one frame, in two clear passes:
+## A flight ball may move at most this many pixels per physics pass — the substep rule
+## below splits a frame into passes to honor it. Comfortably under the rim posts'
+## contact distance, so a fast ball can never step OVER a post between two checks
+## ("tunneling"): with big laggy frame deltas the ball visibly passed through the rim,
+## while the score test (a crossing test) still caught it (Tim, 2026-07-07).
+const MAX_STEP_PX := 24.0
+## Substep ceiling, so one catastrophically long frame can't spiral into doing the
+## whole simulation dozens of times (which would make the lag worse, not better).
+const MAX_PHYSICS_SUBSTEPS := 8
+
+
+## Advance the simulation one frame — split into substeps so no ball moves more than
+## MAX_STEP_PX per collision pass regardless of the frame's delta (see MAX_STEP_PX).
+func _advance_balls(delta: float, bounds: Vector2) -> void:
+	var top_speed := 0.0
+	for ball in _balls:
+		if ball["state"] == "flight":
+			top_speed = maxf(top_speed, (ball["vel"] as Vector2).length() + GRAVITY * delta)
+	var steps := clampi(int(ceil(top_speed * delta / MAX_STEP_PX)), 1, MAX_PHYSICS_SUBSTEPS)
+	var sub_delta := delta / float(steps)
+	for _step in range(steps):
+		_advance_balls_step(sub_delta, bounds)
+
+
+## One physics pass, in two stages:
 ##   1) integrate gravity + motion for the airborne ball (remembering its start position so the
 ##      hoop's top-entry test can see the crossing), and spin it from its horizontal motion,
 ##   2) resolve the airborne ball against the hoop and the board's walls/floor/ceiling.
 ## The wall pass runs last so a ball can never be left overlapping a wall.
-func _advance_balls(delta: float, bounds: Vector2) -> void:
+func _advance_balls_step(delta: float, bounds: Vector2) -> void:
 	# Pass 1: gravity + motion, plus rolling spin.
 	for ball in _balls:
 		if ball["state"] != "flight":
@@ -598,10 +627,12 @@ func _draw_play() -> void:
 ## changes. We CPU-bake (rather than clip_children) because the project supports only one clip
 ## stencil at a time and Main already owns it (see MinigameScreen for the full note).
 func _ensure_board_bg(size: Vector2) -> void:
+	# Integer-pixel cache key — see _board_bg_px for why a float compare was a per-frame
+	# lag disaster here.
 	var target := Vector2i(int(size.x), int(size.y))
-	if target.x < 1 or target.y < 1 or (_board_bg != null and _board_bg_size == size):
+	if target.x < 1 or target.y < 1 or (_board_bg != null and target == _board_bg_px):
 		return
-	_board_bg_size = size
+	_board_bg_px = target
 	var source: Texture2D = load(BOARD_IMAGE)
 	if source == null:
 		return

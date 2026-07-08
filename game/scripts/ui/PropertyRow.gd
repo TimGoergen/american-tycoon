@@ -137,11 +137,23 @@ const RUSHED_SOLID_THRESHOLD_SEC := 0.4
 ## to solid read as sudden (Tim, 2026-07-07). 3.0 = the remaining lap in ⅓s at most.
 const PIN_FILL_PER_SEC := 3.0
 
-## The excitement knob engages only after the rush has been HELD this long — a mere
-## START/rush tap presses the same button for a few frames, which flashed a frenzy
-## burst on every tap (Tim, 2026-07-08). A real hold reaches this within its first
-## pulse; a tap never does.
-const EXCITEMENT_ENGAGE_SEC := 0.3
+## ALL rush presentation (color, boosted income readout, excitement, solid pin, sweep
+## rate) engages only after the rush has been HELD this long — a mere START/rush tap
+## presses the same button for a few frames, which flashed the whole rush look on
+## every tap (Tim, 2026-07-08). A real hold reaches this within its first pulse; a
+## tap never does. The pump itself is NOT gated: pulses land from the first interval.
+const RUSH_ENGAGE_SEC := 0.3
+
+## The displayed bar's sweep rate eases toward its target (natural or rushed) with
+## this time constant, so engaging/releasing a rush ACCELERATES the sweep instead of
+## snapping it — a fill-speed snap stretches the bubble field and reads as a frenzy
+## sprint at the hold's edges (Tim, 2026-07-08: the frenzy must be constant).
+const SWEEP_EASE_TAU := 0.3
+
+## Ceiling on how fast the catch-up easing may move the bar (bars per second): the
+## release's owed finishing lap and a tap's jump-chase finish at a brisk-but-bounded
+## pace instead of the unbounded tau-sprint that read as one more frenzy burst.
+const CATCHUP_MAX_BAR_PER_SEC := 0.35
 
 ## A pinned-solid bar's commanded liquid flow (px/s), fed to its GoldBubbles overlay.
 ## Deliberately brisk: solid means "cycling faster than the eye", so the MOST active
@@ -156,9 +168,12 @@ const SOLID_FLOW_RUSH_MULT := 1.6
 ## Whether the bar was pinned solid last frame — unpinning restarts the visible lap.
 var _was_pinned := false
 
-## Seconds the rush has been continuously held (0 when not held) — gates the
-## excitement knob past EXCITEMENT_ENGAGE_SEC so taps don't flash the frenzy.
+## Seconds the rush has been continuously held (0 when not held) — gates the whole
+## rush presentation past RUSH_ENGAGE_SEC so taps don't flash it.
 var _rush_hold_seconds := 0.0
+
+## The displayed bar's eased sweep rate (bars/sec) — see SWEEP_EASE_TAU.
+var _sweep_rate := 0.0
 
 ## The per-second rate this row's income label currently shows (rush-boosted while rush
 ## is held; 0 for an unowned row's buy-in preview). Cached each _refresh; Main sums it
@@ -686,13 +701,18 @@ func _refresh(delta: float) -> void:
 	# looked at the Button, so a rushed row didn't always present as rushing).
 	var rush_held := (_manager_circle.is_held() or _secondary_held("rush")) \
 			and _prop.units_owned > 0
+	# The ENGAGED flag: held long enough to count as a real hold (see RUSH_ENGAGE_SEC).
+	# Every rush-presentation element below keys off THIS, never the raw press, so a
+	# single tap changes nothing on screen (Tim, 2026-07-08).
+	_rush_hold_seconds = (_rush_hold_seconds + delta) if rush_held else 0.0
+	var rush_engaged := _rush_hold_seconds >= RUSH_ENGAGE_SEC
 	# Deliberately NOT gated on is_cycle_running: an UNSTAFFED property's cycle stops the
 	# instant it pays out and only restarts on the next held-rush pulse, so gating on it
 	# made the readout (and the solid pin) flicker back to the calm display for a few
 	# frames at the end of every cycle (Tim, 2026-07-08). While rush is held the restart
 	# is guaranteed, so the rushed rate stays honest across that momentary gap.
 	var rushed_fractions_per_second := 0.0
-	if rush_held and effective_length > 0.0:
+	if rush_engaged and effective_length > 0.0:
 		rushed_fractions_per_second = 1.0 / effective_length \
 				+ _prop.tuning.hold_rush_per_second * _prop.tuning.rush_pct * _prop.rush_power_multiplier
 	if rushed_fractions_per_second > 0.0:
@@ -748,6 +768,10 @@ func _refresh(delta: float) -> void:
 		# Idle or empty: nothing is advancing, so just mirror the true value exactly.
 		_displayed_cycle_fraction = true_fraction
 		_finish_lap_pending = false
+		# Park the eased sweep at the natural rate so a later start doesn't inherit
+		# a stale rushed rate (or a zero) from long ago.
+		if effective_length > 0.0:
+			_sweep_rate = 1.0 / effective_length
 	else:
 		# A completed cycle (detected above) means the displayed bar usually hasn't
 		# reached the right edge yet (it lags — see _finish_lap_pending), so it owes a
@@ -758,19 +782,24 @@ func _refresh(delta: float) -> void:
 		# progress: the bar fills through 1.0, then wraps onto the new cycle below.
 		var target := true_fraction + (1.0 if _finish_lap_pending else 0.0)
 		# Running: advance at the real fill rate — the DETERMINISTIC rushed rate while
-		# rush is held (the same number the income readout shows). The old natural-rate-
-		# plus-catch-up chase made a held rush sweep in a surge-and-crawl per lap, and
-		# since the bubble field rides the fill, those surges read as frenzy bursts at
-		# the hold's edges no matter how constant the bubbles themselves were (Tim,
-		# 2026-07-08). One constant sweep speed = one constant frenzy. The catch-up
-		# easing below still handles single rush taps and the initial engage.
-		var advance_rate := 1.0 / effective_length
+		# an engaged rush is held (the same number the income readout shows). The rate
+		# is EASED between natural and rushed (SWEEP_EASE_TAU) so engaging/releasing
+		# accelerates the sweep instead of snapping it: a fill-speed snap stretches the
+		# bubble field and reads as a frenzy sprint at the hold's edges. One smooth,
+		# constant sweep = one constant frenzy (Tim, 2026-07-08).
+		var target_rate := 1.0 / effective_length
 		if rushed_fractions_per_second > 0.0:
-			advance_rate = rushed_fractions_per_second
-		var advanced := _displayed_cycle_fraction + delta * advance_rate
+			target_rate = rushed_fractions_per_second
+		_sweep_rate = lerpf(_sweep_rate, target_rate, 1.0 - exp(-delta / SWEEP_EASE_TAU))
+		var advanced := _displayed_cycle_fraction + delta * _sweep_rate
 		if target > advanced:
+			# Catch-up easing (single rush taps, the engage moment, the owed lap after a
+			# release) — CAPPED so it finishes briskly rather than sprinting (the
+			# unbounded tau-sprint was one more edge burst).
 			var catchup := 1.0 - exp(-delta / RUSH_CATCHUP_TAU)
-			_displayed_cycle_fraction = lerpf(advanced, target, catchup)
+			var candidate := lerpf(advanced, target, catchup)
+			var max_step := maxf(_sweep_rate, CATCHUP_MAX_BAR_PER_SEC) * delta
+			_displayed_cycle_fraction = minf(candidate, _displayed_cycle_fraction + max_step)
 		else:
 			_displayed_cycle_fraction = advanced
 		if _finish_lap_pending and _displayed_cycle_fraction >= 1.0:
@@ -787,23 +816,19 @@ func _refresh(delta: float) -> void:
 	# rushable — see `interactive` above), so the bar drops its active green for a calm
 	# blue. Otherwise it stays green, brightening while the rush button is actively held.
 	var rush_no_longer_option := staffed and not interactive
-	_set_cycle_color(rush_no_longer_option, rush_held)
+	_set_cycle_color(rush_no_longer_option, rush_engaged)
 
 	# Carbonation on a pinned-solid bar: the fill edge isn't moving, so the bubbles
 	# would sink to their idle drift — command a brisk flow instead (faster still while
-	# rush is held), so the busiest property carries the busiest fizz and rushing a
-	# solid bar visibly does something (see SOLID_FLOW_PX).
+	# an engaged rush is held), so the busiest property carries the busiest fizz and
+	# rushing a solid bar visibly does something (see SOLID_FLOW_PX).
 	if pinned:
-		_cycle_bubbles.flow_override_px = SOLID_FLOW_PX * (SOLID_FLOW_RUSH_MULT if rush_held else 1.0)
+		_cycle_bubbles.flow_override_px = SOLID_FLOW_PX * (SOLID_FLOW_RUSH_MULT if rush_engaged else 1.0)
 	else:
 		_cycle_bubbles.flow_override_px = -1.0
 	# Rush agitates the liquid itself (work item 5): the excitement knob scales the
-	# whole package — denser crowd, faster floor/cap, livelier sway, churn wobble.
-	# Gated on a sustained hold (EXCITEMENT_ENGAGE_SEC) so a START/rush TAP — which
-	# presses the same button for a few frames — doesn't flash the frenzy.
-	_rush_hold_seconds = (_rush_hold_seconds + delta) if rush_held else 0.0
-	_cycle_bubbles.excitement = \
-			1.0 if _rush_hold_seconds >= EXCITEMENT_ENGAGE_SEC else 0.0
+	# whole package — denser crowd, commanded flow, livelier sway, churn wobble.
+	_cycle_bubbles.excitement = 1.0 if rush_engaged else 0.0
 
 	_refresh_buy_button()
 	_refresh_hire_button()

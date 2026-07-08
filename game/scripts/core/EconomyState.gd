@@ -96,15 +96,26 @@ func try_buy(prop_index: int, count: int, current_tier: int) -> bool:
 	return true
 
 
-## Index of the property that unlocks at exactly `tier` — the alien business a First Contact
-## opens — or -1 if no property is gated to that tier. The 12 Earth properties all unlock at
-## tier 1; each alien property type carries a distinct later unlock_tier (one per epoch).
+## Index of the FLAGSHIP property that unlocks at `tier` — the first (cheapest) member
+## of that epoch's cohort, which anchors the First Contact trade-deal minigame — or -1
+## if no property is gated to that tier. Since Phase 2 each alien epoch has FOUR
+## properties; PROPERTY_PATHS lists every flagship before any sibling, so "first match"
+## is the flagship.
 func get_property_index_for_unlock_tier(tier: int) -> int:
+	var indices := get_property_indices_for_unlock_tier(tier)
+	return indices[0] if not indices.is_empty() else -1
+
+
+## Every property index gated to exactly `tier` — the epoch's whole COHORT
+## (Epoch_Depth_Pass Phase 2). The First Contact bonus applies to all of them (Tim's
+## call: the negotiated terms cover every venture in that civilization's market).
+func get_property_indices_for_unlock_tier(tier: int) -> Array[int]:
+	var indices: Array[int] = []
 	for i in range(properties.size()):
 		var cfg := (properties[i] as PropertyState).config as PropertyConfig
 		if cfg.unlock_tier == tier:
-			return i
-	return -1
+			indices.append(i)
+	return indices
 
 
 # ---------------------------------------------------------------------------

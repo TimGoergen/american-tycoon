@@ -263,6 +263,14 @@ cohort payback ratios. Constraint kept: time-to-first-contact ≈ today's.
    bug/feel immediately, even before cohorts exist.
 2. **Phase 2 — Cohort data + plumbing.** §3: 20 configs (sim-generated numbers),
    roster names, indices-for-tier + cohort bonus loop, First Contact copy tweak.
+   **BUILT 2026-07-08 (`feature/epoch-depth-phase2`), headless-verified, NOT
+   device-tested. One deviation from §3.5's "re-slotting the 5 existing": the 15
+   siblings are APPENDED at property indices 17–31 and the LADDER sorts its rows by
+   base cost for display, instead of re-slotting the flagships to new indices — same
+   on-screen order, zero save migration (property index is every save's identity:
+   per-property rows, retention keys, ladder highs, rosters). Veto if index-grouped
+   configs matter more than migration-free saves. First-pass numbers per §3.2
+   (cost ×3^k, income ×3^k×(1+0.15k), cycle ×(1−0.05k)) — Phase 3 regenerates them.**
 3. **Phase 3 — Pacing retune.** §4: extend the timing study, run candidates, lock
    `economy_scale` step + block step tables + cohort magnitudes; regenerate the
    Phase-2 `.tres` numbers from the winning table.

@@ -383,19 +383,48 @@ func _test_epoch_locked_properties(configs: Array, tuning: TuningConfig) -> void
 ## gated to epoch 2, the tier→property lookup finds it, and grant_starting_units hands over free
 ## units (the negotiation head start) without counting them as spend on the estate's book value.
 func _test_first_contact_grant(configs: Array, tuning: TuningConfig) -> void:
-	print("\n10. First Contact opens one new alien property per epoch (tier→property lookup)")
+	print("\n10. First Contact opens a four-property cohort per epoch (tier→cohort lookup)")
 
-	# Every alien epoch (2..last) ships exactly one new property type gated to it, and the
-	# tier→property lookup resolves each — so every First Contact opens a distinct business.
+	# Every alien epoch (2..last) ships a FOUR-property cohort gated to it (Epoch Depth
+	# Phase 2), the cohort lookup returns all four with the FLAGSHIP (cheapest member)
+	# first — the order the trade-deal minigame and the bonus loop rely on — and the
+	# singular lookup still resolves that flagship.
 	var game_for_lookup := GameState.new(configs, tuning)
 	for tier in range(2, EpochCatalog.tier_count() + 1):
 		var gated := 0
 		for cfg in configs:
 			if (cfg as PropertyConfig).unlock_tier == tier:
 				gated += 1
-		_check("epoch %d ships exactly one new alien property" % tier, gated == 1)
-		_check("epoch %d's property resolves via the tier lookup" % tier,
-			game_for_lookup.economy.get_property_index_for_unlock_tier(tier) >= 0)
+		_check("epoch %d ships a four-property cohort" % tier, gated == 4)
+		var cohort := game_for_lookup.economy.get_property_indices_for_unlock_tier(tier)
+		_check("epoch %d's cohort lookup returns all four members" % tier, cohort.size() == 4)
+		if cohort.is_empty():
+			continue
+		_check("epoch %d's flagship resolves via the singular tier lookup" % tier,
+			game_for_lookup.economy.get_property_index_for_unlock_tier(tier) == cohort[0])
+		var flagship_cost := ((game_for_lookup.economy.properties[cohort[0]] \
+				as PropertyState).config as PropertyConfig).base_cost
+		var flagship_is_cheapest := true
+		for member in cohort:
+			var member_cost := ((game_for_lookup.economy.properties[member] \
+					as PropertyState).config as PropertyConfig).base_cost
+			if member_cost < flagship_cost:
+				flagship_is_cheapest = false
+		_check("epoch %d's flagship is its cohort's cheapest member" % tier, flagship_is_cheapest)
+
+	# The cohort-wide First Contact bonus: applying a bonus to every member of a tier's
+	# cohort (exactly what Main does when the trade-deal minigame finishes) lands the
+	# same income/cycle multipliers on all four properties.
+	var bonus_game := GameState.new(configs, tuning)
+	for member in bonus_game.economy.get_property_indices_for_unlock_tier(2):
+		(bonus_game.economy.properties[member] as PropertyState).set_first_contact_bonus(1.4, 0.88)
+	var all_bonused := true
+	for member in bonus_game.economy.get_property_indices_for_unlock_tier(2):
+		var prop_state := bonus_game.economy.properties[member] as PropertyState
+		if not is_equal_approx(prop_state.first_contact_income_multiplier, 1.4) \
+				or not is_equal_approx(prop_state.first_contact_cycle_multiplier, 0.88):
+			all_bonused = false
+	_check("a cohort-wide First Contact bonus reaches all four members", all_bonused)
 
 	# The shipped ladder includes at least one alien property gated to a later epoch.
 	var alien_index := -1

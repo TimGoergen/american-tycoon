@@ -103,10 +103,11 @@ var _elapsed_since_save := 0.0
 # multiplier scales (GDD §5.5). One host serves every site; only one runs at a time.
 enum MinigameSite { NONE, SUCCESSION, WELCOME_BACK, FIRST_CONTACT }
 var _minigame_site: int = MinigameSite.NONE
-## First Contact (GDD §5.5 site 2): the property whose head-start units the running negotiation
-## minigame is for, and the epoch tier that opened it. Set when the contact beat is dismissed
-## into the minigame; consumed when the minigame finishes and the units are granted.
-var _first_contact_prop_index: int = -1
+## First Contact (GDD §5.5 site 2): the epoch tier the running negotiation minigame is
+## for. Set when the contact beat is dismissed into the minigame; consumed when the
+## minigame finishes and the negotiated bonus is applied to that epoch's WHOLE COHORT
+## (Phase 2: the terms cover every venture in the civilization's market). 0 = none.
+var _first_contact_bonus_tier: int = 0
 var _pending_contact_tier: int = 0
 ## The offline pile awaiting the welcome-back minigame's verdict. The base pile is already
 ## banked when the minigame starts; on finish we credit the +/- delta and show the welcome
@@ -545,7 +546,17 @@ func _build_property_tab() -> Control:
 	ladder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(ladder)
 
-	for i in range(game.economy.properties.size()):
+	# Ladder DISPLAY order: ascending base cost. A property's INDEX (its save identity)
+	# is ConfigLoader.PROPERTY_PATHS order, where cohort siblings are APPENDED so old
+	# saves' indices stay stable — the on-screen order is derived here instead. Cost
+	# sorting interleaves the cohorts correctly (each sibling is ×3 its predecessor and
+	# each next flagship ×30, so a cohort always finishes before the next epoch starts).
+	var ladder_order: Array = range(game.economy.properties.size())
+	ladder_order.sort_custom(func(a: int, b: int) -> bool:
+		var cost_a: float = (game.economy.properties[a] as PropertyState).config.base_cost
+		var cost_b: float = (game.economy.properties[b] as PropertyState).config.base_cost
+		return cost_a < cost_b)
+	for i in ladder_order:
 		var row := PropertyRow.new()
 		row.setup(i, game.economy.properties[i] as PropertyState, game.economy, game.frenzy, game.epoch)
 		row.buy_requested.connect(_on_buy_requested)
@@ -1022,11 +1033,15 @@ func _on_contact_dismissed() -> void:
 
 	var prop := game.economy.properties[prop_index] as PropertyState
 	_minigame_site = MinigameSite.FIRST_CONTACT
-	_first_contact_prop_index = prop_index
-	# Frame the negotiation around the property's per-unit base income, so the result reads as the
-	# opening income you talked your way into rather than an abstract score.
+	_first_contact_bonus_tier = tier
+	# Frame the negotiation around the FLAGSHIP's per-unit base income (the concrete
+	# number being talked up), but pitched at the civilization: the terms struck here
+	# apply to the epoch's whole cohort (Phase 2).
 	_minigame_screen.start_game(
-		MinigameScreen.first_contact_reward(prop.get_single_unit_income_per_cycle(), prop.config.display_name),
+		MinigameScreen.first_contact_reward(
+			prop.get_single_unit_income_per_cycle(), prop.config.display_name,
+			EpochCatalog.civilization(tier)
+		),
 		dynasty.upgrades.minigame_bonus_max()
 	)
 
@@ -1197,12 +1212,15 @@ func _on_welcome_risk_pressed() -> void:
 ## closing beat — the player drops back into the now-bigger game with the property unlocked (owning
 ## none) and its bonus set. Save so the bonus survives a crash before the next autosave.
 func _finish_first_contact_minigame(multiplier: float) -> void:
-	if _first_contact_prop_index >= 0:
-		var prop := game.economy.properties[_first_contact_prop_index] as PropertyState
+	if _first_contact_bonus_tier > 0:
 		var bonus := _first_contact_bonus_for(multiplier)
-		prop.set_first_contact_bonus(bonus[0], bonus[1])
+		# The negotiated terms cover the epoch's WHOLE COHORT (Phase 2, Tim's call) —
+		# every property gated to this tier gets the same income/cycle bonus.
+		for prop_index in game.economy.get_property_indices_for_unlock_tier(_first_contact_bonus_tier):
+			var prop := game.economy.properties[prop_index] as PropertyState
+			prop.set_first_contact_bonus(bonus[0], bonus[1])
 		SaveManager.save_dict_to_file(dynasty.to_save_dict())
-	_first_contact_prop_index = -1
+	_first_contact_bonus_tier = 0
 
 
 ## Map a First Contact minigame multiplier to the permanent property bonus, as

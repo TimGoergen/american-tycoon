@@ -682,12 +682,18 @@ static func offline_pile_reward(pile: float) -> Dictionary:
 ## upside-only bonus on the new alien property (income + cycle-time) — see Main._first_contact_bonus_for.
 ## `base_income` is that property's per-unit base income per cycle, framed as money so the result reads
 ## as the opening income you negotiated; `property_name` is the business being opened (result heading).
-static func first_contact_reward(base_income: float, property_name: String) -> Dictionary:
+## `civilization` names who is across the table: the terms struck here apply to the
+## epoch's WHOLE cohort (Phase 2), so the round is pitched at the civilization while
+## the flagship's income stays the concrete number being negotiated.
+static func first_contact_reward(
+		base_income: float, property_name: String, civilization: String
+) -> Dictionary:
 	return make_reward(
 		base_income, "", property_name.to_upper(),
-		"Negotiate your opening terms in %s" % property_name, true, true,  # as_money, upside_only
-		"Across the table: a civilization that has never seen a human make a deal. "
-		+ "Open strong, and the terms favor you for good."
+		"Broker the %s trade terms" % civilization, true, true,  # as_money, upside_only
+		("Across the table: a civilization that has never seen a human make a deal. "
+		+ "The terms you strike cover every %s venture — open strong, and they favor "
+		+ "you for good.") % civilization
 	)
 
 

@@ -150,8 +150,11 @@ var _begin_howto: Label
 ## _rebake_backdrop) so the bright bottom-corner art doesn't poke past the screen's rounded frame —
 ## clip_children can't do it here (the project supports only one clip stencil, and Main owns it).
 var _backdrop: TextureRect
-## The size the backdrop was last baked for, so we only re-bake when it actually changes.
-var _baked_backdrop_size: Vector2 = Vector2.ZERO
+## The WHOLE-PIXEL size the backdrop was last baked for, so we only re-bake when it
+## actually changes. Integer pixels, not the float size (Tim, 2026-07-07): sub-pixel
+## layout jitter defeated an exact float compare and could re-run the expensive bake
+## every frame — the same trap that lagged the basketball board (see BasketballMinigame).
+var _baked_backdrop_px: Vector2i = Vector2i.ZERO
 
 ## Challenge Mode (Tim, 2026-06-30): a free-play arcade mode launched from the Minigame Tuning
 ## screen. No time limit, no win/loss reward — the chosen type runs endlessly and we track the raw
@@ -284,9 +287,9 @@ func _rebake_backdrop() -> void:
 	if _backdrop == null:
 		return
 	var target := Vector2i(int(_backdrop.size.x), int(_backdrop.size.y))
-	if target.x < 1 or target.y < 1 or _baked_backdrop_size == _backdrop.size:
+	if target.x < 1 or target.y < 1 or target == _baked_backdrop_px:
 		return
-	_baked_backdrop_size = _backdrop.size
+	_baked_backdrop_px = target
 	var texture := bake_rounded_backdrop(target, UiPalette.SCREEN_CORNER_RADIUS)
 	if texture != null:
 		_backdrop.texture = texture

@@ -125,6 +125,16 @@ func _ready() -> void:
 	_create_game()
 	_build_ui()
 	_apply_offline_if_due()
+	# Desktop diagnosis harness (see CarbAutopilot): scripted rush scenario + per-frame
+	# CSV logging, enabled only by the carb_autolog tuning flag. Rows are built in
+	# ladder-display order, so find the target's row by its property index.
+	if tuning.carb_autolog > 0.5:
+		for row in _rows:
+			if (row as PropertyRow).prop_index == CarbAutopilot.TARGET_INDEX:
+				var autopilot := CarbAutopilot.new()
+				autopilot.setup(game, row as PropertyRow)
+				add_child(autopilot)
+				break
 
 
 func _process(delta: float) -> void:

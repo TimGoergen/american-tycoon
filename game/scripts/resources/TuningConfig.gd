@@ -134,6 +134,40 @@ extends Resource
 ## ×1.5^11 ≈ ×87). The missing term the playtest exposed.
 @export var retention_property_step: float = 1.5  # feel-tune
 
+# --- Carbonation frenzy (diagnosis + feel knobs, Tim 2026-07-08) ---
+# The rush "frenzy" state on property bars, live-tunable from Balance Tuning so its
+# elements can be isolated ON DEVICE (an edge burst kept surviving blind fixes).
+
+## 1 = show a tiny per-row debug readout of the live carbonation numbers (excitement
+## level, bubble base speed, measured fill speed, commanded sweep). 0 = off.
+@export var carb_debug_overlay: float = 0.0
+
+## 1 = on boot, run the scripted CarbAutopilot rush scenario (buy a long-cycle
+## property, hold rush 10s, release, observe) while logging every frame's carbonation
+## internals to user://carb_log.csv, then quit. A desktop diagnosis harness — never
+## ship a build with this on.
+@export var carb_autolog: float = 0.0
+
+## How much faster than the bar's own fill speed the bubbles run while a rush frenzy
+## is engaged (px/s) — a RELATIVE surge: the eye measures bubbles against the bar's
+## motion, so an absolute speed read as a burst on slow fills and lazy on fast ones.
+@export var carb_excited_flow: float = 50.0  # feel-tune
+
+## Horizontal churn wobble amplitude (px) at full frenzy.
+@export var carb_excited_wobble: float = 7.0  # feel-tune
+
+## Per-bubble speed spread's LOWER bound at full frenzy (the crawler/streaker mix).
+@export var carb_excited_spread_lower: float = 0.25  # feel-tune
+
+## Comet-tail visibility during frenzy (0 = suppressed, 1 = full tails). Tails curl
+## more at low speeds, which contributed edge bursts; partial by default.
+@export var carb_excited_tails: float = 0.3  # feel-tune
+
+## Seconds for the frenzy look to ramp in/out. A slower ramp keeps the state change
+## from registering as an event of its own. 0.9 = Tim's on-device tuned value
+## (2026-07-08), promoted from his override to the shipped default.
+@export var carb_excited_ease: float = 0.9  # feel-tuned on device
+
 ## Offline income efficiency vs. live play (0–1).
 @export var offline_efficiency: float = 0.5  # TBD-SIM
 

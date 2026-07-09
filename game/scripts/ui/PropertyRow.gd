@@ -137,6 +137,26 @@ const RUSHED_SOLID_THRESHOLD_SEC := 0.4
 ## to solid read as sudden (Tim, 2026-07-07). 3.0 = the remaining lap in ⅓s at most.
 const PIN_FILL_PER_SEC := 3.0
 
+## ALL rush presentation (color, boosted income readout, excitement, solid pin, sweep
+## rate) engages only after the rush has been HELD this long — a mere START/rush tap
+## presses the same button for a few frames, which flashed the whole rush look on
+## every tap (Tim, 2026-07-08). A real hold reaches this within its first pulse; a
+## tap never does. The pump itself is NOT gated: pulses land from the first interval.
+const RUSH_ENGAGE_SEC := 0.3
+
+## The displayed bar's sweep rate eases toward its target (natural or rushed) with
+## this time constant, so engaging/releasing a rush ACCELERATES the sweep instead of
+## snapping it — a fill-speed snap stretches the bubble field and reads as a frenzy
+## sprint at the hold's edges (Tim, 2026-07-08: the frenzy must be constant).
+const SWEEP_EASE_TAU := 0.3
+
+## The catch-up may move the bar at most this multiple of the CURRENT sweep rate.
+## 1.0 — NO headroom (autopilot data, 2026-07-08: even 1.15 made the engage window
+## run measurably 15% hotter than the sustained sweep for its first two seconds).
+## Phase re-syncs at the wraps instead, where the metronome wrap below absorbs any
+## displayed-vs-true drift for free.
+const CATCHUP_RATE_HEADROOM := 1.0
+
 ## A pinned-solid bar's commanded liquid flow (px/s), fed to its GoldBubbles overlay.
 ## Deliberately brisk: solid means "cycling faster than the eye", so the MOST active
 ## property should carry the most active fizz — not sink to the idle drift a motionless
@@ -149,6 +169,13 @@ const SOLID_FLOW_RUSH_MULT := 1.6
 
 ## Whether the bar was pinned solid last frame — unpinning restarts the visible lap.
 var _was_pinned := false
+
+## Seconds the rush has been continuously held (0 when not held) — gates the whole
+## rush presentation past RUSH_ENGAGE_SEC so taps don't flash it.
+var _rush_hold_seconds := 0.0
+
+## The displayed bar's eased sweep rate (bars/sec) — see SWEEP_EASE_TAU.
+var _sweep_rate := 0.0
 
 ## The per-second rate this row's income label currently shows (rush-boosted while rush
 ## is held; 0 for an unowned row's buy-in preview). Cached each _refresh; Main sums it
@@ -211,6 +238,8 @@ var _count_label: Label
 var _income_label: Label
 var _cycle_bar: ProgressBar
 var _cycle_bubbles: GoldBubbles
+## Diagnosis readout over the bar, shown when tuning.carb_debug_overlay = 1.
+var _carb_debug_label: Label
 var _buy_button: Button
 var _buy_caption_label: Label
 var _buy_cost_label: Label
@@ -335,6 +364,26 @@ func _ready() -> void:
 	# Kept as a member: the refresh commands their flow speed while the bar is pinned solid.
 	_cycle_bubbles = GoldBubbles.new()
 	_cycle_bar.add_child(_cycle_bubbles)
+
+	# Tiny diagnosis readout over the bar (tuning.carb_debug_overlay = 1 in Balance
+	# Tuning): the live numbers driving the carbonation, so an on-device eye report can
+	# be matched to WHICH parameter actually moved (Tim, 2026-07-08 — the frenzy edge
+	# burst survived several model-based fixes; this ends the guessing).
+	_carb_debug_label = Label.new()
+	_carb_debug_label.add_theme_font_size_override("font_size", 22)
+	# White with a navy outline so it reads on ANY fill color — the first pass was
+	# plain black at the bar's top-left, exactly where the income label already draws.
+	_carb_debug_label.add_theme_color_override("font_color", Color.WHITE)
+	_carb_debug_label.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
+	_carb_debug_label.add_theme_constant_override("outline_size", 6)
+	_carb_debug_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	# Pinned along the bar's TOP-RIGHT, clear of the left-aligned income readout.
+	_carb_debug_label.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_carb_debug_label.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_carb_debug_label.position.y = 2
+	_carb_debug_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_carb_debug_label.visible = false
+	_cycle_bar.add_child(_carb_debug_label)
 	bar_cell.add_child(_cycle_bar)
 
 	# Per-cycle income: bold BLACK, LEFT-aligned, drawn ON TOP of the bar and vertically centered
@@ -676,13 +725,18 @@ func _refresh(delta: float) -> void:
 	# looked at the Button, so a rushed row didn't always present as rushing).
 	var rush_held := (_manager_circle.is_held() or _secondary_held("rush")) \
 			and _prop.units_owned > 0
+	# The ENGAGED flag: held long enough to count as a real hold (see RUSH_ENGAGE_SEC).
+	# Every rush-presentation element below keys off THIS, never the raw press, so a
+	# single tap changes nothing on screen (Tim, 2026-07-08).
+	_rush_hold_seconds = (_rush_hold_seconds + delta) if rush_held else 0.0
+	var rush_engaged := _rush_hold_seconds >= RUSH_ENGAGE_SEC
 	# Deliberately NOT gated on is_cycle_running: an UNSTAFFED property's cycle stops the
 	# instant it pays out and only restarts on the next held-rush pulse, so gating on it
 	# made the readout (and the solid pin) flicker back to the calm display for a few
 	# frames at the end of every cycle (Tim, 2026-07-08). While rush is held the restart
 	# is guaranteed, so the rushed rate stays honest across that momentary gap.
 	var rushed_fractions_per_second := 0.0
-	if rush_held and effective_length > 0.0:
+	if rush_engaged and effective_length > 0.0:
 		rushed_fractions_per_second = 1.0 / effective_length \
 				+ _prop.tuning.hold_rush_per_second * _prop.tuning.rush_pct * _prop.rush_power_multiplier
 	if rushed_fractions_per_second > 0.0:
@@ -734,10 +788,19 @@ func _refresh(delta: float) -> void:
 		# bar just reads as "maxed and humming".
 		_displayed_cycle_fraction = minf(_displayed_cycle_fraction + delta * PIN_FILL_PER_SEC, 1.0)
 		_finish_lap_pending = false
-	elif not _prop.is_cycle_running or _prop.units_owned == 0:
+	elif (not _prop.is_cycle_running and not rush_engaged) or _prop.units_owned == 0:
 		# Idle or empty: nothing is advancing, so just mirror the true value exactly.
+		# An ENGAGED rush is never idle: an unstaffed cycle stops for a few frames at
+		# every payout until the next pulse restarts it, and routing those frames here
+		# hard-reset the eased sweep to natural — so the "constant" rushed sweep was
+		# actually a sawtooth re-accelerating from scratch every lap (caught red-handed
+		# by Tim's debug-overlay data, 2026-07-08: swp cycled 17→283 within each lap).
 		_displayed_cycle_fraction = true_fraction
 		_finish_lap_pending = false
+		# Park the eased sweep at the natural rate so a later start doesn't inherit
+		# a stale rushed rate (or a zero) from long ago.
+		if effective_length > 0.0:
+			_sweep_rate = 1.0 / effective_length
 	else:
 		# A completed cycle (detected above) means the displayed bar usually hasn't
 		# reached the right edge yet (it lags — see _finish_lap_pending), so it owes a
@@ -747,20 +810,39 @@ func _refresh(delta: float) -> void:
 		# While a lap is owed, the chase target sits one full bar ahead of the true
 		# progress: the bar fills through 1.0, then wraps onto the new cycle below.
 		var target := true_fraction + (1.0 if _finish_lap_pending else 0.0)
-		# Running: advance at the real fill rate. If the target has jumped ahead of that
-		# prediction — a rush, or several per second while the rush button is held —
-		# ease the bar UP toward it instead of snapping, so a held rush reads as smooth
-		# acceleration rather than a stutter of discrete jumps.
-		var advanced := _displayed_cycle_fraction + delta / effective_length
+		# Running: advance at the real fill rate — the DETERMINISTIC rushed rate while
+		# an engaged rush is held (the same number the income readout shows). The rate
+		# is EASED between natural and rushed (SWEEP_EASE_TAU) so engaging/releasing
+		# accelerates the sweep instead of snapping it: a fill-speed snap stretches the
+		# bubble field and reads as a frenzy sprint at the hold's edges. One smooth,
+		# constant sweep = one constant frenzy (Tim, 2026-07-08).
+		var target_rate := 1.0 / effective_length
+		if rushed_fractions_per_second > 0.0:
+			target_rate = rushed_fractions_per_second
+		_sweep_rate = lerpf(_sweep_rate, target_rate, 1.0 - exp(-delta / SWEEP_EASE_TAU))
+		var advanced := _displayed_cycle_fraction + delta * _sweep_rate
 		if target > advanced:
+			# Catch-up (single rush taps, the engage moment, the owed lap after a
+			# release): capped at a small headroom over the CURRENT sweep rate, so
+			# closing the gap never moves the fill visibly faster than the sweep
+			# itself — the gap absorbs as a phase drift over seconds, not a sprint.
 			var catchup := 1.0 - exp(-delta / RUSH_CATCHUP_TAU)
-			_displayed_cycle_fraction = lerpf(advanced, target, catchup)
+			var candidate := lerpf(advanced, target, catchup)
+			var max_step := _sweep_rate * CATCHUP_RATE_HEADROOM * delta
+			_displayed_cycle_fraction = minf(candidate, _displayed_cycle_fraction + max_step)
 		else:
 			_displayed_cycle_fraction = advanced
 		if _finish_lap_pending and _displayed_cycle_fraction >= 1.0:
 			# The bar visibly touched the right edge — wrap onto the new cycle, carrying
 			# any overshoot so the motion stays continuous.
 			_finish_lap_pending = false
+			_displayed_cycle_fraction -= 1.0
+		elif rush_engaged and _displayed_cycle_fraction >= 1.0:
+			# METRONOME wrap while an engaged rush sweeps: never wait at full for the
+			# pulse-stepped true progress to catch up — that wait was a ~quarter-second
+			# stall (fill speed dipping 280 → 120) every single lap, the last rhythm
+			# blip in the frenzy (autopilot data, 2026-07-08). Rate is what matters
+			# during a hold; phase re-syncs on release via the normal machinery.
 			_displayed_cycle_fraction -= 1.0
 		_displayed_cycle_fraction = clampf(_displayed_cycle_fraction, 0.0, 1.0)
 	_last_true_cycle_fraction = true_fraction
@@ -771,16 +853,36 @@ func _refresh(delta: float) -> void:
 	# rushable — see `interactive` above), so the bar drops its active green for a calm
 	# blue. Otherwise it stays green, brightening while the rush button is actively held.
 	var rush_no_longer_option := staffed and not interactive
-	_set_cycle_color(rush_no_longer_option, rush_held)
+	_set_cycle_color(rush_no_longer_option, rush_engaged)
 
 	# Carbonation on a pinned-solid bar: the fill edge isn't moving, so the bubbles
 	# would sink to their idle drift — command a brisk flow instead (faster still while
-	# rush is held), so the busiest property carries the busiest fizz and rushing a
-	# solid bar visibly does something (see SOLID_FLOW_PX).
+	# an engaged rush is held), so the busiest property carries the busiest fizz and
+	# rushing a solid bar visibly does something (see SOLID_FLOW_PX).
 	if pinned:
-		_cycle_bubbles.flow_override_px = SOLID_FLOW_PX * (SOLID_FLOW_RUSH_MULT if rush_held else 1.0)
+		_cycle_bubbles.flow_override_px = SOLID_FLOW_PX * (SOLID_FLOW_RUSH_MULT if rush_engaged else 1.0)
 	else:
 		_cycle_bubbles.flow_override_px = -1.0
+	# Rush agitates the liquid itself (work item 5): the excitement knob scales the
+	# whole package — denser crowd, commanded flow, livelier sway, churn wobble.
+	_cycle_bubbles.excitement = 1.0 if rush_engaged else 0.0
+	# Push the live-tunable frenzy knobs in (Balance Tuning edits these on device, so
+	# the frenzy's elements can be isolated without a rebuild).
+	_cycle_bubbles.excited_flow_px = _prop.tuning.carb_excited_flow
+	_cycle_bubbles.excited_wobble_px = _prop.tuning.carb_excited_wobble
+	_cycle_bubbles.excited_spread_lower = _prop.tuning.carb_excited_spread_lower
+	_cycle_bubbles.excited_tail_visibility = _prop.tuning.carb_excited_tails
+	_cycle_bubbles.excitement_ease_tau = _prop.tuning.carb_excited_ease
+
+	# The diagnosis overlay: live values driving this row's carbonation (reading the
+	# bubbles' internals directly is fine here — this label exists only to expose them).
+	var debug_on := _prop.tuning.carb_debug_overlay > 0.5 and owned
+	_carb_debug_label.visible = debug_on
+	if debug_on:
+		_carb_debug_label.text = "lv %.2f  bub %d  fill %d  swp %d px/s" % [
+			_cycle_bubbles._excitement_level, int(_cycle_bubbles._base_speed_px),
+			int(_cycle_bubbles._smoothed_speed_px), int(_sweep_rate * _cycle_bar.size.x),
+		]
 
 	_refresh_buy_button()
 	_refresh_hire_button()

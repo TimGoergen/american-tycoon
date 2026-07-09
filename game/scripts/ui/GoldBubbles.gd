@@ -30,8 +30,11 @@ extends Control
 # from a fixed per-bubble hash, so the crowd never marches in lockstep yet looks
 # identical across identical bars.
 
-## The full bubble crowd. Narrow fills show a subset (see BUBBLE_SPACING_PX).
+## The full CALM bubble crowd. Narrow fills show a subset (see BUBBLE_SPACING_PX).
 const BUBBLE_COUNT := 24  # +25% (Tim, 2026-07-05), then +60% (Tim, 2026-07-06)
+## The position pool is sized for the biggest crowd excitement can ask for
+## (BUBBLE_COUNT × (1 + EXCITED_DENSITY_BOOST)) so the boost never indexes past it.
+const MAX_BUBBLE_COUNT := 36
 ## One bubble becomes active per this many pixels of filled width (min 2), so a sliver
 ## of fill fizzes with a couple of distinct bubbles instead of a crammed dozen.
 const BUBBLE_SPACING_PX := 13.75  # 22.0 / 1.6 — scaled with the +60% count (Tim, 2026-07-06)
@@ -143,6 +146,53 @@ var density_scale := 1.0
 ## (Tim, 2026-07-06). Tracer tails trail to the right accordingly.
 var flow_reversed := false
 
+## EXCITEMENT (0–1): how agitated the liquid is. 0 = calm (the default everywhere);
+## a property row sets 1 while its rush is held (Tim, 2026-07-07 debrief, work item 5 —
+## rush should visibly whip the liquid up). One knob scales a whole package: more
+## bubbles, a higher idle floor and measured cap on the flow, livelier sway, and a
+## small extra wobble that exists ONLY while excited — the "stacked waves" chaos that
+## was removed from calm bars returns here as deliberate agitation. Hosts set the
+## TARGET; the level eases toward it so agitation ramps in and out, never snaps.
+var excitement := 0.0
+var _excitement_level := 0.0
+## Ease time constant for the level — a VAR (carb_excited_ease) so the ramp speed can
+## be trialed live: a slow ramp tests whether the edge "burst" is the state change
+## itself registering as an event rather than any actual speed excess.
+var excitement_ease_tau := 0.25
+const EXCITED_DENSITY_BOOST := 0.5      # +50% crowd at full excitement
+## The COMMANDED flow while agitated. Excitement bypasses the measured fill speed
+## entirely (blended in by the eased level): the measured path ramps at every press
+## and release, and since the chaos CHARACTER depends on speed (slow bubbles coil
+## their tails into squiggles, fast ones stretch them straight), those ramps made the
+## frenzy look twice as wild at the edges as in the sustained middle (Tim, 2026-07-08:
+## the frenzy must be CONSTANT from start to end).
+## VARS, not consts (Tim, 2026-07-08): the hosts push the carb_excited_* tuning knobs
+## in each frame, so the frenzy's elements can be isolated and tuned live ON DEVICE
+## from the Balance Tuning screen — the edge burst kept surviving blind fixes.
+## Since the relative-frame fix this is the SURGE the bubbles run ABOVE the fill's
+## own speed while excited (px/s), not an absolute flow.
+var excited_flow_px := 50.0
+const EXCITED_SWAY_HZ_BOOST := 0.45     # sway rates run up to this much faster
+## The agitation wobble: sized to stay visible inside the excited flow's streaming
+## (3px vanished under the motion). Constant while excited, like everything else.
+var excited_wobble_px := 7.0
+const EXCITED_WOBBLE_HZ := 2.3
+## While excited, the per-bubble speed spread's LOWER bound drops to this, so the crowd
+## is a chaotic mix of crawlers and streakers instead of a uniform stream — sustained
+## chaos that reads at any flow speed. The UPPER bound is untouched: the fastest
+## bubbles never exceed what the governed speed ladder already allows.
+var excited_spread_lower := 0.25
+## Comet-tail visibility at FULL excitement (0 = suppressed, 1 = full tails). Tails
+## curl inversely with speed, which contributed the edge bursts; partial by default.
+var excited_tail_visibility := 0.3
+## An excited fill keeps at least this many bubbles no matter how NARROW it is. Without
+## a floor the crowd is proportional to filled width, so the moment a rushed bar
+## wrapped, the count collapsed to a handful for most of each lap — every agitation
+## parameter was maxed but there was nothing on screen to show it, which read as the
+## frenzy "fading" within a cycle (Tim, 2026-07-08). A cramped fast-wrapping swarm in a
+## narrow fill is exactly the churn agitation should look like.
+const EXCITED_MIN_ACTIVE := 12
+
 var _time := 0.0
 var _last_fraction := 0.0
 var _smoothed_speed_px := 0.0  # measured fill-edge speed, px/s, smoothed
@@ -168,7 +218,8 @@ func _ready() -> void:
 	# subset is active starts well distributed through the fill. This is the ONE place the
 	# golden-ratio sequence is used directly — every other per-bubble trait comes from the
 	# _variant hash, so traits are independent of position (see _variant's comment).
-	for i in range(BUBBLE_COUNT):
+	# Sized to the excitement-boosted maximum, not the calm count (see MAX_BUBBLE_COUNT).
+	for i in range(MAX_BUBBLE_COUNT):
 		_bubble_pos.append(fmod(float(i) * 0.61803, 1.0))
 
 
@@ -203,10 +254,14 @@ func _current_fraction() -> float:
 	return 0.0
 
 
-## How many bubbles a fill this wide can host without crowding (scaled by density_scale).
+## How many bubbles a fill this wide can host without crowding (scaled by density_scale,
+## and boosted while excited — an agitated liquid froths with a bigger crowd, and never
+## thins below EXCITED_MIN_ACTIVE while agitated, however narrow the fill).
 func _active_count(filled_width: float) -> int:
-	var cap := maxi(2, int(round(BUBBLE_COUNT * density_scale)))
-	return clampi(int(filled_width / BUBBLE_SPACING_PX * density_scale), 2, cap)
+	var density := density_scale * (1.0 + EXCITED_DENSITY_BOOST * _excitement_level)
+	var cap := clampi(int(round(BUBBLE_COUNT * density)), 2, MAX_BUBBLE_COUNT)
+	var min_active := 2 + int(round((float(EXCITED_MIN_ACTIVE) - 2.0) * _excitement_level))
+	return clampi(int(filled_width / BUBBLE_SPACING_PX * density), mini(min_active, cap), cap)
 
 
 func _process(delta: float) -> void:
@@ -225,15 +280,28 @@ func _process(delta: float) -> void:
 	var blend := 1.0 - exp(-delta / SPEED_SMOOTH_TAU)
 	_smoothed_speed_px = lerpf(_smoothed_speed_px, raw_speed_px, blend)
 
+	# Ease the agitation level toward its target so excitement ramps, never snaps.
+	var excite_blend := 1.0 - exp(-delta / maxf(0.01, excitement_ease_tau))
+	_excitement_level = lerpf(_excitement_level, clampf(excitement, 0.0, 1.0), excite_blend)
+
 	# The bar's own speed, floored so still bars keep fizzing and CAPPED below the
 	# commanded solid-bar speeds (see MEASURED_FLOW_CAP_PX) — unless the host commanded
 	# a flow directly (flow_override_px), which is exempt: those ARE the top rungs.
+	# Excitement blends toward the fill's own speed PLUS a constant surge (Tim's
+	# decisive on-device observation, 2026-07-08: the eye measures bubble speed
+	# RELATIVE to the bar's motion — an absolute commanded 90 px/s OUTRAN the slow
+	# fill during the engage ramp, reading as a burst, then fell ~200 px/s BEHIND the
+	# sustained ~283 px/s sweep, reading as lazy). Riding fill + surge keeps the
+	# RELATIVE churn constant at any sweep speed. Deliberately uncapped while excited:
+	# during an engaged rush the fill itself is already the fastest thing on screen.
 	if flow_override_px >= 0.0:
 		_base_speed_px = flow_override_px
 	else:
-		_base_speed_px = clampf(
+		var measured := clampf(
 			_smoothed_speed_px * SPEED_VS_BAR, MIN_DRIFT_PX_PER_SEC, MEASURED_FLOW_CAP_PX
 		)
+		var excited := _smoothed_speed_px * SPEED_VS_BAR + excited_flow_px
+		_base_speed_px = lerpf(measured, excited, _excitement_level)
 
 	# How close the bar is to a crawl: 1.0 at (or below) the idle-drift floor, fading to
 	# 0.0 as the bar speeds up. Widens the per-bubble speed range on slow bars (see the
@@ -243,7 +311,7 @@ func _process(delta: float) -> void:
 
 	var filled_width := fraction * track_width
 	if filled_width >= MIN_FILLED_WIDTH_PX:
-		for i in range(BUBBLE_COUNT):
+		for i in range(MAX_BUBBLE_COUNT):
 			# Each bubble drifts at its own rate between the lower bound and the (speed-
 			# dependent) upper bound, so the crowd spreads out instead of traveling as one
 			# body. Positions advance in normalized space: the same px/s reads as a bigger
@@ -258,8 +326,11 @@ func _process(delta: float) -> void:
 
 ## One bubble's own drift speed (px/s), between the lower bound and the slow-bar-aware
 ## upper bound. Shared by the position advance and the tracer path so they always agree.
+## Excitement WIDENS the spread downward (see EXCITED_SPREAD_LOWER): an agitated crowd
+## mixes crawlers with streakers instead of streaming uniformly.
 func _bubble_speed_px(index: int) -> float:
-	return _base_speed_px * lerpf(1.0 - SPEED_SPREAD, _upper_mult, _variant(index, 0.37))
+	var lower := lerpf(1.0 - SPEED_SPREAD, excited_spread_lower, _excitement_level)
+	return _base_speed_px * lerpf(lower, _upper_mult, _variant(index, 0.37))
 
 
 func _draw() -> void:
@@ -281,15 +352,23 @@ func _draw() -> void:
 		# bubble's own path — the wake it just swirled through — with per-point alpha
 		# fading toward the end. TRACER_GAP_PX of drift converts to this bubble's own
 		# seconds-ago (see the TRACER_* comment for why distance, not time).
+		#
+		# Tails are SUPPRESSED while excited (faded by the eased level): a tail's curl
+		# is inversely proportional to its bubble's speed, so the engage/release ramps —
+		# which necessarily pass through low speeds with agitation already active —
+		# rendered every tail 2–3× curlier than the sustained state, the edge burst
+		# that survived every rate-shaping fix (Tim, 2026-07-08). Frenzy is the swarm;
+		# calm is the comets.
+		var tail_visibility := lerpf(1.0, excited_tail_visibility, _excitement_level)
 		var seconds_per_gap := TRACER_GAP_PX / _bubble_speed_px(i)
 		var tail_width := radius * TRACER_WIDTH_VS_RADIUS
 		var tail_points := PackedVector2Array()
 		var tail_colors := PackedColorArray()
 		var head_point_color := bubble_color
-		head_point_color.a = head_alpha
+		head_point_color.a = head_alpha * tail_visibility
 		tail_points.append(head)
 		tail_colors.append(head_point_color)
-		var sample_alpha := head_alpha
+		var sample_alpha := head_alpha * tail_visibility
 		for sample in range(1, TRACER_COUNT + 1):
 			sample_alpha *= TRACER_ALPHA_FALLOFF
 			var point := _bubble_point(i, radius, filled_width, float(sample) * seconds_per_gap)
@@ -304,7 +383,7 @@ func _draw() -> void:
 			var sample_color := bubble_color
 			sample_color.a = sample_alpha
 			tail_colors.append(sample_color)
-		if tail_points.size() >= 2:
+		if tail_points.size() >= 2 and tail_visibility > 0.02:
 			draw_polyline_colors(tail_points, tail_colors, tail_width, true)
 
 		var color := bubble_color
@@ -354,12 +433,18 @@ func _bubble_point(index: int, radius: float, filled_width: float, seconds_ago: 
 	var at_time := _time - seconds_ago
 	var phase := _variant(index, 0.53) * TAU
 	# One clean sine at this bubble's own fixed rate, phase, and amplitude, around its own
-	# lane. Deliberately NOT a stack of waves — see the SWAY_* comment above.
-	var sway_hz := lerpf(SWAY_HZ_MIN, SWAY_HZ_MAX, _variant(index, 0.29))
+	# lane. Deliberately NOT a stack of waves on a CALM bar — see the SWAY_* comment
+	# above; the extra wobble below exists only in proportion to excitement.
+	var sway_hz := lerpf(SWAY_HZ_MIN, SWAY_HZ_MAX, _variant(index, 0.29)) \
+			* (1.0 + EXCITED_SWAY_HZ_BOOST * _excitement_level)
 	var sway_fraction := lerpf(SWAY_FRACTION_MIN, SWAY_FRACTION_MAX, _variant(index, 0.83))
 	var sway := sin(at_time * TAU * sway_hz + phase) * size.y * sway_fraction
 	# The lane: -1..+1 from the hash, scaled to the offset limit.
 	var lane := (_variant(index, 0.91) * 2.0 - 1.0) * size.y * LANE_OFFSET_FRACTION
+	# The agitation wobble: horizontal churn, scaled purely by the eased excitement —
+	# the flow itself is a constant while excited, so the whole look holds steady.
+	var wobble := sin(at_time * TAU * EXCITED_WOBBLE_HZ + phase * 3.0) \
+			* excited_wobble_px * _excitement_level
 	# Map the normalized position into the filled region, rolled back along the drift —
 	# backward is rightward when the flow is reversed. NOT clamped here: the head clamps
 	# itself in _draw, while out-of-fill tail samples are dropped by the caller (clamping
@@ -368,5 +453,5 @@ func _bubble_point(index: int, radius: float, filled_width: float, seconds_ago: 
 	if flow_reversed:
 		rollback = -rollback
 	var drift_px := _bubble_pos[index] * (filled_width - radius * 2.0) - rollback
-	var x := edge_inset + radius + drift_px
+	var x := edge_inset + radius + drift_px + wobble
 	return Vector2(x, size.y / 2.0 + lane + sway)

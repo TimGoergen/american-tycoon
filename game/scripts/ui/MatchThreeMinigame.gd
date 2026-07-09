@@ -76,10 +76,9 @@ const CELL_SIZE := 104
 const GAP := 8
 const PITCH := CELL_SIZE + GAP
 
-## The bonus banner's gem tile — larger than a board cell so this round's AVOID gem stands
-## out as a prominent "steer around this" cue pinned above the grid. Trimmed 198→132 to give
-## the wider board the vertical room it needs inside the card.
-const BONUS_ICON_SIZE := 110
+## The bonus banner's gem tile — this round's AVOID gem, shown large as a prominent "steer around
+## this" cue pinned above the grid. Doubled to 220 (Tim, 2026-07-09) so it reads unmistakably.
+const BONUS_ICON_SIZE := 220
 
 ## How far a press must move before it counts as a drag-swap (rather than a stray tap).
 const DRAG_THRESHOLD := CELL_SIZE * 0.4

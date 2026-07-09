@@ -155,7 +155,10 @@ var flow_reversed := false
 ## TARGET; the level eases toward it so agitation ramps in and out, never snaps.
 var excitement := 0.0
 var _excitement_level := 0.0
-const EXCITEMENT_EASE_TAU := 0.25
+## Ease time constant for the level — a VAR (carb_excited_ease) so the ramp speed can
+## be trialed live: a slow ramp tests whether the edge "burst" is the state change
+## itself registering as an event rather than any actual speed excess.
+var excitement_ease_tau := 0.25
 const EXCITED_DENSITY_BOOST := 0.5      # +50% crowd at full excitement
 ## The COMMANDED flow while agitated. Excitement bypasses the measured fill speed
 ## entirely (blended in by the eased level): the measured path ramps at every press
@@ -277,7 +280,7 @@ func _process(delta: float) -> void:
 	_smoothed_speed_px = lerpf(_smoothed_speed_px, raw_speed_px, blend)
 
 	# Ease the agitation level toward its target so excitement ramps, never snaps.
-	var excite_blend := 1.0 - exp(-delta / EXCITEMENT_EASE_TAU)
+	var excite_blend := 1.0 - exp(-delta / maxf(0.01, excitement_ease_tau))
 	_excitement_level = lerpf(_excitement_level, clampf(excitement, 0.0, 1.0), excite_blend)
 
 	# The bar's own speed, floored so still bars keep fizzing and CAPPED below the

@@ -92,6 +92,7 @@ const DESCRIPTIONS := {
 	"carb_excited_wobble": "Frenzy churn wobble amplitude in pixels.",
 	"carb_excited_spread_lower": "Frenzy speed-mix lower bound (0.25 = crawlers among streakers).",
 	"carb_excited_tails": "Comet-tail visibility during frenzy (0 = hidden, 1 = full).",
+	"carb_excited_ease": "Seconds for the frenzy look to ramp in/out (try 1.0-1.5 if edges pop).",
 	"offline_efficiency": "Offline income rate vs live play (0–1).",
 	"offline_cap_seconds": "Longest offline accrual window (seconds; 14400 = 4h).",
 	"frenzy_max_multiplier": "Peak income multiplier during a frenzy burn.",

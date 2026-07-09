@@ -161,6 +161,11 @@ extends Resource
 ## more at low speeds, which contributed edge bursts; partial by default.
 @export var carb_excited_tails: float = 0.3  # feel-tune
 
+## Seconds for the frenzy look to ramp in/out. If the kinematics are provably constant
+## but the edges still read as bursts, the burst is the STATE CHANGE itself registering
+## as an event — try 1.0–1.5 so the frenzy fades in too gradually to read as one.
+@export var carb_excited_ease: float = 0.25  # feel-tune
+
 ## Offline income efficiency vs. live play (0–1).
 @export var offline_efficiency: float = 0.5  # TBD-SIM
 

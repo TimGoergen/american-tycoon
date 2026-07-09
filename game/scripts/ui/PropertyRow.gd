@@ -872,6 +872,7 @@ func _refresh(delta: float) -> void:
 	_cycle_bubbles.excited_wobble_px = _prop.tuning.carb_excited_wobble
 	_cycle_bubbles.excited_spread_lower = _prop.tuning.carb_excited_spread_lower
 	_cycle_bubbles.excited_tail_visibility = _prop.tuning.carb_excited_tails
+	_cycle_bubbles.excitement_ease_tau = _prop.tuning.carb_excited_ease
 
 	# The diagnosis overlay: live values driving this row's carbonation (reading the
 	# bubbles' internals directly is fine here — this label exists only to expose them).

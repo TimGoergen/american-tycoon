@@ -35,8 +35,11 @@ func _ready() -> void:
 	viewing_area.add_theme_stylebox_override("panel", UiPalette.make_screen_panel_style())
 	add_child(viewing_area)
 
-	# Top half = logo, bottom half = content. Both rows expand-fill with equal weight for a 50/50
-	# split; the logo keeps its aspect ratio centered within its half.
+	# The screen is split by a fixed 3:2 weight (independent of which content shows), so the logo and
+	# the content both sit at the SAME place on both the pile and the plain-launch screen (Tim,
+	# 2026-07-09). The content is pinned to the TOP of its region, so its top edge — "the buttons/text
+	# below" — lands at the same y regardless of height, and the logo is centered in the whole gap
+	# above it.
 	var rows := VBoxContainer.new()
 	rows.add_theme_constant_override("separation", 8)
 	viewing_area.add_child(rows)
@@ -47,18 +50,33 @@ func _ready() -> void:
 	_logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_logo.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_logo.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_logo.size_flags_stretch_ratio = 3.0  # logo gets the top ~60% (centered within it)
 	rows.add_child(_logo)
 
-	# The bottom half, its content centered.
-	var bottom := CenterContainer.new()
+	# The content region: fixed ~40% at the bottom, its content pinned to the TOP and horizontally
+	# centered (a fixed y on both screens), so the logo above is centered in the same gap either way.
+	var bottom := VBoxContainer.new()
 	bottom.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bottom.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	bottom.size_flags_stretch_ratio = 2.0
+	bottom.alignment = BoxContainer.ALIGNMENT_BEGIN  # content pinned to the TOP of this region
 	rows.add_child(bottom)
+
+	var center_row := HBoxContainer.new()
+	center_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bottom.add_child(center_row)
+	var pad_left := Control.new()
+	pad_left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	center_row.add_child(pad_left)
 
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 16)
 	column.custom_minimum_size = Vector2(760, 0)
-	bottom.add_child(column)
+	center_row.add_child(column)
+
+	var pad_right := Control.new()
+	pad_right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	center_row.add_child(pad_right)
 
 	_pile_content = _build_pile_content()
 	column.add_child(_pile_content)

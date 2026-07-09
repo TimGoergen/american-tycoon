@@ -19,7 +19,7 @@ const ZONE_HALF := 0.11          # half-height of the gold zone (track fraction)
 ## LIFT beats GRAVITY (or holding forever couldn't climb); the margin between them and
 ## the damping set the game's tension. All first-pass values — feel-tune on device.
 const LIFT_ACCEL := 3.0          # upward push while held (track-fractions / sec^2)
-const GRAVITY := 1.5             # downward pull always (track-fractions / sec^2)
+const GRAVITY := 1.9             # downward pull always (track-fractions / sec^2)
 const DAMPING := 1.8             # velocity damping per second (keeps it controllable)
 ## Hitting the track's floor or ceiling bounces the marker back softly rather than
 ## sticking it there — the Stardew bobber "thunk" that punishes slamming an edge.
@@ -27,8 +27,8 @@ const EDGE_BOUNCE := 0.35
 
 # The gold zone wanders: it eases toward a randomly re-rolled target center, so it
 # slides smoothly rather than jumping. ZONE_EASE controls how quickly it catches up.
-const ZONE_TARGET_CHANGE := 1.8  # seconds between new zone-target re-rolls
-const ZONE_EASE := 1.4           # how fast the zone center eases toward its target (per sec)
+const ZONE_TARGET_CHANGE := 1.3  # seconds between new zone-target re-rolls
+const ZONE_EASE := 1.8           # how fast the zone center eases toward its target (per sec)
 
 ## The vertical track's on-screen width.
 const TRACK_WIDTH := 150.0

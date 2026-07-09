@@ -24,6 +24,11 @@ signal finished(multiplier: float, opt_out: bool)
 ## play never affects the run's Legacy.
 signal back_pressed
 
+## Emitted alongside `finished` when the player collected a Legacy gem this round and the result
+## wasn't bad — `amount` is the already-computed unearned Legacy to grant (see Plans/Legacy_Bonus_
+## System.md). Main banks it to the dynasty wallet. Never emitted in review/Challenge or on Skip.
+signal legacy_bonus_earned(amount: int)
+
 # The minigame library — the host draws one at random each round so the player doesn't know
 # which they'll get. Add new types here (Phase 2).
 const MINIGAME_TYPES := [
@@ -88,6 +93,9 @@ var _format_as_money: bool = false
 ## multiplier. Changes the SKIP label, the stakes blurb, and the result screen to match.
 var _upside_only: bool = false
 var _bonus_max: float = 0.25
+## The dynasty's lifetime-earned Legacy, set by Main before a real round so the host can size the
+## Legacy-gem bonus (0.1% of this per gem). Stays 0 in review/Challenge → no bonus is ever granted.
+var _legacy_lifetime: int = 0
 var _seconds_left: float = 0.0
 var _playing: bool = false
 var _opt_out: bool = false
@@ -135,6 +143,9 @@ var _result_amount_label: Label
 ## A type-specific line on the result screen ("Scored 1,240 points", "Caught 14 of 18"), so the
 ## paused result clearly reflects the game just played. Hidden when the type provides none.
 var _result_summary_label: Label
+## The Legacy-gem bonus line ("LEGACY BONUS +N gems" / "gems lost"), shown only when the player
+## collected a gem this round. See _show_result / _legacy_bonus_amount.
+var _result_legacy_label: Label
 var _opt_out_check: CheckBox
 
 ## The "Get Ready / BEGIN" gate shown over the card at the start of every round. The clock and the
@@ -181,6 +192,12 @@ var _begin_framing: Label
 
 func setup(tuning: TuningConfig) -> void:
 	_tuning = tuning
+
+
+## Main calls this before a REAL round with the dynasty's lifetime-earned Legacy, so the host can
+## size any Legacy-gem bonus. Left at 0 for review/Challenge rounds, which never grant a bonus.
+func set_legacy_lifetime(lifetime: int) -> void:
+	_legacy_lifetime = maxi(0, lifetime)
 
 
 func _ready() -> void:
@@ -474,6 +491,16 @@ func _build_result_view() -> Control:
 	_result_summary_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_result_summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(_result_summary_label)
+
+	# The Legacy-gem bonus line — shown only when the player collected a gem this round. Gold with a
+	# navy outline so the windfall reads as special against the cream result card.
+	_result_legacy_label = _make_label("", UiPalette.FONT_SUBHEAD, UiPalette.MUSTARD_GOLD)
+	_result_legacy_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_result_legacy_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_result_legacy_label.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
+	_result_legacy_label.add_theme_constant_override("outline_size", 4)
+	_result_legacy_label.visible = false
+	column.add_child(_result_legacy_label)
 
 	# Push CONTINUE to the BOTTOM of the card: an expanding spacer eats the slack above it so the
 	# button sits at the panel's bottom edge instead of floating up under the summary text (Tim,
@@ -1121,11 +1148,59 @@ func _show_result(mult: float) -> void:
 	_result_summary_label.text = summary
 	_result_summary_label.visible = summary != ""
 
+	_refresh_legacy_result_line(mult)
+
 	_play_view.visible = false
 	_skip_button.visible = false  # the below-card control hides once the round resolves
 	_result_view.visible = true
 	visible = true
 	_animate_result()
+
+
+## Show/hide the Legacy-gem bonus line on the result screen. Only appears when the player actually
+## collected a gem this round; the wording depends on whether the round result let them keep it.
+func _refresh_legacy_result_line(mult: float) -> void:
+	if _result_legacy_label == null:
+		return
+	var collected := _active_minigame.get_legacy_gems_collected() if _active_minigame != null else 0
+	if collected <= 0 or _legacy_lifetime <= 0:
+		_result_legacy_label.visible = false
+		return
+	var amount := _legacy_bonus_amount(mult)
+	if amount > 0:
+		var great := _legacy_bonus_factor(mult) > 1.0
+		_result_legacy_label.text = ("LEGACY BONUS  +%d gems!" % amount) + ("  (great round!)" if great else "")
+		_result_legacy_label.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD)
+	else:
+		# Collected a gem but the round was too weak to keep it (bad result → keep nothing).
+		_result_legacy_label.text = "Legacy bonus lost — a stronger round keeps it"
+		_result_legacy_label.add_theme_color_override("font_color", UiPalette.KETCHUP_RED)
+	_result_legacy_label.visible = true
+
+
+## The round's Legacy-gem tier factor from its final multiplier: 0 below the "full" line (bad → keep
+## nothing), 1.0 at/above full (normal → keep), and 1.0 + great_multiplier−1 deep in the bonus band
+## (great → a proportional bonus). Mirrors the gating in Plans/Legacy_Bonus_System.md.
+func _legacy_bonus_factor(mult: float) -> float:
+	if mult < 1.0:
+		return 0.0
+	var into_bonus := (mult - 1.0) / maxf(0.0001, _bonus_max)
+	if into_bonus >= _tuning.legacy_bonus_great_threshold:
+		return _tuning.legacy_bonus_great_multiplier
+	return 1.0
+
+
+## The unearned Legacy to grant this round: capped collected gems × the round's tier factor × the
+## per-gem fraction × lifetime Legacy. Returns 0 when nothing is owed; otherwise at least 1 (the
+## early-game floor: if the player has any lifetime Legacy and earned a bonus, they always get ≥1).
+func _legacy_bonus_amount(mult: float) -> int:
+	var collected := _active_minigame.get_legacy_gems_collected() if _active_minigame != null else 0
+	var factor := _legacy_bonus_factor(mult)
+	if collected <= 0 or factor <= 0.0 or _legacy_lifetime <= 0:
+		return 0
+	var counted := mini(collected, maxi(1, _tuning.legacy_bonus_max_gems))
+	var raw := float(counted) * factor * _tuning.legacy_bonus_fraction * float(_legacy_lifetime)
+	return maxi(1, int(floor(raw)))
 
 
 ## Result labels for the upside-only First Contact round: announce the BUCKET the run earned (none /
@@ -1199,4 +1274,11 @@ func _on_skip_pressed() -> void:
 
 func _on_continue_pressed() -> void:
 	visible = false
-	finished.emit(_multiplier_for_performance(_current_performance()), _opt_out)
+	var mult := _multiplier_for_performance(_current_performance())
+	# Bank any Legacy-gem bonus first (real rounds only; review/Challenge never set _legacy_lifetime,
+	# and a bad round yields 0), then hand the main outcome multiplier to the site that launched us.
+	if not _review_mode and not _challenge_mode:
+		var bonus := _legacy_bonus_amount(mult)
+		if bonus > 0:
+			legacy_bonus_earned.emit(bonus)
+	finished.emit(mult, _opt_out)

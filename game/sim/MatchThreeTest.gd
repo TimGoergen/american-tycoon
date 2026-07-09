@@ -24,6 +24,7 @@ func _init() -> void:
 	_test_known_swap_scores()
 	_test_grid_stays_valid_after_random_swaps()
 	_test_resolve_swap_steps_reproduce_grid()
+	_test_special_color()
 
 	print("")
 	if _failures == 0:
@@ -326,3 +327,58 @@ func _test_resolve_swap_steps_reproduce_grid() -> void:
 	_check(reproduced, "applying recorded steps reproduces the final grid")
 	_check(sum_cleared == int(result["cleared_total"]), "step clears sum to cleared_total")
 	_check(colors_ok, "cleared_colors run parallel to cleared and match the pre-clear grid")
+
+
+# ---------------------------------------------------------------------------
+# (g) Special (Legacy) color: never in the starting grid, spawns only at its weight, and a 4+
+#     match force-spawns exactly one. Covers the Legacy-gem board mechanic.
+# ---------------------------------------------------------------------------
+
+func _test_special_color() -> void:
+	print("[g] Special (Legacy) color spawn rules")
+	# num_colors 5, special = id 4. Across many seeds the starting grid must never contain it.
+	var special := 4
+	var starting_clean := true
+	for seed_value in [1, 7, 42, 1000, 54321]:
+		var board = Board.new(7, 6, 5, seed_value, special, 0.5)
+		for row in range(board.height):
+			for col in range(board.width):
+				if board.color_at(row, col) == special:
+					starting_clean = false
+	_check(starting_clean, "special color never seeds the starting grid")
+
+	# With weight 0 an ORDINARY refill gem is never the special color (only the 4+-match force path
+	# below can introduce one). Exercise the spawn picker directly so no 4+ match muddies the check.
+	var no_special = Board.new(8, 8, 5, 123, special, 0.0)
+	var saw_special := false
+	for _i in range(2000):
+		if no_special._spawn_color() == special:
+			saw_special = true
+	_check(not saw_special, "weight 0 never spawns the special color on an ordinary refill")
+
+	# And with weight 1.0 an ordinary refill gem is ALWAYS the special color.
+	var all_special = Board.new(8, 8, 5, 321, special, 1.0)
+	var always := true
+	for _i in range(500):
+		if all_special._spawn_color() != special:
+			always = false
+	_check(always, "weight 1.0 always spawns the special color on an ordinary refill")
+
+	# A 4+ match force-spawns exactly one special gem. Build a board with a row of 4 regular gems,
+	# resolve it directly (grid set by hand), and confirm the step's spawns include one special.
+	var forced = Board.new(5, 5, 5, 55, special, 0.0)  # weight 0 so ONLY the forced gem is special
+	# Lay a solid board of color 0, then a horizontal run of four 1s in the top row (cols 0..3).
+	for row in range(forced.height):
+		for col in range(forced.width):
+			forced.grid[row][col] = 0 if (row % 2 == 0) else 2  # alternating rows, no vertical runs
+	forced.grid[0][0] = 1
+	forced.grid[0][1] = 1
+	forced.grid[0][2] = 1
+	forced.grid[0][3] = 1
+	var res: Dictionary = forced._clear_collapse_refill_recorded(
+			[[0, 0], [0, 1], [0, 2], [0, 3]], 1)
+	var special_spawns := 0
+	for s in res["spawns"]:
+		if s["color"] == special:
+			special_spawns += 1
+	_check(special_spawns == 1, "a 4+ match force-spawns exactly one special gem")

@@ -246,15 +246,11 @@ extends Resource
 @export var minigame_duration_seconds: float = 20.0  # feel-tune
 
 # --- Match-3 difficulty (Tim, 2026-07-09: "too easy, I max it every time") ----------
-# The match-3 game maps its own running score onto the host's reward curve; these three
-# knobs set that mapping's difficulty and are live-tunable so Tim can dial the ceiling on
-# device without a rebuild. Higher score targets = harder to reach "full"/"max".
-
-## Extra points a cascade STEP earns per step of chain (step 1 = ×1+this, step 2 = ×1+2·this…).
-## Lowered from the old 1.0: a big value made lucky refill-cascades — combos the player did
-## not plan — pay enormous points, so the game "played itself." Keep modest so deliberate big
-## matches, not luck, drive the score.
-@export var match3_combo_bonus: float = 0.4  # feel-tune
+# The match-3 game maps its own running score onto the host's reward curve; these two knobs set
+# that mapping's difficulty and are live-tunable so Tim can dial the ceiling on device without a
+# rebuild. Higher score targets = harder to reach "full"/"max". (Cascade combos were REMOVED this
+# pass — subsequent matches now score statically by gem count only, so luck no longer inflates the
+# score; there is no combo knob anymore.)
 
 ## Match-3 score that maps to the host's "full" line (keep 100%) — roughly a whole round of
 ## ordinary clean matching. Raise to make merely-full harder to earn.
@@ -264,6 +260,33 @@ extends Resource
 ## Raised well above the old 1000 so a single lucky chain can no longer max the round — the
 ## player must sustain strong play to reach it.
 @export var match3_max_score: float = 2200.0  # feel-tune
+
+# --- Legacy Bonus (Plans/Legacy_Bonus_System.md; Tim, 2026-07-09) --------------------
+# Every minigame has a small, game-specific chance to let the player collect a bonus Legacy gem.
+# The grant is a share of the dynasty's lifetime-earned Legacy, gated by the round's overall result.
+# All first-pass — device-tune the chances, the fraction, and the great-round bonus.
+
+## Legacy granted per collected gem, as a fraction of lifetime-earned Legacy (0.001 = 0.1%).
+@export var legacy_bonus_fraction: float = 0.001  # feel-tune
+
+## Most legacy "moments" a single round can bank. 1 = every game's bonus is worth the same (a clean
+## windfall); raise to make the grant scale with how many gems the player collected in the round.
+@export var legacy_bonus_max_gems: int = 1  # feel-tune
+
+## Multiplier applied to the legacy grant on a GREAT round (top bonus band). 1.10 = +10%.
+@export var legacy_bonus_great_multiplier: float = 1.10  # feel-tune
+
+## How far into the host's bonus band (0..1) a round must reach to count as GREAT for the legacy
+## bonus. Below the "full" line = bad (keep nothing); at/above full but under this = normal.
+@export var legacy_bonus_great_threshold: float = 0.75  # feel-tune
+
+## Per-game chance a Legacy gem becomes available in a round (small). Match-3's is the chance any
+## single spawned gem is a legacy gem; the others are per-round appearance chances.
+@export var legacy_gem_chance_match3: float = 0.03  # feel-tune
+@export var legacy_gem_chance_catch: float = 0.12  # feel-tune
+@export var legacy_gem_chance_timing: float = 0.12  # feel-tune
+@export var legacy_gem_chance_balance: float = 0.15  # feel-tune
+@export var legacy_gem_chance_basketball: float = 0.15  # feel-tune
 
 
 # --- Events (Spec §10) ---

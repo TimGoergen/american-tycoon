@@ -13,6 +13,14 @@ var width: int
 var height: int
 var num_colors: int
 
+## Optional SPECIAL color (the Legacy gem — see Plans/Legacy_Bonus_System.md). When >= 0 it is one
+## of the num_colors ids, matchable like any other, but: it is never placed in the starting grid,
+## refills pick it only with `special_spawn_weight` probability, and a 4+ match force-spawns one.
+## Default -1 (no special color) → identical behavior to a plain board, so existing tests are unchanged.
+var special_color: int = -1
+## Chance a normal refill gem is the special color (0..1). Ignored when special_color < 0.
+var special_spawn_weight: float = 0.0
+
 ## Total gems cleared across the whole game so far (accumulates over every try_swap).
 var score: int = 0
 
@@ -31,10 +39,15 @@ var _rng: RandomNumberGenerator
 const _EMPTY: int = -1
 
 
-func _init(p_width: int, p_height: int, p_num_colors: int, p_seed: int = 0) -> void:
+func _init(
+		p_width: int, p_height: int, p_num_colors: int, p_seed: int = 0,
+		p_special_color: int = -1, p_special_weight: float = 0.0
+) -> void:
 	width = p_width
 	height = p_height
 	num_colors = p_num_colors
+	special_color = p_special_color
+	special_spawn_weight = p_special_weight
 
 	_rng = RandomNumberGenerator.new()
 	if p_seed != 0:
@@ -44,6 +57,25 @@ func _init(p_width: int, p_height: int, p_num_colors: int, p_seed: int = 0) -> v
 		_rng.randomize()
 
 	_build_starting_grid()
+
+
+## A uniformly random NON-special color — used for the starting grid and ordinary refills, so the
+## special (Legacy) color only ever enters play through the weighted/forced spawn paths below.
+func _regular_color() -> int:
+	if special_color < 0:
+		return _rng.randi_range(0, num_colors - 1)
+	# Pick uniformly among 0..num_colors-1, skipping the special color's id.
+	var c := _rng.randi_range(0, num_colors - 2)
+	if c >= special_color:
+		c += 1
+	return c
+
+
+## A refill gem: the special color with `special_spawn_weight` probability, otherwise a regular one.
+func _spawn_color() -> int:
+	if special_color >= 0 and _rng.randf() < special_spawn_weight:
+		return special_color
+	return _regular_color()
 
 
 # ---------------------------------------------------------------------------
@@ -135,7 +167,14 @@ func resolve_swap(r1: int, c1: int, r2: int, c2: int) -> Dictionary:
 		var cleared_colors: Array = []
 		for cell in cleared:
 			cleared_colors.append(grid[cell[0]][cell[1]])
-		var moves := _clear_collapse_refill_recorded(cleared)
+		# A match of 4+ REGULAR gems force-spawns one bonus Legacy gem into this step's refill
+		# (Tim, 2026-07-09). Legacy-gem matches themselves don't spawn more (they're the payout).
+		var force_special := 0
+		if special_color >= 0:
+			for group in groups:
+				if group.size() >= 4 and grid[group[0][0]][group[0][1]] != special_color:
+					force_special += 1
+		var moves := _clear_collapse_refill_recorded(cleared, force_special)
 		steps.append({
 			"matches": groups,
 			"cleared": cleared,
@@ -198,14 +237,14 @@ func _pick_color_without_match(
 	# always a valid choice, but we cap the attempts defensively to avoid any chance of
 	# an infinite loop on a degenerate (num_colors < 3) configuration.
 	for _attempt in range(100):
-		var candidate := _rng.randi_range(0, num_colors - 1)
+		var candidate := _regular_color()  # never seed the special color into the starting grid
 		var makes_horizontal_run: bool = (candidate == left1 and candidate == left2)
 		var makes_vertical_run: bool = (candidate == up1 and candidate == up2)
 		if not makes_horizontal_run and not makes_vertical_run:
 			return candidate
 
-	# Degenerate fallback (should not happen with num_colors >= 3): accept any color.
-	return _rng.randi_range(0, num_colors - 1)
+	# Degenerate fallback (should not happen with num_colors >= 3): accept any regular color.
+	return _regular_color()
 
 
 ## Return every current match as a list of GROUPS, where each group is one maximal line
@@ -265,7 +304,7 @@ func _union_cells(groups: Array) -> Array:
 ## and refill the emptied TOP slots with fresh random colors — recording what moved so a
 ## UI can animate it. Returns { "falls": [...], "spawns": [...] } where falls lists the
 ## survivors that changed row and spawns lists the new top gems. The grid ends collapsed.
-func _clear_collapse_refill_recorded(cleared: Array) -> Dictionary:
+func _clear_collapse_refill_recorded(cleared: Array, force_special: int = 0) -> Dictionary:
 	for cell in cleared:
 		grid[cell[0]][cell[1]] = _EMPTY
 
@@ -285,7 +324,7 @@ func _clear_collapse_refill_recorded(cleared: Array) -> Dictionary:
 		var new_col: Array = []
 		new_col.resize(height)
 		for row in range(empty_count):
-			var color := _rng.randi_range(0, num_colors - 1)
+			var color := _spawn_color()
 			new_col[row] = color
 			spawns.append({"col": col, "to_r": row, "color": color})
 		for i in range(survivor_rows.size()):
@@ -297,5 +336,21 @@ func _clear_collapse_refill_recorded(cleared: Array) -> Dictionary:
 
 		for row in range(height):
 			grid[row][col] = new_col[row]
+
+	# Force one bonus Legacy gem per 4+ match: convert that many random NON-special new spawns to
+	# the special color (updating both the recorded spawn and the grid). Done after the columns are
+	# built so we can pick freely; any new match this creates is caught by the resolve loop's next pass.
+	if special_color >= 0 and force_special > 0:
+		var convertible: Array = []
+		for spawn in spawns:
+			if spawn["color"] != special_color:
+				convertible.append(spawn)
+		var to_convert := mini(force_special, convertible.size())
+		for _n in range(to_convert):
+			var pick: int = _rng.randi_range(0, convertible.size() - 1)
+			var spawn: Dictionary = convertible[pick]
+			convertible.remove_at(pick)
+			spawn["color"] = special_color
+			grid[spawn["to_r"]][spawn["col"]] = special_color
 
 	return {"falls": falls, "spawns": spawns}

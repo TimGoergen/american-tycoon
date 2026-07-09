@@ -36,6 +36,25 @@ var challenge_mode: bool = false
 func get_score() -> int:
 	return 0
 
+# --- Legacy Bonus (GDD §5.5; Plans/Legacy_Bonus_System.md) ------------------------------------
+# Every type has a small, game-specific chance to let the player collect a bonus Legacy gem (match
+# 3 legacy gems, catch a gem-coin, land a lock on a gem, fill the fishing gem bar, shoot through a
+# gem). A collected gem is PROVISIONAL: the host gates the payout by the round's overall result
+# (bad = keep none, normal = keep, great = +bonus) and grants a share of the dynasty's lifetime
+# Legacy. A type only signals WHEN a gem is collected; the host owns the amount and the grant.
+
+## Legacy gems collected this round via this type's own mechanic. Read by the host at round end.
+var _legacy_gems_collected: int = 0
+
+## Call this from a type when its legacy-gem mechanic succeeds. Increments the provisional count.
+func collect_legacy_gem(count: int = 1) -> void:
+	_legacy_gems_collected += maxi(0, count)
+
+## How many legacy gems this type collected this round (the host gates and grants from this).
+func get_legacy_gems_collected() -> int:
+	return _legacy_gems_collected
+
+
 ## Start play. The host calls this once, after adding this control to the play area.
 func begin(tuning: TuningConfig) -> void:
 	pass

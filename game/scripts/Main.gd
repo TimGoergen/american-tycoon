@@ -466,6 +466,7 @@ func _build_ui() -> void:
 	_minigame_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_minigame_screen.setup(tuning)
 	_minigame_screen.finished.connect(_on_minigame_finished)
+	_minigame_screen.legacy_bonus_earned.connect(_on_legacy_bonus_earned)
 	add_child(_minigame_screen)
 
 	# The Minigame Tuning review screen (Settings): a full-screen list that opens any minigame
@@ -1033,6 +1034,7 @@ func _on_contact_dismissed() -> void:
 	var prop := game.economy.properties[prop_index] as PropertyState
 	_minigame_site = MinigameSite.FIRST_CONTACT
 	_first_contact_prop_index = prop_index
+	_minigame_screen.set_legacy_lifetime(dynasty.upgrades.earned_lifetime)
 	# Frame the negotiation around the property's per-unit base income, so the result reads as the
 	# opening income you talked your way into rather than an abstract score.
 	_minigame_screen.start_game(
@@ -1164,6 +1166,7 @@ func _on_pass_on_confirmed() -> void:
 	if game.ui_minigame_enabled:
 		# The minigame's extra-high bonus cap depends on the Family Reputation upgrade.
 		_minigame_site = MinigameSite.SUCCESSION
+		_minigame_screen.set_legacy_lifetime(dynasty.upgrades.earned_lifetime)
 		_minigame_screen.start_game(
 			MinigameScreen.legacy_reward(dynasty.projected_legacy_gain()),
 			dynasty.upgrades.minigame_bonus_max()
@@ -1171,6 +1174,16 @@ func _on_pass_on_confirmed() -> void:
 	else:
 		# Opting out banks the keep floor — skipping is the worst result (GDD §5.5).
 		_finalize_succession(tuning.minigame_keep_floor)
+
+
+## The minigame reported a Legacy-gem bonus (Plans/Legacy_Bonus_System.md): the host already sized
+## the grant from the round result and this generation's lifetime Legacy, so we just bank it to the
+## spendable wallet (unearned — not added to earned_lifetime), refresh the estate readout, and save.
+func _on_legacy_bonus_earned(amount: int) -> void:
+	if amount <= 0:
+		return
+	dynasty.upgrades.grant_bonus(amount)
+	SaveManager.save_dict_to_file(dynasty.to_save_dict())
 
 
 ## The minigame ended: persist the player's "skip future minigames" choice, then apply its
@@ -1196,6 +1209,7 @@ func _on_minigame_finished(multiplier: float, opt_out: bool) -> void:
 ## credits the +/- delta before re-showing the welcome screen with the final haul.
 func _on_welcome_risk_pressed() -> void:
 	_minigame_site = MinigameSite.WELCOME_BACK
+	_minigame_screen.set_legacy_lifetime(dynasty.upgrades.earned_lifetime)
 	_minigame_screen.start_game(
 		MinigameScreen.offline_pile_reward(_pending_offline_pile),
 		WELCOME_BACK_BONUS_MAX

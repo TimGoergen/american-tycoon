@@ -15,15 +15,13 @@ var num_colors: int
 
 ## Optional SPECIAL color (the Legacy gem — see Plans/Legacy_Bonus_System.md). When >= 0 it is one
 ## of the num_colors ids, matchable like any other, but: it is never placed in the starting grid,
-## refills pick it only with `special_spawn_weight` probability, and a 5+ match places one at the
-## swap's target cell (recorded as `legacy_placement`).
+## it never appears in an ordinary refill (it is excluded from _regular_color), and it is created
+## ONLY by a 5+ match, which places one at the swap's target cell (recorded as `legacy_placement`).
 ## Default -1 (no special color) → identical behavior to a plain board, so existing tests are unchanged.
 var special_color: int = -1
-## Chance a normal refill gem is the special color (0..1). Ignored when special_color < 0.
-var special_spawn_weight: float = 0.0
-## Gate for BOTH special-spawn paths (weighted refill + 5+-match force). The minigame turns this off
-## once the Legacy bonus is secured so no more special gems appear (design rule 3). special_color
-## stays set so the special id is still excluded from ordinary refills.
+## Gate for the 5+-match Legacy placement. The minigame turns this off once the Legacy bonus is
+## secured so no more special gems appear (design rule 3). special_color stays set so the special id
+## is still excluded from ordinary refills.
 var enable_special_spawns: bool = true
 ## A regular color that does NOT force-spawn a special gem even on a 5+ match (the match-3 AVOID
 ## gem — matching the thing you're meant to steer around should not reward a Legacy gem). -1 = none.
@@ -49,13 +47,12 @@ const _EMPTY: int = -1
 
 func _init(
 		p_width: int, p_height: int, p_num_colors: int, p_seed: int = 0,
-		p_special_color: int = -1, p_special_weight: float = 0.0
+		p_special_color: int = -1
 ) -> void:
 	width = p_width
 	height = p_height
 	num_colors = p_num_colors
 	special_color = p_special_color
-	special_spawn_weight = p_special_weight
 
 	_rng = RandomNumberGenerator.new()
 	if p_seed != 0:
@@ -67,8 +64,9 @@ func _init(
 	_build_starting_grid()
 
 
-## A uniformly random NON-special color — used for the starting grid and ordinary refills, so the
-## special (Legacy) color only ever enters play through the weighted/forced spawn paths below.
+## A uniformly random NON-special color — used for the starting grid AND every ordinary refill, so
+## the special (Legacy) color never appears on its own; it only ever enters play via the 5+-match
+## placement in resolve_swap.
 func _regular_color() -> int:
 	if special_color < 0:
 		return _rng.randi_range(0, num_colors - 1)
@@ -77,13 +75,6 @@ func _regular_color() -> int:
 	if c >= special_color:
 		c += 1
 	return c
-
-
-## A refill gem: the special color with `special_spawn_weight` probability, otherwise a regular one.
-func _spawn_color() -> int:
-	if special_color >= 0 and enable_special_spawns and _rng.randf() < special_spawn_weight:
-		return special_color
-	return _regular_color()
 
 
 # ---------------------------------------------------------------------------
@@ -343,7 +334,7 @@ func _clear_collapse_refill_recorded(cleared: Array) -> Dictionary:
 		var new_col: Array = []
 		new_col.resize(height)
 		for row in range(empty_count):
-			var color := _spawn_color()
+			var color := _regular_color()
 			new_col[row] = color
 			spawns.append({"col": col, "to_r": row, "color": color})
 		for i in range(survivor_rows.size()):

@@ -36,8 +36,8 @@ const GRID_HEIGHT := 6
 ## so it also carries the special LEGACY gem (id == LEGACY_COLOR), which matches only itself.
 const GEM_COLORS := 4
 ## The Legacy gem's color id — the special 5th gem (Plans/Legacy_Bonus_System.md). It never seeds
-## the starting grid, spawns only rarely (or when a 5+ match forces one), scores 0 normal points,
-## and matching three of them collects a Legacy bonus.
+## the starting grid and never appears in an ordinary refill; it is created ONLY by a 5+ match
+## (placed at the swap target). It scores 0 normal points; matching three collects a Legacy bonus.
 const LEGACY_COLOR := 4
 
 # --- Match scoring (Tim's minigame v4) ---------------------------------------
@@ -64,10 +64,8 @@ const AVOID_MATCH_FACTOR := 0.40
 # The score-to-performance thresholds are LIVE tuning knobs (Balance Tuning), captured from
 # TuningConfig in begin() so Tim can dial the ceiling on device without a rebuild. Defaults live in
 # TuningConfig (match3_full_score / match3_max_score).
-var _score_full: float = 420.0   # score that maps to the host's "full" (keep 100%) line
+var _score_full: float = 600.0   # score that maps to the host's "full" (keep 100%) line
 var _score_max: float = 2200.0   # score that maps to performance 1.0 (max bonus + early-out)
-## Chance any single refilled gem is the Legacy gem (from tuning.legacy_gem_chance_match3).
-var _legacy_spawn_weight: float = 0.03
 
 ## A square cell, generously sized for thumb taps and low-vision readability (§1b),
 ## plus the gap between cells. PITCH is the cell-to-cell pixel stride. Sized so the 7-wide
@@ -162,8 +160,8 @@ func how_to_play() -> String:
 	# numbers — those are tunable constants and copy would drift.
 	return "Drag a gem onto a neighbor to swap; line up 3 or more to clear them. " \
 		+ "Clean matches earn a bonus — any match containing the marked AVOID gem " \
-		+ "loses most of its points. Steer around it. Rare LEGACY gems are worth no " \
-		+ "points, but match three of them to win bonus Legacy gems."
+		+ "loses most of its points. Steer around it. A match of 5 or more drops a " \
+		+ "LEGACY gem; match three of those to win bonus Legacy gems."
 
 
 func begin(tuning: TuningConfig) -> void:
@@ -172,10 +170,10 @@ func begin(tuning: TuningConfig) -> void:
 	# Capture the live difficulty knobs so Balance Tuning edits take effect next round.
 	_score_full = tuning.match3_full_score
 	_score_max = maxf(_score_full + 1.0, tuning.match3_max_score)  # keep max strictly above full
-	_legacy_spawn_weight = tuning.legacy_gem_chance_match3
 	# Board carries GEM_COLORS regular gems PLUS the special Legacy gem (id LEGACY_COLOR): it never
-	# seeds the starting grid, spawns only at _legacy_spawn_weight, and a 5+ match force-spawns one.
-	_board = Board.new(GRID_WIDTH, GRID_HEIGHT, GEM_COLORS + 1, 0, LEGACY_COLOR, _legacy_spawn_weight)
+	# seeds the starting grid and never appears in an ordinary refill — it is created ONLY by a 5+
+	# match, which places it at the swap's target cell (Tim, 2026-07-09: no random legacy spawns).
+	_board = Board.new(GRID_WIDTH, GRID_HEIGHT, GEM_COLORS + 1, 0, LEGACY_COLOR)
 	_choose_avoid_type()
 	# A big match of the AVOID gem must NOT force-spawn a Legacy gem (no reward for matching the gem
 	# you're told to steer around). _choose_avoid_type set _avoid_type; tell the board to skip it.

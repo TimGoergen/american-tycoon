@@ -253,8 +253,8 @@ extends Resource
 # score; there is no combo knob anymore.)
 
 ## Match-3 score that maps to the host's "full" line (keep 100%) — roughly a whole round of
-## ordinary clean matching. Raise to make merely-full harder to earn.
-@export var match3_full_score: float = 420.0  # feel-tune
+## ordinary clean matching. Below this is a "bad" result (keeps less). Tim device-tuned to 600.
+@export var match3_full_score: float = 600.0  # feel-tune
 
 ## Match-3 score that maps to performance 1.0 (the max extra-high bonus, and the early-out).
 ## Raised well above the old 1000 so a single lucky chain can no longer max the round — the
@@ -280,9 +280,8 @@ extends Resource
 ## bonus. Below the "full" line = bad (keep nothing); at/above full but under this = normal.
 @export var legacy_bonus_great_threshold: float = 0.75  # feel-tune
 
-## Per-game chance a Legacy gem becomes available in a round (small). Match-3's is the chance any
-## single spawned gem is a legacy gem; the others are per-round appearance chances.
-@export var legacy_gem_chance_match3: float = 0.012  # feel-tune (rare; the 5+-match force is the main path)
+## Per-game chance a Legacy gem becomes available in a round (small), a per-round appearance chance.
+## (Match-3 has NO random chance — its Legacy gems come only from 5+ matches — so it has no knob.)
 @export var legacy_gem_chance_catch: float = 0.12  # feel-tune
 @export var legacy_gem_chance_timing: float = 0.12  # feel-tune
 @export var legacy_gem_chance_balance: float = 0.15  # feel-tune

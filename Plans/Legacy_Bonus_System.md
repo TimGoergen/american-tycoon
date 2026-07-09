@@ -49,9 +49,9 @@ Banked to the spendable wallet (`LegacyUpgrades.available`) **only** — NOT add
 
 ## Per-game mechanics (Tim's spec)
 
-- **Match-3:** Legacy gem is a real 5th gem. Spawns naturally with a **very small chance** (kept
-  low — the big match is the main path); a match of **5+ regular gems** (not the AVOID color) places
-  one bonus Legacy gem at the swap's **target cell** (where the player moved). Legacy gems do
+- **Match-3:** Legacy gem is a real 5th gem. It has **no random spawn** (Tim, 2026-07-09 — 5+
+  matches make enough); a match of **5+ regular gems** (not the AVOID color) places one bonus Legacy
+  gem at the swap's **target cell** (where the player moved). Legacy gems do
   nothing by themselves and score **0** normal points; **matching 3 of them** collects one bonus.
 - **Catch money:** small chance a falling coin carries a Legacy gem; catching that coin earns the
   gem in addition to the coin.

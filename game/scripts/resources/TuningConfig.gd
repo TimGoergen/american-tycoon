@@ -148,8 +148,10 @@ extends Resource
 ## ship a build with this on.
 @export var carb_autolog: float = 0.0
 
-## The commanded liquid speed (px/s) while a rush frenzy is engaged.
-@export var carb_excited_flow: float = 90.0  # feel-tune
+## How much faster than the bar's own fill speed the bubbles run while a rush frenzy
+## is engaged (px/s) — a RELATIVE surge: the eye measures bubbles against the bar's
+## motion, so an absolute speed read as a burst on slow fills and lazy on fast ones.
+@export var carb_excited_flow: float = 50.0  # feel-tune
 
 ## Horizontal churn wobble amplitude (px) at full frenzy.
 @export var carb_excited_wobble: float = 7.0  # feel-tune

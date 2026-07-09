@@ -165,12 +165,13 @@ const EXCITED_DENSITY_BOOST := 0.5      # +50% crowd at full excitement
 ## and release, and since the chaos CHARACTER depends on speed (slow bubbles coil
 ## their tails into squiggles, fast ones stretch them straight), those ramps made the
 ## frenzy look twice as wild at the edges as in the sustained middle (Tim, 2026-07-08:
-## the frenzy must be CONSTANT from start to end). Still below the solid-bar speeds
-## (110 / 176), preserving the governed ladder.
+## the frenzy must be CONSTANT from start to end).
 ## VARS, not consts (Tim, 2026-07-08): the hosts push the carb_excited_* tuning knobs
 ## in each frame, so the frenzy's elements can be isolated and tuned live ON DEVICE
 ## from the Balance Tuning screen — the edge burst kept surviving blind fixes.
-var excited_flow_px := 90.0
+## Since the relative-frame fix this is the SURGE the bubbles run ABOVE the fill's
+## own speed while excited (px/s), not an absolute flow.
+var excited_flow_px := 50.0
 const EXCITED_SWAY_HZ_BOOST := 0.45     # sway rates run up to this much faster
 ## The agitation wobble: sized to stay visible inside the excited flow's streaming
 ## (3px vanished under the motion). Constant while excited, like everything else.
@@ -286,16 +287,21 @@ func _process(delta: float) -> void:
 	# The bar's own speed, floored so still bars keep fizzing and CAPPED below the
 	# commanded solid-bar speeds (see MEASURED_FLOW_CAP_PX) — unless the host commanded
 	# a flow directly (flow_override_px), which is exempt: those ARE the top rungs.
-	# Excitement BLENDS toward its own commanded flow (see EXCITED_FLOW_PX): at full
-	# agitation the speed is a constant, immune to the measured ramps and catch-up
-	# spikes at a hold's edges, so the frenzy looks the same from engage to release.
+	# Excitement blends toward the fill's own speed PLUS a constant surge (Tim's
+	# decisive on-device observation, 2026-07-08: the eye measures bubble speed
+	# RELATIVE to the bar's motion — an absolute commanded 90 px/s OUTRAN the slow
+	# fill during the engage ramp, reading as a burst, then fell ~200 px/s BEHIND the
+	# sustained ~283 px/s sweep, reading as lazy). Riding fill + surge keeps the
+	# RELATIVE churn constant at any sweep speed. Deliberately uncapped while excited:
+	# during an engaged rush the fill itself is already the fastest thing on screen.
 	if flow_override_px >= 0.0:
 		_base_speed_px = flow_override_px
 	else:
 		var measured := clampf(
 			_smoothed_speed_px * SPEED_VS_BAR, MIN_DRIFT_PX_PER_SEC, MEASURED_FLOW_CAP_PX
 		)
-		_base_speed_px = lerpf(measured, excited_flow_px, _excitement_level)
+		var excited := _smoothed_speed_px * SPEED_VS_BAR + excited_flow_px
+		_base_speed_px = lerpf(measured, excited, _excitement_level)
 
 	# How close the bar is to a crawl: 1.0 at (or below) the idle-drift floor, fading to
 	# 0.0 as the bar speeds up. Widens the per-bubble speed range on slow bars (see the

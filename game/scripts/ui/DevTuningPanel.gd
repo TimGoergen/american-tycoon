@@ -88,7 +88,7 @@ const DESCRIPTIONS := {
 	"retention_cost_growth": "How much each deeper retained level costs vs the last.",
 	"retention_property_step": "How much pricier each higher property's retention is.",
 	"carb_debug_overlay": "1 shows a live per-row readout of the bubble numbers (diagnosis).",
-	"carb_excited_flow": "Bubble speed (px/s) while the rush frenzy is engaged.",
+	"carb_excited_flow": "How much faster than the bar's fill the bubbles run during frenzy (px/s).",
 	"carb_excited_wobble": "Frenzy churn wobble amplitude in pixels.",
 	"carb_excited_spread_lower": "Frenzy speed-mix lower bound (0.25 = crawlers among streakers).",
 	"carb_excited_tails": "Comet-tail visibility during frenzy (0 = hidden, 1 = full).",

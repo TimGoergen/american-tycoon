@@ -50,7 +50,7 @@ Banked to the spendable wallet (`LegacyUpgrades.available`) **only** — NOT add
 ## Per-game mechanics (Tim's spec)
 
 - **Match-3:** Legacy gem is a real 5th gem. Spawns naturally with a **very small chance**; a
-  match of **4+ regular gems** also spawns one bonus Legacy gem into the refill. Legacy gems do
+  match of **5+ regular gems** also spawns one bonus Legacy gem into the refill. Legacy gems do
   nothing by themselves and score **0** normal points; **matching 3 of them** collects one bonus.
 - **Catch money:** small chance a falling coin carries a Legacy gem; catching that coin earns the
   gem in addition to the coin.

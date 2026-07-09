@@ -15,12 +15,12 @@ var num_colors: int
 
 ## Optional SPECIAL color (the Legacy gem — see Plans/Legacy_Bonus_System.md). When >= 0 it is one
 ## of the num_colors ids, matchable like any other, but: it is never placed in the starting grid,
-## refills pick it only with `special_spawn_weight` probability, and a 4+ match force-spawns one.
+## refills pick it only with `special_spawn_weight` probability, and a 5+ match force-spawns one.
 ## Default -1 (no special color) → identical behavior to a plain board, so existing tests are unchanged.
 var special_color: int = -1
 ## Chance a normal refill gem is the special color (0..1). Ignored when special_color < 0.
 var special_spawn_weight: float = 0.0
-## Gate for BOTH special-spawn paths (weighted refill + 4+-match force). The minigame turns this off
+## Gate for BOTH special-spawn paths (weighted refill + 5+-match force). The minigame turns this off
 ## once the Legacy bonus is secured so no more special gems appear (design rule 3). special_color
 ## stays set so the special id is still excluded from ordinary refills.
 var enable_special_spawns: bool = true
@@ -171,12 +171,12 @@ func resolve_swap(r1: int, c1: int, r2: int, c2: int) -> Dictionary:
 		var cleared_colors: Array = []
 		for cell in cleared:
 			cleared_colors.append(grid[cell[0]][cell[1]])
-		# A match of 4+ REGULAR gems force-spawns one bonus Legacy gem into this step's refill
+		# A match of 5+ REGULAR gems force-spawns one bonus Legacy gem into this step's refill
 		# (Tim, 2026-07-09). Legacy-gem matches themselves don't spawn more (they're the payout).
 		var force_special := 0
 		if special_color >= 0 and enable_special_spawns:
 			for group in groups:
-				if group.size() >= 4 and grid[group[0][0]][group[0][1]] != special_color:
+				if group.size() >= 5 and grid[group[0][0]][group[0][1]] != special_color:
 					force_special += 1
 		var moves := _clear_collapse_refill_recorded(cleared, force_special)
 		steps.append({
@@ -341,7 +341,7 @@ func _clear_collapse_refill_recorded(cleared: Array, force_special: int = 0) -> 
 		for row in range(height):
 			grid[row][col] = new_col[row]
 
-	# Force one bonus Legacy gem per 4+ match: convert that many random NON-special new spawns to
+	# Force one bonus Legacy gem per 5+ match: convert that many random NON-special new spawns to
 	# the special color (updating both the recorded spawn and the grid). Done after the columns are
 	# built so we can pick freely; any new match this creates is caught by the resolve loop's next pass.
 	if special_color >= 0 and force_special > 0:

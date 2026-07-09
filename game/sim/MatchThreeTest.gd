@@ -330,8 +330,8 @@ func _test_resolve_swap_steps_reproduce_grid() -> void:
 
 
 # ---------------------------------------------------------------------------
-# (g) Special (Legacy) color: never in the starting grid, spawns only at its weight, and a 4+
-#     match force-spawns exactly one. Covers the Legacy-gem board mechanic.
+# (g) Special (Legacy) color: never in the starting grid, spawns only at its weight, and a big
+#     match force-spawns exactly one (via the refill's force_special count). Covers the Legacy mechanic.
 # ---------------------------------------------------------------------------
 
 func _test_special_color() -> void:
@@ -364,21 +364,41 @@ func _test_special_color() -> void:
 			always = false
 	_check(always, "weight 1.0 always spawns the special color on an ordinary refill")
 
-	# A 4+ match force-spawns exactly one special gem. Build a board with a row of 4 regular gems,
-	# resolve it directly (grid set by hand), and confirm the step's spawns include one special.
-	var forced = Board.new(5, 5, 5, 55, special, 0.0)  # weight 0 so ONLY the forced gem is special
-	# Lay a solid board of color 0, then a horizontal run of four 1s in the top row (cols 0..3).
-	for row in range(forced.height):
-		for col in range(forced.width):
-			forced.grid[row][col] = 0 if (row % 2 == 0) else 2  # alternating rows, no vertical runs
-	forced.grid[0][0] = 1
-	forced.grid[0][1] = 1
-	forced.grid[0][2] = 1
-	forced.grid[0][3] = 1
-	var res: Dictionary = forced._clear_collapse_refill_recorded(
-			[[0, 0], [0, 1], [0, 2], [0, 3]], 1)
-	var special_spawns := 0
-	for s in res["spawns"]:
-		if s["color"] == special:
-			special_spawns += 1
-	_check(special_spawns == 1, "a 4+ match force-spawns exactly one special gem")
+	# Threshold: a match of 5+ force-spawns a special gem; a match of exactly 4 does NOT (Tim,
+	# 2026-07-09). Build a checkerboard (no pre-existing matches, colors 0/1) with two pairs of
+	# color 2 straddling a gap, then swap a 2 up into the gap to complete a straight run.
+	# weight 0 so the ONLY way a special can appear is the forced spawn.
+	var five = Board.new(6, 6, 5, 55, special, 0.0)
+	_fill_checkerboard(five)
+	# [2,2,_,2,2] across row 2 → the swap makes a run of FIVE.
+	five.grid[2][0] = 2; five.grid[2][1] = 2; five.grid[2][3] = 2; five.grid[2][4] = 2
+	five.grid[3][2] = 2  # the gem swapped up into (2,2)
+	var five_res: Dictionary = five.resolve_swap(2, 2, 3, 2)
+	_check(five_res["valid"] and _steps_have_special(five_res, special),
+			"a 5-match force-spawns a special gem")
+
+	var four = Board.new(6, 6, 5, 55, special, 0.0)
+	_fill_checkerboard(four)
+	# [2,2,_,2] across row 2 → the swap makes a run of exactly FOUR (col 4 stays a checkerboard gem).
+	four.grid[2][0] = 2; four.grid[2][1] = 2; four.grid[2][3] = 2
+	four.grid[3][2] = 2
+	var four_res: Dictionary = four.resolve_swap(2, 2, 3, 2)
+	_check(four_res["valid"] and not _steps_have_special(four_res, special),
+			"a 4-match does NOT force a special gem")
+
+
+## Fill a board with a 0/1 checkerboard — no 3-in-a-row anywhere, so tests can place their own
+## setup on top without fighting pre-existing matches.
+func _fill_checkerboard(board) -> void:
+	for row in range(board.height):
+		for col in range(board.width):
+			board.grid[row][col] = (row + col) % 2
+
+
+## True if any step of a resolve result spawned the given special color.
+func _steps_have_special(result: Dictionary, special: int) -> bool:
+	for step in result["steps"]:
+		for s in step["spawns"]:
+			if s["color"] == special:
+				return true
+	return false

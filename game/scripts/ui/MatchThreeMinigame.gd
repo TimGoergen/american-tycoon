@@ -36,7 +36,7 @@ const GRID_HEIGHT := 6
 ## so it also carries the special LEGACY gem (id == LEGACY_COLOR), which matches only itself.
 const GEM_COLORS := 4
 ## The Legacy gem's color id — the special 5th gem (Plans/Legacy_Bonus_System.md). It never seeds
-## the starting grid, spawns only rarely (or when a 4+ match forces one), scores 0 normal points,
+## the starting grid, spawns only rarely (or when a 5+ match forces one), scores 0 normal points,
 ## and matching three of them collects a Legacy bonus.
 const LEGACY_COLOR := 4
 
@@ -171,7 +171,7 @@ func begin(tuning: TuningConfig) -> void:
 	_score_max = maxf(_score_full + 1.0, tuning.match3_max_score)  # keep max strictly above full
 	_legacy_spawn_weight = tuning.legacy_gem_chance_match3
 	# Board carries GEM_COLORS regular gems PLUS the special Legacy gem (id LEGACY_COLOR): it never
-	# seeds the starting grid, spawns only at _legacy_spawn_weight, and a 4+ match force-spawns one.
+	# seeds the starting grid, spawns only at _legacy_spawn_weight, and a 5+ match force-spawns one.
 	_board = Board.new(GRID_WIDTH, GRID_HEIGHT, GEM_COLORS + 1, 0, LEGACY_COLOR, _legacy_spawn_weight)
 	_choose_avoid_type()
 

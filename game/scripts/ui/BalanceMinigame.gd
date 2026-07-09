@@ -5,8 +5,8 @@ extends Minigame
 # item 6): vertical, single-input, in the shape of Stardew Valley's fishing minigame.
 # The old horizontal two-button version didn't work and lagged.
 #
-# One vertical track. HOLD anywhere on the play area to lift the marker; release and
-# gravity pulls it back down. The gold zone drifts up and down the track on its own;
+# One vertical track. HOLD the big button below the track to lift the marker; release
+# and gravity pulls it back down. The gold zone drifts up and down the track on its own;
 # keep the marker inside it and the score banks every moment it stays in. Performance
 # is banked time-in-zone against the FIXED round length, so it only ever rises (see
 # get_performance). It has no natural end — the host's countdown ends the round.
@@ -44,6 +44,7 @@ var _zone_timer: float = 0.0
 var _running: bool = false
 var _rng := RandomNumberGenerator.new()
 var _track: Control
+var _lift_button: Button
 
 # A single accumulated phase drives every continuous pulse (the in-zone marker bounce +
 # the zone-boundary warning glow) from _draw_track — per the standing rule, continuous
@@ -59,15 +60,12 @@ func display_name() -> String:
 
 
 func how_to_play() -> String:
-	return "Hold anywhere to lift the marker; let go and it falls. Keep it inside " \
-		+ "the drifting gold zone — the books balance every moment it stays in."
+	return "Hold the LIFT button to raise the marker; let go and it falls. Keep it " \
+		+ "inside the drifting gold zone — the books balance every moment it stays in."
 
 
 func begin(tuning: TuningConfig) -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
-	# The WHOLE play area is the input (single-input design): this control catches the
-	# press/release itself in _gui_input, and every child ignores the mouse.
-	mouse_filter = Control.MOUSE_FILTER_STOP
 	_rng.randomize()
 	_running = true
 	_pos = 0.25
@@ -95,29 +93,33 @@ func begin(tuning: TuningConfig) -> void:
 	_track.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_track.draw.connect(_draw_track)
 
-	var hint := Label.new()
-	hint.text = "HOLD to lift  ·  RELEASE to drop"
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hint.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
-	hint.add_theme_color_override("font_color", UiPalette.DARK_GOLD)
-	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# The single input: one big hold button below the track, matching how every other
+	# minigame takes input through a dedicated control. button_down/button_up (not
+	# pressed) because "held" is the state that matters, not the click.
+	_lift_button = Button.new()
+	_lift_button.text = "HOLD TO LIFT"
+	_lift_button.custom_minimum_size = Vector2(0, 110)
+	_lift_button.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
+	_lift_button.focus_mode = Control.FOCUS_NONE
+	UiPalette.style_button(_lift_button, true)
+	_lift_button.button_down.connect(_on_lift_button_down)
+	_lift_button.button_up.connect(_on_lift_button_up)
 
 	var column := VBoxContainer.new()
 	column.set_anchors_preset(Control.PRESET_FULL_RECT)
 	column.add_theme_constant_override("separation", 16)
-	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	column.add_child(intro)
 	column.add_child(_track)
-	column.add_child(hint)
+	column.add_child(_lift_button)
 	add_child(column)
 
 
-## The single input: press anywhere = lift, release = drop. Touch arrives as Godot's
-## emulated mouse (the first finger), which is all a modal minigame needs.
-func _gui_input(event: InputEvent) -> void:
-	var click := event as InputEventMouseButton
-	if click != null and click.button_index == MOUSE_BUTTON_LEFT:
-		_held = click.pressed
+func _on_lift_button_down() -> void:
+	_held = true
+
+
+func _on_lift_button_up() -> void:
+	_held = false
 
 
 func get_performance() -> float:

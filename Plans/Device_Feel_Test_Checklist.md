@@ -171,7 +171,8 @@ worth it. Check on the actual Pixel, at arm's length.
       Both read cleanly and refresh correctly.
 - [x] ~~**Carbonation + liquid polish batch (2026-07-06).**~~ **KEEP (2026-07-07).**
       Both holds released: minigame lag fixed and the rush-bar rule verdicted KEEP.
-      One follow-up spun out: rush should agitate the carbonation more (work item 5).
+      One follow-up spun out: rush should agitate the carbonation more (work item 5,
+      now shipped + verified 2026-07-08).
 
 ---
 
@@ -190,9 +191,22 @@ In build order (1–5 small/medium, then the big one):
 4. **Reward curve reshape** — standard performance = neutral 1.0 (flat middle band),
    modest downside floor for bad play, modest upside for great play; skip/opt-out
    exactly 1.0; all band numbers in TuningConfig.
-5. **Rush excitement package** — a single 0–1 "excitement" knob on GoldBubbles scaling
-   density + flow + sway variety (+ maybe trails, a rush-scoped secondary wobble);
-   rows drive it to 1.0 while rush is held.
+5. ~~**Rush excitement package**~~ — **SHIPPED + device-verified KEEP (merged to main
+   e9174ac, 2026-07-08).** Tim: "I think we have finally figured this out, at least
+   well enough to move on. i changed carb excited ease to 0.9 and that helps a lot"
+   (0.9 promoted to the shipped default). The hard part was making the frenzy CONSTANT
+   from press to release — solved by two frame shifts: (a) the bar sweep is a smooth
+   trapezoid (eased engage → deterministic constant rushed rate → metronome wraps →
+   eased release), and (b) excited bubble flow is RELATIVE — measured fill speed + a
+   constant surge — because the eye judges bubbles against the moving fill, not in
+   absolute px/s. All rush presentation gates on one `rush_engaged` flag.
+   **Method lesson (keep):** seven blind feel-iterations failed; instrumenting won —
+   on-device debug overlay (`carb_debug_overlay`) + live carb_* tuning knobs + the
+   `CarbAutopilot` desktop CSV logger (`carb_autolog`). Instrument feel bugs, don't
+   iterate blind.
+   *Flagged trade-offs for Tim's veto:* excited bubbles now exceed the old absolute
+   speed ladder during an active rush sweep (~330 px/s); comet tails default to 0.3
+   visibility during frenzy (`carb_excited_tails` knob if full trails are wanted back).
 6. **Balance the books REWORK** — vertical, single-input, Stardew-fishing mechanic
    (hold to raise, gravity pulls down, bank score while inside the drifting zone);
    also clears its lag.

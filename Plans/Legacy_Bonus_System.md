@@ -81,7 +81,15 @@ match. Default off (weight 0 / no special color) so existing behavior and tests 
   knob and the "COMBO ×N" flourish.
 
 ## Build order
-1. Shared core: base + host + Main + LegacyUpgrades + TuningConfig knobs. **[this pass]**
-2. Match-3: combo removal + Legacy gem (board + minigame) + board tests. **[this pass]**
-3. Catch, Timing, Balance, Basketball mechanics (parallel). **[next]**
+1. Shared core: base + host + Main + LegacyUpgrades + TuningConfig knobs. **[DONE — 4b35194]**
+2. Match-3: combo removal + Legacy gem (board + minigame) + board tests. **[DONE — 4b35194]**
+3. Catch, Timing, Balance, Basketball mechanics (parallel). **[DONE — a15b562]**
 4. Memory once Tim decides its mechanic. Device feel-tune all spawn chances + the great% + fraction.
+
+## Status (2026-07-09)
+Built on `feature/match3-difficulty` (NOT merged — awaiting Tim's device test). Everything
+parse-checks, boots, MatchThreeTest (37) + EpochTest pass, and a runtime smoke ran all four new
+games' gem paths without error. Memory has no legacy mechanic yet (Tim undecided). ALL spawn
+chances, the fraction, the great%/threshold, and the max-gems cap are first-pass — device-tune.
+To SEE a grant, reach a prestige with some lifetime Legacy (early on 0.1% is tiny; the min-1 floor
+covers it).

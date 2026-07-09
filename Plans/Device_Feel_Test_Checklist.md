@@ -140,9 +140,12 @@ can land now (rides work item 3's framing pass); real art stays M3.*
 - [ ] **Timing bar** — **KEEP:** serviceable; needs polish (same class as Catch).
 - [ ] **Memory** — **TWEAK:** works, but the time limit makes a good score feel out of
       the player's control — rethink scoring (accuracy/moves rather than raw time?).
-- [ ] **Balance the books** — **REWORK (work item 6):** doesn't work and lags. Redesign
-      as VERTICAL, single-input, Stardew-fishing-style: hold to raise the marker,
-      gravity pulls it down, keep it inside a drifting target zone to bank score.
+- [x] ~~**Balance the books**~~ — **REWORKED + KEEP (2026-07-09, Tim: "Fishing 1.0 is
+      good").** Now vertical Stardew-fishing: hold the big LIFT button (a dedicated
+      button below the track, matching how the other games take input — Tim's call) to
+      raise the marker, gravity drops it, bank score inside the drifting gold zone.
+      Difficulty device-tuned with Tim: GRAVITY 1.9, zone re-roll 1.3s, ZONE_EASE 1.6.
+      The old layout's lag went with the old layout.
 - [ ] **Get Ready gate** — not separately verdicted; gains the work-item-3 framing copy
       ("why the heir plays this"), re-judge after.
 - [ ] **Challenge mode** — not separately verdicted this session.
@@ -207,9 +210,10 @@ In build order (1–5 small/medium, then the big one):
    *Flagged trade-offs for Tim's veto:* excited bubbles now exceed the old absolute
    speed ladder during an active rush sweep (~330 px/s); comet tails default to 0.3
    visibility during frenzy (`carb_excited_tails` knob if full trails are wanted back).
-6. **Balance the books REWORK** — vertical, single-input, Stardew-fishing mechanic
-   (hold to raise, gravity pulls down, bank score while inside the drifting zone);
-   also clears its lag.
+6. ~~**Balance the books REWORK**~~ — **SHIPPED + device-verified KEEP (merged to main
+   191c241, 2026-07-09; Tim: "Fishing 1.0 is good").** Vertical single-input Stardew-
+   fishing mechanic; input is a large HOLD-TO-LIFT button below the track; difficulty
+   tuned live with Tim (GRAVITY 1.9, zone re-roll 1.3s, ZONE_EASE 1.6). Lag cleared.
 
 **Big build behind them: Epoch_Depth_Pass Phase 2** (4-property cohorts per epoch) —
 priority raised by the §3 "epoch over too quickly" finding.

@@ -312,24 +312,26 @@ func _seconds_since_save(save_dict: Dictionary) -> float:
 
 
 func _apply_offline_if_due() -> void:
-	if _elapsed_since_save <= 0.0:
-		return
 	# Offline earnings accrue to the living generation at the staffed rate. They do
 	# NOT yet receive the dynasty's Legacy multiplier (OfflineCalculator predates
 	# the dynasty layer); folding Legacy into offline accrual is a later refinement.
-	var offline := game.apply_offline(_elapsed_since_save)
-	# The ritual only plays when a pile actually accrued (staffed income).
-	if offline.pile <= 0.0:
-		return
-	var hours_away := offline.elapsed_seconds / 3600.0
+	if _elapsed_since_save > 0.0:
+		var offline := game.apply_offline(_elapsed_since_save)
+		# The welcome-back ritual plays whenever a pile actually accrued (staffed income).
+		if offline.pile > 0.0:
+			var hours_away := offline.elapsed_seconds / 3600.0
+			# The game always opens directly to the welcome-back screen (Tim, 2026-06-24) — never
+			# straight into a minigame. The base pile is already banked by apply_offline, so PUT IT TO
+			# WORK simply dismisses. When transition minigames are on, the screen also offers RISK IT ON
+			# A MINIGAME?, handled by _on_welcome_risk_pressed, which scales the pile we stash here.
+			_pending_offline_pile = offline.pile
+			_pending_offline_hours = hours_away
+			_welcome_overlay.show_pile(offline.pile, hours_away, game.ui_minigame_enabled)
+			return
 
-	# The game always opens directly to the welcome-back screen (Tim, 2026-06-24) — never
-	# straight into a minigame. The base pile is already banked by apply_offline, so PUT IT TO
-	# WORK simply dismisses. When transition minigames are on, the screen also offers RISK IT ON
-	# A MINIGAME?, handled by _on_welcome_risk_pressed, which scales the pile we stash here.
-	_pending_offline_pile = offline.pile
-	_pending_offline_hours = hours_away
-	_welcome_overlay.show_pile(offline.pile, hours_away, game.ui_minigame_enabled)
+	# No offline income to report: still open on the branded launch screen (logo + BEGIN) rather
+	# than dropping straight into the game (Tim, 2026-07-09).
+	_welcome_overlay.show_welcome()
 
 
 # ---------------------------------------------------------------------------

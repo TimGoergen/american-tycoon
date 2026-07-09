@@ -1,18 +1,27 @@
 class_name WelcomeBackOverlay
 extends ColorRect
 
-# The welcome-back ritual, plain M1 version (GDD §3.1, §7): beat one is the
-# cheerful pile with the deadpan stat line; the button hands the player
-# straight into the spending spree. Ceremony copy arrives in M3.
+# The welcome-back / launch screen (GDD §3.1, §7). The game's logo fills the TOP HALF of the
+# screen; the bottom half carries the content. Two modes share this layout (Tim, 2026-07-09):
+#   * show_pile()   — returning after offline income: the cheerful pile + deadpan stat line, then
+#                     PUT IT TO WORK (bank it) or RISK IT (gamble it on a minigame).
+#   * show_welcome() — a plain launch with no offline pile: just a BEGIN button under the logo.
 
 signal dismissed
 ## Player chose to gamble the overnight pile on a minigame instead of banking it as-is.
 signal risk_pressed
 
+const LOGO_TEXTURE := preload("res://art/branding/american_tycoon_logo.png")
+
 var _pile_label: Label
-var _away_label: Label
 var _spend_button: Button
 var _risk_button: Button
+var _away_label: Label
+var _logo: TextureRect
+## The pile-mode content (headline + stats + the two choice buttons), shown/hidden as a group.
+var _pile_content: VBoxContainer
+## The plain-launch button, shown instead of the pile content when there was no offline income.
+var _begin_button: Button
 
 
 func _ready() -> void:
@@ -26,39 +35,70 @@ func _ready() -> void:
 	viewing_area.add_theme_stylebox_override("panel", UiPalette.make_screen_panel_style())
 	add_child(viewing_area)
 
-	var center := CenterContainer.new()
-	viewing_area.add_child(center)
+	# Top half = logo, bottom half = content. Both rows expand-fill with equal weight for a 50/50
+	# split; the logo keeps its aspect ratio centered within its half.
+	var rows := VBoxContainer.new()
+	rows.add_theme_constant_override("separation", 8)
+	viewing_area.add_child(rows)
+
+	_logo = TextureRect.new()
+	_logo.texture = LOGO_TEXTURE
+	_logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_logo.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_logo.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	rows.add_child(_logo)
+
+	# The bottom half, its content centered.
+	var bottom := CenterContainer.new()
+	bottom.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bottom.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	rows.add_child(bottom)
 
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 16)
 	column.custom_minimum_size = Vector2(760, 0)
-	center.add_child(column)
+	bottom.add_child(column)
+
+	_pile_content = _build_pile_content()
+	column.add_child(_pile_content)
+
+	# The plain-launch BEGIN button (shown by show_welcome when there is no pile).
+	_begin_button = Button.new()
+	_begin_button.text = "BEGIN"
+	_begin_button.custom_minimum_size = Vector2(0, 96)
+	_begin_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_begin_button.add_theme_font_size_override("font_size", 28)
+	_begin_button.visible = false
+	UiPalette.style_button(_begin_button, true)
+	_begin_button.pressed.connect(_on_spend_pressed)  # same effect: hide the overlay, reveal the game
+	column.add_child(_begin_button)
+
+
+## Build the returning-player content: the WELCOME BACK headline, the pile/away stat lines, and the
+## PUT IT TO WORK / RISK IT choice row. Kept as one group so show_welcome can hide it wholesale.
+func _build_pile_content() -> VBoxContainer:
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 16)
 
 	var headline := Label.new()
 	headline.text = "WELCOME BACK!"
 	headline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	headline.add_theme_color_override("font_color", UiPalette.NAVY)
 	headline.add_theme_font_size_override("font_size", 48)
-	column.add_child(headline)
+	content.add_child(headline)
 
 	_pile_label = Label.new()
 	_pile_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_pile_label.add_theme_color_override("font_color", UiPalette.MONEY_GREEN)
 	_pile_label.add_theme_font_size_override("font_size", 64)
-	column.add_child(_pile_label)
+	content.add_child(_pile_label)
 
 	_away_label = Label.new()
 	_away_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_away_label.add_theme_color_override("font_color", UiPalette.NAVY)
 	_away_label.add_theme_font_size_override("font_size", 26)
-	column.add_child(_away_label)
-
-	var worked := Label.new()
-	worked.text = "Hours you worked: 0"
-	worked.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	worked.add_theme_color_override("font_color", UiPalette.NAVY)
-	worked.add_theme_font_size_override("font_size", 26)
-	column.add_child(worked)
+	content.add_child(_away_label)
 
 	# Two choices on one row (Tim, 2026-06-24): take the overnight pile as-is, or gamble it on a
 	# minigame that can swing the haul anywhere from 50% to 200%. The RISK button only appears
@@ -66,7 +106,7 @@ func _ready() -> void:
 	# post-minigame result screen — you get one roll.
 	var button_row := HBoxContainer.new()
 	button_row.add_theme_constant_override("separation", 12)
-	column.add_child(button_row)
+	content.add_child(button_row)
 
 	_spend_button = Button.new()
 	_spend_button.text = "PUT IT TO WORK"
@@ -88,6 +128,8 @@ func _ready() -> void:
 	_risk_button.pressed.connect(_on_risk_pressed)
 	button_row.add_child(_risk_button)
 
+	return content
+
 
 ## Show the overlay for a banked pile. `allow_risk` reveals the RISK IT button — true on the
 ## initial welcome (when transition minigames are on), false on the post-minigame result.
@@ -96,6 +138,16 @@ func show_pile(pile: float, hours_away: float, allow_risk: bool = false) -> void
 	# Money.trim drops a whole number's ".0" — "away 2 hours", not "away 2.0 hours".
 	_away_label.text = "You were away %s hours." % Money.trim(hours_away, 1)
 	_risk_button.visible = allow_risk
+	_pile_content.visible = true
+	_begin_button.visible = false
+	visible = true
+
+
+## Show the plain launch screen (no offline income to report): the logo over a single BEGIN button.
+## Same layout as the pile screen, minus the stats and choices (Tim, 2026-07-09).
+func show_welcome() -> void:
+	_pile_content.visible = false
+	_begin_button.visible = true
 	visible = true
 
 

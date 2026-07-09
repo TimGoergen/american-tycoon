@@ -15,7 +15,8 @@ var num_colors: int
 
 ## Optional SPECIAL color (the Legacy gem — see Plans/Legacy_Bonus_System.md). When >= 0 it is one
 ## of the num_colors ids, matchable like any other, but: it is never placed in the starting grid,
-## refills pick it only with `special_spawn_weight` probability, and a 5+ match force-spawns one.
+## refills pick it only with `special_spawn_weight` probability, and a 5+ match places one at the
+## swap's target cell (recorded as `legacy_placement`).
 ## Default -1 (no special color) → identical behavior to a plain board, so existing tests are unchanged.
 var special_color: int = -1
 ## Chance a normal refill gem is the special color (0..1). Ignored when special_color < 0.
@@ -24,6 +25,9 @@ var special_spawn_weight: float = 0.0
 ## once the Legacy bonus is secured so no more special gems appear (design rule 3). special_color
 ## stays set so the special id is still excluded from ordinary refills.
 var enable_special_spawns: bool = true
+## A regular color that does NOT force-spawn a special gem even on a 5+ match (the match-3 AVOID
+## gem — matching the thing you're meant to steer around should not reward a Legacy gem). -1 = none.
+var special_exclude_color: int = -1
 
 ## Total gems cleared across the whole game so far (accumulates over every try_swap).
 var score: int = 0
@@ -158,6 +162,11 @@ func resolve_swap(r1: int, c1: int, r2: int, c2: int) -> Dictionary:
 	result["valid"] = true
 	var steps: Array = []
 	var total_cleared := 0
+	# A match of 5+ REGULAR gems earns a bonus Legacy gem, placed at the swap's TARGET cell once the
+	# board settles (Tim, 2026-07-09 — it should appear where the player moved a gem into, not a
+	# random slot). Legacy-gem matches themselves don't (they're the payout), nor does a match of the
+	# AVOID color (matching the gem you're told to steer around shouldn't be rewarded). One per swap.
+	var qualifying_big_match := false
 	# Each loop is one cascade: find the matches now on the board, clear+collapse+refill,
 	# record what moved. Repeat until no matches remain.
 	while true:
@@ -171,14 +180,13 @@ func resolve_swap(r1: int, c1: int, r2: int, c2: int) -> Dictionary:
 		var cleared_colors: Array = []
 		for cell in cleared:
 			cleared_colors.append(grid[cell[0]][cell[1]])
-		# A match of 5+ REGULAR gems force-spawns one bonus Legacy gem into this step's refill
-		# (Tim, 2026-07-09). Legacy-gem matches themselves don't spawn more (they're the payout).
-		var force_special := 0
-		if special_color >= 0 and enable_special_spawns:
+		if special_color >= 0 and enable_special_spawns and not qualifying_big_match:
 			for group in groups:
-				if group.size() >= 5 and grid[group[0][0]][group[0][1]] != special_color:
-					force_special += 1
-		var moves := _clear_collapse_refill_recorded(cleared, force_special)
+				var gc: int = grid[group[0][0]][group[0][1]]
+				if group.size() >= 5 and gc != special_color and gc != special_exclude_color:
+					qualifying_big_match = true
+					break
+		var moves := _clear_collapse_refill_recorded(cleared)
 		steps.append({
 			"matches": groups,
 			"cleared": cleared,
@@ -186,6 +194,13 @@ func resolve_swap(r1: int, c1: int, r2: int, c2: int) -> Dictionary:
 			"falls": moves["falls"],
 			"spawns": moves["spawns"],
 		})
+
+	# Place the earned Legacy gem at the target cell (r2, c2) now the board is stable, overwriting
+	# whatever settled there. Recorded as `legacy_placement` so the UI can pop it in after the
+	# cascade animation and the step-replay test can apply it.
+	if qualifying_big_match:
+		grid[r2][c2] = special_color
+		result["legacy_placement"] = [r2, c2]
 
 	score += total_cleared
 	result["steps"] = steps
@@ -308,7 +323,7 @@ func _union_cells(groups: Array) -> Array:
 ## and refill the emptied TOP slots with fresh random colors — recording what moved so a
 ## UI can animate it. Returns { "falls": [...], "spawns": [...] } where falls lists the
 ## survivors that changed row and spawns lists the new top gems. The grid ends collapsed.
-func _clear_collapse_refill_recorded(cleared: Array, force_special: int = 0) -> Dictionary:
+func _clear_collapse_refill_recorded(cleared: Array) -> Dictionary:
 	for cell in cleared:
 		grid[cell[0]][cell[1]] = _EMPTY
 
@@ -340,21 +355,5 @@ func _clear_collapse_refill_recorded(cleared: Array, force_special: int = 0) -> 
 
 		for row in range(height):
 			grid[row][col] = new_col[row]
-
-	# Force one bonus Legacy gem per 5+ match: convert that many random NON-special new spawns to
-	# the special color (updating both the recorded spawn and the grid). Done after the columns are
-	# built so we can pick freely; any new match this creates is caught by the resolve loop's next pass.
-	if special_color >= 0 and force_special > 0:
-		var convertible: Array = []
-		for spawn in spawns:
-			if spawn["color"] != special_color:
-				convertible.append(spawn)
-		var to_convert := mini(force_special, convertible.size())
-		for _n in range(to_convert):
-			var pick: int = _rng.randi_range(0, convertible.size() - 1)
-			var spawn: Dictionary = convertible[pick]
-			convertible.remove_at(pick)
-			spawn["color"] = special_color
-			grid[spawn["to_r"]][spawn["col"]] = special_color
 
 	return {"falls": falls, "spawns": spawns}

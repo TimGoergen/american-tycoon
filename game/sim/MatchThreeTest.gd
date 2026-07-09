@@ -364,18 +364,19 @@ func _test_special_color() -> void:
 			always = false
 	_check(always, "weight 1.0 always spawns the special color on an ordinary refill")
 
-	# Threshold: a match of 5+ force-spawns a special gem; a match of exactly 4 does NOT (Tim,
-	# 2026-07-09). Build a checkerboard (no pre-existing matches, colors 0/1) with two pairs of
-	# color 2 straddling a gap, then swap a 2 up into the gap to complete a straight run.
-	# weight 0 so the ONLY way a special can appear is the forced spawn.
+	# A match of 5+ places a Legacy gem at the swap TARGET cell (r2,c2); a match of exactly 4 does
+	# NOT, and neither does a 5+ match of the AVOID color (Tim, 2026-07-09). Build a checkerboard (no
+	# pre-existing matches, colors 0/1) with two pairs of color 2 straddling a gap, then swap a 2 up
+	# into the gap to complete a straight run. weight 0 so the ONLY special path is the earned placement.
 	var five = Board.new(6, 6, 5, 55, special, 0.0)
 	_fill_checkerboard(five)
 	# [2,2,_,2,2] across row 2 → the swap makes a run of FIVE.
 	five.grid[2][0] = 2; five.grid[2][1] = 2; five.grid[2][3] = 2; five.grid[2][4] = 2
 	five.grid[3][2] = 2  # the gem swapped up into (2,2)
 	var five_res: Dictionary = five.resolve_swap(2, 2, 3, 2)
-	_check(five_res["valid"] and _steps_have_special(five_res, special),
-			"a 5-match force-spawns a special gem")
+	_check(five_res["valid"] and five_res.has("legacy_placement")
+			and five_res["legacy_placement"] == [3, 2] and five.color_at(3, 2) == special,
+			"a 5-match places a Legacy gem at the target cell")
 
 	var four = Board.new(6, 6, 5, 55, special, 0.0)
 	_fill_checkerboard(four)
@@ -383,8 +384,18 @@ func _test_special_color() -> void:
 	four.grid[2][0] = 2; four.grid[2][1] = 2; four.grid[2][3] = 2
 	four.grid[3][2] = 2
 	var four_res: Dictionary = four.resolve_swap(2, 2, 3, 2)
-	_check(four_res["valid"] and not _steps_have_special(four_res, special),
-			"a 4-match does NOT force a special gem")
+	_check(four_res["valid"] and not four_res.has("legacy_placement"),
+			"a 4-match does NOT place a Legacy gem")
+
+	# A 5+ match of the EXCLUDED color (the AVOID gem) must NOT place a Legacy gem.
+	var avoid5 = Board.new(6, 6, 5, 55, special, 0.0)
+	_fill_checkerboard(avoid5)
+	avoid5.special_exclude_color = 2  # color 2 is the avoid gem this time
+	avoid5.grid[2][0] = 2; avoid5.grid[2][1] = 2; avoid5.grid[2][3] = 2; avoid5.grid[2][4] = 2
+	avoid5.grid[3][2] = 2
+	var avoid5_res: Dictionary = avoid5.resolve_swap(2, 2, 3, 2)
+	_check(avoid5_res["valid"] and not avoid5_res.has("legacy_placement"),
+			"a 5-match of the avoid color does NOT place a Legacy gem")
 
 
 ## Fill a board with a 0/1 checkerboard — no 3-in-a-row anywhere, so tests can place their own
@@ -393,12 +404,3 @@ func _fill_checkerboard(board) -> void:
 	for row in range(board.height):
 		for col in range(board.width):
 			board.grid[row][col] = (row + col) % 2
-
-
-## True if any step of a resolve result spawned the given special color.
-func _steps_have_special(result: Dictionary, special: int) -> bool:
-	for step in result["steps"]:
-		for s in step["spawns"]:
-			if s["color"] == special:
-				return true
-	return false

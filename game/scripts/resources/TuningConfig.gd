@@ -282,7 +282,7 @@ extends Resource
 
 ## Per-game chance a Legacy gem becomes available in a round (small). Match-3's is the chance any
 ## single spawned gem is a legacy gem; the others are per-round appearance chances.
-@export var legacy_gem_chance_match3: float = 0.03  # feel-tune
+@export var legacy_gem_chance_match3: float = 0.012  # feel-tune (rare; the 5+-match force is the main path)
 @export var legacy_gem_chance_catch: float = 0.12  # feel-tune
 @export var legacy_gem_chance_timing: float = 0.12  # feel-tune
 @export var legacy_gem_chance_balance: float = 0.15  # feel-tune

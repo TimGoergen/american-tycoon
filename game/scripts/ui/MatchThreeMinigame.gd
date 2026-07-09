@@ -142,6 +142,9 @@ var _select_ring: Panel
 ## The big AVOID gem tile from the banner, kept so we can pop it in on round start and give it a
 ## gentle continuous pulse (it is the round's "steer around this" cue, so it should draw the eye).
 var _banner_icon: Control
+## The "Legacy bonus earned" badge in the banner row above the board, revealed once the bonus is
+## secured (see _score_swap). Hidden until then.
+var _legacy_badge: Control
 ## True once the banner's intro pop has finished, so the idle pulse doesn't fight the intro tween.
 var _banner_ready: bool = false
 ## Free-running phase (seconds) accumulated in _process, driving the idle pulses of the selection
@@ -174,6 +177,9 @@ func begin(tuning: TuningConfig) -> void:
 	# seeds the starting grid, spawns only at _legacy_spawn_weight, and a 5+ match force-spawns one.
 	_board = Board.new(GRID_WIDTH, GRID_HEIGHT, GEM_COLORS + 1, 0, LEGACY_COLOR, _legacy_spawn_weight)
 	_choose_avoid_type()
+	# A big match of the AVOID gem must NOT force-spawn a Legacy gem (no reward for matching the gem
+	# you're told to steer around). _choose_avoid_type set _avoid_type; tell the board to skip it.
+	_board.special_exclude_color = _avoid_type
 
 	# NOTE: no in-play instruction label. The Get Ready gate already shows how_to_play() before the
 	# round starts, so repeating it here only stole vertical room from the (now bigger) board and
@@ -246,6 +252,31 @@ func _build_bonus_banner() -> Control:
 
 	_banner_icon = _make_bonus_icon(_avoid_type)
 	row.add_child(_banner_icon)
+
+	# A "Legacy bonus earned" badge that appears in this banner row (above the board) the moment the
+	# player secures the bonus, so it's clear the round's Legacy gems are already banked. Hidden until
+	# then. An expanding spacer pushes it to the right so it doesn't crowd the AVOID cue.
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(spacer)
+
+	_legacy_badge = HBoxContainer.new()
+	_legacy_badge.alignment = BoxContainer.ALIGNMENT_CENTER
+	_legacy_badge.add_theme_constant_override("separation", 8)
+	_legacy_badge.visible = false
+	var badge_icon := TextureRect.new()
+	badge_icon.texture = GEM_TEXTURE[LEGACY_COLOR]
+	badge_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	badge_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	badge_icon.custom_minimum_size = Vector2(BONUS_ICON_SIZE * 0.6, BONUS_ICON_SIZE * 0.6)
+	_legacy_badge.add_child(badge_icon)
+	var badge_label := Label.new()
+	badge_label.text = "BONUS!"
+	badge_label.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
+	badge_label.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD.darkened(0.35))
+	badge_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_legacy_badge.add_child(badge_label)
+	row.add_child(_legacy_badge)
 
 	return row
 
@@ -584,6 +615,12 @@ func _play_resolution(result: Dictionary) -> void:
 	for i in range(result["steps"].size()):
 		await _animate_step(result["steps"][i], float(step_points[i]), i, step_group_details[i])
 
+	# A 5+ match earned a Legacy gem: pop it in at the swap's TARGET cell now the cascade has settled
+	# (Tim, 2026-07-09 — it appears where the player moved, not a random slot). The board already put
+	# the legacy color at that cell, so we swap the settled gem node there for a legacy gem.
+	if result.has("legacy_placement"):
+		await _pop_legacy_gem(result["legacy_placement"])
+
 	# Celebrate hitting the max-bonus line BEFORE clearing _animating, so is_busy() keeps the host's
 	# countdown paused through the celebration (otherwise the host would end the round mid-burst).
 	# Challenge Mode has NO max-bonus line and never ends on score, so we skip the celebration there —
@@ -673,9 +710,11 @@ func _score_swap(result: Dictionary) -> Dictionary:
 	if legacy_matches > 0:
 		collect_legacy_gem(legacy_matches)
 		# Once the bonus is secured, stop the board spawning any more Legacy gems (design rule 3 —
-		# no pointless noise once earned). Any already on the board simply stay as inert gems.
+		# no pointless noise once earned) and reveal the "bonus earned" badge above the board.
 		if legacy_bonus_secured():
 			_board.enable_special_spawns = false
+			if _legacy_badge != null:
+				_legacy_badge.visible = true
 
 	return {
 		"step_points": step_points,
@@ -813,6 +852,30 @@ func _spawn_match_badge(group: Array, points: float, is_avoid: bool, is_legacy: 
 	tween.tween_property(chip, "position:y", chip.position.y - 44.0, 0.7)
 	tween.tween_property(chip, "modulate:a", 0.0, 0.7).set_delay(0.25)
 	tween.chain().tween_callback(chip.queue_free)
+
+
+## Pop a Legacy gem into the swap's target cell after a 5+ match. The board already set that cell to
+## the legacy color; here we swap the settled gem NODE for a legacy gem and bloom it in, so it reads
+## as "a Legacy gem appeared right where you made your move."
+func _pop_legacy_gem(cell: Array) -> void:
+	var row: int = cell[0]
+	var col: int = cell[1]
+	if row < 0 or row >= GRID_HEIGHT or col < 0 or col >= GRID_WIDTH:
+		return
+	var old: Control = _gem_nodes[row][col]
+	if old != null:
+		old.queue_free()
+	var gem := _make_gem(LEGACY_COLOR)
+	gem.position = _cell_pos(row, col)
+	gem.scale = Vector2(0.2, 0.2)
+	gem.z_index = 2
+	_board_area.add_child(gem)
+	_gem_nodes[row][col] = gem
+	var pop := create_tween()
+	pop.tween_property(gem, "scale", Vector2.ONE, 0.3) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	await pop.finished
+	gem.z_index = 0
 
 
 ## The max-bonus celebration: when the score reaches SCORE_MAX (performance 1.0, the best possible

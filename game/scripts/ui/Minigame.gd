@@ -46,6 +46,11 @@ func get_score() -> int:
 ## Legacy gems collected this round via this type's own mechanic. Read by the host at round end.
 var _legacy_gems_collected: int = 0
 
+## How many gems fully earn this round's bonus (from tuning.legacy_bonus_max_gems). The host sets
+## this before begin(). Once this many are collected the bonus is secured, so a type must STOP
+## spawning new legacy gems (design rule 3 — no pointless noise once earned). See legacy_bonus_secured.
+var legacy_bonus_cap: int = 1
+
 ## Call this from a type when its legacy-gem mechanic succeeds. Increments the provisional count.
 func collect_legacy_gem(count: int = 1) -> void:
 	_legacy_gems_collected += maxi(0, count)
@@ -53,6 +58,12 @@ func collect_legacy_gem(count: int = 1) -> void:
 ## How many legacy gems this type collected this round (the host gates and grants from this).
 func get_legacy_gems_collected() -> int:
 	return _legacy_gems_collected
+
+## True once enough gems are collected to fully earn this round's bonus. Every type must check this
+## before spawning a NEW legacy gem and skip the spawn when it returns true, so no more gems appear
+## once the player has already earned the bonus (Tim, 2026-07-09 — avoid unnecessary noise).
+func legacy_bonus_secured() -> bool:
+	return _legacy_gems_collected >= maxi(1, legacy_bonus_cap)
 
 
 ## Start play. The host calls this once, after adding this control to the play area.

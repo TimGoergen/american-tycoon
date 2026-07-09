@@ -767,6 +767,8 @@ func start_game(
 	# a type that aligns its scoring to the shared "full" line (match-3) can read it. See Minigame.
 	_active_minigame.outcome_keep_floor = _tuning.minigame_keep_floor
 	_active_minigame.outcome_bonus_max = _bonus_max
+	# The legacy-gem cap: how many gems earn the bonus, so a type knows when to stop spawning more.
+	_active_minigame.legacy_bonus_cap = _tuning.legacy_bonus_max_gems
 	_play_area.add_child(_active_minigame)
 	_active_minigame.completed.connect(_on_minigame_completed)
 	# Most types run for the shared default; a type may ask for more time on top of it (basketball).

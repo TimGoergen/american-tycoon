@@ -25,6 +25,19 @@ raise it to get the count-proportional model (grant scales with how many you col
 - **Minimum:** if the player has *any* lifetime Legacy and genuinely earned a bonus (collected ≥1,
   result not bad), they always receive **at least 1** gem, even if 0.1%×lifetime rounds below 1.
 
+### Design intentions (Tim, 2026-07-09)
+1. **Not guaranteed.** A legacy gem is never a sure thing in any minigame — the chance is a
+   chance. (Holds already: every spawn chance is < 1.0.)
+2. **Comparable difficulty across games.** Despite the very different mechanics, it should be
+   *roughly equally hard* to earn a bonus in each minigame. This is the guiding goal for tuning the
+   per-game `legacy_gem_chance_*` values (and each game's collection difficulty) on the device pass —
+   the current first-pass numbers are NOT yet calibrated to each other.
+3. **Stop once earned.** The instant the round's bonus is fully earned (enough gems collected to hit
+   the cap — for a given game that may be one gem or several), NO further legacy gems spawn, to avoid
+   pointless noise. Implemented via `Minigame.legacy_bonus_secured()`: the host sets each game's
+   `legacy_bonus_cap` from `legacy_bonus_max_gems` before begin(), and every game checks
+   `legacy_bonus_secured()` before spawning a new gem (match-3 disables its board's special spawns).
+
 ### Payout context (Tim: "any real run")
 Grants only in real transition rounds — **succession/prestige, welcome-back, first contact**. No
 grant in the Minigame Tuning practice screen or Challenge Mode (both are farmable).

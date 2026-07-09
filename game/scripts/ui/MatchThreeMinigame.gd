@@ -672,6 +672,10 @@ func _score_swap(result: Dictionary) -> Dictionary:
 
 	if legacy_matches > 0:
 		collect_legacy_gem(legacy_matches)
+		# Once the bonus is secured, stop the board spawning any more Legacy gems (design rule 3 —
+		# no pointless noise once earned). Any already on the board simply stay as inert gems.
+		if legacy_bonus_secured():
+			_board.enable_special_spawns = false
 
 	return {
 		"step_points": step_points,

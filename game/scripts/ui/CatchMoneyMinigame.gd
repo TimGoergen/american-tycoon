@@ -202,7 +202,8 @@ func _spawn_coin(area_width: float) -> void:
 	# With a small chance this is a "legacy coin": catching it collects a bonus Legacy gem on top of
 	# the normal catch. We flag it (read in _on_coin_caught) and overlay the gem art so it stands out
 	# as special and worth catching. A missed legacy coin just falls away like any other coin.
-	var is_legacy := _rng.randf() < _legacy_coin_chance
+	# Stop spawning legacy coins once the bonus is already earned (design rule 3 — no noise).
+	var is_legacy := not legacy_bonus_secured() and _rng.randf() < _legacy_coin_chance
 	coin.set_meta("legacy", is_legacy)
 	if is_legacy:
 		# The gem sits centered on the coin (mouse-ignored so it never eats the tap), sized to a

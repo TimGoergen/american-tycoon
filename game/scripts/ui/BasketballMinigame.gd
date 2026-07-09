@@ -383,6 +383,9 @@ func _lay_balls_on_floor(bounds: Vector2) -> void:
 ## launch floor and the hoop region — a spot a shot's arc naturally passes through on the way up to
 ## the hoop. Placed clear of the walls so the whole icon is visible and grabbable.
 func _maybe_spawn_legacy_gem(bounds: Vector2) -> void:
+	# Don't spawn once the bonus is already earned (design rule 3 — no noise once secured).
+	if legacy_bonus_secured():
+		return
 	if _rng.randf() >= _legacy_gem_chance:
 		return
 	# Keep the gem off the side walls, and vertically in the mid-band: below the hoop's spawn zone

@@ -237,7 +237,8 @@ func _update_legacy_gem(delta: float, in_zone: bool) -> void:
 	if _gem_roll_timer >= 0.0:
 		_gem_roll_timer -= delta
 		if _gem_roll_timer < 0.0:
-			_gem_active = _rng.randf() < _gem_chance
+			# Don't spawn if the bonus is already earned (design rule 3 — no noise once secured).
+			_gem_active = not legacy_bonus_secured() and _rng.randf() < _gem_chance
 		return
 
 	if not _gem_active:

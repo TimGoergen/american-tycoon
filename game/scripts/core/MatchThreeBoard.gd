@@ -20,6 +20,10 @@ var num_colors: int
 var special_color: int = -1
 ## Chance a normal refill gem is the special color (0..1). Ignored when special_color < 0.
 var special_spawn_weight: float = 0.0
+## Gate for BOTH special-spawn paths (weighted refill + 4+-match force). The minigame turns this off
+## once the Legacy bonus is secured so no more special gems appear (design rule 3). special_color
+## stays set so the special id is still excluded from ordinary refills.
+var enable_special_spawns: bool = true
 
 ## Total gems cleared across the whole game so far (accumulates over every try_swap).
 var score: int = 0
@@ -73,7 +77,7 @@ func _regular_color() -> int:
 
 ## A refill gem: the special color with `special_spawn_weight` probability, otherwise a regular one.
 func _spawn_color() -> int:
-	if special_color >= 0 and _rng.randf() < special_spawn_weight:
+	if special_color >= 0 and enable_special_spawns and _rng.randf() < special_spawn_weight:
 		return special_color
 	return _regular_color()
 
@@ -170,7 +174,7 @@ func resolve_swap(r1: int, c1: int, r2: int, c2: int) -> Dictionary:
 		# A match of 4+ REGULAR gems force-spawns one bonus Legacy gem into this step's refill
 		# (Tim, 2026-07-09). Legacy-gem matches themselves don't spawn more (they're the payout).
 		var force_special := 0
-		if special_color >= 0:
+		if special_color >= 0 and enable_special_spawns:
 			for group in groups:
 				if group.size() >= 4 and grid[group[0][0]][group[0][1]] != special_color:
 					force_special += 1

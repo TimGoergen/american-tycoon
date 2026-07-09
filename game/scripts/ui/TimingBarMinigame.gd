@@ -281,7 +281,8 @@ func _on_freeze_ended() -> void:
 		# its center for the player to grab on their next lock. Rolled here (not once per round) so
 		# the gem always sits in a freshly-placed zone, and only one is ever active at a time. Works
 		# unchanged in Challenge Mode's endless loop — the host suppresses the actual grant there.
-		if not _legacy_gem_active and _rng.randf() < _legacy_gem_chance:
+		# Skip once the bonus is already earned (design rule 3 — no more gems once secured).
+		if not _legacy_gem_active and not legacy_bonus_secured() and _rng.randf() < _legacy_gem_chance:
 			_legacy_gem_active = true
 			_legacy_gem_center = _zone_center
 

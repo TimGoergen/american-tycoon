@@ -142,6 +142,12 @@ extends Resource
 ## level, bubble base speed, measured fill speed, commanded sweep). 0 = off.
 @export var carb_debug_overlay: float = 0.0
 
+## 1 = on boot, run the scripted CarbAutopilot rush scenario (buy a long-cycle
+## property, hold rush 10s, release, observe) while logging every frame's carbonation
+## internals to user://carb_log.csv, then quit. A desktop diagnosis harness — never
+## ship a build with this on.
+@export var carb_autolog: float = 0.0
+
 ## The commanded liquid speed (px/s) while a rush frenzy is engaged.
 @export var carb_excited_flow: float = 90.0  # feel-tune
 

@@ -151,11 +151,11 @@ const RUSH_ENGAGE_SEC := 0.3
 const SWEEP_EASE_TAU := 0.3
 
 ## The catch-up may move the bar at most this multiple of the CURRENT sweep rate.
-## Any fixed catch-up speed above the sustained rushed sweep IS an edge burst (the
-## 0.35 bars/s cap ran ~30% hotter than the ~0.27 sweep — Tim clocked it, 2026-07-08);
-## a 15% headroom is imperceptible as motion but still re-syncs the displayed bar's
-## phase with the true cycle over the following seconds.
-const CATCHUP_RATE_HEADROOM := 1.15
+## 1.0 — NO headroom (autopilot data, 2026-07-08: even 1.15 made the engage window
+## run measurably 15% hotter than the sustained sweep for its first two seconds).
+## Phase re-syncs at the wraps instead, where the metronome wrap below absorbs any
+## displayed-vs-true drift for free.
+const CATCHUP_RATE_HEADROOM := 1.0
 
 ## A pinned-solid bar's commanded liquid flow (px/s), fed to its GoldBubbles overlay.
 ## Deliberately brisk: solid means "cycling faster than the eye", so the MOST active
@@ -836,6 +836,13 @@ func _refresh(delta: float) -> void:
 			# The bar visibly touched the right edge — wrap onto the new cycle, carrying
 			# any overshoot so the motion stays continuous.
 			_finish_lap_pending = false
+			_displayed_cycle_fraction -= 1.0
+		elif rush_engaged and _displayed_cycle_fraction >= 1.0:
+			# METRONOME wrap while an engaged rush sweeps: never wait at full for the
+			# pulse-stepped true progress to catch up — that wait was a ~quarter-second
+			# stall (fill speed dipping 280 → 120) every single lap, the last rhythm
+			# blip in the frenzy (autopilot data, 2026-07-08). Rate is what matters
+			# during a hold; phase re-syncs on release via the normal machinery.
 			_displayed_cycle_fraction -= 1.0
 		_displayed_cycle_fraction = clampf(_displayed_cycle_fraction, 0.0, 1.0)
 	_last_true_cycle_fraction = true_fraction

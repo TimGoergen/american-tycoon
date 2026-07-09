@@ -261,6 +261,10 @@ extends Resource
 ## player must sustain strong play to reach it.
 @export var match3_max_score: float = 2200.0  # feel-tune
 
+## How many gems a single match must contain to drop a Legacy gem (at the swap's target cell).
+## Higher = Legacy gems are rarer. Match-3 has no other way to spawn them.
+@export var match3_legacy_match_size: int = 5  # feel-tune
+
 # --- Legacy Bonus (Plans/Legacy_Bonus_System.md; Tim, 2026-07-09) --------------------
 # Every minigame has a small, game-specific chance to let the player collect a bonus Legacy gem.
 # The grant is a share of the dynasty's lifetime-earned Legacy, gated by the round's overall result.

@@ -159,8 +159,8 @@ func how_to_play() -> String:
 	# numbers — those are tunable constants and copy would drift.
 	return "Drag a gem onto a neighbor to swap; line up 3 or more to clear them. " \
 		+ "Clean matches earn a bonus — any match containing the marked AVOID gem " \
-		+ "loses most of its points. Steer around it. A match of 5 or more drops a " \
-		+ "LEGACY gem; match three of those to win bonus Legacy gems."
+		+ "loses most of its points. Steer around it. A big match drops a LEGACY " \
+		+ "gem; match three of those to win bonus Legacy gems."
 
 
 func begin(tuning: TuningConfig) -> void:
@@ -173,6 +173,8 @@ func begin(tuning: TuningConfig) -> void:
 	# seeds the starting grid and never appears in an ordinary refill — it is created ONLY by a 5+
 	# match, which places it at the swap's target cell (Tim, 2026-07-09: no random legacy spawns).
 	_board = Board.new(GRID_WIDTH, GRID_HEIGHT, GEM_COLORS + 1, 0, LEGACY_COLOR)
+	# How big a match must be to drop a Legacy gem is live-tunable from Balance Tuning.
+	_board.special_match_size = maxi(3, tuning.match3_legacy_match_size)
 	_choose_avoid_type()
 	# A big match of the AVOID gem must NOT force-spawn a Legacy gem (no reward for matching the gem
 	# you're told to steer around). _choose_avoid_type set _avoid_type; tell the board to skip it.

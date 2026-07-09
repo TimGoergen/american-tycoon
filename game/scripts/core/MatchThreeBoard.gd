@@ -23,9 +23,11 @@ var special_color: int = -1
 ## secured so no more special gems appear (design rule 3). special_color stays set so the special id
 ## is still excluded from ordinary refills.
 var enable_special_spawns: bool = true
-## A regular color that does NOT force-spawn a special gem even on a 5+ match (the match-3 AVOID
+## A regular color that does NOT force-spawn a special gem even on a big match (the match-3 AVOID
 ## gem — matching the thing you're meant to steer around should not reward a Legacy gem). -1 = none.
 var special_exclude_color: int = -1
+## How many gems a single match must contain to place a Legacy gem (tunable via Balance Tuning).
+var special_match_size: int = 5
 
 ## Total gems cleared across the whole game so far (accumulates over every try_swap).
 var score: int = 0
@@ -153,10 +155,10 @@ func resolve_swap(r1: int, c1: int, r2: int, c2: int) -> Dictionary:
 	result["valid"] = true
 	var steps: Array = []
 	var total_cleared := 0
-	# A match of 5+ REGULAR gems earns a bonus Legacy gem, placed at the swap's TARGET cell once the
-	# board settles (Tim, 2026-07-09 — it should appear where the player moved a gem into, not a
-	# random slot). Legacy-gem matches themselves don't (they're the payout), nor does a match of the
-	# AVOID color (matching the gem you're told to steer around shouldn't be rewarded). One per swap.
+	# A match of special_match_size+ REGULAR gems earns a bonus Legacy gem, placed at the swap's
+	# TARGET cell once the board settles (Tim, 2026-07-09 — it should appear where the player moved a
+	# gem into, not a random slot). Legacy-gem matches themselves don't (they're the payout), nor does
+	# a match of the AVOID color (matching the gem you're told to steer around shouldn't be rewarded).
 	var qualifying_big_match := false
 	# Each loop is one cascade: find the matches now on the board, clear+collapse+refill,
 	# record what moved. Repeat until no matches remain.
@@ -174,7 +176,7 @@ func resolve_swap(r1: int, c1: int, r2: int, c2: int) -> Dictionary:
 		if special_color >= 0 and enable_special_spawns and not qualifying_big_match:
 			for group in groups:
 				var gc: int = grid[group[0][0]][group[0][1]]
-				if group.size() >= 5 and gc != special_color and gc != special_exclude_color:
+				if group.size() >= special_match_size and gc != special_color and gc != special_exclude_color:
 					qualifying_big_match = true
 					break
 		var moves := _clear_collapse_refill_recorded(cleared)

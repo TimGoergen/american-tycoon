@@ -380,7 +380,17 @@ func _test_special_color() -> void:
 	four.grid[3][2] = 2
 	var four_res: Dictionary = four.resolve_swap(2, 2, 3, 2)
 	_check(four_res["valid"] and not four_res.has("legacy_placement"),
-			"a 4-match does NOT place a Legacy gem")
+			"a 4-match does NOT place a Legacy gem (default match size 5)")
+
+	# The match size is tunable: drop it to 4 and the same 4-match now DOES place a Legacy gem.
+	var four_lowered = Board.new(6, 6, 5, 55, special)
+	_fill_checkerboard(four_lowered)
+	four_lowered.special_match_size = 4
+	four_lowered.grid[2][0] = 2; four_lowered.grid[2][1] = 2; four_lowered.grid[2][3] = 2
+	four_lowered.grid[3][2] = 2
+	var fl_res: Dictionary = four_lowered.resolve_swap(2, 2, 3, 2)
+	_check(fl_res["valid"] and fl_res.has("legacy_placement") and fl_res["legacy_placement"] == [3, 2],
+			"with match size 4, a 4-match DOES place a Legacy gem")
 
 	# A 5+ match of the EXCLUDED color (the AVOID gem) must NOT qualify for a Legacy gem. We check the
 	# qualifying rule directly on _find_match_groups (rather than via resolve_swap, whose refill

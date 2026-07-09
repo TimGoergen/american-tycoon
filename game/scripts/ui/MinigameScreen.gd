@@ -72,11 +72,9 @@ const SKIP_GAP_BELOW_PANEL := 16.0
 ## sweep, not a jitter — the single most-visible shared element, smoothed once here for all six
 ## games (plan §1 juice).
 const KEEP_BAR_LERP_SPEED := 8.0
-## Time-pressure thresholds (seconds left) where the shared timer escalates its warning: a slow
-## amber pulse under WARN, a fast gold blink + scale under CRITICAL. Shared by every game for
-## free (plan §1 juice).
-const TIMER_WARN_SECONDS := 10.0
-const TIMER_CRITICAL_SECONDS := 3.0
+## For the last few seconds the shared timer PULSES once per second — bigger and brighter on each
+## tick — so the countdown reads as real urgency (Tim, 2026-07-09). Shared by every game for free.
+const TIMER_PULSE_SECONDS := 5.0
 
 var _tuning: TuningConfig
 ## The pre-minigame base reward being scaled (Legacy count at prestige, cash pile at
@@ -133,9 +131,6 @@ var _display_mult: float = 0.5
 var _was_at_least_full: bool = false
 ## A decaying [0,1] flash intensity drawn over the whole bar when the fill crosses into "full".
 var _full_flash: float = 0.0
-## Accumulates while a round runs; drives the timer's warning pulse/blink oscillation without
-## needing a wall-clock (it is reset each round).
-var _warn_phase: float = 0.0
 var _play_area: Control
 var _result_heading_label: Label
 var _result_mult_label: Label
@@ -791,7 +786,6 @@ func start_game(
 	_display_mult = _tuning.minigame_keep_floor
 	_was_at_least_full = false
 	_full_flash = 0.0
-	_warn_phase = 0.0
 	_keep_bar.queue_redraw()
 
 	# Label SKIP with what skipping actually does. In the normal "scale an amount" sites it banks the
@@ -1013,9 +1007,9 @@ func _format_amount(amount: float) -> String:
 	return "%d %s" % [int(floor(amount)), _reward_noun]
 
 
-## Update the focal timer each frame: a slow amber pulse under TIMER_WARN_SECONDS, a fast gold
-## blink + scale under TIMER_CRITICAL_SECONDS, and a "held" cue (muted color + pause glyph) while
-## the type is mid-animation so the paused countdown doesn't read as a bug. (plan §1 juice.)
+## Update the focal timer each frame: for the last TIMER_PULSE_SECONDS it pops once per second
+## (bigger + brighter toward gold on each tick), and shows a "held" cue (muted color + pause glyph)
+## while the type is mid-animation so the paused countdown doesn't read as a bug. (plan §1 juice.)
 func _refresh_timer(delta: float, busy: bool) -> void:
 	var secs := int(ceil(_seconds_left))
 	if busy:
@@ -1024,19 +1018,17 @@ func _refresh_timer(delta: float, busy: bool) -> void:
 		_set_timer_scale(1.0)
 		return
 
-	_warn_phase += delta
 	_timer_label.text = "0:%02d" % secs
 	var color := UiPalette.KETCHUP_RED
 	var pulse := 1.0
-	if _seconds_left <= TIMER_CRITICAL_SECONDS and _seconds_left > 0.0:
-		# A fast 0..1 oscillation drives a blink toward gold plus a gentle grow, for real urgency.
-		var beat := 0.5 + 0.5 * sin(_warn_phase * 18.0)
-		color = UiPalette.KETCHUP_RED.lerp(UiPalette.MUSTARD_GOLD, beat)
-		pulse = 1.0 + 0.14 * beat
-	elif _seconds_left <= TIMER_WARN_SECONDS:
-		var beat := 0.5 + 0.5 * sin(_warn_phase * 8.0)
-		color = UiPalette.KETCHUP_RED.lerp(UiPalette.MUSTARD_GOLD, beat * 0.5)
-		pulse = 1.0 + 0.05 * beat
+	if _seconds_left <= TIMER_PULSE_SECONDS and _seconds_left > 0.0:
+		# One pop per second: the fractional part of the remaining time runs 1→0 within each second
+		# and jumps back to ~1 the instant the displayed number ticks down, so the pop lands ON each
+		# tick and eases out over that second. Squared for a sharper spike. Bigger + brighter at peak.
+		var into_second := _seconds_left - floorf(_seconds_left)
+		var pop := into_second * into_second
+		color = UiPalette.KETCHUP_RED.lerp(UiPalette.MUSTARD_GOLD, pop)
+		pulse = 1.0 + 0.3 * pop
 	_set_timer_color(color)
 	_set_timer_scale(pulse)
 

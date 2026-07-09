@@ -245,6 +245,26 @@ extends Resource
 ## (Tim, 2026-06-25) — scoring targets in each minigame assume this length.
 @export var minigame_duration_seconds: float = 20.0  # feel-tune
 
+# --- Match-3 difficulty (Tim, 2026-07-09: "too easy, I max it every time") ----------
+# The match-3 game maps its own running score onto the host's reward curve; these three
+# knobs set that mapping's difficulty and are live-tunable so Tim can dial the ceiling on
+# device without a rebuild. Higher score targets = harder to reach "full"/"max".
+
+## Extra points a cascade STEP earns per step of chain (step 1 = ×1+this, step 2 = ×1+2·this…).
+## Lowered from the old 1.0: a big value made lucky refill-cascades — combos the player did
+## not plan — pay enormous points, so the game "played itself." Keep modest so deliberate big
+## matches, not luck, drive the score.
+@export var match3_combo_bonus: float = 0.4  # feel-tune
+
+## Match-3 score that maps to the host's "full" line (keep 100%) — roughly a whole round of
+## ordinary clean matching. Raise to make merely-full harder to earn.
+@export var match3_full_score: float = 420.0  # feel-tune
+
+## Match-3 score that maps to performance 1.0 (the max extra-high bonus, and the early-out).
+## Raised well above the old 1000 so a single lucky chain can no longer max the round — the
+## player must sustain strong play to reach it.
+@export var match3_max_score: float = 2200.0  # feel-tune
+
 
 # --- Events (Spec §10) ---
 

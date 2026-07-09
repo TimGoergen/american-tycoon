@@ -25,7 +25,13 @@ extends Minigame
 
 const Board = preload("res://scripts/core/MatchThreeBoard.gd")
 
-const GRID_WIDTH := 6
+## Board size (Tim, 2026-07-09: "make it bigger, almost to the edges — and harder"). Widened
+## 6→7 columns so the board fills the card's width; kept at 6 rows because a 7th row overflows
+## the card's height on a portrait phone (the AVOID banner + intro copy take the rest). 7×6 = 42
+## cells (was 36), so it's bigger AND harder: more to read, more places a careless swap wastes a
+## turn. (A further difficulty lever — a 5th gem COLOR would sharply cut accidental matches — is
+## left for a follow-up since it needs a new gem SVG from Tim.)
+const GRID_WIDTH := 7
 const GRID_HEIGHT := 6
 const GEM_COLORS := 4
 
@@ -42,35 +48,36 @@ const POINTS_PER_GEM := 10.0
 ## (n - 3)). So a 3-line is ×1, a 4-line ×1.5, a 5-line ×2 — bigger lines are worth chasing.
 const SIZE_BONUS := 0.5
 ## Combo: each successive cascade step in ONE swap multiplies that step's points by
-## 1 + COMBO_BONUS × step_index (step 0 = ×1, step 1 = ×2, step 2 = ×3 …). Rewards chain setups.
-## DESIRABILITY (polish pass, Tim's "decide and comment"): this combo is left DELIBERATELY
-## UNBOUNDED. A long lucky cascade can spike the score straight to SCORE_MAX and end the round —
-## but because you can only ever EARN points (never lose them), that is a pure positive surprise,
-## never a punishment. A big chain "winning" the round outright is a good feeling, so we keep it
-## uncapped. (If device play shows it ending rounds too abruptly, cap it then.)
-const COMBO_BONUS := 1.0
+## 1 + combo_bonus × step_index (step 0 = ×1, step 1 = ×(1+b), step 2 = ×(1+2b) …). Rewards
+## chain setups. The strength is now a LIVE tuning knob (match3_combo_bonus), lowered from the
+## old 1.0 because big lucky refill-cascades — chains the player didn't plan — paid so much the
+## game "played itself" (Tim, 2026-07-09). A modest bonus keeps deliberate big matches, not
+## luck, as the way to a high score. Read into _combo_bonus in begin().
 ## A match group that AVOIDS the avoid gem earns this bonus (+15%).
 const CLEAN_MATCH_FACTOR := 1.15
 ## A match group that INCLUDES the avoid gem is docked this much (−60%).
 const AVOID_MATCH_FACTOR := 0.40
 
-## Score that maps to the host's "full" (1.0x) line — roughly a whole ~20-second round of
-## ordinary clean matching (Tim: "regular clean play = ~100%"). Nudged 300 -> 320 alongside the
-## POINTS_PER_GEM restore so the "full" difficulty is held (see the re-anchor note above).
-const SCORE_FULL := 320.0
-## Score that maps to performance 1.0 (the host's max extra-high bonus) — roughly a whole round
-## of strong cascade / large-match play. Feel-tune estimate (same v4 / 20-second basis).
-const SCORE_MAX := 1000.0
+# The score-to-performance thresholds and the combo strength are LIVE tuning knobs (Balance
+# Tuning), captured from TuningConfig in begin() so Tim can dial the ceiling on device without a
+# rebuild. Defaults live in TuningConfig (match3_full_score / match3_max_score / match3_combo_bonus).
+var _score_full: float = 420.0   # score that maps to the host's "full" (keep 100%) line
+var _score_max: float = 2200.0   # score that maps to performance 1.0 (max bonus + early-out)
+var _combo_bonus: float = 0.4    # cascade combo strength (see match3_combo_bonus)
 
 ## A square cell, generously sized for thumb taps and low-vision readability (§1b),
-## plus the gap between cells. PITCH is the cell-to-cell pixel stride.
-const CELL_SIZE := 96
+## plus the gap between cells. PITCH is the cell-to-cell pixel stride. Sized so the 7-wide
+## board very nearly fills the card's inner width (≈891px at 1080 render): 7 × PITCH − GAP
+## + the frame's ~44px ≈ 848px, leaving a slim even margin (Tim, 2026-07-09: "almost to the
+## edges"). Slightly smaller cells than before (96→108 is bigger, but 7 of them, not 6).
+const CELL_SIZE := 104
 const GAP := 8
 const PITCH := CELL_SIZE + GAP
 
-## The bonus banner's gem tile — deliberately much larger than a board cell so this round's
-## AVOID gem stands out as a prominent "steer around this" cue pinned above the grid.
-const BONUS_ICON_SIZE := 198
+## The bonus banner's gem tile — larger than a board cell so this round's AVOID gem stands
+## out as a prominent "steer around this" cue pinned above the grid. Trimmed 198→132 to give
+## the wider board the vertical room it needs inside the card.
+const BONUS_ICON_SIZE := 110
 
 ## How far a press must move before it counts as a drag-swap (rather than a stray tap).
 const DRAG_THRESHOLD := CELL_SIZE * 0.4
@@ -148,25 +155,25 @@ func how_to_play() -> String:
 		+ "loses most of its points. Steer around it."
 
 
-func begin(_tuning: TuningConfig) -> void:
+func begin(tuning: TuningConfig) -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_rng.randomize()
+	# Capture the live difficulty knobs so Balance Tuning edits take effect next round.
+	_score_full = tuning.match3_full_score
+	_score_max = maxf(_score_full + 1.0, tuning.match3_max_score)  # keep max strictly above full
+	_combo_bonus = tuning.match3_combo_bonus
 	_board = Board.new(GRID_WIDTH, GRID_HEIGHT, GEM_COLORS)
 	_choose_avoid_type()
 
-	var intro := Label.new()
-	intro.text = how_to_play()
-	intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	intro.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
-	intro.add_theme_color_override("font_color", UiPalette.NAVY)
+	# NOTE: no in-play instruction label. The Get Ready gate already shows how_to_play() before the
+	# round starts, so repeating it here only stole vertical room from the (now bigger) board and
+	# added clutter (Tim, 2026-07-09). The AVOID banner carries the one thing that changes per round.
 
-	# A live running score readout, on its own line under the intro.
+	# A live running score readout on its own line above the board.
 	var score_row := _build_score_row()
 
 	# The banner and the framed board travel together as one group, vertically centered in the
-	# space below the intro/score lines. A small separation keeps the AVOID banner pinned right
-	# above the board.
+	# space below the score line. A small separation keeps the AVOID banner pinned right above the board.
 	var bonus_banner := _build_bonus_banner()
 	var board_frame := _build_board_frame()
 
@@ -180,7 +187,6 @@ func begin(_tuning: TuningConfig) -> void:
 	var column := VBoxContainer.new()
 	column.set_anchors_preset(Control.PRESET_FULL_RECT)
 	column.add_theme_constant_override("separation", 12)
-	column.add_child(intro)
 	column.add_child(score_row)
 	column.add_child(board_group)
 	add_child(column)
@@ -315,9 +321,9 @@ func get_performance() -> float:
 	#   * SCORE_FULL .. SCORE_MAX -> the full line .. performance 1.0 (strong cascade / large-match
 	#                         play climbs into the extra-high band toward the maximum).
 	var full_line := _full_line_performance()
-	if _score <= SCORE_FULL:
-		return full_line * clampf(_score / SCORE_FULL, 0.0, 1.0)
-	var into_bonus := clampf((_score - SCORE_FULL) / (SCORE_MAX - SCORE_FULL), 0.0, 1.0)
+	if _score <= _score_full:
+		return full_line * clampf(_score / _score_full, 0.0, 1.0)
+	var into_bonus := clampf((_score - _score_full) / (_score_max - _score_full), 0.0, 1.0)
 	return full_line + (1.0 - full_line) * into_bonus
 
 
@@ -561,18 +567,19 @@ func _play_resolution(result: Dictionary) -> void:
 	# climb in time with the animation.
 	var scoring := _score_swap(result)
 	var step_points: Array = scoring["step_points"]
+	var step_group_details: Array = scoring["step_group_details"]
 	if scoring["matched_avoid"]:
 		_matched_avoid_gem = true
 
 	for i in range(result["steps"].size()):
-		await _animate_step(result["steps"][i], float(step_points[i]), i)
+		await _animate_step(result["steps"][i], float(step_points[i]), i, step_group_details[i])
 
 	# Celebrate hitting the max-bonus line BEFORE clearing _animating, so is_busy() keeps the host's
 	# countdown paused through the celebration (otherwise the host would end the round mid-burst).
 	# Challenge Mode has NO max-bonus line and never ends on score, so we skip the celebration there —
 	# otherwise it would fire on every swap once the score passed SCORE_MAX. The board keeps
 	# cascading and refilling endlessly; only the player tapping DONE stops it.
-	if not challenge_mode and not _finished and _score >= SCORE_MAX:
+	if not challenge_mode and not _finished and _score >= _score_max:
 		await _celebrate_max()
 
 	_animating = false
@@ -592,7 +599,7 @@ func _maybe_finish_early() -> void:
 		return
 	if _finished:
 		return
-	if _score >= SCORE_MAX:
+	if _score >= _score_max:
 		_finished = true
 		completed.emit(get_performance())
 
@@ -607,6 +614,10 @@ func _score_swap(result: Dictionary) -> Dictionary:
 	var steps: Array = result["steps"]
 	var matched_avoid := false
 	var step_points: Array = []
+	# Per step, a list (aligned with step["matches"]) of {points, is_avoid} so the animation can
+	# label each match GROUP with what it earned and whether it hit the avoid gem — the readable
+	# per-match feedback (Tim, 2026-07-09: "the result of matches is hard to read").
+	var step_group_details: Array = []
 
 	for i in range(steps.size()):
 		var step: Dictionary = steps[i]
@@ -621,8 +632,9 @@ func _score_swap(result: Dictionary) -> Dictionary:
 			color_of_cell[cell[0] * GRID_WIDTH + cell[1]] = cleared_colors[j]
 
 		# Combo: each successive cascade step in this swap multiplies its points (step 0 = ×1).
-		var combo_multiplier := 1.0 + COMBO_BONUS * float(i)
+		var combo_multiplier := 1.0 + _combo_bonus * float(i)
 		var step_raw := 0.0
+		var group_details: Array = []
 		for group in step["matches"]:
 			var cells: Array = group
 			var n: int = cells.size()
@@ -631,20 +643,31 @@ func _score_swap(result: Dictionary) -> Dictionary:
 			# Find this group's color from any of its cells, then apply the clean/avoid factor.
 			var first_cell: Array = cells[0]
 			var group_color: int = color_of_cell[first_cell[0] * GRID_WIDTH + first_cell[1]]
-			if group_color == _avoid_type:
+			var is_avoid := group_color == _avoid_type
+			if is_avoid:
 				group_points *= AVOID_MATCH_FACTOR
 				matched_avoid = true
 			else:
 				group_points *= CLEAN_MATCH_FACTOR
 			step_raw += group_points
+			# The number the player sees on the badge includes the combo, so it matches what the
+			# score readout climbs by for this group.
+			group_details.append({"points": group_points * combo_multiplier, "is_avoid": is_avoid})
 		step_points.append(step_raw * combo_multiplier)
+		step_group_details.append(group_details)
 
-	return {"step_points": step_points, "matched_avoid": matched_avoid}
+	return {
+		"step_points": step_points,
+		"matched_avoid": matched_avoid,
+		"step_group_details": step_group_details,
+	}
 
 
-func _animate_step(step: Dictionary, points: float, step_index: int) -> void:
-	for group in step["matches"]:
-		_spawn_match_badge(group)
+func _animate_step(step: Dictionary, points: float, step_index: int, group_details: Array) -> void:
+	var matches: Array = step["matches"]
+	for gi in range(matches.size()):
+		var detail: Dictionary = group_details[gi]
+		_spawn_match_badge(matches[gi], float(detail["points"]), bool(detail["is_avoid"]))
 	# A cascade step (step_index >= 1) is a chain reaction off the same swap — call it out with a
 	# rising "COMBO ×N" flourish so the player SEES the chain paying off (the combo was invisible
 	# before). step_index 0 is the initial match, so the first cascade is ×2.
@@ -712,7 +735,11 @@ func _apply_spawns(spawns: Array, drop: Tween) -> void:
 		drop.tween_property(gem, "position", _cell_pos(to_r, col), FALL_TIME)
 
 
-func _spawn_match_badge(group: Array) -> void:
+## A color-coded result chip that pops over a cleared match so its OUTCOME reads at a glance
+## (Tim, 2026-07-09: the old cream group-size number didn't say whether a match was good or
+## docked). A clean match shows a green "+N"; a match that hit the avoid gem shows a red
+## "AVOID +N" (it still scores, but at −60%). N is the points this group earned, combo included.
+func _spawn_match_badge(group: Array, points: float, is_avoid: bool) -> void:
 	if group.is_empty():
 		return
 	var sum := Vector2.ZERO
@@ -720,23 +747,43 @@ func _spawn_match_badge(group: Array) -> void:
 		sum += _cell_pos(cell[0], cell[1])
 	var center: Vector2 = sum / float(group.size()) + Vector2(CELL_SIZE, CELL_SIZE) / 2.0
 
-	var badge := Label.new()
-	badge.text = str(group.size())
-	badge.add_theme_font_size_override("font_size", UiPalette.FONT_DISPLAY)
-	badge.add_theme_color_override("font_color", UiPalette.CREAM)
-	badge.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
-	badge.add_theme_constant_override("outline_size", 6)
-	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	badge.position = center - Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
-	badge.size = Vector2(CELL_SIZE, CELL_SIZE)
-	badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_board_area.add_child(badge)
+	var chip := PanelContainer.new()
+	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	chip.z_index = 3  # above gems and the selection ring
+
+	var box := StyleBoxFlat.new()
+	box.bg_color = UiPalette.KETCHUP_RED if is_avoid else UiPalette.MONEY_GREEN
+	box.set_corner_radius_all(14)
+	box.border_color = UiPalette.INK_NAVY
+	box.set_border_width_all(3)
+	box.content_margin_left = 16
+	box.content_margin_right = 16
+	box.content_margin_top = 8
+	box.content_margin_bottom = 8
+	chip.add_theme_stylebox_override("panel", box)
+
+	var label := Label.new()
+	label.text = ("AVOID +%d" % int(round(points))) if is_avoid else ("+%d" % int(round(points)))
+	label.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
+	label.add_theme_color_override("font_color", Color.WHITE)
+	label.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
+	label.add_theme_constant_override("outline_size", 6)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	chip.add_child(label)
+
+	# Size the chip to its text, then center it on the group and float it up as it fades.
+	_board_area.add_child(chip)
+	chip.reset_size()
+	chip.position = center - chip.size / 2.0
+	chip.pivot_offset = chip.size / 2.0
+	chip.scale = Vector2(0.7, 0.7)
 
 	var tween := create_tween().set_parallel(true)
-	tween.tween_property(badge, "position:y", badge.position.y - 36.0, FLASH_TIME + CLEAR_TIME)
-	tween.tween_property(badge, "modulate:a", 0.0, FLASH_TIME + CLEAR_TIME)
-	tween.chain().tween_callback(badge.queue_free)
+	tween.tween_property(chip, "scale", Vector2.ONE, 0.18) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(chip, "position:y", chip.position.y - 44.0, 0.7)
+	tween.tween_property(chip, "modulate:a", 0.0, 0.7).set_delay(0.25)
+	tween.chain().tween_callback(chip.queue_free)
 
 
 ## A cascade chain signal: a teal "COMBO ×N" label that blooms up and fades over the cells a

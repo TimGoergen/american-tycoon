@@ -93,6 +93,9 @@ const DESCRIPTIONS := {
 	"carb_excited_spread_lower": "Frenzy speed-mix lower bound (0.25 = crawlers among streakers).",
 	"carb_excited_tails": "Comet-tail visibility during frenzy (0 = hidden, 1 = full).",
 	"carb_excited_ease": "Seconds for the frenzy look to ramp in/out (try 1.0-1.5 if edges pop).",
+	"match3_combo_bonus": "Match-3 cascade combo strength (low = lucky chains pay less).",
+	"match3_full_score": "Match-3 score that keeps 100% (higher = harder to reach full).",
+	"match3_max_score": "Match-3 score for the max bonus / early win (higher = harder to max).",
 	"offline_efficiency": "Offline income rate vs live play (0–1).",
 	"offline_cap_seconds": "Longest offline accrual window (seconds; 14400 = 4h).",
 	"frenzy_max_multiplier": "Peak income multiplier during a frenzy burn.",
@@ -124,6 +127,9 @@ const DISPLAY_NAMES := {
 	"rush_pct": "Rush Percent",
 	"k_legacy": "Legacy Payout Scale",
 	"alpha_legacy": "Legacy Payout Curve",
+	"match3_combo_bonus": "Match3 Combo Bonus",
+	"match3_full_score": "Match3 Full Score",
+	"match3_max_score": "Match3 Max Score",
 }
 
 

@@ -39,6 +39,11 @@ const MISS_PENALTY := 0.75
 const GLINT_PULSE_SPEED := 4.0
 const GLINT_PULSE_AMOUNT := 0.25
 
+## The Legacy gem texture, overlaid on a "legacy coin" (see _spawn_coin) so the player can see it
+## carries a bonus gem worth catching. Same art used for the currency everywhere else, so it reads
+## instantly (Plans/Legacy_Bonus_System.md — "catch that coin earns the gem in addition").
+const LEGACY_GEM_TEXTURE := preload("res://art/icons/legacy_gem.svg")
+
 var _caught: int = 0
 var _missed: int = 0
 var _spawned: int = 0
@@ -52,6 +57,11 @@ var _spawn_size: float = START_COIN_SIZE
 var _shine_phase: float = 0.0
 var _rng := RandomNumberGenerator.new()
 var _area: Control
+## Chance any single spawned coin is a "legacy coin" carrying a bonus Legacy gem (from
+## tuning.legacy_gem_chance_catch). Catching it collects the gem on top of the normal catch; a
+## missed legacy coin just falls away like any other. Captured live in begin() so Balance Tuning
+## edits take effect next round.
+var _legacy_coin_chance: float = 0.0
 
 
 func display_name() -> String:
@@ -63,10 +73,12 @@ func how_to_play() -> String:
 		+ "misses cost — and they fall faster as you go."
 
 
-func begin(_tuning: TuningConfig) -> void:
+func begin(tuning: TuningConfig) -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_rng.randomize()
 	_running = true
+	# Capture the live spawn chance so Balance Tuning edits take effect next round.
+	_legacy_coin_chance = tuning.legacy_gem_chance_catch
 
 	var intro := Label.new()
 	intro.text = how_to_play()
@@ -187,6 +199,23 @@ func _spawn_coin(area_width: float) -> void:
 	coin.add_child(glint)
 	coin.set_meta("glint", glint)
 
+	# With a small chance this is a "legacy coin": catching it collects a bonus Legacy gem on top of
+	# the normal catch. We flag it (read in _on_coin_caught) and overlay the gem art so it stands out
+	# as special and worth catching. A missed legacy coin just falls away like any other coin.
+	var is_legacy := _rng.randf() < _legacy_coin_chance
+	coin.set_meta("legacy", is_legacy)
+	if is_legacy:
+		# The gem sits centered on the coin (mouse-ignored so it never eats the tap), sized to a
+		# chunk of the coin so the "$" still reads underneath it.
+		var gem := TextureRect.new()
+		gem.texture = LEGACY_GEM_TEXTURE
+		gem.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		gem.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		gem.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		gem.size = Vector2(_spawn_size * 0.62, _spawn_size * 0.62)
+		gem.position = (Vector2(_spawn_size, _spawn_size) - gem.size) / 2.0
+		coin.add_child(gem)
+
 	var max_x: float = maxf(0.0, area_width - _spawn_size)
 	coin.position = Vector2(_rng.randf_range(0.0, max_x), -_spawn_size)
 	coin.pressed.connect(_on_coin_caught.bind(coin))
@@ -222,9 +251,16 @@ func _on_coin_caught(coin: Button) -> void:
 	# Every catch makes the NEXT spawn 5% smaller (compounding), down to the readable floor.
 	_spawn_size = maxf(MIN_COIN_SIZE, _spawn_size * SHRINK_FACTOR)
 	var center := coin.position + coin.size / 2.0
+	# A legacy coin collects a bonus Legacy gem in addition to the normal catch (scoring below is
+	# unchanged). The host gates the actual payout by the round result; in Challenge Mode it just
+	# won't grant. We give an extra gem-earned cue on top of the normal catch juice.
+	var was_legacy := bool(coin.get_meta("legacy", false))
 	_coins.erase(coin)
 	coin.queue_free()
 	_spawn_catch_effect(center, coin.size.x)
+	if was_legacy:
+		collect_legacy_gem()
+		_spawn_legacy_catch_effect(center, coin.size.x)
 
 
 ## Catch reward: a white bloom that swells and fades where the coin was, plus a green "+1" that
@@ -257,6 +293,44 @@ func _spawn_catch_effect(center: Vector2, coin_size: float) -> void:
 	pop_tween.set_parallel(true)
 	pop_tween.tween_property(pop, "position:y", pop.position.y - 70.0, 0.5)
 	pop_tween.tween_property(pop, "modulate:a", 0.0, 0.5)
+	pop_tween.chain().tween_callback(pop.queue_free)
+
+
+## Bonus cue for catching a LEGACY coin, layered on top of the normal catch juice: the gem art
+## blooms and rises where the coin was, with a gold "LEGACY!" label, so earning the bonus gem reads
+## clearly as something extra and special.
+func _spawn_legacy_catch_effect(center: Vector2, coin_size: float) -> void:
+	var gem := TextureRect.new()
+	gem.texture = LEGACY_GEM_TEXTURE
+	gem.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	gem.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	gem.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	gem.size = Vector2(coin_size, coin_size)
+	gem.position = center - gem.size / 2.0
+	gem.pivot_offset = gem.size / 2.0
+	gem.scale = Vector2(0.5, 0.5)
+	_area.add_child(gem)
+	var gem_tween := create_tween()
+	gem_tween.set_parallel(true)
+	gem_tween.tween_property(gem, "scale", Vector2(1.4, 1.4), 0.4) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	gem_tween.tween_property(gem, "position:y", gem.position.y - 60.0, 0.5)
+	gem_tween.tween_property(gem, "modulate:a", 0.0, 0.5).set_delay(0.2)
+	gem_tween.chain().tween_callback(gem.queue_free)
+
+	var pop := Label.new()
+	pop.text = "LEGACY!"
+	pop.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
+	pop.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD)
+	pop.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
+	pop.add_theme_constant_override("outline_size", 5)
+	pop.add_theme_font_override("font", UiPalette.make_bold_font())
+	pop.position = Vector2(center.x - coin_size * 0.4, center.y + coin_size * 0.3)
+	_area.add_child(pop)
+	var pop_tween := create_tween()
+	pop_tween.set_parallel(true)
+	pop_tween.tween_property(pop, "position:y", pop.position.y - 70.0, 0.6)
+	pop_tween.tween_property(pop, "modulate:a", 0.0, 0.6).set_delay(0.2)
 	pop_tween.chain().tween_callback(pop.queue_free)
 
 

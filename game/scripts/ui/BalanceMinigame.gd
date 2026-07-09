@@ -28,7 +28,7 @@ const EDGE_BOUNCE := 0.35
 # The gold zone wanders: it eases toward a randomly re-rolled target center, so it
 # slides smoothly rather than jumping. ZONE_EASE controls how quickly it catches up.
 const ZONE_TARGET_CHANGE := 1.3  # seconds between new zone-target re-rolls
-const ZONE_EASE := 1.8           # how fast the zone center eases toward its target (per sec)
+const ZONE_EASE := 1.6           # how fast the zone center eases toward its target (per sec)
 
 ## The vertical track's on-screen width.
 const TRACK_WIDTH := 150.0

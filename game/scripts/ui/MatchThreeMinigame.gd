@@ -727,8 +727,7 @@ func _animate_step(step: Dictionary, points: float, step_index: int, group_detai
 	for gi in range(matches.size()):
 		var detail: Dictionary = group_details[gi]
 		_spawn_match_badge(
-				matches[gi], float(detail["points"]),
-				bool(detail["is_avoid"]), bool(detail.get("is_legacy", false)))
+				matches[gi], bool(detail["is_avoid"]), bool(detail.get("is_legacy", false)))
 	# Every match flashes the same (no combo now): a plain, consistent pop as it clears.
 	var flash_scale := 1.25
 	var flash := create_tween().set_parallel(true)
@@ -791,11 +790,11 @@ func _apply_spawns(spawns: Array, drop: Tween) -> void:
 		drop.tween_property(gem, "position", _cell_pos(to_r, col), FALL_TIME)
 
 
-## A color-coded result chip that pops over a cleared match so its OUTCOME reads at a glance
-## (Tim, 2026-07-09: the old cream group-size number didn't say whether a match was good or
-## docked). A clean match shows a green "+N"; an avoid match shows a red "AVOID +N" (−60%); a
-## LEGACY match shows a gold "LEGACY GEM!" (no points — it pays a Legacy bonus instead).
-func _spawn_match_badge(group: Array, points: float, is_avoid: bool, is_legacy: bool = false) -> void:
+## A color-coded result chip that pops over a cleared match. It shows the NUMBER OF GEMS in the
+## match (Tim, 2026-07-09 — a plain count reads better than an abstract point total now that combos
+## are gone), colored by outcome: green for a clean match, red for one that hit the avoid gem, and a
+## gold "LEGACY GEM!" for a legacy match (which pays a Legacy bonus, not points).
+func _spawn_match_badge(group: Array, is_avoid: bool, is_legacy: bool = false) -> void:
 	if group.is_empty():
 		return
 	var sum := Vector2.ZERO
@@ -826,10 +825,9 @@ func _spawn_match_badge(group: Array, points: float, is_avoid: bool, is_legacy: 
 	var label := Label.new()
 	if is_legacy:
 		label.text = "LEGACY GEM!"
-	elif is_avoid:
-		label.text = "AVOID +%d" % int(round(points))
 	else:
-		label.text = "+%d" % int(round(points))
+		# The count of gems in this match (merged L/T/+ shapes count as one big match).
+		label.text = "%d" % group.size()
 	label.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
 	label.add_theme_color_override("font_color", Color.WHITE)
 	label.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)

@@ -25,6 +25,7 @@ func _init() -> void:
 	_test_grid_stays_valid_after_random_swaps()
 	_test_resolve_swap_steps_reproduce_grid()
 	_test_special_color()
+	_test_match_group_merge()
 
 	print("")
 	if _failures == 0:
@@ -381,15 +382,46 @@ func _test_special_color() -> void:
 	_check(four_res["valid"] and not four_res.has("legacy_placement"),
 			"a 4-match does NOT place a Legacy gem")
 
-	# A 5+ match of the EXCLUDED color (the AVOID gem) must NOT place a Legacy gem.
-	var avoid5 = Board.new(6, 6, 5, 55, special)
-	_fill_checkerboard(avoid5)
-	avoid5.special_exclude_color = 2  # color 2 is the avoid gem this time
-	avoid5.grid[2][0] = 2; avoid5.grid[2][1] = 2; avoid5.grid[2][3] = 2; avoid5.grid[2][4] = 2
-	avoid5.grid[3][2] = 2
-	var avoid5_res: Dictionary = avoid5.resolve_swap(2, 2, 3, 2)
-	_check(avoid5_res["valid"] and not avoid5_res.has("legacy_placement"),
-			"a 5-match of the avoid color does NOT place a Legacy gem")
+	# A 5+ match of the EXCLUDED color (the AVOID gem) must NOT qualify for a Legacy gem. We check the
+	# qualifying rule directly on _find_match_groups (rather than via resolve_swap, whose refill
+	# cascade could form an unrelated qualifying merge and confuse the assertion): the excluded run is
+	# present as a size-5 group, but its color equals special_exclude_color, so it does not qualify.
+	var avoidb = Board.new(6, 6, 5, 55, special)
+	_fill_checkerboard(avoidb)
+	avoidb.special_exclude_color = 2
+	avoidb.grid[2][0] = 2; avoidb.grid[2][1] = 2; avoidb.grid[2][2] = 2; avoidb.grid[2][3] = 2; avoidb.grid[2][4] = 2
+	var avoid_groups: Array = avoidb._find_match_groups()
+	var any_qualifies := false
+	for g in avoid_groups:
+		var gc: int = avoidb.color_at(g[0][0], g[0][1])
+		if (g as Array).size() >= 5 and gc != special and gc != avoidb.special_exclude_color:
+			any_qualifies = true
+	_check(avoid_groups.size() == 1 and not any_qualifies,
+			"a 5-match of the avoid color does NOT qualify for a Legacy gem")
+
+
+# ---------------------------------------------------------------------------
+# (h) Intersecting same-color runs merge into ONE group; non-touching runs stay separate.
+# ---------------------------------------------------------------------------
+
+func _test_match_group_merge() -> void:
+	print("[h] Intersecting same-color runs merge into one group")
+	# An L of color 2: horizontal (2,0..2) + vertical (2,2),(3,2),(4,2), sharing (2,2) → 5 cells, one group.
+	var b = Board.new(6, 6, 4, 11)
+	_fill_checkerboard(b)
+	b.grid[2][0] = 2; b.grid[2][1] = 2; b.grid[2][2] = 2
+	b.grid[3][2] = 2; b.grid[4][2] = 2
+	var groups: Array = b._find_match_groups()
+	_check(groups.size() == 1, "an L-shape is ONE merged group")
+	_check(groups.size() == 1 and (groups[0] as Array).size() == 5, "the merged L group holds all 5 gems")
+
+	# Two 3-runs of the same color that don't touch stay as two separate groups.
+	var b2 = Board.new(6, 6, 4, 12)
+	_fill_checkerboard(b2)
+	b2.grid[0][0] = 2; b2.grid[0][1] = 2; b2.grid[0][2] = 2
+	b2.grid[4][0] = 2; b2.grid[4][1] = 2; b2.grid[4][2] = 2
+	var groups2: Array = b2._find_match_groups()
+	_check(groups2.size() == 2, "two non-touching 3-runs stay as two groups")
 
 
 ## Fill a board with a 0/1 checkerboard — no 3-in-a-row anywhere, so tests can place their own

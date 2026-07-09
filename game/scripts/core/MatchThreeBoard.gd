@@ -257,15 +257,16 @@ func _pick_color_without_match(
 	return _regular_color()
 
 
-## Return every current match as a list of GROUPS, where each group is one maximal line
-## (3+ same color, horizontal or vertical) as an Array of [row, col]. A cell at the
-## crossing of a horizontal and a vertical match appears in both groups; the caller
-## de-duplicates with _union_cells when it needs the flat set of cleared cells. Empty if
-## the board has no matches. Keeping groups (not just cells) lets the UI show match size.
+## Return every current match as a list of GROUPS (each an Array of [row, col]). A group is a set of
+## same-color gems that form 3+ in a row somewhere AND are connected to each other through those
+## rows — so an L / T / + shape (a horizontal run and a vertical run of the same color crossing at a
+## gem) is ONE merged group, not two (Tim, 2026-07-09). Two 3-runs of the same color that do NOT
+## share a cell stay separate. Empty if the board has no matches. The cells within a group are
+## de-duplicated; groups never overlap, so _union_cells' flat set is unchanged.
 func _find_match_groups() -> Array:
-	var groups: Array = []
+	# First collect every maximal 3+ run (horizontal and vertical) as its own list of cells.
+	var runs: Array = []
 
-	# Horizontal runs: scan each row for stretches of 3+ equal colors.
 	for row in range(height):
 		var run_start := 0
 		while run_start < width:
@@ -273,13 +274,12 @@ func _find_match_groups() -> Array:
 			while run_end + 1 < width and grid[row][run_end + 1] == grid[row][run_start]:
 				run_end += 1
 			if run_end - run_start + 1 >= 3:
-				var group: Array = []
+				var run: Array = []
 				for col in range(run_start, run_end + 1):
-					group.append([row, col])
-				groups.append(group)
+					run.append([row, col])
+				runs.append(run)
 			run_start = run_end + 1
 
-	# Vertical runs: scan each column for stretches of 3+ equal colors.
 	for col in range(width):
 		var run_start := 0
 		while run_start < height:
@@ -287,13 +287,59 @@ func _find_match_groups() -> Array:
 			while run_end + 1 < height and grid[run_end + 1][col] == grid[run_start][col]:
 				run_end += 1
 			if run_end - run_start + 1 >= 3:
-				var group: Array = []
+				var run: Array = []
 				for row in range(run_start, run_end + 1):
-					group.append([row, col])
-				groups.append(group)
+					run.append([row, col])
+				runs.append(run)
 			run_start = run_end + 1
 
+	if runs.is_empty():
+		return []
+
+	# Merge runs that share a cell (union-find over run indices). A cell can sit in at most one
+	# horizontal and one vertical run, so the crossing gem links those two runs into one group.
+	var parent: Array = []
+	for i in range(runs.size()):
+		parent.append(i)
+	var cell_owner := {}  # cell key -> the first run index that contained it
+	for i in range(runs.size()):
+		for cell in runs[i]:
+			var key: int = cell[0] * width + cell[1]
+			if cell_owner.has(key):
+				_union_runs(parent, cell_owner[key], i)
+			else:
+				cell_owner[key] = i
+
+	# Gather each merged component's de-duplicated cells.
+	var cells_by_root := {}
+	for i in range(runs.size()):
+		var root: int = _find_run_root(parent, i)
+		if not cells_by_root.has(root):
+			cells_by_root[root] = {}
+		var cells: Dictionary = cells_by_root[root]
+		for cell in runs[i]:
+			cells[cell[0] * width + cell[1]] = cell
+
+	var groups: Array = []
+	for root in cells_by_root:
+		groups.append((cells_by_root[root] as Dictionary).values())
 	return groups
+
+
+## Union-find root with path halving, over the run-index parent array.
+func _find_run_root(parent: Array, i: int) -> int:
+	while parent[i] != i:
+		parent[i] = parent[parent[i]]
+		i = parent[i]
+	return i
+
+
+## Union two runs into the same component.
+func _union_runs(parent: Array, a: int, b: int) -> void:
+	var ra: int = _find_run_root(parent, a)
+	var rb: int = _find_run_root(parent, b)
+	if ra != rb:
+		parent[rb] = ra
 
 
 ## Flatten match groups into a de-duplicated set of [row, col] cells (a crossing cell

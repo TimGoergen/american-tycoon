@@ -113,6 +113,8 @@ var _rng := RandomNumberGenerator.new()
 ## The single AVOID gem type this round (a color id). Matching a group that contains this gem
 ## is docked −60%; matching only clean gems earns +15%.
 var _avoid_type: int = 0
+## The soft red halo texture drawn behind avoid-type gems (built once, on first use).
+var _avoid_glow_texture: GradientTexture2D
 ## Total points earned so far (only ever rises — there is no way to lose points).
 var _score: float = 0.0
 ## Whether the player ever matched a group containing the avoid gem — used in the result summary.
@@ -412,8 +414,41 @@ func _make_gem(color_id: int) -> Control:
 	gem.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	gem.set_meta("color", color_id)
 
+	# Avoid-type gems get a soft red halo behind them so they're easy to spot and steer around
+	# (Tim, 2026-07-09). The glow is a child drawn behind the gem, so it travels with it and fades
+	# with it on clear.
+	if color_id == _avoid_type:
+		var glow := TextureRect.new()
+		glow.texture = _get_avoid_glow_texture()
+		glow.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		glow.stretch_mode = TextureRect.STRETCH_SCALE
+		var overhang := CELL_SIZE * 0.42
+		glow.position = Vector2(-overhang, -overhang)
+		glow.size = Vector2(CELL_SIZE + overhang * 2.0, CELL_SIZE + overhang * 2.0)
+		glow.show_behind_parent = true  # draw behind the gem texture, not over it
+		glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		gem.add_child(glow)
+
 	_style_gem(gem, false)
 	return gem
+
+
+## A soft red radial glow (opaque-ish red center fading to transparent), built once and reused as the
+## halo behind every avoid gem.
+func _get_avoid_glow_texture() -> GradientTexture2D:
+	if _avoid_glow_texture != null:
+		return _avoid_glow_texture
+	var gradient := Gradient.new()
+	gradient.set_color(0, Color(1.0, 0.15, 0.1, 0.8))   # red at the center
+	gradient.set_color(1, Color(1.0, 0.15, 0.1, 0.0))   # transparent at the edge
+	_avoid_glow_texture = GradientTexture2D.new()
+	_avoid_glow_texture.gradient = gradient
+	_avoid_glow_texture.fill = GradientTexture2D.FILL_RADIAL
+	_avoid_glow_texture.fill_from = Vector2(0.5, 0.5)
+	_avoid_glow_texture.fill_to = Vector2(0.5, 0.0)     # radius reaches the edge
+	_avoid_glow_texture.width = 128
+	_avoid_glow_texture.height = 128
+	return _avoid_glow_texture
 
 
 ## Show a gem as selected/active during a drag. With textured gems there is no panel stylebox to

@@ -1201,29 +1201,30 @@ func _flash_max_then(after: Callable) -> void:
 	flash.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	flash.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	# Cover the whole screen and center the word over the card. z high so it sits above everything.
+	# Cover the whole screen and center the word over the card. z high so it sits above everything. The
+	# label is anchored to fill the screen, so its centered text lands at screen center; we scale it
+	# about the SCREEN center (this host's own size) — reading the label's own size right after add_child
+	# gives (0,0), and forcing it fights the full-rect anchors (Tim, 2026-07-10).
 	flash.set_anchors_preset(Control.PRESET_FULL_RECT)
 	flash.z_index = 10
+	flash.pivot_offset = size / 2.0
 	# The play view stays up behind the flash until the result swaps in, so the board doesn't blank out
 	# mid-celebration. Hide the SKIP control though — the round is over.
 	_skip_button.visible = false
 	add_child(flash)
-	# Force a layout pass so the full-rect label has its real (screen) size before we pivot/scale about
-	# its center — reading size right after add_child would give (0,0) and scale from the top-left.
-	flash.size = size
-	flash.pivot_offset = flash.size / 2.0
 
-	# Bloom in big, hold, then fade — about one second total before the result appears.
+	# Bloom in big, hold, then fade — about one second total before the result appears. Built as a
+	# SEQUENTIAL tween (bloom → hold → fade), pairing the bloom's scale + fade-in with parallel() so we
+	# never leave set_parallel latched across the chain (that latch silently ran the steps out of order
+	# and nothing showed — Tim, 2026-07-10).
 	flash.scale = Vector2(0.5, 0.5)
 	flash.modulate = Color(1, 1, 1, 0.0)
 	var beat := create_tween()
-	beat.set_parallel(true)
 	beat.tween_property(flash, "scale", Vector2.ONE, 0.22) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	beat.tween_property(flash, "modulate:a", 1.0, 0.18)
-	# Hold at full for the middle of the second, then fade out.
-	beat.chain().tween_interval(0.5)
-	beat.tween_property(flash, "modulate:a", 0.0, 0.25)
+	beat.parallel().tween_property(flash, "modulate:a", 1.0, 0.18)
+	beat.tween_interval(0.5)  # hold at full
+	beat.tween_property(flash, "modulate:a", 0.0, 0.25)  # fade out
 	beat.tween_callback(func() -> void:
 		flash.queue_free()
 		after.call())

@@ -554,25 +554,27 @@ func _animate_banner_intro() -> void:
 ## _process yields the icon's scale to this tween, then clears it and restores a neutral scale so the
 ## idle breathing resumes seamlessly. A brief red-tinted brightening reinforces "that one costs you".
 func _pulse_avoid_banner() -> void:
-	if _banner_icon == null or not _banner_ready:
+	if _banner_icon == null:
 		return
+	# Owning the icon's scale/modulate for the duration so the idle _process pulse doesn't fight it.
 	_banner_alerting = true
 	_banner_icon.pivot_offset = _banner_icon.size / 2.0
 	# Warm the flash toward the avoid-gem's warning red so the reminder reads as a caution, not a reward.
 	var alert_tint := Color(1.6, 0.8, 0.7, 1.0)
+	# A single SEQUENTIAL tween that plays two grow/settle beats on scale, with the red tint flashed in
+	# lock-step via set_delay so both properties move together without juggling parallel/chain modes
+	# (the earlier mixed-mode build silently animated nothing — Tim, 2026-07-10).
 	var pulse := create_tween()
-	# Two visible beats: grow-and-tint, settle, grow-and-tint, settle back to normal.
 	for beat in range(2):
-		pulse.set_parallel(true)
-		pulse.tween_property(_banner_icon, "scale", Vector2(1.22, 1.22), 0.12) \
+		pulse.tween_property(_banner_icon, "scale", Vector2(1.25, 1.25), 0.13) \
 				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-		pulse.tween_property(_banner_icon, "modulate", alert_tint, 0.12)
-		pulse.chain().set_parallel(true)
-		pulse.tween_property(_banner_icon, "scale", Vector2.ONE, 0.14) \
+		pulse.parallel().tween_property(_banner_icon, "modulate", alert_tint, 0.13)
+		pulse.tween_property(_banner_icon, "scale", Vector2.ONE, 0.15) \
 				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-		pulse.tween_property(_banner_icon, "modulate", Color.WHITE, 0.14)
-		pulse.chain()
-	pulse.tween_callback(func() -> void: _banner_alerting = false)
+		pulse.parallel().tween_property(_banner_icon, "modulate", Color.WHITE, 0.15)
+	pulse.tween_callback(func() -> void:
+		_banner_alerting = false
+		_banner_icon.modulate = Color.WHITE)
 
 
 func _build_initial_gems() -> void:

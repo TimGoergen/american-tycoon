@@ -235,16 +235,18 @@ const SECOND_ROW_FONT_SIZE := 41
 ## (Tim, 2026-07-09). A dollar-bill sits just before every amount; a property-tab icon sits
 ## before the buy button's "+N" count. Each is sized to roughly its neighboring text's cap
 ## height and mouse-ignored so taps still reach the control underneath.
-##
-## These are drawn at only ~45px tall, and the detailed SVGs (thin frames, a stroked "$",
-## tiny corner pips) turned to aliased mush at that size: Godot's default SVG import
-## rasterizes them at their native ~82px with NO mipmaps, so shrinking point-samples a
-## too-small source. Rather than lean on the per-machine .import config (it is gitignored,
-## so any mipmap/scale tweak there would not survive a fresh import), we rasterize the SVG
-## SOURCE ourselves at a high resolution and build a mipmapped texture in code — crisp at
-## any small size, fully self-contained, and immune to reimport (Tim, 2026-07-09).
+## Each loads the IMPORTED texture (see _crisp_icon_texture) — the raw .svg source is NOT in
+## the export, so it must not be read at runtime.
 const DOLLAR_ICON_SVG := "res://art/icons/dollar_bill.svg"
 const PROPERTY_ICON_SVG := "res://art/icons/tab_property.svg"
+
+## The hire button's headshot icon and the buy button's factory (property-tab) icon are sized
+## so their VISIBLE (opaque) art is the SAME height: 50.6px, the average of their former
+## on-screen heights — the headshot showed ~55.5px, the factory ~45.6px (Tim, 2026-07-10).
+## Each icon's art sits in a square canvas with its own transparent padding, so the BOX needed
+## to reach this visible height differs per icon and is derived from that icon's opaque
+## fraction at each use (headshot: art fills 86/96 of its box; factory: 279/324).
+const MATCHED_ICON_VISIBLE_HEIGHT := 50.6
 
 ## Imported icon textures, loaded once and keyed by source path. Shared across every row
 ## (all rows draw the same two icons), loaded lazily on first use.
@@ -496,10 +498,11 @@ func _ready() -> void:
 	# Inline icons on the buy button (Tim, 2026-07-09): a property-tab icon before the "+N"
 	# count on the left, and a dollar-bill icon before the cost on the right (its "$").
 	var buy_row := _buy_caption_label.get_parent() as HBoxContainer
-	# The property-tab count icon is drawn 30% larger than the cost icon so the "what you're
-	# buying" symbol reads as the button's lead (Tim, 2026-07-09) — sizing it off a scaled-up
-	# font size, since _make_inline_icon fits its box to the passed size.
-	_buy_count_icon = _make_inline_icon(PROPERTY_ICON_SVG, roundi(BUTTON_LABEL_FONT_SIZE * 1.3))
+	# The property-tab count icon is sized to match the hire button's headshot icon: both show
+	# the same visible art height (Tim, 2026-07-10). The factory art fills 279/324 of its square
+	# canvas, so scale the target height up by that inverse to get the box it needs.
+	var factory_box := roundi(MATCHED_ICON_VISIBLE_HEIGHT * 324.0 / 279.0)
+	_buy_count_icon = _make_inline_icon(PROPERTY_ICON_SVG, factory_box, true)
 	buy_row.add_child(_buy_count_icon)
 	buy_row.move_child(_buy_count_icon, 0)  # the tab icon leads, then the "+N" caption
 	_buy_cost_icon = _make_inline_icon(DOLLAR_ICON_SVG, BUTTON_LABEL_FONT_SIZE)
@@ -1118,12 +1121,14 @@ func _add_split_button_labels(button: Button) -> Array:
 ##
 ## The texture is the imported SVG (see _crisp_icon_texture), drawn with LINEAR filtering as
 ## it shrinks into the small inline box.
-func _make_inline_icon(svg_path: String, font_size: int) -> TextureRect:
+## When size_is_box is false (the default), size_px is a neighboring font size and the box is
+## set ~1.1x it so the icon reads a touch taller than the glyphs. When true, size_px IS the box
+## side in pixels directly (used to hit an exact visible height — see the buy count icon).
+func _make_inline_icon(svg_path: String, size_px: int, size_is_box := false) -> TextureRect:
 	var icon := TextureRect.new()
 	icon.texture = _crisp_icon_texture(svg_path)
 	icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	# ~1.1x the font size: the icon box a touch taller than the glyphs so it doesn't read as shrunken.
-	var box := roundi(font_size * 1.1)
+	var box := size_px if size_is_box else roundi(size_px * 1.1)
 	icon.custom_minimum_size = Vector2(box, box)
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -1217,9 +1222,10 @@ func _set_buy_label_colors() -> void:
 ## boxes left the plus visually low and far from the face. Drawing lets the plus hug
 ## the icon's VISIBLE bounds (get_used_rect — see the texture-sizing memory note).
 class StaffHireGlyph extends Control:
-	## Side of the square box the headshot canvas is fitted into.
-	## 56 → 62 in the taller-panel pass (Tim, 2026-07-05).
-	const ICON_SIZE := 62.0
+	## Side of the square box the headshot canvas is fitted into. Sized so the VISIBLE headshot
+	## art (which fills 86/96 of this box) is MATCHED_ICON_VISIBLE_HEIGHT tall, matching the buy
+	## button's factory icon (Tim, 2026-07-10). Was a flat 62.0 (visible ~55.5px).
+	const ICON_SIZE := PropertyRow.MATCHED_ICON_VISIBLE_HEIGHT * 96.0 / 86.0
 	## The plus is bigger than the button's cost text so it carries as a symbol.
 	## +25% in the all-panel-text-larger pass (42 → 52, Tim 2026-07-05).
 	const PLUS_FONT_SIZE := 52

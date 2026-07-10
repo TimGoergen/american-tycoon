@@ -49,7 +49,7 @@ const CASH_BILL_EDGE_PAD := 14
 
 # The bold-gold "/ s" beside the income dollar bill (replaced the "$/clock" icon, Tim 2026-07-09).
 const INCOME_PER_FONT_SIZE := UiPalette.FONT_HEADLINE
-const INCOME_PER_GAP := 10.0  # space between the income bill and the "/ s" text
+const INCOME_PER_GAP := 4.0  # space between the income bill and the "/s" text (tight — Tim, 2026-07-09)
 const BILL_TOP_GAP := 4.0  # small gap between an amount and the dollar bill just beneath it
 
 ## Gap kept between a pinned label and the panel edge it hugs.
@@ -221,7 +221,8 @@ func _ready() -> void:
 	_content.add_child(_income_bill)
 
 	_income_per_label = _make_label(UiPalette.MUSTARD_GOLD, INCOME_PER_FONT_SIZE, 3)  # outline 3 = bold
-	_income_per_label.text = "/ s"
+	# Tight spacing around the slash (Tim, 2026-07-09): no internal space, small bill gap above.
+	_income_per_label.text = "/s"
 	_content.add_child(_income_per_label)
 
 	_cash_bill = TextureRect.new()

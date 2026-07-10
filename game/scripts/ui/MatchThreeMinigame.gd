@@ -80,6 +80,9 @@ const PITCH := CELL_SIZE + GAP
 ## this" cue pinned above the grid. Doubled to 220 (Tim, 2026-07-09) so it reads unmistakably.
 const BONUS_ICON_SIZE := 220
 
+## How far the AVOID gem and BONUS badge are inset from the card's left/right edges (Tim, 2026-07-09).
+const BANNER_EDGE_MARGIN := 40
+
 ## How far a press must move before it counts as a drag-swap (rather than a stray tap).
 const DRAG_THRESHOLD := CELL_SIZE * 0.4
 
@@ -284,7 +287,13 @@ func _build_bonus_banner() -> Control:
 	_legacy_badge.add_child(badge_icon)
 	row.add_child(_legacy_badge)
 
-	return row
+	# Inset the whole banner so the AVOID gem (far left) and the BONUS badge (far right) sit a little
+	# farther from the card's outside edges (Tim, 2026-07-09).
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", BANNER_EDGE_MARGIN)
+	margin.add_theme_constant_override("margin_right", BANNER_EDGE_MARGIN)
+	margin.add_child(row)
+	return margin
 
 
 ## A single large AVOID gem tile for the banner: the gem texture centered inside a rounded panel

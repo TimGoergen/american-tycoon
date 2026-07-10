@@ -443,7 +443,7 @@ func _build_play_view() -> Control:
 	bar_margin.add_theme_constant_override("margin_top", 22)  # nudge the bar down a little (Tim)
 	column.add_child(bar_margin)
 	_keep_bar = Control.new()
-	_keep_bar.custom_minimum_size = Vector2(0, 40)
+	_keep_bar.custom_minimum_size = Vector2(0, 60)  # 40 * 1.5 — 50% taller (Tim, 2026-07-09)
 	_keep_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_keep_bar.draw.connect(_draw_keep_bar)
 	bar_margin.add_child(_keep_bar)
@@ -1021,12 +1021,14 @@ func _format_amount(amount: float) -> String:
 
 
 ## Update the focal timer each frame: for the last TIMER_PULSE_SECONDS it pops once per second
-## (bigger + brighter toward gold on each tick), and shows a "held" cue (muted color + pause glyph)
-## while the type is mid-animation so the paused countdown doesn't read as a bug. (plan §1 juice.)
+## (bigger + brighter toward gold on each tick), and dims to a muted color while the type is
+## mid-animation to show the countdown is held. The text stays the same width whether held or not —
+## the old "⏸" glyph widened the right-aligned label, so the timer visibly slid left during a
+## match's animation (Tim, 2026-07-09); the muted color alone now carries the held cue.
 func _refresh_timer(delta: float, busy: bool) -> void:
 	var secs := int(ceil(_seconds_left))
 	if busy:
-		_timer_label.text = "0:%02d  ⏸" % secs
+		_timer_label.text = "0:%02d" % secs
 		_set_timer_color(UiPalette.NAVY)
 		_set_timer_scale(1.0)
 		return
@@ -1100,7 +1102,7 @@ func _build_segment_styleboxes() -> void:
 func _make_segment_box(color: Color, is_track: bool) -> StyleBoxFlat:
 	var box := StyleBoxFlat.new()
 	box.bg_color = color
-	box.set_corner_radius_all(12)
+	box.set_corner_radius_all(16)
 	if is_track:
 		box.border_color = UiPalette.NAVY
 		box.set_border_width_all(2)

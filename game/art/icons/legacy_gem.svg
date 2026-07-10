@@ -23,7 +23,7 @@
      inkscape:deskcolor="#d1d1d1"
      inkscape:zoom="3.202381"
      inkscape:cx="108.35688"
-     inkscape:cy="90.713753"
+     inkscape:cy="115.69517"
      inkscape:window-width="1920"
      inkscape:window-height="1009"
      inkscape:window-x="-8"
@@ -36,6 +36,18 @@
        No SVG filters (the Godot/thorvg importer doesn't render them) — the glow is gradient ellipses. -->
   <defs
      id="defs10">
+    <linearGradient
+       id="linearGradient24"
+       inkscape:collect="always">
+      <stop
+         style="stop-color:#f743de;stop-opacity:1;"
+         offset="0"
+         id="stop24" />
+      <stop
+         style="stop-color:#771f78;stop-opacity:1;"
+         offset="1"
+         id="stop26" />
+    </linearGradient>
     <linearGradient
        id="linearGradient16"
        inkscape:collect="always">
@@ -215,12 +227,21 @@
        xlink:href="#lg_core"
        id="radialGradient21"
        gradientUnits="userSpaceOnUse"
-       gradientTransform="matrix(-0.04193175,0.77471707,-2.1009692,-0.17738048,237.98576,-41.291848)"
+       gradientTransform="matrix(-0.04193175,0.77471707,-2.1009692,-0.17738048,247.11363,-49.956001)"
        cx="232.83078"
        cy="74.563751"
        fx="232.83078"
        fy="74.563751"
        r="69.268173" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient24"
+       id="linearGradient26"
+       x1="90"
+       y1="109"
+       x2="90"
+       y2="145"
+       gradientUnits="userSpaceOnUse" />
   </defs>
   <!-- Black crystal silhouette (the thick outline) -->
   <polygon
@@ -307,42 +328,30 @@
        opacity="0.8"
        id="ellipse19"
        style="stroke-width:37.4;stroke-dasharray:none" />
-    <rect
-       x="88.185875"
-       y="45.249073"
-       width="3.9405205"
-       height="163.81413"
-       rx="1.3236831"
-       fill="#ffdcf9"
-       opacity="0.55"
-       id="rect19"
-       style="stroke-width:0.32859539;stroke-dasharray:none;fill:#fff1fd;fill-opacity:1;stroke:#ffffff;stroke-opacity:1;opacity:1"
-       ry="4.0179315" />
   </g>
   <path
-     style="stroke-width:10.51505234;stroke-dasharray:none;opacity:1;fill:#8c38be;fill-opacity:1;stroke:#fcbaf3;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:5.4;stroke-opacity:1"
-     d="M 133.89134,177.09344 98.646396,186.1898 Z"
-     id="path17"
-     transform="matrix(-1.4884682,0,0,-0.99553719,253.93983,254.99456)" />
+     style="opacity:1;fill:#8c38be;fill-opacity:1;stroke:#fcbaf3;stroke-width:10.8207;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:5.4;stroke-dasharray:none;stroke-opacity:1"
+     d="M 54.190401,79.998375 107.56424,73.63732 Z"
+     id="path17" />
   <!-- Beveled highlights: light lavender along the upper inner facet edges where light catches -->
   <path
-     style="opacity:1;fill:#8c38be;fill-opacity:1;stroke:#fcbaf3;stroke-width:12.8;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:5.4;stroke-dasharray:none;stroke-opacity:1"
-     d="m 131.77694,68.698889 58.0818,14.36431 z"
+     style="opacity:1;fill:#8c38be;fill-opacity:1;stroke:#fcbaf3;stroke-width:10.8871;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:5.4;stroke-dasharray:none;stroke-opacity:1"
+     d="m 131.28911,74.205968 59.05746,10.22004 z"
      id="path18"
      sodipodi:nodetypes="ccc" />
   <path
-     style="opacity:1;fill:#8c38be;fill-opacity:1;stroke:#fcbaf3;stroke-width:12.8214;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:5.4;stroke-dasharray:none;stroke-opacity:1"
-     d="m 36.539965,168.14015 52.451658,9.08773 z"
+     style="opacity:1;fill:#8c38be;fill-opacity:1;stroke:#fcbaf3;stroke-width:10.675;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:5.4;stroke-dasharray:none;stroke-opacity:1"
+     d="m 40.194089,167.89487 50.45196,10.20283 z"
      id="path19" />
   <path
-     style="opacity:1;fill:#8c38be;fill-opacity:1;stroke:#fcbaf3;stroke-width:12.7557;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:5.4;stroke-dasharray:none;stroke-opacity:1"
-     d="m 201.72191,170.94312 -51.83046,9.10261 z"
+     style="opacity:1;fill:#8c38be;fill-opacity:1;stroke:#fcbaf3;stroke-width:10.2759;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:5.4;stroke-dasharray:none;stroke-opacity:1"
+     d="m 201.55881,169.16277 -49.63066,9.8529 z"
      id="path20" />
   <g
      clip-path="url(#lg_centerclip)"
      id="g21"
-     style="stroke:#f744de;stroke-width:37.4;stroke-dasharray:none;stroke-opacity:0.49283153"
-     transform="matrix(0,-0.85525879,0.6847854,0,34.727427,188.52022)">
+     style="stroke:url(#linearGradient26);stroke-width:37.40020287;stroke-dasharray:none;stroke-opacity:0.49283153;paint-order:stroke fill markers;stroke-linecap:round;stroke-linejoin:bevel"
+     transform="matrix(0,-0.85525879,0.6847854,0,40.660512,196.32691)">
     <ellipse
        cx="90"
        cy="127"
@@ -350,7 +359,7 @@
        ry="98"
        fill="url(#lg_core)"
        id="ellipse20"
-       style="fill:url(#radialGradient21);stroke:#f744de;stroke-width:37.4;stroke-dasharray:none;stroke-opacity:0.49283153" />
+       style="fill:url(#radialGradient21);stroke:url(#linearGradient26);stroke-width:37.40020287;stroke-dasharray:none;stroke-opacity:0.49283153;paint-order:stroke fill markers;stroke-linecap:round;stroke-linejoin:bevel" />
     <ellipse
        cx="90"
        cy="127"
@@ -359,7 +368,7 @@
        fill="#ff86ef"
        opacity="0.8"
        id="ellipse21"
-       style="stroke:#fb9eee;stroke-width:37.4;stroke-dasharray:none;stroke-opacity:0.49283153" />
+       style="stroke:url(#linearGradient26);stroke-width:37.40020287;stroke-dasharray:none;stroke-opacity:0.49283153;paint-order:stroke fill markers;stroke-linecap:round;stroke-linejoin:bevel" />
     <rect
        x="88.185875"
        y="45.249073"
@@ -369,7 +378,43 @@
        fill="#ffdcf9"
        opacity="0.55"
        id="rect21"
-       style="opacity:1;fill:#fff1fd;fill-opacity:1;stroke:#f744de;stroke-width:0.328595;stroke-dasharray:none;stroke-opacity:0.49283153"
+       style="opacity:1;fill:#fff1fd;fill-opacity:1;stroke:url(#linearGradient26);stroke-width:37.40020287;stroke-dasharray:none;stroke-opacity:0.49283153;paint-order:stroke fill markers;stroke-linecap:round;stroke-linejoin:bevel"
        ry="6.9926944" />
   </g>
+  <rect
+     x="88.185875"
+     y="45.249073"
+     width="3.9405205"
+     height="163.81413"
+     rx="1.3236831"
+     fill="#ffdcf9"
+     opacity="0.55"
+     id="rect19"
+     style="stroke-width:0.32859539;stroke-dasharray:none;fill:#fff1fd;fill-opacity:1;stroke:#ffffff;stroke-opacity:1;opacity:1"
+     ry="4.0179315"
+     transform="matrix(-1.4884682,0,0,-0.99553719,253.93983,254.06194)" />
+  <rect
+     x="-82.503365"
+     y="28.123022"
+     width="1.4017677"
+     height="63.556816"
+     rx="1.6260859"
+     fill="#ffdcf9"
+     opacity="0.55"
+     id="rect22"
+     style="opacity:1;fill:#ffffff;fill-opacity:1;stroke:#ffffff;stroke-width:0.122076;stroke-dasharray:none;stroke-opacity:0.492832"
+     ry="4.7548685"
+     transform="matrix(-0.24762195,-0.96885673,0.99146016,-0.13040996,0,0)" />
+  <rect
+     x="151.15929"
+     y="60.036003"
+     width="2.0169492"
+     height="64.757065"
+     rx="1.6382188"
+     fill="#ffdcf9"
+     opacity="0.55"
+     id="rect23"
+     style="opacity:1;fill:#ffffff;fill-opacity:1;stroke:#ffffff;stroke-width:0.147809;stroke-dasharray:none;stroke-opacity:0.492832"
+     ry="4.7624269"
+     transform="matrix(-0.17372982,0.98479335,0.98232311,0.18719324,0,0)" />
 </svg>

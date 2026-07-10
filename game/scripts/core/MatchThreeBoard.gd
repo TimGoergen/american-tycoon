@@ -189,11 +189,17 @@ func resolve_swap(r1: int, c1: int, r2: int, c2: int) -> Dictionary:
 		})
 
 	# Place the earned Legacy gem at the target cell (r2, c2) now the board is stable, overwriting
-	# whatever settled there. Recorded as `legacy_placement` so the UI can pop it in after the
-	# cascade animation and the step-replay test can apply it.
+	# whatever settled there — UNLESS that cell already holds a Legacy gem, in which case it goes to
+	# the CLOSEST cell that doesn't (Tim, 2026-07-09), so a new gem never lands on an existing one.
+	# Recorded as `legacy_placement` so the UI can pop it in after the cascade and the step-replay
+	# test can apply it. Skipped only if the whole board is somehow already Legacy gems.
 	if qualifying_big_match:
-		grid[r2][c2] = special_color
-		result["legacy_placement"] = [r2, c2]
+		var target := [r2, c2]
+		if grid[r2][c2] == special_color:
+			target = _nearest_non_special_cell(r2, c2)
+		if not target.is_empty():
+			grid[target[0]][target[1]] = special_color
+			result["legacy_placement"] = target
 
 	score += total_cleared
 	result["steps"] = steps
@@ -207,6 +213,25 @@ func resolve_swap(r1: int, c1: int, r2: int, c2: int) -> Dictionary:
 
 func _in_bounds(row: int, col: int) -> bool:
 	return row >= 0 and row < height and col >= 0 and col < width
+
+
+## The cell closest to (from_r, from_c) whose gem is NOT the special (Legacy) color, so a newly
+## earned Legacy gem never lands on top of an existing one. Closest by squared distance; ties go to
+## the first found in row-major order. Returns [] only if the whole board is already special gems.
+func _nearest_non_special_cell(from_r: int, from_c: int) -> Array:
+	var best: Array = []
+	var best_dist := 1 << 30
+	for row in range(height):
+		for col in range(width):
+			if grid[row][col] == special_color:
+				continue
+			var dr := row - from_r
+			var dc := col - from_c
+			var dist := dr * dr + dc * dc
+			if dist < best_dist:
+				best_dist = dist
+				best = [row, col]
+	return best
 
 
 ## Swap the colors of two cells in place.

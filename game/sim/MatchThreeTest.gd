@@ -26,6 +26,7 @@ func _init() -> void:
 	_test_resolve_swap_steps_reproduce_grid()
 	_test_special_color()
 	_test_match_group_merge()
+	_test_legacy_redirect()
 
 	print("")
 	if _failures == 0:
@@ -432,6 +433,27 @@ func _test_match_group_merge() -> void:
 	b2.grid[4][0] = 2; b2.grid[4][1] = 2; b2.grid[4][2] = 2
 	var groups2: Array = b2._find_match_groups()
 	_check(groups2.size() == 2, "two non-touching 3-runs stay as two groups")
+
+
+# ---------------------------------------------------------------------------
+# (i) A newly earned Legacy gem redirects to the closest non-Legacy cell when its target is taken.
+# ---------------------------------------------------------------------------
+
+func _test_legacy_redirect() -> void:
+	print("[i] Legacy gem redirects off an occupied target to the nearest free cell")
+	var special := 4
+	var b = Board.new(6, 6, 5, 5, special)
+	_fill_checkerboard(b)  # 0/1 only — no special gems yet
+	# Make the target (2,2) and all four orthogonal neighbors (distance 1) Legacy gems. The nearest
+	# NON-Legacy cells are then the diagonals at squared distance 2.
+	b.grid[2][2] = special
+	b.grid[2][1] = special; b.grid[2][3] = special; b.grid[1][2] = special; b.grid[3][2] = special
+	var cell: Array = b._nearest_non_special_cell(2, 2)
+	_check(not cell.is_empty() and b.color_at(cell[0], cell[1]) != special,
+			"redirect lands on a non-Legacy cell")
+	var dr: int = cell[0] - 2
+	var dc: int = cell[1] - 2
+	_check(dr * dr + dc * dc == 2, "redirect picks the closest free cell (a diagonal neighbor)")
 
 
 ## Fill a board with a 0/1 checkerboard — no 3-in-a-row anywhere, so tests can place their own

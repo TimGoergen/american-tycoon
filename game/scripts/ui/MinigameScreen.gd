@@ -1175,7 +1175,58 @@ func _draw_segment(rect: Rect2, track: StyleBoxFlat, fill: StyleBoxFlat, frac: f
 
 func _end_round() -> void:
 	_playing = false
-	_show_result(_multiplier_for_performance(_current_performance()))
+	var performance := _current_performance()
+	# A round can end for two reasons: the clock ran out, or the player hit the MAXIMUM result and there
+	# was no point playing on. In the latter case flash "MAX!" over the card for a beat before the result
+	# appears, so the player understands the round ended because they maxed it — not that it was cut off
+	# (Tim, 2026-07-10). "Early" = the timer still had time left; a max reached exactly as the clock
+	# expired just shows the result normally. Universal here in the host, so every minigame behaves alike.
+	var ended_on_max := performance >= 1.0 and _seconds_left > 0.0 and not _challenge_mode
+	if ended_on_max:
+		_flash_max_then(func() -> void: _show_result(_multiplier_for_performance(performance)))
+		return
+	_show_result(_multiplier_for_performance(performance))
+
+
+## Flash a big "MAX!" over the card for about a second, then run `after` (which shows the result).
+## The overlay is built on demand and freed when done, so it costs nothing on the common (timer-out)
+## path. Kept on the host so it looks the same for every minigame type (Tim, 2026-07-10).
+func _flash_max_then(after: Callable) -> void:
+	var flash := Label.new()
+	flash.text = "MAX!"
+	flash.add_theme_font_size_override("font_size", UiPalette.FONT_DISPLAY)
+	flash.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD)
+	flash.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
+	flash.add_theme_constant_override("outline_size", 12)
+	flash.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	flash.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Cover the whole screen and center the word over the card. z high so it sits above everything.
+	flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+	flash.z_index = 10
+	# The play view stays up behind the flash until the result swaps in, so the board doesn't blank out
+	# mid-celebration. Hide the SKIP control though — the round is over.
+	_skip_button.visible = false
+	add_child(flash)
+	# Force a layout pass so the full-rect label has its real (screen) size before we pivot/scale about
+	# its center — reading size right after add_child would give (0,0) and scale from the top-left.
+	flash.size = size
+	flash.pivot_offset = flash.size / 2.0
+
+	# Bloom in big, hold, then fade — about one second total before the result appears.
+	flash.scale = Vector2(0.5, 0.5)
+	flash.modulate = Color(1, 1, 1, 0.0)
+	var beat := create_tween()
+	beat.set_parallel(true)
+	beat.tween_property(flash, "scale", Vector2.ONE, 0.22) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	beat.tween_property(flash, "modulate:a", 1.0, 0.18)
+	# Hold at full for the middle of the second, then fade out.
+	beat.chain().tween_interval(0.5)
+	beat.tween_property(flash, "modulate:a", 0.0, 0.25)
+	beat.tween_callback(func() -> void:
+		flash.queue_free()
+		after.call())
 
 
 func _show_result(mult: float) -> void:

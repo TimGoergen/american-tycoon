@@ -410,6 +410,23 @@ func _test_special_color() -> void:
 	_check(avoid_groups.size() == 1 and not any_qualifies,
 			"a 5-match of the avoid color does NOT qualify for a Legacy gem")
 
+	# Matching the Legacy gems themselves suppresses a NEW Legacy spawn for the rest of that swap
+	# (Tim, 2026-07-10): you already collected the payout by matching them, so a big match among the
+	# same swap's cascade must not hand out another. Plant BOTH a legacy-color run AND a qualifying
+	# 5-run of a regular color so they resolve together in the first cascade; with the legacy match
+	# present, resolve_swap must record NO legacy_placement.
+	var suppress = Board.new(6, 6, 5, 55, special)
+	_fill_checkerboard(suppress)  # colors 0/1, no pre-existing matches
+	# A regular 5-run of color 2 across row 4 (would normally earn a Legacy gem on its own).
+	suppress.grid[4][0] = 2; suppress.grid[4][1] = 2; suppress.grid[4][3] = 2; suppress.grid[4][4] = 2
+	suppress.grid[5][2] = 2  # swapped up into (4,2) to complete the run of five
+	# A legacy run of THREE special gems across row 2, already present (the player is matching them).
+	# Placed on a checkerboard so the swap below doesn't disturb them; they match on the same tick.
+	suppress.grid[2][0] = special; suppress.grid[2][1] = special; suppress.grid[2][2] = special
+	var suppress_res: Dictionary = suppress.resolve_swap(4, 2, 5, 2)
+	_check(suppress_res["valid"] and not suppress_res.has("legacy_placement"),
+			"a Legacy-gem match suppresses a new Legacy spawn from the same swap")
+
 
 # ---------------------------------------------------------------------------
 # (h) Intersecting same-color runs merge into ONE group; non-touching runs stay separate.

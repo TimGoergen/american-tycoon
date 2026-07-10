@@ -160,6 +160,11 @@ func resolve_swap(r1: int, c1: int, r2: int, c2: int) -> Dictionary:
 	# gem into, not a random slot). Legacy-gem matches themselves don't (they're the payout), nor does
 	# a match of the AVOID color (matching the gem you're told to steer around shouldn't be rewarded).
 	var qualifying_big_match := false
+	# Once the player MATCHES the special (Legacy) gems themselves in this swap, the cascade that
+	# refills the grid must NOT hand out a brand-new Legacy gem — you already collected the payout by
+	# matching them, so a big match among the resulting refill gems shouldn't spawn another (Tim,
+	# 2026-07-10). Tracked across all cascades of THIS swap and, once true, blocks the placement below.
+	var legacy_matched_this_swap := false
 	# Each loop is one cascade: find the matches now on the board, clear+collapse+refill,
 	# record what moved. Repeat until no matches remain.
 	while true:
@@ -173,7 +178,15 @@ func resolve_swap(r1: int, c1: int, r2: int, c2: int) -> Dictionary:
 		var cleared_colors: Array = []
 		for cell in cleared:
 			cleared_colors.append(grid[cell[0]][cell[1]])
-		if special_color >= 0 and enable_special_spawns and not qualifying_big_match:
+		# Note any Legacy-gem match this cascade — it suppresses a new Legacy spawn for the rest of
+		# this swap (see legacy_matched_this_swap above).
+		if special_color >= 0:
+			for group in groups:
+				if grid[group[0][0]][group[0][1]] == special_color:
+					legacy_matched_this_swap = true
+					break
+		if special_color >= 0 and enable_special_spawns and not qualifying_big_match \
+				and not legacy_matched_this_swap:
 			for group in groups:
 				var gc: int = grid[group[0][0]][group[0][1]]
 				if group.size() >= special_match_size and gc != special_color and gc != special_exclude_color:

@@ -149,6 +149,9 @@ var _banner_icon: Control
 var _legacy_badge: Control
 ## True once the banner's intro pop has finished, so the idle pulse doesn't fight the intro tween.
 var _banner_ready: bool = false
+## True while the AVOID banner is playing its "you matched the avoid gem" reminder pulse, so the
+## idle pulse in _process yields to the reminder tween instead of fighting it for the icon's scale.
+var _banner_alerting: bool = false
 ## Free-running phase (seconds) accumulated in _process, driving the idle pulses of the selection
 ## ring and the AVOID banner. A single accumulated float so we never leak idle-pulse tweens.
 var _pulse_phase: float = 0.0
@@ -522,8 +525,9 @@ func _process(delta: float) -> void:
 		var ring_pulse := 1.0 + 0.07 * sin(_pulse_phase * 6.0)
 		_select_ring.pivot_offset = _select_ring.size / 2.0
 		_select_ring.scale = Vector2(ring_pulse, ring_pulse)
-	if _banner_icon != null and _banner_ready:
-		# A small continuous pulse keeps the "steer around this" gem drawing the eye.
+	if _banner_icon != null and _banner_ready and not _banner_alerting:
+		# A small continuous pulse keeps the "steer around this" gem drawing the eye. Skipped while
+		# the reminder pulse (see _pulse_avoid_banner) owns the icon's scale.
 		var banner_pulse := 1.0 + 0.04 * sin(_pulse_phase * 2.5)
 		_banner_icon.pivot_offset = _banner_icon.size / 2.0
 		_banner_icon.scale = Vector2(banner_pulse, banner_pulse)
@@ -543,6 +547,32 @@ func _animate_banner_intro() -> void:
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	intro.tween_property(_banner_icon, "modulate", Color.WHITE, 0.45)
 	intro.chain().tween_callback(func() -> void: _banner_ready = true)
+
+
+## Pulse the AVOID banner gem a couple of times as a reminder that the player just matched the gem
+## they're meant to steer around (Tim, 2026-07-10). Sets _banner_alerting so the idle pulse in
+## _process yields the icon's scale to this tween, then clears it and restores a neutral scale so the
+## idle breathing resumes seamlessly. A brief red-tinted brightening reinforces "that one costs you".
+func _pulse_avoid_banner() -> void:
+	if _banner_icon == null or not _banner_ready:
+		return
+	_banner_alerting = true
+	_banner_icon.pivot_offset = _banner_icon.size / 2.0
+	# Warm the flash toward the avoid-gem's warning red so the reminder reads as a caution, not a reward.
+	var alert_tint := Color(1.6, 0.8, 0.7, 1.0)
+	var pulse := create_tween()
+	# Two visible beats: grow-and-tint, settle, grow-and-tint, settle back to normal.
+	for beat in range(2):
+		pulse.set_parallel(true)
+		pulse.tween_property(_banner_icon, "scale", Vector2(1.22, 1.22), 0.12) \
+				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		pulse.tween_property(_banner_icon, "modulate", alert_tint, 0.12)
+		pulse.chain().set_parallel(true)
+		pulse.tween_property(_banner_icon, "scale", Vector2.ONE, 0.14) \
+				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+		pulse.tween_property(_banner_icon, "modulate", Color.WHITE, 0.14)
+		pulse.chain()
+	pulse.tween_callback(func() -> void: _banner_alerting = false)
 
 
 func _build_initial_gems() -> void:
@@ -658,6 +688,9 @@ func _play_resolution(result: Dictionary) -> void:
 	var step_group_details: Array = scoring["step_group_details"]
 	if scoring["matched_avoid"]:
 		_matched_avoid_gem = true
+		# Pulse the AVOID gem tile above the grid a couple of times as a visual reminder that this
+		# match hit the gem to steer around (Tim, 2026-07-10).
+		_pulse_avoid_banner()
 
 	for i in range(result["steps"].size()):
 		await _animate_step(result["steps"][i], float(step_points[i]), i, step_group_details[i])
@@ -668,14 +701,10 @@ func _play_resolution(result: Dictionary) -> void:
 	if result.has("legacy_placement"):
 		await _pop_legacy_gem(result["legacy_placement"])
 
-	# Celebrate hitting the max-bonus line BEFORE clearing _animating, so is_busy() keeps the host's
-	# countdown paused through the celebration (otherwise the host would end the round mid-burst).
-	# Challenge Mode has NO max-bonus line and never ends on score, so we skip the celebration there —
-	# otherwise it would fire on every swap once the score passed SCORE_MAX. The board keeps
-	# cascading and refilling endlessly; only the player tapping DONE stops it.
-	if not challenge_mode and not _finished and _score >= _score_max:
-		await _celebrate_max()
-
+	# The max-bonus "MAX!" celebration now lives on the HOST (MinigameScreen._flash_max_then), so every
+	# minigame announces a maxed-out round the same way (Tim, 2026-07-10) — match-3 no longer plays its
+	# own bespoke burst here. Reaching SCORE_MAX simply self-completes below, and the host flashes MAX
+	# before showing the result. Challenge Mode has no max line and never ends on score.
 	_animating = false
 	_maybe_finish_early()
 
@@ -921,45 +950,6 @@ func _pop_legacy_gem(cell: Array) -> void:
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	await pop.finished
 	gem.z_index = 0
-
-
-## The max-bonus celebration: when the score reaches SCORE_MAX (performance 1.0, the best possible
-## result) the round used to just end. Now it pays off — a white wash sweeps the board and a big
-## "MAXED OUT!" label blooms — before the host shows the result. Kept brief; the caller holds
-## is_busy() true across this await so the countdown stays paused.
-func _celebrate_max() -> void:
-	# A white flash over the whole board.
-	var flash := ColorRect.new()
-	flash.color = Color(1, 1, 1, 0.0)
-	flash.set_anchors_preset(Control.PRESET_FULL_RECT)
-	flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	flash.z_index = 4
-	_board_area.add_child(flash)
-
-	var banner := Label.new()
-	banner.text = "MAXED OUT!"
-	banner.add_theme_font_size_override("font_size", UiPalette.FONT_DISPLAY)
-	banner.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD)
-	banner.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
-	banner.add_theme_constant_override("outline_size", 10)
-	banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	banner.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	banner.size = _board_area.size
-	banner.pivot_offset = banner.size / 2.0
-	banner.z_index = 5
-	banner.scale = Vector2(0.5, 0.5)
-	_board_area.add_child(banner)
-
-	var celebrate := create_tween().set_parallel(true)
-	celebrate.tween_property(flash, "color", Color(1, 1, 1, 0.7), 0.12)
-	celebrate.tween_property(flash, "color", Color(1, 1, 1, 0.0), 0.45).set_delay(0.12)
-	celebrate.tween_property(banner, "scale", Vector2.ONE, 0.35) \
-			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	celebrate.tween_property(banner, "modulate:a", 0.0, 0.3).set_delay(0.4)
-	await celebrate.finished
-	flash.queue_free()
-	banner.queue_free()
 
 
 func result_summary() -> String:

@@ -123,11 +123,19 @@ var _skip_button: Button
 ## The smoothed multiplier the spectrum bar actually draws — lerped toward the live multiplier
 ## each frame so the fill glides (see KEEP_BAR_LERP_SPEED).
 var _display_mult: float = 0.5
-## Tracks whether the smoothed fill has reached the "full" (1.0x) line, so the host can fire a
-## one-shot flash the moment it first crosses (plan §1: the warm→green jump made loud).
-var _was_at_least_full: bool = false
-## A decaying [0,1] flash intensity drawn over the whole bar when the fill crosses into "full".
-var _full_flash: float = 0.0
+## Each segment fires a brief flash the moment it FIRST fills completely (Tim, 2026-07-09). We track
+## whether each is currently full (to fire once per crossing) and a decaying [0,1] flash intensity.
+var _left_seg_full: bool = false
+var _right_seg_full: bool = false
+var _left_seg_flash: float = 0.0
+var _right_seg_flash: float = 0.0
+## The two-segment bar's styleboxes, built once and reused so no StyleBoxFlat is allocated per frame
+## (minigame-lag rule). Dark "track" + bright "fill" per segment, plus a shared white flash box.
+var _seg_track_left: StyleBoxFlat
+var _seg_track_right: StyleBoxFlat
+var _seg_fill_left: StyleBoxFlat
+var _seg_fill_right: StyleBoxFlat
+var _seg_flash_box: StyleBoxFlat
 var _play_area: Control
 var _result_heading_label: Label
 var _result_mult_label: Label
@@ -425,19 +433,21 @@ func _build_play_view() -> Control:
 	column.add_child(_highscore_label)
 
 	# The universal outcome bar — identical for every minigame type; it reads the active type's live
-	# performance. Two SEGMENTS (Tim, 2026-07-09): a green LEFT segment that fills as you climb to the
-	# "full" line, and a blue RIGHT segment that then fills as you climb to the max bonus. Each starts
-	# dark and fills left→right; a full segment = you've secured that level. Inside a MarginContainer so
-	# its sides line up with the Back/timer margin above.
+	# performance. Two rounded SEGMENTS side by side (Tim, 2026-07-09): a green LEFT segment that fills
+	# as you climb to the "full" line, and a blue RIGHT segment that then fills as you climb to the max
+	# bonus. Each starts dark and fills left→right and briefly flashes when it completes. Inside a
+	# MarginContainer so its sides line up with the Back/timer margin above and it sits a little lower.
 	var bar_margin := MarginContainer.new()
 	bar_margin.add_theme_constant_override("margin_left", CHROME_MARGIN)
 	bar_margin.add_theme_constant_override("margin_right", CHROME_MARGIN)
+	bar_margin.add_theme_constant_override("margin_top", 22)  # nudge the bar down a little (Tim)
 	column.add_child(bar_margin)
 	_keep_bar = Control.new()
-	_keep_bar.custom_minimum_size = Vector2(0, 34)
+	_keep_bar.custom_minimum_size = Vector2(0, 40)
 	_keep_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_keep_bar.draw.connect(_draw_keep_bar)
 	bar_margin.add_child(_keep_bar)
+	_build_segment_styleboxes()
 
 	# The chosen minigame TYPE fills this area each round. A modest minimum keeps it from
 	# collapsing; the expand flags make it take all the room left inside the centered panel
@@ -604,9 +614,12 @@ func _build_begin_overlay() -> Control:
 func _add_back_button(parent: Container) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	var back := Button.new()
-	back.text = "← BACK"
-	back.custom_minimum_size = Vector2(0, 108)  # 72 * 1.5 — 50% larger (Tim, 2026-07-09)
+	# A solid left-pointing triangle (◀) reads as a bigger, thicker back arrow than the thin "←" and,
+	# unlike the heavy-arrow glyph, is present in the font (Tim, 2026-07-09). Bold thickens it further.
+	back.text = "◀  BACK"
+	back.custom_minimum_size = Vector2(340, 108)  # wider; 72 * 1.5 tall — 50% larger
 	back.add_theme_font_size_override("font_size", int(UiPalette.FONT_BUTTON * 1.5))
+	back.add_theme_font_override("font", UiPalette.make_bold_font())
 	UiPalette.style_button(back, false)
 	back.visible = false
 	back.pressed.connect(_on_back_pressed)
@@ -778,8 +791,10 @@ func start_game(
 	# Reset the shared juice state so a new round starts at the keep floor with no carried-over
 	# flash, pulse, or smoothing from the previous round.
 	_display_mult = _tuning.minigame_keep_floor
-	_was_at_least_full = false
-	_full_flash = 0.0
+	_left_seg_full = false
+	_right_seg_full = false
+	_left_seg_flash = 0.0
+	_right_seg_flash = 0.0
 	_keep_bar.queue_redraw()
 
 	# Label SKIP with what skipping actually does. In the normal "scale an amount" sites it banks the
@@ -1048,59 +1063,81 @@ func _set_timer_scale(factor: float) -> void:
 	_timer_label.scale = Vector2(factor, factor)
 
 
-## Glide the spectrum bar toward the live multiplier and fire a one-shot flash when it first
-## crosses into "full". The smoothed value `_display_mult` is what _draw_keep_bar paints.
+## Glide the outcome bar toward the live multiplier and fire a brief flash the moment either segment
+## first fills completely. The smoothed value `_display_mult` is what _draw_keep_bar paints.
 func _refresh_keep_bar(delta: float) -> void:
 	var target := _multiplier_for_performance(_current_performance())
 	var weight := clampf(delta * KEEP_BAR_LERP_SPEED, 0.0, 1.0)
 	_display_mult = lerpf(_display_mult, target, weight)
 
-	# Flash the moment the LEFT (green) segment first fills — i.e. the player reaches the "full" line
-	# and secures their base reward (and re-arm if it drops back below), so the moment lands with a pop.
-	if not _was_at_least_full and _display_mult >= 1.0:
-		_was_at_least_full = true
-		_full_flash = 1.0
-	elif _was_at_least_full and _display_mult < 1.0:
-		_was_at_least_full = false
-	_full_flash = maxf(0.0, _full_flash - delta * 2.5)
+	var floor_mult := _tuning.minigame_keep_floor
+	var left_full := (_display_mult - floor_mult) / maxf(0.0001, 1.0 - floor_mult) >= 1.0
+	var right_full := (_display_mult - 1.0) / maxf(0.0001, _bonus_max) >= 1.0
+	# Fire each segment's flash once, the moment it first completes (re-arm if it drops back below).
+	if left_full and not _left_seg_full:
+		_left_seg_flash = 1.0
+	if right_full and not _right_seg_full:
+		_right_seg_flash = 1.0
+	_left_seg_full = left_full
+	_right_seg_full = right_full
+	_left_seg_flash = maxf(0.0, _left_seg_flash - delta * 3.0)
+	_right_seg_flash = maxf(0.0, _right_seg_flash - delta * 3.0)
 	_keep_bar.queue_redraw()
 
 
-## The spectrum bar's current 0–1 fill, from the smoothed multiplier — shared by the
-## The two-segment outcome bar (Tim, 2026-07-09). The LEFT half is green, the RIGHT half is blue.
-## Each has a dark background and a bright fill that grows left→right within its own half:
-##   * left (green) fills as the smoothed multiplier climbs floor → 1.0 (the "full" / keep-100% line),
-##   * right (blue) then fills as it climbs 1.0 → 1.0 + bonus_max (the max bonus).
-## A full segment tells the player they've secured that level of success.
+## Build the two-segment bar's styleboxes once, reused every frame so no StyleBoxFlat is allocated
+## per draw (minigame-lag rule).
+func _build_segment_styleboxes() -> void:
+	var green := UiPalette.MONEY_GREEN
+	var blue := UiPalette.CYCLE_BLUE
+	_seg_track_left = _make_segment_box(green.darkened(0.62), true)
+	_seg_track_right = _make_segment_box(blue.darkened(0.62), true)
+	_seg_fill_left = _make_segment_box(green, false)
+	_seg_fill_right = _make_segment_box(blue, false)
+	_seg_flash_box = _make_segment_box(Color(1, 1, 1, 1), false)
+
+
+func _make_segment_box(color: Color, is_track: bool) -> StyleBoxFlat:
+	var box := StyleBoxFlat.new()
+	box.bg_color = color
+	box.set_corner_radius_all(12)
+	if is_track:
+		box.border_color = UiPalette.NAVY
+		box.set_border_width_all(2)
+	return box
+
+
+## The two-segment outcome bar (Tim, 2026-07-09): two separate rounded squares side by side. The LEFT
+## (green) fills as the smoothed multiplier climbs floor → 1.0 (the "full" / keep-100% line); the
+## RIGHT (blue) then fills as it climbs 1.0 → 1.0 + bonus_max (the max bonus). Each has a dark track
+## and a bright fill that grows left→right, and flashes briefly the instant it completes.
 func _draw_keep_bar() -> void:
 	var w := _keep_bar.size.x
 	var h := _keep_bar.size.y
-	if w <= 0.0 or h <= 0.0:
+	if w <= 0.0 or h <= 0.0 or _seg_track_left == null:
 		return
 	var floor_mult := _tuning.minigame_keep_floor
 	var left_frac := clampf((_display_mult - floor_mult) / maxf(0.0001, 1.0 - floor_mult), 0.0, 1.0)
 	var right_frac := clampf((_display_mult - 1.0) / maxf(0.0001, _bonus_max), 0.0, 1.0)
 
-	var half := w * 0.5
-	var green := UiPalette.MONEY_GREEN
-	var blue := UiPalette.CYCLE_BLUE
+	var gap := 12.0
+	var seg_w := (w - gap) * 0.5
+	_draw_segment(Rect2(0, 0, seg_w, h), _seg_track_left, _seg_fill_left, left_frac, _left_seg_flash)
+	_draw_segment(Rect2(seg_w + gap, 0, seg_w, h), _seg_track_right, _seg_fill_right, right_frac, _right_seg_flash)
 
-	# Dark segment backgrounds, then the bright fills growing within each half.
-	_keep_bar.draw_rect(Rect2(0, 0, half, h), green.darkened(0.62))
-	_keep_bar.draw_rect(Rect2(half, 0, w - half, h), blue.darkened(0.62))
-	if left_frac > 0.0:
-		_keep_bar.draw_rect(Rect2(0, 0, left_frac * half, h), green)
-	if right_frac > 0.0:
-		_keep_bar.draw_rect(Rect2(half, 0, right_frac * (w - half), h), blue)
 
-	# A one-shot white wash when the left (green) segment first fills — the "you've secured your
-	# base reward" moment (decays in _refresh_keep_bar).
-	if _full_flash > 0.0:
-		_keep_bar.draw_rect(Rect2(0, 0, w, h), Color(1, 1, 1, _full_flash * 0.5))
-
-	# The divider between the two segments, and the outer navy outline.
-	_keep_bar.draw_rect(Rect2(half - 1.0, 0, 2.0, h), UiPalette.INK_NAVY)
-	_keep_bar.draw_rect(Rect2(0, 0, w, h), UiPalette.NAVY, false, 2.0)
+## Draw one rounded segment: the dark track, a bright fill inset inside it that grows left→right to
+## `frac`, and a brief white flash overlay when the segment has just completed.
+func _draw_segment(rect: Rect2, track: StyleBoxFlat, fill: StyleBoxFlat, frac: float, flash: float) -> void:
+	_keep_bar.draw_style_box(track, rect)
+	if frac > 0.0:
+		var pad := 4.0
+		var fill_w := frac * (rect.size.x - 2.0 * pad)
+		if fill_w > 1.0:
+			_keep_bar.draw_style_box(fill, Rect2(rect.position.x + pad, pad, fill_w, rect.size.y - 2.0 * pad))
+	if flash > 0.0:
+		_seg_flash_box.bg_color = Color(1, 1, 1, clampf(flash, 0.0, 1.0) * 0.7)
+		_keep_bar.draw_style_box(_seg_flash_box, rect)
 
 
 # ---------------------------------------------------------------------------

@@ -242,39 +242,46 @@ func _build_bonus_banner() -> Control:
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_theme_constant_override("separation", 16)
 
+	# AVOID group: the word sits ABOVE the gem (Tim, 2026-07-09).
+	var avoid_group := VBoxContainer.new()
+	avoid_group.alignment = BoxContainer.ALIGNMENT_CENTER
+	avoid_group.add_theme_constant_override("separation", 4)
 	var avoid_tag := Label.new()
 	avoid_tag.text = "AVOID"
+	avoid_tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	avoid_tag.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
 	avoid_tag.add_theme_color_override("font_color", UiPalette.NAVY)
-	avoid_tag.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	row.add_child(avoid_tag)
-
+	avoid_group.add_child(avoid_tag)
 	_banner_icon = _make_bonus_icon(_avoid_type)
-	row.add_child(_banner_icon)
+	_banner_icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	avoid_group.add_child(_banner_icon)
+	row.add_child(avoid_group)
 
-	# A "Legacy bonus earned" badge that appears in this banner row (above the board) the moment the
-	# player secures the bonus, so it's clear the round's Legacy gems are already banked. Hidden until
-	# then. An expanding spacer pushes it to the right so it doesn't crowd the AVOID cue.
+	# An expanding spacer pushes the earned-bonus group to the right so it doesn't crowd the AVOID cue.
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(spacer)
 
-	_legacy_badge = HBoxContainer.new()
+	# BONUS group: the word sits ABOVE the legacy gem, shown the moment the player secures the bonus
+	# (Tim, 2026-07-09), so it's clear the round's Legacy gems are already banked. A smaller framed gem
+	# than the AVOID cue — it's a reward badge, not the thing to watch for.
+	_legacy_badge = VBoxContainer.new()
 	_legacy_badge.alignment = BoxContainer.ALIGNMENT_CENTER
-	_legacy_badge.add_theme_constant_override("separation", 8)
+	_legacy_badge.add_theme_constant_override("separation", 4)
 	_legacy_badge.visible = false
+	var badge_label := Label.new()
+	badge_label.text = "BONUS"
+	badge_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	badge_label.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
+	badge_label.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD.darkened(0.35))
+	_legacy_badge.add_child(badge_label)
 	var badge_icon := TextureRect.new()
 	badge_icon.texture = GEM_TEXTURE[LEGACY_COLOR]
 	badge_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	badge_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	badge_icon.custom_minimum_size = Vector2(BONUS_ICON_SIZE * 0.6, BONUS_ICON_SIZE * 0.6)
+	badge_icon.custom_minimum_size = Vector2(BONUS_ICON_SIZE * 0.55, BONUS_ICON_SIZE * 0.55)
+	badge_icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_legacy_badge.add_child(badge_icon)
-	var badge_label := Label.new()
-	badge_label.text = "BONUS!"
-	badge_label.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
-	badge_label.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD.darkened(0.35))
-	badge_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_legacy_badge.add_child(badge_label)
 	row.add_child(_legacy_badge)
 
 	return row

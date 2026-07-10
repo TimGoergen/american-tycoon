@@ -47,11 +47,10 @@ const CASH_BILL_ICON_PATH := "res://art/icons/dollar_bill.svg"
 const CASH_BILL_SIZE := Vector2(130, 65)
 const CASH_BILL_EDGE_PAD := 14
 
-# The dark-gold "$ / clock" income-per-second symbol shown beneath the income number,
-# left-aligned (replaced the old "INCOME" word, Tim 2026-06-28). Box matches the SVG's 114×64
-# (~1.78:1) aspect so the glyphs sit flush-left in the box with no extra padding.
-const INCOME_ICON_PATH := "res://art/icons/income_per_sec.svg"
-const INCOME_ICON_SIZE := Vector2(107, 60)
+# The bold-gold "/ s" beside the income dollar bill (replaced the "$/clock" icon, Tim 2026-07-09).
+const INCOME_PER_FONT_SIZE := UiPalette.FONT_HEADLINE
+const INCOME_PER_GAP := 4.0  # space between the income bill and the "/s" text (tight — Tim, 2026-07-09)
+const BILL_TOP_GAP := 4.0  # small gap between an amount and the dollar bill just beneath it
 
 ## Gap kept between a pinned label and the panel edge it hugs.
 const EDGE_MARGIN := 14
@@ -125,7 +124,8 @@ var _income_refresh_accumulator := INCOME_REFRESH_INTERVAL  # repaint on the ver
 var _content: Control
 var _income_label: Label
 var _cash_label: Label
-var _income_icon: TextureRect  # gold "$/s" symbol beneath the income number (was the "INCOME" word)
+var _income_bill: TextureRect  # dollar-bill icon beneath the income number, left-aligned
+var _income_per_label: Label  # bold-gold "/ s" beside the income bill (marks the per-second rate)
 var _cash_bill: TextureRect  # dollar-bill icon beneath the cash number, right-aligned (was beside "CASH")
 var _epoch_label: Label  # the current epoch / civilization name (was the heir name)
 ## Contact progress — how much of this epoch's economy the generation has consumed — shown
@@ -134,6 +134,10 @@ var _epoch_label: Label  # the current epoch / civilization name (was the heir n
 ## sides; a single red divider strip separates it from the income content above, so exactly
 ## one line sits between panel and bar. Fed by Main via set_epoch_progress each frame.
 var _economy_bar: ProgressBar
+## The silver "N% of economy consumed" readout centered over the economy bar.
+var _economy_label: Label
+## White for that readout (Tim, 2026-07-09), no outline.
+const ECONOMY_SILVER := Color.WHITE
 var _economy_divider: ColorRect
 ## Height of the economy bar strip, and of the red divider above it (the divider matches
 ## the panel frame's 12px thickness so it reads as the same line).
@@ -204,17 +208,22 @@ func _ready() -> void:
 	_cash_label = _make_label(UiPalette.DARK_MONEY_GREEN, CASH_FONT_SIZE, CASH_BOLD)
 	_content.add_child(_cash_label)
 
-	# Beneath each value sits a small icon instead of a word (Tim, 2026-06-28): the gold "$/s"
-	# symbol under the income number, and the green-and-gold dollar bill under the cash number.
-	# KEEP_ASPECT_CENTERED preserves each icon's shape inside its box.
-	_income_icon = TextureRect.new()
-	_income_icon.texture = load(INCOME_ICON_PATH)
-	_income_icon.custom_minimum_size = INCOME_ICON_SIZE
-	_income_icon.size = INCOME_ICON_SIZE
-	_income_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_income_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_income_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_content.add_child(_income_icon)
+	# Beneath each value sits its currency symbol (Tim, 2026-07-09): a dollar bill under BOTH numbers,
+	# with a bold-gold "/ s" beside the income bill to mark the per-second rate. The two bills share a
+	# size and a row so they line up. KEEP_ASPECT_CENTERED preserves the bill shape inside its box.
+	_income_bill = TextureRect.new()
+	_income_bill.texture = load(CASH_BILL_ICON_PATH)
+	_income_bill.custom_minimum_size = CASH_BILL_SIZE
+	_income_bill.size = CASH_BILL_SIZE
+	_income_bill.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_income_bill.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_income_bill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_content.add_child(_income_bill)
+
+	_income_per_label = _make_label(UiPalette.MUSTARD_GOLD, INCOME_PER_FONT_SIZE, 3)  # outline 3 = bold
+	# Tight spacing around the slash (Tim, 2026-07-09): no internal space, small bill gap above.
+	_income_per_label.text = "/s"
+	_content.add_child(_income_per_label)
 
 	_cash_bill = TextureRect.new()
 	_cash_bill.texture = load(CASH_BILL_ICON_PATH)
@@ -262,6 +271,20 @@ func _ready() -> void:
 	var bubbles := GoldBubbles.new()
 	bubbles.bubble_color = UiPalette.NEON_BLUE
 	_economy_bar.add_child(bubbles)
+
+	# A silver readout centered over the economy bar telling the player how much of this epoch's
+	# economy they've consumed (Tim, 2026-07-09). Full-rect over the bar, mouse-ignored, with a
+	# navy outline so the silver stays legible over the blue fill and the bubbles.
+	_economy_label = Label.new()
+	_economy_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_economy_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_economy_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_economy_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_economy_label.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
+	# Light gray, no outline (Tim, 2026-07-09).
+	_economy_label.add_theme_color_override("font_color", ECONOMY_SILVER)
+	_economy_bar.add_child(_economy_label)
+
 	_content.add_child(_economy_bar)
 
 
@@ -301,9 +324,9 @@ func set_income_per_sec(income_per_sec: float) -> void:
 
 
 func set_cash(cash: float) -> void:
-	# The cash balance uses its own fuller formatting (commas to $999,999, cents below
-	# $1,000, "$1.00 M" above) rather than the compact display() costs/income use.
-	_cash_label.text = Money.of(cash).display_cash()
+	# The cash balance uses its own fuller formatting (commas to 999,999, cents below 1,000,
+	# "1.00 M" above). No leading "$" — the dollar-bill icon beneath it carries that (Tim, 2026-07-09).
+	_cash_label.text = Money.of(cash).display_cash().trim_prefix("$")
 
 
 ## The current epoch / civilization name (e.g. "EARTH", "LUMINARI COLLECTIVE"). Shown
@@ -323,7 +346,9 @@ func set_epoch_progress(consumed: float, goal: float) -> void:
 	_economy_bar.visible = show_bar
 	_economy_divider.visible = show_bar
 	if show_bar:
-		_economy_bar.value = clampf(maxf(0.0, consumed) / goal, 0.0, 1.0)
+		var fraction := clampf(maxf(0.0, consumed) / goal, 0.0, 1.0)
+		_economy_bar.value = fraction
+		_economy_label.text = "%d%% of economy consumed" % int(round(fraction * 100.0))
 
 
 ## Toggle the frenzy glow. Main drives this from the live frenzy state each frame.
@@ -445,10 +470,9 @@ func _process(delta: float) -> void:
 	_income_refresh_accumulator += delta
 	if _income_refresh_accumulator >= INCOME_REFRESH_INTERVAL:
 		_income_refresh_accumulator = 0.0
-		# Just the amount — the "$/s" icon beneath it carries the "per second" (Tim, 2026-06-28).
-		# A bare "$" icon would read the same as the cash side's dollar bill, so the icon keeps
-		# its "/s"; printing "/s" on the number too would be redundant.
-		_income_label.text = Money.of(_pending_income_per_sec).display()
+		# Same fuller formatting as the cash amount, and no leading "$" — the bill + "/ s" symbol
+		# beneath it carries the currency and the "per second" (Tim, 2026-07-09).
+		_income_label.text = Money.of(_pending_income_per_sec).display_cash().trim_prefix("$")
 
 	# Frenzy glow: pulse the ticket background between white and a soft red while a burn is
 	# active; snap back to plain white the moment it ends. The glow shows through the planet
@@ -468,46 +492,47 @@ func _layout_labels() -> void:
 	var area := _content.size
 	var caption_gap := 2.0  # space between a value and its caption beneath it
 
-	# A TextureRect sizes itself to its texture's NATIVE size unless pinned (EXPAND_IGNORE_SIZE
-	# only frees the minimum size, it doesn't hold the rect). Force both icon boxes to their
-	# intended sizes every frame, or the bill renders at its 120px source width and its right edge
-	# overflows the panel (the bug behind "the dollar bill goes off the edge", Tim 2026-06-28).
-	_income_icon.size = INCOME_ICON_SIZE
+	# A TextureRect sizes itself to its texture's NATIVE size unless pinned. Force both bills to the
+	# intended size every frame, or a bill renders at its source width and its right edge overflows
+	# the panel (the "dollar bill goes off the edge" bug, Tim 2026-06-28).
+	_income_bill.size = CASH_BILL_SIZE
 	_cash_bill.size = CASH_BILL_SIZE
 
-	# Captions stay put where the old centered value+caption block placed them; only the
-	# big amounts move up. So we still compute the centered-block top (where the pair used
-	# to sit) to anchor each caption, then nudge the amount to half that distance from the
-	# top of the panel — i.e. twice as close to the top (Tim's call).
-
-	# Income (left edge): the "$/s" icon sits where the caption used to; the amount moves up.
-	# Vertical math uses LABEL_LAYOUT_HEIGHT (the original plate height), not the live
-	# area.y, so shrinking the plate leaves every element exactly where it was.
+	# Both amounts move up toward the top; both dollar bills sit on ONE shared row just beneath them
+	# (moved up close to the amounts, Tim 2026-07-09). Income and cash labels are the same font size,
+	# so we size one block for both. Vertical math uses LABEL_LAYOUT_HEIGHT (the original plate
+	# height), not the live area.y, so shrinking the plate leaves every element where it was.
 	_income_label.size = _income_label.get_minimum_size()
-	var income_block_h := _income_label.size.y + caption_gap + INCOME_ICON_SIZE.y
-	var income_centered_top := (LABEL_LAYOUT_HEIGHT - income_block_h) / 2.0
-	var income_icon_top := income_centered_top + _income_label.size.y + caption_gap
-	_income_label.position = Vector2(EDGE_MARGIN, income_centered_top / 2.0)
-	_income_icon.position = Vector2(EDGE_MARGIN, income_icon_top)
-
-	# Cash (right edge): the dollar-bill icon sits beneath the amount, right-aligned to the
-	# edge (no "CASH" word anymore), mirroring the income side.
 	_cash_label.size = _cash_label.get_minimum_size()
-	var cash_block_h := _cash_label.size.y + caption_gap + CASH_BILL_SIZE.y
-	var cash_centered_top := (LABEL_LAYOUT_HEIGHT - cash_block_h) / 2.0
-	var cash_icon_top := cash_centered_top + _cash_label.size.y + caption_gap
-	_cash_label.position = Vector2(area.x - _cash_label.size.x - EDGE_MARGIN, cash_centered_top / 2.0)
-	# The bill fills its box edge-to-edge (unlike a number, whose last glyph carries side-bearing),
-	# so it needs extra right clearance to sit comfortably within the panel's thick frame, not
-	# butt against it (Tim, 2026-06-28).
-	_cash_bill.position = Vector2(area.x - CASH_BILL_SIZE.x - (EDGE_MARGIN + CASH_BILL_EDGE_PAD), cash_icon_top)
+	var amount_h := maxf(_income_label.size.y, _cash_label.size.y)
+	var block_h := amount_h + caption_gap + CASH_BILL_SIZE.y
+	var centered_top := (LABEL_LAYOUT_HEIGHT - block_h) / 2.0
+	var amount_top := centered_top / 2.0                 # amounts nudged up (twice as close to top)
+	var bill_row_y := amount_top + amount_h + BILL_TOP_GAP  # bills hug just under the amounts
 
-	# Epoch name: horizontally centered across the whole plate, BOTTOM-aligned with the icon
-	# row (Tim, 2026-06-21) so the three elements share one baseline — the taller name (larger
-	# font) grows upward only. Both icons share the same bottom because the income and cash
-	# numbers are the same font size, so either icon's bottom is the baseline.
+	# KEEP_ASPECT_CENTERED centers the (wider-than-tall) bill inside its 2:1 box, so the VISIBLE
+	# bill sits inset from the box's left/right edges by this much. The amounts align to that
+	# visible edge — not the box edge — so each number and its bill share one margin (Tim, 2026-07-09).
+	var bill_side_pad := _visible_bill_side_padding()
+
+	# Income (left edge): amount, then the dollar bill with a bold-gold "/ s" beside it. The amount
+	# is inset by the bill's centering padding so its left edge lines up with the visible bill below.
+	_income_label.position = Vector2(EDGE_MARGIN + bill_side_pad, amount_top)
+	_income_bill.position = Vector2(EDGE_MARGIN, bill_row_y)
+	_income_per_label.size = _income_per_label.get_minimum_size()
+	_income_per_label.position = Vector2(
+		EDGE_MARGIN + CASH_BILL_SIZE.x + INCOME_PER_GAP,
+		bill_row_y + (CASH_BILL_SIZE.y - _income_per_label.size.y) / 2.0)
+
+	# Cash (right edge): amount, then the dollar bill right-aligned to the amount's right edge. The
+	# amount is pulled in by the same padding so its right edge lines up with the visible bill below.
+	_cash_label.position = Vector2(area.x - _cash_label.size.x - EDGE_MARGIN - bill_side_pad, amount_top)
+	_cash_bill.position = Vector2(area.x - CASH_BILL_SIZE.x - EDGE_MARGIN, bill_row_y)
+
+	# Epoch name: horizontally centered, BOTTOM-aligned with the shared bill row so the three
+	# elements share one baseline; the taller name grows upward only.
 	_epoch_label.size = _epoch_label.get_minimum_size()
-	var icon_baseline_y := income_icon_top + INCOME_ICON_SIZE.y
+	var icon_baseline_y := bill_row_y + CASH_BILL_SIZE.y
 	_epoch_label.position = Vector2(
 		(area.x - _epoch_label.size.x) / 2.0,
 		icon_baseline_y - _epoch_label.size.y
@@ -532,6 +557,20 @@ func _layout_labels() -> void:
 	_economy_divider.size = Vector2(area.x, ECONOMY_DIVIDER_HEIGHT)
 	_economy_bar.position = Vector2(0, area.y - ECONOMY_BAR_HEIGHT)
 	_economy_bar.size = Vector2(area.x, ECONOMY_BAR_HEIGHT)
+
+
+## Horizontal padding (px) between a bill BOX's edge and the VISIBLE bill inside it. The bill
+## art is wider-than-tall, so KEEP_ASPECT_CENTERED fits it to the box HEIGHT and centers it,
+## leaving equal transparent gaps on the left and right. The amounts are inset by this so each
+## number's edge lines up with the bill drawn beneath it (Tim, 2026-07-09). Derived from the
+## texture's real aspect so it stays correct if the bill art or box size ever changes.
+func _visible_bill_side_padding() -> float:
+	var tex_size := Vector2(_income_bill.texture.get_size())
+	if tex_size.y <= 0.0:
+		return 0.0
+	# Height-constrained fit (the box is 2:1, the bill ~1.44:1, so height is the binding dimension).
+	var visible_width := CASH_BILL_SIZE.y * (tex_size.x / tex_size.y)
+	return maxf((CASH_BILL_SIZE.x - visible_width) / 2.0, 0.0)
 
 
 ## The mild flash: lift the panel's brightness for an instant, then ease it back

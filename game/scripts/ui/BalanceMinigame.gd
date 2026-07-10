@@ -33,6 +33,25 @@ const ZONE_EASE := 1.6           # how fast the zone center eases toward its tar
 ## The vertical track's on-screen width.
 const TRACK_WIDTH := 150.0
 
+# --- Legacy gem (Plans/Legacy_Bonus_System.md) --------------------------------
+# Full Stardew: a legacy gem may appear pinned to the gold zone. Hold the marker in
+# the zone to fill a SEPARATE gem-progress bar; drift out and it drains (slower than
+# it fills). Fill it and you keep the gem (collect_legacy_gem). This progress is
+# wholly separate from the round score / time-in-zone — it never touches performance.
+## Seconds of in-zone holding to fill the gem bar from empty to full.
+const GEM_FILL_SECONDS := 2.2
+## Seconds to drain a full bar back to empty while OUT of the zone — deliberately
+## slower than the fill so a brief slip doesn't erase all your progress (Stardew feel).
+const GEM_DRAIN_SECONDS := 4.5
+## Wait after the round starts before rolling whether a gem appears, so the player has
+## a beat to settle into the zone before the bonus shows up (rolled once per round).
+const GEM_ROLL_DELAY := 1.2
+## The gem icon's on-screen size where it's pinned beside the gold zone.
+const GEM_ICON_SIZE := 52.0
+
+## The legacy gem currency art, drawn beside the zone as the "hold here to collect" cue.
+const LEGACY_GEM_TEXTURE := preload("res://art/icons/legacy_gem.svg")
+
 var _pos: float = 0.25           # marker position, 0 = bottom (it starts resting low)
 var _vel: float = 0.0
 var _held: bool = false
@@ -54,6 +73,18 @@ var _pulse_phase: float = 0.0
 # behind it and the marker stays easy to follow as it moves.
 var _prev_pos: float = 0.25
 
+# --- Legacy gem state ---------------------------------------------------------
+## The spawn chance captured from tuning in begin() (0..1). Rolled once per round.
+var _gem_chance: float = 0.0
+## Counts down GEM_ROLL_DELAY at round start, then we roll _gem_active once. -1 = rolled.
+var _gem_roll_timer: float = 0.0
+## True while a legacy gem exists on the zone waiting to be collected.
+var _gem_active: bool = false
+## Gem-progress in [0,1] — fills while in-zone, drains while out. SEPARATE from the score.
+var _gem_progress: float = 0.0
+## Set for a short cue after the bar fills and the gem is collected, so the win reads.
+var _gem_won_flash: float = 0.0
+
 
 func display_name() -> String:
 	return "Balance the Books"
@@ -74,6 +105,17 @@ func begin(tuning: TuningConfig) -> void:
 	# Bank time-in-zone against the whole round, so the host's spectrum bar starts empty
 	# and only climbs while the marker is in the zone (it never falls back).
 	_total_round_seconds = maxf(0.1, tuning.minigame_duration_seconds)
+
+	# Legacy gem: capture the live spawn chance and arm the one-time roll. We roll ONCE
+	# per round (after GEM_ROLL_DELAY) rather than on every zone re-roll, so at most one
+	# gem ever appears and its appearance is a clean per-round windfall. Works the same in
+	# Challenge Mode (endless) — the gem can still be collected; the host suppresses the
+	# actual grant there, so nothing here needs to change.
+	_gem_chance = clampf(tuning.legacy_gem_chance_balance, 0.0, 1.0)
+	_gem_roll_timer = GEM_ROLL_DELAY
+	_gem_active = false
+	_gem_progress = 0.0
+	_gem_won_flash = 0.0
 
 	var intro := Label.new()
 	intro.text = how_to_play()
@@ -171,11 +213,49 @@ func _process(delta: float) -> void:
 		_pos = 1.0
 		_vel = -absf(_vel) * EDGE_BOUNCE
 
-	if absf(_pos - _zone_center) <= ZONE_HALF:
+	var in_zone := absf(_pos - _zone_center) <= ZONE_HALF
+	if in_zone:
 		_time_in_zone += delta
+
+	_update_legacy_gem(delta, in_zone)
 
 	if _track != null:
 		_track.queue_redraw()
+
+
+## Advance the legacy-gem mechanic once per frame. This is entirely SEPARATE from the
+## round score / time-in-zone — it never touches _time_in_zone or get_performance().
+##  1. Once, after GEM_ROLL_DELAY, roll _gem_chance to decide if a gem appears this round.
+##  2. While a gem is active: fill _gem_progress when in-zone, drain it (slower) when out.
+##  3. On a full bar: collect the gem, fire a brief win cue, and clear it (one gem per round).
+func _update_legacy_gem(delta: float, in_zone: bool) -> void:
+	# Fade the post-win flash regardless of whether another gem is active.
+	if _gem_won_flash > 0.0:
+		_gem_won_flash = maxf(0.0, _gem_won_flash - delta)
+
+	# One-time appearance roll, a beat into the round.
+	if _gem_roll_timer >= 0.0:
+		_gem_roll_timer -= delta
+		if _gem_roll_timer < 0.0:
+			# Don't spawn if the bonus is already earned (design rule 3 — no noise once secured).
+			_gem_active = not legacy_bonus_secured() and _rng.randf() < _gem_chance
+		return
+
+	if not _gem_active:
+		return
+
+	# Fill in-zone, drain (slower) out of it. Constant rates from the *_SECONDS knobs.
+	if in_zone:
+		_gem_progress = minf(1.0, _gem_progress + delta / GEM_FILL_SECONDS)
+	else:
+		_gem_progress = maxf(0.0, _gem_progress - delta / GEM_DRAIN_SECONDS)
+
+	if _gem_progress >= 1.0:
+		# Bar full — bank the gem (host gates/grants it), clear it, and flash a win cue.
+		collect_legacy_gem()
+		_gem_active = false
+		_gem_progress = 0.0
+		_gem_won_flash = 0.9
 
 
 ## Track-space (0 bottom … 1 top) to screen y within the track control.
@@ -211,6 +291,38 @@ func _draw_track() -> void:
 	var edge_thickness := 3.0 + 6.0 * edge_proximity
 	_track.draw_rect(Rect2(0, zone_y, w, edge_thickness), edge_color)
 	_track.draw_rect(Rect2(0, zone_y + zone_h - edge_thickness, w, edge_thickness), edge_color)
+
+	# Legacy gem: when one is active, pin its icon at the zone center as a "hold here to
+	# collect it" cue, with a thin vertical progress bar beside it that fills in-zone and
+	# drains out. Drawn under the marker so the marker still reads on top. Separate from
+	# the round score entirely — this only visualizes _gem_progress.
+	if _gem_active:
+		var gem_cy := _to_screen_y(_zone_center)
+		# The gem icon, centered on the zone. A gentle in-zone shimmer nudges the player to
+		# stay put; a steady icon when out. Sits slightly left so the bar has room on the right.
+		var gem_shimmer := (0.5 + 0.5 * sin(_pulse_phase * 6.0)) if in_zone else 0.0
+		var gem_size := GEM_ICON_SIZE * (1.0 + 0.10 * gem_shimmer)
+		var gem_x := w * 0.5 - gem_size * 0.5 - 14.0
+		_track.draw_texture_rect(
+			LEGACY_GEM_TEXTURE,
+			Rect2(gem_x, gem_cy - gem_size * 0.5, gem_size, gem_size),
+			false)
+
+		# The gem-progress bar: a vertical track to the right of the icon that fills from the
+		# bottom up. White fill over a dark trough so the fill/drain is unmistakable.
+		var bar_w := 16.0
+		var bar_h := GEM_ICON_SIZE * 1.4
+		var bar_x := gem_x + gem_size + 10.0
+		var bar_y := gem_cy - bar_h * 0.5
+		_track.draw_rect(Rect2(bar_x, bar_y, bar_w, bar_h), Color(0, 0, 0, 0.5))
+		var fill_h := bar_h * clampf(_gem_progress, 0.0, 1.0)
+		_track.draw_rect(Rect2(bar_x, bar_y + bar_h - fill_h, bar_w, fill_h), Color.WHITE)
+		_track.draw_rect(Rect2(bar_x, bar_y, bar_w, bar_h), UiPalette.MUSTARD_GOLD, false, 2.0)
+
+	# A brief bright wash across the whole track right after the gem is collected, so the
+	# win reads even though the icon has already cleared.
+	if _gem_won_flash > 0.0:
+		_track.draw_rect(Rect2(0, 0, w, h), Color(1, 1, 1, 0.5 * _gem_won_flash))
 
 	# Marker: a horizontal band — green in-zone, red out — with a drop shadow + motion
 	# trail so it tracks easily, gently bouncing (size pulse) while safely in the zone.

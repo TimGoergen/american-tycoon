@@ -119,6 +119,24 @@ var _hoop_placed: bool = false     # one-shot: center the hoop once the board ha
 var _hoop_pos: Vector2 = Vector2.ZERO
 var _hoop_flash: float = 0.0       # brief brighten of the rim after a made basket, decays in _process
 
+# --- Legacy gem state (see the LEGACY_GEM constants above) -------------------------------------
+## Chance (0..1) that a legacy gem appears this round, captured from tuning in begin().
+var _legacy_gem_chance: float = 0.0
+## True while a legacy gem is on the board waiting to be earned. Only ever one at a time.
+var _legacy_gem_active: bool = false
+## Where the active gem floats (board-local), placed once the board has a real size.
+var _legacy_gem_pos: Vector2 = Vector2.ZERO
+## One-shot: place the gem once the board is laid out (like the hoop/balls), if this round rolled one.
+var _legacy_gem_placed: bool = false
+## Whether the CURRENT shot's flight has already passed through the gem. Reset at the start of each
+## shot (in _release_sling); if it's true when that same shot scores, the gem is collected.
+var _passed_through_gem_this_shot: bool = false
+## A short "you got it!" pop after collecting: a decaying pulse the draw reads to flash the spot.
+var _legacy_gem_win_cue: float = 0.0
+const LEGACY_GEM_WIN_CUE_FADE := 1.4  # life drained per second (so the cue lasts ~0.7s)
+## Free-running phase (seconds) driving the idle bob/shimmer of the waiting gem so it looks alive.
+var _legacy_gem_phase: float = 0.0
+
 # --- Celebration juice (polish pass, Tim 2026-06-29) -------------------------------------------
 # This pass adds NO difficulty change (Basketball "holds"); it only makes a made basket feel good.
 # All of the state below is purely cosmetic — it never touches _baskets or get_performance().
@@ -173,6 +191,22 @@ var _board_border: StyleBoxFlat
 # with plain shapes (an ellipse rim + a net), so only the ball needs a texture.
 const BALL_TEX := preload("res://art/icons/basketball.svg")
 
+# --- Legacy Bonus (Plans/Legacy_Bonus_System.md) ----------------------------------------------
+# Basketball's legacy mechanic: with a small chance one legacy gem appears floating in the play
+# area between the launch floor and the hoop. It is earned ONLY if a single shot passes THROUGH
+# the gem (the ball's center comes within LEGACY_GEM_GRAB_RADIUS of it at any point during that
+# shot's flight) AND that SAME shot then scores. Pass through but miss the basket and the gem is
+# NOT collected — it clears when the ball comes to rest, so each gem is worth one honest attempt
+# (chosen over "stays forever" so a lucky pass-through can't be re-tried until it happens to score).
+
+## The legacy gem icon — the same currency art used everywhere else, so the player recognizes it.
+const LEGACY_GEM_TEX := preload("res://art/icons/legacy_gem.svg")
+## Half the on-screen size (px) the gem is drawn at. Generous so it reads as a grabbable target.
+const LEGACY_GEM_RADIUS := 44.0
+## How close the ball's CENTER must come to the gem's center to count as "through" it. The ball is
+## big (BALL_RADIUS), so this is comfortably larger than the drawn gem — brushing it counts.
+const LEGACY_GEM_GRAB_RADIUS := BALL_RADIUS + LEGACY_GEM_RADIUS
+
 
 func display_name() -> String:
 	return "Micro Basketball"
@@ -202,6 +236,13 @@ func begin(tuning: TuningConfig) -> void:
 	_particles.clear()
 	_score_rings.clear()
 	_net_swing_time = 0.0
+	# Legacy gem: capture the spawn chance and reset the per-round gem state. Whether a gem actually
+	# appears is rolled once the board has a size (in _process), so we know where the play area is.
+	_legacy_gem_chance = clampf(tuning.legacy_gem_chance_basketball, 0.0, 1.0)
+	_legacy_gem_active = false
+	_legacy_gem_placed = false
+	_passed_through_gem_this_shot = false
+	_legacy_gem_win_cue = 0.0
 	# Round length is read (not hardcoded) so this type tracks whatever the host sets; only used
 	# here for the comment math — performance is baskets/target, which the host samples live.
 	var _round_seconds := maxf(0.1, tuning.minigame_duration_seconds)
@@ -276,8 +317,16 @@ func _process(delta: float) -> void:
 	if not _started_balls:
 		_lay_balls_on_floor(bounds)
 		_started_balls = true
+	if not _legacy_gem_placed:
+		# Roll for the gem once, now that we know the board size (so we can place it between the
+		# launch floor and the hoop region). If it doesn't spawn, it simply never appears this round.
+		_maybe_spawn_legacy_gem(bounds)
+		_legacy_gem_placed = true
 
 	_hoop_flash = maxf(0.0, _hoop_flash - delta * 3.0)
+	# Advance the gem's idle animation and its post-collect win cue (both purely cosmetic).
+	_legacy_gem_phase += delta
+	_legacy_gem_win_cue = maxf(0.0, _legacy_gem_win_cue - delta * LEGACY_GEM_WIN_CUE_FADE)
 	_advance_balls(delta, bounds)
 	_advance_celebration(delta)
 	_play.queue_redraw()
@@ -328,6 +377,40 @@ func _lay_balls_on_floor(bounds: Vector2) -> void:
 			"state": "idle",
 			"spin": 0.0,
 		})
+
+
+## With probability _legacy_gem_chance, spawn ONE legacy gem floating in the play area between the
+## launch floor and the hoop region — a spot a shot's arc naturally passes through on the way up to
+## the hoop. Placed clear of the walls so the whole icon is visible and grabbable.
+func _maybe_spawn_legacy_gem(bounds: Vector2) -> void:
+	# Don't spawn once the bonus is already earned (design rule 3 — no noise once secured).
+	if legacy_bonus_secured():
+		return
+	if _rng.randf() >= _legacy_gem_chance:
+		return
+	# Keep the gem off the side walls, and vertically in the mid-band: below the hoop's spawn zone
+	# (which sits in the upper 25–50%) yet above the resting balls, so a launched ball flies through
+	# it en route to the rim rather than it sitting on the floor or overlapping the hoop.
+	var margin_x := WALL_THICKNESS + LEGACY_GEM_RADIUS
+	_legacy_gem_pos = Vector2(
+		_rng.randf_range(margin_x, bounds.x - margin_x),
+		_rng.randf_range(bounds.y * 0.55, bounds.y * 0.78)
+	)
+	_legacy_gem_active = true
+
+
+## True if the ball's travel this substep (the segment from `from` to `to`) came within
+## LEGACY_GEM_GRAB_RADIUS of the active gem. Testing the whole segment — not just the endpoint —
+## is what stops a fast ball tunneling THROUGH the gem between two sampled positions.
+func _segment_hits_gem(from: Vector2, to: Vector2) -> bool:
+	# Closest point on segment [from, to] to the gem, via the standard projection clamped to [0,1].
+	var seg := to - from
+	var seg_len_sq := seg.length_squared()
+	var closest: Vector2 = from
+	if seg_len_sq > 0.0001:
+		var t := clampf((_legacy_gem_pos - from).dot(seg) / seg_len_sq, 0.0, 1.0)
+		closest = from + seg * t
+	return closest.distance_to(_legacy_gem_pos) <= LEGACY_GEM_GRAB_RADIUS
 
 
 ## After a made basket, move the still hoop to a fresh spot: vertically somewhere between the
@@ -381,6 +464,12 @@ func _advance_balls_step(delta: float, bounds: Vector2) -> void:
 		# Spin from horizontal motion (rolling without slipping: angular speed = vx / radius), so the
 		# ball visibly rotates as it rolls along the floor or arcs through the air (Tim, 2026-06-28).
 		ball["spin"] = float(ball.get("spin", 0.0)) + ball["vel"].x / BALL_RADIUS * delta
+		# Legacy gem "through" test, sampled EVERY physics substep (not once per frame) so a fast
+		# ball can't step past the gem between checks — same tunneling concern as the rim. We test
+		# the segment prev→pos, not just the endpoint, so even at MAX_STEP_PX a grazing pass counts.
+		if _legacy_gem_active and not _passed_through_gem_this_shot:
+			if _segment_hits_gem(ball["prev"], ball["pos"]):
+				_passed_through_gem_this_shot = true
 
 	# Pass 2: hoop scoring/bounces, then the board walls.
 	for ball in _balls:
@@ -425,6 +514,12 @@ func _resolve_walls(ball: Dictionary, bounds: Vector2) -> void:
 		if absf(ball["vel"].y) < REST_SPEED and absf(ball["vel"].x) < REST_SPEED:
 			ball["vel"] = Vector2.ZERO
 			ball["state"] = "idle"
+			# The shot has ended without scoring (a made basket returns earlier, in _resolve_hoop).
+			# If it passed through the gem but missed, that gem is spent: clear it so a lucky
+			# pass-through can't be retried until it finally scores (design: one honest attempt).
+			if _legacy_gem_active and _passed_through_gem_this_shot:
+				_legacy_gem_active = false
+			_passed_through_gem_this_shot = false
 
 
 ## Resolve a flight ball against the hoop. Returns true if it scored (the caller then skips the
@@ -441,6 +536,12 @@ func _resolve_hoop(ball: Dictionary, prev: Vector2, bounds: Vector2) -> bool:
 		_baskets += 1
 		_hoop_flash = 1.0
 		_celebrate_basket()  # net swing + score-ring pop + a small confetti spray (cosmetic only)
+		# Legacy gem: earned only if THIS shot also passed through the gem (both in one shot). The
+		# host gates the actual payout by the round result; here we just record the collection.
+		if _legacy_gem_active and _passed_through_gem_this_shot:
+			collect_legacy_gem()
+			_legacy_gem_win_cue = 1.0     # a brief pop at the gem's spot
+			_legacy_gem_active = false    # consumed — one gem per appearance
 		_rest_ball(ball, bounds)
 		_move_hoop(bounds)
 		return true
@@ -558,6 +659,9 @@ func _release_sling() -> void:
 	var ball: Dictionary = _balls[_aim_index]
 	var pull: Vector2 = ball["pos"] - _aim_anchor
 	var pull_distance := pull.length()
+	# A new shot begins: reset the "passed through the gem" flag so through-gem credit is per-shot
+	# (the gem must be crossed AND the basket made within this SAME shot).
+	_passed_through_gem_this_shot = false
 	# Always launch from the anchor (the ball "returns to the pocket" and shoots off), so it never
 	# starts mid-air at the pulled-back position.
 	ball["pos"] = _aim_anchor
@@ -608,6 +712,10 @@ func _draw_play() -> void:
 
 	if _aim_index != -1:
 		_draw_aim_guide()
+
+	# The waiting legacy gem (and its brief post-collect win cue) sit above the play field so the
+	# player sees the target to shoot through.
+	_draw_legacy_gem()
 
 	# The celebration layer (score rings + basket confetti), drawn over the play field but
 	# under the board frame so it never spills past the walls visually.
@@ -755,6 +863,33 @@ func _draw_celebration() -> void:
 		var spark_color: Color = particle["color"]
 		spark_color.a = clampf(particle["life"], 0.0, 1.0)
 		_play.draw_circle(particle["pos"], particle["radius"], spark_color)
+
+
+## Draw the waiting legacy gem (a gently bobbing, shimmering icon with a soft halo so it reads as a
+## grabbable target), plus a brief expanding "win" ring at the spot right after one is collected.
+func _draw_legacy_gem() -> void:
+	if _legacy_gem_active:
+		# A gentle vertical bob + a pulsing halo so the gem looks alive and invites a shot through it.
+		var bob := sin(_legacy_gem_phase * 2.4) * 6.0
+		var center := _legacy_gem_pos + Vector2(0.0, bob)
+		var halo_pulse := 1.0 + 0.12 * sin(_legacy_gem_phase * 4.0)
+		var halo := UiPalette.MUSTARD_GOLD
+		halo.a = 0.28
+		_play.draw_circle(center, LEGACY_GEM_RADIUS * 1.35 * halo_pulse, halo)
+		# The gem icon itself, centered on the (bobbing) spot.
+		var rect := Rect2(
+			center - Vector2(LEGACY_GEM_RADIUS, LEGACY_GEM_RADIUS),
+			Vector2(LEGACY_GEM_RADIUS * 2.0, LEGACY_GEM_RADIUS * 2.0)
+		)
+		_play.draw_texture_rect(LEGACY_GEM_TEX, rect, false)
+
+	# The collect cue: a bright ring bursting outward from where the gem was, fading as it grows.
+	if _legacy_gem_win_cue > 0.0:
+		var life := _legacy_gem_win_cue
+		var radius := LEGACY_GEM_RADIUS + (1.0 - life) * 90.0  # small at collect (life 1) -> wide as it fades
+		var cue_color := UiPalette.MUSTARD_GOLD
+		cue_color.a = life
+		_play.draw_arc(_legacy_gem_pos, radius, 0.0, TAU, 28, cue_color, 5.0, true)
 
 
 ## Draw half of the rim ellipse. top_half draws the far/top edge (sin < 0); otherwise the

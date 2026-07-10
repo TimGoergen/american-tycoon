@@ -154,14 +154,14 @@ extends Resource
 @export var carb_excited_flow: float = 50.0  # feel-tune
 
 ## Horizontal churn wobble amplitude (px) at full frenzy.
-@export var carb_excited_wobble: float = 7.0  # feel-tune
+@export var carb_excited_wobble: float = 4.0  # feel-tuned on device (Tim, 2026-07-09)
 
 ## Per-bubble speed spread's LOWER bound at full frenzy (the crawler/streaker mix).
 @export var carb_excited_spread_lower: float = 0.25  # feel-tune
 
 ## Comet-tail visibility during frenzy (0 = suppressed, 1 = full tails). Tails curl
 ## more at low speeds, which contributed edge bursts; partial by default.
-@export var carb_excited_tails: float = 0.3  # feel-tune
+@export var carb_excited_tails: float = 0.5  # feel-tuned on device (Tim, 2026-07-09)
 
 ## Seconds for the frenzy look to ramp in/out. A slower ramp keeps the state change
 ## from registering as an event of its own. 0.9 = Tim's on-device tuned value
@@ -243,7 +243,53 @@ extends Resource
 
 ## How long one minigame round lasts, in seconds. Every type is tuned to a ~20s round
 ## (Tim, 2026-06-25) — scoring targets in each minigame assume this length.
-@export var minigame_duration_seconds: float = 20.0  # feel-tune
+@export var minigame_duration_seconds: float = 25.0  # feel-tuned on device (Tim, 2026-07-09)
+
+# --- Match-3 difficulty (Tim, 2026-07-09: "too easy, I max it every time") ----------
+# The match-3 game maps its own running score onto the host's reward curve; these two knobs set
+# that mapping's difficulty and are live-tunable so Tim can dial the ceiling on device without a
+# rebuild. Higher score targets = harder to reach "full"/"max". (Cascade combos were REMOVED this
+# pass — subsequent matches now score statically by gem count only, so luck no longer inflates the
+# score; there is no combo knob anymore.)
+
+## Match-3 score that maps to the host's "full" line (keep 100%) — roughly a whole round of
+## ordinary clean matching. Below this is a "bad" result (keeps less). Tim device-tuned to 600.
+@export var match3_full_score: float = 600.0  # feel-tune
+
+## Match-3 score that maps to performance 1.0 (the max extra-high bonus, and the early-out).
+## Raised well above the old 1000 so a single lucky chain can no longer max the round — the
+## player must sustain strong play to reach it.
+@export var match3_max_score: float = 2200.0  # feel-tune
+
+## How many gems a single match must contain to drop a Legacy gem (at the swap's target cell).
+## Higher = Legacy gems are rarer. Match-3 has no other way to spawn them.
+@export var match3_legacy_match_size: int = 4  # feel-tuned on device (Tim, 2026-07-09)
+
+# --- Legacy Bonus (Plans/Legacy_Bonus_System.md; Tim, 2026-07-09) --------------------
+# Every minigame has a small, game-specific chance to let the player collect a bonus Legacy gem.
+# The grant is a share of the dynasty's lifetime-earned Legacy, gated by the round's overall result.
+# All first-pass — device-tune the chances, the fraction, and the great-round bonus.
+
+## Legacy granted per collected gem, as a fraction of lifetime-earned Legacy (0.001 = 0.1%).
+@export var legacy_bonus_fraction: float = 0.001  # feel-tune
+
+## Most legacy "moments" a single round can bank. 1 = every game's bonus is worth the same (a clean
+## windfall); raise to make the grant scale with how many gems the player collected in the round.
+@export var legacy_bonus_max_gems: int = 1  # feel-tune
+
+## Multiplier applied to the legacy grant on a GREAT round (top bonus band). 1.10 = +10%.
+@export var legacy_bonus_great_multiplier: float = 1.10  # feel-tune
+
+## How far into the host's bonus band (0..1) a round must reach to count as GREAT for the legacy
+## bonus. Below the "full" line = bad (keep nothing); at/above full but under this = normal.
+@export var legacy_bonus_great_threshold: float = 0.75  # feel-tune
+
+## Per-game chance a Legacy gem becomes available in a round (small), a per-round appearance chance.
+## (Match-3 has NO random chance — its Legacy gems come only from 5+ matches — so it has no knob.)
+@export var legacy_gem_chance_catch: float = 0.12  # feel-tune
+@export var legacy_gem_chance_timing: float = 0.12  # feel-tune
+@export var legacy_gem_chance_balance: float = 0.15  # feel-tune
+@export var legacy_gem_chance_basketball: float = 0.15  # feel-tune
 
 
 # --- Events (Spec §10) ---

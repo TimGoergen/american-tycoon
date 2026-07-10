@@ -36,6 +36,7 @@ var _first_contact_overlay: FirstContactOverlay
 var _frenzy_bar: FrenzyBar
 var _wage_panel: WagePanel
 var _welcome_overlay: WelcomeBackOverlay
+var _about_screen: AboutScreen
 var _will_screen: WillScreen
 var _legacy_screen: LegacyScreen
 var _ledger_screen: FamilyLedgerScreen
@@ -312,24 +313,26 @@ func _seconds_since_save(save_dict: Dictionary) -> float:
 
 
 func _apply_offline_if_due() -> void:
-	if _elapsed_since_save <= 0.0:
-		return
 	# Offline earnings accrue to the living generation at the staffed rate. They do
 	# NOT yet receive the dynasty's Legacy multiplier (OfflineCalculator predates
 	# the dynasty layer); folding Legacy into offline accrual is a later refinement.
-	var offline := game.apply_offline(_elapsed_since_save)
-	# The ritual only plays when a pile actually accrued (staffed income).
-	if offline.pile <= 0.0:
-		return
-	var hours_away := offline.elapsed_seconds / 3600.0
+	if _elapsed_since_save > 0.0:
+		var offline := game.apply_offline(_elapsed_since_save)
+		# The welcome-back ritual plays whenever a pile actually accrued (staffed income).
+		if offline.pile > 0.0:
+			var hours_away := offline.elapsed_seconds / 3600.0
+			# The game always opens directly to the welcome-back screen (Tim, 2026-06-24) — never
+			# straight into a minigame. The base pile is already banked by apply_offline, so PUT IT TO
+			# WORK simply dismisses. When transition minigames are on, the screen also offers RISK IT ON
+			# A MINIGAME?, handled by _on_welcome_risk_pressed, which scales the pile we stash here.
+			_pending_offline_pile = offline.pile
+			_pending_offline_hours = hours_away
+			_welcome_overlay.show_pile(offline.pile, hours_away, game.ui_minigame_enabled)
+			return
 
-	# The game always opens directly to the welcome-back screen (Tim, 2026-06-24) — never
-	# straight into a minigame. The base pile is already banked by apply_offline, so PUT IT TO
-	# WORK simply dismisses. When transition minigames are on, the screen also offers RISK IT ON
-	# A MINIGAME?, handled by _on_welcome_risk_pressed, which scales the pile we stash here.
-	_pending_offline_pile = offline.pile
-	_pending_offline_hours = hours_away
-	_welcome_overlay.show_pile(offline.pile, hours_away, game.ui_minigame_enabled)
+	# No offline income to report: still open on the branded launch screen (logo + BEGIN) rather
+	# than dropping straight into the game (Tim, 2026-07-09).
+	_welcome_overlay.show_welcome()
 
 
 # ---------------------------------------------------------------------------
@@ -434,6 +437,11 @@ func _build_ui() -> void:
 	_welcome_overlay.risk_pressed.connect(_on_welcome_risk_pressed)
 	add_child(_welcome_overlay)
 
+	# The About modal (Settings → About), hidden until opened.
+	_about_screen = AboutScreen.new()
+	_about_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(_about_screen)
+
 	# The first-contact overlay (GDD §6.2): shown when a generation consumes the current
 	# economy and reaches the next alien epoch. Main freezes the economy while it is up so
 	# the beat lands. EpochState.contact_made fires it; it is rebuilt with the generation
@@ -466,6 +474,7 @@ func _build_ui() -> void:
 	_minigame_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_minigame_screen.setup(tuning)
 	_minigame_screen.finished.connect(_on_minigame_finished)
+	_minigame_screen.legacy_bonus_earned.connect(_on_legacy_bonus_earned)
 	add_child(_minigame_screen)
 
 	# The Minigame Tuning review screen (Settings): a full-screen list that opens any minigame
@@ -734,6 +743,15 @@ func _build_settings_tab() -> Control:
 	minigame_tuning_button.pressed.connect(_on_minigame_tuning_pressed)
 	bottom_buttons.add_child(minigame_tuning_button)
 
+	# About: opens the modal with the logo, name, version, and credits (Tim, 2026-07-09).
+	var about_button := Button.new()
+	about_button.custom_minimum_size = Vector2(0, tuning_button_height)
+	about_button.add_theme_font_size_override("font_size", TUNING_BUTTON_FONT)
+	UiPalette.style_button(about_button, false)
+	about_button.text = "ABOUT"
+	about_button.pressed.connect(_on_about_pressed)
+	bottom_buttons.add_child(about_button)
+
 	stack.add_child(v)
 	_settings_page = v
 
@@ -937,6 +955,12 @@ func _on_minigame_tuning_pressed() -> void:
 	_minigame_review_screen.open()
 
 
+## About pressed: show the modal with the logo, name, version, and credits. Its own Back button
+## hides it again (no state to restore — the game keeps running behind it).
+func _on_about_pressed() -> void:
+	_about_screen.open()
+
+
 ## Apply tuning edits: persist the overrides, save the run so no progress is lost,
 ## then reload the scene. Startup re-loads tuning with the new overrides layered
 ## over the baked defaults — the same proven reload path used after a succession.
@@ -1033,6 +1057,7 @@ func _on_contact_dismissed() -> void:
 	var prop := game.economy.properties[prop_index] as PropertyState
 	_minigame_site = MinigameSite.FIRST_CONTACT
 	_first_contact_prop_index = prop_index
+	_minigame_screen.set_legacy_lifetime(dynasty.upgrades.earned_lifetime)
 	# Frame the negotiation around the property's per-unit base income, so the result reads as the
 	# opening income you talked your way into rather than an abstract score.
 	_minigame_screen.start_game(
@@ -1164,6 +1189,7 @@ func _on_pass_on_confirmed() -> void:
 	if game.ui_minigame_enabled:
 		# The minigame's extra-high bonus cap depends on the Family Reputation upgrade.
 		_minigame_site = MinigameSite.SUCCESSION
+		_minigame_screen.set_legacy_lifetime(dynasty.upgrades.earned_lifetime)
 		_minigame_screen.start_game(
 			MinigameScreen.legacy_reward(dynasty.projected_legacy_gain()),
 			dynasty.upgrades.minigame_bonus_max()
@@ -1171,6 +1197,16 @@ func _on_pass_on_confirmed() -> void:
 	else:
 		# Opting out banks the keep floor — skipping is the worst result (GDD §5.5).
 		_finalize_succession(tuning.minigame_keep_floor)
+
+
+## The minigame reported a Legacy-gem bonus (Plans/Legacy_Bonus_System.md): the host already sized
+## the grant from the round result and this generation's lifetime Legacy, so we just bank it to the
+## spendable wallet (unearned — not added to earned_lifetime), refresh the estate readout, and save.
+func _on_legacy_bonus_earned(amount: int) -> void:
+	if amount <= 0:
+		return
+	dynasty.upgrades.grant_bonus(amount)
+	SaveManager.save_dict_to_file(dynasty.to_save_dict())
 
 
 ## The minigame ended: persist the player's "skip future minigames" choice, then apply its
@@ -1196,6 +1232,7 @@ func _on_minigame_finished(multiplier: float, opt_out: bool) -> void:
 ## credits the +/- delta before re-showing the welcome screen with the final haul.
 func _on_welcome_risk_pressed() -> void:
 	_minigame_site = MinigameSite.WELCOME_BACK
+	_minigame_screen.set_legacy_lifetime(dynasty.upgrades.earned_lifetime)
 	_minigame_screen.start_game(
 		MinigameScreen.offline_pile_reward(_pending_offline_pile),
 		WELCOME_BACK_BONUS_MAX

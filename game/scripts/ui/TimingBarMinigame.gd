@@ -70,6 +70,21 @@ var _click_marks: Array = []
 ## _zone_ghost_half is the OLD (larger) half-width; _zone_ghost_left counts down ZONE_GHOST_TIME.
 var _zone_ghost_half: float = 0.0
 var _zone_ghost_left: float = 0.0
+
+# --- Legacy gem (Plans/Legacy_Bonus_System.md) -------------------------------
+## Chance, per successful lock, that a legacy gem appears in the center of the NEXT target zone
+## (from tuning.legacy_gem_chance_timing). Only one gem opportunity is ever active at a time.
+var _legacy_gem_chance: float = 0.0
+## True while a legacy gem is sitting in the zone waiting to be grabbed. The player's next lock
+## consumes it: a hit collects it, a miss loses it (see _on_lock). Drawn at _legacy_gem_center.
+var _legacy_gem_active: bool = false
+## Bar-fraction center of the pending legacy gem (always the zone center it spawned in).
+var _legacy_gem_center: float = 0.5
+## Brief gold "you grabbed it" burst after a legacy gem is collected, decays in _process like _flash.
+var _legacy_win_flash: float = 0.0
+## The legacy gem art, drawn centered in the target zone as a "grab this on your next lock" cue.
+const LEGACY_GEM_TEXTURE = preload("res://art/icons/legacy_gem.svg")
+
 var _rng := RandomNumberGenerator.new()
 
 var _bar: Control
@@ -85,7 +100,7 @@ func how_to_play() -> String:
 		+ "best, and the zone shrinks after every hit."
 
 
-func begin(_tuning: TuningConfig) -> void:
+func begin(tuning: TuningConfig) -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_rng.randomize()
 	_marker_pos = 0.0
@@ -95,6 +110,10 @@ func begin(_tuning: TuningConfig) -> void:
 	_success_count = 0
 	_accuracy_sum = 0.0
 	_running = true
+	# Live legacy-gem spawn chance so Balance Tuning edits take effect next round. No gem is
+	# active until a successful lock rolls one into the next zone (see _on_freeze_ended).
+	_legacy_gem_chance = tuning.legacy_gem_chance_timing
+	_legacy_gem_active = false
 	_move_zone()
 
 	var column := VBoxContainer.new()
@@ -169,6 +188,7 @@ func _process(delta: float) -> void:
 		return
 	_flash = maxf(0.0, _flash - delta * 4.0)
 	_miss_flash = maxf(0.0, _miss_flash - delta * 4.0)
+	_legacy_win_flash = maxf(0.0, _legacy_win_flash - delta * 2.0)  # slower fade so the grab reads
 	# Age the click-feedback lines and drop any that have fully faded — removed in-place,
 	# walking backward, instead of filter() rebuilding the array every frame (minigame
 	# lag pass, Tim 2026-07-06).
@@ -207,6 +227,13 @@ func _on_lock() -> void:
 	# green (scored) or red (wasted) so the player gets clear feedback on exactly where, and how
 	# well, their tap was perceived.
 	_click_marks.append({"pos": _marker_pos, "age": 0.0, "hit": hit})
+	# A pending legacy gem is consumed by THIS lock, whichever way it goes: a hit (lock landed in
+	# the zone the gem sits in) collects it with a win cue; a miss simply loses it (no penalty).
+	if _legacy_gem_active:
+		_legacy_gem_active = false
+		if hit:
+			collect_legacy_gem()
+			_legacy_win_flash = 1.0
 	if not hit:
 		# Missed the zone. Normal mode: a misfire costs a lock (never below zero) and scores nothing.
 		# Challenge Mode: mistakes must NOT stop play or reduce the score, so we skip the −1 penalty
@@ -250,6 +277,14 @@ func _on_freeze_ended() -> void:
 		completed.emit(get_performance())
 	elif _freeze_success:
 		_move_zone()
+		# After the zone jumps to its fresh spot, roll the small chance to drop a legacy gem into
+		# its center for the player to grab on their next lock. Rolled here (not once per round) so
+		# the gem always sits in a freshly-placed zone, and only one is ever active at a time. Works
+		# unchanged in Challenge Mode's endless loop — the host suppresses the actual grant there.
+		# Skip once the bonus is already earned (design rule 3 — no more gems once secured).
+		if not _legacy_gem_active and not legacy_bonus_secured() and _rng.randf() < _legacy_gem_chance:
+			_legacy_gem_active = true
+			_legacy_gem_center = _zone_center
 
 
 ## The zone's current half-width: starts at ZONE_HALF and shrinks linearly to ZONE_HALF_MIN
@@ -304,6 +339,22 @@ func _draw_bar() -> void:
 	var zone_x := (_zone_center - half) * w
 	var zone_w := (half * 2.0) * w
 	_bar.draw_rect(Rect2(zone_x, 0, zone_w, h), UiPalette.MUSTARD_GOLD)
+	# Legacy gem: sits in the center of the current zone as a "grab this on your next lock" cue.
+	# Drawn over the gold zone (so it reads as sitting ON the target) but under the marker/bursts.
+	# The gem art is square, so we size it to the bar height and center it on the zone center.
+	if _legacy_gem_active:
+		var gem_size := h
+		var gem_x := _legacy_gem_center * w - gem_size * 0.5
+		_bar.draw_texture_rect(LEGACY_GEM_TEXTURE, Rect2(gem_x, 0, gem_size, gem_size), false)
+	# Legacy win burst: a brief gold ring expanding out from where the gem was, so a grabbed gem
+	# clearly pays off. Fades with _legacy_win_flash; drawn as an outline so it never hides the bar.
+	if _legacy_win_flash > 0.0:
+		var burst_grow := 1.0 + (1.0 - _legacy_win_flash) * 1.5  # starts tight, blooms outward
+		var burst_half := (h * 0.5) * burst_grow
+		var burst_x := _legacy_gem_center * w
+		_bar.draw_rect(
+				Rect2(burst_x - burst_half, h * 0.5 - burst_half, burst_half * 2.0, burst_half * 2.0),
+				Color(UiPalette.MUSTARD_GOLD, _legacy_win_flash), false, 5.0)
 	# Click-feedback lines: a green line for a scored lock, a red line for a wasted miss, at each
 	# recorded click, pulsing as it fades over CLICK_MARK_FADE seconds (alpha falls with age; the
 	# pulse keeps it lively while visible).

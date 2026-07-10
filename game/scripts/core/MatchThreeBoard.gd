@@ -13,6 +13,22 @@ var width: int
 var height: int
 var num_colors: int
 
+## Optional SPECIAL color (the Legacy gem — see Plans/Legacy_Bonus_System.md). When >= 0 it is one
+## of the num_colors ids, matchable like any other, but: it is never placed in the starting grid,
+## it never appears in an ordinary refill (it is excluded from _regular_color), and it is created
+## ONLY by a 5+ match, which places one at the swap's target cell (recorded as `legacy_placement`).
+## Default -1 (no special color) → identical behavior to a plain board, so existing tests are unchanged.
+var special_color: int = -1
+## Gate for the 5+-match Legacy placement. The minigame turns this off once the Legacy bonus is
+## secured so no more special gems appear (design rule 3). special_color stays set so the special id
+## is still excluded from ordinary refills.
+var enable_special_spawns: bool = true
+## A regular color that does NOT force-spawn a special gem even on a big match (the match-3 AVOID
+## gem — matching the thing you're meant to steer around should not reward a Legacy gem). -1 = none.
+var special_exclude_color: int = -1
+## How many gems a single match must contain to place a Legacy gem (tunable via Balance Tuning).
+var special_match_size: int = 5
+
 ## Total gems cleared across the whole game so far (accumulates over every try_swap).
 var score: int = 0
 
@@ -31,10 +47,14 @@ var _rng: RandomNumberGenerator
 const _EMPTY: int = -1
 
 
-func _init(p_width: int, p_height: int, p_num_colors: int, p_seed: int = 0) -> void:
+func _init(
+		p_width: int, p_height: int, p_num_colors: int, p_seed: int = 0,
+		p_special_color: int = -1
+) -> void:
 	width = p_width
 	height = p_height
 	num_colors = p_num_colors
+	special_color = p_special_color
 
 	_rng = RandomNumberGenerator.new()
 	if p_seed != 0:
@@ -44,6 +64,19 @@ func _init(p_width: int, p_height: int, p_num_colors: int, p_seed: int = 0) -> v
 		_rng.randomize()
 
 	_build_starting_grid()
+
+
+## A uniformly random NON-special color — used for the starting grid AND every ordinary refill, so
+## the special (Legacy) color never appears on its own; it only ever enters play via the 5+-match
+## placement in resolve_swap.
+func _regular_color() -> int:
+	if special_color < 0:
+		return _rng.randi_range(0, num_colors - 1)
+	# Pick uniformly among 0..num_colors-1, skipping the special color's id.
+	var c := _rng.randi_range(0, num_colors - 2)
+	if c >= special_color:
+		c += 1
+	return c
 
 
 # ---------------------------------------------------------------------------
@@ -122,6 +155,16 @@ func resolve_swap(r1: int, c1: int, r2: int, c2: int) -> Dictionary:
 	result["valid"] = true
 	var steps: Array = []
 	var total_cleared := 0
+	# A match of special_match_size+ REGULAR gems earns a bonus Legacy gem, placed at the swap's
+	# TARGET cell once the board settles (Tim, 2026-07-09 — it should appear where the player moved a
+	# gem into, not a random slot). Legacy-gem matches themselves don't (they're the payout), nor does
+	# a match of the AVOID color (matching the gem you're told to steer around shouldn't be rewarded).
+	var qualifying_big_match := false
+	# Once the player MATCHES the special (Legacy) gems themselves in this swap, the cascade that
+	# refills the grid must NOT hand out a brand-new Legacy gem — you already collected the payout by
+	# matching them, so a big match among the resulting refill gems shouldn't spawn another (Tim,
+	# 2026-07-10). Tracked across all cascades of THIS swap and, once true, blocks the placement below.
+	var legacy_matched_this_swap := false
 	# Each loop is one cascade: find the matches now on the board, clear+collapse+refill,
 	# record what moved. Repeat until no matches remain.
 	while true:
@@ -135,6 +178,20 @@ func resolve_swap(r1: int, c1: int, r2: int, c2: int) -> Dictionary:
 		var cleared_colors: Array = []
 		for cell in cleared:
 			cleared_colors.append(grid[cell[0]][cell[1]])
+		# Note any Legacy-gem match this cascade — it suppresses a new Legacy spawn for the rest of
+		# this swap (see legacy_matched_this_swap above).
+		if special_color >= 0:
+			for group in groups:
+				if grid[group[0][0]][group[0][1]] == special_color:
+					legacy_matched_this_swap = true
+					break
+		if special_color >= 0 and enable_special_spawns and not qualifying_big_match \
+				and not legacy_matched_this_swap:
+			for group in groups:
+				var gc: int = grid[group[0][0]][group[0][1]]
+				if group.size() >= special_match_size and gc != special_color and gc != special_exclude_color:
+					qualifying_big_match = true
+					break
 		var moves := _clear_collapse_refill_recorded(cleared)
 		steps.append({
 			"matches": groups,
@@ -143,6 +200,19 @@ func resolve_swap(r1: int, c1: int, r2: int, c2: int) -> Dictionary:
 			"falls": moves["falls"],
 			"spawns": moves["spawns"],
 		})
+
+	# Place the earned Legacy gem at the target cell (r2, c2) now the board is stable, overwriting
+	# whatever settled there — UNLESS that cell already holds a Legacy gem, in which case it goes to
+	# the CLOSEST cell that doesn't (Tim, 2026-07-09), so a new gem never lands on an existing one.
+	# Recorded as `legacy_placement` so the UI can pop it in after the cascade and the step-replay
+	# test can apply it. Skipped only if the whole board is somehow already Legacy gems.
+	if qualifying_big_match:
+		var target := [r2, c2]
+		if grid[r2][c2] == special_color:
+			target = _nearest_non_special_cell(r2, c2)
+		if not target.is_empty():
+			grid[target[0]][target[1]] = special_color
+			result["legacy_placement"] = target
 
 	score += total_cleared
 	result["steps"] = steps
@@ -156,6 +226,25 @@ func resolve_swap(r1: int, c1: int, r2: int, c2: int) -> Dictionary:
 
 func _in_bounds(row: int, col: int) -> bool:
 	return row >= 0 and row < height and col >= 0 and col < width
+
+
+## The cell closest to (from_r, from_c) whose gem is NOT the special (Legacy) color, so a newly
+## earned Legacy gem never lands on top of an existing one. Closest by squared distance; ties go to
+## the first found in row-major order. Returns [] only if the whole board is already special gems.
+func _nearest_non_special_cell(from_r: int, from_c: int) -> Array:
+	var best: Array = []
+	var best_dist := 1 << 30
+	for row in range(height):
+		for col in range(width):
+			if grid[row][col] == special_color:
+				continue
+			var dr := row - from_r
+			var dc := col - from_c
+			var dist := dr * dr + dc * dc
+			if dist < best_dist:
+				best_dist = dist
+				best = [row, col]
+	return best
 
 
 ## Swap the colors of two cells in place.
@@ -198,25 +287,26 @@ func _pick_color_without_match(
 	# always a valid choice, but we cap the attempts defensively to avoid any chance of
 	# an infinite loop on a degenerate (num_colors < 3) configuration.
 	for _attempt in range(100):
-		var candidate := _rng.randi_range(0, num_colors - 1)
+		var candidate := _regular_color()  # never seed the special color into the starting grid
 		var makes_horizontal_run: bool = (candidate == left1 and candidate == left2)
 		var makes_vertical_run: bool = (candidate == up1 and candidate == up2)
 		if not makes_horizontal_run and not makes_vertical_run:
 			return candidate
 
-	# Degenerate fallback (should not happen with num_colors >= 3): accept any color.
-	return _rng.randi_range(0, num_colors - 1)
+	# Degenerate fallback (should not happen with num_colors >= 3): accept any regular color.
+	return _regular_color()
 
 
-## Return every current match as a list of GROUPS, where each group is one maximal line
-## (3+ same color, horizontal or vertical) as an Array of [row, col]. A cell at the
-## crossing of a horizontal and a vertical match appears in both groups; the caller
-## de-duplicates with _union_cells when it needs the flat set of cleared cells. Empty if
-## the board has no matches. Keeping groups (not just cells) lets the UI show match size.
+## Return every current match as a list of GROUPS (each an Array of [row, col]). A group is a set of
+## same-color gems that form 3+ in a row somewhere AND are connected to each other through those
+## rows — so an L / T / + shape (a horizontal run and a vertical run of the same color crossing at a
+## gem) is ONE merged group, not two (Tim, 2026-07-09). Two 3-runs of the same color that do NOT
+## share a cell stay separate. Empty if the board has no matches. The cells within a group are
+## de-duplicated; groups never overlap, so _union_cells' flat set is unchanged.
 func _find_match_groups() -> Array:
-	var groups: Array = []
+	# First collect every maximal 3+ run (horizontal and vertical) as its own list of cells.
+	var runs: Array = []
 
-	# Horizontal runs: scan each row for stretches of 3+ equal colors.
 	for row in range(height):
 		var run_start := 0
 		while run_start < width:
@@ -224,13 +314,12 @@ func _find_match_groups() -> Array:
 			while run_end + 1 < width and grid[row][run_end + 1] == grid[row][run_start]:
 				run_end += 1
 			if run_end - run_start + 1 >= 3:
-				var group: Array = []
+				var run: Array = []
 				for col in range(run_start, run_end + 1):
-					group.append([row, col])
-				groups.append(group)
+					run.append([row, col])
+				runs.append(run)
 			run_start = run_end + 1
 
-	# Vertical runs: scan each column for stretches of 3+ equal colors.
 	for col in range(width):
 		var run_start := 0
 		while run_start < height:
@@ -238,13 +327,59 @@ func _find_match_groups() -> Array:
 			while run_end + 1 < height and grid[run_end + 1][col] == grid[run_start][col]:
 				run_end += 1
 			if run_end - run_start + 1 >= 3:
-				var group: Array = []
+				var run: Array = []
 				for row in range(run_start, run_end + 1):
-					group.append([row, col])
-				groups.append(group)
+					run.append([row, col])
+				runs.append(run)
 			run_start = run_end + 1
 
+	if runs.is_empty():
+		return []
+
+	# Merge runs that share a cell (union-find over run indices). A cell can sit in at most one
+	# horizontal and one vertical run, so the crossing gem links those two runs into one group.
+	var parent: Array = []
+	for i in range(runs.size()):
+		parent.append(i)
+	var cell_owner := {}  # cell key -> the first run index that contained it
+	for i in range(runs.size()):
+		for cell in runs[i]:
+			var key: int = cell[0] * width + cell[1]
+			if cell_owner.has(key):
+				_union_runs(parent, cell_owner[key], i)
+			else:
+				cell_owner[key] = i
+
+	# Gather each merged component's de-duplicated cells.
+	var cells_by_root := {}
+	for i in range(runs.size()):
+		var root: int = _find_run_root(parent, i)
+		if not cells_by_root.has(root):
+			cells_by_root[root] = {}
+		var cells: Dictionary = cells_by_root[root]
+		for cell in runs[i]:
+			cells[cell[0] * width + cell[1]] = cell
+
+	var groups: Array = []
+	for root in cells_by_root:
+		groups.append((cells_by_root[root] as Dictionary).values())
 	return groups
+
+
+## Union-find root with path halving, over the run-index parent array.
+func _find_run_root(parent: Array, i: int) -> int:
+	while parent[i] != i:
+		parent[i] = parent[parent[i]]
+		i = parent[i]
+	return i
+
+
+## Union two runs into the same component.
+func _union_runs(parent: Array, a: int, b: int) -> void:
+	var ra: int = _find_run_root(parent, a)
+	var rb: int = _find_run_root(parent, b)
+	if ra != rb:
+		parent[rb] = ra
 
 
 ## Flatten match groups into a de-duplicated set of [row, col] cells (a crossing cell
@@ -285,7 +420,7 @@ func _clear_collapse_refill_recorded(cleared: Array) -> Dictionary:
 		var new_col: Array = []
 		new_col.resize(height)
 		for row in range(empty_count):
-			var color := _rng.randi_range(0, num_colors - 1)
+			var color := _regular_color()
 			new_col[row] = color
 			spawns.append({"col": col, "to_r": row, "color": color})
 		for i in range(survivor_rows.size()):

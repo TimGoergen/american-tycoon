@@ -132,14 +132,21 @@ can land now (rides work item 3's framing pass); real art stays M3.*
       upside, or the bonus is effectively flat. Levers to feel-tune (land WITH item 4):
       perfect threshold up from 200, tighter clock, or +1 gem color; put the threshold
       in TuningConfig.
-- [ ] **Basketball** — **KEEP w/ TWEAKs:** really good; add a backboard, and the launch
-      strength isn't linear — it ramps too strong too fast (remap drag distance →
-      force).
+- [ ] **Basketball** — **KEEP w/ TWEAKs; FIX SHIPPED (2026-07-10, `feature/minigame-feedback`).**
+      Both TWEAKs built: (1) a backboard now sits behind the drifting hoop (translucent board + dark
+      frame + shooter's square; cosmetic, no bank-shot collision yet); (2) the launch is no longer
+      linear — speed now eases over the drag via `_throw_fraction` (LAUNCH_MAX_DRAG 200 /
+      LAUNCH_CURVE_EXP 1.7, `PULL_POWER` removed), so small/medium pulls are gentle and full power
+      needs a long drag. Re-judge the launch feel on device; the curve exponent is the lever.
 - [ ] **Catch money** — **KEEP:** simple but serviceable; needs art + copy (polish
       pass, not mechanics).
 - [ ] **Timing bar** — **KEEP:** serviceable; needs polish (same class as Catch).
-- [ ] **Memory** — **TWEAK:** works, but the time limit makes a good score feel out of
-      the player's control — rethink scoring (accuracy/moves rather than raw time?).
+- [x] ~~**Memory** — **TWEAK:** works, but the time limit makes a good score feel out of
+      the player's control — rethink scoring (accuracy/moves rather than raw time?).~~
+      **ADDRESSED (2026-07-10):** the Memory timer was REMOVED entirely (recall against a clock
+      added nothing) — the game now owns its own ending. Also reshaped: 8→6 base rounds + a
+      chance-gated identical-pad "gem round" bonus. Device-approved by Tim ("memory game changes
+      look good"). Re-judge the no-timer scoring feel on the next device pass.
 - [x] ~~**Balance the books**~~ — **REWORKED + KEEP (2026-07-09, Tim: "Fishing 1.0 is
       good").** Now vertical Stardew-fishing: hold the big LIFT button (a dedicated
       button below the track, matching how the other games take input — Tim's call) to
@@ -191,9 +198,14 @@ In build order (1–5 small/medium, then the big one):
    on the overlay. Art itself stays M3.
 3. **Transition framing copy** — Get Ready gate explains WHY the minigame plays (the
    heir proving themselves at succession; risking the pile on welcome-back).
-4. **Reward curve reshape** — standard performance = neutral 1.0 (flat middle band),
-   modest downside floor for bad play, modest upside for great play; skip/opt-out
-   exactly 1.0; all band numbers in TuningConfig.
+4. ~~**Reward curve reshape**~~ — **SHIPPED (2026-07-10, `feature/minigame-feedback`).** The host
+   multiplier is now a two-segment curve: `minigame_keep_floor` (retuned 0.5→**0.9**, a modest
+   downside) at performance 0, exactly **1.0** at `minigame_full_performance` (new knob, 0.5 —
+   "standard" play), up to 1.0+bonus at performance 1.0 (modest upside). Skip/opt-out already banks
+   1.0. Match-3 reads the neutral point via the new `outcome_full_performance` the host sets (its
+   "clean play = full" alignment holds). All numbers live in Balance Tuning — device-tune. NOTE: the
+   result-screen "Legacy lost" framing is now gentle automatically (a bad round shows KEPT ~90%, not
+   50%); re-judge its wording on device.
 5. ~~**Rush excitement package**~~ — **SHIPPED + device-verified KEEP (merged to main
    e9174ac, 2026-07-08).** Tim: "I think we have finally figured this out, at least
    well enough to move on. i changed carb excited ease to 0.9 and that helps a lot"

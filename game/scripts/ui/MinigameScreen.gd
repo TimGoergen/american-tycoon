@@ -77,6 +77,10 @@ const KEEP_BAR_LERP_SPEED := 8.0
 ## tick — so the countdown reads as real urgency (Tim, 2026-07-09). Shared by every game for free.
 const TIMER_PULSE_SECONDS := 5.0
 
+## Every line on the "Get Ready" gate is scaled up by this factor (Tim, 2026-07-10) so the pre-round
+## text reads comfortably at arm's length. Applied to each label's font size and the BEGIN button.
+const GET_READY_TEXT_SCALE := 1.3
+
 var _tuning: TuningConfig
 ## The pre-minigame base reward being scaled (Legacy count at prestige, cash pile at
 ## welcome-back). Kept as a float so it can hold either a small Legacy count or a large
@@ -575,25 +579,37 @@ func _build_begin_overlay() -> Control:
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	overlay.visible = false
 
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	overlay.add_child(center)
+	# Fill the card, then lay out top-to-bottom: a SCROLLING text column that takes the slack, and the
+	# BEGIN button PINNED below it. At the enlarged text size (Tim, 2026-07-10) a wordy game's
+	# instructions can exceed the card height; scrolling the text keeps BEGIN always on the card and
+	# reachable instead of spilling off the bottom. A small inner margin keeps text off the card edge.
+	var margin := MarginContainer.new()
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	for side in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
+		margin.add_theme_constant_override(side, 16)
+	overlay.add_child(margin)
+
+	var outer := VBoxContainer.new()
+	outer.add_theme_constant_override("separation", 16)
+	margin.add_child(outer)
+
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED  # wrap, never scroll sideways
+	outer.add_child(scroll)
 
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 24)
-	# Constrain the column width (design space is 1080 wide) so the longer goal lines wrap inside
-	# the card instead of running off it — the CenterContainer otherwise shrinks the box to its
-	# widest single line.
-	box.custom_minimum_size = Vector2(720, 0)
-	center.add_child(box)
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL  # fill the scroll width so text centers + wraps
+	scroll.add_child(box)
 
-	var ready := _make_label("GET READY", UiPalette.FONT_HEADLINE, UiPalette.NAVY)
+	var ready := _make_label("GET READY", _scaled_ready_size(UiPalette.FONT_HEADLINE), UiPalette.NAVY)
 	ready.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(ready)
 
 	# The WHY line — this round's place in the story, before any mechanics. Slightly
 	# muted so it reads as narration above the gold game title.
-	_begin_framing = _make_label("", UiPalette.FONT_CARD_BODY, Color(UiPalette.NAVY, 0.85))
+	_begin_framing = _make_label("", _scaled_ready_size(UiPalette.FONT_CARD_BODY), Color(UiPalette.NAVY, 0.85))
 	_begin_framing.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_begin_framing.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(_begin_framing)
@@ -601,37 +617,41 @@ func _build_begin_overlay() -> Control:
 	# Names the randomly drawn type so the player knows what they're about to play.
 	# DARK_GOLD (not the brighter MUSTARD_GOLD) so the game name reads clearly on the cream card
 	# (Tim, 2026-07-09).
-	_begin_title = _make_label("", UiPalette.FONT_DISPLAY, UiPalette.DARK_GOLD)
+	_begin_title = _make_label("", _scaled_ready_size(UiPalette.FONT_DISPLAY), UiPalette.DARK_GOLD)
 	_begin_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_begin_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(_begin_title)
 
 	# The goal of THIS game (set per round from the type's how_to_play), so the player knows the
 	# objective before the clock starts rather than only once play begins (Tim, 2026-06-29).
-	_begin_howto = _make_label("", UiPalette.FONT_CARD_BODY, UiPalette.NAVY)
+	_begin_howto = _make_label("", _scaled_ready_size(UiPalette.FONT_CARD_BODY), UiPalette.NAVY)
 	_begin_howto.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_begin_howto.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(_begin_howto)
 
 	# The stakes line — reward win/lose in a normal round, "play as long as you like" in Challenge
 	# Mode. Set per mode by start_game / start_challenge (kept as a field for that).
-	_begin_stakes = _make_label("", UiPalette.FONT_LABEL, UiPalette.DARK_GOLD)
+	_begin_stakes = _make_label("", _scaled_ready_size(UiPalette.FONT_LABEL), UiPalette.DARK_GOLD)
 	_begin_stakes.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_begin_stakes.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(_begin_stakes)
 
 	# The closing hint ("The clock starts…" normally; hidden in Challenge Mode). Also a field.
-	_begin_hint = _make_label("The clock starts when you press Begin.", UiPalette.FONT_LABEL, UiPalette.NAVY)
+	_begin_hint = _make_label("The clock starts when you press Begin.", _scaled_ready_size(UiPalette.FONT_LABEL), UiPalette.NAVY)
 	_begin_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_begin_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(_begin_hint)
 
+	# BEGIN sits in `outer`, BELOW the scroll — pinned to the card so it stays visible no matter how
+	# long the scrolling instructions are. SHRINK_CENTER keeps its fixed width, centered.
 	var begin_button := Button.new()
 	begin_button.custom_minimum_size = Vector2(360, 110)
+	begin_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	UiPalette.style_button(begin_button, true)  # the action (red) button — this is the "go" control
+	begin_button.add_theme_font_size_override("font_size", _scaled_ready_size(UiPalette.FONT_BUTTON))
 	begin_button.text = "BEGIN"
 	begin_button.pressed.connect(_on_begin_pressed)
-	box.add_child(begin_button)
+	outer.add_child(begin_button)
 
 	return overlay
 
@@ -661,6 +681,12 @@ func _add_back_button(parent: Container) -> HBoxContainer:
 	_back_buttons.append(back)
 	parent.add_child(row)
 	return row
+
+
+## A base font size scaled up for the "Get Ready" gate (GET_READY_TEXT_SCALE), rounded to a whole
+## point size. Keeps every gate line proportionally bigger from one factor.
+func _scaled_ready_size(base_size: int) -> int:
+	return int(round(base_size * GET_READY_TEXT_SCALE))
 
 
 func _make_label(text: String, font_size: int, color: Color) -> Label:

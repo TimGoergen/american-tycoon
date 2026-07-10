@@ -36,6 +36,7 @@ var _first_contact_overlay: FirstContactOverlay
 var _frenzy_bar: FrenzyBar
 var _wage_panel: WagePanel
 var _welcome_overlay: WelcomeBackOverlay
+var _about_screen: AboutScreen
 var _will_screen: WillScreen
 var _legacy_screen: LegacyScreen
 var _ledger_screen: FamilyLedgerScreen
@@ -436,6 +437,11 @@ func _build_ui() -> void:
 	_welcome_overlay.risk_pressed.connect(_on_welcome_risk_pressed)
 	add_child(_welcome_overlay)
 
+	# The About modal (Settings → About), hidden until opened.
+	_about_screen = AboutScreen.new()
+	_about_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(_about_screen)
+
 	# The first-contact overlay (GDD §6.2): shown when a generation consumes the current
 	# economy and reaches the next alien epoch. Main freezes the economy while it is up so
 	# the beat lands. EpochState.contact_made fires it; it is rebuilt with the generation
@@ -737,6 +743,15 @@ func _build_settings_tab() -> Control:
 	minigame_tuning_button.pressed.connect(_on_minigame_tuning_pressed)
 	bottom_buttons.add_child(minigame_tuning_button)
 
+	# About: opens the modal with the logo, name, version, and credits (Tim, 2026-07-09).
+	var about_button := Button.new()
+	about_button.custom_minimum_size = Vector2(0, tuning_button_height)
+	about_button.add_theme_font_size_override("font_size", TUNING_BUTTON_FONT)
+	UiPalette.style_button(about_button, false)
+	about_button.text = "ABOUT"
+	about_button.pressed.connect(_on_about_pressed)
+	bottom_buttons.add_child(about_button)
+
 	stack.add_child(v)
 	_settings_page = v
 
@@ -938,6 +953,12 @@ func _on_dev_pressed() -> void:
 ## (see _process), just like the other full-screen overlays.
 func _on_minigame_tuning_pressed() -> void:
 	_minigame_review_screen.open()
+
+
+## About pressed: show the modal with the logo, name, version, and credits. Its own Back button
+## hides it again (no state to restore — the game keeps running behind it).
+func _on_about_pressed() -> void:
+	_about_screen.open()
 
 
 ## Apply tuning edits: persist the overrides, save the run so no progress is lost,

@@ -13,6 +13,13 @@ extends Control
 ## ends on its countdown; whichever happens first wins, using the final performance.
 signal completed(performance: float)
 
+## Ask the host to flash a big centered banner over the screen — the SAME look and size as the
+## universal "MAX!" celebration — then run `after` once it finishes. A type uses this to announce a
+## mid-round beat (Memory's "GEM ROUND" before its bonus round) so the announcement matches MAX!
+## exactly. The host connects this and owns the flash; a type with no host (unit tests) simply sees
+## nothing happen. `after` may be an empty Callable.
+signal banner_requested(text: String, color: Color, after: Callable)
+
 ## The host's outcome curve, set by the host BEFORE begin() so a type that wants to align its
 ## internal scoring to where the shared "full" (1.0x) line falls can read it. `keep_floor` is
 ## the multiplier at performance 0; `bonus_max` is the extra-high bonus above 1.0x at

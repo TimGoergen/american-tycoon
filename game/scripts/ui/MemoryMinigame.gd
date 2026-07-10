@@ -300,10 +300,12 @@ func _on_pad_input(event: InputEvent, pad_id: int) -> void:
 			_start_round()
 		elif _rounds_done >= TARGET_ROUNDS:
 			# Full game — the main reward is now maxed. If this run earned a shot at the gem bonus
-			# round, hand off to it (it emits `completed` when done); otherwise celebrate and finish.
+			# round, first flash a big "GEM ROUND" banner (same size as MAX!) so the player sees they
+			# cleared the game and knows a bonus is coming BEFORE the pads change (Tim, 2026-07-10) —
+			# the host runs _begin_gem_round when the banner finishes. Otherwise celebrate and finish.
 			_running = false
 			if _gem_round_available:
-				_begin_gem_round()
+				banner_requested.emit("GEM ROUND", UiPalette.MUSTARD_GOLD, _begin_gem_round)
 			else:
 				_play_round_clear_celebration()
 		else:

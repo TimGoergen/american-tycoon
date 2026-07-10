@@ -802,6 +802,8 @@ func start_game(
 	_active_minigame.legacy_bonus_cap = _tuning.legacy_bonus_max_gems
 	_play_area.add_child(_active_minigame)
 	_active_minigame.completed.connect(_on_minigame_completed)
+	# Let a type ask for the shared big banner (Memory's "GEM ROUND"), so it matches MAX! exactly.
+	_active_minigame.banner_requested.connect(_on_banner_requested)
 	# Most types run for the shared default; a type may ask for more time on top of it (basketball).
 	_seconds_left = _tuning.minigame_duration_seconds + maxf(0.0, _active_minigame.extra_seconds())
 	# A no-timer type (Memory) hides the countdown entirely and ends the round only when it emits
@@ -1203,13 +1205,25 @@ func _end_round() -> void:
 
 
 ## Flash a big "MAX!" over the card for about a second, then run `after` (which shows the result).
-## The overlay is built on demand and freed when done, so it costs nothing on the common (timer-out)
-## path. Kept on the host so it looks the same for every minigame type (Tim, 2026-07-10).
+## Hides the SKIP control first (the round is over), then defers to the shared flash_banner so every
+## maxed-out round announces the same way. Kept as its own name for the max-out call site.
 func _flash_max_then(after: Callable) -> void:
+	# The play view stays up behind the flash until the result swaps in, so the board doesn't blank
+	# out mid-celebration; but the round is over, so hide the below-card SKIP control.
+	_skip_button.visible = false
+	flash_banner("MAX!", UiPalette.MUSTARD_GOLD, after)
+
+
+## Flash `text` big and gold-styled over the CENTER of the screen for about a second, then run
+## `after`. Shared by the universal "MAX!" celebration and any minigame that asks for a mid-round
+## banner via banner_requested (Memory's "GEM ROUND"), so every big centered flash looks and sizes
+## the SAME (Tim, 2026-07-10). Built on demand and freed when done. Does NOT touch the SKIP control
+## or the play view, so it is safe to use mid-round (the caller decides what to hide).
+func flash_banner(text: String, color: Color, after: Callable) -> void:
 	var flash := Label.new()
-	flash.text = "MAX!"
+	flash.text = text
 	flash.add_theme_font_size_override("font_size", UiPalette.FONT_DISPLAY)
-	flash.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD)
+	flash.add_theme_color_override("font_color", color)
 	flash.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
 	flash.add_theme_constant_override("outline_size", 12)
 	flash.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -1222,15 +1236,12 @@ func _flash_max_then(after: Callable) -> void:
 	flash.set_anchors_preset(Control.PRESET_FULL_RECT)
 	flash.z_index = 10
 	flash.pivot_offset = size / 2.0
-	# The play view stays up behind the flash until the result swaps in, so the board doesn't blank out
-	# mid-celebration. Hide the SKIP control though — the round is over.
-	_skip_button.visible = false
 	add_child(flash)
 
-	# Bloom in big, hold, then fade — about one second total before the result appears. Built as a
-	# SEQUENTIAL tween (bloom → hold → fade), pairing the bloom's scale + fade-in with parallel() so we
-	# never leave set_parallel latched across the chain (that latch silently ran the steps out of order
-	# and nothing showed — Tim, 2026-07-10).
+	# Bloom in big, hold, then fade — about one second total. Built as a SEQUENTIAL tween (bloom → hold
+	# → fade), pairing the bloom's scale + fade-in with parallel() so we never leave set_parallel latched
+	# across the chain (that latch silently ran the steps out of order and nothing showed — Tim,
+	# 2026-07-10).
 	flash.scale = Vector2(0.5, 0.5)
 	flash.modulate = Color(1, 1, 1, 0.0)
 	var beat := create_tween()
@@ -1241,7 +1252,15 @@ func _flash_max_then(after: Callable) -> void:
 	beat.tween_property(flash, "modulate:a", 0.0, 0.25)  # fade out
 	beat.tween_callback(func() -> void:
 		flash.queue_free()
-		after.call())
+		# Guard: the requesting minigame may have been freed (player left) during the ~1s banner.
+		if after.is_valid():
+			after.call())
+
+
+## A minigame asked for the shared banner (see Minigame.banner_requested). Flash it, then run the
+## type's continuation — e.g. Memory announces "GEM ROUND" and resumes into its bonus round.
+func _on_banner_requested(text: String, color: Color, after: Callable) -> void:
+	flash_banner(text, color, after)
 
 
 func _show_result(mult: float) -> void:

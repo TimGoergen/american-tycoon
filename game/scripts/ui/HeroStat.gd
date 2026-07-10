@@ -510,16 +510,23 @@ func _layout_labels() -> void:
 	var amount_top := centered_top / 2.0                 # amounts nudged up (twice as close to top)
 	var bill_row_y := amount_top + amount_h + BILL_TOP_GAP  # bills hug just under the amounts
 
-	# Income (left edge): amount, then the dollar bill with a bold-gold "/ s" beside it.
-	_income_label.position = Vector2(EDGE_MARGIN, amount_top)
+	# KEEP_ASPECT_CENTERED centers the (wider-than-tall) bill inside its 2:1 box, so the VISIBLE
+	# bill sits inset from the box's left/right edges by this much. The amounts align to that
+	# visible edge — not the box edge — so each number and its bill share one margin (Tim, 2026-07-09).
+	var bill_side_pad := _visible_bill_side_padding()
+
+	# Income (left edge): amount, then the dollar bill with a bold-gold "/ s" beside it. The amount
+	# is inset by the bill's centering padding so its left edge lines up with the visible bill below.
+	_income_label.position = Vector2(EDGE_MARGIN + bill_side_pad, amount_top)
 	_income_bill.position = Vector2(EDGE_MARGIN, bill_row_y)
 	_income_per_label.size = _income_per_label.get_minimum_size()
 	_income_per_label.position = Vector2(
 		EDGE_MARGIN + CASH_BILL_SIZE.x + INCOME_PER_GAP,
 		bill_row_y + (CASH_BILL_SIZE.y - _income_per_label.size.y) / 2.0)
 
-	# Cash (right edge): amount, then the dollar bill right-aligned to the amount's right edge.
-	_cash_label.position = Vector2(area.x - _cash_label.size.x - EDGE_MARGIN, amount_top)
+	# Cash (right edge): amount, then the dollar bill right-aligned to the amount's right edge. The
+	# amount is pulled in by the same padding so its right edge lines up with the visible bill below.
+	_cash_label.position = Vector2(area.x - _cash_label.size.x - EDGE_MARGIN - bill_side_pad, amount_top)
 	_cash_bill.position = Vector2(area.x - CASH_BILL_SIZE.x - EDGE_MARGIN, bill_row_y)
 
 	# Epoch name: horizontally centered, BOTTOM-aligned with the shared bill row so the three
@@ -550,6 +557,20 @@ func _layout_labels() -> void:
 	_economy_divider.size = Vector2(area.x, ECONOMY_DIVIDER_HEIGHT)
 	_economy_bar.position = Vector2(0, area.y - ECONOMY_BAR_HEIGHT)
 	_economy_bar.size = Vector2(area.x, ECONOMY_BAR_HEIGHT)
+
+
+## Horizontal padding (px) between a bill BOX's edge and the VISIBLE bill inside it. The bill
+## art is wider-than-tall, so KEEP_ASPECT_CENTERED fits it to the box HEIGHT and centers it,
+## leaving equal transparent gaps on the left and right. The amounts are inset by this so each
+## number's edge lines up with the bill drawn beneath it (Tim, 2026-07-09). Derived from the
+## texture's real aspect so it stays correct if the bill art or box size ever changes.
+func _visible_bill_side_padding() -> float:
+	var tex_size := Vector2(_income_bill.texture.get_size())
+	if tex_size.y <= 0.0:
+		return 0.0
+	# Height-constrained fit (the box is 2:1, the bill ~1.44:1, so height is the binding dimension).
+	var visible_width := CASH_BILL_SIZE.y * (tex_size.x / tex_size.y)
+	return maxf((CASH_BILL_SIZE.x - visible_width) / 2.0, 0.0)
 
 
 ## The mild flash: lift the panel's brightness for an instant, then ease it back

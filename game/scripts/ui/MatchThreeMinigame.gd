@@ -439,7 +439,7 @@ func _get_avoid_glow_texture() -> GradientTexture2D:
 	if _avoid_glow_texture != null:
 		return _avoid_glow_texture
 	var gradient := Gradient.new()
-	gradient.set_color(0, Color(1.0, 0.15, 0.1, 0.8))   # red at the center
+	gradient.set_color(0, Color(1.0, 0.15, 0.1, 0.2))   # faint red at the center (Tim: 75% weaker)
 	gradient.set_color(1, Color(1.0, 0.15, 0.1, 0.0))   # transparent at the edge
 	_avoid_glow_texture = GradientTexture2D.new()
 	_avoid_glow_texture.gradient = gradient

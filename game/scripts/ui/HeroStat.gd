@@ -136,8 +136,8 @@ var _epoch_label: Label  # the current epoch / civilization name (was the heir n
 var _economy_bar: ProgressBar
 ## The silver "N% of economy consumed" readout centered over the economy bar.
 var _economy_label: Label
-## Silver for that readout — a light metallic grey that reads over the blue economy fill.
-const ECONOMY_SILVER := Color("#D2D6DE")
+## Light gray for that readout (Tim, 2026-07-09), no outline.
+const ECONOMY_SILVER := Color("#D8D8D8")
 var _economy_divider: ColorRect
 ## Height of the economy bar strip, and of the red divider above it (the divider matches
 ## the panel frame's 12px thickness so it reads as the same line).
@@ -280,9 +280,8 @@ func _ready() -> void:
 	_economy_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_economy_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_economy_label.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
+	# Light gray, no outline (Tim, 2026-07-09).
 	_economy_label.add_theme_color_override("font_color", ECONOMY_SILVER)
-	_economy_label.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
-	_economy_label.add_theme_constant_override("outline_size", 5)
 	_economy_bar.add_child(_economy_label)
 
 	_content.add_child(_economy_bar)

@@ -246,13 +246,8 @@ const SECOND_ROW_FONT_SIZE := 41
 const DOLLAR_ICON_SVG := "res://art/icons/dollar_bill.svg"
 const PROPERTY_ICON_SVG := "res://art/icons/tab_property.svg"
 
-## How many times the SVG's native pixel size we rasterize each icon to. The sources are
-## ~57–81px tall, so 4x gives a ~230–324px image — generously denser than the ~45px the icon
-## is drawn at, giving mipmapped downscaling plenty of detail to sample from.
-const ICON_RASTER_SCALE := 4.0
-
-## Crisp, mipmapped icon textures rasterized once from the SVG sources, keyed by source path.
-## Shared across every row (all rows draw the same two icons), built lazily on first use.
+## Imported icon textures, loaded once and keyed by source path. Shared across every row
+## (all rows draw the same two icons), loaded lazily on first use.
 static var _crisp_icon_cache := {}
 
 var _manager_circle: ManagerCircle
@@ -1121,14 +1116,12 @@ func _add_split_button_labels(button: Button) -> Array:
 ## same weight as the digits beside it, aspect-preserved, and mouse-ignored so a tap on it
 ## still reaches the control underneath. (Tim, 2026-07-09.)
 ##
-## The texture is our own high-resolution, mipmapped rasterization of the SVG (see
-## _crisp_icon_texture) — the default import rasterizes too small and un-mipmapped to shrink
-## cleanly — and the TextureRect is set to LINEAR_WITH_MIPMAPS so the downscale samples the
-## mip chain instead of aliasing the full-res image.
+## The texture is the imported SVG (see _crisp_icon_texture), drawn with LINEAR filtering as
+## it shrinks into the small inline box.
 func _make_inline_icon(svg_path: String, font_size: int) -> TextureRect:
 	var icon := TextureRect.new()
 	icon.texture = _crisp_icon_texture(svg_path)
-	icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	# ~1.1x the font size: the icon box a touch taller than the glyphs so it doesn't read as shrunken.
 	var box := roundi(font_size * 1.1)
 	icon.custom_minimum_size = Vector2(box, box)
@@ -1139,23 +1132,18 @@ func _make_inline_icon(svg_path: String, font_size: int) -> TextureRect:
 	return icon
 
 
-## Rasterize an icon SVG at ICON_RASTER_SCALE and return a mipmapped ImageTexture for it,
-## caching the result so the CPU rasterization + mip generation happens once per icon for
-## the whole ladder (all rows share the same two icons). We rasterize the SVG SOURCE at a
-## chosen scale rather than use the imported CompressedTexture2D because the import is fixed
-## at the SVG's native ~82px with no mipmaps — far too small and un-mipmapped to shrink to
-## ~45px without aliasing (Tim, 2026-07-09). Building it in code keeps the crispness in
-## source control, immune to the per-machine (gitignored) .import settings.
-static func _crisp_icon_texture(svg_path: String) -> ImageTexture:
+## Return the imported texture for an icon SVG, cached so the load happens once per icon for
+## the whole ladder (all rows share the same two icons).
+##
+## IMPORTANT: this loads the IMPORTED texture (which ships inside the export PCK). The earlier
+## version read the raw .svg SOURCE at runtime and rasterized it — but the export filter is
+## "all_resources", which strips source files, so on device that read returned nothing and the
+## app crashed on load (Tim, 2026-07-10). The imported SVG rasterizes at its native size, which
+## is ample for these small inline icons — the same way ManagerCircle.HEADSHOT_TEX is used.
+static func _crisp_icon_texture(svg_path: String) -> Texture2D:
 	if _crisp_icon_cache.has(svg_path):
 		return _crisp_icon_cache[svg_path]
-	var svg_source := FileAccess.get_file_as_string(svg_path)
-	var image := Image.new()
-	# load_svg_from_string takes a multiplier on the SVG's own pixel size — a flat scale keeps
-	# each icon's aspect and just renders it denser (see ICON_RASTER_SCALE).
-	image.load_svg_from_string(svg_source, ICON_RASTER_SCALE)
-	image.generate_mipmaps()
-	var texture := ImageTexture.create_from_image(image)
+	var texture := load(svg_path) as Texture2D
 	_crisp_icon_cache[svg_path] = texture
 	return texture
 
@@ -1249,10 +1237,8 @@ class StaffHireGlyph extends Control:
 				tint = value
 				queue_redraw()
 
-	## A crisp, mipmapped rasterization of the headshot SVG (see PropertyRow._crisp_icon_texture).
-	## The imported CompressedTexture2D is fixed at the SVG's native size with no mipmaps, so
-	## drawing it small looked blocky (Tim, 2026-07-09) — same fix as the dollar-bill/tab icons.
-	static var _headshot_tex: ImageTexture
+	## The imported headshot SVG, shared across all rows (see PropertyRow._crisp_icon_texture).
+	static var _headshot_tex: Texture2D
 	## The headshot art's opaque bounds inside its canvas, computed ONCE for all rows
 	## (get_used_rect is a CPU pixel scan; the canvas carries transparent padding). Measured
 	## against the crisp texture above so it scales in step with tex.get_size() in _draw.
@@ -1263,8 +1249,8 @@ class StaffHireGlyph extends Control:
 
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
-		# Sample the mip chain when the crisp texture is drawn down into its small box.
-		texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+		# LINEAR filtering as the headshot is drawn down into its small box.
+		texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		if _headshot_tex == null:
 			_headshot_tex = PropertyRow._crisp_icon_texture("res://art/icons/headshot.svg")
 		if _icon_used_rect.size == Vector2.ZERO:

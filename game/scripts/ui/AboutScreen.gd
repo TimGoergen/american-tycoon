@@ -59,21 +59,25 @@ func _ready() -> void:
 	logo.texture = LOGO_TEXTURE
 	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	# Fill the content column's width (min width 0 + shrink-center collapsed it to nothing); the SVG
-	# keeps its aspect centered within the 520px-tall band.
-	logo.custom_minimum_size = Vector2(0, 520)
+	# Bigger, and use the texture's mipmaps so it isn't blocky when scaled (Tim, 2026-07-09 — the
+	# .import now generates them). Fills the column width; the logo keeps its aspect centered.
+	logo.custom_minimum_size = Vector2(0, 720)
 	logo.size_flags_horizontal = Control.SIZE_FILL
+	logo.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	content.add_child(logo)
 
+	# Game title 40% larger than the display size; the "Designed by" line 20% smaller (Tim, 2026-07-09).
 	content.add_child(_make_line(
 		ProjectSettings.get_setting("application/config/name", "American Tycoon"),
-		UiPalette.FONT_DISPLAY, UiPalette.NAVY))
+		int(UiPalette.FONT_DISPLAY * 1.4), UiPalette.NAVY))
 	content.add_child(_make_line(
 		"Version " + str(ProjectSettings.get_setting("application/config/version", "0.0.0")),
 		UiPalette.FONT_SUBHEAD, UiPalette.DARK_GOLD))
-	content.add_child(_make_line("Designed by Tim Goergen", UiPalette.FONT_HEADLINE, UiPalette.NAVY))
 	content.add_child(_make_line(
-		"Built by Claude Code with a little help from Copilot and Gemini",
+		"Designed by Tim Goergen", int(UiPalette.FONT_HEADLINE * 0.8), UiPalette.NAVY))
+	# Credits on two lines — one label with a break so the two lines sit tight together (Tim, 2026-07-09).
+	content.add_child(_make_line(
+		"Built by Claude Code\nwith a little help from Copilot and Gemini",
 		UiPalette.FONT_LABEL, Color(UiPalette.NAVY, 0.75)))
 
 

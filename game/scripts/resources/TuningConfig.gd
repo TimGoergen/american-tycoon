@@ -154,14 +154,14 @@ extends Resource
 @export var carb_excited_flow: float = 50.0  # feel-tune
 
 ## Horizontal churn wobble amplitude (px) at full frenzy.
-@export var carb_excited_wobble: float = 7.0  # feel-tune
+@export var carb_excited_wobble: float = 4.0  # feel-tuned on device (Tim, 2026-07-09)
 
 ## Per-bubble speed spread's LOWER bound at full frenzy (the crawler/streaker mix).
 @export var carb_excited_spread_lower: float = 0.25  # feel-tune
 
 ## Comet-tail visibility during frenzy (0 = suppressed, 1 = full tails). Tails curl
 ## more at low speeds, which contributed edge bursts; partial by default.
-@export var carb_excited_tails: float = 0.3  # feel-tune
+@export var carb_excited_tails: float = 0.5  # feel-tuned on device (Tim, 2026-07-09)
 
 ## Seconds for the frenzy look to ramp in/out. A slower ramp keeps the state change
 ## from registering as an event of its own. 0.9 = Tim's on-device tuned value
@@ -243,7 +243,7 @@ extends Resource
 
 ## How long one minigame round lasts, in seconds. Every type is tuned to a ~20s round
 ## (Tim, 2026-06-25) — scoring targets in each minigame assume this length.
-@export var minigame_duration_seconds: float = 20.0  # feel-tune
+@export var minigame_duration_seconds: float = 25.0  # feel-tuned on device (Tim, 2026-07-09)
 
 # --- Match-3 difficulty (Tim, 2026-07-09: "too easy, I max it every time") ----------
 # The match-3 game maps its own running score onto the host's reward curve; these two knobs set
@@ -263,7 +263,7 @@ extends Resource
 
 ## How many gems a single match must contain to drop a Legacy gem (at the swap's target cell).
 ## Higher = Legacy gems are rarer. Match-3 has no other way to spawn them.
-@export var match3_legacy_match_size: int = 5  # feel-tune
+@export var match3_legacy_match_size: int = 4  # feel-tuned on device (Tim, 2026-07-09)
 
 # --- Legacy Bonus (Plans/Legacy_Bonus_System.md; Tim, 2026-07-09) --------------------
 # Every minigame has a small, game-specific chance to let the player collect a bonus Legacy gem.

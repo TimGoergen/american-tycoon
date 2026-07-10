@@ -137,6 +137,26 @@ const RUSHED_SOLID_THRESHOLD_SEC := 0.4
 ## to solid read as sudden (Tim, 2026-07-07). 3.0 = the remaining lap in ⅓s at most.
 const PIN_FILL_PER_SEC := 3.0
 
+## ALL rush presentation (color, boosted income readout, excitement, solid pin, sweep
+## rate) engages only after the rush has been HELD this long — a mere START/rush tap
+## presses the same button for a few frames, which flashed the whole rush look on
+## every tap (Tim, 2026-07-08). A real hold reaches this within its first pulse; a
+## tap never does. The pump itself is NOT gated: pulses land from the first interval.
+const RUSH_ENGAGE_SEC := 0.3
+
+## The displayed bar's sweep rate eases toward its target (natural or rushed) with
+## this time constant, so engaging/releasing a rush ACCELERATES the sweep instead of
+## snapping it — a fill-speed snap stretches the bubble field and reads as a frenzy
+## sprint at the hold's edges (Tim, 2026-07-08: the frenzy must be constant).
+const SWEEP_EASE_TAU := 0.3
+
+## The catch-up may move the bar at most this multiple of the CURRENT sweep rate.
+## 1.0 — NO headroom (autopilot data, 2026-07-08: even 1.15 made the engage window
+## run measurably 15% hotter than the sustained sweep for its first two seconds).
+## Phase re-syncs at the wraps instead, where the metronome wrap below absorbs any
+## displayed-vs-true drift for free.
+const CATCHUP_RATE_HEADROOM := 1.0
+
 ## A pinned-solid bar's commanded liquid flow (px/s), fed to its GoldBubbles overlay.
 ## Deliberately brisk: solid means "cycling faster than the eye", so the MOST active
 ## property should carry the most active fizz — not sink to the idle drift a motionless
@@ -149,6 +169,13 @@ const SOLID_FLOW_RUSH_MULT := 1.6
 
 ## Whether the bar was pinned solid last frame — unpinning restarts the visible lap.
 var _was_pinned := false
+
+## Seconds the rush has been continuously held (0 when not held) — gates the whole
+## rush presentation past RUSH_ENGAGE_SEC so taps don't flash it.
+var _rush_hold_seconds := 0.0
+
+## The displayed bar's eased sweep rate (bars/sec) — see SWEEP_EASE_TAU.
+var _sweep_rate := 0.0
 
 ## The per-second rate this row's income label currently shows (rush-boosted while rush
 ## is held; 0 for an unowned row's buy-in preview). Cached each _refresh; Main sums it
@@ -204,18 +231,49 @@ const SECOND_ROW_HEIGHT := 90
 ## then −20% back to 41 for this band specifically (Tim, 2026-07-05).
 const SECOND_ROW_FONT_SIZE := 41
 
+## Small inline icons that replace the leading "$" on money figures and mark the buy count
+## (Tim, 2026-07-09). A dollar-bill sits just before every amount; a property-tab icon sits
+## before the buy button's "+N" count. Each is sized to roughly its neighboring text's cap
+## height and mouse-ignored so taps still reach the control underneath.
+## Each loads the IMPORTED texture (see _crisp_icon_texture) — the raw .svg source is NOT in
+## the export, so it must not be read at runtime.
+const DOLLAR_ICON_SVG := "res://art/icons/dollar_bill.svg"
+const PROPERTY_ICON_SVG := "res://art/icons/tab_property.svg"
+
+## The hire button's headshot icon and the buy button's factory (property-tab) icon are sized
+## so their VISIBLE (opaque) art is the SAME height: 50.6px, the average of their former
+## on-screen heights — the headshot showed ~55.5px, the factory ~45.6px (Tim, 2026-07-10).
+## Each icon's art sits in a square canvas with its own transparent padding, so the BOX needed
+## to reach this visible height differs per icon and is derived from that icon's opaque
+## fraction at each use (headshot: art fills 86/96 of its box; factory: 279/324).
+const MATCHED_ICON_VISIBLE_HEIGHT := 50.6
+
+## Imported icon textures, loaded once and keyed by source path. Shared across every row
+## (all rows draw the same two icons), loaded lazily on first use.
+static var _crisp_icon_cache := {}
+
 var _manager_circle: ManagerCircle
 var _name_label: Label
 ## The "owned / next-milestone-threshold" readout, inside its own gray-outlined chip (Tim, 2026-07-01).
 var _count_label: Label
 var _income_label: Label
+## Dollar-bill icon drawn just left of the income readout, in place of its leading "$".
+var _income_icon: TextureRect
 var _cycle_bar: ProgressBar
 var _cycle_bubbles: GoldBubbles
+## Diagnosis readout over the bar, shown when tuning.carb_debug_overlay = 1.
+var _carb_debug_label: Label
 var _buy_button: Button
 var _buy_caption_label: Label
+## Property-tab icon before the buy button's "+N" count.
+var _buy_count_icon: TextureRect
 var _buy_cost_label: Label
+## Dollar-bill icon before the buy button's cost (hidden when there is no cost to show).
+var _buy_cost_icon: TextureRect
 var _hire_button: Button
 var _hire_cost_label: Label
+## Dollar-bill icon before the hire button's cost (hidden while the button shows "MAX").
+var _hire_cost_icon: TextureRect
 ## The hire button's hand-drawn "add staff" symbol: headshot + "+" (see StaffHireGlyph).
 var _hire_glyph: StaffHireGlyph
 
@@ -335,6 +393,26 @@ func _ready() -> void:
 	# Kept as a member: the refresh commands their flow speed while the bar is pinned solid.
 	_cycle_bubbles = GoldBubbles.new()
 	_cycle_bar.add_child(_cycle_bubbles)
+
+	# Tiny diagnosis readout over the bar (tuning.carb_debug_overlay = 1 in Balance
+	# Tuning): the live numbers driving the carbonation, so an on-device eye report can
+	# be matched to WHICH parameter actually moved (Tim, 2026-07-08 — the frenzy edge
+	# burst survived several model-based fixes; this ends the guessing).
+	_carb_debug_label = Label.new()
+	_carb_debug_label.add_theme_font_size_override("font_size", 22)
+	# White with a navy outline so it reads on ANY fill color — the first pass was
+	# plain black at the bar's top-left, exactly where the income label already draws.
+	_carb_debug_label.add_theme_color_override("font_color", Color.WHITE)
+	_carb_debug_label.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
+	_carb_debug_label.add_theme_constant_override("outline_size", 6)
+	_carb_debug_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	# Pinned along the bar's TOP-RIGHT, clear of the left-aligned income readout.
+	_carb_debug_label.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_carb_debug_label.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_carb_debug_label.position.y = 2
+	_carb_debug_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_carb_debug_label.visible = false
+	_cycle_bar.add_child(_carb_debug_label)
 	bar_cell.add_child(_cycle_bar)
 
 	# Per-cycle income: bold BLACK, LEFT-aligned, drawn ON TOP of the bar and vertically centered
@@ -343,9 +421,20 @@ func _ready() -> void:
 	# jumble). A cream outline (the project's faux-weight trick) keeps it legible over both the
 	# green fill and the gray track. Inset a little from the cell's edges; ignores the mouse so a
 	# tap on the bar area is never eaten by the label.
+	# A small dollar-bill icon stands in for the leading "$" on the amount (Tim, 2026-07-09),
+	# pinned to the bar's left edge and vertically centered like the income text. The label
+	# starts just to its right (offset_left below leaves room for the icon box + a small gap).
+	_income_icon = _make_inline_icon(DOLLAR_ICON_SVG, SECOND_ROW_FONT_SIZE)
+	_income_icon.set_anchors_preset(Control.PRESET_LEFT_WIDE)  # left edge, full height, vertically centered
+	_income_icon.offset_left = 12
+	# LEFT_WIDE stretches to the cell's full height; keep it icon-sized so the aspect fit centers it.
+	_income_icon.offset_right = 12 + _income_icon.custom_minimum_size.x
+	bar_cell.add_child(_income_icon)
+
 	_income_label = Label.new()
 	_income_label.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_income_label.offset_left = 12
+	# Start the text just past the dollar-bill icon (its left inset + width + a 4px gap).
+	_income_label.offset_left = _income_icon.offset_right + 4
 	_income_label.offset_right = -12
 	_income_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	_income_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -391,6 +480,11 @@ func _ready() -> void:
 	var hire_row := _hire_cost_label.get_parent() as HBoxContainer
 	hire_row.add_child(_hire_glyph)
 	hire_row.move_child(_hire_glyph, 0)  # the glyph first, then the cost label
+	# A dollar-bill icon just before the hire cost, standing in for its "$" (Tim, 2026-07-09).
+	# Hidden in _refresh_hire_button while the button shows "MAX" (no cost).
+	_hire_cost_icon = _make_inline_icon(DOLLAR_ICON_SVG, BUTTON_LABEL_FONT_SIZE)
+	hire_row.add_child(_hire_cost_icon)
+	hire_row.move_child(_hire_cost_icon, hire_row.get_child_count() - 2)  # icon, then cost label last
 	button_line.add_child(_hire_button)
 
 	_buy_button = Button.new()
@@ -401,6 +495,19 @@ func _ready() -> void:
 	var buy_labels := _add_split_button_labels(_buy_button)
 	_buy_caption_label = buy_labels[0]
 	_buy_cost_label = buy_labels[1]
+	# Inline icons on the buy button (Tim, 2026-07-09): a property-tab icon before the "+N"
+	# count on the left, and a dollar-bill icon before the cost on the right (its "$").
+	var buy_row := _buy_caption_label.get_parent() as HBoxContainer
+	# The property-tab count icon is sized to match the hire button's headshot icon: both show
+	# the same visible art height (Tim, 2026-07-10). The factory art fills 279/324 of its square
+	# canvas, so scale the target height up by that inverse to get the box it needs.
+	var factory_box := roundi(MATCHED_ICON_VISIBLE_HEIGHT * 324.0 / 279.0)
+	_buy_count_icon = _make_inline_icon(PROPERTY_ICON_SVG, factory_box, true)
+	buy_row.add_child(_buy_count_icon)
+	buy_row.move_child(_buy_count_icon, 0)  # the tab icon leads, then the "+N" caption
+	_buy_cost_icon = _make_inline_icon(DOLLAR_ICON_SVG, BUTTON_LABEL_FONT_SIZE)
+	buy_row.add_child(_buy_cost_icon)
+	buy_row.move_child(_buy_cost_icon, buy_row.get_child_count() - 2)  # dollar icon, then cost label last
 	button_line.add_child(_buy_button)
 
 	# Let a swipe that lands anywhere on the row (the panel, labels, or progress
@@ -676,21 +783,28 @@ func _refresh(delta: float) -> void:
 	# looked at the Button, so a rushed row didn't always present as rushing).
 	var rush_held := (_manager_circle.is_held() or _secondary_held("rush")) \
 			and _prop.units_owned > 0
+	# The ENGAGED flag: held long enough to count as a real hold (see RUSH_ENGAGE_SEC).
+	# Every rush-presentation element below keys off THIS, never the raw press, so a
+	# single tap changes nothing on screen (Tim, 2026-07-08).
+	_rush_hold_seconds = (_rush_hold_seconds + delta) if rush_held else 0.0
+	var rush_engaged := _rush_hold_seconds >= RUSH_ENGAGE_SEC
 	# Deliberately NOT gated on is_cycle_running: an UNSTAFFED property's cycle stops the
 	# instant it pays out and only restarts on the next held-rush pulse, so gating on it
 	# made the readout (and the solid pin) flicker back to the calm display for a few
 	# frames at the end of every cycle (Tim, 2026-07-08). While rush is held the restart
 	# is guaranteed, so the rushed rate stays honest across that momentary gap.
 	var rushed_fractions_per_second := 0.0
-	if rush_held and effective_length > 0.0:
+	if rush_engaged and effective_length > 0.0:
 		rushed_fractions_per_second = 1.0 / effective_length \
 				+ _prop.tuning.hold_rush_per_second * _prop.tuning.rush_pct * _prop.rush_power_multiplier
+	# The leading "$" is now shown as the dollar-bill icon just left of the label (see
+	# _income_icon), so strip it off every amount before it goes into the text (Tim, 2026-07-09).
 	if rushed_fractions_per_second > 0.0:
-		_income_label.text = Money.of(per_cycle * rushed_fractions_per_second).display() + " / s"
+		_income_label.text = Money.of(per_cycle * rushed_fractions_per_second).display().trim_prefix("$") + " / s"
 	elif effective_length > 0.0 and effective_length <= PER_SECOND_READOUT_THRESHOLD_SEC:
-		_income_label.text = Money.of(per_cycle / effective_length).display() + " / s"
+		_income_label.text = Money.of(per_cycle / effective_length).display().trim_prefix("$") + " / s"
 	else:
-		_income_label.text = "%s / %s" % [Money.of(per_cycle).display(), _format_cycle_duration(effective_length)]
+		_income_label.text = "%s / %s" % [Money.of(per_cycle).display().trim_prefix("$"), _format_cycle_duration(effective_length)]
 	# Cache the per-second equivalent of whatever the label just showed (rush-boosted
 	# while held) — Main sums these across rows for the hero panel's income headline
 	# (Tim, 2026-07-07), so the headline always equals the sum of the visible rows.
@@ -734,10 +848,19 @@ func _refresh(delta: float) -> void:
 		# bar just reads as "maxed and humming".
 		_displayed_cycle_fraction = minf(_displayed_cycle_fraction + delta * PIN_FILL_PER_SEC, 1.0)
 		_finish_lap_pending = false
-	elif not _prop.is_cycle_running or _prop.units_owned == 0:
+	elif (not _prop.is_cycle_running and not rush_engaged) or _prop.units_owned == 0:
 		# Idle or empty: nothing is advancing, so just mirror the true value exactly.
+		# An ENGAGED rush is never idle: an unstaffed cycle stops for a few frames at
+		# every payout until the next pulse restarts it, and routing those frames here
+		# hard-reset the eased sweep to natural — so the "constant" rushed sweep was
+		# actually a sawtooth re-accelerating from scratch every lap (caught red-handed
+		# by Tim's debug-overlay data, 2026-07-08: swp cycled 17→283 within each lap).
 		_displayed_cycle_fraction = true_fraction
 		_finish_lap_pending = false
+		# Park the eased sweep at the natural rate so a later start doesn't inherit
+		# a stale rushed rate (or a zero) from long ago.
+		if effective_length > 0.0:
+			_sweep_rate = 1.0 / effective_length
 	else:
 		# A completed cycle (detected above) means the displayed bar usually hasn't
 		# reached the right edge yet (it lags — see _finish_lap_pending), so it owes a
@@ -747,20 +870,39 @@ func _refresh(delta: float) -> void:
 		# While a lap is owed, the chase target sits one full bar ahead of the true
 		# progress: the bar fills through 1.0, then wraps onto the new cycle below.
 		var target := true_fraction + (1.0 if _finish_lap_pending else 0.0)
-		# Running: advance at the real fill rate. If the target has jumped ahead of that
-		# prediction — a rush, or several per second while the rush button is held —
-		# ease the bar UP toward it instead of snapping, so a held rush reads as smooth
-		# acceleration rather than a stutter of discrete jumps.
-		var advanced := _displayed_cycle_fraction + delta / effective_length
+		# Running: advance at the real fill rate — the DETERMINISTIC rushed rate while
+		# an engaged rush is held (the same number the income readout shows). The rate
+		# is EASED between natural and rushed (SWEEP_EASE_TAU) so engaging/releasing
+		# accelerates the sweep instead of snapping it: a fill-speed snap stretches the
+		# bubble field and reads as a frenzy sprint at the hold's edges. One smooth,
+		# constant sweep = one constant frenzy (Tim, 2026-07-08).
+		var target_rate := 1.0 / effective_length
+		if rushed_fractions_per_second > 0.0:
+			target_rate = rushed_fractions_per_second
+		_sweep_rate = lerpf(_sweep_rate, target_rate, 1.0 - exp(-delta / SWEEP_EASE_TAU))
+		var advanced := _displayed_cycle_fraction + delta * _sweep_rate
 		if target > advanced:
+			# Catch-up (single rush taps, the engage moment, the owed lap after a
+			# release): capped at a small headroom over the CURRENT sweep rate, so
+			# closing the gap never moves the fill visibly faster than the sweep
+			# itself — the gap absorbs as a phase drift over seconds, not a sprint.
 			var catchup := 1.0 - exp(-delta / RUSH_CATCHUP_TAU)
-			_displayed_cycle_fraction = lerpf(advanced, target, catchup)
+			var candidate := lerpf(advanced, target, catchup)
+			var max_step := _sweep_rate * CATCHUP_RATE_HEADROOM * delta
+			_displayed_cycle_fraction = minf(candidate, _displayed_cycle_fraction + max_step)
 		else:
 			_displayed_cycle_fraction = advanced
 		if _finish_lap_pending and _displayed_cycle_fraction >= 1.0:
 			# The bar visibly touched the right edge — wrap onto the new cycle, carrying
 			# any overshoot so the motion stays continuous.
 			_finish_lap_pending = false
+			_displayed_cycle_fraction -= 1.0
+		elif rush_engaged and _displayed_cycle_fraction >= 1.0:
+			# METRONOME wrap while an engaged rush sweeps: never wait at full for the
+			# pulse-stepped true progress to catch up — that wait was a ~quarter-second
+			# stall (fill speed dipping 280 → 120) every single lap, the last rhythm
+			# blip in the frenzy (autopilot data, 2026-07-08). Rate is what matters
+			# during a hold; phase re-syncs on release via the normal machinery.
 			_displayed_cycle_fraction -= 1.0
 		_displayed_cycle_fraction = clampf(_displayed_cycle_fraction, 0.0, 1.0)
 	_last_true_cycle_fraction = true_fraction
@@ -771,16 +913,36 @@ func _refresh(delta: float) -> void:
 	# rushable — see `interactive` above), so the bar drops its active green for a calm
 	# blue. Otherwise it stays green, brightening while the rush button is actively held.
 	var rush_no_longer_option := staffed and not interactive
-	_set_cycle_color(rush_no_longer_option, rush_held)
+	_set_cycle_color(rush_no_longer_option, rush_engaged)
 
 	# Carbonation on a pinned-solid bar: the fill edge isn't moving, so the bubbles
 	# would sink to their idle drift — command a brisk flow instead (faster still while
-	# rush is held), so the busiest property carries the busiest fizz and rushing a
-	# solid bar visibly does something (see SOLID_FLOW_PX).
+	# an engaged rush is held), so the busiest property carries the busiest fizz and
+	# rushing a solid bar visibly does something (see SOLID_FLOW_PX).
 	if pinned:
-		_cycle_bubbles.flow_override_px = SOLID_FLOW_PX * (SOLID_FLOW_RUSH_MULT if rush_held else 1.0)
+		_cycle_bubbles.flow_override_px = SOLID_FLOW_PX * (SOLID_FLOW_RUSH_MULT if rush_engaged else 1.0)
 	else:
 		_cycle_bubbles.flow_override_px = -1.0
+	# Rush agitates the liquid itself (work item 5): the excitement knob scales the
+	# whole package — denser crowd, commanded flow, livelier sway, churn wobble.
+	_cycle_bubbles.excitement = 1.0 if rush_engaged else 0.0
+	# Push the live-tunable frenzy knobs in (Balance Tuning edits these on device, so
+	# the frenzy's elements can be isolated without a rebuild).
+	_cycle_bubbles.excited_flow_px = _prop.tuning.carb_excited_flow
+	_cycle_bubbles.excited_wobble_px = _prop.tuning.carb_excited_wobble
+	_cycle_bubbles.excited_spread_lower = _prop.tuning.carb_excited_spread_lower
+	_cycle_bubbles.excited_tail_visibility = _prop.tuning.carb_excited_tails
+	_cycle_bubbles.excitement_ease_tau = _prop.tuning.carb_excited_ease
+
+	# The diagnosis overlay: live values driving this row's carbonation (reading the
+	# bubbles' internals directly is fine here — this label exists only to expose them).
+	var debug_on := _prop.tuning.carb_debug_overlay > 0.5 and owned
+	_carb_debug_label.visible = debug_on
+	if debug_on:
+		_carb_debug_label.text = "lv %.2f  bub %d  fill %d  swp %d px/s" % [
+			_cycle_bubbles._excitement_level, int(_cycle_bubbles._base_speed_px),
+			int(_cycle_bubbles._smoothed_speed_px), int(_sweep_rate * _cycle_bar.size.x),
+		]
 
 	_refresh_buy_button()
 	_refresh_hire_button()
@@ -836,10 +998,16 @@ func _apply_ownership_styling(owned: bool) -> void:
 		add_theme_stylebox_override("panel", UiPalette.make_panel_style())
 		# Owned: the per-cycle payout in bold black (Tim, 2026-07-01).
 		_income_label.add_theme_color_override("font_color", Color.BLACK)
+		# The dollar-bill icon is FULL-COLOR art (green note, gold seal), so it shows at its
+		# own colors — modulate stays white. Tinting it to the text color turned the whole
+		# icon into a solid black silhouette (Tim, 2026-07-09).
+		_income_icon.modulate = Color.WHITE
 	else:
 		add_theme_stylebox_override("panel", UiPalette.make_unowned_panel_style())
-		# Unowned: a drab dark-gray single-unit preview, matching the locked row look.
+		# Unowned: a drab dark-gray single-unit preview, matching the locked row look. Fade the
+		# color icon back with alpha (rather than recolor it) so it still reads as a dollar bill.
 		_income_label.add_theme_color_override("font_color", UiPalette.DARK_GRAY)
+		_income_icon.modulate = Color(1, 1, 1, 0.5)
 
 
 ## The staff button's `pressed` handler. One action only — buy the next ladder rung —
@@ -862,6 +1030,8 @@ func _refresh_hire_button() -> void:
 	if _economy.is_staff_level_maxed(prop_index, _epoch.current_tier):
 		_apply_hire_styling(true)
 		_hire_cost_label.text = "MAX"
+		# "MAX" is not a price, so hide the dollar-bill icon (Tim, 2026-07-09).
+		_hire_cost_icon.visible = false
 		_hire_button.disabled = true
 		_hire_cost_label.add_theme_color_override("font_color", UiPalette.NAVY)
 		_hire_glyph.tint = UiPalette.NAVY
@@ -869,14 +1039,20 @@ func _refresh_hire_button() -> void:
 
 	_apply_hire_styling(false)
 	var cost := _economy.get_next_staff_level_cost(prop_index)
-	_hire_cost_label.text = Money.of(cost).display()
+	# Drop the leading "$" — the dollar-bill icon before the label carries it (Tim, 2026-07-09).
+	_hire_cost_label.text = Money.of(cost).display().trim_prefix("$")
+	_hire_cost_icon.visible = true
 	# A property with no units can't be staffed — a staffer needs something to run.
 	_hire_button.disabled = _economy.cash < cost or _prop.units_owned == 0
 	# Navy on the live mustard plate, dimmed to match the disabled cream plate — applied to
-	# the cost and the headshot+plus glyph together so they read as one.
+	# the cost text and the headshot+plus glyph (both monochrome, so they take a flat tint).
 	var hire_color := Color(UiPalette.NAVY, 0.45) if _hire_button.disabled else UiPalette.NAVY
 	_hire_cost_label.add_theme_color_override("font_color", hire_color)
 	_hire_glyph.tint = hire_color
+	# The dollar-bill icon is FULL-COLOR art, so it keeps its own colors (tinting it navy
+	# turned it into a solid dark box — Tim, 2026-07-09); only fade it with alpha when the
+	# button is disabled, matching the dimmed cost text beside it.
+	_hire_cost_icon.modulate = Color(1, 1, 1, 0.45) if _hire_button.disabled else Color.WHITE
 
 
 ## Swap the hire button between the normal action look (HIRE/UPGRADE) and the faint-
@@ -937,6 +1113,46 @@ func _add_split_button_labels(button: Button) -> Array:
 	return [left, right]
 
 
+## Build a small inline icon that sits just left of a text label, standing in for the
+## symbol the label used to spell out (the "$" on money figures, or a tab icon on the buy
+## count). Sized to a square a little taller than the font's cap height so it reads at the
+## same weight as the digits beside it, aspect-preserved, and mouse-ignored so a tap on it
+## still reaches the control underneath. (Tim, 2026-07-09.)
+##
+## The texture is the imported SVG (see _crisp_icon_texture), drawn with LINEAR filtering as
+## it shrinks into the small inline box.
+## When size_is_box is false (the default), size_px is a neighboring font size and the box is
+## set ~1.1x it so the icon reads a touch taller than the glyphs. When true, size_px IS the box
+## side in pixels directly (used to hit an exact visible height — see the buy count icon).
+func _make_inline_icon(svg_path: String, size_px: int, size_is_box := false) -> TextureRect:
+	var icon := TextureRect.new()
+	icon.texture = _crisp_icon_texture(svg_path)
+	icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	var box := size_px if size_is_box else roundi(size_px * 1.1)
+	icon.custom_minimum_size = Vector2(box, box)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return icon
+
+
+## Return the imported texture for an icon SVG, cached so the load happens once per icon for
+## the whole ladder (all rows share the same two icons).
+##
+## IMPORTANT: this loads the IMPORTED texture (which ships inside the export PCK). The earlier
+## version read the raw .svg SOURCE at runtime and rasterized it — but the export filter is
+## "all_resources", which strips source files, so on device that read returned nothing and the
+## app crashed on load (Tim, 2026-07-10). The imported SVG rasterizes at its native size, which
+## is ample for these small inline icons — the same way ManagerCircle.HEADSHOT_TEX is used.
+static func _crisp_icon_texture(svg_path: String) -> Texture2D:
+	if _crisp_icon_cache.has(svg_path):
+		return _crisp_icon_cache[svg_path]
+	var texture := load(svg_path) as Texture2D
+	_crisp_icon_cache[svg_path] = texture
+	return texture
+
+
 ## Tint both of a split button's labels the one color. The overlay labels aren't the
 ## button's own text, so they don't follow its font_color/disabled theme overrides —
 ## we set their color to match the button's current state by hand.
@@ -969,14 +1185,15 @@ func _refresh_buy_button() -> void:
 		# show the next single unit's cost so the player can see how close they are,
 		# instead of a blank "—".
 		_buy_caption_label.text = "+0"
-		_buy_cost_label.text = Money.of(_prop.get_bulk_cost(1)).display()
+		# Drop the "$" — the dollar-bill icon before the label carries it (Tim, 2026-07-09).
+		_buy_cost_label.text = Money.of(_prop.get_bulk_cost(1)).display().trim_prefix("$")
 		_buy_button.disabled = true
 		_set_buy_label_colors()
 		return
 
 	var cost := _prop.get_bulk_cost(count)
 	_buy_caption_label.text = "+%d" % count
-	_buy_cost_label.text = Money.of(cost).display()
+	_buy_cost_label.text = Money.of(cost).display().trim_prefix("$")
 	_buy_button.disabled = _economy.cash < cost
 	_set_buy_label_colors()
 
@@ -984,10 +1201,14 @@ func _refresh_buy_button() -> void:
 ## Color the buy button's labels to match its state: the action pale-gold when live,
 ## or the dimmed navy of style_button's disabled plate when it can't be afforded.
 func _set_buy_label_colors() -> void:
-	if _buy_button.disabled:
-		_set_split_label_color(_buy_caption_label, _buy_cost_label, Color(UiPalette.NAVY, 0.45))
-	else:
-		_set_split_label_color(_buy_caption_label, _buy_cost_label, UiPalette.PALE_GOLD)
+	var color := Color(UiPalette.NAVY, 0.45) if _buy_button.disabled else UiPalette.PALE_GOLD
+	_set_split_label_color(_buy_caption_label, _buy_cost_label, color)
+	# The property-tab icon is a MONOCHROME navy glyph, so it takes the same flat tint as the
+	# count text beside it. The dollar-bill icon is FULL-COLOR art, so it keeps its own colors
+	# (tinting it turned it into a solid box — Tim, 2026-07-09) and only fades with alpha when
+	# the button is disabled.
+	_buy_count_icon.modulate = color
+	_buy_cost_icon.modulate = Color(1, 1, 1, 0.45) if _buy_button.disabled else Color.WHITE
 
 
 # ---------------------------------------------------------------------------
@@ -1001,9 +1222,10 @@ func _set_buy_label_colors() -> void:
 ## boxes left the plus visually low and far from the face. Drawing lets the plus hug
 ## the icon's VISIBLE bounds (get_used_rect — see the texture-sizing memory note).
 class StaffHireGlyph extends Control:
-	## Side of the square box the headshot canvas is fitted into.
-	## 56 → 62 in the taller-panel pass (Tim, 2026-07-05).
-	const ICON_SIZE := 62.0
+	## Side of the square box the headshot canvas is fitted into. Sized so the VISIBLE headshot
+	## art (which fills 86/96 of this box) is MATCHED_ICON_VISIBLE_HEIGHT tall, matching the buy
+	## button's factory icon (Tim, 2026-07-10). Was a flat 62.0 (visible ~55.5px).
+	const ICON_SIZE := PropertyRow.MATCHED_ICON_VISIBLE_HEIGHT * 96.0 / 86.0
 	## The plus is bigger than the button's cost text so it carries as a symbol.
 	## +25% in the all-panel-text-larger pass (42 → 52, Tim 2026-07-05).
 	const PLUS_FONT_SIZE := 52
@@ -1021,8 +1243,11 @@ class StaffHireGlyph extends Control:
 				tint = value
 				queue_redraw()
 
+	## The imported headshot SVG, shared across all rows (see PropertyRow._crisp_icon_texture).
+	static var _headshot_tex: Texture2D
 	## The headshot art's opaque bounds inside its canvas, computed ONCE for all rows
-	## (get_used_rect is a CPU pixel scan; the canvas carries transparent padding).
+	## (get_used_rect is a CPU pixel scan; the canvas carries transparent padding). Measured
+	## against the crisp texture above so it scales in step with tex.get_size() in _draw.
 	static var _icon_used_rect := Rect2()
 	## The bold face the "+" draws in (all panel text is bold, Tim 2026-07-05) —
 	## cached: building a FontVariation per frame in _draw would be wasteful.
@@ -1030,8 +1255,12 @@ class StaffHireGlyph extends Control:
 
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		# LINEAR filtering as the headshot is drawn down into its small box.
+		texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		if _headshot_tex == null:
+			_headshot_tex = PropertyRow._crisp_icon_texture("res://art/icons/headshot.svg")
 		if _icon_used_rect.size == Vector2.ZERO:
-			_icon_used_rect = Rect2(ManagerCircle.HEADSHOT_TEX.get_image().get_used_rect())
+			_icon_used_rect = Rect2(_headshot_tex.get_image().get_used_rect())
 		if _plus_font == null:
 			_plus_font = UiPalette.make_bold_font()
 		var plus_width := _plus_font.get_string_size("+", HORIZONTAL_ALIGNMENT_LEFT, -1.0, PLUS_FONT_SIZE).x
@@ -1040,7 +1269,7 @@ class StaffHireGlyph extends Control:
 	func _draw() -> void:
 		# Fit the icon canvas into its square box preserving aspect (what the old
 		# TextureRect's KEEP_ASPECT did), pinned LEFT and vertically centered.
-		var tex := ManagerCircle.HEADSHOT_TEX
+		var tex := _headshot_tex
 		var tex_size := Vector2(tex.get_size())
 		var fit := minf(ICON_SIZE / tex_size.x, ICON_SIZE / tex_size.y)
 		var canvas_size := tex_size * fit

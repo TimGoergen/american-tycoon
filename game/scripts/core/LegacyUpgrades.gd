@@ -37,6 +37,15 @@ func award(amount: int) -> void:
 	earned_lifetime += amount
 
 
+## Grant an UNEARNED Legacy bonus (a minigame legacy-gem windfall — see Plans/Legacy_Bonus_
+## System.md). Adds to the spendable wallet ONLY, deliberately NOT to earned_lifetime: the bonus is
+## a perk, so it never inflates its own 0.1%-of-lifetime base or the long-arc prestige score.
+func grant_bonus(amount: int) -> void:
+	if amount <= 0:
+		return
+	available += amount
+
+
 ## Current purchased level of an upgrade (0 if never bought).
 func get_level(id: String) -> int:
 	return int(levels.get(id, 0))

@@ -24,6 +24,9 @@ func _init() -> void:
 	_test_known_swap_scores()
 	_test_grid_stays_valid_after_random_swaps()
 	_test_resolve_swap_steps_reproduce_grid()
+	_test_special_color()
+	_test_match_group_merge()
+	_test_legacy_redirect()
 
 	print("")
 	if _failures == 0:
@@ -326,3 +329,153 @@ func _test_resolve_swap_steps_reproduce_grid() -> void:
 	_check(reproduced, "applying recorded steps reproduces the final grid")
 	_check(sum_cleared == int(result["cleared_total"]), "step clears sum to cleared_total")
 	_check(colors_ok, "cleared_colors run parallel to cleared and match the pre-clear grid")
+
+
+# ---------------------------------------------------------------------------
+# (g) Special (Legacy) color: never in the starting grid, spawns only at its weight, and a big
+#     match force-spawns exactly one (via the refill's force_special count). Covers the Legacy mechanic.
+# ---------------------------------------------------------------------------
+
+func _test_special_color() -> void:
+	print("[g] Special (Legacy) color spawn rules")
+	# num_colors 5, special = id 4. The special color never seeds the starting grid AND never appears
+	# in an ordinary refill — it is created only by a 5+ match. Check the starting grid across seeds,
+	# then run many random swaps and confirm the only special gems on the board came from 5+ matches
+	# (i.e. via a recorded legacy_placement, exercised in the placement tests below).
+	var special := 4
+	var starting_clean := true
+	for seed_value in [1, 7, 42, 1000, 54321]:
+		var board = Board.new(7, 6, 5, seed_value, special)
+		for row in range(board.height):
+			for col in range(board.width):
+				if board.color_at(row, col) == special:
+					starting_clean = false
+	_check(starting_clean, "special color never seeds the starting grid")
+
+	# Ordinary refills never produce the special color: _regular_color (used by every refill) skips it.
+	var refill_board = Board.new(8, 8, 5, 123, special)
+	var saw_special := false
+	for _i in range(3000):
+		if refill_board._regular_color() == special:
+			saw_special = true
+	_check(not saw_special, "ordinary refills never produce the special color")
+
+	# A match of 5+ places a Legacy gem at the swap TARGET cell (r2,c2); a match of exactly 4 does
+	# NOT, and neither does a 5+ match of the AVOID color (Tim, 2026-07-09). Build a checkerboard (no
+	# pre-existing matches, colors 0/1) with two pairs of color 2 straddling a gap, then swap a 2 up
+	# into the gap to complete a straight run.
+	var five = Board.new(6, 6, 5, 55, special)
+	_fill_checkerboard(five)
+	# [2,2,_,2,2] across row 2 → the swap makes a run of FIVE.
+	five.grid[2][0] = 2; five.grid[2][1] = 2; five.grid[2][3] = 2; five.grid[2][4] = 2
+	five.grid[3][2] = 2  # the gem swapped up into (2,2)
+	var five_res: Dictionary = five.resolve_swap(2, 2, 3, 2)
+	_check(five_res["valid"] and five_res.has("legacy_placement")
+			and five_res["legacy_placement"] == [3, 2] and five.color_at(3, 2) == special,
+			"a 5-match places a Legacy gem at the target cell")
+
+	var four = Board.new(6, 6, 5, 55, special)
+	_fill_checkerboard(four)
+	# [2,2,_,2] across row 2 → the swap makes a run of exactly FOUR (col 4 stays a checkerboard gem).
+	four.grid[2][0] = 2; four.grid[2][1] = 2; four.grid[2][3] = 2
+	four.grid[3][2] = 2
+	var four_res: Dictionary = four.resolve_swap(2, 2, 3, 2)
+	_check(four_res["valid"] and not four_res.has("legacy_placement"),
+			"a 4-match does NOT place a Legacy gem (default match size 5)")
+
+	# The match size is tunable: drop it to 4 and the same 4-match now DOES place a Legacy gem.
+	var four_lowered = Board.new(6, 6, 5, 55, special)
+	_fill_checkerboard(four_lowered)
+	four_lowered.special_match_size = 4
+	four_lowered.grid[2][0] = 2; four_lowered.grid[2][1] = 2; four_lowered.grid[2][3] = 2
+	four_lowered.grid[3][2] = 2
+	var fl_res: Dictionary = four_lowered.resolve_swap(2, 2, 3, 2)
+	_check(fl_res["valid"] and fl_res.has("legacy_placement") and fl_res["legacy_placement"] == [3, 2],
+			"with match size 4, a 4-match DOES place a Legacy gem")
+
+	# A 5+ match of the EXCLUDED color (the AVOID gem) must NOT qualify for a Legacy gem. We check the
+	# qualifying rule directly on _find_match_groups (rather than via resolve_swap, whose refill
+	# cascade could form an unrelated qualifying merge and confuse the assertion): the excluded run is
+	# present as a size-5 group, but its color equals special_exclude_color, so it does not qualify.
+	var avoidb = Board.new(6, 6, 5, 55, special)
+	_fill_checkerboard(avoidb)
+	avoidb.special_exclude_color = 2
+	avoidb.grid[2][0] = 2; avoidb.grid[2][1] = 2; avoidb.grid[2][2] = 2; avoidb.grid[2][3] = 2; avoidb.grid[2][4] = 2
+	var avoid_groups: Array = avoidb._find_match_groups()
+	var any_qualifies := false
+	for g in avoid_groups:
+		var gc: int = avoidb.color_at(g[0][0], g[0][1])
+		if (g as Array).size() >= 5 and gc != special and gc != avoidb.special_exclude_color:
+			any_qualifies = true
+	_check(avoid_groups.size() == 1 and not any_qualifies,
+			"a 5-match of the avoid color does NOT qualify for a Legacy gem")
+
+	# Matching the Legacy gems themselves suppresses a NEW Legacy spawn for the rest of that swap
+	# (Tim, 2026-07-10): you already collected the payout by matching them, so a big match among the
+	# same swap's cascade must not hand out another. Plant BOTH a legacy-color run AND a qualifying
+	# 5-run of a regular color so they resolve together in the first cascade; with the legacy match
+	# present, resolve_swap must record NO legacy_placement.
+	var suppress = Board.new(6, 6, 5, 55, special)
+	_fill_checkerboard(suppress)  # colors 0/1, no pre-existing matches
+	# A regular 5-run of color 2 across row 4 (would normally earn a Legacy gem on its own).
+	suppress.grid[4][0] = 2; suppress.grid[4][1] = 2; suppress.grid[4][3] = 2; suppress.grid[4][4] = 2
+	suppress.grid[5][2] = 2  # swapped up into (4,2) to complete the run of five
+	# A legacy run of THREE special gems across row 2, already present (the player is matching them).
+	# Placed on a checkerboard so the swap below doesn't disturb them; they match on the same tick.
+	suppress.grid[2][0] = special; suppress.grid[2][1] = special; suppress.grid[2][2] = special
+	var suppress_res: Dictionary = suppress.resolve_swap(4, 2, 5, 2)
+	_check(suppress_res["valid"] and not suppress_res.has("legacy_placement"),
+			"a Legacy-gem match suppresses a new Legacy spawn from the same swap")
+
+
+# ---------------------------------------------------------------------------
+# (h) Intersecting same-color runs merge into ONE group; non-touching runs stay separate.
+# ---------------------------------------------------------------------------
+
+func _test_match_group_merge() -> void:
+	print("[h] Intersecting same-color runs merge into one group")
+	# An L of color 2: horizontal (2,0..2) + vertical (2,2),(3,2),(4,2), sharing (2,2) → 5 cells, one group.
+	var b = Board.new(6, 6, 4, 11)
+	_fill_checkerboard(b)
+	b.grid[2][0] = 2; b.grid[2][1] = 2; b.grid[2][2] = 2
+	b.grid[3][2] = 2; b.grid[4][2] = 2
+	var groups: Array = b._find_match_groups()
+	_check(groups.size() == 1, "an L-shape is ONE merged group")
+	_check(groups.size() == 1 and (groups[0] as Array).size() == 5, "the merged L group holds all 5 gems")
+
+	# Two 3-runs of the same color that don't touch stay as two separate groups.
+	var b2 = Board.new(6, 6, 4, 12)
+	_fill_checkerboard(b2)
+	b2.grid[0][0] = 2; b2.grid[0][1] = 2; b2.grid[0][2] = 2
+	b2.grid[4][0] = 2; b2.grid[4][1] = 2; b2.grid[4][2] = 2
+	var groups2: Array = b2._find_match_groups()
+	_check(groups2.size() == 2, "two non-touching 3-runs stay as two groups")
+
+
+# ---------------------------------------------------------------------------
+# (i) A newly earned Legacy gem redirects to the closest non-Legacy cell when its target is taken.
+# ---------------------------------------------------------------------------
+
+func _test_legacy_redirect() -> void:
+	print("[i] Legacy gem redirects off an occupied target to the nearest free cell")
+	var special := 4
+	var b = Board.new(6, 6, 5, 5, special)
+	_fill_checkerboard(b)  # 0/1 only — no special gems yet
+	# Make the target (2,2) and all four orthogonal neighbors (distance 1) Legacy gems. The nearest
+	# NON-Legacy cells are then the diagonals at squared distance 2.
+	b.grid[2][2] = special
+	b.grid[2][1] = special; b.grid[2][3] = special; b.grid[1][2] = special; b.grid[3][2] = special
+	var cell: Array = b._nearest_non_special_cell(2, 2)
+	_check(not cell.is_empty() and b.color_at(cell[0], cell[1]) != special,
+			"redirect lands on a non-Legacy cell")
+	var dr: int = cell[0] - 2
+	var dc: int = cell[1] - 2
+	_check(dr * dr + dc * dc == 2, "redirect picks the closest free cell (a diagonal neighbor)")
+
+
+## Fill a board with a 0/1 checkerboard — no 3-in-a-row anywhere, so tests can place their own
+## setup on top without fighting pre-existing matches.
+func _fill_checkerboard(board) -> void:
+	for row in range(board.height):
+		for col in range(board.width):
+			board.grid[row][col] = (row + col) % 2

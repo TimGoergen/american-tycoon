@@ -153,6 +153,11 @@ jobs:
           content = re.sub(r'^version/name="[^"]*"',       f'version/name="0.0.0.{build_num}"',   content, flags=re.MULTILINE)
           open(path, "w").write(content)
           print(f"Android version: 0.0.0.{build_num} (code {run_num})")
+          # Keep the runtime version (shown on the in-game About screen) in sync with the build.
+          pg_path = "game/project.godot"
+          pg = open(pg_path).read()
+          pg = re.sub(r'^config/version="[^"]*"', f'config/version="0.0.0.{build_num}"', pg, flags=re.MULTILINE)
+          open(pg_path, "w").write(pg)
           EOF
 
       - name: Verify keystore and Android SDK

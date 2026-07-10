@@ -1,21 +1,124 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="120" height="60" viewBox="0 0 120 60">
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="82.668785"
+   height="57.464329"
+   viewBox="0 0 82.668785 57.464329"
+   version="1.1"
+   id="svg6"
+   sodipodi:docname="dollar_bill.svg"
+   inkscape:version="1.4.4 (dcaf3e7, 2026-05-05)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs6" />
+  <sodipodi:namedview
+     id="namedview6"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     showguides="true"
+     inkscape:zoom="6.725"
+     inkscape:cx="35.167286"
+     inkscape:cy="20.892193"
+     inkscape:window-width="1920"
+     inkscape:window-height="1009"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg6" />
   <!-- Dollar bill: green note with a gold border and a gold center seal. The "$"
        is drawn as vector strokes (not <text>) because Godot's SVG rasterizer does
        not embed fonts, so a text glyph would not render reliably. -->
   <!-- Bill body -->
-  <rect x="2" y="2" width="116" height="56" rx="7" fill="#2E7D4F" stroke="#D4AF37" stroke-width="4"/>
+  <rect
+     x="1.89247"
+     y="1.89247"
+     width="78.883842"
+     height="53.67939"
+     rx="7"
+     fill="#2e7d4f"
+     stroke="#d4af37"
+     stroke-width="3.78494"
+     id="rect1"
+     ry="7"
+     style="stroke:#153a25;stroke-opacity:1" />
   <!-- Inner gold guilloche frame -->
-  <rect x="9" y="9" width="102" height="42" rx="4" fill="none" stroke="#D4AF37" stroke-width="2"/>
+  <rect
+     x="6.7412934"
+     y="7.4847875"
+     width="69.186203"
+     height="42.346054"
+     rx="4"
+     fill="none"
+     stroke="#d4af37"
+     stroke-width="2"
+     id="rect2"
+     ry="4"
+     style="stroke:#e9d622;stroke-opacity:1" />
   <!-- Corner pips (gold) -->
-  <circle cx="15" cy="15" r="3" fill="#D4AF37"/>
-  <circle cx="105" cy="15" r="3" fill="#D4AF37"/>
-  <circle cx="15" cy="45" r="3" fill="#D4AF37"/>
-  <circle cx="105" cy="45" r="3" fill="#D4AF37"/>
+  <circle
+     cx="12.91432"
+     cy="13.657814"
+     r="3"
+     fill="#d4af37"
+     id="circle2"
+     style="fill:#e9d622;fill-opacity:1" />
+  <circle
+     cx="69.159676"
+     cy="13.657814"
+     r="3"
+     fill="#d4af37"
+     id="circle3"
+     style="fill:#e9d622;fill-opacity:1" />
+  <circle
+     cx="12.91432"
+     cy="43.657814"
+     r="3"
+     fill="#d4af37"
+     id="circle4"
+     style="fill:#e9d622;fill-opacity:1" />
+  <circle
+     cx="69.159676"
+     cy="43.657814"
+     r="3"
+     fill="#d4af37"
+     id="circle5"
+     style="fill:#e9d622;fill-opacity:1" />
   <!-- Center seal -->
-  <circle cx="60" cy="30" r="15" fill="#F2D277" stroke="#D4AF37" stroke-width="2"/>
+  <circle
+     cx="40.96265"
+     cy="28.657814"
+     r="15"
+     fill="#f2d277"
+     stroke="#d4af37"
+     stroke-width="2"
+     id="circle6"
+     style="fill:#e9d622;fill-opacity:1;stroke:#e9d622;stroke-opacity:1" />
   <!-- "$" glyph, drawn with strokes over the seal -->
-  <g fill="none" stroke="#1F5C39" stroke-width="3" stroke-linecap="round">
-    <path d="M66 24 C66 20 54 20 54 25 C54 30 66 30 66 35 C66 40 54 40 54 36"/>
-    <line x1="60" y1="18" x2="60" y2="42"/>
+  <g
+     fill="none"
+     stroke="#1f5c39"
+     stroke-width="3"
+     stroke-linecap="round"
+     id="g6"
+     transform="translate(-19.037352,-1.3421857)"
+     style="stroke:#153a25;stroke-opacity:1">
+    <path
+       d="m 66,24 c 0,-4 -12,-4 -12,1 0,5 12,5 12,10 0,5 -12,5 -12,1"
+       id="path6"
+       style="stroke:#153a25;stroke-opacity:1" />
+    <line
+       x1="60"
+       y1="18"
+       x2="60"
+       y2="42"
+       id="line6"
+       style="stroke:#153a25;stroke-opacity:1" />
   </g>
 </svg>

@@ -19,9 +19,22 @@ extends Minigame
 # grows once a round is recalled correctly. We never emit `completed` in this mode; the host ends the
 # run itself and reads get_score() (rounds cleared) live. Normal (reward) mode is unchanged: every
 # new branch below is guarded on `challenge_mode`, so the wrong-tap game-over beat still fires.
+#
+# Legacy Bonus (2026-07-10, Plans/Legacy_Bonus_System.md): after clearing ALL rounds (mastering the
+# main game), there is a chance-gated BONUS ROUND. In it the four pads are made IDENTICAL — each
+# wears the Legacy-gem image, so color can no longer be used to remember the sequence and the player
+# must recall by pure POSITION — and the sequence is longer (memory_gem_sequence_length). Recall it
+# to collect one Legacy gem. It is independent of the main reward (already banked at a full clear):
+# miss it and you simply don't get the gem. The chance and the length are both tuning knobs, and the
+# round is offered only on a REAL run (never Challenge Mode).
 
-## Rounds (sequence length) that make a full game (also the performance denominator).
-const TARGET_ROUNDS := 8
+## Rounds (sequence length) that make a full game (also the performance denominator). Reduced 8->6
+## (Tim, 2026-07-10): the gem bonus round is the new deep-recall test, so the base game can be shorter.
+const TARGET_ROUNDS := 6
+
+## The Legacy-gem image worn by every pad during the bonus round — the same gem used for the currency
+## everywhere else, so the player instantly recognizes what is at stake.
+const GEM_IMAGE := preload("res://art/icons/legacy_gem.svg")
 const PAD_COLORS := [
 	UiPalette.KETCHUP_RED, UiPalette.MUSTARD_GOLD, UiPalette.ATOMIC_TEAL, UiPalette.MONEY_GREEN,
 ]
@@ -49,6 +62,20 @@ var _rng := RandomNumberGenerator.new()
 var _pads: Array = []  # the four pad Panels (index = pad id)
 var _status_label: Label
 
+## --- Legacy bonus round -----------------------------------------------------------------------
+## Rolled once in begin(): true if this real run offers the gem bonus round after a full clear.
+var _gem_round_available: bool = false
+## True only while the bonus round is on screen (routes pad taps to the gem handler, and tells the
+## main-game guards the normal game is over). The four pads are gem-skinned while this is set.
+var _gem_round_active: bool = false
+## The bonus round's target sequence and the player's cursor into it, kept separate from the main
+## game's `_sequence`/`_input_index` so the two phases never interfere.
+var _gem_sequence: Array = []
+var _gem_input_index: int = 0
+var _gem_accepting_input: bool = false
+## How long the bonus sequence is (from tuning.memory_gem_sequence_length) — the gem's difficulty lever.
+var _gem_length: int = 5
+
 
 func display_name() -> String:
 	return "Memory Match"
@@ -59,10 +86,25 @@ func how_to_play() -> String:
 		+ "Each round adds a step — the deeper you go, the more it pays."
 
 
-func begin(_tuning: TuningConfig) -> void:
+## Memory runs WITHOUT the host countdown (Tim, 2026-07-10): recalling a sequence against a clock
+## adds nothing, and the bonus round can't be rushed. The host hides the timer and lets this game
+## end itself (it always emits `completed` on a clear, a miss, or the end of the bonus round).
+func uses_timer() -> bool:
+	return false
+
+
+func begin(tuning: TuningConfig) -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_rng.randomize()
 	_running = true
+
+	# Decide up front whether this run earns a shot at the gem bonus round. Real runs only — Challenge
+	# Mode never grants a bonus — and only when the roll succeeds. The round itself is offered later,
+	# after the player actually clears all TARGET_ROUNDS (mastery gates eligibility; this chance gates
+	# whether it appears at all).
+	_gem_length = maxi(1, tuning.memory_gem_sequence_length)
+	if not challenge_mode:
+		_gem_round_available = _rng.randf() < tuning.legacy_gem_chance_memory
 
 	var intro := Label.new()
 	intro.text = how_to_play()
@@ -214,10 +256,14 @@ func _play_sequence() -> void:
 
 
 func _on_pad_input(event: InputEvent, pad_id: int) -> void:
-	if not _accepting_input or not _running:
-		return
 	if not (event is InputEventMouseButton and event.pressed \
 			and event.button_index == MOUSE_BUTTON_LEFT):
+		return
+	# During the bonus round the same pads mean something different — route to the gem handler.
+	if _gem_round_active:
+		_on_gem_pad_input(pad_id)
+		return
+	if not _accepting_input or not _running:
 		return
 
 	# Quick press feedback: light + bounce the pad, then un-flash shortly after (only schedule the
@@ -253,9 +299,15 @@ func _on_pad_input(event: InputEvent, pad_id: int) -> void:
 			_set_status("Round %d cleared!" % _rounds_done, UiPalette.MONEY_GREEN)
 			_start_round()
 		elif _rounds_done >= TARGET_ROUNDS:
-			# Full game — celebrate before handing off to the result screen.
+			# Full game — the main reward is now maxed. If this run earned a shot at the gem bonus
+			# round, first flash a big "GEM ROUND" banner (same size as MAX!) so the player sees they
+			# cleared the game and knows a bonus is coming BEFORE the pads change (Tim, 2026-07-10) —
+			# the host runs _begin_gem_round when the banner finishes. Otherwise celebrate and finish.
 			_running = false
-			_play_round_clear_celebration()
+			if _gem_round_available:
+				banner_requested.emit("GEM ROUND", UiPalette.MUSTARD_GOLD, _begin_gem_round)
+			else:
+				_play_round_clear_celebration()
 		else:
 			_set_status("Nice!", UiPalette.MONEY_GREEN)
 			_start_round()
@@ -307,6 +359,147 @@ func _play_round_clear_celebration() -> void:
 		if is_instance_valid(_pads[pad_id]):
 			_flash_pad(pad_id, false)
 
+	_beat_playing = false
+	if is_inside_tree():
+		completed.emit(get_performance())
+
+
+# ---------------------------------------------------------------------------
+# Legacy bonus round (Plans/Legacy_Bonus_System.md)
+# ---------------------------------------------------------------------------
+
+## Begin the bonus round: make all four pads identical Legacy-gem tiles (so only POSITION can be
+## recalled — no color crutch), build a longer random sequence, play it back, then hand the turn to
+## the player. Reached only after a full clear on a run that rolled the gem chance in begin().
+func _begin_gem_round() -> void:
+	_gem_round_active = true
+	for pad_id in range(_pads.size()):
+		_make_gem_pad(_pads[pad_id])
+	_gem_sequence.clear()
+	for _i in range(_gem_length):
+		_gem_sequence.append(_rng.randi_range(0, 3))
+	_gem_input_index = 0
+	await _play_gem_sequence()
+	if not _gem_round_active or not is_inside_tree():
+		return
+	_gem_accepting_input = true
+	_set_status("Your turn — %d taps for the gem" % _gem_sequence.size(), UiPalette.MUSTARD_GOLD)
+
+
+## Dress a pad as a Legacy-gem tile: a cream face with a gold border wearing the gem image, added
+## once. All four look the same, which is the whole point — the sequence must be held by position.
+func _make_gem_pad(pad: Panel) -> void:
+	var box := StyleBoxFlat.new()
+	box.bg_color = UiPalette.CREAM
+	box.border_color = UiPalette.DARK_GOLD
+	box.set_border_width_all(3)
+	box.set_corner_radius_all(16)
+	pad.add_theme_stylebox_override("panel", box)
+	if pad.get_node_or_null("GemIcon") == null:
+		var icon := TextureRect.new()
+		icon.name = "GemIcon"
+		icon.texture = GEM_IMAGE
+		# IGNORE_SIZE so the node's minimum size is NOT the SVG's (large) native pixel size — otherwise
+		# that minimum overrides the anchor rect and the gem renders far bigger than the 240px pad. With
+		# it 0, the anchors/offsets below control the rect and KEEP_ASPECT_CENTERED fits the gem inside.
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE  # taps still reach the pad beneath
+		icon.set_anchors_preset(Control.PRESET_FULL_RECT)
+		# Inset the gem inside the pad so a border of tile shows around it.
+		icon.offset_left = 40.0
+		icon.offset_top = 40.0
+		icon.offset_right = -40.0
+		icon.offset_bottom = -40.0
+		pad.add_child(icon)
+
+
+## Light a gem pad (brighter face + gold border) and bounce it, then restore on `lit` false — the
+## gem-round equivalent of _flash_pad, which would otherwise repaint the pad its old solid color.
+func _flash_gem_pad(pad_id: int, lit: bool) -> void:
+	var pad: Panel = _pads[pad_id]
+	var box := StyleBoxFlat.new()
+	box.bg_color = UiPalette.CREAM.lightened(0.35) if lit else UiPalette.CREAM
+	box.border_color = UiPalette.MUSTARD_GOLD if lit else UiPalette.DARK_GOLD
+	box.set_border_width_all(8 if lit else 3)
+	box.set_corner_radius_all(16)
+	pad.add_theme_stylebox_override("panel", box)
+	pad.pivot_offset = pad.size / 2.0
+	var target := Vector2(PAD_FLASH_SCALE, PAD_FLASH_SCALE) if lit else Vector2.ONE
+	var bounce := create_tween()
+	bounce.tween_property(pad, "scale", target, 0.12) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+## Play the bonus sequence back with input locked (mirrors _play_sequence, but over the gem pads and
+## guarded on _gem_round_active). A slightly longer lead-in — this is the hard, deliberate one.
+func _play_gem_sequence() -> void:
+	_gem_accepting_input = false
+	if not is_inside_tree():
+		return
+	await get_tree().create_timer(0.5).timeout
+	for pad_id in _gem_sequence:
+		if not _gem_round_active or not is_inside_tree():
+			return
+		_flash_gem_pad(pad_id, true)
+		await get_tree().create_timer(FLASH_ON).timeout
+		if not _gem_round_active or not is_inside_tree():
+			return
+		_flash_gem_pad(pad_id, false)
+		await get_tree().create_timer(FLASH_GAP).timeout
+
+
+## A tap during the bonus round: give press feedback, then check it against the gem sequence. A wrong
+## tap forfeits the gem (the main reward is already banked); completing the whole sequence collects it.
+func _on_gem_pad_input(pad_id: int) -> void:
+	if not _gem_accepting_input:
+		return
+
+	_flash_gem_pad(pad_id, true)
+	if is_inside_tree():
+		get_tree().create_timer(0.15).timeout.connect(
+			func() -> void:
+				if is_instance_valid(_pads[pad_id]) and _gem_round_active:
+					_flash_gem_pad(pad_id, false)
+		)
+
+	if pad_id != _gem_sequence[_gem_input_index]:
+		_gem_accepting_input = false
+		_gem_round_active = false
+		_play_gem_fail_beat()
+		return
+
+	_gem_input_index += 1
+	if _gem_input_index >= _gem_sequence.size():
+		# Whole bonus sequence recalled — the gem is earned (the host gates and grants the amount).
+		_gem_accepting_input = false
+		_gem_round_active = false
+		collect_legacy_gem()
+		_play_gem_success_celebration()
+
+
+## Win beat: a gold ripple across the gem pads, then finish. Holds is_busy so the beat is seen even
+## though the host has no countdown for this game (harmless there, correct if it ever gained one).
+func _play_gem_success_celebration() -> void:
+	_beat_playing = true
+	_set_status("LEGACY GEM WON!", UiPalette.MUSTARD_GOLD)
+	for pad_id in range(_pads.size()):
+		if not is_inside_tree():
+			break
+		_flash_gem_pad(pad_id, true)
+		await get_tree().create_timer(0.1).timeout
+	await get_tree().create_timer(0.4).timeout
+	_beat_playing = false
+	if is_inside_tree():
+		completed.emit(get_performance())
+
+
+## Miss beat: a brief "no gem" message, then finish. No penalty — the main reward was already banked
+## on the full clear; the player simply doesn't get the bonus gem.
+func _play_gem_fail_beat() -> void:
+	_beat_playing = true
+	_set_status("So close — no gem this time.", UiPalette.KETCHUP_RED)
+	await get_tree().create_timer(0.7).timeout
 	_beat_playing = false
 	if is_inside_tree():
 		completed.emit(get_performance())

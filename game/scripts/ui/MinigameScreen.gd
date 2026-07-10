@@ -24,6 +24,11 @@ signal finished(multiplier: float, opt_out: bool)
 ## play never affects the run's Legacy.
 signal back_pressed
 
+## Emitted alongside `finished` when the player collected a Legacy gem this round and the result
+## wasn't bad — `amount` is the already-computed unearned Legacy to grant (see Plans/Legacy_Bonus_
+## System.md). Main banks it to the dynasty wallet. Never emitted in review/Challenge or on Skip.
+signal legacy_bonus_earned(amount: int)
+
 # The minigame library — the host draws one at random each round so the player doesn't know
 # which they'll get. Add new types here (Phase 2).
 const MINIGAME_TYPES := [
@@ -55,23 +60,22 @@ const PANEL_HEIGHT_FRACTION := 0.672  # 0.84 * 0.80  (20% shorter)
 ## bezel frame.
 const PANEL_BORDER_WIDTH := 8
 
-## The SKIP / DONE control floats BELOW the card in the scrim (Tim, 2026-07-02), sized relative to its
-## old in-card form: 40% taller than the old 72px, and 20% narrower than the card (a fraction of the
-## panel width), with a small gap under the panel's bottom edge.
+## The SKIP / DONE control floats BELOW the card in the scrim (Tim, 2026-07-02).
 const SKIP_BUTTON_HEIGHT := 101              # 72 * 1.4 — 40% taller
-const SKIP_WIDTH_FRACTION_OF_PANEL := 0.80   # 20% less wide than the card
 const SKIP_GAP_BELOW_PANEL := 16.0
+
+## A generous, consistent margin between the chrome (Back / timer, spectrum bar, SKIP button) and the
+## card edges (Tim, 2026-07-09) — beyond the card's own content margin. The play board still fills.
+const CHROME_MARGIN := 28
 
 ## How fast the spectrum bar's fill glides toward its true value (per-second lerp weight). The
 ## bar tracks a smoothed `_display_mult` rather than the raw live multiplier so it reads as a
 ## sweep, not a jitter — the single most-visible shared element, smoothed once here for all six
 ## games (plan §1 juice).
 const KEEP_BAR_LERP_SPEED := 8.0
-## Time-pressure thresholds (seconds left) where the shared timer escalates its warning: a slow
-## amber pulse under WARN, a fast gold blink + scale under CRITICAL. Shared by every game for
-## free (plan §1 juice).
-const TIMER_WARN_SECONDS := 10.0
-const TIMER_CRITICAL_SECONDS := 3.0
+## For the last few seconds the shared timer PULSES once per second — bigger and brighter on each
+## tick — so the countdown reads as real urgency (Tim, 2026-07-09). Shared by every game for free.
+const TIMER_PULSE_SECONDS := 5.0
 
 var _tuning: TuningConfig
 ## The pre-minigame base reward being scaled (Legacy count at prestige, cash pile at
@@ -88,6 +92,9 @@ var _format_as_money: bool = false
 ## multiplier. Changes the SKIP label, the stakes blurb, and the result screen to match.
 var _upside_only: bool = false
 var _bonus_max: float = 0.25
+## The dynasty's lifetime-earned Legacy, set by Main before a real round so the host can size the
+## Legacy-gem bonus (0.1% of this per gem). Stays 0 in review/Challenge → no bonus is ever granted.
+var _legacy_lifetime: int = 0
 var _seconds_left: float = 0.0
 var _playing: bool = false
 var _opt_out: bool = false
@@ -110,32 +117,37 @@ var _timer_label: Label
 ## The spectrum bar communicates by fill + color ONLY — no numeric "kept" readout (plan §1,
 ## decision 2026-06-29). What you'd keep on a skip is made legible on the SKIP button instead.
 var _keep_bar: Control
-## The gold-bubble drift riding the spectrum bar's fill (every progress bar carries them,
-## Tim 2026-07-03). The bar draws by hand, so the fill fraction is fed to the bubbles
-## explicitly each refresh rather than read from a ProgressBar.
-var _keep_bar_bubbles: GoldBubbles
 ## The skip control, kept as a field so start_game can label it with the concrete reward a skip
 ## banks (the keep floor), now that the spectrum bar shows no numbers.
 var _skip_button: Button
 ## The smoothed multiplier the spectrum bar actually draws — lerped toward the live multiplier
 ## each frame so the fill glides (see KEEP_BAR_LERP_SPEED).
 var _display_mult: float = 0.5
-## Tracks whether the smoothed fill has reached the "full" (1.0x) line, so the host can fire a
-## one-shot flash the moment it first crosses (plan §1: the warm→green jump made loud).
-var _was_at_least_full: bool = false
-## A decaying [0,1] flash intensity drawn over the whole bar when the fill crosses into "full".
-var _full_flash: float = 0.0
-## Accumulates while a round runs; drives the timer's warning pulse/blink oscillation without
-## needing a wall-clock (it is reset each round).
-var _warn_phase: float = 0.0
+## Each segment fires a brief flash the moment it FIRST fills completely (Tim, 2026-07-09). We track
+## whether each is currently full (to fire once per crossing) and a decaying [0,1] flash intensity.
+var _left_seg_full: bool = false
+var _right_seg_full: bool = false
+var _left_seg_flash: float = 0.0
+var _right_seg_flash: float = 0.0
+## The two-segment bar's styleboxes, built once and reused so no StyleBoxFlat is allocated per frame
+## (minigame-lag rule). Dark "track" + bright "fill" per segment, plus a shared white flash box.
+var _seg_track_left: StyleBoxFlat
+var _seg_track_right: StyleBoxFlat
+var _seg_fill_left: StyleBoxFlat
+var _seg_fill_right: StyleBoxFlat
+var _seg_flash_box: StyleBoxFlat
 var _play_area: Control
 var _result_heading_label: Label
 var _result_mult_label: Label
 var _result_amount_label: Label
+## The smaller "(base + bonus)" / "(of X)" breakdown line beneath the big total. Hidden when empty.
+var _result_breakdown_label: Label
 ## A type-specific line on the result screen ("Scored 1,240 points", "Caught 14 of 18"), so the
 ## paused result clearly reflects the game just played. Hidden when the type provides none.
 var _result_summary_label: Label
-var _opt_out_check: CheckBox
+## The Legacy-gem bonus line ("LEGACY BONUS +N gems" / "gems lost"), shown only when the player
+## collected a gem this round. See _show_result / _legacy_bonus_amount.
+var _result_legacy_label: Label
 
 ## The "Get Ready / BEGIN" gate shown over the card at the start of every round. The clock and the
 ## chosen type both stay frozen until the player presses Begin, so no round ever starts the instant
@@ -181,6 +193,12 @@ var _begin_framing: Label
 
 func setup(tuning: TuningConfig) -> void:
 	_tuning = tuning
+
+
+## Main calls this before a REAL round with the dynasty's lifetime-earned Legacy, so the host can
+## size any Legacy-gem bonus. Left at 0 for review/Challenge rounds, which never grant a bonus.
+func set_legacy_lifetime(lifetime: int) -> void:
+	_legacy_lifetime = maxi(0, lifetime)
 
 
 func _ready() -> void:
@@ -254,17 +272,18 @@ func _ready() -> void:
 	UiPalette.style_button(_skip_button, false)
 	_skip_button.text = "SKIP"
 	_skip_button.pressed.connect(_on_skip_pressed)
-	var skip_half_w := (PANEL_WIDTH_FRACTION * SKIP_WIDTH_FRACTION_OF_PANEL) / 2.0
-	_skip_button.anchor_left = 0.5 - skip_half_w
-	_skip_button.anchor_right = 0.5 + skip_half_w
-	# Both vertical anchors pin to the panel's bottom edge; the offsets give the button a fixed height
-	# a small gap below it.
+	# Its left/right anchors track the card's edges; the offsets inset it by the SAME margin the
+	# spectrum bar and top row use (card content margin + CHROME_MARGIN), so all three line up. A
+	# matching CHROME_MARGIN gap sits below it before the screen frame (Tim, 2026-07-09).
+	var side_inset := float(UiPalette.UNIVERSAL_CONTENT_MARGIN + CHROME_MARGIN)
+	_skip_button.anchor_left = 0.5 - half_w
+	_skip_button.anchor_right = 0.5 + half_w
 	_skip_button.anchor_top = 0.5 + half_h
 	_skip_button.anchor_bottom = 0.5 + half_h
-	_skip_button.offset_left = 0.0
-	_skip_button.offset_right = 0.0
-	_skip_button.offset_top = SKIP_GAP_BELOW_PANEL
-	_skip_button.offset_bottom = SKIP_GAP_BELOW_PANEL + SKIP_BUTTON_HEIGHT
+	_skip_button.offset_left = side_inset
+	_skip_button.offset_right = -side_inset
+	_skip_button.offset_top = CHROME_MARGIN
+	_skip_button.offset_bottom = CHROME_MARGIN + SKIP_BUTTON_HEIGHT
 	_skip_button.visible = false  # revealed on Begin (see _start_active_round)
 	add_child(_skip_button)
 
@@ -379,15 +398,19 @@ func _build_play_view() -> Control:
 	column.add_theme_constant_override("separation", 12)
 
 	# The first row carries two things side by side: the Back button (review mode only) on the left,
-	# and the round timer right-aligned. Sharing one row — instead of giving the timer a row of its
-	# own — frees that height for the game board (Tim, 2026-07-02). The centered purpose blurb (live
-	# rounds only) sits just below.
-	var top_row := _add_back_button(column)
+	# and the round timer right-aligned. It sits inside a MarginContainer so the Back button and timer
+	# keep a generous margin from the card's top and side edges (Tim, 2026-07-09).
+	var top_margin := MarginContainer.new()
+	top_margin.add_theme_constant_override("margin_top", CHROME_MARGIN)
+	top_margin.add_theme_constant_override("margin_left", CHROME_MARGIN)
+	top_margin.add_theme_constant_override("margin_right", CHROME_MARGIN)
+	column.add_child(top_margin)
+	var top_row := _add_back_button(top_margin)
 
 	# The timer stays the round's focal point (plan §1): big and faux-bold, escalating in color/scale
-	# as time runs low (see _refresh_timer). It now lives at the top-right of the first row — the
-	# spacer inside top_row pushes it to the right edge.
-	_timer_label = _make_label("0:30", UiPalette.FONT_DISPLAY, UiPalette.KETCHUP_RED)
+	# as time runs low (see _refresh_timer). It lives at the top-right of the first row (the spacer
+	# inside top_row pushes it right), 50% larger than the shared display size (Tim, 2026-07-09).
+	_timer_label = _make_label("0:30", int(UiPalette.FONT_DISPLAY * 1.5), UiPalette.KETCHUP_RED)
 	_timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_timer_label.add_theme_font_override("font", UiPalette.make_bold_font())
 	top_row.add_child(_timer_label)
@@ -411,17 +434,22 @@ func _build_play_view() -> Control:
 	_highscore_label.visible = false
 	column.add_child(_highscore_label)
 
-	# The universal spectrum bar — identical for every minigame type; it reads the active type's
-	# live performance. It carries meaning by fill + color ONLY (no numbers): warm red→gold below
-	# the "full" line, green→blue into the extra-high bonus band.
+	# The universal outcome bar — identical for every minigame type; it reads the active type's live
+	# performance. Two rounded SEGMENTS side by side (Tim, 2026-07-09): a green LEFT segment that fills
+	# as you climb to the "full" line, and a blue RIGHT segment that then fills as you climb to the max
+	# bonus. Each starts dark and fills left→right and briefly flashes when it completes. Inside a
+	# MarginContainer so its sides line up with the Back/timer margin above and it sits a little lower.
+	var bar_margin := MarginContainer.new()
+	bar_margin.add_theme_constant_override("margin_left", CHROME_MARGIN)
+	bar_margin.add_theme_constant_override("margin_right", CHROME_MARGIN)
+	bar_margin.add_theme_constant_override("margin_top", 22)  # nudge the bar down a little (Tim)
+	column.add_child(bar_margin)
 	_keep_bar = Control.new()
-	_keep_bar.custom_minimum_size = Vector2(0, 34)
+	_keep_bar.custom_minimum_size = Vector2(0, 60)  # 40 * 1.5 — 50% taller (Tim, 2026-07-09)
 	_keep_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_keep_bar.draw.connect(_draw_keep_bar)
-	_keep_bar_bubbles = GoldBubbles.new()
-	_keep_bar_bubbles.edge_inset = 2.0  # stay inside the bar's 2px navy outline
-	_keep_bar.add_child(_keep_bar_bubbles)
-	column.add_child(_keep_bar)
+	bar_margin.add_child(_keep_bar)
+	_build_segment_styleboxes()
 
 	# The chosen minigame TYPE fills this area each round. A modest minimum keeps it from
 	# collapsing; the expand flags make it take all the room left inside the centered panel
@@ -433,16 +461,8 @@ func _build_play_view() -> Control:
 	column.add_child(_play_area)
 
 	# The SKIP / DONE control is NOT in this column — it floats BELOW the card in the scrim, built in
-	# _ready (Tim, 2026-07-02). Only the opt-out checkbox remains here, at the bottom of the card.
-	_opt_out_check = CheckBox.new()
-	_opt_out_check.text = "Skip minigames from now on"
-	_opt_out_check.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
-	for state in ["font_color", "font_pressed_color", "font_hover_color",
-			"font_focus_color", "font_hover_pressed_color", "font_disabled_color"]:
-		_opt_out_check.add_theme_color_override(state, UiPalette.NAVY)
-	_opt_out_check.toggled.connect(func(on: bool) -> void: _opt_out = on)
-	column.add_child(_opt_out_check)
-
+	# _ready (Tim, 2026-07-02). The in-round "Skip minigames from now on" checkbox was removed (Tim,
+	# 2026-07-09); the "play transition minigames" preference lives in Settings.
 	return column
 
 
@@ -451,7 +471,20 @@ func _build_result_view() -> Control:
 	column.add_theme_constant_override("separation", 16)
 	column.visible = false
 
-	_add_back_button(column)
+	# The Back button gets the SAME size and edge margin as the play screen's (Tim, 2026-07-09): same
+	# _add_back_button, wrapped in a MarginContainer with CHROME_MARGIN like the play view's top row.
+	var back_margin := MarginContainer.new()
+	back_margin.add_theme_constant_override("margin_top", CHROME_MARGIN)
+	back_margin.add_theme_constant_override("margin_left", CHROME_MARGIN)
+	back_margin.add_theme_constant_override("margin_right", CHROME_MARGIN)
+	column.add_child(back_margin)
+	_add_back_button(back_margin)
+
+	# An expanding spacer above the text block (mirrored by the one below CONTINUE) centers the result
+	# text vertically in the middle of the card (Tim, 2026-07-09).
+	var top_spacer := Control.new()
+	top_spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	column.add_child(top_spacer)
 
 	# The heading names what was won ("THE INHERITANCE" / "THE OVERNIGHT HAUL"); start_game
 	# sets it per site from the reward context.
@@ -463,17 +496,33 @@ func _build_result_view() -> Control:
 	_result_mult_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(_result_mult_label)
 
-	# DARK_MONEY_GREEN (not MONEY_GREEN): the lighter cash green washes out against the cream result
-	# card and was hard to read (Tim, 2026-07-02); the darker green reads clearly on cream.
-	_result_amount_label = _make_label("", UiPalette.FONT_SUBHEAD, UiPalette.DARK_MONEY_GREEN)
+	# The "+X Legacy" total: NAVY (the Back button's label color), 40% larger than FONT_SUBHEAD and
+	# bold so it's the clear focal figure (Tim, 2026-07-09).
+	_result_amount_label = _make_label("", int(UiPalette.FONT_SUBHEAD * 1.4), UiPalette.NAVY)
 	_result_amount_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_result_amount_label.add_theme_font_override("font", UiPalette.make_bold_font())
 	column.add_child(_result_amount_label)
+
+	# The base + bonus breakdown (or "of X" on a weak round) on its own smaller line beneath the total.
+	_result_breakdown_label = _make_label("", UiPalette.FONT_LABEL, UiPalette.NAVY)
+	_result_breakdown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	column.add_child(_result_breakdown_label)
 
 	# How the player did at the game itself (set per round from the type's result_summary).
 	_result_summary_label = _make_label("", UiPalette.FONT_LABEL, UiPalette.NAVY)
 	_result_summary_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_result_summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(_result_summary_label)
+
+	# The Legacy-gem bonus line — shown only when the player collected a gem this round. Gold with a
+	# navy outline so the windfall reads as special against the cream result card.
+	_result_legacy_label = _make_label("", UiPalette.FONT_SUBHEAD, UiPalette.MUSTARD_GOLD)
+	_result_legacy_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_result_legacy_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_result_legacy_label.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
+	_result_legacy_label.add_theme_constant_override("outline_size", 4)
+	_result_legacy_label.visible = false
+	column.add_child(_result_legacy_label)
 
 	# Push CONTINUE to the BOTTOM of the card: an expanding spacer eats the slack above it so the
 	# button sits at the panel's bottom edge instead of floating up under the summary text (Tim,
@@ -506,6 +555,12 @@ func _build_result_view() -> Control:
 	continue_row.add_child(right_pad)
 
 	column.add_child(continue_row)
+
+	# A CHROME_MARGIN gap below CONTINUE so it isn't jammed against the card's bottom edge (Tim,
+	# 2026-07-09) — matching the breathing room the SKIP button has on the play screen.
+	var continue_bottom := Control.new()
+	continue_bottom.custom_minimum_size = Vector2(0, CHROME_MARGIN)
+	column.add_child(continue_bottom)
 
 	return column
 
@@ -544,7 +599,9 @@ func _build_begin_overlay() -> Control:
 	box.add_child(_begin_framing)
 
 	# Names the randomly drawn type so the player knows what they're about to play.
-	_begin_title = _make_label("", UiPalette.FONT_DISPLAY, UiPalette.MUSTARD_GOLD)
+	# DARK_GOLD (not the brighter MUSTARD_GOLD) so the game name reads clearly on the cream card
+	# (Tim, 2026-07-09).
+	_begin_title = _make_label("", UiPalette.FONT_DISPLAY, UiPalette.DARK_GOLD)
 	_begin_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_begin_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(_begin_title)
@@ -583,12 +640,15 @@ func _build_begin_overlay() -> Control:
 ## review mode (start_game's review_mode flag) makes it visible. A short HBox keeps it from
 ## stretching the full width — it sits in the top-left like a typical "back" affordance. Returns the
 ## row so a caller (the play view) can add the timer to it, right-aligned past the spacer.
-func _add_back_button(column: VBoxContainer) -> HBoxContainer:
+func _add_back_button(parent: Container) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	var back := Button.new()
-	back.text = "← BACK"
-	back.custom_minimum_size = Vector2(0, 72)
-	back.add_theme_font_size_override("font_size", UiPalette.FONT_BUTTON)
+	# A solid left-pointing triangle (◀) reads as a bigger, thicker back arrow than the thin "←" and,
+	# unlike the heavy-arrow glyph, is present in the font (Tim, 2026-07-09). Bold thickens it further.
+	back.text = "◀  BACK"
+	back.custom_minimum_size = Vector2(340, 108)  # wider; 72 * 1.5 tall — 50% larger
+	back.add_theme_font_size_override("font_size", int(UiPalette.FONT_BUTTON * 1.5))
+	back.add_theme_font_override("font", UiPalette.make_bold_font())
 	UiPalette.style_button(back, false)
 	back.visible = false
 	back.pressed.connect(_on_back_pressed)
@@ -599,7 +659,7 @@ func _add_back_button(column: VBoxContainer) -> HBoxContainer:
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(spacer)
 	_back_buttons.append(back)
-	column.add_child(row)
+	parent.add_child(row)
 	return row
 
 
@@ -718,9 +778,7 @@ func start_game(
 
 	_bonus_max = maxf(0.0, bonus_max)
 	_seconds_left = _tuning.minigame_duration_seconds
-	_opt_out = false
-	if _opt_out_check != null:
-		_opt_out_check.button_pressed = false
+	_opt_out = false  # the in-round opt-out checkbox was removed; the preference lives in Settings
 
 	# The result heading names what was won; set it before the round so the result view is
 	# already correct when it appears.
@@ -746,10 +804,17 @@ func start_game(
 	# a type that aligns its scoring to the shared "full" line (match-3) can read it. See Minigame.
 	_active_minigame.outcome_keep_floor = _tuning.minigame_keep_floor
 	_active_minigame.outcome_bonus_max = _bonus_max
+	# The legacy-gem cap: how many gems earn the bonus, so a type knows when to stop spawning more.
+	_active_minigame.legacy_bonus_cap = _tuning.legacy_bonus_max_gems
 	_play_area.add_child(_active_minigame)
 	_active_minigame.completed.connect(_on_minigame_completed)
+	# Let a type ask for the shared big banner (Memory's "GEM ROUND"), so it matches MAX! exactly.
+	_active_minigame.banner_requested.connect(_on_banner_requested)
 	# Most types run for the shared default; a type may ask for more time on top of it (basketball).
 	_seconds_left = _tuning.minigame_duration_seconds + maxf(0.0, _active_minigame.extra_seconds())
+	# A no-timer type (Memory) hides the countdown entirely and ends the round only when it emits
+	# `completed` itself — the clock branch in _process is skipped for it (see uses_timer).
+	_timer_label.visible = _active_minigame.uses_timer()
 
 	# The round does NOT start yet: the type stays un-begun and the clock paused behind the Begin
 	# gate, so the player is never caught off guard. _on_begin_pressed starts it for real.
@@ -766,19 +831,18 @@ func start_game(
 	# Reset the shared juice state so a new round starts at the keep floor with no carried-over
 	# flash, pulse, or smoothing from the previous round.
 	_display_mult = _tuning.minigame_keep_floor
-	_was_at_least_full = false
-	_full_flash = 0.0
-	_warn_phase = 0.0
+	_left_seg_full = false
+	_right_seg_full = false
+	_left_seg_flash = 0.0
+	_right_seg_flash = 0.0
 	_keep_bar.queue_redraw()
 
-	# Label SKIP with what skipping actually does. In the normal "scale an amount" sites it banks the
-	# keep floor; in upside-only First Contact there's no floor to lose — skipping just forgoes the
-	# bonus, so it says so plainly.
+	# Label SKIP with what skipping actually does: keep the DEFAULT amount as-is (multiplier 1.0),
+	# forgoing only the bonus (Tim, 2026-07-09). Upside-only First Contact says so plainly.
 	if _upside_only:
 		_skip_button.text = "SKIP · no bonus"
 	else:
-		var skip_amount := _base_amount * _tuning.minigame_keep_floor
-		_skip_button.text = "SKIP · keep %s" % _format_amount(skip_amount)
+		_skip_button.text = "SKIP · keep %s" % _format_amount(_base_amount)
 
 	# The round's fiction: shown in live play, hidden in the review tuner (a practice
 	# round has no story) and whenever a site provides none.
@@ -793,9 +857,14 @@ func start_game(
 	if _upside_only:
 		_begin_stakes.text = "Play well to earn a BONUS on this business — more income, faster cycles. A weak round or Skip just opens it at its base income. No penalty."
 	else:
-		_begin_stakes.text = "Play well to keep MORE — a great round earns a bonus on top. A weak round or Skip keeps only the minimum."
+		_begin_stakes.text = "Play well to earn a BONUS on top of your inheritance. Skip to keep it as-is — a weak round keeps less."
 	_begin_stakes.visible = true
-	_begin_hint.text = "The clock starts when you press Begin."
+	# A timed game warns the clock is about to start; a no-timer game (Memory) invites the player to
+	# take their time instead, so the hint never promises a clock that won't appear.
+	if _active_minigame.uses_timer():
+		_begin_hint.text = "The clock starts when you press Begin."
+	else:
+		_begin_hint.text = "No clock — take your time."
 	_begin_hint.visible = true
 
 	_begin_overlay.modulate = Color.WHITE
@@ -855,12 +924,11 @@ func start_challenge(type_script: Script) -> void:
 	visible = true
 
 
-## Swap the reward chrome for the Challenge chrome. Reward mode (on=false): the timer, spectrum
-## bar, and opt-out show. Challenge mode (on=true): the live score + best-to-beat show instead.
+## Swap the reward chrome for the Challenge chrome. Reward mode (on=false): the timer + outcome bar
+## show. Challenge mode (on=true): the live score + best-to-beat show instead.
 func _set_challenge_chrome(on: bool) -> void:
 	_timer_label.visible = not on
 	_keep_bar.visible = not on
-	_opt_out_check.visible = not on
 	_score_label.visible = on
 	_highscore_label.visible = on
 
@@ -897,6 +965,12 @@ func _process(delta: float) -> void:
 	if _challenge_mode:
 		_update_challenge_score()
 		return
+	# A no-timer game (Memory) owns its own ending: no countdown and no max-early-out. Just keep the
+	# outcome bar gliding and wait for the game to emit `completed` on its own (a clear, a miss, or
+	# its bonus round). Checked before the timer logic so none of it runs for such a game.
+	if _active_minigame != null and not _active_minigame.uses_timer():
+		_refresh_keep_bar(delta)
+		return
 	# Pause the countdown while a type is mid-animation (e.g. match-3 cascades) so animation time
 	# isn't charged to the player — but keep the spectrum bar gliding and show a "held" cue on the
 	# timer so a stalled countdown doesn't read as a bug (plan §1).
@@ -905,6 +979,11 @@ func _process(delta: float) -> void:
 		_seconds_left = maxf(0.0, _seconds_left - delta)
 	_refresh_timer(delta, busy)
 	_refresh_keep_bar(delta)
+	# End the round the instant the player has achieved the MAXIMUM result — no reason to keep playing
+	# a round already won outright (Tim, 2026-07-09). Applies to every game via its performance.
+	if not busy and _current_performance() >= 1.0:
+		_end_round()
+		return
 	if not busy and _seconds_left <= 0.0:
 		_end_round()
 
@@ -990,30 +1069,30 @@ func _format_amount(amount: float) -> String:
 	return "%d %s" % [int(floor(amount)), _reward_noun]
 
 
-## Update the focal timer each frame: a slow amber pulse under TIMER_WARN_SECONDS, a fast gold
-## blink + scale under TIMER_CRITICAL_SECONDS, and a "held" cue (muted color + pause glyph) while
-## the type is mid-animation so the paused countdown doesn't read as a bug. (plan §1 juice.)
+## Update the focal timer each frame: for the last TIMER_PULSE_SECONDS it pops once per second
+## (bigger + brighter toward gold on each tick), and dims to a muted color while the type is
+## mid-animation to show the countdown is held. The text stays the same width whether held or not —
+## the old "⏸" glyph widened the right-aligned label, so the timer visibly slid left during a
+## match's animation (Tim, 2026-07-09); the muted color alone now carries the held cue.
 func _refresh_timer(delta: float, busy: bool) -> void:
 	var secs := int(ceil(_seconds_left))
 	if busy:
-		_timer_label.text = "0:%02d  ⏸" % secs
+		_timer_label.text = "0:%02d" % secs
 		_set_timer_color(UiPalette.NAVY)
 		_set_timer_scale(1.0)
 		return
 
-	_warn_phase += delta
 	_timer_label.text = "0:%02d" % secs
 	var color := UiPalette.KETCHUP_RED
 	var pulse := 1.0
-	if _seconds_left <= TIMER_CRITICAL_SECONDS and _seconds_left > 0.0:
-		# A fast 0..1 oscillation drives a blink toward gold plus a gentle grow, for real urgency.
-		var beat := 0.5 + 0.5 * sin(_warn_phase * 18.0)
-		color = UiPalette.KETCHUP_RED.lerp(UiPalette.MUSTARD_GOLD, beat)
-		pulse = 1.0 + 0.14 * beat
-	elif _seconds_left <= TIMER_WARN_SECONDS:
-		var beat := 0.5 + 0.5 * sin(_warn_phase * 8.0)
-		color = UiPalette.KETCHUP_RED.lerp(UiPalette.MUSTARD_GOLD, beat * 0.5)
-		pulse = 1.0 + 0.05 * beat
+	if _seconds_left <= TIMER_PULSE_SECONDS and _seconds_left > 0.0:
+		# One pop per second: the fractional part of the remaining time runs 1→0 within each second
+		# and jumps back to ~1 the instant the displayed number ticks down, so the pop lands ON each
+		# tick and eases out over that second. Squared for a sharper spike. Bigger + brighter at peak.
+		var into_second := _seconds_left - floorf(_seconds_left)
+		var pop := into_second * into_second
+		color = UiPalette.KETCHUP_RED.lerp(UiPalette.MUSTARD_GOLD, pop)
+		pulse = 1.0 + 0.3 * pop
 	_set_timer_color(color)
 	_set_timer_scale(pulse)
 
@@ -1035,63 +1114,81 @@ func _set_timer_scale(factor: float) -> void:
 	_timer_label.scale = Vector2(factor, factor)
 
 
-## Glide the spectrum bar toward the live multiplier and fire a one-shot flash when it first
-## crosses into "full". The smoothed value `_display_mult` is what _draw_keep_bar paints.
+## Glide the outcome bar toward the live multiplier and fire a brief flash the moment either segment
+## first fills completely. The smoothed value `_display_mult` is what _draw_keep_bar paints.
 func _refresh_keep_bar(delta: float) -> void:
 	var target := _multiplier_for_performance(_current_performance())
 	var weight := clampf(delta * KEEP_BAR_LERP_SPEED, 0.0, 1.0)
 	_display_mult = lerpf(_display_mult, target, weight)
 
-	# Flash the moment the smoothed fill first reaches the "full" line (and re-arm if it drops
-	# back below), so the warm→green color jump lands with a visible pop instead of silently.
-	if not _was_at_least_full and _display_mult >= 1.0:
-		_was_at_least_full = true
-		_full_flash = 1.0
-	elif _was_at_least_full and _display_mult < 1.0:
-		_was_at_least_full = false
-	_full_flash = maxf(0.0, _full_flash - delta * 2.5)
-	_keep_bar_bubbles.set_fill_fraction(_keep_bar_fill_fraction())
+	var floor_mult := _tuning.minigame_keep_floor
+	var left_full := (_display_mult - floor_mult) / maxf(0.0001, 1.0 - floor_mult) >= 1.0
+	var right_full := (_display_mult - 1.0) / maxf(0.0001, _bonus_max) >= 1.0
+	# Fire each segment's flash once, the moment it first completes (re-arm if it drops back below).
+	if left_full and not _left_seg_full:
+		_left_seg_flash = 1.0
+	if right_full and not _right_seg_full:
+		_right_seg_flash = 1.0
+	_left_seg_full = left_full
+	_right_seg_full = right_full
+	_left_seg_flash = maxf(0.0, _left_seg_flash - delta * 3.0)
+	_right_seg_flash = maxf(0.0, _right_seg_flash - delta * 3.0)
 	_keep_bar.queue_redraw()
 
 
-## The spectrum bar's current 0–1 fill, from the smoothed multiplier — shared by the
-## draw pass and the gold-bubble overlay so the two can never disagree.
-func _keep_bar_fill_fraction() -> float:
-	var floor_mult := _tuning.minigame_keep_floor
-	var span := maxf(0.0001, (1.0 + _bonus_max) - floor_mult)
-	return clampf((_display_mult - floor_mult) / span, 0.0, 1.0)
+## Build the two-segment bar's styleboxes once, reused every frame so no StyleBoxFlat is allocated
+## per draw (minigame-lag rule).
+func _build_segment_styleboxes() -> void:
+	var green := UiPalette.MONEY_GREEN
+	var blue := UiPalette.CYCLE_BLUE
+	_seg_track_left = _make_segment_box(green.darkened(0.62), true)
+	_seg_track_right = _make_segment_box(blue.darkened(0.62), true)
+	_seg_fill_left = _make_segment_box(green, false)
+	_seg_fill_right = _make_segment_box(blue, false)
+	_seg_flash_box = _make_segment_box(Color(1, 1, 1, 1), false)
 
 
+func _make_segment_box(color: Color, is_track: bool) -> StyleBoxFlat:
+	var box := StyleBoxFlat.new()
+	box.bg_color = color
+	box.set_corner_radius_all(16)
+	if is_track:
+		box.border_color = UiPalette.NAVY
+		box.set_border_width_all(2)
+	return box
+
+
+## The two-segment outcome bar (Tim, 2026-07-09): two separate rounded squares side by side. The LEFT
+## (green) fills as the smoothed multiplier climbs floor → 1.0 (the "full" / keep-100% line); the
+## RIGHT (blue) then fills as it climbs 1.0 → 1.0 + bonus_max (the max bonus). Each has a dark track
+## and a bright fill that grows left→right, and flashes briefly the instant it completes.
 func _draw_keep_bar() -> void:
 	var w := _keep_bar.size.x
 	var h := _keep_bar.size.y
-	if w <= 0.0 or h <= 0.0:
+	if w <= 0.0 or h <= 0.0 or _seg_track_left == null:
 		return
-	# Draw the SMOOTHED multiplier so the fill glides rather than jumps (see _refresh_keep_bar).
-	var mult := _display_mult
-	var fill_frac := _keep_bar_fill_fraction()
+	var floor_mult := _tuning.minigame_keep_floor
+	var left_frac := clampf((_display_mult - floor_mult) / maxf(0.0001, 1.0 - floor_mult), 0.0, 1.0)
+	var right_frac := clampf((_display_mult - 1.0) / maxf(0.0001, _bonus_max), 0.0, 1.0)
 
-	_keep_bar.draw_rect(Rect2(0, 0, w, h), UiPalette.INK_NAVY)
-	_keep_bar.draw_rect(Rect2(0, 0, fill_frac * w, h), _keep_color(mult))
+	var gap := 12.0
+	var seg_w := (w - gap) * 0.5
+	_draw_segment(Rect2(0, 0, seg_w, h), _seg_track_left, _seg_fill_left, left_frac, _left_seg_flash)
+	_draw_segment(Rect2(seg_w + gap, 0, seg_w, h), _seg_track_right, _seg_fill_right, right_frac, _right_seg_flash)
 
-	# A soft bright cap rides the leading edge of the fill, brightening as performance climbs into
-	# the extra-high bonus band (plan §1) — a small reward for pushing past "full".
-	var into_bonus := clampf((mult - 1.0) / maxf(0.0001, _bonus_max), 0.0, 1.0)
-	var edge_x := fill_frac * w
-	var cap_w := 10.0
-	var cap_color := _keep_color(mult).lerp(Color.WHITE, 0.4 + 0.5 * into_bonus)
-	cap_color.a = 0.35 + 0.55 * into_bonus
-	_keep_bar.draw_rect(Rect2(edge_x - cap_w, 0, cap_w, h), cap_color)
 
-	# A one-shot white wash across the whole bar the instant the fill first reaches "full"
-	# (decays in _refresh_keep_bar) so the warm→green color jump lands with a pop, not silently.
-	if _full_flash > 0.0:
-		_keep_bar.draw_rect(Rect2(0, 0, w, h), Color(1, 1, 1, _full_flash * 0.5))
-
-	# No "full" divider line (Tim, 2026-06-25): the deliberate warm→green color jump at exactly
-	# 100% already marks where you stop losing Legacy and start banking bonus, so the line is
-	# redundant. The color change alone carries the meaning.
-	_keep_bar.draw_rect(Rect2(0, 0, w, h), UiPalette.NAVY, false, 2.0)
+## Draw one rounded segment: the dark track, a bright fill inset inside it that grows left→right to
+## `frac`, and a brief white flash overlay when the segment has just completed.
+func _draw_segment(rect: Rect2, track: StyleBoxFlat, fill: StyleBoxFlat, frac: float, flash: float) -> void:
+	_keep_bar.draw_style_box(track, rect)
+	if frac > 0.0:
+		var pad := 4.0
+		var fill_w := frac * (rect.size.x - 2.0 * pad)
+		if fill_w > 1.0:
+			_keep_bar.draw_style_box(fill, Rect2(rect.position.x + pad, pad, fill_w, rect.size.y - 2.0 * pad))
+	if flash > 0.0:
+		_seg_flash_box.bg_color = Color(1, 1, 1, clampf(flash, 0.0, 1.0) * 0.7)
+		_keep_bar.draw_style_box(_seg_flash_box, rect)
 
 
 # ---------------------------------------------------------------------------
@@ -1100,38 +1197,161 @@ func _draw_keep_bar() -> void:
 
 func _end_round() -> void:
 	_playing = false
-	_show_result(_multiplier_for_performance(_current_performance()))
+	var performance := _current_performance()
+	# A round can end for two reasons: the clock ran out, or the player hit the MAXIMUM result and there
+	# was no point playing on. In the latter case flash "MAX!" over the card for a beat before the result
+	# appears, so the player understands the round ended because they maxed it — not that it was cut off
+	# (Tim, 2026-07-10). "Early" = the timer still had time left; a max reached exactly as the clock
+	# expired just shows the result normally. Universal here in the host, so every minigame behaves alike.
+	var ended_on_max := performance >= 1.0 and _seconds_left > 0.0 and not _challenge_mode
+	if ended_on_max:
+		_flash_max_then(func() -> void: _show_result(_multiplier_for_performance(performance)))
+		return
+	_show_result(_multiplier_for_performance(performance))
+
+
+## Flash a big "MAX!" over the card for about a second, then run `after` (which shows the result).
+## Hides the SKIP control first (the round is over), then defers to the shared flash_banner so every
+## maxed-out round announces the same way. Kept as its own name for the max-out call site.
+func _flash_max_then(after: Callable) -> void:
+	# The play view stays up behind the flash until the result swaps in, so the board doesn't blank
+	# out mid-celebration; but the round is over, so hide the below-card SKIP control.
+	_skip_button.visible = false
+	flash_banner("MAX!", UiPalette.MUSTARD_GOLD, after)
+
+
+## Flash `text` big and gold-styled over the CENTER of the screen for about a second, then run
+## `after`. Shared by the universal "MAX!" celebration and any minigame that asks for a mid-round
+## banner via banner_requested (Memory's "GEM ROUND"), so every big centered flash looks and sizes
+## the SAME (Tim, 2026-07-10). Built on demand and freed when done. Does NOT touch the SKIP control
+## or the play view, so it is safe to use mid-round (the caller decides what to hide).
+func flash_banner(text: String, color: Color, after: Callable) -> void:
+	var flash := Label.new()
+	flash.text = text
+	flash.add_theme_font_size_override("font_size", UiPalette.FONT_DISPLAY)
+	flash.add_theme_color_override("font_color", color)
+	flash.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
+	flash.add_theme_constant_override("outline_size", 12)
+	flash.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	flash.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Cover the whole screen and center the word over the card. z high so it sits above everything. The
+	# label is anchored to fill the screen, so its centered text lands at screen center; we scale it
+	# about the SCREEN center (this host's own size) — reading the label's own size right after add_child
+	# gives (0,0), and forcing it fights the full-rect anchors (Tim, 2026-07-10).
+	flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+	flash.z_index = 10
+	flash.pivot_offset = size / 2.0
+	add_child(flash)
+
+	# Bloom in big, hold, then fade — about one second total. Built as a SEQUENTIAL tween (bloom → hold
+	# → fade), pairing the bloom's scale + fade-in with parallel() so we never leave set_parallel latched
+	# across the chain (that latch silently ran the steps out of order and nothing showed — Tim,
+	# 2026-07-10).
+	flash.scale = Vector2(0.5, 0.5)
+	flash.modulate = Color(1, 1, 1, 0.0)
+	var beat := create_tween()
+	beat.tween_property(flash, "scale", Vector2.ONE, 0.22) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	beat.parallel().tween_property(flash, "modulate:a", 1.0, 0.18)
+	beat.tween_interval(0.5)  # hold at full
+	beat.tween_property(flash, "modulate:a", 0.0, 0.25)  # fade out
+	beat.tween_callback(func() -> void:
+		flash.queue_free()
+		# Guard: the requesting minigame may have been freed (player left) during the ~1s banner.
+		if after.is_valid():
+			after.call())
+
+
+## A minigame asked for the shared banner (see Minigame.banner_requested). Flash it, then run the
+## type's continuation — e.g. Memory announces "GEM ROUND" and resumes into its bonus round.
+func _on_banner_requested(text: String, color: Color, after: Callable) -> void:
+	flash_banner(text, color, after)
 
 
 func _show_result(mult: float) -> void:
+	_result_breakdown_label.visible = false  # only the amount-scaling branch below reveals it
 	if _upside_only:
 		_set_first_contact_result_labels(mult)
 	else:
 		var kept := _base_amount * mult
+		# The big total goes on _result_amount_label; the smaller parenthetical breakdown (if any) on
+		# _result_breakdown_label beneath it.
+		_result_amount_label.text = "+%s" % _format_amount(kept)
+		var breakdown := ""
 		if mult > 1.0:
 			_result_mult_label.text = "+%d%% BONUS" % int(round((mult - 1.0) * 100.0))
-			_result_mult_label.add_theme_color_override("font_color", UiPalette.ATOMIC_TEAL)
-			_result_amount_label.text = "+%s  (%s +%s bonus)" % \
-					[_format_amount(kept), _format_amount(_base_amount), _format_amount(kept - _base_amount)]
+			# A saturated blue (not the pale teal) for the bonus headline (Tim, 2026-07-09).
+			_result_mult_label.add_theme_color_override("font_color", Color("#2E6FD6"))
+			breakdown = "(%s + %s bonus)" % [_format_amount(_base_amount), _format_amount(kept - _base_amount)]
 		elif mult >= 1.0:
 			_result_mult_label.text = "FULL"
 			_result_mult_label.add_theme_color_override("font_color", UiPalette.DARK_MONEY_GREEN)
-			_result_amount_label.text = "+%s" % _format_amount(kept)
 		else:
 			_result_mult_label.text = "KEPT %d%%" % int(round(mult * 100.0))
 			_result_mult_label.add_theme_color_override("font_color", _keep_color(mult))
-			_result_amount_label.text = "+%s  (of %s)" % [_format_amount(kept), _format_amount(_base_amount)]
+			breakdown = "(of %s)" % _format_amount(_base_amount)
+		_result_breakdown_label.text = breakdown
+		_result_breakdown_label.visible = breakdown != ""
 
 	# The type's own summary of how the round was played (empty for types that provide none).
 	var summary := _active_minigame.result_summary() if _active_minigame != null else ""
 	_result_summary_label.text = summary
 	_result_summary_label.visible = summary != ""
 
+	_refresh_legacy_result_line(mult)
+
 	_play_view.visible = false
 	_skip_button.visible = false  # the below-card control hides once the round resolves
 	_result_view.visible = true
 	visible = true
 	_animate_result()
+
+
+## Show/hide the Legacy-gem bonus line on the result screen. Only appears when the player actually
+## collected a gem this round; the wording depends on whether the round result let them keep it.
+func _refresh_legacy_result_line(mult: float) -> void:
+	if _result_legacy_label == null:
+		return
+	var collected := _active_minigame.get_legacy_gems_collected() if _active_minigame != null else 0
+	if collected <= 0 or _legacy_lifetime <= 0:
+		_result_legacy_label.visible = false
+		return
+	var amount := _legacy_bonus_amount(mult)
+	if amount > 0:
+		var great := _legacy_bonus_factor(mult) > 1.0
+		_result_legacy_label.text = ("LEGACY BONUS  +%d gems!" % amount) + ("  (great round!)" if great else "")
+		_result_legacy_label.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD)
+	else:
+		# Collected a gem but the round was too weak to keep it (bad result → keep nothing).
+		_result_legacy_label.text = "Legacy bonus lost — a stronger round keeps it"
+		_result_legacy_label.add_theme_color_override("font_color", UiPalette.KETCHUP_RED)
+	_result_legacy_label.visible = true
+
+
+## The round's Legacy-gem tier factor from its final multiplier: 0 below the "full" line (bad → keep
+## nothing), 1.0 at/above full (normal → keep), and 1.0 + great_multiplier−1 deep in the bonus band
+## (great → a proportional bonus). Mirrors the gating in Plans/Legacy_Bonus_System.md.
+func _legacy_bonus_factor(mult: float) -> float:
+	if mult < 1.0:
+		return 0.0
+	var into_bonus := (mult - 1.0) / maxf(0.0001, _bonus_max)
+	if into_bonus >= _tuning.legacy_bonus_great_threshold:
+		return _tuning.legacy_bonus_great_multiplier
+	return 1.0
+
+
+## The unearned Legacy to grant this round: capped collected gems × the round's tier factor × the
+## per-gem fraction × lifetime Legacy. Returns 0 when nothing is owed; otherwise at least 1 (the
+## early-game floor: if the player has any lifetime Legacy and earned a bonus, they always get ≥1).
+func _legacy_bonus_amount(mult: float) -> int:
+	var collected := _active_minigame.get_legacy_gems_collected() if _active_minigame != null else 0
+	var factor := _legacy_bonus_factor(mult)
+	if collected <= 0 or factor <= 0.0 or _legacy_lifetime <= 0:
+		return 0
+	var counted := mini(collected, maxi(1, _tuning.legacy_bonus_max_gems))
+	var raw := float(counted) * factor * _tuning.legacy_bonus_fraction * float(_legacy_lifetime)
+	return maxi(1, int(floor(raw)))
 
 
 ## Result labels for the upside-only First Contact round: announce the BUCKET the run earned (none /
@@ -1192,17 +1412,25 @@ func _on_back_pressed() -> void:
 	back_pressed.emit()
 
 
-## Skip (reward round): bank the keep floor (the worst result) and leave. In Challenge Mode this is
-## the DONE button — it saves the high score and returns to the list instead.
+## Skip (reward round): keep the DEFAULT amount as-is and leave — skipping forgoes the bonus but
+## does NOT cost anything (Tim, 2026-07-09: skip keeps the default, not half). That is multiplier 1.0.
+## In Challenge Mode this is the DONE button — it saves the high score and returns to the list instead.
 func _on_skip_pressed() -> void:
 	if _challenge_mode:
 		_end_challenge()
 		return
 	_playing = false
 	visible = false
-	finished.emit(_tuning.minigame_keep_floor, _opt_out)
+	finished.emit(1.0, _opt_out)
 
 
 func _on_continue_pressed() -> void:
 	visible = false
-	finished.emit(_multiplier_for_performance(_current_performance()), _opt_out)
+	var mult := _multiplier_for_performance(_current_performance())
+	# Bank any Legacy-gem bonus first (real rounds only; review/Challenge never set _legacy_lifetime,
+	# and a bad round yields 0), then hand the main outcome multiplier to the site that launched us.
+	if not _review_mode and not _challenge_mode:
+		var bonus := _legacy_bonus_amount(mult)
+		if bonus > 0:
+			legacy_bonus_earned.emit(bonus)
+	finished.emit(mult, _opt_out)

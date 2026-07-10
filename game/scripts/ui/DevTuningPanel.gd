@@ -51,8 +51,9 @@ const ROW_DESC_SIZE := UiPalette.FONT_LABEL
 const ROW_VALUE_SIZE := UiPalette.FONT_SUBHEAD
 const BUTTON_SIZE := UiPalette.FONT_SUBHEAD
 
-## Fixed width (px) of the value editor column, so the constant names line up.
-const VALUE_COLUMN_WIDTH := 400
+## Fixed width (px) of the value editor column, so the constant names line up. Trimmed from 400 so a
+## long name + the field can't push the row past the panel's right edge (Tim, 2026-07-09).
+const VALUE_COLUMN_WIDTH := 300
 ## Minimum height (px) of a value editor — a comfortable thumb target.
 const VALUE_HEIGHT := 72
 ## Clearance between each row's right edge and the scroll's overlaid scrollbar: the
@@ -87,6 +88,26 @@ const DESCRIPTIONS := {
 	"retention_base_cost": "Legacy to retain the first property's first staff level.",
 	"retention_cost_growth": "How much each deeper retained level costs vs the last.",
 	"retention_property_step": "How much pricier each higher property's retention is.",
+	"carb_debug_overlay": "1 shows a live per-row readout of the bubble numbers (diagnosis).",
+	"carb_excited_flow": "How much faster than the bar's fill the bubbles run during frenzy (px/s).",
+	"carb_excited_wobble": "Frenzy churn wobble amplitude in pixels.",
+	"carb_excited_spread_lower": "Frenzy speed-mix lower bound (0.25 = crawlers among streakers).",
+	"carb_excited_tails": "Comet-tail visibility during frenzy (0 = hidden, 1 = full).",
+	"carb_excited_ease": "Seconds for the frenzy look to ramp in/out (try 1.0-1.5 if edges pop).",
+	"minigame_duration_seconds": "Seconds each transition minigame lasts (shared by all games).",
+	"match3_full_score": "Match-3 score that keeps 100% (higher = harder to reach full).",
+	"match3_max_score": "Match-3 score for the max bonus / early win (higher = harder to max).",
+	"match3_legacy_match_size": "Gems in a match needed to drop a Legacy gem (higher = rarer).",
+	"legacy_bonus_fraction": "Legacy granted per collected gem, as a fraction of lifetime (0.001 = 0.1%).",
+	"legacy_bonus_max_gems": "Most legacy moments one round can bank (1 = flat windfall).",
+	"legacy_bonus_great_multiplier": "Bonus to the legacy grant on a great round (1.10 = +10%).",
+	"legacy_bonus_great_threshold": "How far into the bonus band counts as a great round (0-1).",
+	"legacy_gem_chance_catch": "Chance a legacy gem-coin appears in Catch Money.",
+	"legacy_gem_chance_timing": "Chance a legacy gem appears in the Timing zone.",
+	"legacy_gem_chance_balance": "Chance a legacy gem appears in the Balance zone.",
+	"legacy_gem_chance_basketball": "Chance a legacy gem appears in Basketball.",
+	"legacy_gem_chance_memory": "Chance the Memory gem bonus round appears after a full clear.",
+	"memory_gem_sequence_length": "Length of the Memory gem bonus sequence (identical pads; higher = harder).",
 	"offline_efficiency": "Offline income rate vs live play (0–1).",
 	"offline_cap_seconds": "Longest offline accrual window (seconds; 14400 = 4h).",
 	"frenzy_max_multiplier": "Peak income multiplier during a frenzy burn.",
@@ -118,7 +139,56 @@ const DISPLAY_NAMES := {
 	"rush_pct": "Rush Percent",
 	"k_legacy": "Legacy Payout Scale",
 	"alpha_legacy": "Legacy Payout Curve",
+	"minigame_duration_seconds": "Minigame Timer Seconds",
+	"match3_full_score": "Match3 Full Score",
+	"match3_max_score": "Match3 Max Score",
+	"match3_legacy_match_size": "Match3 Legacy Match Size",
+	"legacy_bonus_fraction": "Legacy Bonus Fraction",
+	"legacy_bonus_max_gems": "Legacy Bonus Max Gems",
+	"legacy_bonus_great_multiplier": "Legacy Bonus Great Multiplier",
+	"legacy_bonus_great_threshold": "Legacy Bonus Great Threshold",
+	"legacy_gem_chance_catch": "Legacy Gem Chance Catch",
+	"legacy_gem_chance_timing": "Legacy Gem Chance Timing",
+	"legacy_gem_chance_balance": "Legacy Gem Chance Balance",
+	"legacy_gem_chance_basketball": "Legacy Gem Chance Basketball",
+	"legacy_gem_chance_memory": "Legacy Gem Chance Memory",
+	"memory_gem_sequence_length": "Memory Gem Sequence Length",
 }
+
+
+## The tuning knobs are grouped into collapsible sections (Tim, 2026-07-09 — the flat list
+## had grown too long to scan), the same pattern as the Estate Planning tab's upgrade
+## categories. Each section owns a set of knobs matched by NAME PREFIX (a plain "starts-with"
+## test), so adding a new knob to TuningConfig usually lands in the right section with no UI
+## change. The order here is the order the sections appear. A knob is placed in the FIRST
+## section whose prefix list matches it; anything unmatched falls into the "Other" section
+## appended at the end. Each entry is { "title": String, "prefixes": Array[String] } — a
+## prefix that is a full knob name (e.g. "logic_hz") simply matches only that one knob.
+const SECTIONS := [
+	{"title": "Core Loop", "prefixes": [
+		"logic_hz", "m1_starting_cash", "band_step", "cycle_floor", "rush_pct",
+		"hold_rush_per_second", "earth_economy_target", "autosave_cadence",
+	]},
+	{"title": "Wage", "prefixes": ["wage_"]},
+	{"title": "Frenzy", "prefixes": ["frenzy_"]},
+	{"title": "Buy & Hire Holds", "prefixes": ["buy_hold_", "hire_hold_"]},
+	{"title": "Staff", "prefixes": ["staff_"]},
+	{"title": "Retention", "prefixes": ["retention_"]},
+	{"title": "Carbonation", "prefixes": ["carb_"]},
+	{"title": "Minigames", "prefixes": ["minigame_", "match3_"]},
+	{"title": "Legacy Bonus", "prefixes": ["legacy_bonus_", "legacy_gem_chance_"]},
+	{"title": "Offline", "prefixes": ["offline_"]},
+	{"title": "Estate & Legacy", "prefixes": ["estate_", "loophole_", "k_legacy", "alpha_legacy"]},
+	{"title": "Events", "prefixes": ["crash_", "audit_"]},
+]
+
+## The catch-all section title for knobs no SECTIONS prefix matched (so a newly added knob
+## always appears somewhere, even before it is sorted into a real section).
+const OTHER_SECTION_TITLE := "Other"
+
+## Vertical breathing room (px) above the first section and below the last, between the scroll
+## content and the scroll frame's edges (Tim, 2026-07-09 — the list felt cramped against the frame).
+const SCROLL_VERTICAL_MARGIN := 24
 
 
 # One LineEdit per constant, keyed by constant name, read back on Apply.
@@ -130,6 +200,9 @@ var _types: Dictionary = {}
 var _baked: Dictionary = {}
 
 var _list: VBoxContainer
+# Each collapsible section, keyed by its title → { "button": Button header, "body": VBoxContainer,
+# "expanded": bool }. All sections start collapsed; the header-row arrow buttons drive them all.
+var _sections: Dictionary = {}
 var _reset_dynasty_button: Button
 # Two-tap guard on the destructive wipe: armed by the first tap, fires on the second.
 var _reset_armed := false
@@ -163,12 +236,30 @@ func _build_chrome() -> void:
 	title.add_theme_font_size_override("font_size", TITLE_SIZE)
 	column.add_child(title)
 
+	# Subtitle + the Collapse-All / Expand-All arrow buttons share one row: the subtitle expands
+	# to take the slack and pushes the two icon buttons to the right edge (like the Estate tab).
+	var subtitle_row := HBoxContainer.new()
+	subtitle_row.add_theme_constant_override("separation", 10)
+	column.add_child(subtitle_row)
+
 	var subtitle := Label.new()
 	subtitle.text = "Edit a value, then Apply & Reload. Gold = overridden."
 	subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	subtitle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	subtitle.size_flags_vertical = Control.SIZE_SHRINK_CENTER  # center against the taller buttons
 	subtitle.add_theme_color_override("font_color", UiPalette.NAVY)
 	subtitle.add_theme_font_size_override("font_size", SUBTITLE_SIZE)
-	column.add_child(subtitle)
+	subtitle_row.add_child(subtitle)
+
+	# Up arrow = collapse all (the list folds up); down arrow = expand all (it opens down) — the
+	# same intuitive convention as the Estate tab. Icon-only so they stay narrow and right-aligned.
+	var collapse_all_button := _make_bulk_button("res://art/icons/arrow_up.svg")
+	collapse_all_button.pressed.connect(set_all_collapsed.bind(true))
+	subtitle_row.add_child(collapse_all_button)
+
+	var expand_all_button := _make_bulk_button("res://art/icons/arrow_down.svg")
+	expand_all_button.pressed.connect(set_all_collapsed.bind(false))
+	subtitle_row.add_child(expand_all_button)
 
 	# ── Scrollable list of constant rows ──
 	var scroll := ScrollContainer.new()
@@ -177,9 +268,12 @@ func _build_chrome() -> void:
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_RESERVE
 	column.add_child(scroll)
 
-	# Right margin keeping every row clear of the overlaid scrollbar (see SCROLLBAR_GAP).
+	# Right margin keeps every row clear of the overlaid scrollbar (see SCROLLBAR_GAP); the
+	# top/bottom margins give the section list breathing room off the scroll frame's edges.
 	var list_margin := MarginContainer.new()
 	list_margin.add_theme_constant_override("margin_right", SCROLLBAR_GAP)
+	list_margin.add_theme_constant_override("margin_top", SCROLL_VERTICAL_MARGIN)
+	list_margin.add_theme_constant_override("margin_bottom", SCROLL_VERTICAL_MARGIN)
 	list_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(list_margin)
 
@@ -229,6 +323,92 @@ func _make_button(text: String, is_action: bool) -> Button:
 
 
 # ---------------------------------------------------------------------------
+# Collapsible sections (same pattern as the Estate Planning tab)
+# ---------------------------------------------------------------------------
+
+## Build one collapsible section into `_list`: a full-width header button that toggles a body
+## VBoxContainer holding that section's rows. Every section starts COLLAPSED. Returns the body for
+## the caller to fill with constant rows. All sections share the dev-tool blue plate, since these
+## are developer groupings (not the color-coded player categories of the Estate tab).
+func _add_collapsible_section(title: String) -> VBoxContainer:
+	var header := Button.new()
+	header.custom_minimum_size = Vector2(0, 62)
+	header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_theme_font_size_override("font_size", ROW_LABEL_SIZE)
+	# Caret + name read from the left like a typical section/disclosure header.
+	header.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	header.add_theme_stylebox_override("normal", _make_section_plate(UiPalette.CYCLE_BLUE))
+	header.add_theme_stylebox_override("hover", _make_section_plate(UiPalette.CYCLE_BLUE))
+	header.add_theme_stylebox_override("pressed", _make_section_plate(UiPalette.CYCLE_BLUE.darkened(0.15)))
+	header.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		header.add_theme_color_override(state, UiPalette.CREAM)
+	header.pressed.connect(_toggle_section.bind(title))
+	_list.add_child(header)
+
+	var body := VBoxContainer.new()
+	body.add_theme_constant_override("separation", 14)
+	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.visible = false   # collapsed by default
+	_list.add_child(body)
+
+	_sections[title] = {"button": header, "body": body, "expanded": false}
+	_update_section_header(title)
+	return body
+
+
+## A blue plate (dev-tool CYCLE_BLUE fill, navy border) for a section header button — the same
+## plate shape as the Estate tab's section headers, but one shared color for the whole panel.
+func _make_section_plate(color: Color) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = color
+	style.border_color = UiPalette.NAVY
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(4)
+	style.set_content_margin_all(8)
+	return style
+
+
+## A compact icon utility button (Collapse All / Expand All — an arrow glyph), styled as a
+## standard (non-spend) button. Icon-only, so it stays narrow; expand_icon scales the arrow to fill.
+func _make_bulk_button(icon_path: String) -> Button:
+	var button := Button.new()
+	button.icon = load(icon_path)
+	button.expand_icon = true
+	button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	button.vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
+	button.custom_minimum_size = Vector2(84, 62)
+	button.add_theme_constant_override("icon_max_width", 48)
+	UiPalette.style_button(button, false)
+	return button
+
+
+## Flip one section between expanded and collapsed (its header was tapped).
+func _toggle_section(title: String) -> void:
+	var section: Dictionary = _sections[title]
+	section["expanded"] = not bool(section["expanded"])
+	(section["body"] as Control).visible = bool(section["expanded"])
+	_update_section_header(title)
+
+
+## Expand or collapse every section at once (the header-row Collapse-All / Expand-All arrows).
+func set_all_collapsed(collapsed: bool) -> void:
+	for title in _sections:
+		var section: Dictionary = _sections[title]
+		section["expanded"] = not collapsed
+		(section["body"] as Control).visible = not collapsed
+		_update_section_header(String(title))
+
+
+## Refresh a section header's caret + name to match its expanded state. "+" invites a tap to open a
+## collapsed section; "-" shows it is already open.
+func _update_section_header(title: String) -> void:
+	var section: Dictionary = _sections[title]
+	var marker := "-" if bool(section["expanded"]) else "+"
+	(section["button"] as Button).text = "%s  %s" % [marker, title.to_upper()]
+
+
+# ---------------------------------------------------------------------------
 # Showing / populating
 # ---------------------------------------------------------------------------
 
@@ -241,11 +421,15 @@ func open(effective_tuning: TuningConfig, baked_tuning: TuningConfig) -> void:
 	_value_edits.clear()
 	_types.clear()
 	_baked.clear()
+	_sections.clear()
 	for child in _list.get_children():
 		child.queue_free()
 
-	# Reflection: every exported int/float on TuningConfig, in declaration order
-	# (so related constants stay grouped exactly as they read in the source file).
+	# Reflection: every exported int/float on TuningConfig, in declaration order (so related
+	# constants stay grouped exactly as they read in the source file). We first sort each knob
+	# into its section by name prefix, then render section by section — so a section's rows share
+	# their source order, and the sections themselves appear in the fixed SECTIONS order.
+	var knobs_by_section: Dictionary = {}   # section title → Array of [name, type] pairs
 	for prop in effective_tuning.get_property_list():
 		var usage: int = prop["usage"]
 		if not (usage & PROPERTY_USAGE_SCRIPT_VARIABLE):
@@ -254,22 +438,54 @@ func open(effective_tuning: TuningConfig, baked_tuning: TuningConfig) -> void:
 		if type != TYPE_INT and type != TYPE_FLOAT:
 			continue
 		var name: String = prop["name"]
-		_add_constant_row(name, type, effective_tuning.get(name), baked_tuning.get(name))
+		var section_title := _section_title_for(name)
+		if not knobs_by_section.has(section_title):
+			knobs_by_section[section_title] = []
+		knobs_by_section[section_title].append([name, type])
+
+	# Render the sections in the fixed SECTIONS order, then the catch-all "Other" last. Only a
+	# section that actually owns at least one knob gets a header (empty sections are skipped).
+	var ordered_titles: Array = []
+	for section in SECTIONS:
+		ordered_titles.append(String(section["title"]))
+	ordered_titles.append(OTHER_SECTION_TITLE)
+
+	for title in ordered_titles:
+		if not knobs_by_section.has(title):
+			continue
+		var body := _add_collapsible_section(String(title))
+		for pair in knobs_by_section[title]:
+			var name: String = pair[0]
+			var type: int = pair[1]
+			_add_constant_row(body, name, type, effective_tuning.get(name), baked_tuning.get(name))
 
 	visible = true
 
 
-## One constant row: the name and a concise description stacked on the left, an
-## editable value on the right. A row whose current value differs from the baked
-## default is tinted gold and marked, so an active override is obvious at a glance.
-func _add_constant_row(name: String, type: int, current_value: Variant, baked_value: Variant) -> void:
+## The title of the section a knob belongs to: the first SECTIONS entry with a prefix the knob
+## name starts with, or the catch-all "Other" when nothing matches. A prefix that is a full knob
+## name simply matches only that knob.
+func _section_title_for(name: String) -> String:
+	for section in SECTIONS:
+		for prefix in section["prefixes"]:
+			if name.begins_with(String(prefix)):
+				return String(section["title"])
+	return OTHER_SECTION_TITLE
+
+
+## One constant row, added to `parent` (its collapsible section's body): the name and a concise
+## description stacked on the left, an editable value on the right. A row whose current value
+## differs from the baked default is tinted gold and marked, so an active override is obvious at a
+## glance. Every row's LineEdit is still registered in _value_edits, so Apply reads it back
+## unchanged whichever section it lives in.
+func _add_constant_row(parent: VBoxContainer, name: String, type: int, current_value: Variant, baked_value: Variant) -> void:
 	_types[name] = type
 	_baked[name] = baked_value
 	var is_overridden: bool = current_value != baked_value
 
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
-	_list.add_child(row)
+	parent.add_child(row)
 
 	# Name (top) + description (beneath) share the left column; the editor sits to
 	# their right, vertically centered against the stacked text.
@@ -290,6 +506,8 @@ func _add_constant_row(name: String, type: int, current_value: Variant, baked_va
 	label.add_theme_color_override(
 		"font_color", UiPalette.MUSTARD_GOLD if is_overridden else UiPalette.NAVY)
 	label.add_theme_font_size_override("font_size", ROW_LABEL_SIZE)
+	# Wrap a long name instead of forcing the whole row wider than the panel (Tim, 2026-07-09).
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	text_column.add_child(label)
 
 	var description: String = DESCRIPTIONS.get(name, "")

@@ -25,9 +25,20 @@ extends Minigame
 
 const Board = preload("res://scripts/core/MatchThreeBoard.gd")
 
-const GRID_WIDTH := 6
+## Board size (Tim, 2026-07-09: "make it bigger, almost to the edges — and harder"). Widened
+## 6→7 columns so the board fills the card's width; kept at 6 rows because a 7th row overflows
+## the card's height on a portrait phone (the AVOID banner + intro copy take the rest). 7×6 = 42
+## cells (was 36), so it's bigger AND harder: more to read, more places a careless swap wastes a
+## turn.
+const GRID_WIDTH := 7
 const GRID_HEIGHT := 6
+## Regular matchable gem colors (red/gold/teal/green). The board is built with GEM_COLORS + 1 ids
+## so it also carries the special LEGACY gem (id == LEGACY_COLOR), which matches only itself.
 const GEM_COLORS := 4
+## The Legacy gem's color id — the special 5th gem (Plans/Legacy_Bonus_System.md). It never seeds
+## the starting grid and never appears in an ordinary refill; it is created ONLY by a 5+ match
+## (placed at the swap target). It scores 0 normal points; matching three collects a Legacy bonus.
+const LEGACY_COLOR := 4
 
 # --- Match scoring (Tim's minigame v4) ---------------------------------------
 # UN-PLAYTESTED (polish pass 2026-06-29): the three score constants below were RE-ANCHORED
@@ -41,36 +52,36 @@ const POINTS_PER_GEM := 10.0
 ## Larger matches pay more PER gem: a group of n gems is worth POINTS_PER_GEM × n × (1 + this ×
 ## (n - 3)). So a 3-line is ×1, a 4-line ×1.5, a 5-line ×2 — bigger lines are worth chasing.
 const SIZE_BONUS := 0.5
-## Combo: each successive cascade step in ONE swap multiplies that step's points by
-## 1 + COMBO_BONUS × step_index (step 0 = ×1, step 1 = ×2, step 2 = ×3 …). Rewards chain setups.
-## DESIRABILITY (polish pass, Tim's "decide and comment"): this combo is left DELIBERATELY
-## UNBOUNDED. A long lucky cascade can spike the score straight to SCORE_MAX and end the round —
-## but because you can only ever EARN points (never lose them), that is a pure positive surprise,
-## never a punishment. A big chain "winning" the round outright is a good feeling, so we keep it
-## uncapped. (If device play shows it ending rounds too abruptly, cap it then.)
-const COMBO_BONUS := 1.0
+# NO cascade combo (Tim, 2026-07-09): cascade matches score STATICALLY by their gem count only.
+# Cascades come from random refill gems the player didn't arrange, so a rising combo multiplier
+# rewarded luck ("the game plays itself"). Every match — initial or cascade — is now worth the
+# same for the same size, so deliberate big matches are the only way to score more.
 ## A match group that AVOIDS the avoid gem earns this bonus (+15%).
 const CLEAN_MATCH_FACTOR := 1.15
 ## A match group that INCLUDES the avoid gem is docked this much (−60%).
 const AVOID_MATCH_FACTOR := 0.40
 
-## Score that maps to the host's "full" (1.0x) line — roughly a whole ~20-second round of
-## ordinary clean matching (Tim: "regular clean play = ~100%"). Nudged 300 -> 320 alongside the
-## POINTS_PER_GEM restore so the "full" difficulty is held (see the re-anchor note above).
-const SCORE_FULL := 320.0
-## Score that maps to performance 1.0 (the host's max extra-high bonus) — roughly a whole round
-## of strong cascade / large-match play. Feel-tune estimate (same v4 / 20-second basis).
-const SCORE_MAX := 1000.0
+# The score-to-performance thresholds are LIVE tuning knobs (Balance Tuning), captured from
+# TuningConfig in begin() so Tim can dial the ceiling on device without a rebuild. Defaults live in
+# TuningConfig (match3_full_score / match3_max_score).
+var _score_full: float = 600.0   # score that maps to the host's "full" (keep 100%) line
+var _score_max: float = 2200.0   # score that maps to performance 1.0 (max bonus + early-out)
 
 ## A square cell, generously sized for thumb taps and low-vision readability (§1b),
-## plus the gap between cells. PITCH is the cell-to-cell pixel stride.
-const CELL_SIZE := 96
+## plus the gap between cells. PITCH is the cell-to-cell pixel stride. Sized so the 7-wide
+## board very nearly fills the card's inner width (≈891px at 1080 render): 7 × PITCH − GAP
+## + the frame's ~44px ≈ 848px, leaving a slim even margin (Tim, 2026-07-09: "almost to the
+## edges"). Slightly smaller cells than before (96→108 is bigger, but 7 of them, not 6).
+const CELL_SIZE := 104
 const GAP := 8
 const PITCH := CELL_SIZE + GAP
 
-## The bonus banner's gem tile — deliberately much larger than a board cell so this round's
-## AVOID gem stands out as a prominent "steer around this" cue pinned above the grid.
-const BONUS_ICON_SIZE := 198
+## The bonus banner's gem tile — this round's AVOID gem, shown above the grid. Sized down 30% from
+## the earlier 220 (Tim, 2026-07-09); the BONUS badge is a fraction of this, so both shrink together.
+const BONUS_ICON_SIZE := 154
+
+## How far the AVOID gem and BONUS badge are inset from the card's left/right edges (Tim, 2026-07-09).
+const BANNER_EDGE_MARGIN := 80
 
 ## How far a press must move before it counts as a drag-swap (rather than a stray tap).
 const DRAG_THRESHOLD := CELL_SIZE * 0.4
@@ -84,11 +95,14 @@ const FALL_TIME := 0.30
 # Each gem id 0..3 gets a distinct, hand-drawn SVG with its own COLOR and SHAPE (round,
 # diamond, hexagon, teardrop) so they read at a glance for colour-blind / low-vision players.
 # The SVGs live in art/icons/ so Tim can restyle a gem by editing one file.
+## Index 0..3 are the regular gems; index 4 (LEGACY_COLOR) is the Legacy gem, drawn with the same
+## legacy_gem.svg used for the currency everywhere else so the player recognizes it instantly.
 const GEM_TEXTURE := [
 	preload("res://art/icons/gem_red.svg"),
 	preload("res://art/icons/gem_gold.svg"),
 	preload("res://art/icons/gem_teal.svg"),
 	preload("res://art/icons/gem_green.svg"),
+	preload("res://art/icons/legacy_gem.svg"),
 ]
 
 var _board
@@ -99,6 +113,8 @@ var _rng := RandomNumberGenerator.new()
 ## The single AVOID gem type this round (a color id). Matching a group that contains this gem
 ## is docked −60%; matching only clean gems earns +15%.
 var _avoid_type: int = 0
+## The soft red halo texture drawn behind avoid-type gems (built once, on first use).
+var _avoid_glow_texture: GradientTexture2D
 ## Total points earned so far (only ever rises — there is no way to lose points).
 var _score: float = 0.0
 ## Whether the player ever matched a group containing the avoid gem — used in the result summary.
@@ -128,8 +144,14 @@ var _select_ring: Panel
 ## The big AVOID gem tile from the banner, kept so we can pop it in on round start and give it a
 ## gentle continuous pulse (it is the round's "steer around this" cue, so it should draw the eye).
 var _banner_icon: Control
+## The "Legacy bonus earned" badge in the banner row above the board, revealed once the bonus is
+## secured (see _score_swap). Hidden until then.
+var _legacy_badge: Control
 ## True once the banner's intro pop has finished, so the idle pulse doesn't fight the intro tween.
 var _banner_ready: bool = false
+## True while the AVOID banner is playing its "you matched the avoid gem" reminder pulse, so the
+## idle pulse in _process yields to the reminder tween instead of fighting it for the icon's scale.
+var _banner_alerting: bool = false
 ## Free-running phase (seconds) accumulated in _process, driving the idle pulses of the selection
 ## ring and the AVOID banner. A single accumulated float so we never leak idle-pulse tweens.
 var _pulse_phase: float = 0.0
@@ -145,28 +167,36 @@ func how_to_play() -> String:
 	# numbers — those are tunable constants and copy would drift.
 	return "Drag a gem onto a neighbor to swap; line up 3 or more to clear them. " \
 		+ "Clean matches earn a bonus — any match containing the marked AVOID gem " \
-		+ "loses most of its points. Steer around it."
+		+ "loses most of its points. Steer around it. A big match drops a LEGACY " \
+		+ "gem; match three of those to win bonus Legacy gems."
 
 
-func begin(_tuning: TuningConfig) -> void:
+func begin(tuning: TuningConfig) -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_rng.randomize()
-	_board = Board.new(GRID_WIDTH, GRID_HEIGHT, GEM_COLORS)
+	# Capture the live difficulty knobs so Balance Tuning edits take effect next round.
+	_score_full = tuning.match3_full_score
+	_score_max = maxf(_score_full + 1.0, tuning.match3_max_score)  # keep max strictly above full
+	# Board carries GEM_COLORS regular gems PLUS the special Legacy gem (id LEGACY_COLOR): it never
+	# seeds the starting grid and never appears in an ordinary refill — it is created ONLY by a 5+
+	# match, which places it at the swap's target cell (Tim, 2026-07-09: no random legacy spawns).
+	_board = Board.new(GRID_WIDTH, GRID_HEIGHT, GEM_COLORS + 1, 0, LEGACY_COLOR)
+	# How big a match must be to drop a Legacy gem is live-tunable from Balance Tuning.
+	_board.special_match_size = maxi(3, tuning.match3_legacy_match_size)
 	_choose_avoid_type()
+	# A big match of the AVOID gem must NOT force-spawn a Legacy gem (no reward for matching the gem
+	# you're told to steer around). _choose_avoid_type set _avoid_type; tell the board to skip it.
+	_board.special_exclude_color = _avoid_type
 
-	var intro := Label.new()
-	intro.text = how_to_play()
-	intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	intro.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
-	intro.add_theme_color_override("font_color", UiPalette.NAVY)
+	# NOTE: no in-play instruction label. The Get Ready gate already shows how_to_play() before the
+	# round starts, so repeating it here only stole vertical room from the (now bigger) board and
+	# added clutter (Tim, 2026-07-09). The AVOID banner carries the one thing that changes per round.
 
-	# A live running score readout, on its own line under the intro.
-	var score_row := _build_score_row()
+	# No in-play "Score: N" readout (Tim, 2026-07-09): the host's outcome bar already shows progress,
+	# so the number was redundant. The score is still tracked internally for get_performance / get_score.
 
-	# The banner and the framed board travel together as one group, vertically centered in the
-	# space below the intro/score lines. A small separation keeps the AVOID banner pinned right
-	# above the board.
+	# The banner and the framed board travel together as one group, vertically centered in the space
+	# below the top chrome. A small separation keeps the AVOID banner pinned right above the board.
 	var bonus_banner := _build_bonus_banner()
 	var board_frame := _build_board_frame()
 
@@ -180,8 +210,6 @@ func begin(_tuning: TuningConfig) -> void:
 	var column := VBoxContainer.new()
 	column.set_anchors_preset(Control.PRESET_FULL_RECT)
 	column.add_theme_constant_override("separation", 12)
-	column.add_child(intro)
-	column.add_child(score_row)
 	column.add_child(board_group)
 	add_child(column)
 
@@ -198,21 +226,6 @@ func _choose_avoid_type() -> void:
 	_avoid_type = _rng.randi_range(0, GEM_COLORS - 1)
 
 
-## The live running score readout (refreshed as cascades resolve by _update_score_display), on
-## its own centered line under the intro.
-func _build_score_row() -> Control:
-	var row := HBoxContainer.new()
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-
-	_score_label = Label.new()
-	_score_label.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
-	_score_label.add_theme_color_override("font_color", UiPalette.MONEY_GREEN)
-	row.add_child(_score_label)
-	_update_score_display()
-
-	return row
-
-
 ## Build the AVOID banner pinned directly above the grid: an "AVOID" tag next to this round's
 ## avoid gem, shown large inside a gold-framed panel so the player can see at a glance which gem
 ## to steer around (matching it is docked −60%; clean matches earn +15%).
@@ -221,17 +234,56 @@ func _build_bonus_banner() -> Control:
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_theme_constant_override("separation", 16)
 
+	# AVOID group: the word sits ABOVE the gem (Tim, 2026-07-09).
+	var avoid_group := VBoxContainer.new()
+	avoid_group.alignment = BoxContainer.ALIGNMENT_CENTER
+	avoid_group.add_theme_constant_override("separation", 4)
 	var avoid_tag := Label.new()
 	avoid_tag.text = "AVOID"
+	avoid_tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	avoid_tag.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
 	avoid_tag.add_theme_color_override("font_color", UiPalette.NAVY)
-	avoid_tag.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	row.add_child(avoid_tag)
-
+	avoid_group.add_child(avoid_tag)
 	_banner_icon = _make_bonus_icon(_avoid_type)
-	row.add_child(_banner_icon)
+	_banner_icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	avoid_group.add_child(_banner_icon)
+	row.add_child(avoid_group)
 
-	return row
+	# An expanding spacer pushes the earned-bonus group to the right so it doesn't crowd the AVOID cue.
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(spacer)
+
+	# BONUS group: the word sits ABOVE the legacy gem, shown the moment the player secures the bonus
+	# (Tim, 2026-07-09), so it's clear the round's Legacy gems are already banked. A smaller framed gem
+	# than the AVOID cue — it's a reward badge, not the thing to watch for.
+	_legacy_badge = VBoxContainer.new()
+	_legacy_badge.alignment = BoxContainer.ALIGNMENT_CENTER
+	_legacy_badge.add_theme_constant_override("separation", 4)
+	_legacy_badge.visible = false
+	var badge_label := Label.new()
+	badge_label.text = "BONUS"
+	badge_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	badge_label.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
+	badge_label.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD.darkened(0.35))
+	_legacy_badge.add_child(badge_label)
+	var badge_icon := TextureRect.new()
+	badge_icon.texture = GEM_TEXTURE[LEGACY_COLOR]
+	badge_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	badge_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	badge_icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS  # smooth when downscaled
+	badge_icon.custom_minimum_size = Vector2(BONUS_ICON_SIZE * 0.55, BONUS_ICON_SIZE * 0.55)
+	badge_icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_legacy_badge.add_child(badge_icon)
+	row.add_child(_legacy_badge)
+
+	# Inset the whole banner so the AVOID gem (far left) and the BONUS badge (far right) sit a little
+	# farther from the card's outside edges (Tim, 2026-07-09).
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", BANNER_EDGE_MARGIN)
+	margin.add_theme_constant_override("margin_right", BANNER_EDGE_MARGIN)
+	margin.add_child(row)
+	return margin
 
 
 ## A single large AVOID gem tile for the banner: the gem texture centered inside a rounded panel
@@ -255,6 +307,7 @@ func _make_bonus_icon(color_id: int) -> Control:
 	tex.texture = GEM_TEXTURE[color_id]
 	tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	tex.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS  # smooth when downscaled
 	tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	tex.set_anchors_preset(Control.PRESET_FULL_RECT)
 	tex.offset_left = 24
@@ -315,9 +368,9 @@ func get_performance() -> float:
 	#   * SCORE_FULL .. SCORE_MAX -> the full line .. performance 1.0 (strong cascade / large-match
 	#                         play climbs into the extra-high band toward the maximum).
 	var full_line := _full_line_performance()
-	if _score <= SCORE_FULL:
-		return full_line * clampf(_score / SCORE_FULL, 0.0, 1.0)
-	var into_bonus := clampf((_score - SCORE_FULL) / (SCORE_MAX - SCORE_FULL), 0.0, 1.0)
+	if _score <= _score_full:
+		return full_line * clampf(_score / _score_full, 0.0, 1.0)
+	var into_bonus := clampf((_score - _score_full) / (_score_max - _score_full), 0.0, 1.0)
 	return full_line + (1.0 - full_line) * into_bonus
 
 
@@ -356,13 +409,57 @@ func _make_gem(color_id: int) -> Control:
 	gem.texture = GEM_TEXTURE[color_id]
 	gem.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	gem.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	# Use the texture's mipmaps when downscaled from the large SVG raster, or the detailed legacy gem
+	# looks pixelated at cell size (Tim, 2026-07-09). The .import already generates mipmaps.
+	gem.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	gem.size = Vector2(CELL_SIZE, CELL_SIZE)
 	gem.pivot_offset = Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
 	gem.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	gem.set_meta("color", color_id)
 
+	# Avoid-type gems get a soft red halo behind them so they're easy to spot and steer around
+	# (Tim, 2026-07-09). The glow is a child drawn behind the gem, so it travels with it and fades
+	# with it on clear.
+	if color_id == _avoid_type:
+		var glow := TextureRect.new()
+		glow.texture = _get_avoid_glow_texture()
+		glow.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		glow.stretch_mode = TextureRect.STRETCH_SCALE
+		var overhang := CELL_SIZE * 0.08  # a little tighter still — hugs the gem (Tim, 2026-07-09)
+		glow.position = Vector2(-overhang, -overhang)
+		glow.size = Vector2(CELL_SIZE + overhang * 2.0, CELL_SIZE + overhang * 2.0)
+		glow.show_behind_parent = true  # draw behind the gem texture, not over it
+		glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		gem.add_child(glow)
+
 	_style_gem(gem, false)
 	return gem
+
+
+## A soft red radial glow (opaque-ish red center fading to transparent), built once and reused as the
+## halo behind every avoid gem.
+func _get_avoid_glow_texture() -> GradientTexture2D:
+	if _avoid_glow_texture != null:
+		return _avoid_glow_texture
+	# A solid red core that holds most of the (now small) radius, then fades quickly at the edge, so
+	# the halo reads as a firm red ring hugging the gem rather than a big soft cloud (Tim, 2026-07-09).
+	var gradient := Gradient.new()
+	gradient.offsets = PackedFloat32Array([0.0, 0.72, 1.0])
+	# Earthy brick red rather than a pure fire red (Tim, 2026-07-09).
+	var earthy := Color(0.72, 0.26, 0.18)
+	gradient.colors = PackedColorArray([
+		Color(earthy.r, earthy.g, earthy.b, 0.51),   # earthy red core
+		Color(earthy.r, earthy.g, earthy.b, 0.48),   # near the edge of the tight radius
+		Color(earthy.r, earthy.g, earthy.b, 0.0),    # quick fade to transparent
+	])
+	_avoid_glow_texture = GradientTexture2D.new()
+	_avoid_glow_texture.gradient = gradient
+	_avoid_glow_texture.fill = GradientTexture2D.FILL_RADIAL
+	_avoid_glow_texture.fill_from = Vector2(0.5, 0.5)
+	_avoid_glow_texture.fill_to = Vector2(0.5, 0.0)     # radius reaches the edge
+	_avoid_glow_texture.width = 128
+	_avoid_glow_texture.height = 128
+	return _avoid_glow_texture
 
 
 ## Show a gem as selected/active during a drag. With textured gems there is no panel stylebox to
@@ -428,8 +525,9 @@ func _process(delta: float) -> void:
 		var ring_pulse := 1.0 + 0.07 * sin(_pulse_phase * 6.0)
 		_select_ring.pivot_offset = _select_ring.size / 2.0
 		_select_ring.scale = Vector2(ring_pulse, ring_pulse)
-	if _banner_icon != null and _banner_ready:
-		# A small continuous pulse keeps the "steer around this" gem drawing the eye.
+	if _banner_icon != null and _banner_ready and not _banner_alerting:
+		# A small continuous pulse keeps the "steer around this" gem drawing the eye. Skipped while
+		# the reminder pulse (see _pulse_avoid_banner) owns the icon's scale.
 		var banner_pulse := 1.0 + 0.04 * sin(_pulse_phase * 2.5)
 		_banner_icon.pivot_offset = _banner_icon.size / 2.0
 		_banner_icon.scale = Vector2(banner_pulse, banner_pulse)
@@ -449,6 +547,34 @@ func _animate_banner_intro() -> void:
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	intro.tween_property(_banner_icon, "modulate", Color.WHITE, 0.45)
 	intro.chain().tween_callback(func() -> void: _banner_ready = true)
+
+
+## Pulse the AVOID banner gem a couple of times as a reminder that the player just matched the gem
+## they're meant to steer around (Tim, 2026-07-10). Sets _banner_alerting so the idle pulse in
+## _process yields the icon's scale to this tween, then clears it and restores a neutral scale so the
+## idle breathing resumes seamlessly. A brief red-tinted brightening reinforces "that one costs you".
+func _pulse_avoid_banner() -> void:
+	if _banner_icon == null:
+		return
+	# Owning the icon's scale/modulate for the duration so the idle _process pulse doesn't fight it.
+	_banner_alerting = true
+	_banner_icon.pivot_offset = _banner_icon.size / 2.0
+	# Warm the flash toward the avoid-gem's warning red so the reminder reads as a caution, not a reward.
+	var alert_tint := Color(1.6, 0.8, 0.7, 1.0)
+	# A single SEQUENTIAL tween that plays two grow/settle beats on scale, with the red tint flashed in
+	# lock-step via set_delay so both properties move together without juggling parallel/chain modes
+	# (the earlier mixed-mode build silently animated nothing — Tim, 2026-07-10).
+	var pulse := create_tween()
+	for beat in range(2):
+		pulse.tween_property(_banner_icon, "scale", Vector2(1.25, 1.25), 0.13) \
+				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		pulse.parallel().tween_property(_banner_icon, "modulate", alert_tint, 0.13)
+		pulse.tween_property(_banner_icon, "scale", Vector2.ONE, 0.15) \
+				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+		pulse.parallel().tween_property(_banner_icon, "modulate", Color.WHITE, 0.15)
+	pulse.tween_callback(func() -> void:
+		_banner_alerting = false
+		_banner_icon.modulate = Color.WHITE)
 
 
 func _build_initial_gems() -> void:
@@ -561,20 +687,26 @@ func _play_resolution(result: Dictionary) -> void:
 	# climb in time with the animation.
 	var scoring := _score_swap(result)
 	var step_points: Array = scoring["step_points"]
+	var step_group_details: Array = scoring["step_group_details"]
 	if scoring["matched_avoid"]:
 		_matched_avoid_gem = true
+		# Pulse the AVOID gem tile above the grid a couple of times as a visual reminder that this
+		# match hit the gem to steer around (Tim, 2026-07-10).
+		_pulse_avoid_banner()
 
 	for i in range(result["steps"].size()):
-		await _animate_step(result["steps"][i], float(step_points[i]), i)
+		await _animate_step(result["steps"][i], float(step_points[i]), i, step_group_details[i])
 
-	# Celebrate hitting the max-bonus line BEFORE clearing _animating, so is_busy() keeps the host's
-	# countdown paused through the celebration (otherwise the host would end the round mid-burst).
-	# Challenge Mode has NO max-bonus line and never ends on score, so we skip the celebration there —
-	# otherwise it would fire on every swap once the score passed SCORE_MAX. The board keeps
-	# cascading and refilling endlessly; only the player tapping DONE stops it.
-	if not challenge_mode and not _finished and _score >= SCORE_MAX:
-		await _celebrate_max()
+	# A 5+ match earned a Legacy gem: pop it in at the swap's TARGET cell now the cascade has settled
+	# (Tim, 2026-07-09 — it appears where the player moved, not a random slot). The board already put
+	# the legacy color at that cell, so we swap the settled gem node there for a legacy gem.
+	if result.has("legacy_placement"):
+		await _pop_legacy_gem(result["legacy_placement"])
 
+	# The max-bonus "MAX!" celebration now lives on the HOST (MinigameScreen._flash_max_then), so every
+	# minigame announces a maxed-out round the same way (Tim, 2026-07-10) — match-3 no longer plays its
+	# own bespoke burst here. Reaching SCORE_MAX simply self-completes below, and the host flashes MAX
+	# before showing the result. Challenge Mode has no max line and never ends on score.
 	_animating = false
 	_maybe_finish_early()
 
@@ -592,21 +724,26 @@ func _maybe_finish_early() -> void:
 		return
 	if _finished:
 		return
-	if _score >= SCORE_MAX:
+	if _score >= _score_max:
 		_finished = true
 		completed.emit(get_performance())
 
 
-## Compute a swap's earnings from the board's recorded resolution steps. Returns the points to
-## award for each cascade step plus whether the swap matched the avoid gem anywhere:
-##   { "step_points": Array[float], "matched_avoid": bool }
-## Each match GROUP is scored on its own: a clean group (no avoid gem) earns +15%, a group that
-## contains the avoid gem is docked −60%. The groups' points are summed per step, then the step's
-## rising COMBO multiplier is applied.
+## Compute a swap's earnings from the board's recorded resolution steps. Returns:
+##   { "step_points": Array[float], "matched_avoid": bool, "step_group_details": Array,
+##     "legacy_matches": int }
+## Each match GROUP is scored on its own with NO combo: a clean group (no avoid gem) earns +15%,
+## an avoid group is docked −60%, and a LEGACY group scores 0 (it pays a Legacy bonus, not points).
+## step_group_details is aligned with each step's matches so the animation can label each group.
 func _score_swap(result: Dictionary) -> Dictionary:
 	var steps: Array = result["steps"]
 	var matched_avoid := false
+	var legacy_matches := 0
 	var step_points: Array = []
+	# Per step, a list (aligned with step["matches"]) of {points, is_avoid, is_legacy} so the
+	# animation can label each match GROUP with what it earned — the readable per-match feedback
+	# (Tim, 2026-07-09: "the result of matches is hard to read").
+	var step_group_details: Array = []
 
 	for i in range(steps.size()):
 		var step: Dictionary = steps[i]
@@ -620,38 +757,59 @@ func _score_swap(result: Dictionary) -> Dictionary:
 			var cell: Array = cleared[j]
 			color_of_cell[cell[0] * GRID_WIDTH + cell[1]] = cleared_colors[j]
 
-		# Combo: each successive cascade step in this swap multiplies its points (step 0 = ×1).
-		var combo_multiplier := 1.0 + COMBO_BONUS * float(i)
 		var step_raw := 0.0
+		var group_details: Array = []
 		for group in step["matches"]:
 			var cells: Array = group
 			var n: int = cells.size()
-			# Bigger lines score more per gem (see SIZE_BONUS).
-			var group_points := POINTS_PER_GEM * float(n) * (1.0 + SIZE_BONUS * float(n - 3))
-			# Find this group's color from any of its cells, then apply the clean/avoid factor.
 			var first_cell: Array = cells[0]
 			var group_color: int = color_of_cell[first_cell[0] * GRID_WIDTH + first_cell[1]]
-			if group_color == _avoid_type:
+
+			if group_color == LEGACY_COLOR:
+				# Matching 3+ Legacy gems collects a Legacy bonus and scores NO points ("by
+				# themselves they do nothing"). The host gates the payout by the round result.
+				legacy_matches += 1
+				group_details.append({"points": 0.0, "is_avoid": false, "is_legacy": true})
+				continue
+
+			# Bigger lines score more per gem (see SIZE_BONUS). No cascade combo — static by size.
+			var group_points := POINTS_PER_GEM * float(n) * (1.0 + SIZE_BONUS * float(n - 3))
+			var is_avoid := group_color == _avoid_type
+			if is_avoid:
 				group_points *= AVOID_MATCH_FACTOR
 				matched_avoid = true
 			else:
 				group_points *= CLEAN_MATCH_FACTOR
 			step_raw += group_points
-		step_points.append(step_raw * combo_multiplier)
+			group_details.append({"points": group_points, "is_avoid": is_avoid, "is_legacy": false})
+		step_points.append(step_raw)
+		step_group_details.append(group_details)
 
-	return {"step_points": step_points, "matched_avoid": matched_avoid}
+	if legacy_matches > 0:
+		collect_legacy_gem(legacy_matches)
+		# Once the bonus is secured, stop the board spawning any more Legacy gems (design rule 3 —
+		# no pointless noise once earned) and reveal the "bonus earned" badge above the board.
+		if legacy_bonus_secured():
+			_board.enable_special_spawns = false
+			if _legacy_badge != null:
+				_legacy_badge.visible = true
+
+	return {
+		"step_points": step_points,
+		"matched_avoid": matched_avoid,
+		"step_group_details": step_group_details,
+		"legacy_matches": legacy_matches,
+	}
 
 
-func _animate_step(step: Dictionary, points: float, step_index: int) -> void:
-	for group in step["matches"]:
-		_spawn_match_badge(group)
-	# A cascade step (step_index >= 1) is a chain reaction off the same swap — call it out with a
-	# rising "COMBO ×N" flourish so the player SEES the chain paying off (the combo was invisible
-	# before). step_index 0 is the initial match, so the first cascade is ×2.
-	if step_index >= 1:
-		_spawn_combo_flourish(step, step_index)
-	# Cascades also flash BIGGER, so a deep chain reads as more energetic as it climbs.
-	var flash_scale := 1.25 + 0.08 * float(step_index)
+func _animate_step(step: Dictionary, points: float, step_index: int, group_details: Array) -> void:
+	var matches: Array = step["matches"]
+	for gi in range(matches.size()):
+		var detail: Dictionary = group_details[gi]
+		_spawn_match_badge(
+				matches[gi], bool(detail["is_avoid"]), bool(detail.get("is_legacy", false)))
+	# Every match flashes the same (no combo now): a plain, consistent pop as it clears.
+	var flash_scale := 1.25
 	var flash := create_tween().set_parallel(true)
 	for cell in step["cleared"]:
 		var gem: Control = _gem_nodes[cell[0]][cell[1]]
@@ -712,7 +870,11 @@ func _apply_spawns(spawns: Array, drop: Tween) -> void:
 		drop.tween_property(gem, "position", _cell_pos(to_r, col), FALL_TIME)
 
 
-func _spawn_match_badge(group: Array) -> void:
+## A color-coded result chip that pops over a cleared match. It shows the NUMBER OF GEMS in the
+## match (Tim, 2026-07-09 — a plain count reads better than an abstract point total now that combos
+## are gone), colored by outcome: green for a clean match, red for one that hit the avoid gem, and a
+## gold "LEGACY GEM!" for a legacy match (which pays a Legacy bonus, not points).
+func _spawn_match_badge(group: Array, is_avoid: bool, is_legacy: bool = false) -> void:
 	if group.is_empty():
 		return
 	var sum := Vector2.ZERO
@@ -720,105 +882,83 @@ func _spawn_match_badge(group: Array) -> void:
 		sum += _cell_pos(cell[0], cell[1])
 	var center: Vector2 = sum / float(group.size()) + Vector2(CELL_SIZE, CELL_SIZE) / 2.0
 
-	var badge := Label.new()
-	badge.text = str(group.size())
-	badge.add_theme_font_size_override("font_size", UiPalette.FONT_DISPLAY)
-	badge.add_theme_color_override("font_color", UiPalette.CREAM)
-	badge.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
-	badge.add_theme_constant_override("outline_size", 6)
-	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	badge.position = center - Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
-	badge.size = Vector2(CELL_SIZE, CELL_SIZE)
-	badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_board_area.add_child(badge)
+	var chip := PanelContainer.new()
+	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	chip.z_index = 3  # above gems and the selection ring
 
-	var tween := create_tween().set_parallel(true)
-	tween.tween_property(badge, "position:y", badge.position.y - 36.0, FLASH_TIME + CLEAR_TIME)
-	tween.tween_property(badge, "modulate:a", 0.0, FLASH_TIME + CLEAR_TIME)
-	tween.chain().tween_callback(badge.queue_free)
-
-
-## A cascade chain signal: a teal "COMBO ×N" label that blooms up and fades over the cells a
-## cascade step just cleared, so a chain reaction reads as a building combo rather than gems quietly
-## vanishing. N is the step's combo multiplier (step_index 1 -> ×2, etc.), matching _score_swap.
-func _spawn_combo_flourish(step: Dictionary, step_index: int) -> void:
-	var cleared: Array = step["cleared"]
-	if cleared.is_empty():
-		return
-	# Center the flourish on the average of the cleared cells, in board-local coordinates.
-	var sum := Vector2.ZERO
-	for cell in cleared:
-		sum += _cell_pos(cell[0], cell[1])
-	var center: Vector2 = sum / float(cleared.size()) + Vector2(CELL_SIZE, CELL_SIZE) / 2.0
+	var chip_color := UiPalette.MONEY_GREEN
+	if is_legacy:
+		chip_color = UiPalette.MUSTARD_GOLD
+	elif is_avoid:
+		chip_color = UiPalette.KETCHUP_RED
+	var box := StyleBoxFlat.new()
+	box.bg_color = chip_color
+	box.set_corner_radius_all(14)
+	box.border_color = UiPalette.INK_NAVY
+	box.set_border_width_all(3)
+	box.content_margin_left = 16
+	box.content_margin_right = 16
+	box.content_margin_top = 8
+	box.content_margin_bottom = 8
+	chip.add_theme_stylebox_override("panel", box)
 
 	var label := Label.new()
-	label.text = "COMBO ×%d" % (step_index + 1)
+	if is_legacy:
+		label.text = "LEGACY GEM!"
+	else:
+		# The count of gems in this match (merged L/T/+ shapes count as one big match).
+		label.text = "%d" % group.size()
 	label.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
-	label.add_theme_color_override("font_color", UiPalette.ATOMIC_TEAL)
+	label.add_theme_color_override("font_color", Color.WHITE)
 	label.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
-	label.add_theme_constant_override("outline_size", 8)
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_constant_override("outline_size", 6)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	label.size = Vector2(CELL_SIZE * 3.0, CELL_SIZE)
-	label.position = center - label.size / 2.0
-	label.pivot_offset = label.size / 2.0
-	label.z_index = 3  # above gems and the selection ring
-	label.scale = Vector2(0.6, 0.6)
-	_board_area.add_child(label)
+	chip.add_child(label)
 
-	var bloom := create_tween().set_parallel(true)
-	bloom.tween_property(label, "scale", Vector2(1.15, 1.15), 0.22) \
+	# Size the chip to its text, then center it on the group and float it up as it fades.
+	_board_area.add_child(chip)
+	chip.reset_size()
+	chip.position = center - chip.size / 2.0
+	chip.pivot_offset = chip.size / 2.0
+	chip.scale = Vector2(0.7, 0.7)
+
+	var tween := create_tween().set_parallel(true)
+	tween.tween_property(chip, "scale", Vector2.ONE, 0.18) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	bloom.tween_property(label, "position:y", label.position.y - 48.0, 0.55)
-	bloom.tween_property(label, "modulate:a", 0.0, 0.55).set_delay(0.15)
-	bloom.chain().tween_callback(label.queue_free)
+	tween.tween_property(chip, "position:y", chip.position.y - 44.0, 0.7)
+	tween.tween_property(chip, "modulate:a", 0.0, 0.7).set_delay(0.25)
+	tween.chain().tween_callback(chip.queue_free)
 
 
-## The max-bonus celebration: when the score reaches SCORE_MAX (performance 1.0, the best possible
-## result) the round used to just end. Now it pays off — a white wash sweeps the board and a big
-## "MAXED OUT!" label blooms — before the host shows the result. Kept brief; the caller holds
-## is_busy() true across this await so the countdown stays paused.
-func _celebrate_max() -> void:
-	# A white flash over the whole board.
-	var flash := ColorRect.new()
-	flash.color = Color(1, 1, 1, 0.0)
-	flash.set_anchors_preset(Control.PRESET_FULL_RECT)
-	flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	flash.z_index = 4
-	_board_area.add_child(flash)
-
-	var banner := Label.new()
-	banner.text = "MAXED OUT!"
-	banner.add_theme_font_size_override("font_size", UiPalette.FONT_DISPLAY)
-	banner.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD)
-	banner.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
-	banner.add_theme_constant_override("outline_size", 10)
-	banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	banner.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	banner.size = _board_area.size
-	banner.pivot_offset = banner.size / 2.0
-	banner.z_index = 5
-	banner.scale = Vector2(0.5, 0.5)
-	_board_area.add_child(banner)
-
-	var celebrate := create_tween().set_parallel(true)
-	celebrate.tween_property(flash, "color", Color(1, 1, 1, 0.7), 0.12)
-	celebrate.tween_property(flash, "color", Color(1, 1, 1, 0.0), 0.45).set_delay(0.12)
-	celebrate.tween_property(banner, "scale", Vector2.ONE, 0.35) \
+## Pop a Legacy gem into the swap's target cell after a 5+ match. The board already set that cell to
+## the legacy color; here we swap the settled gem NODE for a legacy gem and bloom it in, so it reads
+## as "a Legacy gem appeared right where you made your move."
+func _pop_legacy_gem(cell: Array) -> void:
+	var row: int = cell[0]
+	var col: int = cell[1]
+	if row < 0 or row >= GRID_HEIGHT or col < 0 or col >= GRID_WIDTH:
+		return
+	var old: Control = _gem_nodes[row][col]
+	if old != null:
+		old.queue_free()
+	var gem := _make_gem(LEGACY_COLOR)
+	gem.position = _cell_pos(row, col)
+	gem.scale = Vector2(0.2, 0.2)
+	gem.z_index = 2
+	_board_area.add_child(gem)
+	_gem_nodes[row][col] = gem
+	var pop := create_tween()
+	pop.tween_property(gem, "scale", Vector2.ONE, 0.3) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	celebrate.tween_property(banner, "modulate:a", 0.0, 0.3).set_delay(0.4)
-	await celebrate.finished
-	flash.queue_free()
-	banner.queue_free()
+	await pop.finished
+	gem.z_index = 0
 
 
 func result_summary() -> String:
-	var line := "Scored %d points" % int(round(_score))
-	if _matched_avoid_gem:
-		line += " — watch out for the AVOID gem next time!"
-	else:
-		line += " — clean matching, nicely done!"
-	return line
+	# No point total, and no AVOID-gem scolding (Tim, 2026-07-09) — just a bit of flavor tied to how
+	# the round went. A round below the "full" line keeps only the minimum, so acknowledge the miss.
+	if get_legacy_gems_collected() > 0:
+		return "You matched the LEGACY gems!"
+	if get_performance() < _full_line_performance():
+		return "Nice try!"
+	return "Nicely done!"

@@ -422,7 +422,7 @@ func _make_gem(color_id: int) -> Control:
 		glow.texture = _get_avoid_glow_texture()
 		glow.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		glow.stretch_mode = TextureRect.STRETCH_SCALE
-		var overhang := CELL_SIZE * 0.42
+		var overhang := CELL_SIZE * 0.12  # tighter — hugs the gem (Tim, 2026-07-09)
 		glow.position = Vector2(-overhang, -overhang)
 		glow.size = Vector2(CELL_SIZE + overhang * 2.0, CELL_SIZE + overhang * 2.0)
 		glow.show_behind_parent = true  # draw behind the gem texture, not over it
@@ -438,9 +438,15 @@ func _make_gem(color_id: int) -> Control:
 func _get_avoid_glow_texture() -> GradientTexture2D:
 	if _avoid_glow_texture != null:
 		return _avoid_glow_texture
+	# A solid red core that holds most of the (now small) radius, then fades quickly at the edge, so
+	# the halo reads as a firm red ring hugging the gem rather than a big soft cloud (Tim, 2026-07-09).
 	var gradient := Gradient.new()
-	gradient.set_color(0, Color(1.0, 0.15, 0.1, 0.2))   # faint red at the center (Tim: 75% weaker)
-	gradient.set_color(1, Color(1.0, 0.15, 0.1, 0.0))   # transparent at the edge
+	gradient.offsets = PackedFloat32Array([0.0, 0.72, 1.0])
+	gradient.colors = PackedColorArray([
+		Color(1.0, 0.1, 0.08, 0.85),   # solid red core
+		Color(1.0, 0.1, 0.08, 0.8),    # still solid near the edge of the tight radius
+		Color(1.0, 0.1, 0.08, 0.0),    # quick fade to transparent
+	])
 	_avoid_glow_texture = GradientTexture2D.new()
 	_avoid_glow_texture.gradient = gradient
 	_avoid_glow_texture.fill = GradientTexture2D.FILL_RADIAL

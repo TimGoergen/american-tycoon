@@ -291,6 +291,15 @@ extends Resource
 @export var legacy_gem_chance_balance: float = 0.15  # feel-tune
 @export var legacy_gem_chance_basketball: float = 0.15  # feel-tune
 
+## Memory's Legacy gem is a chance-gated BONUS ROUND, offered only after the player clears the whole
+## game (all 6 rounds). This is the per-run chance that bonus round appears once they've earned it.
+@export var legacy_gem_chance_memory: float = 0.15  # feel-tune
+
+## How many taps the Memory bonus round's sequence is. In that round all four pads look identical
+## (each wears the gem), so this is recalled by pure position — the Memory gem's difficulty lever.
+## Higher = harder to earn. Starts at 5 (Tim, 2026-07-10).
+@export var memory_gem_sequence_length: int = 5  # feel-tune
+
 
 # --- Events (Spec §10) ---
 

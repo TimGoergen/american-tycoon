@@ -13,6 +13,13 @@ extends Control
 ## ends on its countdown; whichever happens first wins, using the final performance.
 signal completed(performance: float)
 
+## Ask the host to flash a big centered banner over the screen — the SAME look and size as the
+## universal "MAX!" celebration — then run `after` once it finishes. A type uses this to announce a
+## mid-round beat (Memory's "GEM ROUND" before its bonus round) so the announcement matches MAX!
+## exactly. The host connects this and owns the flash; a type with no host (unit tests) simply sees
+## nothing happen. `after` may be an empty Callable.
+signal banner_requested(text: String, color: Color, after: Callable)
+
 ## The host's outcome curve, set by the host BEFORE begin() so a type that wants to align its
 ## internal scoring to where the shared "full" (1.0x) line falls can read it. `keep_floor` is
 ## the multiplier at performance 0; `bonus_max` is the extra-high bonus above 1.0x at
@@ -79,6 +86,14 @@ func get_performance() -> float:
 ## isn't charged to the player. Most types never block.
 func is_busy() -> bool:
 	return false
+
+## Whether this type runs against the host's countdown timer. Almost every type does, so the default
+## is true. A type that returns false (Memory — recalling a sequence against a clock adds nothing and
+## the bonus sequence can't be rushed) gets NO timer at all: the host hides the countdown and never
+## ends the round on the clock or on a max-early-out. Such a type OWNS its own ending — it must emit
+## `completed` itself when play is over (on a win, a miss, or its own bonus round).
+func uses_timer() -> bool:
+	return true
 
 ## A short, human-readable name for this minigame type. The random prestige draw doesn't
 ## need it, but the Minigame Tuning review screen (Settings) lists every type by name so

@@ -804,6 +804,7 @@ func start_game(
 	# a type that aligns its scoring to the shared "full" line (match-3) can read it. See Minigame.
 	_active_minigame.outcome_keep_floor = _tuning.minigame_keep_floor
 	_active_minigame.outcome_bonus_max = _bonus_max
+	_active_minigame.outcome_full_performance = _tuning.minigame_full_performance
 	# The legacy-gem cap: how many gems earn the bonus, so a type knows when to stop spawning more.
 	_active_minigame.legacy_bonus_cap = _tuning.legacy_bonus_max_gems
 	_play_area.add_child(_active_minigame)
@@ -1033,12 +1034,17 @@ func _end_challenge() -> void:
 # The universal "Legacy kept" indicator
 # ---------------------------------------------------------------------------
 
-## Performance (0..1) -> kept multiplier: keep_floor at 0, 1.0 ("full") partway up, and the
-## extra-high bonus (1.0 + bonus_max) at performance 1.0. One curve for every minigame type.
+## Performance (0..1) -> kept multiplier. A two-segment curve (Tim, work item 4, 2026-07-10) so
+## STANDARD play is neutral, not punishing: below the "full" point the multiplier eases from
+## keep_floor (a modest downside at performance 0) up to 1.0; at/above it, up to the extra-high bonus
+## (1.0 + bonus_max) at performance 1.0. `minigame_full_performance` is where 1.0 sits — the same
+## value a skip banks. One curve for every minigame type.
 func _multiplier_for_performance(performance: float) -> float:
-	var floor_mult := _tuning.minigame_keep_floor
-	var span := (1.0 - floor_mult) + _bonus_max
-	return floor_mult + clampf(performance, 0.0, 1.0) * span
+	var perf := clampf(performance, 0.0, 1.0)
+	var full_perf := clampf(_tuning.minigame_full_performance, 0.0001, 0.9999)
+	if perf < full_perf:
+		return lerpf(_tuning.minigame_keep_floor, 1.0, perf / full_perf)
+	return lerpf(1.0, 1.0 + _bonus_max, (perf - full_perf) / (1.0 - full_perf))
 
 
 func _current_performance() -> float:

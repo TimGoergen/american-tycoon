@@ -374,14 +374,11 @@ func get_performance() -> float:
 	return full_line + (1.0 - full_line) * into_bonus
 
 
-## The performance value at which the host's curve hits exactly 1.0x ("full"), derived from the
-## outcome curve the host set before begin(). Anchoring our score-to-performance mapping here is
-## what makes "regular clean play = full" true whether the site's bonus cap is 0.25 or 1.0.
+## The performance value at which the host's curve hits exactly 1.0x ("full"). The host sets this
+## point directly now (outcome_full_performance, work item 4), so we read it rather than deriving it —
+## anchoring our score-to-performance mapping here is what makes "regular clean play = full" true.
 func _full_line_performance() -> float:
-	var span := (1.0 - outcome_keep_floor) + outcome_bonus_max
-	if span <= 0.0:
-		return 1.0
-	return (1.0 - outcome_keep_floor) / span
+	return clampf(outcome_full_performance, 0.0, 1.0)
 
 
 ## Refresh the live score readout.

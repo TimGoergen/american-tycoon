@@ -223,15 +223,23 @@ extends Resource
 # costs now live in LegacyUpgradeCatalog.gd, not here.
 
 # --- Prestige minigame (GDD §5.5, Spec §9.3) ---
-# At prestige the player plays a match-3 whose score sets how much of the run's base
-# Legacy they KEEP: legacy_awarded = floor(base_legacy × mult). The multiplier rises
-# from minigame_keep_floor (score 0) → 1.0 "full" (score ≥ minigame_full_score) → up to
-# 1.0 + bonus (score ≥ minigame_extra_score), where the extra-high bonus cap comes from
-# LegacyUpgrades.minigame_bonus_max() (0.25 base, +5%/level via Family Reputation).
+# At prestige the player plays a minigame whose performance sets how much of the run's base
+# Legacy they KEEP: legacy_awarded = floor(base_legacy × mult). Reward curve reshaped (Tim,
+# work item 4, 2026-07-10) so standard play is NEUTRAL, not punishing: the multiplier is
+# minigame_keep_floor at performance 0 (a MODEST downside now, not half), exactly 1.0 at
+# performance minigame_full_performance ("standard" play — the same value a skip / minigame-off
+# banks), and up to 1.0 + bonus at performance 1.0 (a modest upside). The extra-high bonus cap
+# comes from LegacyUpgrades.minigame_bonus_max() (0.25 base, +5%/level via Family Reputation).
 
-## Fraction of the base Legacy kept on the WORST result (score 0) — also what a skip /
-## minigame-off banks. Below 1.0, so a poor round (or opting out) loses Legacy.
-@export var minigame_keep_floor: float = 0.5  # feel-tune
+## Fraction of the base Legacy kept on the WORST result (performance 0). Reshaped to a MODEST
+## downside (Tim, work item 4): a bad round loses only a little, it no longer costs half. A skip /
+## minigame-off banks 1.0 (full), not this floor.
+@export var minigame_keep_floor: float = 0.9  # feel-tune
+
+## The performance (0..1) that maps to exactly 1.0 — "standard" play, the neutral result. Below it
+## the reward eases down toward minigame_keep_floor (modest downside); above it, up into the bonus
+## (modest upside). Match-3 anchors its "full" score to this point (see MatchThreeMinigame).
+@export var minigame_full_performance: float = 0.5  # feel-tune
 
 ## Gems cleared to keep the FULL base Legacy (multiplier exactly 1.0). The multiplier
 ## scales linearly from the floor (score 0) up to 1.0 at this score.

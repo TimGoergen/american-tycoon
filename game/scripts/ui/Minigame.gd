@@ -28,6 +28,10 @@ signal banner_requested(text: String, color: Color, after: Callable)
 ## them so "regular non-bonus play = exactly full" holds regardless of the site's bonus cap.
 var outcome_keep_floor: float = 0.5
 var outcome_bonus_max: float = 0.25
+## The performance (0..1) the host maps to exactly 1.0 ("standard" play). Set by the host before
+## begin(), so a type that aligns its scoring to the "full" line (match-3) reads the same neutral
+## point the host uses. Below it the reward eases down to keep_floor; above it, up into the bonus.
+var outcome_full_performance: float = 0.5
 
 ## Challenge Mode (Tim, 2026-06-30): the host sets this true BEFORE begin() when the player picks
 ## Challenge Mode on the Minigame Tuning screen. In Challenge Mode a type must run ENDLESSLY — no

@@ -397,6 +397,10 @@ func _make_gem_pad(pad: Panel) -> void:
 		var icon := TextureRect.new()
 		icon.name = "GemIcon"
 		icon.texture = GEM_IMAGE
+		# IGNORE_SIZE so the node's minimum size is NOT the SVG's (large) native pixel size — otherwise
+		# that minimum overrides the anchor rect and the gem renders far bigger than the 240px pad. With
+		# it 0, the anchors/offsets below control the rect and KEEP_ASPECT_CENTERED fits the gem inside.
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE  # taps still reach the pad beneath
 		icon.set_anchors_preset(Control.PRESET_FULL_RECT)

@@ -920,9 +920,7 @@ func _celebrate_max() -> void:
 
 
 func result_summary() -> String:
-	# No point total (Tim, 2026-07-09: points aren't shown to the player) — just a bit of flavor.
+	# No point total, and no AVOID-gem scolding (Tim, 2026-07-09) — just a bit of positive flavor.
 	if get_legacy_gems_collected() > 0:
 		return "You matched the LEGACY gems!"
-	elif _matched_avoid_gem:
-		return "Watch out for the AVOID gem next time!"
-	return "Clean matching, nicely done!"
+	return "Nicely done!"

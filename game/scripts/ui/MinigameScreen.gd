@@ -140,6 +140,8 @@ var _play_area: Control
 var _result_heading_label: Label
 var _result_mult_label: Label
 var _result_amount_label: Label
+## The smaller "(base + bonus)" / "(of X)" breakdown line beneath the big total. Hidden when empty.
+var _result_breakdown_label: Label
 ## A type-specific line on the result screen ("Scored 1,240 points", "Caught 14 of 18"), so the
 ## paused result clearly reflects the game just played. Hidden when the type provides none.
 var _result_summary_label: Label
@@ -469,7 +471,14 @@ func _build_result_view() -> Control:
 	column.add_theme_constant_override("separation", 16)
 	column.visible = false
 
-	_add_back_button(column)
+	# The Back button gets the SAME size and edge margin as the play screen's (Tim, 2026-07-09): same
+	# _add_back_button, wrapped in a MarginContainer with CHROME_MARGIN like the play view's top row.
+	var back_margin := MarginContainer.new()
+	back_margin.add_theme_constant_override("margin_top", CHROME_MARGIN)
+	back_margin.add_theme_constant_override("margin_left", CHROME_MARGIN)
+	back_margin.add_theme_constant_override("margin_right", CHROME_MARGIN)
+	column.add_child(back_margin)
+	_add_back_button(back_margin)
 
 	# An expanding spacer above the text block (mirrored by the one below CONTINUE) centers the result
 	# text vertically in the middle of the card (Tim, 2026-07-09).
@@ -487,10 +496,17 @@ func _build_result_view() -> Control:
 	_result_mult_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(_result_mult_label)
 
-	# NAVY — the same color as the Back button's label (Tim, 2026-07-09); reads clearly on cream.
-	_result_amount_label = _make_label("", UiPalette.FONT_SUBHEAD, UiPalette.NAVY)
+	# The "+X Legacy" total: NAVY (the Back button's label color), 40% larger than FONT_SUBHEAD and
+	# bold so it's the clear focal figure (Tim, 2026-07-09).
+	_result_amount_label = _make_label("", int(UiPalette.FONT_SUBHEAD * 1.4), UiPalette.NAVY)
 	_result_amount_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_result_amount_label.add_theme_font_override("font", UiPalette.make_bold_font())
 	column.add_child(_result_amount_label)
+
+	# The base + bonus breakdown (or "of X" on a weak round) on its own smaller line beneath the total.
+	_result_breakdown_label = _make_label("", UiPalette.FONT_LABEL, UiPalette.NAVY)
+	_result_breakdown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	column.add_child(_result_breakdown_label)
 
 	# How the player did at the game itself (set per round from the type's result_summary).
 	_result_summary_label = _make_label("", UiPalette.FONT_LABEL, UiPalette.NAVY)
@@ -540,6 +556,12 @@ func _build_result_view() -> Control:
 
 	column.add_child(continue_row)
 
+	# A CHROME_MARGIN gap below CONTINUE so it isn't jammed against the card's bottom edge (Tim,
+	# 2026-07-09) — matching the breathing room the SKIP button has on the play screen.
+	var continue_bottom := Control.new()
+	continue_bottom.custom_minimum_size = Vector2(0, CHROME_MARGIN)
+	column.add_child(continue_bottom)
+
 	return column
 
 
@@ -577,7 +599,9 @@ func _build_begin_overlay() -> Control:
 	box.add_child(_begin_framing)
 
 	# Names the randomly drawn type so the player knows what they're about to play.
-	_begin_title = _make_label("", UiPalette.FONT_DISPLAY, UiPalette.MUSTARD_GOLD)
+	# DARK_GOLD (not the brighter MUSTARD_GOLD) so the game name reads clearly on the cream card
+	# (Tim, 2026-07-09).
+	_begin_title = _make_label("", UiPalette.FONT_DISPLAY, UiPalette.DARK_GOLD)
 	_begin_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_begin_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(_begin_title)
@@ -1155,25 +1179,29 @@ func _end_round() -> void:
 
 
 func _show_result(mult: float) -> void:
+	_result_breakdown_label.visible = false  # only the amount-scaling branch below reveals it
 	if _upside_only:
 		_set_first_contact_result_labels(mult)
 	else:
 		var kept := _base_amount * mult
+		# The big total goes on _result_amount_label; the smaller parenthetical breakdown (if any) on
+		# _result_breakdown_label beneath it.
+		_result_amount_label.text = "+%s" % _format_amount(kept)
+		var breakdown := ""
 		if mult > 1.0:
 			_result_mult_label.text = "+%d%% BONUS" % int(round((mult - 1.0) * 100.0))
 			# A saturated blue (not the pale teal) for the bonus headline (Tim, 2026-07-09).
 			_result_mult_label.add_theme_color_override("font_color", Color("#2E6FD6"))
-			# Two lines: the total on the first, the base + bonus breakdown on the second.
-			_result_amount_label.text = "+%s\n(%s + %s bonus)" % \
-					[_format_amount(kept), _format_amount(_base_amount), _format_amount(kept - _base_amount)]
+			breakdown = "(%s + %s bonus)" % [_format_amount(_base_amount), _format_amount(kept - _base_amount)]
 		elif mult >= 1.0:
 			_result_mult_label.text = "FULL"
 			_result_mult_label.add_theme_color_override("font_color", UiPalette.DARK_MONEY_GREEN)
-			_result_amount_label.text = "+%s" % _format_amount(kept)
 		else:
 			_result_mult_label.text = "KEPT %d%%" % int(round(mult * 100.0))
 			_result_mult_label.add_theme_color_override("font_color", _keep_color(mult))
-			_result_amount_label.text = "+%s  (of %s)" % [_format_amount(kept), _format_amount(_base_amount)]
+			breakdown = "(of %s)" % _format_amount(_base_amount)
+		_result_breakdown_label.text = breakdown
+		_result_breakdown_label.visible = breakdown != ""
 
 	# The type's own summary of how the round was played (empty for types that provide none).
 	var summary := _active_minigame.result_summary() if _active_minigame != null else ""

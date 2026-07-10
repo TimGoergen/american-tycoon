@@ -443,8 +443,8 @@ func _get_avoid_glow_texture() -> GradientTexture2D:
 	var gradient := Gradient.new()
 	gradient.offsets = PackedFloat32Array([0.0, 0.72, 1.0])
 	gradient.colors = PackedColorArray([
-		Color(1.0, 0.1, 0.08, 0.85),   # solid red core
-		Color(1.0, 0.1, 0.08, 0.8),    # still solid near the edge of the tight radius
+		Color(1.0, 0.1, 0.08, 0.51),   # red core (alpha reduced 40%, Tim 2026-07-09)
+		Color(1.0, 0.1, 0.08, 0.48),   # near the edge of the tight radius
 		Color(1.0, 0.1, 0.08, 0.0),    # quick fade to transparent
 	])
 	_avoid_glow_texture = GradientTexture2D.new()

@@ -471,6 +471,12 @@ func _build_result_view() -> Control:
 
 	_add_back_button(column)
 
+	# An expanding spacer above the text block (mirrored by the one below CONTINUE) centers the result
+	# text vertically in the middle of the card (Tim, 2026-07-09).
+	var top_spacer := Control.new()
+	top_spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	column.add_child(top_spacer)
+
 	# The heading names what was won ("THE INHERITANCE" / "THE OVERNIGHT HAUL"); start_game
 	# sets it per site from the reward context.
 	_result_heading_label = _make_label("THE INHERITANCE", UiPalette.FONT_HEADLINE, UiPalette.NAVY)
@@ -481,9 +487,8 @@ func _build_result_view() -> Control:
 	_result_mult_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(_result_mult_label)
 
-	# DARK_MONEY_GREEN (not MONEY_GREEN): the lighter cash green washes out against the cream result
-	# card and was hard to read (Tim, 2026-07-02); the darker green reads clearly on cream.
-	_result_amount_label = _make_label("", UiPalette.FONT_SUBHEAD, UiPalette.DARK_MONEY_GREEN)
+	# NAVY — the same color as the Back button's label (Tim, 2026-07-09); reads clearly on cream.
+	_result_amount_label = _make_label("", UiPalette.FONT_SUBHEAD, UiPalette.NAVY)
 	_result_amount_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(_result_amount_label)
 
@@ -1158,8 +1163,10 @@ func _show_result(mult: float) -> void:
 		var kept := _base_amount * mult
 		if mult > 1.0:
 			_result_mult_label.text = "+%d%% BONUS" % int(round((mult - 1.0) * 100.0))
-			_result_mult_label.add_theme_color_override("font_color", UiPalette.ATOMIC_TEAL)
-			_result_amount_label.text = "+%s  (%s +%s bonus)" % \
+			# A saturated blue (not the pale teal) for the bonus headline (Tim, 2026-07-09).
+			_result_mult_label.add_theme_color_override("font_color", Color("#2E6FD6"))
+			# Two lines: the total on the first, the base + bonus breakdown on the second.
+			_result_amount_label.text = "+%s\n(%s + %s bonus)" % \
 					[_format_amount(kept), _format_amount(_base_amount), _format_amount(kept - _base_amount)]
 		elif mult >= 1.0:
 			_result_mult_label.text = "FULL"

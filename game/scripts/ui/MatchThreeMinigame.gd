@@ -76,12 +76,12 @@ const CELL_SIZE := 104
 const GAP := 8
 const PITCH := CELL_SIZE + GAP
 
-## The bonus banner's gem tile — this round's AVOID gem, shown large as a prominent "steer around
-## this" cue pinned above the grid. Doubled to 220 (Tim, 2026-07-09) so it reads unmistakably.
-const BONUS_ICON_SIZE := 220
+## The bonus banner's gem tile — this round's AVOID gem, shown above the grid. Sized down 30% from
+## the earlier 220 (Tim, 2026-07-09); the BONUS badge is a fraction of this, so both shrink together.
+const BONUS_ICON_SIZE := 154
 
 ## How far the AVOID gem and BONUS badge are inset from the card's left/right edges (Tim, 2026-07-09).
-const BANNER_EDGE_MARGIN := 40
+const BANNER_EDGE_MARGIN := 80
 
 ## How far a press must move before it counts as a drag-swap (rather than a stray tap).
 const DRAG_THRESHOLD := CELL_SIZE * 0.4
@@ -187,11 +187,11 @@ func begin(tuning: TuningConfig) -> void:
 	# round starts, so repeating it here only stole vertical room from the (now bigger) board and
 	# added clutter (Tim, 2026-07-09). The AVOID banner carries the one thing that changes per round.
 
-	# A live running score readout on its own line above the board.
-	var score_row := _build_score_row()
+	# No in-play "Score: N" readout (Tim, 2026-07-09): the host's outcome bar already shows progress,
+	# so the number was redundant. The score is still tracked internally for get_performance / get_score.
 
-	# The banner and the framed board travel together as one group, vertically centered in the
-	# space below the score line. A small separation keeps the AVOID banner pinned right above the board.
+	# The banner and the framed board travel together as one group, vertically centered in the space
+	# below the top chrome. A small separation keeps the AVOID banner pinned right above the board.
 	var bonus_banner := _build_bonus_banner()
 	var board_frame := _build_board_frame()
 
@@ -205,7 +205,6 @@ func begin(tuning: TuningConfig) -> void:
 	var column := VBoxContainer.new()
 	column.set_anchors_preset(Control.PRESET_FULL_RECT)
 	column.add_theme_constant_override("separation", 12)
-	column.add_child(score_row)
 	column.add_child(board_group)
 	add_child(column)
 
@@ -220,21 +219,6 @@ func begin(tuning: TuningConfig) -> void:
 ## Pick the single AVOID gem type for this round (one random color id).
 func _choose_avoid_type() -> void:
 	_avoid_type = _rng.randi_range(0, GEM_COLORS - 1)
-
-
-## The live running score readout (refreshed as cascades resolve by _update_score_display), on
-## its own centered line under the intro.
-func _build_score_row() -> Control:
-	var row := HBoxContainer.new()
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-
-	_score_label = Label.new()
-	_score_label.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
-	_score_label.add_theme_color_override("font_color", UiPalette.MONEY_GREEN)
-	row.add_child(_score_label)
-	_update_score_display()
-
-	return row
 
 
 ## Build the AVOID banner pinned directly above the grid: an "AVOID" tag next to this round's
@@ -282,6 +266,7 @@ func _build_bonus_banner() -> Control:
 	badge_icon.texture = GEM_TEXTURE[LEGACY_COLOR]
 	badge_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	badge_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	badge_icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS  # smooth when downscaled
 	badge_icon.custom_minimum_size = Vector2(BONUS_ICON_SIZE * 0.55, BONUS_ICON_SIZE * 0.55)
 	badge_icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_legacy_badge.add_child(badge_icon)
@@ -317,6 +302,7 @@ func _make_bonus_icon(color_id: int) -> Control:
 	tex.texture = GEM_TEXTURE[color_id]
 	tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	tex.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS  # smooth when downscaled
 	tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	tex.set_anchors_preset(Control.PRESET_FULL_RECT)
 	tex.offset_left = 24
@@ -418,6 +404,9 @@ func _make_gem(color_id: int) -> Control:
 	gem.texture = GEM_TEXTURE[color_id]
 	gem.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	gem.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	# Use the texture's mipmaps when downscaled from the large SVG raster, or the detailed legacy gem
+	# looks pixelated at cell size (Tim, 2026-07-09). The .import already generates mipmaps.
+	gem.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	gem.size = Vector2(CELL_SIZE, CELL_SIZE)
 	gem.pivot_offset = Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
 	gem.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -931,11 +920,9 @@ func _celebrate_max() -> void:
 
 
 func result_summary() -> String:
-	var line := "Scored %d points" % int(round(_score))
+	# No point total (Tim, 2026-07-09: points aren't shown to the player) — just a bit of flavor.
 	if get_legacy_gems_collected() > 0:
-		line += " — and matched the LEGACY gems!"
+		return "You matched the LEGACY gems!"
 	elif _matched_avoid_gem:
-		line += " — watch out for the AVOID gem next time!"
-	else:
-		line += " — clean matching, nicely done!"
-	return line
+		return "Watch out for the AVOID gem next time!"
+	return "Clean matching, nicely done!"

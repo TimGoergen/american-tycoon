@@ -61,7 +61,15 @@ Banked to the spendable wallet (`LegacyUpgrades.available`) **only** — NOT add
   a gem-progress bar fills, and **drains** while out; fill it to keep the gem (Stardew-style).
 - **Basketball:** the gem is earned only if a shot passes **through** the gem **and** scores, in a
   single shot.
-- **Memory:** UNDECIDED (Tim). Left out for now — no Legacy gem in Memory yet.
+- **Memory:** a chance-gated BONUS ROUND after a full clear (Tim, 2026-07-10). Clear all 6 rounds
+  (the base game was shortened 8→6 for this), and — on a per-run chance (`legacy_gem_chance_memory`)
+  — a bonus round is offered: all four pads become IDENTICAL (each wearing the gem image), so the
+  sequence can only be recalled by POSITION, and its length is `memory_gem_sequence_length` (starts
+  at 5). Recall it to collect the gem. It is independent of the main reward (already banked at the
+  full clear): miss it and you simply get no gem, no penalty. Memory also runs with NO host timer
+  (recall against a clock adds nothing) — it opts out via `Minigame.uses_timer()` and owns its own
+  ending. The chance is Memory's frequency lever and the length is its difficulty lever (both in
+  Balance Tuning), replacing the single `legacy_gem_chance_*` role the other games use.
 
 ## Architecture
 
@@ -98,12 +106,17 @@ match. Default off (weight 0 / no special color) so existing behavior and tests 
 1. Shared core: base + host + Main + LegacyUpgrades + TuningConfig knobs. **[DONE — 4b35194]**
 2. Match-3: combo removal + Legacy gem (board + minigame) + board tests. **[DONE — 4b35194]**
 3. Catch, Timing, Balance, Basketball mechanics (parallel). **[DONE — a15b562]**
-4. Memory once Tim decides its mechanic. Device feel-tune all spawn chances + the great% + fraction.
+4. Memory's mechanic. **[DONE — 2026-07-10, `feature/memory-legacy-gem`]** The identical-pad bonus
+   round above; also removed Memory's timer. Device feel-tune all spawn chances + the great% + fraction.
 
-## Status (2026-07-09)
-Built on `feature/match3-difficulty` (NOT merged — awaiting Tim's device test). Everything
-parse-checks, boots, MatchThreeTest (37) + EpochTest pass, and a runtime smoke ran all four new
-games' gem paths without error. Memory has no legacy mechanic yet (Tim undecided). ALL spawn
-chances, the fraction, the great%/threshold, and the max-gems cap are first-pass — device-tune.
-To SEE a grant, reach a prestige with some lifetime Legacy (early on 0.1% is tiny; the min-1 floor
-covers it).
+## Status (2026-07-10)
+Steps 1–3 shipped to `main` (merged from `feature/match3-difficulty`). Step 4 (Memory) built on
+`feature/memory-legacy-gem`: base game 8→6 rounds, chance-gated identical-pad bonus round (length 5),
+no host timer for Memory (new `Minigame.uses_timer()` opt-out the host honors), two new tuning knobs
+(`legacy_gem_chance_memory`, `memory_gem_sequence_length`) with Balance Tuning descriptions. Verified:
+all five touched scripts parse-check clean, project imports clean, Main boots clean, and a runtime
+smoke drove a real MemoryMinigame through a full 6-round clear → forced bonus round → perfect 5-tap
+recall → 1 gem collected. The whole minigame pass is now mechanically complete across all six games.
+ALL spawn chances, the fraction, the great%/threshold, the max-gems cap, and now the Memory chance +
+sequence length are first-pass — device-tune. To SEE a grant, reach a prestige with some lifetime
+Legacy (early on 0.1% is tiny; the min-1 floor covers it).

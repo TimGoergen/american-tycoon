@@ -106,6 +106,8 @@ const DESCRIPTIONS := {
 	"legacy_gem_chance_timing": "Chance a legacy gem appears in the Timing zone.",
 	"legacy_gem_chance_balance": "Chance a legacy gem appears in the Balance zone.",
 	"legacy_gem_chance_basketball": "Chance a legacy gem appears in Basketball.",
+	"legacy_gem_chance_memory": "Chance the Memory gem bonus round appears after a full clear.",
+	"memory_gem_sequence_length": "Length of the Memory gem bonus sequence (identical pads; higher = harder).",
 	"offline_efficiency": "Offline income rate vs live play (0–1).",
 	"offline_cap_seconds": "Longest offline accrual window (seconds; 14400 = 4h).",
 	"frenzy_max_multiplier": "Peak income multiplier during a frenzy burn.",
@@ -149,6 +151,8 @@ const DISPLAY_NAMES := {
 	"legacy_gem_chance_timing": "Legacy Gem Chance Timing",
 	"legacy_gem_chance_balance": "Legacy Gem Chance Balance",
 	"legacy_gem_chance_basketball": "Legacy Gem Chance Basketball",
+	"legacy_gem_chance_memory": "Legacy Gem Chance Memory",
+	"memory_gem_sequence_length": "Memory Gem Sequence Length",
 }
 
 

@@ -804,6 +804,9 @@ func start_game(
 	_active_minigame.completed.connect(_on_minigame_completed)
 	# Most types run for the shared default; a type may ask for more time on top of it (basketball).
 	_seconds_left = _tuning.minigame_duration_seconds + maxf(0.0, _active_minigame.extra_seconds())
+	# A no-timer type (Memory) hides the countdown entirely and ends the round only when it emits
+	# `completed` itself — the clock branch in _process is skipped for it (see uses_timer).
+	_timer_label.visible = _active_minigame.uses_timer()
 
 	# The round does NOT start yet: the type stays un-begun and the clock paused behind the Begin
 	# gate, so the player is never caught off guard. _on_begin_pressed starts it for real.
@@ -848,7 +851,12 @@ func start_game(
 	else:
 		_begin_stakes.text = "Play well to earn a BONUS on top of your inheritance. Skip to keep it as-is — a weak round keeps less."
 	_begin_stakes.visible = true
-	_begin_hint.text = "The clock starts when you press Begin."
+	# A timed game warns the clock is about to start; a no-timer game (Memory) invites the player to
+	# take their time instead, so the hint never promises a clock that won't appear.
+	if _active_minigame.uses_timer():
+		_begin_hint.text = "The clock starts when you press Begin."
+	else:
+		_begin_hint.text = "No clock — take your time."
 	_begin_hint.visible = true
 
 	_begin_overlay.modulate = Color.WHITE
@@ -948,6 +956,12 @@ func _process(delta: float) -> void:
 	# Challenge Mode has no countdown and no win/loss — just keep the live score readout current.
 	if _challenge_mode:
 		_update_challenge_score()
+		return
+	# A no-timer game (Memory) owns its own ending: no countdown and no max-early-out. Just keep the
+	# outcome bar gliding and wait for the game to emit `completed` on its own (a clear, a miss, or
+	# its bonus round). Checked before the timer logic so none of it runs for such a game.
+	if _active_minigame != null and not _active_minigame.uses_timer():
+		_refresh_keep_bar(delta)
 		return
 	# Pause the countdown while a type is mid-animation (e.g. match-3 cascades) so animation time
 	# isn't charged to the player — but keep the spectrum bar gliding and show a "held" cue on the

@@ -80,6 +80,14 @@ func get_performance() -> float:
 func is_busy() -> bool:
 	return false
 
+## Whether this type runs against the host's countdown timer. Almost every type does, so the default
+## is true. A type that returns false (Memory — recalling a sequence against a clock adds nothing and
+## the bonus sequence can't be rushed) gets NO timer at all: the host hides the countdown and never
+## ends the round on the clock or on a max-early-out. Such a type OWNS its own ending — it must emit
+## `completed` itself when play is over (on a win, a miss, or its own bonus round).
+func uses_timer() -> bool:
+	return true
+
 ## A short, human-readable name for this minigame type. The random prestige draw doesn't
 ## need it, but the Minigame Tuning review screen (Settings) lists every type by name so
 ## they can each be opened and tested. Override in each type.

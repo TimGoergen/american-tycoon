@@ -86,7 +86,8 @@ func _ready() -> void:
 	_begin_button.text = "BEGIN"
 	_begin_button.custom_minimum_size = Vector2(0, 96)
 	_begin_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_begin_button.add_theme_font_size_override("font_size", 28)
+	_begin_button.add_theme_font_size_override("font_size", 39)  # 28 * 1.4 — 40% larger (Tim)
+	_begin_button.add_theme_font_override("font", UiPalette.make_bold_font())
 	_begin_button.visible = false
 	UiPalette.style_button(_begin_button, true)
 	_begin_button.pressed.connect(_on_spend_pressed)  # same effect: hide the overlay, reveal the game
@@ -130,7 +131,8 @@ func _build_pile_content() -> VBoxContainer:
 	_spend_button.text = "PUT IT TO WORK"
 	_spend_button.custom_minimum_size = Vector2(0, 96)
 	_spend_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_spend_button.add_theme_font_size_override("font_size", 28)
+	_spend_button.add_theme_font_size_override("font_size", 39)  # 28 * 1.4 — 40% larger (Tim)
+	_spend_button.add_theme_font_override("font", UiPalette.make_bold_font())
 	UiPalette.style_button(_spend_button, true)
 	_spend_button.pressed.connect(_on_spend_pressed)
 	button_row.add_child(_spend_button)
@@ -139,7 +141,8 @@ func _build_pile_content() -> VBoxContainer:
 	_risk_button.text = "RISK IT ON A MINIGAME?"
 	_risk_button.custom_minimum_size = Vector2(0, 96)
 	_risk_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_risk_button.add_theme_font_size_override("font_size", 28)
+	_risk_button.add_theme_font_size_override("font_size", 39)  # 28 * 1.4 — 40% larger (Tim)
+	_risk_button.add_theme_font_override("font", UiPalette.make_bold_font())
 	# The label is long; wrap it onto two lines rather than clipping at narrow widths.
 	_risk_button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	UiPalette.style_button(_risk_button, false)

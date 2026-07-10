@@ -51,8 +51,9 @@ const ROW_DESC_SIZE := UiPalette.FONT_LABEL
 const ROW_VALUE_SIZE := UiPalette.FONT_SUBHEAD
 const BUTTON_SIZE := UiPalette.FONT_SUBHEAD
 
-## Fixed width (px) of the value editor column, so the constant names line up.
-const VALUE_COLUMN_WIDTH := 400
+## Fixed width (px) of the value editor column, so the constant names line up. Trimmed from 400 so a
+## long name + the field can't push the row past the panel's right edge (Tim, 2026-07-09).
+const VALUE_COLUMN_WIDTH := 300
 ## Minimum height (px) of a value editor — a comfortable thumb target.
 const VALUE_HEIGHT := 72
 ## Clearance between each row's right edge and the scroll's overlaid scrollbar: the
@@ -320,6 +321,8 @@ func _add_constant_row(name: String, type: int, current_value: Variant, baked_va
 	label.add_theme_color_override(
 		"font_color", UiPalette.MUSTARD_GOLD if is_overridden else UiPalette.NAVY)
 	label.add_theme_font_size_override("font_size", ROW_LABEL_SIZE)
+	# Wrap a long name instead of forcing the whole row wider than the panel (Tim, 2026-07-09).
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	text_column.add_child(label)
 
 	var description: String = DESCRIPTIONS.get(name, "")

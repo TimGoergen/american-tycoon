@@ -75,6 +75,13 @@ const EPOCHS := [
 			# but the roster stays the same length as the property ladder so indexing always works.
 			"Exchange Floor Boss",
 			"Data Foundry Manager", "Spore Bank Manager", "Vault Keeper", "Time Bank Manager",
+			# Cohort siblings (Phase 2, property indices 17–31). Earth never staffs them
+			# (each is locked until its epoch), but every roster spans all 32 properties.
+			"Beam Utilities Foreman", "Futures Desk Chief", "Dyson Site Manager",
+			"Server City Superintendent", "Mine Boss", "Labor Agency Director",
+			"Network Line Manager", "Refinery Foreman", "Co-op Chairman",
+			"Gem Floor Manager", "Lens Works Foreman", "Realty Broker",
+			"Deadline Desk Manager", "Market Stall Keeper", "Escrow Officer",
 		],
 	},
 	{
@@ -100,6 +107,13 @@ const EPOCHS := [
 			"Plasma Fund Manager", "Light-Speed Lobbyist", "Luminous Chief of Staff",
 			"Photon Exchange Director",
 			"Photon Foundry", "Light Spore Bank", "Prism Keeper", "Lumen Time Bank",
+			# Cohort siblings 17–31; 17–19 are the Luminari's own (home-epoch) staffers,
+			# mirroring those .tres staffer_name fields.
+			"Beam Grid Operator", "Flare Futures Broker", "Dyson Site Foreman",
+			"Lumen Server Warden", "Photonic Mine Sifter", "Radiant Labor Broker",
+			"Lightline Weaver", "Solar Compost Refiner", "Terraform Ray Steward",
+			"Prism Floor Trader", "Sunbeam Lens Grinder", "Lightspire Concierge",
+			"Sundial Enforcer", "Golden-Hour Appraiser", "Eternal Dawn Notary",
 		],
 	},
 	{
@@ -123,6 +137,13 @@ const EPOCHS := [
 			"Quant Supercluster", "Policy Compiler", "Executive Mainframe",
 			"Exchange Daemon",
 			"Foundry Core", "Spore Daemon", "Vault Subroutine", "Chrono Daemon",
+			# Cohort siblings 17–31; 20–22 are the Grid's own (home-epoch) staffers,
+			# mirroring those .tres staffer_name fields.
+			"Beam Routing Daemon", "Futures Prediction Engine", "Dyson Assembly Swarm",
+			"Rack City Warden", "Mining Subroutine", "Labor Dispatch Core",
+			"Network Crawler Prime", "Biomass Process Unit", "Terraforming Compiler",
+			"Gem Sorting Array", "Lens Calibration Bot", "Monolith Logic Broker",
+			"Deadline Scheduler Daemon", "Momentary Cache Trader", "Escrow Checksum Warden",
 		],
 	},
 	{
@@ -146,6 +167,13 @@ const EPOCHS := [
 			"Spore Cloud Fund", "Root-Network Lobbyist", "Hive-Mind Chief of Staff",
 			"Spore-Market Maker",
 			"Mycelial Foundry", "Spore Banker", "Fungal Vault", "Spore Time Bank",
+			# Cohort siblings 17–31; 23–25 are the Unity's own (home-epoch) staffers,
+			# mirroring those .tres staffer_name fields.
+			"Beam-Fed Mycelier", "Spore Futures Whisperer", "Dyson Grove Cultivator",
+			"Server-Rot Colonist", "Mycelial Mine Creeper", "Fungal Labor Bloom",
+			"Hyphae Line-Tender", "Decay Refiner", "Sporefall Steward",
+			"Crystal Mold Trader", "Spore Lens Polisher", "Overgrowth Realtor",
+			"Rot-Clock Keeper", "Momentary Bloom Broker", "Everspore Notary",
 		],
 	},
 	{
@@ -168,6 +196,13 @@ const EPOCHS := [
 			"Crystalline Fund Manager", "Bedrock Lobbyist", "Diamond Chief of Staff",
 			"Prism Exchange Broker",
 			"Crystal Foundry", "Crystal Spore Vault", "Prism Vault Keeper", "Crystal Time Bank",
+			# Cohort siblings 17–31; 26–28 are the Conglomerate's own (home-epoch)
+			# staffers, mirroring those .tres staffer_name fields.
+			"Refracted Beam Cutter", "Crystal Futures Assayer", "Dyson Lattice Mason",
+			"Quartz Server Setter", "Geode Mine Surveyor", "Crystalline Labor Agent",
+			"Lattice Network Fitter", "Petrified Biomass Refiner", "Crystal Terraform Sculptor",
+			"Facet Floor Trader", "Lens Grinder Prime", "Monolith Concierge",
+			"Hourstone Enforcer", "Moment Crystal Appraiser", "Amber Escrow Keeper",
 		],
 	},
 	{
@@ -192,6 +227,13 @@ const EPOCHS := [
 			"Temporal Fund Manager", "Eternity Lobbyist", "Time-Lord Chief of Staff",
 			"Temporal Exchange Lord",
 			"Chrono Foundry", "Eternal Spore Bank", "Timeless Vault", "Time Banker",
+			# Cohort siblings 17–31; 29–31 are the Enclave's own (home-epoch) staffers,
+			# mirroring those .tres staffer_name fields.
+			"Beam-Time Arbitrageur", "Yesterday's Futures Broker", "Dyson Epoch Engineer",
+			"Server Uptime Usurer", "Chrono-Mine Excavator", "Overtime Labor Baron",
+			"Timeline Network Splicer", "Fossil Biomass Refiner", "Epoch Terraformer",
+			"Age-of-Gems Trader", "Timelens Grinder", "Monolith-of-Hours Warden",
+			"Deadline Enforcer", "Moment Appraiser", "Eternity Notary",
 		],
 	},
 ]

@@ -31,6 +31,28 @@ const PROPERTY_PATHS := [
 	"res://config/properties/15_spore_bank.tres",        # epoch 4 — Mycelium Unity
 	"res://config/properties/16_prism_vault.tres",       # epoch 5 — Quartzite Conglomerate
 	"res://config/properties/17_time_bank.tres",         # epoch 6 — Chronophage Enclave
+	# COHORT SIBLINGS (Epoch_Depth_Pass Phase 2, 2026-07-08): each alien epoch now has
+	# FOUR properties — the flagship above plus three siblings ×3 apart in magnitude, so
+	# a cohort spans ~27× and hands off cleanly to the next epoch's flagship at ~30×.
+	# APPENDED here (not re-slotted next to their flagships) ON PURPOSE: this array's
+	# order is every save's property INDEX — retention keys, per-property save rows,
+	# staffer rosters — so inserting mid-list would force an index migration. The LADDER
+	# shows cost order instead (Main sorts the rows for display); indices stay stable.
+	"res://config/properties/18_beam_utilities.tres",     # epoch 2
+	"res://config/properties/19_solar_futures_desk.tres", # epoch 2
+	"res://config/properties/20_dyson_holdings.tres",     # epoch 2
+	"res://config/properties/21_server_metropolis.tres",  # epoch 3
+	"res://config/properties/22_algorithm_mines.tres",    # epoch 3
+	"res://config/properties/23_robo_labor_agency.tres",  # epoch 3
+	"res://config/properties/24_hyphae_networks.tres",    # epoch 4
+	"res://config/properties/25_biomass_refinery.tres",   # epoch 4
+	"res://config/properties/26_terraforming_coop.tres",  # epoch 4
+	"res://config/properties/27_gem_exchange.tres",       # epoch 5
+	"res://config/properties/28_laser_lens_works.tres",   # epoch 5
+	"res://config/properties/29_monolith_realty.tres",    # epoch 5
+	"res://config/properties/30_deadline_futures.tres",   # epoch 6
+	"res://config/properties/31_moment_market.tres",      # epoch 6
+	"res://config/properties/32_eternity_escrow.tres",    # epoch 6
 ]
 
 ## Returns null (with an error pushed) if the tuning file is missing.

@@ -422,7 +422,7 @@ func _make_gem(color_id: int) -> Control:
 		glow.texture = _get_avoid_glow_texture()
 		glow.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		glow.stretch_mode = TextureRect.STRETCH_SCALE
-		var overhang := CELL_SIZE * 0.12  # tighter — hugs the gem (Tim, 2026-07-09)
+		var overhang := CELL_SIZE * 0.08  # a little tighter still — hugs the gem (Tim, 2026-07-09)
 		glow.position = Vector2(-overhang, -overhang)
 		glow.size = Vector2(CELL_SIZE + overhang * 2.0, CELL_SIZE + overhang * 2.0)
 		glow.show_behind_parent = true  # draw behind the gem texture, not over it
@@ -442,10 +442,12 @@ func _get_avoid_glow_texture() -> GradientTexture2D:
 	# the halo reads as a firm red ring hugging the gem rather than a big soft cloud (Tim, 2026-07-09).
 	var gradient := Gradient.new()
 	gradient.offsets = PackedFloat32Array([0.0, 0.72, 1.0])
+	# Earthy brick red rather than a pure fire red (Tim, 2026-07-09).
+	var earthy := Color(0.72, 0.26, 0.18)
 	gradient.colors = PackedColorArray([
-		Color(1.0, 0.1, 0.08, 0.51),   # red core (alpha reduced 40%, Tim 2026-07-09)
-		Color(1.0, 0.1, 0.08, 0.48),   # near the edge of the tight radius
-		Color(1.0, 0.1, 0.08, 0.0),    # quick fade to transparent
+		Color(earthy.r, earthy.g, earthy.b, 0.51),   # earthy red core
+		Color(earthy.r, earthy.g, earthy.b, 0.48),   # near the edge of the tight radius
+		Color(earthy.r, earthy.g, earthy.b, 0.0),    # quick fade to transparent
 	])
 	_avoid_glow_texture = GradientTexture2D.new()
 	_avoid_glow_texture.gradient = gradient
@@ -961,7 +963,10 @@ func _celebrate_max() -> void:
 
 
 func result_summary() -> String:
-	# No point total, and no AVOID-gem scolding (Tim, 2026-07-09) — just a bit of positive flavor.
+	# No point total, and no AVOID-gem scolding (Tim, 2026-07-09) — just a bit of flavor tied to how
+	# the round went. A round below the "full" line keeps only the minimum, so acknowledge the miss.
 	if get_legacy_gems_collected() > 0:
 		return "You matched the LEGACY gems!"
+	if get_performance() < _full_line_performance():
+		return "Nice try!"
 	return "Nicely done!"

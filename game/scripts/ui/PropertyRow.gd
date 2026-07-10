@@ -231,20 +231,52 @@ const SECOND_ROW_HEIGHT := 90
 ## then −20% back to 41 for this band specifically (Tim, 2026-07-05).
 const SECOND_ROW_FONT_SIZE := 41
 
+## Small inline icons that replace the leading "$" on money figures and mark the buy count
+## (Tim, 2026-07-09). A dollar-bill sits just before every amount; a property-tab icon sits
+## before the buy button's "+N" count. Each is sized to roughly its neighboring text's cap
+## height and mouse-ignored so taps still reach the control underneath.
+##
+## These are drawn at only ~45px tall, and the detailed SVGs (thin frames, a stroked "$",
+## tiny corner pips) turned to aliased mush at that size: Godot's default SVG import
+## rasterizes them at their native ~82px with NO mipmaps, so shrinking point-samples a
+## too-small source. Rather than lean on the per-machine .import config (it is gitignored,
+## so any mipmap/scale tweak there would not survive a fresh import), we rasterize the SVG
+## SOURCE ourselves at a high resolution and build a mipmapped texture in code — crisp at
+## any small size, fully self-contained, and immune to reimport (Tim, 2026-07-09).
+const DOLLAR_ICON_SVG := "res://art/icons/dollar_bill.svg"
+const PROPERTY_ICON_SVG := "res://art/icons/tab_property.svg"
+
+## How many times the SVG's native pixel size we rasterize each icon to. The sources are
+## ~57–81px tall, so 4x gives a ~230–324px image — generously denser than the ~45px the icon
+## is drawn at, giving mipmapped downscaling plenty of detail to sample from.
+const ICON_RASTER_SCALE := 4.0
+
+## Crisp, mipmapped icon textures rasterized once from the SVG sources, keyed by source path.
+## Shared across every row (all rows draw the same two icons), built lazily on first use.
+static var _crisp_icon_cache := {}
+
 var _manager_circle: ManagerCircle
 var _name_label: Label
 ## The "owned / next-milestone-threshold" readout, inside its own gray-outlined chip (Tim, 2026-07-01).
 var _count_label: Label
 var _income_label: Label
+## Dollar-bill icon drawn just left of the income readout, in place of its leading "$".
+var _income_icon: TextureRect
 var _cycle_bar: ProgressBar
 var _cycle_bubbles: GoldBubbles
 ## Diagnosis readout over the bar, shown when tuning.carb_debug_overlay = 1.
 var _carb_debug_label: Label
 var _buy_button: Button
 var _buy_caption_label: Label
+## Property-tab icon before the buy button's "+N" count.
+var _buy_count_icon: TextureRect
 var _buy_cost_label: Label
+## Dollar-bill icon before the buy button's cost (hidden when there is no cost to show).
+var _buy_cost_icon: TextureRect
 var _hire_button: Button
 var _hire_cost_label: Label
+## Dollar-bill icon before the hire button's cost (hidden while the button shows "MAX").
+var _hire_cost_icon: TextureRect
 ## The hire button's hand-drawn "add staff" symbol: headshot + "+" (see StaffHireGlyph).
 var _hire_glyph: StaffHireGlyph
 
@@ -392,9 +424,20 @@ func _ready() -> void:
 	# jumble). A cream outline (the project's faux-weight trick) keeps it legible over both the
 	# green fill and the gray track. Inset a little from the cell's edges; ignores the mouse so a
 	# tap on the bar area is never eaten by the label.
+	# A small dollar-bill icon stands in for the leading "$" on the amount (Tim, 2026-07-09),
+	# pinned to the bar's left edge and vertically centered like the income text. The label
+	# starts just to its right (offset_left below leaves room for the icon box + a small gap).
+	_income_icon = _make_inline_icon(DOLLAR_ICON_SVG, SECOND_ROW_FONT_SIZE)
+	_income_icon.set_anchors_preset(Control.PRESET_LEFT_WIDE)  # left edge, full height, vertically centered
+	_income_icon.offset_left = 12
+	# LEFT_WIDE stretches to the cell's full height; keep it icon-sized so the aspect fit centers it.
+	_income_icon.offset_right = 12 + _income_icon.custom_minimum_size.x
+	bar_cell.add_child(_income_icon)
+
 	_income_label = Label.new()
 	_income_label.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_income_label.offset_left = 12
+	# Start the text just past the dollar-bill icon (its left inset + width + a 4px gap).
+	_income_label.offset_left = _income_icon.offset_right + 4
 	_income_label.offset_right = -12
 	_income_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	_income_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -440,6 +483,11 @@ func _ready() -> void:
 	var hire_row := _hire_cost_label.get_parent() as HBoxContainer
 	hire_row.add_child(_hire_glyph)
 	hire_row.move_child(_hire_glyph, 0)  # the glyph first, then the cost label
+	# A dollar-bill icon just before the hire cost, standing in for its "$" (Tim, 2026-07-09).
+	# Hidden in _refresh_hire_button while the button shows "MAX" (no cost).
+	_hire_cost_icon = _make_inline_icon(DOLLAR_ICON_SVG, BUTTON_LABEL_FONT_SIZE)
+	hire_row.add_child(_hire_cost_icon)
+	hire_row.move_child(_hire_cost_icon, hire_row.get_child_count() - 2)  # icon, then cost label last
 	button_line.add_child(_hire_button)
 
 	_buy_button = Button.new()
@@ -450,6 +498,18 @@ func _ready() -> void:
 	var buy_labels := _add_split_button_labels(_buy_button)
 	_buy_caption_label = buy_labels[0]
 	_buy_cost_label = buy_labels[1]
+	# Inline icons on the buy button (Tim, 2026-07-09): a property-tab icon before the "+N"
+	# count on the left, and a dollar-bill icon before the cost on the right (its "$").
+	var buy_row := _buy_caption_label.get_parent() as HBoxContainer
+	# The property-tab count icon is drawn 30% larger than the cost icon so the "what you're
+	# buying" symbol reads as the button's lead (Tim, 2026-07-09) — sizing it off a scaled-up
+	# font size, since _make_inline_icon fits its box to the passed size.
+	_buy_count_icon = _make_inline_icon(PROPERTY_ICON_SVG, roundi(BUTTON_LABEL_FONT_SIZE * 1.3))
+	buy_row.add_child(_buy_count_icon)
+	buy_row.move_child(_buy_count_icon, 0)  # the tab icon leads, then the "+N" caption
+	_buy_cost_icon = _make_inline_icon(DOLLAR_ICON_SVG, BUTTON_LABEL_FONT_SIZE)
+	buy_row.add_child(_buy_cost_icon)
+	buy_row.move_child(_buy_cost_icon, buy_row.get_child_count() - 2)  # dollar icon, then cost label last
 	button_line.add_child(_buy_button)
 
 	# Let a swipe that lands anywhere on the row (the panel, labels, or progress
@@ -739,12 +799,14 @@ func _refresh(delta: float) -> void:
 	if rush_engaged and effective_length > 0.0:
 		rushed_fractions_per_second = 1.0 / effective_length \
 				+ _prop.tuning.hold_rush_per_second * _prop.tuning.rush_pct * _prop.rush_power_multiplier
+	# The leading "$" is now shown as the dollar-bill icon just left of the label (see
+	# _income_icon), so strip it off every amount before it goes into the text (Tim, 2026-07-09).
 	if rushed_fractions_per_second > 0.0:
-		_income_label.text = Money.of(per_cycle * rushed_fractions_per_second).display() + " / s"
+		_income_label.text = Money.of(per_cycle * rushed_fractions_per_second).display().trim_prefix("$") + " / s"
 	elif effective_length > 0.0 and effective_length <= PER_SECOND_READOUT_THRESHOLD_SEC:
-		_income_label.text = Money.of(per_cycle / effective_length).display() + " / s"
+		_income_label.text = Money.of(per_cycle / effective_length).display().trim_prefix("$") + " / s"
 	else:
-		_income_label.text = "%s / %s" % [Money.of(per_cycle).display(), _format_cycle_duration(effective_length)]
+		_income_label.text = "%s / %s" % [Money.of(per_cycle).display().trim_prefix("$"), _format_cycle_duration(effective_length)]
 	# Cache the per-second equivalent of whatever the label just showed (rush-boosted
 	# while held) — Main sums these across rows for the hero panel's income headline
 	# (Tim, 2026-07-07), so the headline always equals the sum of the visible rows.
@@ -938,10 +1000,16 @@ func _apply_ownership_styling(owned: bool) -> void:
 		add_theme_stylebox_override("panel", UiPalette.make_panel_style())
 		# Owned: the per-cycle payout in bold black (Tim, 2026-07-01).
 		_income_label.add_theme_color_override("font_color", Color.BLACK)
+		# The dollar-bill icon is FULL-COLOR art (green note, gold seal), so it shows at its
+		# own colors — modulate stays white. Tinting it to the text color turned the whole
+		# icon into a solid black silhouette (Tim, 2026-07-09).
+		_income_icon.modulate = Color.WHITE
 	else:
 		add_theme_stylebox_override("panel", UiPalette.make_unowned_panel_style())
-		# Unowned: a drab dark-gray single-unit preview, matching the locked row look.
+		# Unowned: a drab dark-gray single-unit preview, matching the locked row look. Fade the
+		# color icon back with alpha (rather than recolor it) so it still reads as a dollar bill.
 		_income_label.add_theme_color_override("font_color", UiPalette.DARK_GRAY)
+		_income_icon.modulate = Color(1, 1, 1, 0.5)
 
 
 ## The staff button's `pressed` handler. One action only — buy the next ladder rung —
@@ -964,6 +1032,8 @@ func _refresh_hire_button() -> void:
 	if _economy.is_staff_level_maxed(prop_index, _epoch.current_tier):
 		_apply_hire_styling(true)
 		_hire_cost_label.text = "MAX"
+		# "MAX" is not a price, so hide the dollar-bill icon (Tim, 2026-07-09).
+		_hire_cost_icon.visible = false
 		_hire_button.disabled = true
 		_hire_cost_label.add_theme_color_override("font_color", UiPalette.NAVY)
 		_hire_glyph.tint = UiPalette.NAVY
@@ -971,14 +1041,20 @@ func _refresh_hire_button() -> void:
 
 	_apply_hire_styling(false)
 	var cost := _economy.get_next_staff_level_cost(prop_index)
-	_hire_cost_label.text = Money.of(cost).display()
+	# Drop the leading "$" — the dollar-bill icon before the label carries it (Tim, 2026-07-09).
+	_hire_cost_label.text = Money.of(cost).display().trim_prefix("$")
+	_hire_cost_icon.visible = true
 	# A property with no units can't be staffed — a staffer needs something to run.
 	_hire_button.disabled = _economy.cash < cost or _prop.units_owned == 0
 	# Navy on the live mustard plate, dimmed to match the disabled cream plate — applied to
-	# the cost and the headshot+plus glyph together so they read as one.
+	# the cost text and the headshot+plus glyph (both monochrome, so they take a flat tint).
 	var hire_color := Color(UiPalette.NAVY, 0.45) if _hire_button.disabled else UiPalette.NAVY
 	_hire_cost_label.add_theme_color_override("font_color", hire_color)
 	_hire_glyph.tint = hire_color
+	# The dollar-bill icon is FULL-COLOR art, so it keeps its own colors (tinting it navy
+	# turned it into a solid dark box — Tim, 2026-07-09); only fade it with alpha when the
+	# button is disabled, matching the dimmed cost text beside it.
+	_hire_cost_icon.modulate = Color(1, 1, 1, 0.45) if _hire_button.disabled else Color.WHITE
 
 
 ## Swap the hire button between the normal action look (HIRE/UPGRADE) and the faint-
@@ -1039,6 +1115,51 @@ func _add_split_button_labels(button: Button) -> Array:
 	return [left, right]
 
 
+## Build a small inline icon that sits just left of a text label, standing in for the
+## symbol the label used to spell out (the "$" on money figures, or a tab icon on the buy
+## count). Sized to a square a little taller than the font's cap height so it reads at the
+## same weight as the digits beside it, aspect-preserved, and mouse-ignored so a tap on it
+## still reaches the control underneath. (Tim, 2026-07-09.)
+##
+## The texture is our own high-resolution, mipmapped rasterization of the SVG (see
+## _crisp_icon_texture) — the default import rasterizes too small and un-mipmapped to shrink
+## cleanly — and the TextureRect is set to LINEAR_WITH_MIPMAPS so the downscale samples the
+## mip chain instead of aliasing the full-res image.
+func _make_inline_icon(svg_path: String, font_size: int) -> TextureRect:
+	var icon := TextureRect.new()
+	icon.texture = _crisp_icon_texture(svg_path)
+	icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	# ~1.1x the font size: the icon box a touch taller than the glyphs so it doesn't read as shrunken.
+	var box := roundi(font_size * 1.1)
+	icon.custom_minimum_size = Vector2(box, box)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return icon
+
+
+## Rasterize an icon SVG at ICON_RASTER_SCALE and return a mipmapped ImageTexture for it,
+## caching the result so the CPU rasterization + mip generation happens once per icon for
+## the whole ladder (all rows share the same two icons). We rasterize the SVG SOURCE at a
+## chosen scale rather than use the imported CompressedTexture2D because the import is fixed
+## at the SVG's native ~82px with no mipmaps — far too small and un-mipmapped to shrink to
+## ~45px without aliasing (Tim, 2026-07-09). Building it in code keeps the crispness in
+## source control, immune to the per-machine (gitignored) .import settings.
+static func _crisp_icon_texture(svg_path: String) -> ImageTexture:
+	if _crisp_icon_cache.has(svg_path):
+		return _crisp_icon_cache[svg_path]
+	var svg_source := FileAccess.get_file_as_string(svg_path)
+	var image := Image.new()
+	# load_svg_from_string takes a multiplier on the SVG's own pixel size — a flat scale keeps
+	# each icon's aspect and just renders it denser (see ICON_RASTER_SCALE).
+	image.load_svg_from_string(svg_source, ICON_RASTER_SCALE)
+	image.generate_mipmaps()
+	var texture := ImageTexture.create_from_image(image)
+	_crisp_icon_cache[svg_path] = texture
+	return texture
+
+
 ## Tint both of a split button's labels the one color. The overlay labels aren't the
 ## button's own text, so they don't follow its font_color/disabled theme overrides —
 ## we set their color to match the button's current state by hand.
@@ -1071,14 +1192,15 @@ func _refresh_buy_button() -> void:
 		# show the next single unit's cost so the player can see how close they are,
 		# instead of a blank "—".
 		_buy_caption_label.text = "+0"
-		_buy_cost_label.text = Money.of(_prop.get_bulk_cost(1)).display()
+		# Drop the "$" — the dollar-bill icon before the label carries it (Tim, 2026-07-09).
+		_buy_cost_label.text = Money.of(_prop.get_bulk_cost(1)).display().trim_prefix("$")
 		_buy_button.disabled = true
 		_set_buy_label_colors()
 		return
 
 	var cost := _prop.get_bulk_cost(count)
 	_buy_caption_label.text = "+%d" % count
-	_buy_cost_label.text = Money.of(cost).display()
+	_buy_cost_label.text = Money.of(cost).display().trim_prefix("$")
 	_buy_button.disabled = _economy.cash < cost
 	_set_buy_label_colors()
 
@@ -1086,10 +1208,14 @@ func _refresh_buy_button() -> void:
 ## Color the buy button's labels to match its state: the action pale-gold when live,
 ## or the dimmed navy of style_button's disabled plate when it can't be afforded.
 func _set_buy_label_colors() -> void:
-	if _buy_button.disabled:
-		_set_split_label_color(_buy_caption_label, _buy_cost_label, Color(UiPalette.NAVY, 0.45))
-	else:
-		_set_split_label_color(_buy_caption_label, _buy_cost_label, UiPalette.PALE_GOLD)
+	var color := Color(UiPalette.NAVY, 0.45) if _buy_button.disabled else UiPalette.PALE_GOLD
+	_set_split_label_color(_buy_caption_label, _buy_cost_label, color)
+	# The property-tab icon is a MONOCHROME navy glyph, so it takes the same flat tint as the
+	# count text beside it. The dollar-bill icon is FULL-COLOR art, so it keeps its own colors
+	# (tinting it turned it into a solid box — Tim, 2026-07-09) and only fades with alpha when
+	# the button is disabled.
+	_buy_count_icon.modulate = color
+	_buy_cost_icon.modulate = Color(1, 1, 1, 0.45) if _buy_button.disabled else Color.WHITE
 
 
 # ---------------------------------------------------------------------------
@@ -1123,8 +1249,13 @@ class StaffHireGlyph extends Control:
 				tint = value
 				queue_redraw()
 
+	## A crisp, mipmapped rasterization of the headshot SVG (see PropertyRow._crisp_icon_texture).
+	## The imported CompressedTexture2D is fixed at the SVG's native size with no mipmaps, so
+	## drawing it small looked blocky (Tim, 2026-07-09) — same fix as the dollar-bill/tab icons.
+	static var _headshot_tex: ImageTexture
 	## The headshot art's opaque bounds inside its canvas, computed ONCE for all rows
-	## (get_used_rect is a CPU pixel scan; the canvas carries transparent padding).
+	## (get_used_rect is a CPU pixel scan; the canvas carries transparent padding). Measured
+	## against the crisp texture above so it scales in step with tex.get_size() in _draw.
 	static var _icon_used_rect := Rect2()
 	## The bold face the "+" draws in (all panel text is bold, Tim 2026-07-05) —
 	## cached: building a FontVariation per frame in _draw would be wasteful.
@@ -1132,8 +1263,12 @@ class StaffHireGlyph extends Control:
 
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		# Sample the mip chain when the crisp texture is drawn down into its small box.
+		texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+		if _headshot_tex == null:
+			_headshot_tex = PropertyRow._crisp_icon_texture("res://art/icons/headshot.svg")
 		if _icon_used_rect.size == Vector2.ZERO:
-			_icon_used_rect = Rect2(ManagerCircle.HEADSHOT_TEX.get_image().get_used_rect())
+			_icon_used_rect = Rect2(_headshot_tex.get_image().get_used_rect())
 		if _plus_font == null:
 			_plus_font = UiPalette.make_bold_font()
 		var plus_width := _plus_font.get_string_size("+", HORIZONTAL_ALIGNMENT_LEFT, -1.0, PLUS_FONT_SIZE).x
@@ -1142,7 +1277,7 @@ class StaffHireGlyph extends Control:
 	func _draw() -> void:
 		# Fit the icon canvas into its square box preserving aspect (what the old
 		# TextureRect's KEEP_ASPECT did), pinned LEFT and vertically centered.
-		var tex := ManagerCircle.HEADSHOT_TEX
+		var tex := _headshot_tex
 		var tex_size := Vector2(tex.get_size())
 		var fit := minf(ICON_SIZE / tex_size.x, ICON_SIZE / tex_size.y)
 		var canvas_size := tex_size * fit

@@ -802,14 +802,12 @@ func start_game(
 	_right_seg_flash = 0.0
 	_keep_bar.queue_redraw()
 
-	# Label SKIP with what skipping actually does. In the normal "scale an amount" sites it banks the
-	# keep floor; in upside-only First Contact there's no floor to lose — skipping just forgoes the
-	# bonus, so it says so plainly.
+	# Label SKIP with what skipping actually does: keep the DEFAULT amount as-is (multiplier 1.0),
+	# forgoing only the bonus (Tim, 2026-07-09). Upside-only First Contact says so plainly.
 	if _upside_only:
 		_skip_button.text = "SKIP · no bonus"
 	else:
-		var skip_amount := _base_amount * _tuning.minigame_keep_floor
-		_skip_button.text = "SKIP · keep %s" % _format_amount(skip_amount)
+		_skip_button.text = "SKIP · keep %s" % _format_amount(_base_amount)
 
 	# The round's fiction: shown in live play, hidden in the review tuner (a practice
 	# round has no story) and whenever a site provides none.
@@ -824,7 +822,7 @@ func start_game(
 	if _upside_only:
 		_begin_stakes.text = "Play well to earn a BONUS on this business — more income, faster cycles. A weak round or Skip just opens it at its base income. No penalty."
 	else:
-		_begin_stakes.text = "Play well to keep MORE — a great round earns a bonus on top. A weak round or Skip keeps only the minimum."
+		_begin_stakes.text = "Play well to earn a BONUS on top of your inheritance. Skip to keep it as-is — a weak round keeps less."
 	_begin_stakes.visible = true
 	_begin_hint.text = "The clock starts when you press Begin."
 	_begin_hint.visible = true
@@ -1295,15 +1293,16 @@ func _on_back_pressed() -> void:
 	back_pressed.emit()
 
 
-## Skip (reward round): bank the keep floor (the worst result) and leave. In Challenge Mode this is
-## the DONE button — it saves the high score and returns to the list instead.
+## Skip (reward round): keep the DEFAULT amount as-is and leave — skipping forgoes the bonus but
+## does NOT cost anything (Tim, 2026-07-09: skip keeps the default, not half). That is multiplier 1.0.
+## In Challenge Mode this is the DONE button — it saves the high score and returns to the list instead.
 func _on_skip_pressed() -> void:
 	if _challenge_mode:
 		_end_challenge()
 		return
 	_playing = false
 	visible = false
-	finished.emit(_tuning.minigame_keep_floor, _opt_out)
+	finished.emit(1.0, _opt_out)
 
 
 func _on_continue_pressed() -> void:

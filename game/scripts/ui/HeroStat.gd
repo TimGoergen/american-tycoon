@@ -136,8 +136,8 @@ var _epoch_label: Label  # the current epoch / civilization name (was the heir n
 var _economy_bar: ProgressBar
 ## The silver "N% of economy consumed" readout centered over the economy bar.
 var _economy_label: Label
-## Light gray for that readout (Tim, 2026-07-09), no outline.
-const ECONOMY_SILVER := Color("#D8D8D8")
+## White for that readout (Tim, 2026-07-09), no outline.
+const ECONOMY_SILVER := Color.WHITE
 var _economy_divider: ColorRect
 ## Height of the economy bar strip, and of the red divider above it (the divider matches
 ## the panel frame's 12px thickness so it reads as the same line).

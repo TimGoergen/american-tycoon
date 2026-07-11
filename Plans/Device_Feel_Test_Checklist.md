@@ -153,8 +153,9 @@ can land now (rides work item 3's framing pass); real art stays M3.*
       raise the marker, gravity drops it, bank score inside the drifting gold zone.
       Difficulty device-tuned with Tim: GRAVITY 1.9, zone re-roll 1.3s, ZONE_EASE 1.6.
       The old layout's lag went with the old layout.
-- [ ] **Get Ready gate** — not separately verdicted; gains the work-item-3 framing copy
-      ("why the heir plays this"), re-judge after.
+- [x] ~~**Get Ready gate**~~ — **KEEP (2026-07-10, Tim: "the get ready looks good").** Text scaled
+      up (GET_READY_TEXT_SCALE 1.4) and the block vertically centered so it reads as one balanced
+      group (fixed the tall-phone empty-gap look). Framing copy already lands via work item 3.
 - [ ] **Challenge mode** — not separately verdicted this session.
 - [ ] **Result screen** — re-judge after the work-item-4 reward reshape (the "Legacy
       lost" framing changes when standard play becomes neutral).

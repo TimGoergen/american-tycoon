@@ -148,35 +148,15 @@ extends Resource
 ## ship a build with this on.
 @export var carb_autolog: float = 0.0
 
-## How much faster than the bar's own fill speed the bubbles run while a rush frenzy
-## is engaged (px/s) — a RELATIVE surge: the eye measures bubbles against the bar's
-## motion, so an absolute speed read as a burst on slow fills and lazy on fast ones.
-@export var carb_excited_flow: float = 50.0  # feel-tune
-
-## Horizontal churn wobble amplitude (px) at full frenzy.
-@export var carb_excited_wobble: float = 4.0  # feel-tuned on device (Tim, 2026-07-09)
-
-## Per-bubble speed spread's LOWER bound at full frenzy (the crawler/streaker mix).
-@export var carb_excited_spread_lower: float = 0.25  # feel-tune
-
-## Comet-tail visibility during frenzy (0 = suppressed, 1 = full tails). Tails curl
-## more at low speeds, which contributed edge bursts; partial by default.
-@export var carb_excited_tails: float = 0.5  # feel-tuned on device (Tim, 2026-07-09)
-
-## Seconds for the frenzy look to ramp in/out. A slower ramp keeps the state change
-## from registering as an event of its own. 0.9 = Tim's on-device tuned value
-## (2026-07-08), promoted from his override to the shipped default.
-@export var carb_excited_ease: float = 0.9  # feel-tuned on device
-
-# --- Carbonation SPEED TIERS (Tim, 2026-07-10) ---
-# The bubble speed is no longer measured from the bar's fill — every bar picks an excitement
-# TIER and each tier has a STATIC px/s speed set here (Main pushes these into GoldBubbles at
-# startup). IDLE = a still/full bar; FLOWING = a cycling property / the economy bar / TURBO
-# charging; RUSHED = TURBO burning; FRENZY = a property's rush held. All feel-tune.
-@export var carb_tier_idle_px: float = 16.0     # feel-tune
-@export var carb_tier_flowing_px: float = 70.0  # feel-tune
+# --- Carbonation SPEED TIERS (Tim, 2026-07-10; values dialed on device 2026-07-11) ---
+# The bubble speed is not measured from the bar's fill — every bar picks an excitement TIER and each
+# tier has a STATIC px/s speed set here (Main pushes these into GoldBubbles at startup). IDLE = a
+# still/full bar; FLOWING = a cycling property / the economy bar / TURBO charging; RUSHED = TURBO
+# burning; FRENZY = a property's rush held. Values below are Tim's device-tuned set.
+@export var carb_tier_idle_px: float = 20.0     # feel-tune
+@export var carb_tier_flowing_px: float = 50.0  # feel-tune
 @export var carb_tier_rushed_px: float = 150.0  # feel-tune
-@export var carb_tier_frenzy_px: float = 220.0  # feel-tune
+@export var carb_tier_frenzy_px: float = 200.0  # feel-tune
 ## Seconds a bar's bubble speed/agitation eases over when it changes tier. 0 = INSTANT (no accel/
 ## decel ramp when a rush engages/releases — a held rush is constant from press to release, Tim's
 ## long-standing "no edge burst" goal). Raise it only if some smoothing is ever wanted.

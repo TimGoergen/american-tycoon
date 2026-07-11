@@ -47,7 +47,7 @@ enum Tier { IDLE, FLOWING, RUSHED, FRENZY }
 ## (not const) so Main can overwrite it from the carb_tier_* tuning knobs once at startup, letting
 ## the ladder be tuned live (the panel reloads the scene on Apply, re-running that setup). Every
 ## GoldBubbles instance shares this one global ladder. Defaults are the first-pass feel values.
-static var tier_speed_px: Array[float] = [16.0, 70.0, 150.0, 220.0]
+static var tier_speed_px: Array[float] = [20.0, 50.0, 150.0, 200.0]
 
 ## The STATIC agitation level (0–1) for each tier: how busy the liquid looks (bubble count boost,
 ## churn wobble, faster sway, comet-tail suppression). IDLE is calm; FRENZY is fully whipped up.

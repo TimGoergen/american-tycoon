@@ -172,6 +172,17 @@ func _ready() -> void:
 	_proceed_button.pressed.connect(_on_proceed_pressed)
 	column.add_child(_proceed_button)
 
+	# Push every line LARGER and BOLDER (Tim, 2026-07-11): the epoch-transition screens still read
+	# too small/soft after the earlier pass. Bump each label ~20% and faux-bold it — bold also lifts
+	# contrast on the cream plate. One loop so there are no per-line edits; the button keeps its own
+	# styling. Done after all lines are built so it catches every one.
+	for child in column.get_children():
+		if child is Label:
+			var label := child as Label
+			var current := label.get_theme_font_size("font_size")
+			label.add_theme_font_size_override("font_size", int(round(current * 1.2)))
+			label.add_theme_font_override("font", UiPalette.make_bold_font())
+
 	# The card lines, in the order the reveal walks through them. `note` and the button are
 	# handled at the end of the sequence, so they are NOT in this list. Keeping this list is
 	# what lets the re-entrancy reset be a simple loop instead of touching each node by hand.

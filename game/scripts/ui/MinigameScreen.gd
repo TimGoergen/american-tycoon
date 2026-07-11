@@ -624,18 +624,34 @@ func _build_begin_overlay() -> Control:
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	overlay.visible = false
 
-	# The gate content is VERTICALLY CENTERED in the card (Tim, 2026-07-10): the card is tall on a
-	# phone, so centering the whole block — text plus BEGIN together — keeps it balanced instead of
-	# leaving a big dead gap. A fixed column width (not the full card) keeps the enlarged lines
-	# comfortably wrapped and off the card edges.
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	overlay.add_child(center)
+	# The gate text SCROLLS if it's tall, with BEGIN PINNED below, so a wordy game (match-3) can never
+	# push BEGIN off the card (Tim, 2026-07-10). Short games still read as a CENTERED block: the scroll
+	# stretches its content column to the viewport when it fits, and the column centers its lines; when
+	# the text overflows, the column exceeds the viewport and the scroll takes over instead.
+	var margin := MarginContainer.new()
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	for side in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
+		margin.add_theme_constant_override(side, 16)
+	overlay.add_child(margin)
 
+	var outer := VBoxContainer.new()
+	outer.add_theme_constant_override("separation", 16)
+	margin.add_child(outer)
+
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED  # wrap, never scroll sideways
+	outer.add_child(scroll)
+
+	# The text column. EXPAND_FILL both ways so the ScrollContainer stretches it to fill the viewport
+	# when the text is SHORT, and ALIGNMENT_CENTER then centers the lines within it (the approved
+	# centered look); when the text is TALL it exceeds the viewport and scrolling takes over.
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 16)
-	box.custom_minimum_size = Vector2(820, 0)
-	center.add_child(box)
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	scroll.add_child(box)
 
 	var ready := _make_label("GET READY", _scaled_ready_size(UiPalette.FONT_HEADLINE), UiPalette.NAVY)
 	ready.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -676,8 +692,8 @@ func _build_begin_overlay() -> Control:
 	_begin_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(_begin_hint)
 
-	# BEGIN sits at the bottom of the centered block, right under the text (no dead gap above it).
-	# SHRINK_CENTER keeps its fixed width, centered, instead of stretching to the column width.
+	# BEGIN is PINNED below the scroll (in `outer`, NOT the scrolling column), so it stays on the card
+	# no matter how tall the instructions are. SHRINK_CENTER keeps its fixed width, centered.
 	var begin_button := Button.new()
 	begin_button.custom_minimum_size = Vector2(360, 110)
 	begin_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -685,7 +701,7 @@ func _build_begin_overlay() -> Control:
 	begin_button.add_theme_font_size_override("font_size", _scaled_ready_size(UiPalette.FONT_BUTTON))
 	begin_button.text = "BEGIN"
 	begin_button.pressed.connect(_on_begin_pressed)
-	box.add_child(begin_button)
+	outer.add_child(begin_button)
 
 	return overlay
 

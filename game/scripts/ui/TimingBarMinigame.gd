@@ -130,22 +130,26 @@ func begin(tuning: TuningConfig) -> void:
 	intro.add_theme_color_override("font_color", UiPalette.NAVY)
 	column.add_child(intro)
 
+	# Lock count sits ABOVE the game bar (Tim, 2026-07-10), in a dark color so it reads on the
+	# light play area. It's a status readout, not a call to action, so it doesn't need the green.
+	_locks_label = Label.new()
+	_locks_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_locks_label.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
+	_locks_label.add_theme_color_override("font_color", UiPalette.INK_NAVY)
+	column.add_child(_locks_label)
+	_update_locks_label()
+
 	_bar = Control.new()
 	_bar.custom_minimum_size = Vector2(0, 96)
 	_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_bar.draw.connect(_draw_bar)
 	column.add_child(_bar)
 
-	_locks_label = Label.new()
-	_locks_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_locks_label.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
-	_locks_label.add_theme_color_override("font_color", UiPalette.MONEY_GREEN)
-	column.add_child(_locks_label)
-	_update_locks_label()
-
 	var lock_button := Button.new()
 	lock_button.text = "LOCK"
-	lock_button.custom_minimum_size = Vector2(0, 110)
+	# 50% taller than the old 110px (Tim, 2026-07-10) — the minigame's dedicated action button
+	# should be a big, easy target (matches our large-tappable-button guidance).
+	lock_button.custom_minimum_size = Vector2(0, 165)
 	UiPalette.style_button(lock_button, true)  # red: the act button
 	lock_button.pressed.connect(_on_lock)
 	column.add_child(lock_button)

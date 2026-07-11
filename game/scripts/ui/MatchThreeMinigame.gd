@@ -144,9 +144,6 @@ var _select_ring: Panel
 ## The big AVOID gem tile from the banner, kept so we can pop it in on round start and give it a
 ## gentle continuous pulse (it is the round's "steer around this" cue, so it should draw the eye).
 var _banner_icon: Control
-## The "Legacy bonus earned" badge in the banner row above the board, revealed once the bonus is
-## secured (see _score_swap). Hidden until then.
-var _legacy_badge: Control
 ## True once the banner's intro pop has finished, so the idle pulse doesn't fight the intro tween.
 var _banner_ready: bool = false
 ## True while the AVOID banner is playing its "you matched the avoid gem" reminder pulse, so the
@@ -253,28 +250,9 @@ func _build_bonus_banner() -> Control:
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(spacer)
 
-	# BONUS group: the word sits ABOVE the legacy gem, shown the moment the player secures the bonus
-	# (Tim, 2026-07-09), so it's clear the round's Legacy gems are already banked. A smaller framed gem
-	# than the AVOID cue — it's a reward badge, not the thing to watch for.
-	_legacy_badge = VBoxContainer.new()
-	_legacy_badge.alignment = BoxContainer.ALIGNMENT_CENTER
-	_legacy_badge.add_theme_constant_override("separation", 4)
-	_legacy_badge.visible = false
-	var badge_label := Label.new()
-	badge_label.text = "BONUS"
-	badge_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	badge_label.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
-	badge_label.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD.darkened(0.35))
-	_legacy_badge.add_child(badge_label)
-	var badge_icon := TextureRect.new()
-	badge_icon.texture = GEM_TEXTURE[LEGACY_COLOR]
-	badge_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	badge_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	badge_icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS  # smooth when downscaled
-	badge_icon.custom_minimum_size = Vector2(BONUS_ICON_SIZE * 0.55, BONUS_ICON_SIZE * 0.55)
-	badge_icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	_legacy_badge.add_child(badge_icon)
-	row.add_child(_legacy_badge)
+	# The "Legacy gem earned" badge now lives on the shared minigame host (MinigameScreen),
+	# so it appears identically on every game the moment a gem is secured (Tim, 2026-07-10).
+	# Match-3 no longer draws its own — this used to be a BONUS label + gem here.
 
 	# Inset the whole banner so the AVOID gem (far left) and the BONUS badge (far right) sit a little
 	# farther from the card's outside edges (Tim, 2026-07-09).
@@ -799,15 +777,15 @@ func _score_steps(steps: Array) -> Dictionary:
 
 
 ## Bank collected Legacy gems and, once the bonus is secured, stop the board spawning more (design
-## rule 3 — no pointless noise once earned) and reveal the "bonus earned" badge above the board.
+## rule 3 — no pointless noise once earned). The shared host draws the "gem earned" badge.
 func _collect_legacy(count: int) -> void:
 	if count <= 0:
 		return
 	collect_legacy_gem(count)
 	if legacy_bonus_secured():
+		# Stop seeding more legacy gems once the bonus is banked. The shared host
+		# (MinigameScreen) shows the "Legacy gem earned" badge — no local badge here.
 		_board.enable_special_spawns = false
-		if _legacy_badge != null:
-			_legacy_badge.visible = true
 
 
 func _animate_step(step: Dictionary, points: float, step_index: int, group_details: Array) -> void:

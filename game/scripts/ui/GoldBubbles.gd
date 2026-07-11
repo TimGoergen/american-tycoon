@@ -85,9 +85,11 @@ const ALPHA_MIN := 0.45
 const ALPHA_MAX := 0.85
 ## Tracers: each bubble trails ONE antialiased polyline back along its own path, per-point alpha
 ## fading out. Samples spaced by DISTANCE (not time) so a slow bar's tail still clears the head.
-const TRACER_COUNT := 20
-const TRACER_GAP_PX := 3.0
-const TRACER_ALPHA_FALLOFF := 0.87
+## Sample count cut 20->12 with a wider gap (same ~tail length) for perf — the tail path is the
+## carbonation hot cost (Tim, 2026-07-11). Falloff retuned so the fade still spans the shorter tail.
+const TRACER_COUNT := 12
+const TRACER_GAP_PX := 5.0
+const TRACER_ALPHA_FALLOFF := 0.79
 const TRACER_WIDTH_VS_RADIUS := 1.4
 ## Hide bubbles entirely when the filled region is narrower than this.
 const MIN_FILLED_WIDTH_PX := 14.0
@@ -157,17 +159,35 @@ var _pos_seeded := false
 ## speed when laying its tracer path.
 var _upper_mult := 1.0 + SPEED_SPREAD
 
+# Per-bubble TRAITS, all derived from the fixed _variant hash and therefore CONSTANT for the life of
+# the node. Cached once in _ready so the hot draw path (many bubbles × up to TRACER_COUNT tail
+# samples × many bars, every frame) doesn't re-hash them with sines each time — the main carbonation
+# perf cost (Tim, 2026-07-11). Only the time-varying sway/wobble sines are computed per frame.
+var _c_radius: Array[float] = []      # bubble radius (px)
+var _c_alpha: Array[float] = []       # head opacity
+var _c_phase: Array[float] = []       # sway/wobble phase (radians)
+var _c_sway_hz: Array[float] = []     # base sway rate (agitation boost applied at draw time)
+var _c_sway_frac: Array[float] = []   # sway amplitude, × bar height
+var _c_lane_frac: Array[float] = []   # resting lane offset, × bar height
+var _c_speed_var: Array[float] = []   # position in the per-bubble speed-spread range
+
 
 func _ready() -> void:
 	# set_anchors_AND_OFFSETS_preset: the anchors-only variant leaves a zero-height rect hugging
 	# the bar's top, drawing the bubbles as specks pinned to the top edge (Tim, 2026-07-05).
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	# Placeholder positions; seeded to a golden-ratio spread across the real fill width on the first
-	# valid frame (see _process). The Weyl sequence is evenly spread for EVERY prefix, so whatever
-	# subset a narrow fill draws starts well distributed instead of clumped at the left.
-	for _i in range(MAX_BUBBLE_COUNT):
+	# Placeholder positions (seeded to a golden-ratio spread across the bar on the first valid frame,
+	# see _process) and the per-bubble trait cache (fixed for the node's life — see above).
+	for i in range(MAX_BUBBLE_COUNT):
 		_bubble_pos.append(0.0)
+		_c_radius.append(lerpf(RADIUS_MIN, RADIUS_MAX, _variant(i, 0.13)))
+		_c_alpha.append(lerpf(ALPHA_MIN, ALPHA_MAX, _variant(i, 0.71)))
+		_c_phase.append(_variant(i, 0.53) * TAU)
+		_c_sway_hz.append(lerpf(SWAY_HZ_MIN, SWAY_HZ_MAX, _variant(i, 0.29)))
+		_c_sway_frac.append(lerpf(SWAY_FRACTION_MIN, SWAY_FRACTION_MAX, _variant(i, 0.83)))
+		_c_lane_frac.append((_variant(i, 0.91) * 2.0 - 1.0) * LANE_OFFSET_FRACTION)
+		_c_speed_var.append(_variant(i, 0.37))
 
 
 ## A stable per-bubble pseudo-random in [0,1), hashed from (index, salt) — fixed, not random, so
@@ -176,10 +196,6 @@ func _ready() -> void:
 ## one coherent wave — Tim, 2026-07-06).
 func _variant(index: int, salt: float) -> float:
 	return fposmod(sin(float(index) * 127.1 + salt * 311.7) * 43758.5453, 1.0)
-
-
-func _alpha_of(index: int) -> float:
-	return lerpf(ALPHA_MIN, ALPHA_MAX, _variant(index, 0.71))
 
 
 ## Feed the fill fraction (0–1) for a bar this node can't read on its own (a hand-drawn bar).
@@ -255,7 +271,7 @@ func _process(delta: float) -> void:
 ## spread downward (EXCITED_SPREAD_LOWER): a whipped-up crowd mixes crawlers with streakers.
 func _bubble_speed_px(index: int) -> float:
 	var lower := lerpf(1.0 - SPEED_SPREAD, EXCITED_SPREAD_LOWER, _agitation)
-	return _base_speed_px * lerpf(lower, _upper_mult, _variant(index, 0.37))
+	return _base_speed_px * lerpf(lower, _upper_mult, _c_speed_var[index])
 
 
 func _draw() -> void:
@@ -270,12 +286,12 @@ func _draw() -> void:
 		# coverage is instant and even across the fill however fast it grew (see the header).
 		if _bubble_pos[i] > filled_width:
 			continue
-		var radius := lerpf(RADIUS_MIN, RADIUS_MAX, _variant(i, 0.13))
+		var radius := _c_radius[i]
 		var head := _bubble_point(i, radius, filled_width, 0.0)
 		# Only the head clamps into the fill; tail samples that fall outside are dropped (a clamped
 		# sample would pile up at the edge rather than trail behind).
 		head.x = clampf(head.x, edge_inset + radius, edge_inset + filled_width - radius)
-		var head_alpha := _alpha_of(i)
+		var head_alpha := _c_alpha[i]
 
 		# Tail (drawn under the head): ONE antialiased polyline back along the bubble's own path.
 		# SKIPPED ENTIRELY while agitated — the 20-sample tail path is the per-bubble hot cost, so a
@@ -349,13 +365,11 @@ func _draw_vertical_gradient(
 ## no stored history.
 func _bubble_point(index: int, radius: float, filled_width: float, seconds_ago: float) -> Vector2:
 	var at_time := _time - seconds_ago
-	var phase := _variant(index, 0.53) * TAU
-	# One clean sine at this bubble's own rate/phase/amplitude around its own lane.
-	var sway_hz := lerpf(SWAY_HZ_MIN, SWAY_HZ_MAX, _variant(index, 0.29)) \
-			* (1.0 + EXCITED_SWAY_HZ_BOOST * _agitation)
-	var sway_fraction := lerpf(SWAY_FRACTION_MIN, SWAY_FRACTION_MAX, _variant(index, 0.83))
-	var sway := sin(at_time * TAU * sway_hz + phase) * size.y * sway_fraction
-	var lane := (_variant(index, 0.91) * 2.0 - 1.0) * size.y * LANE_OFFSET_FRACTION
+	# All per-bubble traits are cached (see _ready); only the two time-varying sines are per frame.
+	var phase := _c_phase[index]
+	var sway_hz := _c_sway_hz[index] * (1.0 + EXCITED_SWAY_HZ_BOOST * _agitation)
+	var sway := sin(at_time * TAU * sway_hz + phase) * size.y * _c_sway_frac[index]
+	var lane := _c_lane_frac[index] * size.y
 	# The agitation wobble: horizontal churn scaled purely by the eased agitation.
 	var wobble := sin(at_time * TAU * EXCITED_WOBBLE_HZ + phase * 3.0) \
 			* EXCITED_WOBBLE_PX * _agitation

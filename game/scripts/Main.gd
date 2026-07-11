@@ -282,6 +282,13 @@ func _notification(what: int) -> void:
 
 func _create_game() -> void:
 	tuning = ConfigLoader.load_tuning()
+	# Push the carbonation speed-tier ladder into GoldBubbles' shared static table (Tim, 2026-07-10):
+	# every bubble crowd reads the same tier speeds, so setting it once here (re-run on a scene reload
+	# after a Balance Tuning Apply) lets the ladder be tuned live without threading tuning per-bar.
+	GoldBubbles.tier_speed_px = [
+		tuning.carb_tier_idle_px, tuning.carb_tier_flowing_px,
+		tuning.carb_tier_rushed_px, tuning.carb_tier_frenzy_px,
+	]
 	var property_configs := ConfigLoader.load_property_configs()
 
 	# Constructing the dynasty also builds generation 1, already seeded with
@@ -395,6 +402,11 @@ func _build_ui() -> void:
 	UiPalette.apply_screen_bezel(viewing_area)
 	viewing_area.add_theme_stylebox_override("panel", UiPalette.make_screen_frame_style())
 	add_child(viewing_area)
+	# Hide the ENTIRE game view (hero stat + property ladder + all their carbonation bars) while a
+	# full-screen modal is up (see _process): a covered Control is not culled — it keeps drawing every
+	# frame under the opaque overlay, and the ladder's bubble bars are a real per-frame GPU spend that
+	# showed up as minigame lag. This list was declared long ago but never populated (Tim, 2026-07-11).
+	_covered_game_layers.append(viewing_area)
 
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 10)

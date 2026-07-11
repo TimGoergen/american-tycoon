@@ -106,9 +106,10 @@ const EXCITED_WOBBLE_HZ := 2.3
 ## At full agitation the per-bubble speed spread's LOWER bound drops to this, so the crowd is a
 ## chaotic mix of crawlers and streakers rather than a uniform stream.
 const EXCITED_SPREAD_LOWER := 0.25
-## Comet-tail visibility at full agitation (0 = suppressed, 1 = full). Curly slow-bubble tails
-## read as chaos; partial by default so a whipped-up bar is a swarm, a calm bar is comets.
-const EXCITED_TAIL_VISIBILITY := 0.3
+## Comet-tail visibility at full agitation. 0 = no tails at FRENZY (the tail path is then SKIPPED
+## entirely — see _draw — so a rush is a cheap, smooth swarm of dots), which also reads best: frenzy
+## is the swarm, calm is the comets (Tim, 2026-07-11).
+const EXCITED_TAIL_VISIBILITY := 0.0
 
 ## Left/right inset of the fill inside the bar (framed meters inset by their border width).
 var edge_inset := 0.0
@@ -275,35 +276,36 @@ func _draw() -> void:
 		head.x = clampf(head.x, edge_inset + radius, edge_inset + filled_width - radius)
 		var head_alpha := _alpha_of(i)
 
-		# Tail first (so the head draws over it): ONE antialiased polyline back along the bubble's
-		# own path. Tails are SUPPRESSED while agitated (a tail's curl is inversely proportional to
-		# speed, so slow agitated bubbles rendered curlier tails that read as chaos — frenzy is the
-		# swarm, calm is the comets, Tim 2026-07-08).
+		# Tail (drawn under the head): ONE antialiased polyline back along the bubble's own path.
+		# SKIPPED ENTIRELY while agitated — the 20-sample tail path is the per-bubble hot cost, so a
+		# whipped-up FRENZY (tail_visibility ~0) is a cheap swarm of tail-less dots that moves smoothly
+		# on device, which also matches "frenzy is the swarm, calm is the comets" (Tim, 2026-07-11 perf).
 		var tail_visibility := lerpf(1.0, EXCITED_TAIL_VISIBILITY, _agitation)
-		var seconds_per_gap := TRACER_GAP_PX / maxf(1.0, _bubble_speed_px(i))
-		var tail_width := radius * TRACER_WIDTH_VS_RADIUS
-		var tail_points := PackedVector2Array()
-		var tail_colors := PackedColorArray()
-		var head_point_color := bubble_color
-		head_point_color.a = head_alpha * tail_visibility
-		tail_points.append(head)
-		tail_colors.append(head_point_color)
-		var sample_alpha := head_alpha * tail_visibility
-		for sample in range(1, TRACER_COUNT + 1):
-			sample_alpha *= TRACER_ALPHA_FALLOFF
-			var point := _bubble_point(i, radius, filled_width, float(sample) * seconds_per_gap)
-			# The wake pokes out of the fill's TRAILING edge — right when reversed, left otherwise.
-			if flow_reversed:
-				if point.x > edge_inset + filled_width - tail_width / 2.0:
+		if tail_visibility > 0.02:
+			var seconds_per_gap := TRACER_GAP_PX / maxf(1.0, _bubble_speed_px(i))
+			var tail_width := radius * TRACER_WIDTH_VS_RADIUS
+			var tail_points := PackedVector2Array()
+			var tail_colors := PackedColorArray()
+			var head_point_color := bubble_color
+			head_point_color.a = head_alpha * tail_visibility
+			tail_points.append(head)
+			tail_colors.append(head_point_color)
+			var sample_alpha := head_alpha * tail_visibility
+			for sample in range(1, TRACER_COUNT + 1):
+				sample_alpha *= TRACER_ALPHA_FALLOFF
+				var point := _bubble_point(i, radius, filled_width, float(sample) * seconds_per_gap)
+				# The wake pokes out of the fill's TRAILING edge — right when reversed, left otherwise.
+				if flow_reversed:
+					if point.x > edge_inset + filled_width - tail_width / 2.0:
+						break
+				elif point.x < edge_inset + tail_width / 2.0:
 					break
-			elif point.x < edge_inset + tail_width / 2.0:
-				break
-			tail_points.append(point)
-			var sample_color := bubble_color
-			sample_color.a = sample_alpha
-			tail_colors.append(sample_color)
-		if tail_points.size() >= 2 and tail_visibility > 0.02:
-			draw_polyline_colors(tail_points, tail_colors, tail_width, true)
+				tail_points.append(point)
+				var sample_color := bubble_color
+				sample_color.a = sample_alpha
+				tail_colors.append(sample_color)
+			if tail_points.size() >= 2:
+				draw_polyline_colors(tail_points, tail_colors, tail_width, true)
 
 		var color := bubble_color
 		color.a = head_alpha

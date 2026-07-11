@@ -110,6 +110,9 @@ const DESCRIPTIONS := {
 	"legacy_gem_chance_basketball": "Chance a legacy gem appears in Basketball.",
 	"legacy_gem_chance_memory": "Chance the Memory gem bonus round appears after a full clear.",
 	"memory_gem_sequence_length": "Length of the Memory gem bonus sequence (identical pads; higher = harder).",
+	"basketball_launch_curve_exp": "Basketball throw ease (higher = gentler small pulls, finer aim).",
+	"basketball_launch_max_drag": "Drag distance (px) for a full-power basketball throw (higher = more pull needed).",
+	"basketball_max_throw_speed": "Max basketball throw speed (px/sec) — raw power.",
 	"offline_efficiency": "Offline income rate vs live play (0–1).",
 	"offline_cap_seconds": "Longest offline accrual window (seconds; 14400 = 4h).",
 	"frenzy_max_multiplier": "Peak income multiplier during a frenzy burn.",
@@ -157,6 +160,9 @@ const DISPLAY_NAMES := {
 	"legacy_gem_chance_basketball": "Legacy Gem Chance Basketball",
 	"legacy_gem_chance_memory": "Legacy Gem Chance Memory",
 	"memory_gem_sequence_length": "Memory Gem Sequence Length",
+	"basketball_launch_curve_exp": "Basketball Launch Ease",
+	"basketball_launch_max_drag": "Basketball Full-Power Drag",
+	"basketball_max_throw_speed": "Basketball Max Speed",
 }
 
 
@@ -179,7 +185,7 @@ const SECTIONS := [
 	{"title": "Staff", "prefixes": ["staff_"]},
 	{"title": "Retention", "prefixes": ["retention_"]},
 	{"title": "Carbonation", "prefixes": ["carb_"]},
-	{"title": "Minigames", "prefixes": ["minigame_", "match3_"]},
+	{"title": "Minigames", "prefixes": ["minigame_", "match3_", "basketball_"]},
 	{"title": "Legacy Bonus", "prefixes": ["legacy_bonus_", "legacy_gem_chance_"]},
 	{"title": "Offline", "prefixes": ["offline_"]},
 	{"title": "Estate & Legacy", "prefixes": ["estate_", "loophole_", "k_legacy", "alpha_legacy"]},

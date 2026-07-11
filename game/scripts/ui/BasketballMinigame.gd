@@ -48,22 +48,25 @@ const RIM_POST_RADIUS := 16.1
 const GRAVITY := 2400.0
 
 ## The slingshot: the throw is aimed OPPOSITE the pull (ball dragged away from its rest spot), and
-## its SPEED is a NON-LINEAR function of the drag distance — the drag fraction over LAUNCH_MAX_DRAG,
-## raised to LAUNCH_CURVE_EXP. The old map was linear (distance × a fixed power) and "ramped too
-## strong too fast" (Tim, 2026-07-07): a short pull already maxed out, leaving no fine control. The
-## curve now eases the low end so small/medium pulls are gentle and full power needs a long drag.
-## MAX_PULL caps how far the ball can visually stretch; a drag shorter than MIN_PULL is not a throw
-## (the ball just snaps back). FEEL-TUNE.
+## its SPEED is a NON-LINEAR function of the drag distance — the drag fraction over the launch-max
+## drag, raised to the launch-curve exponent. The old map was linear (distance × a fixed power) and
+## "ramped too strong too fast" (Tim, 2026-07-07): a short pull already maxed out, leaving no fine
+## control. The curve now eases the low end so small/medium pulls are gentle and full power needs a
+## long drag. MAX_PULL caps how far the ball can visually stretch; a drag shorter than MIN_PULL is
+## not a throw (the ball just snaps back).
 const MAX_PULL := 300.0
 const MIN_PULL := 28.0
-## Drag distance (px) at which the throw reaches MAX_THROW_SPEED — longer drags add no more force.
-## Near the old effective cap (~193px), so full power stays reachable given the limited drag room.
-const LAUNCH_MAX_DRAG := 200.0
-## Launch response exponent. 1.0 = the old linear ramp; >1 eases the low end (small pulls gentle,
-## force building toward the end of the drag) for finer aim control at low power.
-const LAUNCH_CURVE_EXP := 1.7
+
+# The three launch-curve values are now TUNING KNOBS (Tim, 2026-07-10) so the throw feel can be
+# dialed on device via Balance Tuning without a rebuild. Read from TuningConfig in begin(); the
+# defaults below match the previous constants.
+## Drag distance (px) at which the throw reaches max speed — longer drags add no more force.
+var _launch_max_drag: float = 200.0
+## Launch response exponent. 1.0 = a linear ramp; >1 eases the low end (small pulls gentle, force
+## building toward the end of the drag) for finer aim control at low power.
+var _launch_curve_exp: float = 1.7
 ## Hard cap on the resulting throw speed (px/sec).
-const MAX_THROW_SPEED := 2900.0
+var _max_throw_speed: float = 2900.0
 
 ## Aim-guide force colors (Tim, 2026-06-30; extended to four stops 2026-07-01 for readability): the
 ## force wedge is a SINGLE color that CHANGES with the current pull's force, climbing through a wider
@@ -245,6 +248,10 @@ func begin(tuning: TuningConfig) -> void:
 	# Legacy gem: capture the spawn chance and reset the per-round gem state. Whether a gem actually
 	# appears is rolled once the board has a size (in _process), so we know where the play area is.
 	_legacy_gem_chance = clampf(tuning.legacy_gem_chance_basketball, 0.0, 1.0)
+	# Launch-curve knobs (device-tunable). Guarded so a zeroed knob can't divide by zero / kill power.
+	_launch_max_drag = maxf(1.0, tuning.basketball_launch_max_drag)
+	_launch_curve_exp = maxf(0.1, tuning.basketball_launch_curve_exp)
+	_max_throw_speed = maxf(1.0, tuning.basketball_max_throw_speed)
 	_legacy_gem_active = false
 	_legacy_gem_placed = false
 	_passed_through_gem_this_shot = false
@@ -679,7 +686,7 @@ func _release_sling() -> void:
 		ball["state"] = "flight"
 	else:
 		# Aim OPPOSITE the pull; speed comes from the non-linear launch curve (see _throw_fraction).
-		var speed := _throw_fraction(pull_distance) * MAX_THROW_SPEED
+		var speed := _throw_fraction(pull_distance) * _max_throw_speed
 		ball["vel"] = (-pull / pull_distance) * speed
 		ball["state"] = "flight"
 	_aim_index = -1
@@ -689,8 +696,8 @@ func _release_sling() -> void:
 ## MAX_PULL / LAUNCH_* constants). Shared by the release (actual speed) and the aim guide (wedge size
 ## + color) so what the player SEES matches what they GET.
 func _throw_fraction(pull_distance: float) -> float:
-	var frac := clampf(pull_distance / LAUNCH_MAX_DRAG, 0.0, 1.0)
-	return pow(frac, LAUNCH_CURVE_EXP)
+	var frac := clampf(pull_distance / _launch_max_drag, 0.0, 1.0)
+	return pow(frac, _launch_curve_exp)
 
 
 ## Draw the board outline, the hoop (net + rim, split so a scoring ball passes through it), every

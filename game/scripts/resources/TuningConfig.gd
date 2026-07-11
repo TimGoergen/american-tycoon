@@ -299,6 +299,15 @@ extends Resource
 @export var legacy_gem_chance_balance: float = 0.15  # feel-tune
 @export var legacy_gem_chance_basketball: float = 0.15  # feel-tune
 
+# --- Basketball launch curve (Tim, 2026-07-10: device-tunable throw feel) ------------
+# The slingshot throw speed = (drag / basketball_launch_max_drag, clamped 0..1) ^
+# basketball_launch_curve_exp × basketball_max_throw_speed. Higher exponent = gentler low end
+# (finer aim control); larger max-drag = more pull needed for full power; larger max-speed = more
+# raw power. All feel-tune.
+@export var basketball_launch_curve_exp: float = 1.7   # feel-tune
+@export var basketball_launch_max_drag: float = 200.0  # feel-tune (px)
+@export var basketball_max_throw_speed: float = 2900.0  # feel-tune (px/sec)
+
 ## Memory's Legacy gem is a chance-gated BONUS ROUND, offered only after the player clears the whole
 ## game (all 6 rounds). This is the per-run chance that bonus round appears once they've earned it.
 @export var legacy_gem_chance_memory: float = 0.15  # feel-tune

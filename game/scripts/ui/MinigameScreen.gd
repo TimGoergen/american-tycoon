@@ -79,7 +79,8 @@ const TIMER_PULSE_SECONDS := 5.0
 
 ## Every line on the "Get Ready" gate is scaled up by this factor (Tim, 2026-07-10) so the pre-round
 ## text reads comfortably at arm's length. Applied to each label's font size and the BEGIN button.
-const GET_READY_TEXT_SCALE := 1.3
+## 1.4 landed between "didn't look bigger" (1.3) and "too big" (1.6) on device.
+const GET_READY_TEXT_SCALE := 1.4
 
 var _tuning: TuningConfig
 ## The pre-minigame base reward being scaled (Legacy count at prestige, cash pile at
@@ -579,29 +580,18 @@ func _build_begin_overlay() -> Control:
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	overlay.visible = false
 
-	# Fill the card, then lay out top-to-bottom: a SCROLLING text column that takes the slack, and the
-	# BEGIN button PINNED below it. At the enlarged text size (Tim, 2026-07-10) a wordy game's
-	# instructions can exceed the card height; scrolling the text keeps BEGIN always on the card and
-	# reachable instead of spilling off the bottom. A small inner margin keeps text off the card edge.
-	var margin := MarginContainer.new()
-	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	for side in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
-		margin.add_theme_constant_override(side, 16)
-	overlay.add_child(margin)
-
-	var outer := VBoxContainer.new()
-	outer.add_theme_constant_override("separation", 16)
-	margin.add_child(outer)
-
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED  # wrap, never scroll sideways
-	outer.add_child(scroll)
+	# The gate content is VERTICALLY CENTERED in the card (Tim, 2026-07-10): the card is tall on a
+	# phone, so centering the whole block — text plus BEGIN together — keeps it balanced instead of
+	# leaving a big dead gap. A fixed column width (not the full card) keeps the enlarged lines
+	# comfortably wrapped and off the card edges.
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.add_child(center)
 
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 24)
-	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL  # fill the scroll width so text centers + wraps
-	scroll.add_child(box)
+	box.add_theme_constant_override("separation", 16)
+	box.custom_minimum_size = Vector2(820, 0)
+	center.add_child(box)
 
 	var ready := _make_label("GET READY", _scaled_ready_size(UiPalette.FONT_HEADLINE), UiPalette.NAVY)
 	ready.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -642,8 +632,8 @@ func _build_begin_overlay() -> Control:
 	_begin_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(_begin_hint)
 
-	# BEGIN sits in `outer`, BELOW the scroll — pinned to the card so it stays visible no matter how
-	# long the scrolling instructions are. SHRINK_CENTER keeps its fixed width, centered.
+	# BEGIN sits at the bottom of the centered block, right under the text (no dead gap above it).
+	# SHRINK_CENTER keeps its fixed width, centered, instead of stretching to the column width.
 	var begin_button := Button.new()
 	begin_button.custom_minimum_size = Vector2(360, 110)
 	begin_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -651,7 +641,7 @@ func _build_begin_overlay() -> Control:
 	begin_button.add_theme_font_size_override("font_size", _scaled_ready_size(UiPalette.FONT_BUTTON))
 	begin_button.text = "BEGIN"
 	begin_button.pressed.connect(_on_begin_pressed)
-	outer.add_child(begin_button)
+	box.add_child(begin_button)
 
 	return overlay
 

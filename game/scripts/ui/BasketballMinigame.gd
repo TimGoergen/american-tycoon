@@ -35,6 +35,10 @@ const BALL_RADIUS := 53.2          # ~106px diameter
 ## from the original 82×30, Tim 2026-06-28.)
 const HOOP_RX := 94.3
 const HOOP_RY := 34.5
+## The backboard (drawn behind the hoop) is wider than the rim, so the hoop's drift must be kept
+## further from the walls than the rim alone — else the backboard pokes past the board edge (Tim,
+## 2026-07-10). Defined here so _draw_backboard and the hoop-drift bound use the SAME width.
+const BACKBOARD_WIDTH := HOOP_RX * 2.8
 ## Half-width of the scoring "mouth" at the top of the rim. Narrower than HOOP_RX so the solid rim
 ## ENDS (the posts) sit just outside the mouth — a near-miss clips a post and bounces (a rim-out),
 ## while a clean drop through the gap scores.
@@ -430,7 +434,9 @@ func _segment_hits_gem(from: Vector2, to: Vector2) -> bool:
 ## board's middle and halfway up to the top, horizontally anywhere that keeps the whole ellipse off
 ## the walls.
 func _move_hoop(bounds: Vector2) -> void:
-	var margin_x := WALL_THICKNESS + HOOP_RX
+	# Keep the whole BACKBOARD inside the walls (it is wider than the rim), so it never pokes past the
+	# board edge when the hoop drifts near a side.
+	var margin_x := WALL_THICKNESS + BACKBOARD_WIDTH * 0.5
 	_hoop_pos = Vector2(
 		_rng.randf_range(margin_x, bounds.x - margin_x),
 		_rng.randf_range(bounds.y * 0.25, bounds.y * 0.5)
@@ -920,7 +926,7 @@ func _draw_legacy_gem() -> void:
 ## (drawn relative to _hoop_pos). Purely cosmetic — the ball is NOT bounced off it; a shot still
 ## scores only by dropping through the rim (bank-shot collision could be a later addition).
 func _draw_backboard() -> void:
-	var width := HOOP_RX * 2.8
+	var width := BACKBOARD_WIDTH
 	var height := HOOP_RX * 1.6
 	var bottom_y := _hoop_pos.y - HOOP_RY * 0.2   # just above the rim's back edge
 	var board := Rect2(Vector2(_hoop_pos.x - width * 0.5, bottom_y - height), Vector2(width, height))

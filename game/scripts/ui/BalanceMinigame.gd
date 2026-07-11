@@ -55,15 +55,12 @@ const GEM_ICON_SIZE := 52.0
 # --- Success feedback chips ---------------------------------------------------
 # Tim, 2026-07-11 — every minigame shows context-specific success feedback like Match-3
 # does. This game banks time-in-zone continuously, so there is no single "catch complete"
-# moment; instead we pop a green "IN THE ZONE!" chip the instant the marker (re-)enters the
-# gold zone (the discrete "you hooked it" action), then gold chips as banked performance
-# crosses milestones (the round adding up). Both are debounced so we never chip per frame.
+# moment; a per-entry "in the zone" chip was too noisy (Tim, 2026-07-11), so we only pop a
+# gold chip as banked performance crosses milestones (the round adding up), each fired once.
 ## Banked-performance fractions that each earn a one-time gold "banking" chip.
 const PERFORMANCE_MILESTONES := [0.25, 0.5, 0.75, 1.0]
 ## The short label shown for each milestone, matched by index to PERFORMANCE_MILESTONES.
 const MILESTONE_LABELS := ["BANKING!", "HALFWAY!", "ALMOST!", "BALANCED!"]
-## Shortest gap between two "IN THE ZONE!" chips, so bobbing across the edge can't spam them.
-const ZONE_CHIP_COOLDOWN := 1.1
 
 ## The legacy gem currency art, drawn beside the zone as the "hold here to collect" cue.
 const LEGACY_GEM_TEXTURE := preload("res://art/icons/legacy_gem.svg")
@@ -102,11 +99,6 @@ var _gem_progress: float = 0.0
 var _gem_won_flash: float = 0.0
 
 # --- Success feedback state ---------------------------------------------------
-## Whether the marker was inside the zone last frame, so we can detect the discrete
-## out-to-in transition (the "you hooked it" moment) rather than chipping every frame.
-var _was_in_zone: bool = false
-## Counts down after an "IN THE ZONE!" chip so re-entries can't spam the feedback.
-var _zone_chip_cooldown: float = 0.0
 ## How many performance milestones we've already celebrated, so each fires exactly once.
 var _milestones_shown: int = 0
 
@@ -143,8 +135,6 @@ func begin(tuning: TuningConfig) -> void:
 	_gem_won_flash = 0.0
 
 	# Success-feedback bookkeeping, fresh each round.
-	_was_in_zone = false
-	_zone_chip_cooldown = 0.0
 	_milestones_shown = 0
 
 	var intro := Label.new()
@@ -259,33 +249,21 @@ func _process(delta: float) -> void:
 
 	_update_legacy_gem(delta, in_zone)
 
-	_update_success_chips(delta, in_zone)
+	_update_success_chips()
 
 	if _track != null:
 		_track.queue_redraw()
 
 
-## Pop context-specific success chips, matching Match-3's feedback (Tim, 2026-07-11 — every
-## minigame shows success feedback). Two discrete, debounced events: a green "IN THE ZONE!"
-## when the marker (re-)enters the gold zone, and a one-time gold chip each time banked
-## performance crosses a milestone. Both are spawned on the track control so they float over
-## the bar, centered near the marker in the track's local coordinates.
-func _update_success_chips(delta: float, in_zone: bool) -> void:
+## Pop a gold "banking" chip the first time banked performance crosses each milestone, matching
+## Match-3's feedback (Tim, 2026-07-11 — every minigame shows success feedback). Gold marks these
+## as the exceptional "the books are balancing" beats. A per-zone-entry chip was tried but read as
+## too noisy (Tim, 2026-07-11), so milestones are the only success chip here. Spawned on the track
+## control so they float over the bar, centered on the gold zone in the track's local coordinates.
+func _update_success_chips() -> void:
 	if _track == null:
 		return
 
-	_zone_chip_cooldown = maxf(0.0, _zone_chip_cooldown - delta)
-
-	# The discrete "you hooked it" action: crossing from out-of-zone to in-zone. Debounced so
-	# bobbing back and forth across the edge can't spam the chip.
-	if in_zone and not _was_in_zone and _zone_chip_cooldown <= 0.0:
-		var marker_spot := Vector2(_track.size.x * 0.5, _to_screen_y(_pos))
-		FloatingChip.spawn(_track, marker_spot, "IN THE ZONE!", UiPalette.MONEY_GREEN)
-		_zone_chip_cooldown = ZONE_CHIP_COOLDOWN
-	_was_in_zone = in_zone
-
-	# Round success adding up: a gold chip the first time banked performance passes each
-	# milestone. Gold marks these as the exceptional "the books are balancing" beats.
 	var performance := get_performance()
 	while (_milestones_shown < PERFORMANCE_MILESTONES.size()
 			and performance >= PERFORMANCE_MILESTONES[_milestones_shown]):

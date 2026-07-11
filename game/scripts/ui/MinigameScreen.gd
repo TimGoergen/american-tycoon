@@ -78,9 +78,8 @@ const KEEP_BAR_LERP_SPEED := 8.0
 const TIMER_PULSE_SECONDS := 5.0
 
 ## Every line on the "Get Ready" gate is scaled up by this factor (Tim, 2026-07-10) so the pre-round
-## text reads comfortably at arm's length. Applied to each label's font size and the BEGIN button. The
-## gate scrolls, so a large factor is safe — long instructions scroll rather than overflow the card.
-const GET_READY_TEXT_SCALE := 1.6
+## text reads comfortably at arm's length. Applied to each label's font size and the BEGIN button.
+const GET_READY_TEXT_SCALE := 1.3
 
 var _tuning: TuningConfig
 ## The pre-minigame base reward being scaled (Legacy count at prestige, cash pile at

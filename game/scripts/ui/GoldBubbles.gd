@@ -94,8 +94,9 @@ const MIN_FILLED_WIDTH_PX := 14.0
 
 ## Liquid shading over the filled region: top/bottom edges darken, the center line brightens,
 ## like light through a tube of liquid. Four vertical-gradient bands.
-const LIQUID_EDGE_DARKEN_ALPHA := 0.16
-const LIQUID_CENTER_BRIGHT_ALPHA := 0.10
+## Higher contrast (Tim, 2026-07-11): darker top/bottom edges, brighter center line.
+const LIQUID_EDGE_DARKEN_ALPHA := 0.30
+const LIQUID_CENTER_BRIGHT_ALPHA := 0.20
 
 # --- Agitation visuals (apply in proportion to the eased agitation level) ---------------------
 const EXCITED_DENSITY_BOOST := 0.5      # +50% crowd at full agitation

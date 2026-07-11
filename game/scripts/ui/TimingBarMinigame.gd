@@ -88,6 +88,9 @@ var _legacy_gem_active: bool = false
 var _legacy_gem_center: float = 0.5
 ## Brief gold "you grabbed it" burst after a legacy gem is collected, decays in _process like _flash.
 var _legacy_win_flash: float = 0.0
+## Brief gray "it slipped away" cue after a gem is LOST to a missed lock, so a lost gem is never
+## invisible (Tim, 2026-07-11 — a gem was vanishing with no indication). Decays like _legacy_win_flash.
+var _legacy_lost_flash: float = 0.0
 ## The legacy gem art, drawn centered in the target zone as a "grab this on your next lock" cue.
 const LEGACY_GEM_TEXTURE = preload("res://art/icons/legacy_gem.svg")
 
@@ -199,6 +202,7 @@ func _process(delta: float) -> void:
 	_flash = maxf(0.0, _flash - delta * 4.0)
 	_miss_flash = maxf(0.0, _miss_flash - delta * 4.0)
 	_legacy_win_flash = maxf(0.0, _legacy_win_flash - delta * 2.0)  # slower fade so the grab reads
+	_legacy_lost_flash = maxf(0.0, _legacy_lost_flash - delta * 2.0)  # same pace so the loss reads too
 	# Age the click-feedback lines and drop any that have fully faded — removed in-place,
 	# walking backward, instead of filter() rebuilding the array every frame (minigame
 	# lag pass, Tim 2026-07-06).
@@ -246,6 +250,10 @@ func _on_lock() -> void:
 		if hit:
 			collect_legacy_gem()
 			_legacy_win_flash = 1.0
+		else:
+			# Lost it. Show it slip away (gray fade at the gem's spot) so the gem never just
+			# disappears with no cue — the missed lock already carries its own penalty.
+			_legacy_lost_flash = 1.0
 	if not hit:
 		# Missed the zone. Normal mode: a misfire costs a lock (never below zero) and scores nothing.
 		# Challenge Mode: mistakes must NOT stop play or reduce the score, so we skip the −1 penalty
@@ -370,6 +378,16 @@ func _draw_bar() -> void:
 		_bar.draw_rect(
 				Rect2(burst_x - burst_half, h * 0.5 - burst_half, burst_half * 2.0, burst_half * 2.0),
 				Color(UiPalette.MUSTARD_GOLD, _legacy_win_flash), false, 5.0)
+	# Legacy LOSS cue: the gem, grayed and shrinking as it fades, drawn where it sat — so a gem
+	# missed by the next lock visibly slips away instead of vanishing with no feedback. Drawn as a
+	# fading, shrinking, desaturated copy of the same gem art so it clearly reads as "that gem, lost."
+	if _legacy_lost_flash > 0.0:
+		var lost_size := h * _legacy_lost_flash  # shrinks toward nothing as it fades out
+		var lost_x := _legacy_gem_center * w - lost_size * 0.5
+		var lost_y := (h - lost_size) * 0.5
+		_bar.draw_texture_rect(
+				LEGACY_GEM_TEXTURE, Rect2(lost_x, lost_y, lost_size, lost_size), false,
+				Color(0.6, 0.6, 0.6, _legacy_lost_flash))
 	# Click-feedback lines: a green line for a scored lock, a red line for a wasted miss, at each
 	# recorded click, pulsing as it fades over CLICK_MARK_FADE seconds (alpha falls with age; the
 	# pulse keeps it lively while visible).

@@ -172,6 +172,17 @@ func _ready() -> void:
 	_proceed_button.pressed.connect(_on_proceed_pressed)
 	column.add_child(_proceed_button)
 
+	# Push every line LARGER and BOLDER (Tim, 2026-07-11): the epoch-transition screens still read
+	# too small/soft after the earlier pass. Bump each label ~20% and faux-bold it — bold also lifts
+	# contrast on the cream plate. One loop so there are no per-line edits; the button keeps its own
+	# styling. Done after all lines are built so it catches every one.
+	for child in column.get_children():
+		if child is Label:
+			var label := child as Label
+			var current := label.get_theme_font_size("font_size")
+			label.add_theme_font_size_override("font_size", int(round(current * 1.2)))
+			label.add_theme_font_override("font", UiPalette.make_bold_font())
+
 	# The card lines, in the order the reveal walks through them. `note` and the button are
 	# handled at the end of the sequence, so they are NOT in this list. Keeping this list is
 	# what lets the re-entrancy reset be a simple loop instead of touching each node by hand.
@@ -231,7 +242,15 @@ func show_contact(tier: int) -> void:
 	# sequence, so its label starts empty; the narrator's capper is plain text that
 	# simply fades in near the end.
 	_hail_full_text = "“%s”" % EpochCatalog.hail(tier)
-	_hail_label.text = ""
+	# Give the hail its FULL text now and let the layout size it at FULL height; _set_center_pivots
+	# (which runs after layout) then PINS that height and hides the characters (visible_ratio 0). The
+	# typewriter reveals them IN PLACE without the label growing, so nothing below it moves — printed
+	# text never shifts as later lines appear (Tim, 2026-07-11). visible_ratio alone can't reserve the
+	# space: in this Godot version an autowrapped label's height tracks only the VISIBLE lines, so the
+	# height must be pinned. custom_minimum_size resets to height 0 so THIS hail recomputes its own.
+	_hail_label.text = _hail_full_text
+	_hail_label.custom_minimum_size = Vector2(760, 0)
+	_hail_label.visible_ratio = 1.0
 	_narration_label.text = EpochCatalog.contact_line(tier)
 
 	_blink_time = 0.0
@@ -334,6 +353,10 @@ func _set_center_pivots() -> void:
 	_headline_label.pivot_offset = _headline_label.size / 2.0
 	_civ_label.pivot_offset = _civ_label.size / 2.0
 	_market_label.pivot_offset = _market_label.size / 2.0
+	# Pin the hail to its full-text height now that layout has sized it, THEN hide the characters — so
+	# the typewriter (visible_ratio 0->1) can't shrink/grow the label and shove the card around.
+	_hail_label.custom_minimum_size.y = _hail_label.size.y
+	_hail_label.visible_ratio = 0.0
 
 
 ## How long the typewriter should take, derived from the hail's length at a steady pace.
@@ -350,8 +373,8 @@ func _typewriter_duration() -> float:
 ## the ratio walk it open. This runs on its OWN short-lived tween so it can outlive a single
 ## step of the main timeline; the main timeline waits for it via _typewriter_duration().
 func _start_typewriter() -> void:
-	_hail_label.text = _hail_full_text
-	_hail_label.visible_ratio = 0.0
+	# The full text + visible_ratio 0 were set up front (see show_contact) so the layout is already
+	# stable and reserved; just walk the ratio open in place — no size change, nothing below moves.
 	var typer := create_tween()
 	typer.tween_property(_hail_label, "visible_ratio", 1.0, _typewriter_duration())
 

@@ -90,7 +90,7 @@ const FORCE_COLOR_RAMP := [
 ## with the pull distance.
 const AIM_WEDGE_BASE_MIN := 10.0    # wide-end width at near-zero force
 const AIM_WEDGE_BASE_MAX := 40.0    # wide-end width at maxed force
-const AIM_WEDGE_LENGTH_SCALE := 1.6 # wedge length = pull distance × this
+const AIM_WEDGE_LENGTH_SCALE := 1.92 # wedge length = effective drag × this (1.6 +20%, Tim 2026-07-10)
 
 ## Fraction of speed KEPT when a ball bounces off a wall, the floor, the ceiling, or the hoop
 ## (0 = dead stop, 1 = perfectly elastic). Lowered for the heavier feel — a dense ball thuds and

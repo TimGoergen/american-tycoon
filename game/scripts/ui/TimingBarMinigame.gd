@@ -245,11 +245,13 @@ func _on_lock() -> void:
 	_click_marks.append({"pos": _marker_pos, "age": 0.0, "hit": hit})
 	# A pending legacy gem is consumed by THIS lock, whichever way it goes: a hit (lock landed in
 	# the zone the gem sits in) collects it with a win cue; a miss simply loses it (no penalty).
+	var grabbed_gem := false
 	if _legacy_gem_active:
 		_legacy_gem_active = false
 		if hit:
 			collect_legacy_gem()
 			_legacy_win_flash = 1.0
+			grabbed_gem = true  # this lock's success chip becomes the gold "LEGACY GEM!" cue
 		else:
 			# Lost it. Show it slip away (gray fade at the gem's spot) so the gem never just
 			# disappears with no cue — the missed lock already carries its own penalty.
@@ -262,6 +264,11 @@ func _on_lock() -> void:
 			_locks = maxi(0, _locks - 1)
 		_miss_flash = 1.0
 		_freeze_success = false  # draw the gray drop-shadow "miss" burst during the freeze
+		# Red "MISS!" chip at the marker so a wasted lock reads like every other game's feedback
+		# (Tim, 2026-07-11 — the timing bar was missing its miss chip). Red = failure, never a success.
+		if _bar != null:
+			FloatingChip.spawn(_bar, Vector2(_marker_pos * _bar.size.x, _bar.size.y * 0.5),
+					"MISS!", UiPalette.KETCHUP_RED)
 		_update_locks_label()
 		return
 
@@ -270,14 +277,17 @@ func _on_lock() -> void:
 	_accuracy_sum += accuracy
 	_locks += 1
 	_success_count += 1
-	# Success chip floating up from the marker, with text by how clean the lock was, so a good lock
-	# reads at a glance like Match-3's match chips (Tim, 2026-07-11). A dead-center lock earns the gold
-	# "PERFECT!"; the rest are green. Shown even when this same lock grabs a legacy gem — the two cues
-	# stack (gold gem burst + this chip), which reads as an extra-good moment, not clutter.
+	# Success chip floating up from the marker, so a good lock reads at a glance like Match-3's match
+	# chips (Tim, 2026-07-11). A lock that GRABBED a legacy gem shows the gold "LEGACY GEM!" chip so
+	# earning the gem is unmistakable on the game itself (Tim, 2026-07-11 — it wasn't reflected before);
+	# otherwise the text reflects how clean the lock was — gold "PERFECT!" dead-center, else green.
 	if _bar != null:
 		var chip_text := "NICE!"
 		var chip_color := UiPalette.MONEY_GREEN
-		if accuracy >= 0.9:
+		if grabbed_gem:
+			chip_text = "LEGACY GEM!"
+			chip_color = UiPalette.MUSTARD_GOLD
+		elif accuracy >= 0.9:
 			chip_text = "PERFECT!"
 			chip_color = UiPalette.MUSTARD_GOLD
 		elif accuracy >= 0.6:

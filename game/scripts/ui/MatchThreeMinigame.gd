@@ -165,10 +165,9 @@ func how_to_play() -> String:
 	# Spells out the avoid-gem mechanic in words (work item 3): the old one-liner never
 	# said what avoiding earns or costs (Tim, 2026-07-07). Deliberately no exact
 	# numbers — those are tunable constants and copy would drift.
-	return "Drag a gem onto a neighbor to swap; line up 3 or more to clear them. " \
-		+ "Clean matches earn a bonus — any match containing the marked AVOID gem " \
-		+ "loses most of its points. Steer around it. A big match drops a LEGACY " \
-		+ "gem; match three of those to win bonus Legacy gems."
+	return "Drag a gem onto a neighbor to swap. Match 3+ to clear. Clean matches " \
+		+ "earn bonus; any match using the AVOID gem awards fewer points. Big " \
+		+ "matches drop LEGACY gems — match three to earn bonus Legacy gems."
 
 
 func begin(tuning: TuningConfig) -> void:

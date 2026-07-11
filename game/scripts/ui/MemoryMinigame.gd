@@ -192,6 +192,18 @@ func _flash_pad(pad_id: int, lit: bool) -> void:
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
+## The on-screen center of the pad board, in THIS minigame root's local coordinates — where a
+## success chip should pop. The pads live in a GridContainer, so we read that grid's global rect
+## and convert it into our own local space (we're the full-rect root the host adds us to).
+## Falls back to our own center if the grid isn't laid out yet.
+func _board_center() -> Vector2:
+	if _pads.is_empty() or not is_instance_valid(_pads[0]):
+		return size / 2.0
+	var grid: Control = _pads[0].get_parent()
+	var grid_global_center := grid.get_global_rect().get_center()
+	return grid_global_center - get_global_rect().position
+
+
 ## Set the status line and pop it in (a small grow + fade), so a change of phase ("Watch…" /
 ## "Your turn…") announces itself instead of silently swapping text.
 func _set_status(text: String, color: Color) -> void:
@@ -297,6 +309,9 @@ func _on_pad_input(event: InputEvent, pad_id: int) -> void:
 		if challenge_mode:
 			# Challenge Mode: no target and no win screen — grow by one and keep going forever.
 			_set_status("Round %d cleared!" % _rounds_done, UiPalette.MONEY_GREEN)
+			# Challenge Mode has no end-beat celebration, so the chip is the per-round success
+			# cue here (Tim, 2026-07-11 — every minigame shows success feedback like Match-3).
+			FloatingChip.spawn(self, _board_center(), "CLEARED!", UiPalette.MONEY_GREEN)
 			_start_round()
 		elif _rounds_done >= TARGET_ROUNDS:
 			# Full game — the main reward is now maxed. If this run earned a shot at the gem bonus
@@ -310,6 +325,10 @@ func _on_pad_input(event: InputEvent, pad_id: int) -> void:
 				_play_round_clear_celebration()
 		else:
 			_set_status("Nice!", UiPalette.MONEY_GREEN)
+			# Floating success chip over the board, matching Match-3's per-success feedback
+			# (Tim, 2026-07-11 — every minigame shows success feedback like Match-3). A round
+			# clear is a discrete event, so this can't spam like a per-tap chip would.
+			FloatingChip.spawn(self, _board_center(), "ROUND CLEAR!", UiPalette.MONEY_GREEN)
 			_start_round()
 
 
@@ -347,6 +366,10 @@ func _play_game_over_beat(wrong_pad_id: int) -> void:
 func _play_round_clear_celebration() -> void:
 	_beat_playing = true
 	_set_status("You did it!", UiPalette.MONEY_GREEN)
+	# Clearing every round is the exceptional success, so a GOLD chip (not the plain green round
+	# chip) marks it — matching Match-3's bonus-gold cue (Tim, 2026-07-11 — every minigame shows
+	# success feedback like Match-3).
+	FloatingChip.spawn(self, _board_center(), "PERFECT!", UiPalette.MUSTARD_GOLD)
 
 	# Flash each pad bright in turn for a celebratory ripple.
 	for pad_id in range(_pads.size()):

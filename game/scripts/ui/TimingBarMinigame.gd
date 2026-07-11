@@ -5,9 +5,11 @@ extends Minigame
 # library so the host's random draw has variety. A marker sweeps back and forth across a
 # bar; the player taps LOCK to catch it inside the gold zone. The zone JUMPS to a new random
 # spot after every successful lock and slowly SHRINKS (down to half its width) as locks pile
-# up, so it gets harder. A click that misses the zone COSTS a lock. Each successful lock
-# scores accuracy in [0,1]; after TARGET_LOCKS successful locks the game ends, and the marker
-# speeds up a little each lock. Performance = average accuracy over TARGET_LOCKS (a never-made
+# up, so it gets harder. A miss just wastes time — the host countdown keeps running (a miss is
+# never charged a lock; that yo-yoing count only confused players, Tim 2026-07-11) and scores
+# nothing. Each successful lock scores accuracy in [0,1]; landing TARGET_LOCKS locks ends the
+# round early, otherwise the host's countdown ends it. The lock count only ever climbs, shown as
+# fill-only pips above the bar. Performance = average accuracy over TARGET_LOCKS (a never-made
 # lock counts as zero, so you must keep landing them, not just nail one).
 #
 # Owns only its gameplay; the host owns the countdown / spectrum / result / multiplier.
@@ -42,6 +44,12 @@ const CLICK_MARK_FADE := 2.0
 ## the player can SEE it got smaller (the shrink was invisible until felt before).
 const ZONE_GHOST_TIME := 0.5
 
+## --- Lock-count pips (normal mode) --- One dot per lock, drawn above the bar (see _draw_lock_pips).
+const PIP_RADIUS := 9.0        # dot radius
+const PIP_GAP := 12.0          # empty space between adjacent dots
+const PIP_RIM_WIDTH := 3.0     # navy outline thickness so a dot reads on the light background
+const PIP_ROW_HEIGHT := 30.0   # height of the pip row control
+
 var _marker_pos: float = 0.0
 var _marker_dir: float = 1.0
 var _marker_speed: float = BASE_SPEED
@@ -55,6 +63,12 @@ var _running: bool = false
 var _flash: float = 0.0       # brief cream highlight after a successful lock, decays in _process
 var _miss_flash: float = 0.0  # brief red highlight after a missed click, decays in _process
 var _zone_center: float = 0.5  # current center of the gold zone (bar fraction); jumps each lock
+## Displayed half-width of the gold zone. Refreshed ONLY in _move_zone (which runs after the freeze),
+## never straight from _current_zone_half(), so a hit doesn't visibly shrink the zone mid-freeze — the
+## zone holds its pre-hit size through the whole result freeze and only shrinks+jumps once it ends
+## (Tim, 2026-07-11). _current_zone_half() is the target size for the live lock count; this is what's
+## actually drawn until the next _move_zone applies it.
+var _zone_half: float = ZONE_HALF
 ## Freeze-burst state. While _freeze_left > 0 the marker and zone hold still, a hit/miss burst
 ## is drawn, and is_busy() is true so the host pauses its countdown for the duration.
 var _freeze_left: float = 0.0
@@ -82,12 +96,19 @@ var _legacy_gem_active: bool = false
 var _legacy_gem_center: float = 0.5
 ## Brief gold "you grabbed it" burst after a legacy gem is collected, decays in _process like _flash.
 var _legacy_win_flash: float = 0.0
+## Brief gray "it slipped away" cue after a gem is LOST to a missed lock, so a lost gem is never
+## invisible (Tim, 2026-07-11 — a gem was vanishing with no indication). Decays like _legacy_win_flash.
+var _legacy_lost_flash: float = 0.0
 ## The legacy gem art, drawn centered in the target zone as a "grab this on your next lock" cue.
 const LEGACY_GEM_TEXTURE = preload("res://art/icons/legacy_gem.svg")
 
 var _rng := RandomNumberGenerator.new()
 
 var _bar: Control
+## Normal mode shows the lock count as fill-only pips above the bar (a dot per lock, filled as you
+## land them, never emptied). Challenge Mode is endless with no 10-lock target, so it keeps a plain
+## running-count label instead. Exactly one of these is shown, chosen in begin() by the mode.
+var _lock_pips: Control
 var _locks_label: Label
 
 
@@ -130,22 +151,34 @@ func begin(tuning: TuningConfig) -> void:
 	intro.add_theme_color_override("font_color", UiPalette.NAVY)
 	column.add_child(intro)
 
+	# Lock count sits ABOVE the game bar (Tim, 2026-07-10). Normal mode draws it as fill-only pips
+	# (one per lock, filled as you land them); Challenge Mode is endless, so it shows a plain running
+	# count instead. Only the mode's control is added.
+	if challenge_mode:
+		_locks_label = Label.new()
+		_locks_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_locks_label.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
+		_locks_label.add_theme_color_override("font_color", UiPalette.INK_NAVY)
+		column.add_child(_locks_label)
+	else:
+		_lock_pips = Control.new()
+		_lock_pips.custom_minimum_size = Vector2(0, PIP_ROW_HEIGHT)
+		_lock_pips.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_lock_pips.draw.connect(_draw_lock_pips)
+		column.add_child(_lock_pips)
+	_update_locks_label()
+
 	_bar = Control.new()
 	_bar.custom_minimum_size = Vector2(0, 96)
 	_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_bar.draw.connect(_draw_bar)
 	column.add_child(_bar)
 
-	_locks_label = Label.new()
-	_locks_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_locks_label.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
-	_locks_label.add_theme_color_override("font_color", UiPalette.MONEY_GREEN)
-	column.add_child(_locks_label)
-	_update_locks_label()
-
 	var lock_button := Button.new()
 	lock_button.text = "LOCK"
-	lock_button.custom_minimum_size = Vector2(0, 110)
+	# 50% taller than the old 110px (Tim, 2026-07-10) — the minigame's dedicated action button
+	# should be a big, easy target (matches our large-tappable-button guidance).
+	lock_button.custom_minimum_size = Vector2(0, 165)
 	UiPalette.style_button(lock_button, true)  # red: the act button
 	lock_button.pressed.connect(_on_lock)
 	column.add_child(lock_button)
@@ -189,6 +222,7 @@ func _process(delta: float) -> void:
 	_flash = maxf(0.0, _flash - delta * 4.0)
 	_miss_flash = maxf(0.0, _miss_flash - delta * 4.0)
 	_legacy_win_flash = maxf(0.0, _legacy_win_flash - delta * 2.0)  # slower fade so the grab reads
+	_legacy_lost_flash = maxf(0.0, _legacy_lost_flash - delta * 2.0)  # same pace so the loss reads too
 	# Age the click-feedback lines and drop any that have fully faded — removed in-place,
 	# walking backward, instead of filter() rebuilding the array every frame (minigame
 	# lag pass, Tim 2026-07-06).
@@ -220,7 +254,9 @@ func _on_lock() -> void:
 	# Every LOCK press freezes the bar for a beat so the player can read a hit/miss burst. The
 	# success flag (set below, once we know hit vs miss) chooses which burst _draw_bar shows.
 	_freeze_left = FREEZE_TIME
-	var half := _current_zone_half()
+	# Judge the tap against the zone AS DISPLAYED (its pre-hit size), not _current_zone_half() for the
+	# soon-to-be-incremented lock count — the player aimed at the zone they can see.
+	var half := _zone_half
 	var distance := absf(_marker_pos - _zone_center)
 	var hit := distance <= half
 	# Drop a fading line wherever the marker was at the moment of the click — hit or miss — colored
@@ -229,20 +265,28 @@ func _on_lock() -> void:
 	_click_marks.append({"pos": _marker_pos, "age": 0.0, "hit": hit})
 	# A pending legacy gem is consumed by THIS lock, whichever way it goes: a hit (lock landed in
 	# the zone the gem sits in) collects it with a win cue; a miss simply loses it (no penalty).
+	var grabbed_gem := false
 	if _legacy_gem_active:
 		_legacy_gem_active = false
 		if hit:
 			collect_legacy_gem()
 			_legacy_win_flash = 1.0
+			grabbed_gem = true  # this lock's success chip becomes the gold "LEGACY GEM!" cue
+		else:
+			# Lost it. Show it slip away (gray fade at the gem's spot) so the gem never just
+			# disappears with no cue — the missed lock already carries its own penalty.
+			_legacy_lost_flash = 1.0
 	if not hit:
-		# Missed the zone. Normal mode: a misfire costs a lock (never below zero) and scores nothing.
-		# Challenge Mode: mistakes must NOT stop play or reduce the score, so we skip the −1 penalty
-		# entirely — the miss simply doesn't score and the endless run continues.
-		if not challenge_mode:
-			_locks = maxi(0, _locks - 1)
+		# Missed the zone. A miss scores nothing and does NOT change the lock count — its only cost
+		# is the time it burns, since the host countdown keeps running during play. (This used to
+		# subtract a lock, but the count yo-yoing up and down read as a treadmill; Tim, 2026-07-11.)
 		_miss_flash = 1.0
 		_freeze_success = false  # draw the gray drop-shadow "miss" burst during the freeze
-		_update_locks_label()
+		# Red "MISS!" chip at the marker so a wasted lock reads like every other game's feedback
+		# (Tim, 2026-07-11). Red = failure, never a success.
+		if _bar != null:
+			FloatingChip.spawn(_bar, Vector2(_marker_pos * _bar.size.x, _bar.size.y * 0.5),
+					"MISS!", UiPalette.KETCHUP_RED)
 		return
 
 	# Hit: accuracy 1.0 dead-center of the zone, falling to 0 at its (current) edges.
@@ -250,6 +294,22 @@ func _on_lock() -> void:
 	_accuracy_sum += accuracy
 	_locks += 1
 	_success_count += 1
+	# Success chip floating up from the marker, so a good lock reads at a glance like Match-3's match
+	# chips (Tim, 2026-07-11). A lock that GRABBED a legacy gem shows the gold "LEGACY GEM!" chip so
+	# earning the gem is unmistakable on the game itself (Tim, 2026-07-11 — it wasn't reflected before);
+	# otherwise the text reflects how clean the lock was — gold "PERFECT!" dead-center, else green.
+	if _bar != null:
+		var chip_text := "NICE!"
+		var chip_color := UiPalette.MONEY_GREEN
+		if grabbed_gem:
+			chip_text = "LEGACY GEM!"
+			chip_color = UiPalette.MUSTARD_GOLD
+		elif accuracy >= 0.9:
+			chip_text = "PERFECT!"
+			chip_color = UiPalette.MUSTARD_GOLD
+		elif accuracy >= 0.6:
+			chip_text = "GREAT!"
+		FloatingChip.spawn(_bar, Vector2(_marker_pos * _bar.size.x, _bar.size.y * 0.5), chip_text, chip_color)
 	_marker_speed *= SPEED_RAMP
 	if challenge_mode:
 		# Endless play would ramp the sweep past what's hittable; hold it at the cap so the run stays
@@ -297,7 +357,10 @@ func _current_zone_half() -> float:
 ## Pick a new random zone center that keeps the whole zone on the bar (center within one
 ## half-width of either end), so a freshly placed zone is never clipped off the edge.
 func _move_zone() -> void:
-	var half := _current_zone_half()
+	# Apply the shrink NOW (after the freeze) by refreshing the displayed half-width from the current
+	# lock count. This is the only place _zone_half changes, so the zone stays its pre-hit size for the
+	# whole result freeze and shrinks together with the jump below.
+	_zone_half = _current_zone_half()
 	# Leave a brief fading outline at the PREVIOUS (larger) width at the new spot, so the player sees
 	# the zone actually shrank. _move_zone runs after _locks has incremented, so the previous width is
 	# the half for (_locks - 1). Skipped at the very first placement (_locks == 0), where nothing has
@@ -306,16 +369,44 @@ func _move_zone() -> void:
 		var prev_progress := clampf(float(_locks - 1) / float(TARGET_LOCKS), 0.0, 1.0)
 		_zone_ghost_half = lerpf(ZONE_HALF, ZONE_HALF_MIN, prev_progress)
 		_zone_ghost_left = ZONE_GHOST_TIME
-	_zone_center = _rng.randf_range(half, 1.0 - half)
+	_zone_center = _rng.randf_range(_zone_half, 1.0 - _zone_half)
 
 
 func _update_locks_label() -> void:
 	# Challenge Mode is endless, so "x / TARGET" is meaningless there — show the running successful-lock
-	# score instead. Normal mode keeps the familiar progress-toward-target readout.
+	# score instead. Normal mode redraws its pips to fill one more for the lock just landed.
 	if challenge_mode:
-		_locks_label.text = "Locks: %d" % _success_count
-	else:
-		_locks_label.text = "Locks: %d / %d" % [_locks, TARGET_LOCKS]
+		if _locks_label != null:
+			_locks_label.text = "Locks: %d" % _success_count
+	elif _lock_pips != null:
+		_lock_pips.queue_redraw()
+
+
+## Draw the normal-mode lock pips: TARGET_LOCKS dots centered in a row, the first `_locks` of them
+## filled green (locks landed) and the rest empty navy rings (locks to go). Fill-only — a miss never
+## empties one — so the row reads as steady progress toward the early finish (Tim, 2026-07-11).
+func _draw_lock_pips() -> void:
+	if _lock_pips == null:
+		return
+	var w := _lock_pips.size.x
+	var h := _lock_pips.size.y
+	if w <= 0.0 or h <= 0.0:
+		return
+	# Center the whole row of pips: n dots of radius PIP_RADIUS, PIP_GAP between their edges.
+	var n := TARGET_LOCKS
+	var step := PIP_RADIUS * 2.0 + PIP_GAP  # distance between adjacent pip centers
+	var row_width := step * float(n) - PIP_GAP  # last pip has no trailing gap
+	var cx := (w - row_width) * 0.5 + PIP_RADIUS
+	var cy := h * 0.5
+	for i in range(n):
+		var center := Vector2(cx + float(i) * step, cy)
+		if i < _locks:
+			# Landed: a filled green dot with a navy rim so it reads on the light background.
+			_lock_pips.draw_circle(center, PIP_RADIUS, UiPalette.MONEY_GREEN)
+			_lock_pips.draw_arc(center, PIP_RADIUS, 0.0, TAU, 20, UiPalette.INK_NAVY, PIP_RIM_WIDTH, true)
+		else:
+			# Still to go: just the navy rim (an empty ring).
+			_lock_pips.draw_arc(center, PIP_RADIUS, 0.0, TAU, 20, UiPalette.INK_NAVY, PIP_RIM_WIDTH, true)
 
 
 ## Draw the bar: a navy track, the gold target zone at its current (roving, shrinking) spot,
@@ -334,8 +425,8 @@ func _draw_bar() -> void:
 		var ghost_x := (_zone_center - _zone_ghost_half) * w
 		var ghost_w := (_zone_ghost_half * 2.0) * w
 		_bar.draw_rect(Rect2(ghost_x, 0, ghost_w, h), Color(UiPalette.MUSTARD_GOLD, 0.45 * ghost_life), false, 4.0)
-	# Gold target zone at its current center and width.
-	var half := _current_zone_half()
+	# Gold target zone at its current center and displayed width (see _zone_half — holds through the freeze).
+	var half := _zone_half
 	var zone_x := (_zone_center - half) * w
 	var zone_w := (half * 2.0) * w
 	_bar.draw_rect(Rect2(zone_x, 0, zone_w, h), UiPalette.MUSTARD_GOLD)
@@ -355,6 +446,16 @@ func _draw_bar() -> void:
 		_bar.draw_rect(
 				Rect2(burst_x - burst_half, h * 0.5 - burst_half, burst_half * 2.0, burst_half * 2.0),
 				Color(UiPalette.MUSTARD_GOLD, _legacy_win_flash), false, 5.0)
+	# Legacy LOSS cue: the gem, grayed and shrinking as it fades, drawn where it sat — so a gem
+	# missed by the next lock visibly slips away instead of vanishing with no feedback. Drawn as a
+	# fading, shrinking, desaturated copy of the same gem art so it clearly reads as "that gem, lost."
+	if _legacy_lost_flash > 0.0:
+		var lost_size := h * _legacy_lost_flash  # shrinks toward nothing as it fades out
+		var lost_x := _legacy_gem_center * w - lost_size * 0.5
+		var lost_y := (h - lost_size) * 0.5
+		_bar.draw_texture_rect(
+				LEGACY_GEM_TEXTURE, Rect2(lost_x, lost_y, lost_size, lost_size), false,
+				Color(0.6, 0.6, 0.6, _legacy_lost_flash))
 	# Click-feedback lines: a green line for a scored lock, a red line for a wasted miss, at each
 	# recorded click, pulsing as it fades over CLICK_MARK_FADE seconds (alpha falls with age; the
 	# pulse keeps it lively while visible).

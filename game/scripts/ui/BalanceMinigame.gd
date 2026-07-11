@@ -52,6 +52,16 @@ const GEM_ROLL_DELAY := 1.2
 ## The gem icon's on-screen size where it's pinned beside the gold zone.
 const GEM_ICON_SIZE := 52.0
 
+# --- Success feedback chips ---------------------------------------------------
+# Tim, 2026-07-11 — every minigame shows context-specific success feedback like Match-3
+# does. This game banks time-in-zone continuously, so there is no single "catch complete"
+# moment; a per-entry "in the zone" chip was too noisy (Tim, 2026-07-11), so we only pop a
+# gold chip as banked performance crosses milestones (the round adding up), each fired once.
+## Banked-performance fractions that each earn a one-time gold "banking" chip.
+const PERFORMANCE_MILESTONES := [0.25, 0.5, 0.75, 1.0]
+## The short label shown for each milestone, matched by index to PERFORMANCE_MILESTONES.
+const MILESTONE_LABELS := ["BANKING!", "HALFWAY!", "ALMOST!", "BALANCED!"]
+
 ## The legacy gem currency art, drawn beside the zone as the "hold here to collect" cue.
 const LEGACY_GEM_TEXTURE := preload("res://art/icons/legacy_gem.svg")
 
@@ -88,6 +98,10 @@ var _gem_progress: float = 0.0
 ## Set for a short cue after the bar fills and the gem is collected, so the win reads.
 var _gem_won_flash: float = 0.0
 
+# --- Success feedback state ---------------------------------------------------
+## How many performance milestones we've already celebrated, so each fires exactly once.
+var _milestones_shown: int = 0
+
 
 func display_name() -> String:
 	return "Balance the Books"
@@ -119,6 +133,9 @@ func begin(tuning: TuningConfig) -> void:
 	_gem_active = false
 	_gem_progress = 0.0
 	_gem_won_flash = 0.0
+
+	# Success-feedback bookkeeping, fresh each round.
+	_milestones_shown = 0
 
 	var intro := Label.new()
 	intro.text = how_to_play()
@@ -232,8 +249,28 @@ func _process(delta: float) -> void:
 
 	_update_legacy_gem(delta, in_zone)
 
+	_update_success_chips()
+
 	if _track != null:
 		_track.queue_redraw()
+
+
+## Pop a gold "banking" chip the first time banked performance crosses each milestone, matching
+## Match-3's feedback (Tim, 2026-07-11 — every minigame shows success feedback). Gold marks these
+## as the exceptional "the books are balancing" beats. A per-zone-entry chip was tried but read as
+## too noisy (Tim, 2026-07-11), so milestones are the only success chip here. Spawned on the track
+## control so they float over the bar, centered on the gold zone in the track's local coordinates.
+func _update_success_chips() -> void:
+	if _track == null:
+		return
+
+	var performance := get_performance()
+	while (_milestones_shown < PERFORMANCE_MILESTONES.size()
+			and performance >= PERFORMANCE_MILESTONES[_milestones_shown]):
+		var zone_spot := Vector2(_track.size.x * 0.5, _to_screen_y(_zone_center))
+		FloatingChip.spawn(_track, zone_spot, MILESTONE_LABELS[_milestones_shown],
+				UiPalette.MUSTARD_GOLD)
+		_milestones_shown += 1
 
 
 ## Advance the legacy-gem mechanic once per frame. This is entirely SEPARATE from the

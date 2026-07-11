@@ -50,6 +50,10 @@ const DEFAULT_PURPOSE := "Grow the inheritance"
 ## card floats over. Sits inside the black screen bezel like every other screen's background.
 const BACKGROUND_IMAGE := "res://art/backgrounds/minigame_background.png"
 
+## The Legacy gem art for the shared "gem earned" badge (see _gem_badge) — the same gem used for the
+## currency everywhere, so it reads instantly.
+const LEGACY_GEM_TEXTURE := preload("res://art/icons/legacy_gem.svg")
+
 ## The centered panel that frames every minigame, as anchor fractions of the full-screen scrim, so
 ## it stays centered and scales with the screen. Shrunk 2026-06-29 (Tim): 20% shorter and 10%
 ## narrower than the original 0.84 tall / 0.95 wide, so more of the backdrop shows around it.
@@ -148,6 +152,9 @@ var _seg_fill_left: StyleBoxFlat
 var _seg_fill_right: StyleBoxFlat
 var _seg_flash_box: StyleBoxFlat
 var _play_area: Control
+## The shared "Legacy gem earned!" badge: floats at the top of the play area and appears on EVERY
+## game the moment a Legacy gem is collected this round (polled in _process). Hidden until then.
+var _gem_badge: Control
 var _result_heading_label: Label
 ## The one-word verdict of how the round went ("GREAT ROUND" / "FULL" / "WEAK ROUND" / a First
 ## Contact bucket), colored by tier — the headline of the result statement.
@@ -484,6 +491,30 @@ func _build_play_view() -> Control:
 	_play_area.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_play_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	column.add_child(_play_area)
+
+	# The shared "gem earned" badge floats at the TOP of the play area (full-width row, centered), over
+	# whatever game is running (z above it, mouse-ignored), so showing it never reflows the game. It's
+	# revealed in _process the instant a Legacy gem is collected, uniformly across every game type.
+	var badge_row := HBoxContainer.new()
+	badge_row.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	badge_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	badge_row.add_theme_constant_override("separation", 12)
+	badge_row.z_index = 5
+	badge_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	badge_row.visible = false
+	var gem_icon := TextureRect.new()
+	gem_icon.texture = LEGACY_GEM_TEXTURE
+	gem_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	gem_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	gem_icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	gem_icon.custom_minimum_size = Vector2(56, 56)
+	badge_row.add_child(gem_icon)
+	var gem_word := _make_label("LEGACY GEM!", UiPalette.FONT_SUBHEAD, UiPalette.MUSTARD_GOLD.darkened(0.35))
+	gem_word.add_theme_font_override("font", UiPalette.make_bold_font())
+	gem_word.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	badge_row.add_child(gem_word)
+	_play_area.add_child(badge_row)
+	_gem_badge = badge_row
 
 	# The SKIP / DONE control is NOT in this column — it floats BELOW the card in the scrim, built in
 	# _ready (Tim, 2026-07-02). The in-round "Skip minigames from now on" checkbox was removed (Tim,
@@ -932,6 +963,8 @@ func start_game(
 	_result_view.visible = false
 	_playing = false
 	_skip_button.visible = false  # revealed on Begin (see _start_active_round)
+	if _gem_badge != null:
+		_gem_badge.visible = false  # hidden until a gem is collected this round
 	_timer_label.text = "0:%02d" % int(ceil(_seconds_left))
 	_timer_label.scale = Vector2.ONE
 
@@ -1018,6 +1051,8 @@ func start_challenge(type_script: Script) -> void:
 	_result_view.visible = false
 	_playing = false
 	_skip_button.visible = false  # revealed on Begin (see _start_active_round)
+	if _gem_badge != null:
+		_gem_badge.visible = false
 
 	_begin_title.text = _active_minigame.display_name()
 	_begin_howto.text = _active_minigame.how_to_play()
@@ -1068,6 +1103,11 @@ func _start_active_round() -> void:
 func _process(delta: float) -> void:
 	if not _playing:
 		return
+	# Reveal the shared "gem earned" badge the instant a Legacy gem is collected this round — uniform
+	# across every game type (Tim, 2026-07-11). Checked before the mode branches so it runs for all.
+	if _gem_badge != null and _active_minigame != null \
+			and _active_minigame.get_legacy_gems_collected() > 0:
+		_gem_badge.visible = true
 	# Challenge Mode has no countdown and no win/loss — just keep the live score readout current.
 	if _challenge_mode:
 		_update_challenge_score()

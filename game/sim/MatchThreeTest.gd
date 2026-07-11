@@ -393,6 +393,23 @@ func _test_special_color() -> void:
 	_check(fl_res["valid"] and fl_res.has("legacy_placement") and fl_res["legacy_placement"] == [3, 2],
 			"with match size 4, a 4-match DOES place a Legacy gem")
 
+	# A placed Legacy gem that COMPLETES a line of 3+ Legacy gems is resolved immediately: the board
+	# records post_placement_steps that clear the trio, rather than leaving it sitting unmatched until
+	# a later swap re-scans it (Tim, 2026-07-10).
+	var chain = Board.new(6, 6, 5, 55, special)
+	_fill_checkerboard(chain)
+	chain.grid[2][0] = 2; chain.grid[2][1] = 2; chain.grid[2][3] = 2; chain.grid[2][4] = 2
+	chain.grid[3][2] = 2  # swapped up into (2,2) → a run of five → places a Legacy gem at (3,2)
+	chain.grid[3][0] = special; chain.grid[3][1] = special  # two Legacy gems already waiting on row 3
+	var chain_res: Dictionary = chain.resolve_swap(2, 2, 3, 2)
+	var cleared_special := false
+	if chain_res.has("post_placement_steps"):
+		for step in chain_res["post_placement_steps"]:
+			if special in step["cleared_colors"]:
+				cleared_special = true
+	_check(chain_res.has("legacy_placement") and chain_res["legacy_placement"] == [3, 2] and cleared_special,
+			"a placed Legacy gem that completes a 3-line is matched immediately (post_placement_steps)")
+
 	# A 5+ match of the EXCLUDED color (the AVOID gem) must NOT qualify for a Legacy gem. We check the
 	# qualifying rule directly on _find_match_groups (rather than via resolve_swap, whose refill
 	# cascade could form an unrelated qualifying merge and confuse the assertion): the excluded run is

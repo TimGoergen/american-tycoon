@@ -1,2 +1,87 @@
 
-mid_game_progress_thoughts
+i've had a chance to play the early game and have a lot of thoughts.  i want to capture them all here and update any gdd, dev map, roadmap documents necessary, and then talk through options.
+
+# game progression feel
+
+the latest changes make the early game feel good.  with active play, I got to the stall point relatively quickly during the earth epoch, and then prestiged for what felt like a noticeable improvement.  that is perfect.
+
+# epoch progression feel
+
+the time to reach the first epoch seems good, maybe slightly fast.  but after that, each subsequent epoch lands way too fast.  having only a single additional property feels cheap, there should be at least 3 to 5 new properties per epoch
+
+the first contact screen at the end of earth renders weird, the first line is too low and is behind the next line.
+
+all epoch transition screens should use larger and more contrasting font to improve readability
+
+# staff legacy
+- in my last playthrough, after i reached the end of earth and started the next epoch, the hire buttons were disabled and had labels with amounts much higher than it had read prior to transition.  
+- each staff upgrade should be static in effect, not relative to the current epoch.
+- each 20 staff upgrades are specific to the epoch in which they became available, and that levels effects should be based on the epoch in which it became available rather than when it was purchased
+
+# ui polish
+- on any screen, any amount of currency or cycle/rate should only have a decimal place if the decimal is not zero
+- on the property panel, if the cycle rate display is based on per/second rather than cycle time, than it should say " / s" rather than " / 1s"
+- rather than showing a text block to describe the players progress in the current economy, a green progress bar should be pinned to the bottom of the income panel, have the same red outline as the income panel, with only a single instance of that line between the income panel and the economy progress bar
+-- on all progress bars, small gold bubble particles should move left to right with up and down sway
+-- speed of gold particles should be twice the speed of the progress bar
+
+
+# new property panel characteristics
+- each property panel should be made a little taller so that all of the elements it contains can also be taller
+- all text should be bold
+
+
+
+
+# carbonation trouble-shooting
+Property: Hedge Fund
+Properties Owned: 2
+- metrics at rest
+-- lv 0.00
+-- bub 14
+-- fill 0
+-- swp 17 px/s
+
+- metrics during normal progress
+-- lvl 0.00
+-- bub 15 to 30
+-- fill 10 to 20
+-- swp 17 px/s
+
+- metrics during sustained rush mode
+-- lvl 1.00
+-- bub 89
+-- fill 100 to 300 as progress bar moves from empty to full
+-- swp 17 to 283 as progress bar moves from empty to full
+
+- metrics mid-ramp-up
+-- lvl 0.34
+-- bub 53
+-- fill 34
+-- swp 101 px/s
+
+- metrics mid-ramp-down
+-- lvl 0.32
+-- bub 83
+-- fill 224
+-- swp 111 px/s
+
+
+
+
+
+
+
+# new about screen
+in the settings screen, a new button labled About will be created next to the tuning buttons
+- when the user clicks About, a modal screen pops up
+-- the modal screen has the game logo at the top
+-- below the logo is the game name
+-- below the game name is teh game version number
+-- below the version number is "Designed by Tim Goergen"
+-- below the designed by label is "Built by Claude Code with a little help from Copilot and Gemini"
+-- above the game logo will be a standard back button in the top left
+
+
+
+Drag a gem onto a neighbor to swap. Match 3+ to clear. Clean matches earn bonus; any match using the marked AVOID gem loses most points, so steer around it. Big matches drop LEGACY gems—match three to earn bonus Legacy gems.

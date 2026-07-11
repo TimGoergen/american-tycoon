@@ -223,15 +223,23 @@ extends Resource
 # costs now live in LegacyUpgradeCatalog.gd, not here.
 
 # --- Prestige minigame (GDD §5.5, Spec §9.3) ---
-# At prestige the player plays a match-3 whose score sets how much of the run's base
-# Legacy they KEEP: legacy_awarded = floor(base_legacy × mult). The multiplier rises
-# from minigame_keep_floor (score 0) → 1.0 "full" (score ≥ minigame_full_score) → up to
-# 1.0 + bonus (score ≥ minigame_extra_score), where the extra-high bonus cap comes from
-# LegacyUpgrades.minigame_bonus_max() (0.25 base, +5%/level via Family Reputation).
+# At prestige the player plays a minigame whose performance sets how much of the run's base
+# Legacy they KEEP: legacy_awarded = floor(base_legacy × mult). Reward curve reshaped (Tim,
+# work item 4, 2026-07-10) so standard play is NEUTRAL, not punishing: the multiplier is
+# minigame_keep_floor at performance 0 (a MODEST downside now, not half), exactly 1.0 at
+# performance minigame_full_performance ("standard" play — the same value a skip / minigame-off
+# banks), and up to 1.0 + bonus at performance 1.0 (a modest upside). The extra-high bonus cap
+# comes from LegacyUpgrades.minigame_bonus_max() (0.25 base, +5%/level via Family Reputation).
 
-## Fraction of the base Legacy kept on the WORST result (score 0) — also what a skip /
-## minigame-off banks. Below 1.0, so a poor round (or opting out) loses Legacy.
-@export var minigame_keep_floor: float = 0.5  # feel-tune
+## Fraction of the base Legacy kept on the WORST result (performance 0). Reshaped to a MODEST
+## downside (Tim, work item 4): a bad round loses only a little, it no longer costs half. A skip /
+## minigame-off banks 1.0 (full), not this floor.
+@export var minigame_keep_floor: float = 0.9  # feel-tune
+
+## The performance (0..1) that maps to exactly 1.0 — "standard" play, the neutral result. Below it
+## the reward eases down toward minigame_keep_floor (modest downside); above it, up into the bonus
+## (modest upside). Match-3 anchors its "full" score to this point (see MatchThreeMinigame).
+@export var minigame_full_performance: float = 0.5  # feel-tune
 
 ## Gems cleared to keep the FULL base Legacy (multiplier exactly 1.0). The multiplier
 ## scales linearly from the floor (score 0) up to 1.0 at this score.
@@ -290,6 +298,15 @@ extends Resource
 @export var legacy_gem_chance_timing: float = 0.12  # feel-tune
 @export var legacy_gem_chance_balance: float = 0.15  # feel-tune
 @export var legacy_gem_chance_basketball: float = 0.15  # feel-tune
+
+# --- Basketball launch curve (Tim, 2026-07-10: device-tunable throw feel) ------------
+# The slingshot throw speed = (drag / basketball_launch_max_drag, clamped 0..1) ^
+# basketball_launch_curve_exp × basketball_max_throw_speed. Higher exponent = gentler low end
+# (finer aim control); larger max-drag = more pull needed for full power; larger max-speed = more
+# raw power. All feel-tune.
+@export var basketball_launch_curve_exp: float = 1.7   # feel-tune
+@export var basketball_launch_max_drag: float = 200.0  # feel-tune (px)
+@export var basketball_max_throw_speed: float = 2900.0  # feel-tune (px/sec)
 
 ## Memory's Legacy gem is a chance-gated BONUS ROUND, offered only after the player clears the whole
 ## game (all 6 rounds). This is the per-run chance that bonus round appears once they've earned it.

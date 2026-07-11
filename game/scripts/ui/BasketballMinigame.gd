@@ -35,6 +35,10 @@ const BALL_RADIUS := 53.2          # ~106px diameter
 ## from the original 82×30, Tim 2026-06-28.)
 const HOOP_RX := 94.3
 const HOOP_RY := 34.5
+## The backboard (drawn behind the hoop) is wider than the rim, so the hoop's drift must be kept
+## further from the walls than the rim alone — else the backboard pokes past the board edge (Tim,
+## 2026-07-10). Defined here so _draw_backboard and the hoop-drift bound use the SAME width.
+const BACKBOARD_WIDTH := HOOP_RX * 2.8
 ## Half-width of the scoring "mouth" at the top of the rim. Narrower than HOOP_RX so the solid rim
 ## ENDS (the posts) sit just outside the mouth — a near-miss clips a post and bounces (a rim-out),
 ## while a clean drop through the gap scores.
@@ -47,17 +51,26 @@ const RIM_POST_RADIUS := 16.1
 ## fast-falling feel with tight arcs and little hang time, rather than floating like balloons.
 const GRAVITY := 2400.0
 
-## The slingshot: the throw velocity is the pull vector (ball dragged away from its rest spot),
-## reversed, times PULL_POWER. The drag is capped at MAX_PULL so a huge yank can't overpower the
-## board; a drag shorter than MIN_PULL on release is not a throw (the ball just snaps back).
-## PULL_POWER raised 9.6 -> 15.0 (Tim, 2026-06-30): the ball rests near the floor, so there often
-## isn't room to drag it far — more force per pixel means a short pull already reaches the hoop,
-## hitting the MAX_THROW_SPEED cap at ~193px of drag instead of needing the full 300. FEEL-TUNE.
+## The slingshot: the throw is aimed OPPOSITE the pull (ball dragged away from its rest spot), and
+## its SPEED is a NON-LINEAR function of the drag distance — the drag fraction over the launch-max
+## drag, raised to the launch-curve exponent. The old map was linear (distance × a fixed power) and
+## "ramped too strong too fast" (Tim, 2026-07-07): a short pull already maxed out, leaving no fine
+## control. The curve now eases the low end so small/medium pulls are gentle and full power needs a
+## long drag. MAX_PULL caps how far the ball can visually stretch; a drag shorter than MIN_PULL is
+## not a throw (the ball just snaps back).
 const MAX_PULL := 300.0
 const MIN_PULL := 28.0
-const PULL_POWER := 15.0
+
+# The three launch-curve values are now TUNING KNOBS (Tim, 2026-07-10) so the throw feel can be
+# dialed on device via Balance Tuning without a rebuild. Read from TuningConfig in begin(); the
+# defaults below match the previous constants.
+## Drag distance (px) at which the throw reaches max speed — longer drags add no more force.
+var _launch_max_drag: float = 200.0
+## Launch response exponent. 1.0 = a linear ramp; >1 eases the low end (small pulls gentle, force
+## building toward the end of the drag) for finer aim control at low power.
+var _launch_curve_exp: float = 1.7
 ## Hard cap on the resulting throw speed (px/sec).
-const MAX_THROW_SPEED := 2900.0
+var _max_throw_speed: float = 2900.0
 
 ## Aim-guide force colors (Tim, 2026-06-30; extended to four stops 2026-07-01 for readability): the
 ## force wedge is a SINGLE color that CHANGES with the current pull's force, climbing through a wider
@@ -77,7 +90,7 @@ const FORCE_COLOR_RAMP := [
 ## with the pull distance.
 const AIM_WEDGE_BASE_MIN := 10.0    # wide-end width at near-zero force
 const AIM_WEDGE_BASE_MAX := 40.0    # wide-end width at maxed force
-const AIM_WEDGE_LENGTH_SCALE := 1.6 # wedge length = pull distance × this
+const AIM_WEDGE_LENGTH_SCALE := 1.92 # wedge length = effective drag × this (1.6 +20%, Tim 2026-07-10)
 
 ## Fraction of speed KEPT when a ball bounces off a wall, the floor, the ceiling, or the hoop
 ## (0 = dead stop, 1 = perfectly elastic). Lowered for the heavier feel — a dense ball thuds and
@@ -239,6 +252,10 @@ func begin(tuning: TuningConfig) -> void:
 	# Legacy gem: capture the spawn chance and reset the per-round gem state. Whether a gem actually
 	# appears is rolled once the board has a size (in _process), so we know where the play area is.
 	_legacy_gem_chance = clampf(tuning.legacy_gem_chance_basketball, 0.0, 1.0)
+	# Launch-curve knobs (device-tunable). Guarded so a zeroed knob can't divide by zero / kill power.
+	_launch_max_drag = maxf(1.0, tuning.basketball_launch_max_drag)
+	_launch_curve_exp = maxf(0.1, tuning.basketball_launch_curve_exp)
+	_max_throw_speed = maxf(1.0, tuning.basketball_max_throw_speed)
 	_legacy_gem_active = false
 	_legacy_gem_placed = false
 	_passed_through_gem_this_shot = false
@@ -417,7 +434,9 @@ func _segment_hits_gem(from: Vector2, to: Vector2) -> bool:
 ## board's middle and halfway up to the top, horizontally anywhere that keeps the whole ellipse off
 ## the walls.
 func _move_hoop(bounds: Vector2) -> void:
-	var margin_x := WALL_THICKNESS + HOOP_RX
+	# Keep the whole BACKBOARD inside the walls (it is wider than the rim), so it never pokes past the
+	# board edge when the hoop drifts near a side.
+	var margin_x := WALL_THICKNESS + BACKBOARD_WIDTH * 0.5
 	_hoop_pos = Vector2(
 		_rng.randf_range(margin_x, bounds.x - margin_x),
 		_rng.randf_range(bounds.y * 0.25, bounds.y * 0.5)
@@ -672,12 +691,19 @@ func _release_sling() -> void:
 		ball["vel"] = Vector2.ZERO
 		ball["state"] = "flight"
 	else:
-		var throw := -pull * PULL_POWER  # opposite the drag, force ∝ drag distance
-		if throw.length() > MAX_THROW_SPEED:
-			throw = throw.normalized() * MAX_THROW_SPEED
-		ball["vel"] = throw
+		# Aim OPPOSITE the pull; speed comes from the non-linear launch curve (see _throw_fraction).
+		var speed := _throw_fraction(pull_distance) * _max_throw_speed
+		ball["vel"] = (-pull / pull_distance) * speed
 		ball["state"] = "flight"
 	_aim_index = -1
+
+
+## The normalized throw force [0,1] for a pull distance, under the non-linear launch curve (see the
+## MAX_PULL / LAUNCH_* constants). Shared by the release (actual speed) and the aim guide (wedge size
+## + color) so what the player SEES matches what they GET.
+func _throw_fraction(pull_distance: float) -> float:
+	var frac := clampf(pull_distance / _launch_max_drag, 0.0, 1.0)
+	return pow(frac, _launch_curve_exp)
 
 
 ## Draw the board outline, the hoop (net + rim, split so a scoring ball passes through it), every
@@ -690,6 +716,9 @@ func _draw_play() -> void:
 	_ensure_board_bg(bounds)
 	if _board_bg != null:
 		_play.draw_texture_rect(_board_bg, Rect2(Vector2.ZERO, bounds), false)
+
+	# The backboard sits behind the hoop, drawn before the net/rim so those mount in front of it.
+	_draw_backboard()
 
 	# The hoop is drawn in layers so a falling ball reads as dropping THROUGH it: the net and the
 	# back (far) half of the rim go down first, then the balls, then the front (near) half of the
@@ -819,13 +848,17 @@ func _draw_aim_guide() -> void:
 	if pull_distance < MIN_PULL:
 		return  # too short to be a throw — no force wedge yet
 
-	# The force this pull will produce (distance × power, capped at the throw-speed limit), so the
-	# wedge maxes out exactly when more pull would add nothing.
-	var force := clampf(pull_distance * PULL_POWER / MAX_THROW_SPEED, 0.0, 1.0)
+	# The force this pull will produce under the non-linear launch curve, so the wedge grows exactly
+	# as the actual throw speed does (and maxes out when more pull would add nothing).
+	var force := _throw_fraction(pull_distance)
 	var travel_dir := -pull / pull_distance               # the ball flies OPPOSITE the pull
 	var perp := Vector2(-travel_dir.y, travel_dir.x)       # wide-end spread, across the travel direction
 	var wide_half := lerpf(AIM_WEDGE_BASE_MIN, AIM_WEDGE_BASE_MAX, force) * 0.5
-	var wide_center := _aim_anchor + travel_dir * (pull_distance * AIM_WEDGE_LENGTH_SCALE)
+	# The wedge LENGTH tracks the EFFECTIVE drag (capped at the full-power point), not the raw pull, so
+	# the cone stops GROWING exactly when the force — and its color — max out. Past that, extra pull
+	# adds no force, so the cone must not keep lengthening (Tim, 2026-07-10).
+	var effective_drag := minf(pull_distance, _launch_max_drag)
+	var wide_center := _aim_anchor + travel_dir * (effective_drag * AIM_WEDGE_LENGTH_SCALE)
 	var wedge := PackedVector2Array([
 		_aim_anchor,                          # POINT — at the ball's launch location
 		wide_center + perp * wide_half,       # wide end, fanned out in the direction of travel
@@ -890,6 +923,24 @@ func _draw_legacy_gem() -> void:
 		var cue_color := UiPalette.MUSTARD_GOLD
 		cue_color.a = life
 		_play.draw_arc(_legacy_gem_pos, radius, 0.0, TAU, 28, cue_color, 5.0, true)
+
+
+## Draw a simple backboard behind the hoop (Tim, 2026-07-07 request): a translucent white board with
+## a dark frame and the classic shooter's square just above the rim. It tracks the drifting hoop
+## (drawn relative to _hoop_pos). Purely cosmetic — the ball is NOT bounced off it; a shot still
+## scores only by dropping through the rim (bank-shot collision could be a later addition).
+func _draw_backboard() -> void:
+	var width := BACKBOARD_WIDTH
+	var height := HOOP_RX * 1.6
+	var bottom_y := _hoop_pos.y - HOOP_RY * 0.2   # just above the rim's back edge
+	var board := Rect2(Vector2(_hoop_pos.x - width * 0.5, bottom_y - height), Vector2(width, height))
+	_play.draw_rect(board, Color(1.0, 1.0, 1.0, 0.82), true)   # translucent white face
+	_play.draw_rect(board, UiPalette.INK_NAVY, false, 4.0)     # dark frame
+	# The shooter's square, centered horizontally, sitting just above the rim (rim-colored outline).
+	var sq_w := HOOP_RX * 1.05
+	var sq_h := HOOP_RX * 0.62
+	var square := Rect2(Vector2(_hoop_pos.x - sq_w * 0.5, bottom_y - 10.0 - sq_h), Vector2(sq_w, sq_h))
+	_play.draw_rect(square, UiPalette.ORANGE, false, 4.0)
 
 
 ## Draw half of the rim ellipse. top_half draws the far/top edge (sin < 0); otherwise the

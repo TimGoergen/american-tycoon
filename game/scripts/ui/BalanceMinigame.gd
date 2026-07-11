@@ -32,6 +32,9 @@ const ZONE_EASE := 1.6           # how fast the zone center eases toward its tar
 
 ## The vertical track's on-screen width.
 const TRACK_WIDTH := 150.0
+## The LIFT button's width. It sits to the RIGHT of the track and fills the play height, so it is a
+## tall column (much taller than wide) — a large, easy hold target beside the bar (Tim, 2026-07-10).
+const LIFT_BUTTON_WIDTH := 300.0
 
 # --- Legacy gem (Plans/Legacy_Bonus_System.md) --------------------------------
 # Full Stardew: a legacy gem may appear pinned to the gold zone. Hold the marker in
@@ -135,24 +138,34 @@ func begin(tuning: TuningConfig) -> void:
 	_track.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_track.draw.connect(_draw_track)
 
-	# The single input: one big hold button below the track, matching how every other
-	# minigame takes input through a dedicated control. button_down/button_up (not
-	# pressed) because "held" is the state that matters, not the click.
+	# The single input: one big hold button to the RIGHT of the track, matching how every other
+	# minigame takes input through a dedicated control. It fills the play height (EXPAND_FILL), so it
+	# is a tall column — taller than wide — giving a large, easy hold target beside the bar (Tim,
+	# 2026-07-10). button_down/button_up (not pressed) because "held" is the state that matters.
 	_lift_button = Button.new()
 	_lift_button.text = "HOLD TO LIFT"
-	_lift_button.custom_minimum_size = Vector2(0, 110)
+	_lift_button.custom_minimum_size = Vector2(LIFT_BUTTON_WIDTH, 0)
+	_lift_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_lift_button.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_lift_button.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
 	_lift_button.focus_mode = Control.FOCUS_NONE
 	UiPalette.style_button(_lift_button, true)
 	_lift_button.button_down.connect(_on_lift_button_down)
 	_lift_button.button_up.connect(_on_lift_button_up)
 
+	# Track on the LEFT, the tall LIFT button to its RIGHT, centered as a pair (Tim, 2026-07-10).
+	var play_row := HBoxContainer.new()
+	play_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	play_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	play_row.add_theme_constant_override("separation", 28)
+	play_row.add_child(_track)
+	play_row.add_child(_lift_button)
+
 	var column := VBoxContainer.new()
 	column.set_anchors_preset(Control.PRESET_FULL_RECT)
 	column.add_theme_constant_override("separation", 16)
 	column.add_child(intro)
-	column.add_child(_track)
-	column.add_child(_lift_button)
+	column.add_child(play_row)
 	add_child(column)
 
 

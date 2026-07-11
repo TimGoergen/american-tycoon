@@ -32,10 +32,13 @@ extends Control
 #
 # Deliberately cheap: a handful of circles per bar, no Particles2D, no textures.
 #
-# Each bubble's position along the fill is stored NORMALIZED (0–1 of the filled width) so a
-# narrow sliver stays evenly spread instead of clumping, and every bubble draws its own size,
-# speed, opacity, sway rate/phase, and lane from a fixed per-bubble hash — the crowd never
-# marches in lockstep yet looks identical across identical bars.
+# COVERAGE MODEL (Tim, 2026-07-11): the bubbles are spread across the WHOLE BAR (a fixed pixel
+# coordinate space, 0..track_width), drifting at the constant tier speed, and we only DRAW the ones
+# currently under the fill. So the fill can never "outrun" them and leave the right side empty, and
+# they never pile up at the left edge — when the fill grows, bubbles already sitting in that region
+# (just not yet drawn) appear instantly, at constant density across the entire width. Each bubble
+# draws its own size, speed, opacity, sway rate/phase, and lane from a fixed per-bubble hash, so the
+# crowd never marches in lockstep yet looks identical across identical bars.
 
 ## The four excitement tiers a host can put a bar in. Index into tier_speed_px / TIER_AGITATION.
 enum Tier { IDLE, FLOWING, RUSHED, FRENZY }
@@ -50,13 +53,13 @@ static var tier_speed_px: Array[float] = [16.0, 70.0, 150.0, 220.0]
 ## churn wobble, faster sway, comet-tail suppression). IDLE is calm; FRENZY is fully whipped up.
 const TIER_AGITATION := [0.0, 0.15, 0.55, 1.0]
 
-## The full CALM bubble crowd. Narrow fills show a subset (see BUBBLE_SPACING_PX).
-const BUBBLE_COUNT := 24
-## The position pool is sized for the biggest crowd agitation can ask for
-## (BUBBLE_COUNT × (1 + EXCITED_DENSITY_BOOST)) so the boost never indexes past it.
-const MAX_BUBBLE_COUNT := 36
-## One bubble becomes active per this many pixels of filled width (min 2).
-const BUBBLE_SPACING_PX := 13.75
+## The position pool: bubbles spread across the WHOLE bar. Sized to cover the widest bar at the
+## densest (agitated) setting — track_width / BUBBLE_SPACING_PX × (1 + EXCITED_DENSITY_BOOST). Only
+## the ones under the fill are drawn, so the actual drawn count still scales with the FILL.
+const MAX_BUBBLE_COUNT := 64
+## One bubble per this many pixels of BAR width — the constant density. (Was per filled-width; now
+## the crowd is laid across the whole bar and clipped to the fill, so density stays constant.)
+const BUBBLE_SPACING_PX := 16.0
 ## Bubble radius range in pixels — small, like carbonation, not coins.
 const RADIUS_MIN := 1.7
 const RADIUS_MAX := 3.9
@@ -106,9 +109,6 @@ const EXCITED_SPREAD_LOWER := 0.25
 ## Comet-tail visibility at full agitation (0 = suppressed, 1 = full). Curly slow-bubble tails
 ## read as chaos; partial by default so a whipped-up bar is a swarm, a calm bar is comets.
 const EXCITED_TAIL_VISIBILITY := 0.3
-## A whipped-up fill keeps at least this many bubbles no matter how narrow, so a fast-wrapping
-## rushed bar still shows a churning swarm instead of collapsing to a handful.
-const EXCITED_MIN_ACTIVE := 12
 
 ## Left/right inset of the fill inside the bar (framed meters inset by their border width).
 var edge_inset := 0.0
@@ -195,13 +195,13 @@ func _current_fraction() -> float:
 	return 0.0
 
 
-## How many bubbles a fill this wide can host (scaled by density_scale, boosted while agitated,
-## and never below EXCITED_MIN_ACTIVE while agitated however narrow the fill).
-func _active_count(filled_width: float) -> int:
+## How many bubbles to lay across the WHOLE bar: constant density (1 / BUBBLE_SPACING_PX per px of
+## bar), scaled by density_scale and the agitation boost. Only the ones under the fill are drawn (see
+## _draw), so the DRAWN count still scales with the fill while the density stays constant. Capped at
+## the pool size.
+func _pool_count(track_width: float) -> int:
 	var density := density_scale * (1.0 + EXCITED_DENSITY_BOOST * _agitation)
-	var cap := clampi(int(round(BUBBLE_COUNT * density)), 2, MAX_BUBBLE_COUNT)
-	var min_active := 2 + int(round((float(EXCITED_MIN_ACTIVE) - 2.0) * _agitation))
-	return clampi(int(filled_width / BUBBLE_SPACING_PX * density), mini(min_active, cap), cap)
+	return clampi(int(track_width / BUBBLE_SPACING_PX * density), 2, MAX_BUBBLE_COUNT)
 
 
 func _process(delta: float) -> void:
@@ -209,7 +209,6 @@ func _process(delta: float) -> void:
 		return
 	_time += delta
 
-	var fraction := _current_fraction()
 	var track_width := maxf(0.0, size.x - edge_inset * 2.0)
 
 	# Ease the base speed and agitation toward the current TIER's static values — the entire speed
@@ -225,22 +224,21 @@ func _process(delta: float) -> void:
 	var slowness := clampf(SLOW_SPEED_REFERENCE_PX / maxf(1.0, _base_speed_px), 0.0, 1.0)
 	_upper_mult = lerpf(1.0 + SPEED_SPREAD, SLOW_UPPER_MULT, slowness)
 
-	var filled_width := fraction * track_width
-	if filled_width >= MIN_FILLED_WIDTH_PX:
+	if track_width >= MIN_FILLED_WIDTH_PX:
 		if not _pos_seeded:
-			# Spread the crowd evenly across the current fill (in pixels) the first time it's wide
-			# enough to show.
+			# Spread the crowd evenly across the WHOLE bar (in pixels) once its width is known, so a
+			# bubble sits ready at every part of the bar and appears the instant the fill reaches it.
 			for i in range(MAX_BUBBLE_COUNT):
-				_bubble_pos[i] = fmod(float(i) * 0.61803, 1.0) * filled_width
+				_bubble_pos[i] = fmod(float(i) * 0.61803, 1.0) * track_width
 			_pos_seeded = true
 		for i in range(MAX_BUBBLE_COUNT):
-			# Advance at a CONSTANT pixel speed — the tier speed, unaffected by how the fill grows.
-			# fposmod (not fmod) so a reversed flow wraps cleanly, and it re-maps into the fill if the
-			# width shrank (a cycle-bar reset).
+			# Advance at a CONSTANT pixel speed — the tier speed — wrapping across the whole bar. Only
+			# the bubbles under the fill are drawn (see _draw), so the fill can't outrun them and the
+			# right side is never empty. fposmod (not fmod) so a reversed flow wraps cleanly.
 			var step := _bubble_speed_px(i) * delta
 			if flow_reversed:
 				step = -step
-			_bubble_pos[i] = fposmod(_bubble_pos[i] + step, filled_width)
+			_bubble_pos[i] = fposmod(_bubble_pos[i] + step, track_width)
 	queue_redraw()
 
 
@@ -259,7 +257,11 @@ func _draw() -> void:
 	if filled_width < MIN_FILLED_WIDTH_PX:
 		return
 	_draw_liquid_shading(filled_width)
-	for i in range(_active_count(filled_width)):
+	for i in range(_pool_count(track_width)):
+		# The crowd is spread across the WHOLE bar; only draw the ones currently under the fill, so
+		# coverage is instant and even across the fill however fast it grew (see the header).
+		if _bubble_pos[i] > filled_width:
+			continue
 		var radius := lerpf(RADIUS_MIN, RADIUS_MAX, _variant(i, 0.13))
 		var head := _bubble_point(i, radius, filled_width, 0.0)
 		# Only the head clamps into the fill; tail samples that fall outside are dropped (a clamped

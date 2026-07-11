@@ -177,8 +177,10 @@ extends Resource
 @export var carb_tier_flowing_px: float = 70.0  # feel-tune
 @export var carb_tier_rushed_px: float = 150.0  # feel-tune
 @export var carb_tier_frenzy_px: float = 220.0  # feel-tune
-## Seconds a bar's bubble speed/agitation eases over when it changes tier (so it never snaps).
-@export var carb_tier_ease: float = 0.3  # feel-tune
+## Seconds a bar's bubble speed/agitation eases over when it changes tier. 0 = INSTANT (no accel/
+## decel ramp when a rush engages/releases — a held rush is constant from press to release, Tim's
+## long-standing "no edge burst" goal). Raise it only if some smoothing is ever wanted.
+@export var carb_tier_ease: float = 0.0  # feel-tune
 
 ## Offline income efficiency vs. live play (0–1).
 @export var offline_efficiency: float = 0.5  # TBD-SIM

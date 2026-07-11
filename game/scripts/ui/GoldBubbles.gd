@@ -211,13 +211,19 @@ func _process(delta: float) -> void:
 
 	var track_width := maxf(0.0, size.x - edge_inset * 2.0)
 
-	# Ease the base speed and agitation toward the current TIER's static values — the entire speed
-	# model. No fill measurement; a constant target means a constant steady-state (no swings), and
-	# the ease only shapes the brief transition between tiers.
-	var blend := 1.0 - exp(-delta / maxf(0.01, tier_ease_tau))
+	# Set the base speed and agitation from the current TIER's static values — the entire speed model.
+	# By DEFAULT the change is INSTANT (tier_ease_tau 0): the tier's look is fully on the moment the
+	# state changes, so a held rush is CONSTANT from press to release with NO accel/decel ramp at the
+	# edges — the "edge burst" that the frenzy pass spent so long killing (Tim, 2026-07-11). A nonzero
+	# tier_ease_tau eases the transition instead, if some smoothing is ever wanted.
 	var t := clampi(tier, 0, tier_speed_px.size() - 1)
-	_base_speed_px = lerpf(_base_speed_px, tier_speed_px[t], blend)
-	_agitation = lerpf(_agitation, float(TIER_AGITATION[t]), blend)
+	if tier_ease_tau <= 0.001:
+		_base_speed_px = tier_speed_px[t]
+		_agitation = float(TIER_AGITATION[t])
+	else:
+		var blend := 1.0 - exp(-delta / tier_ease_tau)
+		_base_speed_px = lerpf(_base_speed_px, tier_speed_px[t], blend)
+		_agitation = lerpf(_agitation, float(TIER_AGITATION[t]), blend)
 
 	# How close this tier is to a crawl: 1.0 at/under the reference, fading to 0 as it speeds up.
 	# Widens the per-bubble speed range on slow tiers so they don't read as one uniform speed.

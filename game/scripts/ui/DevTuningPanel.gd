@@ -98,7 +98,7 @@ const DESCRIPTIONS := {
 	"carb_tier_flowing_px": "Bubble speed on a normally cycling bar / economy bar (px/s).",
 	"carb_tier_rushed_px": "Bubble speed while TURBO is burning (px/s).",
 	"carb_tier_frenzy_px": "Bubble speed while a property's rush is held (px/s) — the fastest tier.",
-	"carb_tier_ease": "Seconds a bar's bubble speed eases over when it changes tier.",
+	"carb_tier_ease": "Seconds bubble speed eases over on a tier change (0 = instant, no rush ramp).",
 	"minigame_duration_seconds": "Seconds each transition minigame lasts (shared by all games).",
 	"minigame_keep_floor": "Reward kept on the WORST round (modest downside; higher = gentler, 1.0 = no penalty).",
 	"minigame_full_performance": "Performance (0-1) that keeps exactly 100% — 'standard' play; below eases down, above earns bonus.",

@@ -402,6 +402,11 @@ func _build_ui() -> void:
 	UiPalette.apply_screen_bezel(viewing_area)
 	viewing_area.add_theme_stylebox_override("panel", UiPalette.make_screen_frame_style())
 	add_child(viewing_area)
+	# Hide the ENTIRE game view (hero stat + property ladder + all their carbonation bars) while a
+	# full-screen modal is up (see _process): a covered Control is not culled — it keeps drawing every
+	# frame under the opaque overlay, and the ladder's bubble bars are a real per-frame GPU spend that
+	# showed up as minigame lag. This list was declared long ago but never populated (Tim, 2026-07-11).
+	_covered_game_layers.append(viewing_area)
 
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 10)

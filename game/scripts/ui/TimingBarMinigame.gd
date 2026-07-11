@@ -5,9 +5,11 @@ extends Minigame
 # library so the host's random draw has variety. A marker sweeps back and forth across a
 # bar; the player taps LOCK to catch it inside the gold zone. The zone JUMPS to a new random
 # spot after every successful lock and slowly SHRINKS (down to half its width) as locks pile
-# up, so it gets harder. A click that misses the zone COSTS a lock. Each successful lock
-# scores accuracy in [0,1]; after TARGET_LOCKS successful locks the game ends, and the marker
-# speeds up a little each lock. Performance = average accuracy over TARGET_LOCKS (a never-made
+# up, so it gets harder. A miss just wastes time — the host countdown keeps running (a miss is
+# never charged a lock; that yo-yoing count only confused players, Tim 2026-07-11) and scores
+# nothing. Each successful lock scores accuracy in [0,1]; landing TARGET_LOCKS locks ends the
+# round early, otherwise the host's countdown ends it. The lock count only ever climbs, shown as
+# fill-only pips above the bar. Performance = average accuracy over TARGET_LOCKS (a never-made
 # lock counts as zero, so you must keep landing them, not just nail one).
 #
 # Owns only its gameplay; the host owns the countdown / spectrum / result / multiplier.
@@ -41,6 +43,12 @@ const CLICK_MARK_FADE := 2.0
 ## How long (seconds) the fading "previous size" outline lingers after the zone shrinks+jumps, so
 ## the player can SEE it got smaller (the shrink was invisible until felt before).
 const ZONE_GHOST_TIME := 0.5
+
+## --- Lock-count pips (normal mode) --- One dot per lock, drawn above the bar (see _draw_lock_pips).
+const PIP_RADIUS := 9.0        # dot radius
+const PIP_GAP := 12.0          # empty space between adjacent dots
+const PIP_RIM_WIDTH := 3.0     # navy outline thickness so a dot reads on the light background
+const PIP_ROW_HEIGHT := 30.0   # height of the pip row control
 
 var _marker_pos: float = 0.0
 var _marker_dir: float = 1.0
@@ -97,6 +105,10 @@ const LEGACY_GEM_TEXTURE = preload("res://art/icons/legacy_gem.svg")
 var _rng := RandomNumberGenerator.new()
 
 var _bar: Control
+## Normal mode shows the lock count as fill-only pips above the bar (a dot per lock, filled as you
+## land them, never emptied). Challenge Mode is endless with no 10-lock target, so it keeps a plain
+## running-count label instead. Exactly one of these is shown, chosen in begin() by the mode.
+var _lock_pips: Control
 var _locks_label: Label
 
 
@@ -139,13 +151,21 @@ func begin(tuning: TuningConfig) -> void:
 	intro.add_theme_color_override("font_color", UiPalette.NAVY)
 	column.add_child(intro)
 
-	# Lock count sits ABOVE the game bar (Tim, 2026-07-10), in a dark color so it reads on the
-	# light play area. It's a status readout, not a call to action, so it doesn't need the green.
-	_locks_label = Label.new()
-	_locks_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_locks_label.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
-	_locks_label.add_theme_color_override("font_color", UiPalette.INK_NAVY)
-	column.add_child(_locks_label)
+	# Lock count sits ABOVE the game bar (Tim, 2026-07-10). Normal mode draws it as fill-only pips
+	# (one per lock, filled as you land them); Challenge Mode is endless, so it shows a plain running
+	# count instead. Only the mode's control is added.
+	if challenge_mode:
+		_locks_label = Label.new()
+		_locks_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_locks_label.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
+		_locks_label.add_theme_color_override("font_color", UiPalette.INK_NAVY)
+		column.add_child(_locks_label)
+	else:
+		_lock_pips = Control.new()
+		_lock_pips.custom_minimum_size = Vector2(0, PIP_ROW_HEIGHT)
+		_lock_pips.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_lock_pips.draw.connect(_draw_lock_pips)
+		column.add_child(_lock_pips)
 	_update_locks_label()
 
 	_bar = Control.new()
@@ -257,19 +277,16 @@ func _on_lock() -> void:
 			# disappears with no cue — the missed lock already carries its own penalty.
 			_legacy_lost_flash = 1.0
 	if not hit:
-		# Missed the zone. Normal mode: a misfire costs a lock (never below zero) and scores nothing.
-		# Challenge Mode: mistakes must NOT stop play or reduce the score, so we skip the −1 penalty
-		# entirely — the miss simply doesn't score and the endless run continues.
-		if not challenge_mode:
-			_locks = maxi(0, _locks - 1)
+		# Missed the zone. A miss scores nothing and does NOT change the lock count — its only cost
+		# is the time it burns, since the host countdown keeps running during play. (This used to
+		# subtract a lock, but the count yo-yoing up and down read as a treadmill; Tim, 2026-07-11.)
 		_miss_flash = 1.0
 		_freeze_success = false  # draw the gray drop-shadow "miss" burst during the freeze
 		# Red "MISS!" chip at the marker so a wasted lock reads like every other game's feedback
-		# (Tim, 2026-07-11 — the timing bar was missing its miss chip). Red = failure, never a success.
+		# (Tim, 2026-07-11). Red = failure, never a success.
 		if _bar != null:
 			FloatingChip.spawn(_bar, Vector2(_marker_pos * _bar.size.x, _bar.size.y * 0.5),
 					"MISS!", UiPalette.KETCHUP_RED)
-		_update_locks_label()
 		return
 
 	# Hit: accuracy 1.0 dead-center of the zone, falling to 0 at its (current) edges.
@@ -357,11 +374,39 @@ func _move_zone() -> void:
 
 func _update_locks_label() -> void:
 	# Challenge Mode is endless, so "x / TARGET" is meaningless there — show the running successful-lock
-	# score instead. Normal mode keeps the familiar progress-toward-target readout.
+	# score instead. Normal mode redraws its pips to fill one more for the lock just landed.
 	if challenge_mode:
-		_locks_label.text = "Locks: %d" % _success_count
-	else:
-		_locks_label.text = "Locks: %d / %d" % [_locks, TARGET_LOCKS]
+		if _locks_label != null:
+			_locks_label.text = "Locks: %d" % _success_count
+	elif _lock_pips != null:
+		_lock_pips.queue_redraw()
+
+
+## Draw the normal-mode lock pips: TARGET_LOCKS dots centered in a row, the first `_locks` of them
+## filled green (locks landed) and the rest empty navy rings (locks to go). Fill-only — a miss never
+## empties one — so the row reads as steady progress toward the early finish (Tim, 2026-07-11).
+func _draw_lock_pips() -> void:
+	if _lock_pips == null:
+		return
+	var w := _lock_pips.size.x
+	var h := _lock_pips.size.y
+	if w <= 0.0 or h <= 0.0:
+		return
+	# Center the whole row of pips: n dots of radius PIP_RADIUS, PIP_GAP between their edges.
+	var n := TARGET_LOCKS
+	var step := PIP_RADIUS * 2.0 + PIP_GAP  # distance between adjacent pip centers
+	var row_width := step * float(n) - PIP_GAP  # last pip has no trailing gap
+	var cx := (w - row_width) * 0.5 + PIP_RADIUS
+	var cy := h * 0.5
+	for i in range(n):
+		var center := Vector2(cx + float(i) * step, cy)
+		if i < _locks:
+			# Landed: a filled green dot with a navy rim so it reads on the light background.
+			_lock_pips.draw_circle(center, PIP_RADIUS, UiPalette.MONEY_GREEN)
+			_lock_pips.draw_arc(center, PIP_RADIUS, 0.0, TAU, 20, UiPalette.INK_NAVY, PIP_RIM_WIDTH, true)
+		else:
+			# Still to go: just the navy rim (an empty ring).
+			_lock_pips.draw_arc(center, PIP_RADIUS, 0.0, TAU, 20, UiPalette.INK_NAVY, PIP_RIM_WIDTH, true)
 
 
 ## Draw the bar: a navy track, the gold target zone at its current (roving, shrinking) spot,

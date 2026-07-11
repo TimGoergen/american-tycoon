@@ -1220,6 +1220,12 @@ func _draw_segment(rect: Rect2, track: StyleBoxFlat, fill: StyleBoxFlat, frac: f
 func _end_round() -> void:
 	_playing = false
 	var performance := _current_performance()
+	# The spectrum bar's fill is SMOOTHED (lerped toward the live value each frame while playing). Now
+	# that the round is over the lerp stops, so snap the bar to the true final multiplier — otherwise a
+	# round that ends the instant the player maxes out shows the MAX! flash over a bar that hadn't
+	# finished filling (Tim, 2026-07-10). The bar stays visible behind the flash, so this must be full.
+	_display_mult = _multiplier_for_performance(performance)
+	_keep_bar.queue_redraw()
 	# A round can end for two reasons: the clock ran out, or the player hit the MAXIMUM result and there
 	# was no point playing on. In the latter case flash "MAX!" over the card for a beat before the result
 	# appears, so the player understands the round ended because they maxed it — not that it was cut off

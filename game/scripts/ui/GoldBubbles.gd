@@ -142,8 +142,15 @@ var _time := 0.0
 ## static value. `_base_speed_px` is what the crowd rides; `_agitation` scales the busy visuals.
 var _base_speed_px := tier_speed_px[Tier.FLOWING]
 var _agitation := 0.0
-## Per-bubble position along the filled region, NORMALIZED 0–1.
+## Per-bubble position along the filled region, in ABSOLUTE PIXELS from the fill's left edge
+## (Tim, 2026-07-11). This USED to be normalized 0–1 and multiplied by filled_width in _draw — but
+## that made a WIDENING fill re-map every bubble rightward, adding an on-screen velocity that rode
+## the fill speed (so the movement still swung with the bar and reacted to rush, defeating the whole
+## point of static tiers). Pixels advance at a constant px/s regardless of how the fill grows.
 var _bubble_pos: Array[float] = []
+## Positions are seeded (spread across the fill) on the first frame the fill is wide enough, since
+## filled_width isn't known at _ready.
+var _pos_seeded := false
 ## The slow-bar speed-spread ceiling, cached each _process so _draw can recompute a bubble's own
 ## speed when laying its tracer path.
 var _upper_mult := 1.0 + SPEED_SPREAD
@@ -154,10 +161,11 @@ func _ready() -> void:
 	# the bar's top, drawing the bubbles as specks pinned to the top edge (Tim, 2026-07-05).
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	# Starting positions from the golden-ratio (Weyl) sequence: evenly spread for EVERY prefix, so
-	# whatever subset a narrow fill draws starts well distributed instead of clumped at the left.
-	for i in range(MAX_BUBBLE_COUNT):
-		_bubble_pos.append(fmod(float(i) * 0.61803, 1.0))
+	# Placeholder positions; seeded to a golden-ratio spread across the real fill width on the first
+	# valid frame (see _process). The Weyl sequence is evenly spread for EVERY prefix, so whatever
+	# subset a narrow fill draws starts well distributed instead of clumped at the left.
+	for _i in range(MAX_BUBBLE_COUNT):
+		_bubble_pos.append(0.0)
 
 
 ## A stable per-bubble pseudo-random in [0,1), hashed from (index, salt) — fixed, not random, so
@@ -219,13 +227,20 @@ func _process(delta: float) -> void:
 
 	var filled_width := fraction * track_width
 	if filled_width >= MIN_FILLED_WIDTH_PX:
+		if not _pos_seeded:
+			# Spread the crowd evenly across the current fill (in pixels) the first time it's wide
+			# enough to show.
+			for i in range(MAX_BUBBLE_COUNT):
+				_bubble_pos[i] = fmod(float(i) * 0.61803, 1.0) * filled_width
+			_pos_seeded = true
 		for i in range(MAX_BUBBLE_COUNT):
-			# Advance in NORMALIZED space so the same px/s reads as a bigger step through a narrower
-			# fill. fposmod (not fmod) so a reversed flow wraps cleanly from 0 back to 1.
-			var step := _bubble_speed_px(i) * delta / filled_width
+			# Advance at a CONSTANT pixel speed — the tier speed, unaffected by how the fill grows.
+			# fposmod (not fmod) so a reversed flow wraps cleanly, and it re-maps into the fill if the
+			# width shrank (a cycle-bar reset).
+			var step := _bubble_speed_px(i) * delta
 			if flow_reversed:
 				step = -step
-			_bubble_pos[i] = fposmod(_bubble_pos[i] + step, 1.0)
+			_bubble_pos[i] = fposmod(_bubble_pos[i] + step, filled_width)
 	queue_redraw()
 
 
@@ -333,11 +348,12 @@ func _bubble_point(index: int, radius: float, filled_width: float, seconds_ago: 
 	# The agitation wobble: horizontal churn scaled purely by the eased agitation.
 	var wobble := sin(at_time * TAU * EXCITED_WOBBLE_HZ + phase * 3.0) \
 			* EXCITED_WOBBLE_PX * _agitation
-	# Map the normalized position into the filled region, rolled back along the drift — backward is
-	# rightward when reversed. NOT clamped here (the head clamps in _draw; tail samples are dropped).
+	# The pixel position along the fill, rolled back along the drift — backward is rightward when
+	# reversed. NOT clamped here (the head clamps in _draw; tail samples are dropped). `filled_width`
+	# and `radius` no longer scale the position — the head clamp keeps it inside the fill.
 	var rollback := _bubble_speed_px(index) * seconds_ago
 	if flow_reversed:
 		rollback = -rollback
-	var drift_px := _bubble_pos[index] * (filled_width - radius * 2.0) - rollback
-	var x := edge_inset + radius + drift_px + wobble
+	var drift_px := _bubble_pos[index] - rollback
+	var x := edge_inset + drift_px + wobble
 	return Vector2(x, size.y / 2.0 + lane + sway)

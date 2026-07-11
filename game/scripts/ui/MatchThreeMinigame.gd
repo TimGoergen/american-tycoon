@@ -682,7 +682,7 @@ func _play_resolution(result: Dictionary) -> void:
 	# Score the whole swap up front from the recorded steps (deterministic), but AWARD it step by
 	# step as each cascade clears on screen — so the score readout and the host's spectrum bar
 	# climb in time with the animation.
-	var scoring := _score_swap(result)
+	var scoring := _score_steps(result["steps"])
 	var step_points: Array = scoring["step_points"]
 	var step_group_details: Array = scoring["step_group_details"]
 	if scoring["matched_avoid"]:
@@ -690,6 +690,7 @@ func _play_resolution(result: Dictionary) -> void:
 		# Pulse the AVOID gem tile above the grid a couple of times as a visual reminder that this
 		# match hit the gem to steer around (Tim, 2026-07-10).
 		_pulse_avoid_banner()
+	_collect_legacy(scoring["legacy_matches"])
 
 	for i in range(result["steps"].size()):
 		await _animate_step(result["steps"][i], float(step_points[i]), i, step_group_details[i])
@@ -699,6 +700,15 @@ func _play_resolution(result: Dictionary) -> void:
 	# the legacy color at that cell, so we swap the settled gem node there for a legacy gem.
 	if result.has("legacy_placement"):
 		await _pop_legacy_gem(result["legacy_placement"])
+
+		# The placed gem may have completed a line of 3+ Legacy gems. The board resolved those into
+		# post_placement_steps; play them now (after the gem pops in) so the collection reads clearly.
+		if result.has("post_placement_steps"):
+			var post_steps: Array = result["post_placement_steps"]
+			var post := _score_steps(post_steps)
+			_collect_legacy(post["legacy_matches"])
+			for i in range(post_steps.size()):
+				await _animate_step(post_steps[i], float(post["step_points"][i]), i, post["step_group_details"][i])
 
 	# The max-bonus "MAX!" celebration now lives on the HOST (MinigameScreen._flash_max_then), so every
 	# minigame announces a maxed-out round the same way (Tim, 2026-07-10) — match-3 no longer plays its
@@ -732,8 +742,7 @@ func _maybe_finish_early() -> void:
 ## Each match GROUP is scored on its own with NO combo: a clean group (no avoid gem) earns +15%,
 ## an avoid group is docked −60%, and a LEGACY group scores 0 (it pays a Legacy bonus, not points).
 ## step_group_details is aligned with each step's matches so the animation can label each group.
-func _score_swap(result: Dictionary) -> Dictionary:
-	var steps: Array = result["steps"]
+func _score_steps(steps: Array) -> Dictionary:
 	var matched_avoid := false
 	var legacy_matches := 0
 	var step_points: Array = []
@@ -782,21 +791,24 @@ func _score_swap(result: Dictionary) -> Dictionary:
 		step_points.append(step_raw)
 		step_group_details.append(group_details)
 
-	if legacy_matches > 0:
-		collect_legacy_gem(legacy_matches)
-		# Once the bonus is secured, stop the board spawning any more Legacy gems (design rule 3 —
-		# no pointless noise once earned) and reveal the "bonus earned" badge above the board.
-		if legacy_bonus_secured():
-			_board.enable_special_spawns = false
-			if _legacy_badge != null:
-				_legacy_badge.visible = true
-
 	return {
 		"step_points": step_points,
 		"matched_avoid": matched_avoid,
 		"step_group_details": step_group_details,
 		"legacy_matches": legacy_matches,
 	}
+
+
+## Bank collected Legacy gems and, once the bonus is secured, stop the board spawning more (design
+## rule 3 — no pointless noise once earned) and reveal the "bonus earned" badge above the board.
+func _collect_legacy(count: int) -> void:
+	if count <= 0:
+		return
+	collect_legacy_gem(count)
+	if legacy_bonus_secured():
+		_board.enable_special_spawns = false
+		if _legacy_badge != null:
+			_legacy_badge.visible = true
 
 
 func _animate_step(step: Dictionary, points: float, step_index: int, group_details: Array) -> void:

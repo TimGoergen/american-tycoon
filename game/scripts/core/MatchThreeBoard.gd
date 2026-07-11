@@ -214,6 +214,33 @@ func resolve_swap(r1: int, c1: int, r2: int, c2: int) -> Dictionary:
 			grid[target[0]][target[1]] = special_color
 			result["legacy_placement"] = target
 
+	# The just-placed Legacy gem may complete a line of 3+ Legacy gems already on the board. Resolve
+	# any match it creates NOW — otherwise a lined-up trio would sit unmatched until some later swap
+	# happened to re-scan it (Tim, 2026-07-10). Recorded SEPARATELY (not in `steps`) so the UI can pop
+	# the placed gem in first, then play these follow-up clears. Uses the same cascade machinery; it
+	# never places another Legacy gem, so there's no placement chain.
+	if result.has("legacy_placement"):
+		var post_steps: Array = []
+		while true:
+			var groups := _find_match_groups()
+			if groups.is_empty():
+				break
+			var cleared := _union_cells(groups)
+			total_cleared += cleared.size()
+			var cleared_colors: Array = []
+			for cell in cleared:
+				cleared_colors.append(grid[cell[0]][cell[1]])
+			var moves := _clear_collapse_refill_recorded(cleared)
+			post_steps.append({
+				"matches": groups,
+				"cleared": cleared,
+				"cleared_colors": cleared_colors,
+				"falls": moves["falls"],
+				"spawns": moves["spawns"],
+			})
+		if not post_steps.is_empty():
+			result["post_placement_steps"] = post_steps
+
 	score += total_cleared
 	result["steps"] = steps
 	result["cleared_total"] = total_cleared

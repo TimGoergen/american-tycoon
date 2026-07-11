@@ -55,6 +55,12 @@ var _running: bool = false
 var _flash: float = 0.0       # brief cream highlight after a successful lock, decays in _process
 var _miss_flash: float = 0.0  # brief red highlight after a missed click, decays in _process
 var _zone_center: float = 0.5  # current center of the gold zone (bar fraction); jumps each lock
+## Displayed half-width of the gold zone. Refreshed ONLY in _move_zone (which runs after the freeze),
+## never straight from _current_zone_half(), so a hit doesn't visibly shrink the zone mid-freeze — the
+## zone holds its pre-hit size through the whole result freeze and only shrinks+jumps once it ends
+## (Tim, 2026-07-11). _current_zone_half() is the target size for the live lock count; this is what's
+## actually drawn until the next _move_zone applies it.
+var _zone_half: float = ZONE_HALF
 ## Freeze-burst state. While _freeze_left > 0 the marker and zone hold still, a hit/miss burst
 ## is drawn, and is_busy() is true so the host pauses its countdown for the duration.
 var _freeze_left: float = 0.0
@@ -224,7 +230,9 @@ func _on_lock() -> void:
 	# Every LOCK press freezes the bar for a beat so the player can read a hit/miss burst. The
 	# success flag (set below, once we know hit vs miss) chooses which burst _draw_bar shows.
 	_freeze_left = FREEZE_TIME
-	var half := _current_zone_half()
+	# Judge the tap against the zone AS DISPLAYED (its pre-hit size), not _current_zone_half() for the
+	# soon-to-be-incremented lock count — the player aimed at the zone they can see.
+	var half := _zone_half
 	var distance := absf(_marker_pos - _zone_center)
 	var hit := distance <= half
 	# Drop a fading line wherever the marker was at the moment of the click — hit or miss — colored
@@ -301,7 +309,10 @@ func _current_zone_half() -> float:
 ## Pick a new random zone center that keeps the whole zone on the bar (center within one
 ## half-width of either end), so a freshly placed zone is never clipped off the edge.
 func _move_zone() -> void:
-	var half := _current_zone_half()
+	# Apply the shrink NOW (after the freeze) by refreshing the displayed half-width from the current
+	# lock count. This is the only place _zone_half changes, so the zone stays its pre-hit size for the
+	# whole result freeze and shrinks together with the jump below.
+	_zone_half = _current_zone_half()
 	# Leave a brief fading outline at the PREVIOUS (larger) width at the new spot, so the player sees
 	# the zone actually shrank. _move_zone runs after _locks has incremented, so the previous width is
 	# the half for (_locks - 1). Skipped at the very first placement (_locks == 0), where nothing has
@@ -310,7 +321,7 @@ func _move_zone() -> void:
 		var prev_progress := clampf(float(_locks - 1) / float(TARGET_LOCKS), 0.0, 1.0)
 		_zone_ghost_half = lerpf(ZONE_HALF, ZONE_HALF_MIN, prev_progress)
 		_zone_ghost_left = ZONE_GHOST_TIME
-	_zone_center = _rng.randf_range(half, 1.0 - half)
+	_zone_center = _rng.randf_range(_zone_half, 1.0 - _zone_half)
 
 
 func _update_locks_label() -> void:
@@ -338,8 +349,8 @@ func _draw_bar() -> void:
 		var ghost_x := (_zone_center - _zone_ghost_half) * w
 		var ghost_w := (_zone_ghost_half * 2.0) * w
 		_bar.draw_rect(Rect2(ghost_x, 0, ghost_w, h), Color(UiPalette.MUSTARD_GOLD, 0.45 * ghost_life), false, 4.0)
-	# Gold target zone at its current center and width.
-	var half := _current_zone_half()
+	# Gold target zone at its current center and displayed width (see _zone_half — holds through the freeze).
+	var half := _zone_half
 	var zone_x := (_zone_center - half) * w
 	var zone_w := (half * 2.0) * w
 	_bar.draw_rect(Rect2(zone_x, 0, zone_w, h), UiPalette.MUSTARD_GOLD)

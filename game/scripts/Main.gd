@@ -282,6 +282,13 @@ func _notification(what: int) -> void:
 
 func _create_game() -> void:
 	tuning = ConfigLoader.load_tuning()
+	# Push the carbonation speed-tier ladder into GoldBubbles' shared static table (Tim, 2026-07-10):
+	# every bubble crowd reads the same tier speeds, so setting it once here (re-run on a scene reload
+	# after a Balance Tuning Apply) lets the ladder be tuned live without threading tuning per-bar.
+	GoldBubbles.tier_speed_px = [
+		tuning.carb_tier_idle_px, tuning.carb_tier_flowing_px,
+		tuning.carb_tier_rushed_px, tuning.carb_tier_frenzy_px,
+	]
 	var property_configs := ConfigLoader.load_property_configs()
 
 	# Constructing the dynasty also builds generation 1, already seeded with

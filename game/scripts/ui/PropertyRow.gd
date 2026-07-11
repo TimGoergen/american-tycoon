@@ -915,33 +915,27 @@ func _refresh(delta: float) -> void:
 	var rush_no_longer_option := staffed and not interactive
 	_set_cycle_color(rush_no_longer_option, rush_engaged)
 
-	# Carbonation on a pinned-solid bar: the fill edge isn't moving, so the bubbles
-	# would sink to their idle drift — command a brisk flow instead (faster still while
-	# an engaged rush is held), so the busiest property carries the busiest fizz and
-	# rushing a solid bar visibly does something (see SOLID_FLOW_PX).
-	if pinned:
-		_cycle_bubbles.flow_override_px = SOLID_FLOW_PX * (SOLID_FLOW_RUSH_MULT if rush_engaged else 1.0)
+	# Carbonation TIER (Tim, 2026-07-10): the bar's actual fill speed no longer drives the
+	# bubbles — each state just picks a tier with a STATIC speed and agitation. Holding rush
+	# whips the liquid up (FRENZY); a normally cycling owned bar FLOWS; a static or unowned
+	# bar only fizzes (IDLE). The ease inside GoldBubbles smooths transitions between tiers.
+	if not owned:
+		_cycle_bubbles.tier = GoldBubbles.Tier.IDLE
+	elif rush_engaged:
+		_cycle_bubbles.tier = GoldBubbles.Tier.FRENZY
+	elif _prop.is_cycle_running:
+		_cycle_bubbles.tier = GoldBubbles.Tier.FLOWING
 	else:
-		_cycle_bubbles.flow_override_px = -1.0
-	# Rush agitates the liquid itself (work item 5): the excitement knob scales the
-	# whole package — denser crowd, commanded flow, livelier sway, churn wobble.
-	_cycle_bubbles.excitement = 1.0 if rush_engaged else 0.0
-	# Push the live-tunable frenzy knobs in (Balance Tuning edits these on device, so
-	# the frenzy's elements can be isolated without a rebuild).
-	_cycle_bubbles.excited_flow_px = _prop.tuning.carb_excited_flow
-	_cycle_bubbles.excited_wobble_px = _prop.tuning.carb_excited_wobble
-	_cycle_bubbles.excited_spread_lower = _prop.tuning.carb_excited_spread_lower
-	_cycle_bubbles.excited_tail_visibility = _prop.tuning.carb_excited_tails
-	_cycle_bubbles.excitement_ease_tau = _prop.tuning.carb_excited_ease
+		_cycle_bubbles.tier = GoldBubbles.Tier.IDLE
+	_cycle_bubbles.tier_ease_tau = _prop.tuning.carb_tier_ease
 
 	# The diagnosis overlay: live values driving this row's carbonation (reading the
 	# bubbles' internals directly is fine here — this label exists only to expose them).
 	var debug_on := _prop.tuning.carb_debug_overlay > 0.5 and owned
 	_carb_debug_label.visible = debug_on
 	if debug_on:
-		_carb_debug_label.text = "lv %.2f  bub %d  fill %d  swp %d px/s" % [
-			_cycle_bubbles._excitement_level, int(_cycle_bubbles._base_speed_px),
-			int(_cycle_bubbles._smoothed_speed_px), int(_sweep_rate * _cycle_bar.size.x),
+		_carb_debug_label.text = "tier %d  agit %.2f  spd %d px/s" % [
+			_cycle_bubbles.tier, _cycle_bubbles._agitation, int(_cycle_bubbles._base_speed_px),
 		]
 
 	_refresh_buy_button()

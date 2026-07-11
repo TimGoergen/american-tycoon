@@ -46,7 +46,7 @@ func _process(delta: float) -> void:
 		_game.economy.cash += prop.get_bulk_cost(2) * 2.0
 		_game.try_buy(TARGET_INDEX, 2)
 		_game.tap_property(TARGET_INDEX)
-		_lines.append("t,phase,lv,bub_px,fill_px,swp_rate,disp,true_frac,running,hold_s")
+		_lines.append("t,phase,agit,bub_px,tier,swp_rate,disp,true_frac,running,hold_s")
 
 	if not _bought:
 		return
@@ -67,11 +67,11 @@ func _process(delta: float) -> void:
 		phase = "rel"
 	var effective := prop.get_effective_cycle_length()
 	var true_frac := prop.cycle_progress / effective if effective > 0.0 else 0.0
-	_lines.append("%.3f,%s,%.3f,%.1f,%.1f,%.4f,%.4f,%.4f,%s,%.2f" % [
+	_lines.append("%.3f,%s,%.3f,%.1f,%d,%.4f,%.4f,%.4f,%s,%.2f" % [
 		_elapsed, phase,
-		_row._cycle_bubbles._excitement_level,
+		_row._cycle_bubbles._agitation,
 		_row._cycle_bubbles._base_speed_px,
-		_row._cycle_bubbles._smoothed_speed_px,
+		_row._cycle_bubbles.tier,
 		_row._sweep_rate,
 		_row._displayed_cycle_fraction,
 		true_frac,

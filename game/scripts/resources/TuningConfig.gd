@@ -168,6 +168,18 @@ extends Resource
 ## (2026-07-08), promoted from his override to the shipped default.
 @export var carb_excited_ease: float = 0.9  # feel-tuned on device
 
+# --- Carbonation SPEED TIERS (Tim, 2026-07-10) ---
+# The bubble speed is no longer measured from the bar's fill — every bar picks an excitement
+# TIER and each tier has a STATIC px/s speed set here (Main pushes these into GoldBubbles at
+# startup). IDLE = a still/full bar; FLOWING = a cycling property / the economy bar / TURBO
+# charging; RUSHED = TURBO burning; FRENZY = a property's rush held. All feel-tune.
+@export var carb_tier_idle_px: float = 16.0     # feel-tune
+@export var carb_tier_flowing_px: float = 70.0  # feel-tune
+@export var carb_tier_rushed_px: float = 150.0  # feel-tune
+@export var carb_tier_frenzy_px: float = 220.0  # feel-tune
+## Seconds a bar's bubble speed/agitation eases over when it changes tier (so it never snaps).
+@export var carb_tier_ease: float = 0.3  # feel-tune
+
 ## Offline income efficiency vs. live play (0–1).
 @export var offline_efficiency: float = 0.5  # TBD-SIM
 

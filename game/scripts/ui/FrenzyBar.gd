@@ -160,3 +160,6 @@ func _set_burn_style(burning: bool) -> void:
 	# full crowd; charging fills left-to-right with the reduced crowd (Tim, 2026-07-06).
 	_bubbles.flow_reversed = burning
 	_bubbles.density_scale = 1.0 if burning else CHARGING_BUBBLE_DENSITY
+	# Carbonation TIER (Tim, 2026-07-10): burning discharges the multiplier — a livelier RUSHED
+	# flow; charging is the steady FLOWING accrual. Speeds are per-tier static values.
+	_bubbles.tier = GoldBubbles.Tier.RUSHED if burning else GoldBubbles.Tier.FLOWING

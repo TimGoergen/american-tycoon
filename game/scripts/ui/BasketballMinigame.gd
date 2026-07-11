@@ -854,7 +854,11 @@ func _draw_aim_guide() -> void:
 	var travel_dir := -pull / pull_distance               # the ball flies OPPOSITE the pull
 	var perp := Vector2(-travel_dir.y, travel_dir.x)       # wide-end spread, across the travel direction
 	var wide_half := lerpf(AIM_WEDGE_BASE_MIN, AIM_WEDGE_BASE_MAX, force) * 0.5
-	var wide_center := _aim_anchor + travel_dir * (pull_distance * AIM_WEDGE_LENGTH_SCALE)
+	# The wedge LENGTH tracks the EFFECTIVE drag (capped at the full-power point), not the raw pull, so
+	# the cone stops GROWING exactly when the force — and its color — max out. Past that, extra pull
+	# adds no force, so the cone must not keep lengthening (Tim, 2026-07-10).
+	var effective_drag := minf(pull_distance, _launch_max_drag)
+	var wide_center := _aim_anchor + travel_dir * (effective_drag * AIM_WEDGE_LENGTH_SCALE)
 	var wedge := PackedVector2Array([
 		_aim_anchor,                          # POINT — at the ball's launch location
 		wide_center + perp * wide_half,       # wide end, fanned out in the direction of travel

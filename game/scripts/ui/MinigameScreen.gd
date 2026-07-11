@@ -91,6 +91,12 @@ var _base_amount: float = 0.0
 ## result-screen heading, and whether amounts are formatted as dollars instead of a count.
 var _reward_noun: String = "Legacy"
 var _result_heading: String = "THE INHERITANCE"
+## Result-screen row labels so the outcome reads as a context-specific STATEMENT (Tim, 2026-07-10):
+## `_base_label` names the pre-minigame amount ("Earned while away"), `_total_label` names the final
+## banked amount ("Total banked"). Set per site from the reward context; both amount-scaling sites
+## and First Contact use them.
+var _base_label: String = "Base"
+var _total_label: String = "Total"
 var _format_as_money: bool = false
 ## Upside-only mode (First Contact, GDD §5.5 site 2): the floor is the base — a weak run or a Skip
 ## costs nothing, and a good run adds a BUCKETED bonus (low/med/high) rather than a continuous
@@ -143,10 +149,24 @@ var _seg_fill_right: StyleBoxFlat
 var _seg_flash_box: StyleBoxFlat
 var _play_area: Control
 var _result_heading_label: Label
-var _result_mult_label: Label
-var _result_amount_label: Label
-## The smaller "(base + bonus)" / "(of X)" breakdown line beneath the big total. Hidden when empty.
-var _result_breakdown_label: Label
+## The one-word verdict of how the round went ("GREAT ROUND" / "FULL" / "WEAK ROUND" / a First
+## Contact bucket), colored by tier — the headline of the result statement.
+var _result_verdict_label: Label
+## The result STATEMENT: labelled key/value rows so the outcome reads as a clear, context-specific
+## ledger (Tim, 2026-07-10) — base amount, the minigame's impact, then the final total. Each row is a
+## left-aligned key + a right-aligned value; the total row is larger and bold. Populated per site.
+var _stat_base_key: Label
+var _stat_base_val: Label
+var _stat_impact_key: Label
+var _stat_impact_val: Label
+## A second impact row, used only where a site has two effects to show (First Contact: income boost
+## AND cycle speed). Hidden for the amount-scaling sites, which have a single impact.
+var _stat_impact2_key: Label
+var _stat_impact2_val: Label
+var _stat_impact2_row: Control
+var _stat_divider: Control
+var _stat_total_key: Label
+var _stat_total_val: Label
 ## A type-specific line on the result screen ("Scored 1,240 points", "Caught 14 of 18"), so the
 ## paused result clearly reflects the game just played. Hidden when the type provides none.
 var _result_summary_label: Label
@@ -497,21 +517,45 @@ func _build_result_view() -> Control:
 	_result_heading_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(_result_heading_label)
 
-	_result_mult_label = _make_label("", UiPalette.FONT_DISPLAY, UiPalette.MUSTARD_GOLD)
-	_result_mult_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	column.add_child(_result_mult_label)
+	# The verdict headline — how the round went, colored by tier.
+	_result_verdict_label = _make_label("", UiPalette.FONT_DISPLAY, UiPalette.MUSTARD_GOLD)
+	_result_verdict_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	column.add_child(_result_verdict_label)
 
-	# The "+X Legacy" total: NAVY (the Back button's label color), 40% larger than FONT_SUBHEAD and
-	# bold so it's the clear focal figure (Tim, 2026-07-09).
-	_result_amount_label = _make_label("", int(UiPalette.FONT_SUBHEAD * 1.4), UiPalette.NAVY)
-	_result_amount_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_result_amount_label.add_theme_font_override("font", UiPalette.make_bold_font())
-	column.add_child(_result_amount_label)
+	# The statement — base → impact → total — as key/value rows in a constrained, centered column so
+	# it reads as a clean ledger rather than running the full card width (Tim, 2026-07-10).
+	var statement := VBoxContainer.new()
+	statement.add_theme_constant_override("separation", 12)
+	statement.custom_minimum_size = Vector2(680, 0)
+	statement.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	column.add_child(statement)
 
-	# The base + bonus breakdown (or "of X" on a weak round) on its own smaller line beneath the total.
-	_result_breakdown_label = _make_label("", UiPalette.FONT_LABEL, UiPalette.NAVY)
-	_result_breakdown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	column.add_child(_result_breakdown_label)
+	var base_row := _make_stat_row(false)
+	_stat_base_key = base_row["key"]
+	_stat_base_val = base_row["val"]
+	statement.add_child(base_row["row"])
+
+	var impact_row := _make_stat_row(false)
+	_stat_impact_key = impact_row["key"]
+	_stat_impact_val = impact_row["val"]
+	statement.add_child(impact_row["row"])
+
+	var impact2_row := _make_stat_row(false)
+	_stat_impact2_key = impact2_row["key"]
+	_stat_impact2_val = impact2_row["val"]
+	_stat_impact2_row = impact2_row["row"]
+	statement.add_child(impact2_row["row"])
+
+	# A thin rule between the impact and the final total, like the line above a receipt total.
+	_stat_divider = ColorRect.new()
+	_stat_divider.color = Color(UiPalette.NAVY, 0.35)
+	_stat_divider.custom_minimum_size = Vector2(0, 3)
+	statement.add_child(_stat_divider)
+
+	var total_row := _make_stat_row(true)
+	_stat_total_key = total_row["key"]
+	_stat_total_val = total_row["val"]
+	statement.add_child(total_row["row"])
 
 	# How the player did at the game itself (set per round from the type's result_summary).
 	_result_summary_label = _make_label("", UiPalette.FONT_LABEL, UiPalette.NAVY)
@@ -679,6 +723,28 @@ func _scaled_ready_size(base_size: int) -> int:
 	return int(round(base_size * GET_READY_TEXT_SCALE))
 
 
+## Build one statement row: a left-aligned KEY label that takes the slack, and a right-aligned VALUE
+## label sized to its content at the far right — so the row reads as "Earned while away … $1.20M".
+## `big` makes it the bold, larger total row. Returns the row and its two labels for the caller to fill.
+func _make_stat_row(big: bool) -> Dictionary:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 24)
+	var key_size := int(UiPalette.FONT_SUBHEAD * (1.1 if big else 0.95))
+	var val_size := int(UiPalette.FONT_SUBHEAD * (1.35 if big else 1.05))
+	var key := _make_label("", key_size, UiPalette.NAVY)
+	key.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	key.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var val := _make_label("", val_size, UiPalette.NAVY)
+	val.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	val.size_flags_horizontal = Control.SIZE_SHRINK_END
+	if big:
+		key.add_theme_font_override("font", UiPalette.make_bold_font())
+		val.add_theme_font_override("font", UiPalette.make_bold_font())
+	row.add_child(key)
+	row.add_child(val)
+	return {"row": row, "key": key, "val": val}
+
+
 func _make_label(text: String, font_size: int, color: Color) -> Label:
 	var label := Label.new()
 	label.text = text
@@ -700,14 +766,17 @@ func _make_label(text: String, font_size: int, color: Color) -> Label:
 ## what this round is in the story (the heir proving themselves, risking the overnight
 ## pile, negotiating with aliens). Nothing in the game explained why a minigame was
 ## suddenly happening (Tim, 2026-07-07 debrief, work item 3).
+## `base_label` / `total_label` name the two ends of the result STATEMENT for this site
+## ("Earned while away" → "Total banked"), so the outcome reads with context (Tim, 2026-07-10).
 static func make_reward(
 		base: float, noun: String, heading: String, purpose: String, format_as_money: bool,
-		upside_only: bool = false, framing: String = ""
+		upside_only: bool = false, framing: String = "", base_label: String = "Base",
+		total_label: String = "Total"
 ) -> Dictionary:
 	return {
 		"base": base, "noun": noun, "heading": heading,
 		"purpose": purpose, "as_money": format_as_money, "upside_only": upside_only,
-		"framing": framing,
+		"framing": framing, "base_label": base_label, "total_label": total_label,
 	}
 
 
@@ -742,7 +811,8 @@ static func legacy_reward(base_legacy: int) -> Dictionary:
 	return make_reward(
 		float(base_legacy), "Legacy", "THE INHERITANCE", DEFAULT_PURPOSE, false, false,
 		"The will is read. Before the fortune passes, the heir must show the estate "
-		+ "what kind of tycoon they are."
+		+ "what kind of tycoon they are.",
+		"Inheritance at stake", "PASSED TO YOUR HEIR"
 	)
 
 
@@ -750,7 +820,8 @@ static func legacy_reward(base_legacy: int) -> Dictionary:
 static func offline_pile_reward(pile: float) -> Dictionary:
 	return make_reward(
 		pile, "", "THE OVERNIGHT HAUL", "Make the most of your time away", true, false,
-		"The empire earned this while you were away. One bold move before it banks."
+		"The empire earned this while you were away. One bold move before it banks.",
+		"Earned while away", "TOTAL BANKED"
 	)
 
 
@@ -769,7 +840,8 @@ static func first_contact_reward(
 		"Broker the %s trade terms" % civilization, true, true,  # as_money, upside_only
 		("Across the table: a civilization that has never seen a human make a deal. "
 		+ "The terms you strike cover every %s venture — open strong, and they favor "
-		+ "you for good.") % civilization
+		+ "you for good.") % civilization,
+		"Base income", "Opening income"
 	)
 
 
@@ -788,6 +860,8 @@ func start_game(
 	_base_amount = float(reward.get("base", 0.0))
 	_reward_noun = String(reward.get("noun", "Legacy"))
 	_result_heading = String(reward.get("heading", "THE INHERITANCE"))
+	_base_label = String(reward.get("base_label", "Base"))
+	_total_label = String(reward.get("total_label", "Total"))
 	_format_as_money = bool(reward.get("as_money", false))
 	_upside_only = bool(reward.get("upside_only", false))
 	var purpose := String(reward.get("purpose", DEFAULT_PURPOSE))
@@ -1298,29 +1372,10 @@ func _on_banner_requested(text: String, color: Color, after: Callable) -> void:
 
 
 func _show_result(mult: float) -> void:
-	_result_breakdown_label.visible = false  # only the amount-scaling branch below reveals it
 	if _upside_only:
-		_set_first_contact_result_labels(mult)
+		_fill_first_contact_statement(mult)
 	else:
-		var kept := _base_amount * mult
-		# The big total goes on _result_amount_label; the smaller parenthetical breakdown (if any) on
-		# _result_breakdown_label beneath it.
-		_result_amount_label.text = "+%s" % _format_amount(kept)
-		var breakdown := ""
-		if mult > 1.0:
-			_result_mult_label.text = "+%d%% BONUS" % int(round((mult - 1.0) * 100.0))
-			# A saturated blue (not the pale teal) for the bonus headline (Tim, 2026-07-09).
-			_result_mult_label.add_theme_color_override("font_color", Color("#2E6FD6"))
-			breakdown = "(%s + %s bonus)" % [_format_amount(_base_amount), _format_amount(kept - _base_amount)]
-		elif mult >= 1.0:
-			_result_mult_label.text = "FULL"
-			_result_mult_label.add_theme_color_override("font_color", UiPalette.DARK_MONEY_GREEN)
-		else:
-			_result_mult_label.text = "KEPT %d%%" % int(round(mult * 100.0))
-			_result_mult_label.add_theme_color_override("font_color", _keep_color(mult))
-			breakdown = "(of %s)" % _format_amount(_base_amount)
-		_result_breakdown_label.text = breakdown
-		_result_breakdown_label.visible = breakdown != ""
+		_fill_amount_statement(mult)
 
 	# The type's own summary of how the round was played (empty for types that provide none).
 	var summary := _active_minigame.result_summary() if _active_minigame != null else ""
@@ -1334,6 +1389,82 @@ func _show_result(mult: float) -> void:
 	_result_view.visible = true
 	visible = true
 	_animate_result()
+
+
+## Fill the statement for an amount-scaling site (succession Legacy / welcome-back cash): the base
+## amount you brought in, the minigame's impact on it (a signed amount + the percent), and the final
+## banked total — each clearly labelled so the outcome reads with context (Tim, 2026-07-10).
+func _fill_amount_statement(mult: float) -> void:
+	_stat_impact2_row.visible = false  # amount sites have a single impact line
+	var kept := _base_amount * mult
+	# Derive the impact from the SAME values the base and total rows show, so base + impact = total
+	# exactly. Legacy is a whole-gem count (_format_amount floors it), so the delta must be the
+	# difference of the floored amounts or the three numbers won't reconcile (Tim, 2026-07-10).
+	var delta := (kept - _base_amount) if _format_as_money else (floorf(kept) - floorf(_base_amount))
+
+	# Reset the row key/value colors that the branches below may tint, so nothing carries over.
+	_stat_impact_key.add_theme_color_override("font_color", UiPalette.NAVY)
+
+	if mult > 1.0 + 0.001:
+		_result_verdict_label.text = "GREAT ROUND"
+		_result_verdict_label.add_theme_color_override("font_color", Color("#2E6FD6"))
+		_stat_impact_key.text = "Minigame bonus  (+%d%%)" % int(round((mult - 1.0) * 100.0))
+		_stat_impact_val.text = "+%s" % _format_amount(delta)
+		_stat_impact_val.add_theme_color_override("font_color", UiPalette.DARK_MONEY_GREEN)
+	elif mult < 1.0 - 0.001:
+		_result_verdict_label.text = "WEAK ROUND"
+		_result_verdict_label.add_theme_color_override("font_color", _keep_color(mult))
+		_stat_impact_key.text = "Weak round  (kept %d%%)" % int(round(mult * 100.0))
+		_stat_impact_val.text = "−%s" % _format_amount(-delta)
+		_stat_impact_val.add_theme_color_override("font_color", UiPalette.KETCHUP_RED)
+	else:
+		_result_verdict_label.text = "FULL RESULT"
+		_result_verdict_label.add_theme_color_override("font_color", UiPalette.DARK_MONEY_GREEN)
+		_stat_impact_key.text = "Kept in full"
+		_stat_impact_val.text = "—"
+		_stat_impact_val.add_theme_color_override("font_color", UiPalette.NAVY)
+
+	_stat_base_key.text = _base_label
+	_stat_base_val.text = _format_amount(_base_amount)
+	_stat_total_key.text = _total_label
+	_stat_total_val.text = _format_amount(kept)
+
+
+## Fill the statement for the upside-only First Contact round: the property's base income, the terms
+## you negotiated (income boost + faster cycles, or none), and the opening income that buys — matching
+## exactly what Main applies to the property (both read FIRST_CONTACT_BUCKETS).
+func _fill_first_contact_statement(mult: float) -> void:
+	var bucket := first_contact_bucket(mult, _bonus_max)
+	var info: Dictionary = FIRST_CONTACT_BUCKETS[bucket]
+	var income_mult := float(info["income"])
+	var cycle_mult := float(info["cycle"])
+
+	_result_verdict_label.text = String(info["label"])
+	_result_verdict_label.add_theme_color_override(
+		"font_color", UiPalette.DARK_MONEY_GREEN if bucket == 0 else UiPalette.ATOMIC_TEAL)
+
+	_stat_base_key.text = _base_label  # "Base income"
+	_stat_base_val.text = "%s / cycle" % _format_amount(_base_amount)
+	_stat_base_val.add_theme_color_override("font_color", UiPalette.NAVY)
+
+	if bucket == 0:
+		# No bonus: opens at its base income, and there is nothing extra to show on the second line.
+		_stat_impact_key.text = "Negotiated terms"
+		_stat_impact_val.text = "no bonus"
+		_stat_impact_val.add_theme_color_override("font_color", UiPalette.NAVY)
+		_stat_impact2_row.visible = false
+	else:
+		_stat_impact_key.text = "Income boost"
+		_stat_impact_val.text = "+%d%%" % int(round((income_mult - 1.0) * 100.0))
+		_stat_impact_val.add_theme_color_override("font_color", UiPalette.ATOMIC_TEAL)
+		_stat_impact2_key.text = "Faster cycles"
+		_stat_impact2_val.text = "−%d%%" % int(round((1.0 - cycle_mult) * 100.0))
+		_stat_impact2_val.add_theme_color_override("font_color", UiPalette.ATOMIC_TEAL)
+		_stat_impact2_row.visible = true
+
+	_stat_impact_key.add_theme_color_override("font_color", UiPalette.NAVY)
+	_stat_total_key.text = _total_label  # "Opening income"
+	_stat_total_val.text = "%s / cycle" % _format_amount(_base_amount * income_mult)
 
 
 ## Show/hide the Legacy-gem bonus line on the result screen. Only appears when the player actually
@@ -1382,37 +1513,14 @@ func _legacy_bonus_amount(mult: float) -> int:
 	return maxi(1, int(floor(raw)))
 
 
-## Result labels for the upside-only First Contact round: announce the BUCKET the run earned (none /
-## low / medium / high) and the opening income it buys, matching exactly what Main applies to the
-## property (both read FIRST_CONTACT_BUCKETS). _base_amount is the property's per-unit base income.
-func _set_first_contact_result_labels(mult: float) -> void:
-	var bucket := first_contact_bucket(mult, _bonus_max)
-	var info: Dictionary = FIRST_CONTACT_BUCKETS[bucket]
-	_result_mult_label.text = String(info["label"])
-	# Base is calm green (no loss — it opens at its full base income); any bonus is the teal "extra".
-	# DARK_MONEY_GREEN so the base reads clearly on the cream card (Tim, 2026-07-02).
-	_result_mult_label.add_theme_color_override(
-		"font_color", UiPalette.DARK_MONEY_GREEN if bucket == 0 else UiPalette.ATOMIC_TEAL
-	)
-	var income_mult := float(info["income"])
-	if bucket == 0:
-		_result_amount_label.text = "Opens at %s / cycle" % _format_amount(_base_amount)
-	else:
-		_result_amount_label.text = "%s / cycle  (+%d%% income, −%d%% cycle)" % [
-			_format_amount(_base_amount * income_mult),
-			int(round((income_mult - 1.0) * 100.0)),
-			int(round((1.0 - float(info["cycle"])) * 100.0)),
-		]
-
-
-## The payoff beat (plan §1): fade the result view in, then bloom the multiplier and amount with a
-## brief scale pop and a flash to white, so the reveal reads as a reward rather than an instant cut.
+## The payoff beat (plan §1): fade the result view in, then bloom the verdict and the total figure
+## with a brief scale pop and a flash to white, so the reveal reads as a reward, not an instant cut.
 func _animate_result() -> void:
 	_result_view.modulate = Color(1, 1, 1, 0)
 	var reveal := create_tween()
 	reveal.tween_property(_result_view, "modulate:a", 1.0, 0.25)
 
-	for label in [_result_mult_label, _result_amount_label]:
+	for label in [_result_verdict_label, _stat_total_val]:
 		# Capture each label's settled color so the white flash can resolve back to it.
 		var final_color: Color = label.get_theme_color("font_color")
 		label.pivot_offset = label.size / 2.0

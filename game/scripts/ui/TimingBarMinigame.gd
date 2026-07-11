@@ -270,6 +270,19 @@ func _on_lock() -> void:
 	_accuracy_sum += accuracy
 	_locks += 1
 	_success_count += 1
+	# Success chip floating up from the marker, with text by how clean the lock was, so a good lock
+	# reads at a glance like Match-3's match chips (Tim, 2026-07-11). A dead-center lock earns the gold
+	# "PERFECT!"; the rest are green. Shown even when this same lock grabs a legacy gem — the two cues
+	# stack (gold gem burst + this chip), which reads as an extra-good moment, not clutter.
+	if _bar != null:
+		var chip_text := "NICE!"
+		var chip_color := UiPalette.MONEY_GREEN
+		if accuracy >= 0.9:
+			chip_text = "PERFECT!"
+			chip_color = UiPalette.MUSTARD_GOLD
+		elif accuracy >= 0.6:
+			chip_text = "GREAT!"
+		FloatingChip.spawn(_bar, Vector2(_marker_pos * _bar.size.x, _bar.size.y * 0.5), chip_text, chip_color)
 	_marker_speed *= SPEED_RAMP
 	if challenge_mode:
 		# Endless play would ramp the sweep past what's hittable; hold it at the cap so the run stays

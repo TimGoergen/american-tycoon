@@ -259,9 +259,16 @@ func _on_coin_caught(coin: Button) -> void:
 	_coins.erase(coin)
 	coin.queue_free()
 	_spawn_catch_effect(center, coin.size.x)
+	# A context-specific result chip on every catch, matching how Match-3 badges a good action
+	# (Tim, 2026-07-11 — every minigame shows success feedback like Match-3). A legacy coin is the
+	# exceptional/bonus catch, so it gets a gold "JACKPOT!" chip; an ordinary catch gets a green
+	# "CAUGHT!". This stacks on top of the existing +1 pop and the legacy gem cue by design.
 	if was_legacy:
+		FloatingChip.spawn(_area, center, "JACKPOT!", UiPalette.MUSTARD_GOLD)
 		collect_legacy_gem()
 		_spawn_legacy_catch_effect(center, coin.size.x)
+	else:
+		FloatingChip.spawn(_area, center, "CAUGHT!", UiPalette.MONEY_GREEN)
 
 
 ## Catch reward: a white bloom that swells and fades where the coin was, plus a green "+1" that

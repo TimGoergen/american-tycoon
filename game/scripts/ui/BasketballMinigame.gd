@@ -555,6 +555,17 @@ func _resolve_hoop(ball: Dictionary, prev: Vector2, bounds: Vector2) -> bool:
 		_baskets += 1
 		_hoop_flash = 1.0
 		_celebrate_basket()  # net swing + score-ring pop + a small confetti spray (cosmetic only)
+		# Result chip: pop a short badge over the hoop on a made basket, so every minigame gives the
+		# same Match-3-style success feedback (Tim, 2026-07-11 - every minigame shows success feedback
+		# like Match-3). A CLEAN swish - the ball dropped through near the CENTER of the mouth, well
+		# clear of the rim posts - reads as gold "SWISH!"; any other made basket is a green "SCORE!".
+		# "Clean" is judged against half the mouth half-width, so only a truly centered drop earns the
+		# gold. The chip centers just above the rim (drawn over the confetti and net).
+		var drop_offset := absf(ball["pos"].x - _hoop_pos.x)
+		var is_swish := drop_offset <= RIM_HALF_WIDTH * 0.5
+		var chip_text := "SWISH!" if is_swish else "SCORE!"
+		var chip_color := UiPalette.MUSTARD_GOLD if is_swish else UiPalette.MONEY_GREEN
+		FloatingChip.spawn(_play, _hoop_pos - Vector2(0.0, HOOP_RY + 40.0), chip_text, chip_color)
 		# Legacy gem: earned only if THIS shot also passed through the gem (both in one shot). The
 		# host gates the actual payout by the round result; here we just record the collection.
 		if _legacy_gem_active and _passed_through_gem_this_shot:

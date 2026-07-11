@@ -868,52 +868,17 @@ func _spawn_match_badge(group: Array, is_avoid: bool, is_legacy: bool = false) -
 		sum += _cell_pos(cell[0], cell[1])
 	var center: Vector2 = sum / float(group.size()) + Vector2(CELL_SIZE, CELL_SIZE) / 2.0
 
-	var chip := PanelContainer.new()
-	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	chip.z_index = 3  # above gems and the selection ring
-
+	# The chip's text and color depend on the match: gold "LEGACY GEM!" for a legacy match, red for
+	# a match that hit the AVOID gem, green with the gem count for a clean match. The shared helper
+	# (FloatingChip) owns the look and float-up animation so every minigame's feedback matches.
 	var chip_color := UiPalette.MONEY_GREEN
+	var chip_text := "%d" % group.size()  # merged L/T/+ shapes count as one big match
 	if is_legacy:
 		chip_color = UiPalette.MUSTARD_GOLD
+		chip_text = "LEGACY GEM!"
 	elif is_avoid:
 		chip_color = UiPalette.KETCHUP_RED
-	var box := StyleBoxFlat.new()
-	box.bg_color = chip_color
-	box.set_corner_radius_all(14)
-	box.border_color = UiPalette.INK_NAVY
-	box.set_border_width_all(3)
-	box.content_margin_left = 16
-	box.content_margin_right = 16
-	box.content_margin_top = 8
-	box.content_margin_bottom = 8
-	chip.add_theme_stylebox_override("panel", box)
-
-	var label := Label.new()
-	if is_legacy:
-		label.text = "LEGACY GEM!"
-	else:
-		# The count of gems in this match (merged L/T/+ shapes count as one big match).
-		label.text = "%d" % group.size()
-	label.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
-	label.add_theme_color_override("font_color", Color.WHITE)
-	label.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
-	label.add_theme_constant_override("outline_size", 6)
-	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	chip.add_child(label)
-
-	# Size the chip to its text, then center it on the group and float it up as it fades.
-	_board_area.add_child(chip)
-	chip.reset_size()
-	chip.position = center - chip.size / 2.0
-	chip.pivot_offset = chip.size / 2.0
-	chip.scale = Vector2(0.7, 0.7)
-
-	var tween := create_tween().set_parallel(true)
-	tween.tween_property(chip, "scale", Vector2.ONE, 0.18) \
-			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tween.tween_property(chip, "position:y", chip.position.y - 44.0, 0.7)
-	tween.tween_property(chip, "modulate:a", 0.0, 0.7).set_delay(0.25)
-	tween.chain().tween_callback(chip.queue_free)
+	FloatingChip.spawn(_board_area, center, chip_text, chip_color)
 
 
 ## Pop a Legacy gem into the swap's target cell after a 5+ match. The board already set that cell to

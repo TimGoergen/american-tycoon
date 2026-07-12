@@ -72,6 +72,15 @@ var _swipe_start := Vector2.ZERO
 var _swipe_delta := Vector2.ZERO
 const EPOCH_SWIPE_THRESHOLD := 60.0  # px of horizontal travel to count as a tab swipe
 
+# "New ventures" nudge: pop a modal the first time a tab the player hasn't opened has a property
+# they can afford, so the pager's hidden tabs stay discoverable (Tim 2026-07-11).
+var _venture_overlay: NewVenturesOverlay
+var _tab_seen: Array = []             # tabs the player has viewed — a seen tab is never nudged
+var _tab_nudged: Array = []           # tabs already nudged — fire at most once each
+var _pending_venture_tab := -1        # the tab the live nudge points at (for its "SHOW ME")
+var _venture_check_timer := 0.0
+const VENTURE_CHECK_INTERVAL := 0.5   # how often to scan for a newly-affordable unopened tab
+
 # Bottom tab bar (UI Notes §7). The four surfaces share one content slot; one is
 # visible at a time, switched by the icon buttons pinned along the bottom.
 const TAB_PROPERTY := 0
@@ -166,7 +175,8 @@ func _process(delta: float) -> void:
 	# (The Balance Tuning panel is no longer in this list: embedded in the Settings tab,
 	# it neither covers the game nor needs the freeze — Apply saves and reloads anyway.)
 	var modal_up := _will_screen.visible or _first_contact_overlay.visible \
-			or _minigame_screen.visible or _minigame_review_screen.visible
+			or _minigame_screen.visible or _minigame_review_screen.visible \
+			or _venture_overlay.visible
 	var overlay_up := modal_up or _welcome_overlay.visible
 	SecondaryTapButton.enabled = _active_tab == TAB_PROPERTY and not overlay_up
 
@@ -215,6 +225,12 @@ func _process(delta: float) -> void:
 	# Cash keeps updating every frame so the balance still counts up smoothly.
 	_hero_stat.set_cash(game.economy.cash)
 	_hero_stat.set_frenzy_glow(game.frenzy.get_multiplier() > 1.0)
+
+	# Nudge the player toward an unopened tab the moment its first venture becomes affordable.
+	_venture_check_timer += delta
+	if _venture_check_timer >= VENTURE_CHECK_INTERVAL:
+		_venture_check_timer = 0.0
+		_check_new_ventures()
 
 	# The current epoch name rides on the hero stat (replaced the heir name, Tim 2026-06-27);
 	# the prestige-exit button and the Estate Office button (with its Legacy balance) reflect
@@ -472,6 +488,13 @@ func _build_ui() -> void:
 	_about_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_about_screen)
 
+	# The "new ventures" nudge (epoch pager discoverability), hidden until a next tab first
+	# becomes affordable. SHOW ME jumps to it; NOT NOW closes.
+	_venture_overlay = NewVenturesOverlay.new()
+	_venture_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_venture_overlay.show_requested.connect(_on_venture_show_requested)
+	add_child(_venture_overlay)
+
 	# The first-contact overlay (GDD §6.2): shown when a generation consumes the current
 	# economy and reaches the next alien epoch. Main freezes the economy while it is up so
 	# the beat lands. EpochState.contact_made fires it; it is rebuilt with the generation
@@ -628,6 +651,11 @@ func _build_property_tab() -> Control:
 		_rows.append(row)
 
 	# Open on the deepest reached epoch (where the player is actively buying) and paint the pager.
+	# The seen/nudged trackers gate the "new ventures" nudge (one per unopened tab).
+	_tab_seen.resize(_epoch_tab_count())
+	_tab_seen.fill(false)
+	_tab_nudged.resize(_epoch_tab_count())
+	_tab_nudged.fill(false)
 	_set_epoch_tab(_epoch_default_tab())
 
 	_wage_panel = WagePanel.new()
@@ -751,6 +779,9 @@ func _step_epoch_tab(delta: int) -> void:
 ## repaint the pager. Safe to call before the rows exist (used from _on_contact_made too).
 func _set_epoch_tab(tab: int) -> void:
 	_epoch_tab = clampi(tab, 0, _epoch_tab_max())
+	# Viewing a tab marks it seen, so it never triggers the "new ventures" nudge afterward.
+	if _epoch_tab < _tab_seen.size():
+		_tab_seen[_epoch_tab] = true
 	for row_variant in _rows:
 		var row := row_variant as PropertyRow
 		row.set_tab_active(_epoch_tab_of(row.prop_index) == _epoch_tab)
@@ -806,6 +837,46 @@ func _any_row_holding() -> bool:
 		if (row_variant as PropertyRow).is_hold_active():
 			return true
 	return false
+
+
+## Nudge the player toward the lowest UNOPENED, reachable tab whose cheapest venture they can now
+## afford (and own none of) — a one-time pointer so the pager's hidden tabs stay discoverable.
+func _check_new_ventures() -> void:
+	if _tab_seen.is_empty() or _venture_overlay.visible:
+		return
+	for tab in range(_epoch_tab_count()):
+		if tab == _epoch_tab or tab > _epoch_tab_max():
+			continue  # the tab you're already on, or one not opened yet
+		if bool(_tab_seen[tab]) or bool(_tab_nudged[tab]):
+			continue
+		if _tab_is_new_and_affordable(tab):
+			_tab_nudged[tab] = true
+			_pending_venture_tab = tab
+			_venture_overlay.show_for(_epoch_tab_name(tab), _epoch_tab_sub(tab))
+			return  # one nudge at a time
+
+
+## True when the player owns NOTHING in `tab` yet and can afford its cheapest property — i.e. the
+## tab has just become a place worth visiting.
+func _tab_is_new_and_affordable(tab: int) -> bool:
+	var cheapest := INF
+	var found := false
+	for i in range(game.economy.properties.size()):
+		if _epoch_tab_of(i) != tab:
+			continue
+		var prop := game.economy.properties[i] as PropertyState
+		if prop.units_owned > 0:
+			return false  # already engaged with this tab — not "new"
+		cheapest = minf(cheapest, prop.get_bulk_cost(1))
+		found = true
+	return found and game.economy.cash >= cheapest
+
+
+## "SHOW ME" on the nudge — page the player to the tab it pointed at.
+func _on_venture_show_requested() -> void:
+	if _pending_venture_tab >= 0:
+		_set_epoch_tab(_pending_venture_tab)
+		_pending_venture_tab = -1
 
 
 ## Estate Planning tab: the prestige hub — the "Plan the Estate" succession action on

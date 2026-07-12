@@ -75,6 +75,7 @@ const EPOCH_SWIPE_THRESHOLD := 60.0  # px of horizontal travel to count as a tab
 # "New ventures" nudge: pop a modal the first time a tab the player hasn't opened has a property
 # they can afford, so the pager's hidden tabs stay discoverable (Tim 2026-07-11).
 var _venture_overlay: NewVenturesOverlay
+var _tab_unlocked: Array = []         # tabs the player can open yet (persisted once true)
 var _tab_seen: Array = []             # tabs the player has viewed — a seen tab is never nudged
 var _tab_nudged: Array = []           # tabs already nudged — fire at most once each
 var _pending_venture_tab := -1        # the tab the live nudge points at (for its "SHOW ME")
@@ -230,6 +231,7 @@ func _process(delta: float) -> void:
 	_venture_check_timer += delta
 	if _venture_check_timer >= VENTURE_CHECK_INTERVAL:
 		_venture_check_timer = 0.0
+		_update_tab_unlocks()
 		_check_new_ventures()
 
 	# The current epoch name rides on the hero stat (replaced the heir name, Tim 2026-06-27);
@@ -650,12 +652,17 @@ func _build_property_tab() -> Control:
 		ladder.add_child(row)
 		_rows.append(row)
 
-	# Open on the deepest reached epoch (where the player is actively buying) and paint the pager.
-	# The seen/nudged trackers gate the "new ventures" nudge (one per unopened tab).
+	# Tab gating + the "new ventures" nudge trackers. Blue Collar (tab 0) always starts open;
+	# _update_tab_unlocks() then opens any tab the current save already qualifies for.
+	_tab_unlocked.resize(_epoch_tab_count())
+	_tab_unlocked.fill(false)
+	_tab_unlocked[0] = true
 	_tab_seen.resize(_epoch_tab_count())
 	_tab_seen.fill(false)
 	_tab_nudged.resize(_epoch_tab_count())
 	_tab_nudged.fill(false)
+	_update_tab_unlocks()
+	# Open on the deepest UNLOCKED tab (where the player is actively buying) and paint the pager.
 	_set_epoch_tab(_epoch_default_tab())
 
 	_wage_panel = WagePanel.new()
@@ -687,19 +694,59 @@ func _epoch_tab_of(prop_index: int) -> int:
 	return (prop.config as PropertyConfig).unlock_tier
 
 
-## The highest tab the player can currently open (the navigation upper bound). BOTH Earth collar
-## tabs (0, 1) are always open; alien epoch tabs open one at a time at First Contact. So the max
-## is the reached epoch, but never below 1 (White Collar is reachable from the very start).
+## The highest tab the player can currently open (the navigation upper bound) — the deepest
+## UNLOCKED tab. Tabs unlock in order (you can afford White Collar long before reaching epoch 2),
+## so the deepest unlocked index is also the count of open tabs. See _update_tab_unlocks().
 func _epoch_tab_max() -> int:
-	return maxi(1, game.epoch.current_tier)
+	var highest := 0
+	for tab in range(_tab_unlocked.size()):
+		if bool(_tab_unlocked[tab]):
+			highest = tab
+	return highest
 
 
-## The tab to open on load: the deepest alien epoch if one is reached, else Earth Blue Collar
-## (tab 0) — the start of the ladder, where a fresh founder begins.
+## The tab to open on load: the deepest unlocked tab — where the player is actively buying.
 func _epoch_default_tab() -> int:
-	if game.epoch.current_tier >= 2:
-		return game.epoch.current_tier
-	return 0
+	return _epoch_tab_max()
+
+
+## Open any still-locked tab that now qualifies (persisted once open). Blue Collar is always open;
+## Earth WHITE COLLAR opens the first time its cheapest property is affordable (or already owned —
+## Tim 2026-07-12); an alien epoch tab opens at First Contact (its epoch reached). Repaints the
+## pager when something opens so the new dot lights up. Idempotent — an open tab never re-locks.
+func _update_tab_unlocks() -> void:
+	if _tab_unlocked.is_empty():
+		return
+	var changed := false
+	for tab in range(_tab_unlocked.size()):
+		if bool(_tab_unlocked[tab]):
+			continue
+		var should_open := false
+		if tab == 0:
+			should_open = true
+		elif tab >= 2:
+			should_open = game.epoch.current_tier >= tab  # alien: First Contact opens it
+		else:
+			should_open = _tab_affordable_or_owned(tab)   # White Collar: first affordable
+		if should_open:
+			_tab_unlocked[tab] = true
+			changed = true
+	if changed:
+		_update_epoch_pager()
+
+
+## True when the player owns any property in `tab`, or can afford its cheapest — the condition
+## for a non-epoch tab (White Collar) to open.
+func _tab_affordable_or_owned(tab: int) -> bool:
+	var cheapest := INF
+	for i in range(game.economy.properties.size()):
+		if _epoch_tab_of(i) != tab:
+			continue
+		var prop := game.economy.properties[i] as PropertyState
+		if prop.units_owned > 0:
+			return true
+		cheapest = minf(cheapest, prop.get_bulk_cost(1))
+	return game.economy.cash >= cheapest
 
 
 ## The big label for a tab: "EARTH" for the two Earth tabs, else the civilization's name.
@@ -845,8 +892,8 @@ func _check_new_ventures() -> void:
 	if _tab_seen.is_empty() or _venture_overlay.visible:
 		return
 	for tab in range(_epoch_tab_count()):
-		if tab == _epoch_tab or tab > _epoch_tab_max():
-			continue  # the tab you're already on, or one not opened yet
+		if tab == _epoch_tab or not bool(_tab_unlocked[tab]):
+			continue  # the tab you're already on, or one not open yet
 		if bool(_tab_seen[tab]) or bool(_tab_nudged[tab]):
 			continue
 		if _tab_is_new_and_affordable(tab):
@@ -1328,8 +1375,9 @@ func _on_contact_made(new_tier: int) -> void:
 	# Swap the play-field backdrop to match the newly reached epoch before the beat plays,
 	# so when the first-contact overlay clears the player is looking at the new world.
 	_background.texture = load(_background_path_for_tier(new_tier))
-	# The new epoch just opened its pager tab — jump to it so that when the contact beat (and any
-	# trade-deal minigame) clears, the player is looking at the new civilization's properties.
+	# The new epoch just opened its pager tab — unlock it, then jump to it so that when the contact
+	# beat (and any trade-deal minigame) clears, the player is looking at the new civ's properties.
+	_update_tab_unlocks()
 	_set_epoch_tab(new_tier)
 	_pending_contact_tier = new_tier
 	_first_contact_overlay.show_contact(new_tier)

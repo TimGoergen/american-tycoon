@@ -24,10 +24,13 @@ class_name EpochCatalog
 # Chronophage were added in Phase 4).
 #
 # EPOCH PACING (Continuous-ladder rework, 2026-07-12 — Tim's "each new property is a ~7×
-# jump from the last, like a new property on Earth" model). The 37 properties are now ONE
-# continuous geometric ladder at ~7×/rung: Earth's 12 are unchanged (they already run ~7×/rung,
-# ATM $50 → Executive Assets $100B) and the 25 alien rungs CONTINUE it from Executive Assets,
-# 5 rungs per epoch. Epochs are thematic milestones on the ladder, not magnitude cliffs.
+# jump from the last, like a new property on Earth" model). The 37 properties climb at ~7×/rung:
+# Earth's 12 are unchanged (already ~7×/rung, ATM $50 → Executive Assets $100B); the 25 alien rungs
+# continue that ×7 progression, 5 rungs per epoch, but ANCHORED to the player's epoch-entry WEALTH
+# (not to the last Earth property) so each flagship is a real SAVE-UP: flagship(T) ≈ 10% of the
+# previous threshold (≈ cash on hand), income anchored separately for a ~3× step-up. So it is ×7
+# within and across alien epochs, with one "catch up to your wealth" jump at the Earth→alien
+# boundary (Tim 2026-07-12: the flagship must not be pocket change on arrival).
 #   economy_scale = 7^(5·(tier-1)) = (7^5)^(tier-1) -> 1, 16807, 2.82e8, 4.75e12, 7.98e16, 1.34e21
 # i.e. the earn-to-clear threshold grows one 5-rung ladder block per epoch, matching how far the
 # property magnitudes climb in that epoch — so pacing stays ~flat and you can never trivially buy

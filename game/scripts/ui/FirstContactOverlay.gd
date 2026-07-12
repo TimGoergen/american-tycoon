@@ -417,8 +417,11 @@ func _format_multiplier(value: float) -> String:
 func _input(event: InputEvent) -> void:
 	if not visible or not _proceed_button.disabled:
 		return
-	var pressed := (event is InputEventScreenTouch and event.pressed) \
-			or (event is InputEventMouseButton and event.pressed)
+	var pressed := false
+	if event is InputEventScreenTouch:
+		pressed = (event as InputEventScreenTouch).pressed
+	elif event is InputEventMouseButton:
+		pressed = (event as InputEventMouseButton).pressed
 	if pressed:
 		_skip_reveal()
 		get_viewport().set_input_as_handled()

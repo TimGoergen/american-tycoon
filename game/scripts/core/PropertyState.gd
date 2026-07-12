@@ -394,14 +394,28 @@ func start_cycle() -> void:
 		_start_cycle_internal()
 
 
-## Rush verb (Layer 2): tap on a running cycle advances it by RUSH_PCT of cycle_length.
-func rush_cycle() -> void:
+## Rush verb (Layer 2): tap/hold on a running cycle advances it by RUSH_PCT of cycle_length. If
+## the advance FILLS the cycle, it completes RIGHT NOW — collects (at the given frenzy multiplier),
+## resets, and auto-restarts if staffed — rather than leaving the bar sitting full until the next
+## 10 Hz logic tick collects it. That tick delay was making rushed income visibly lag the rushed
+## cycles (Tim 2026-07-11). Returns the income earned by this rush (0 unless a cycle completed).
+func rush_cycle(income_multiplier: float = 1.0) -> float:
 	if not is_cycle_running:
-		return
+		return 0.0
 	var effective_length := _effective_cycle_length()
 	# The Legacy "Strong-Arm Tactics" upgrade makes each rush advance the cycle further.
 	var rush_fraction := tuning.rush_pct * rush_power_multiplier
-	cycle_progress = minf(cycle_progress + rush_fraction * effective_length, effective_length)
+	cycle_progress += rush_fraction * effective_length
+	if cycle_progress < effective_length:
+		return 0.0
+	# The rush filled the cycle — pay it out now, mirroring tick()'s completion branch.
+	cycle_progress = 0.0
+	var earned := _collect(income_multiplier)
+	if is_staffed:
+		_start_cycle_internal()  # auto-restart, same as the tick
+	else:
+		is_cycle_running = false  # manual: stops after one pay (a held pulse re-taps to restart)
+	return earned
 
 
 # ---------------------------------------------------------------------------

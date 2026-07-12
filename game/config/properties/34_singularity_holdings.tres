@@ -4,12 +4,12 @@
 
 [resource]
 script = ExtResource("1")
-property_id = 22
-display_name = "Algorithm Mines"
+property_id = 34
+display_name = "Singularity Holdings"
 unlock_tier = 3
-base_cost = 3125000000000000.0
+base_cost = 23630000000000000.0
 r0 = 1.09
-base_income_per_unit = 6938000000000000.0
-base_cycle_length = 216.0
-staffer_name = "Mining Subroutine"
+base_income_per_unit = 52470000000000000.0
+base_cycle_length = 192.0
+staffer_name = "Singularity Overmind"
 accent_color = Color(0.2, 0.7, 0.75, 1)

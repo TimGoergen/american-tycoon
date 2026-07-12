@@ -126,7 +126,8 @@ func tap_property(prop_index: int) -> void:
 	frenzy.on_tap()
 	var prop := economy.properties[prop_index] as PropertyState
 	if prop.is_cycle_running:
-		prop.rush_cycle()
+		# Rush pays at the current frenzy multiplier and credits immediately if it completes.
+		economy.credit_property_income(prop.rush_cycle(frenzy.get_multiplier()))
 	else:
 		prop.start_cycle()
 
@@ -139,7 +140,9 @@ func hold_rush_property(prop_index: int) -> void:
 	if not prop.is_cycle_running:
 		return
 	frenzy.on_tap(tuning.frenzy_fill_hold_factor)
-	prop.rush_cycle()
+	# Rush pays at the current frenzy multiplier and credits immediately if it completes,
+	# so the cash keeps pace with the rushed bar instead of waiting for the next tick.
+	economy.credit_property_income(prop.rush_cycle(frenzy.get_multiplier()))
 
 
 ## Pop the frenzy meter if allowed. Returns true if a burn started.

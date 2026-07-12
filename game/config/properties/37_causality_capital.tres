@@ -4,12 +4,12 @@
 
 [resource]
 script = ExtResource("1")
-property_id = 30
-display_name = "Deadline Futures"
+property_id = 37
+display_name = "Causality Capital"
 unlock_tier = 6
-base_cost = 286299999999999970000.0
+base_cost = 5953999999999999500000.0
 r0 = 1.09
-base_income_per_unit = 635600000000000000000.0
-base_cycle_length = 228.0
-staffer_name = "Deadline Enforcer"
+base_income_per_unit = 13220000000000001000000.0
+base_cycle_length = 192.0
+staffer_name = "Sovereign of Cause & Effect"
 accent_color = Color(0.4, 0.6, 0.85, 1)

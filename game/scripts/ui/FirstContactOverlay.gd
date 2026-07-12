@@ -50,6 +50,10 @@ var _hail_full_text := ""
 ## created — there is no scene node to free, so we must hold the reference to stop it).
 var _reveal_tween: Tween = null
 
+## The hail's typewriter runs on its own short tween; held so a tap-to-skip can .kill() it (like
+## _reveal_tween, a tween has no scene node to free, so we must keep the handle to stop it).
+var _typewriter_tween: Tween = null
+
 
 func _ready() -> void:
 	# Black field framing a cream rounded viewing area — the same full-screen frame the main
@@ -375,8 +379,8 @@ func _typewriter_duration() -> float:
 func _start_typewriter() -> void:
 	# The full text + visible_ratio 0 were set up front (see show_contact) so the layout is already
 	# stable and reserved; just walk the ratio open in place — no size change, nothing below moves.
-	var typer := create_tween()
-	typer.tween_property(_hail_label, "visible_ratio", 1.0, _typewriter_duration())
+	_typewriter_tween = create_tween()
+	_typewriter_tween.tween_property(_hail_label, "visible_ratio", 1.0, _typewriter_duration())
 
 
 ## The reveal is over: fade the button up and enable it. From here the player can answer.
@@ -403,6 +407,41 @@ func _format_multiplier(value: float) -> String:
 		if count % 3 == 0 and i > 0:
 			grouped = "," + grouped
 	return grouped
+
+
+## Tap-to-skip: a press anywhere WHILE the staged reveal is still running snaps the whole card to
+## its finished state and lights the ANSWER THE CALL button, so a player who doesn't want to wait
+## out the animation isn't forced to (Tim 2026-07-11). Once the reveal is done (button live), taps
+## fall through normally so the button handles them. The event is consumed so this same tap doesn't
+## also press the just-revealed button (which would skip AND dismiss in one touch).
+func _input(event: InputEvent) -> void:
+	if not visible or not _proceed_button.disabled:
+		return
+	var pressed := false
+	if event is InputEventScreenTouch:
+		pressed = (event as InputEventScreenTouch).pressed
+	elif event is InputEventMouseButton:
+		pressed = (event as InputEventMouseButton).pressed
+	if pressed:
+		_skip_reveal()
+		get_viewport().set_input_as_handled()
+
+
+## Snap every staged line to fully visible, complete the typewriter, and reveal the button — the
+## finished state of the reveal — killing the running tweens so they can't animate over it.
+func _skip_reveal() -> void:
+	if _reveal_tween != null and _reveal_tween.is_valid():
+		_reveal_tween.kill()
+	_reveal_tween = null
+	if _typewriter_tween != null and _typewriter_tween.is_valid():
+		_typewriter_tween.kill()
+	_typewriter_tween = null
+	for node in _staged_nodes:
+		node.modulate.a = 1.0
+		node.scale = Vector2.ONE
+	_hail_label.visible_ratio = 1.0
+	_proceed_button.modulate.a = 1.0
+	_proceed_button.disabled = false
 
 
 func _on_proceed_pressed() -> void:

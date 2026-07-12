@@ -55,6 +55,33 @@ var _lifetime_earned_label: RichTextLabel
 var _shown_lifetime_earned := -1
 var _rows: Array = []
 
+# Epoch PAGER (Tim 2026-07-11): the property ladder is split into epoch "tabs" — Earth Blue
+# Collar (indices 0-5), Earth White Collar (6-11), then one tab per alien epoch. The pager
+# shows ONE tab at a time (big label + ‹ › arrows + dots + swipe), so only that tab's ~6 rows
+# ever draw (the CPU win at 37 properties). Tab index: 0/1 = Earth, 2..tier_count = epoch N.
+var _epoch_tab := 0
+var _epoch_pager_label: Label       # the big civilization / "EARTH" name
+var _epoch_pager_sub: Label         # the "Blue Collar" / "White Collar" subtitle (blank for aliens)
+var _epoch_prev_button: Button
+var _epoch_next_button: Button
+var _epoch_pager_dots: EpochPagerDots
+var _epoch_pager_box: Control       # the pager header (label + arrows + dots)
+var _ladder_area: Control           # the property-list region; swipes over either change tabs
+var _swipe_tracking := false        # a touch is down on the ladder, tracking for a horizontal swipe
+var _swipe_start := Vector2.ZERO
+var _swipe_delta := Vector2.ZERO
+const EPOCH_SWIPE_THRESHOLD := 60.0  # px of horizontal travel to count as a tab swipe
+
+# "New ventures" nudge: pop a modal the first time a tab the player hasn't opened has a property
+# they can afford, so the pager's hidden tabs stay discoverable (Tim 2026-07-11).
+var _venture_overlay: NewVenturesOverlay
+var _tab_unlocked: Array = []         # tabs the player can open yet (persisted once true)
+var _tab_seen: Array = []             # tabs the player has viewed — a seen tab is never nudged
+var _tab_nudged: Array = []           # tabs already nudged — fire at most once each
+var _pending_venture_tab := -1        # the tab the live nudge points at (for its "SHOW ME")
+var _venture_check_timer := 0.0
+const VENTURE_CHECK_INTERVAL := 0.5   # how often to scan for a newly-affordable unopened tab
+
 # Bottom tab bar (UI Notes §7). The four surfaces share one content slot; one is
 # visible at a time, switched by the icon buttons pinned along the bottom.
 const TAB_PROPERTY := 0
@@ -149,7 +176,8 @@ func _process(delta: float) -> void:
 	# (The Balance Tuning panel is no longer in this list: embedded in the Settings tab,
 	# it neither covers the game nor needs the freeze — Apply saves and reloads anyway.)
 	var modal_up := _will_screen.visible or _first_contact_overlay.visible \
-			or _minigame_screen.visible or _minigame_review_screen.visible
+			or _minigame_screen.visible or _minigame_review_screen.visible \
+			or _venture_overlay.visible
 	var overlay_up := modal_up or _welcome_overlay.visible
 	SecondaryTapButton.enabled = _active_tab == TAB_PROPERTY and not overlay_up
 
@@ -198,6 +226,13 @@ func _process(delta: float) -> void:
 	# Cash keeps updating every frame so the balance still counts up smoothly.
 	_hero_stat.set_cash(game.economy.cash)
 	_hero_stat.set_frenzy_glow(game.frenzy.get_multiplier() > 1.0)
+
+	# Nudge the player toward an unopened tab the moment its first venture becomes affordable.
+	_venture_check_timer += delta
+	if _venture_check_timer >= VENTURE_CHECK_INTERVAL:
+		_venture_check_timer = 0.0
+		_update_tab_unlocks()
+		_check_new_ventures()
 
 	# The current epoch name rides on the hero stat (replaced the heir name, Tim 2026-06-27);
 	# the prestige-exit button and the Estate Office button (with its Legacy balance) reflect
@@ -455,6 +490,13 @@ func _build_ui() -> void:
 	_about_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_about_screen)
 
+	# The "new ventures" nudge (epoch pager discoverability), hidden until a next tab first
+	# becomes affordable. SHOW ME jumps to it; NOT NOW closes.
+	_venture_overlay = NewVenturesOverlay.new()
+	_venture_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_venture_overlay.show_requested.connect(_on_venture_show_requested)
+	add_child(_venture_overlay)
+
 	# The first-contact overlay (GDD §6.2): shown when a generation consumes the current
 	# economy and reaches the next alien epoch. Main freezes the economy while it is up so
 	# the beat lands. EpochState.contact_made fires it; it is rebuilt with the generation
@@ -546,6 +588,12 @@ func _build_property_tab() -> Control:
 	_buy_mode_button.add_child(SecondaryTapButton.new())
 	action_row.add_child(_buy_mode_button)
 
+	# Epoch pager header: the big epoch label + ‹ › arrows + position dots, above the ladder.
+	# Only the active epoch's rows are drawn (PropertyRow.set_tab_active), so the property
+	# count on screen stays ~6 no matter how deep the run is (Tim 2026-07-11).
+	_epoch_pager_box = _build_epoch_pager()
+	v.add_child(_epoch_pager_box)
+
 	# The property ladder: the rows in a vertical scroll (GDD §2), hosted in a plain
 	# Control so the two overlays can sit ON the list without reserving layout space:
 	# the ScrollEdgeArrows paging strips (Tim, 2026-07-05), and the GhostScrollBar.
@@ -571,6 +619,12 @@ func _build_property_tab() -> Control:
 	var ghost_bar := GhostScrollBar.new()
 	ghost_bar.setup(scroll)
 	ladder_area.add_child(ghost_bar)
+
+	# Horizontal swipes over this region change epoch tabs — detected in _input (which never
+	# consumes the event), so the row buttons and vertical scroll keep working. (An earlier
+	# MOUSE_FILTER_PASS overlay here swallowed the buy-button taps: a PASS control forwards to
+	# its PARENT, not to the buttons it covers.)
+	_ladder_area = ladder_area
 
 	var ladder := VBoxContainer.new()
 	ladder.add_theme_constant_override("separation", 10)
@@ -598,6 +652,19 @@ func _build_property_tab() -> Control:
 		ladder.add_child(row)
 		_rows.append(row)
 
+	# Tab gating + the "new ventures" nudge trackers. Blue Collar (tab 0) always starts open;
+	# _update_tab_unlocks() then opens any tab the current save already qualifies for.
+	_tab_unlocked.resize(_epoch_tab_count())
+	_tab_unlocked.fill(false)
+	_tab_unlocked[0] = true
+	_tab_seen.resize(_epoch_tab_count())
+	_tab_seen.fill(false)
+	_tab_nudged.resize(_epoch_tab_count())
+	_tab_nudged.fill(false)
+	_update_tab_unlocks()
+	# Open on the deepest UNLOCKED tab (where the player is actively buying) and paint the pager.
+	_set_epoch_tab(_epoch_default_tab())
+
 	_wage_panel = WagePanel.new()
 	_wage_panel.setup(game.wage, tuning, game.frenzy)
 	_wage_panel.wage_tapped.connect(_on_wage_tapped)
@@ -605,6 +672,262 @@ func _build_property_tab() -> Control:
 	v.add_child(_wage_panel)
 
 	return v
+
+
+# ---------------------------------------------------------------------------
+# Epoch pager — the property ladder's per-epoch tabs (Tim 2026-07-11)
+# ---------------------------------------------------------------------------
+
+## Number of pager tabs: 2 Earth (Blue/White Collar) + one per alien epoch.
+func _epoch_tab_count() -> int:
+	return EpochCatalog.tier_count() + 1
+
+
+## Which tab a property index belongs to: 0 = Earth Blue Collar (indices 0-5), 1 = Earth White
+## Collar (6-11), else the property's alien epoch (unlock_tier 2..tier_count).
+func _epoch_tab_of(prop_index: int) -> int:
+	if prop_index <= 5:
+		return 0
+	if prop_index <= 11:
+		return 1
+	var prop := game.economy.properties[prop_index] as PropertyState
+	return (prop.config as PropertyConfig).unlock_tier
+
+
+## The highest tab the player can currently open (the navigation upper bound) — the deepest
+## UNLOCKED tab. Tabs unlock in order (you can afford White Collar long before reaching epoch 2),
+## so the deepest unlocked index is also the count of open tabs. See _update_tab_unlocks().
+func _epoch_tab_max() -> int:
+	var highest := 0
+	for tab in range(_tab_unlocked.size()):
+		if bool(_tab_unlocked[tab]):
+			highest = tab
+	return highest
+
+
+## The tab to open on load: the deepest unlocked tab — where the player is actively buying.
+func _epoch_default_tab() -> int:
+	return _epoch_tab_max()
+
+
+## Open any still-locked tab that now qualifies (persisted once open). Blue Collar is always open;
+## Earth WHITE COLLAR opens the first time its cheapest property is affordable (or already owned —
+## Tim 2026-07-12); an alien epoch tab opens at First Contact (its epoch reached). Repaints the
+## pager when something opens so the new dot lights up. Idempotent — an open tab never re-locks.
+func _update_tab_unlocks() -> void:
+	if _tab_unlocked.is_empty():
+		return
+	var changed := false
+	for tab in range(_tab_unlocked.size()):
+		if bool(_tab_unlocked[tab]):
+			continue
+		var should_open := false
+		if tab == 0:
+			should_open = true
+		elif tab >= 2:
+			should_open = game.epoch.current_tier >= tab  # alien: First Contact opens it
+		else:
+			should_open = _tab_affordable_or_owned(tab)   # White Collar: first affordable
+		if should_open:
+			_tab_unlocked[tab] = true
+			changed = true
+	if changed:
+		_update_epoch_pager()
+
+
+## True when the player owns any property in `tab`, or can afford its cheapest — the condition
+## for a non-epoch tab (White Collar) to open.
+func _tab_affordable_or_owned(tab: int) -> bool:
+	var cheapest := INF
+	for i in range(game.economy.properties.size()):
+		if _epoch_tab_of(i) != tab:
+			continue
+		var prop := game.economy.properties[i] as PropertyState
+		if prop.units_owned > 0:
+			return true
+		cheapest = minf(cheapest, prop.get_bulk_cost(1))
+	return game.economy.cash >= cheapest
+
+
+## The big label for a tab: "EARTH" for the two Earth tabs, else the civilization's name.
+func _epoch_tab_name(tab: int) -> String:
+	if tab <= 1:
+		return "EARTH"
+	return String(EpochCatalog.get_epoch(tab).get("civilization", "")).to_upper()
+
+
+## The subtitle under the name: the collar for Earth, blank for aliens (the civ name stands alone).
+func _epoch_tab_sub(tab: int) -> String:
+	if tab == 0:
+		return "BLUE COLLAR"
+	if tab == 1:
+		return "WHITE COLLAR"
+	return ""
+
+
+func _build_epoch_pager() -> Control:
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 4)
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	box.add_child(row)
+
+	_epoch_prev_button = _make_pager_arrow("‹")
+	_epoch_prev_button.pressed.connect(func() -> void: _step_epoch_tab(-1))
+	row.add_child(_epoch_prev_button)
+
+	var center := VBoxContainer.new()
+	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	center.add_theme_constant_override("separation", 0)
+	row.add_child(center)
+
+	_epoch_pager_label = Label.new()
+	_epoch_pager_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_epoch_pager_label.add_theme_font_override("font", UiPalette.make_bold_font())
+	_epoch_pager_label.add_theme_font_size_override("font_size", UiPalette.FONT_DISPLAY)
+	_epoch_pager_label.add_theme_color_override("font_color", UiPalette.NAVY)
+	center.add_child(_epoch_pager_label)
+
+	_epoch_pager_sub = Label.new()
+	_epoch_pager_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_epoch_pager_sub.add_theme_font_override("font", UiPalette.make_bold_font())
+	_epoch_pager_sub.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
+	_epoch_pager_sub.add_theme_color_override("font_color", UiPalette.DARK_GOLD)
+	center.add_child(_epoch_pager_sub)
+
+	_epoch_next_button = _make_pager_arrow("›")
+	_epoch_next_button.pressed.connect(func() -> void: _step_epoch_tab(1))
+	row.add_child(_epoch_next_button)
+
+	_epoch_pager_dots = EpochPagerDots.new()
+	box.add_child(_epoch_pager_dots)
+	return box
+
+
+## A large, readable ‹ / › stepper button for the pager.
+func _make_pager_arrow(glyph: String) -> Button:
+	var b := Button.new()
+	b.text = glyph
+	b.custom_minimum_size = Vector2(96, UiPalette.STANDARD_BUTTON_HEIGHT)
+	b.add_theme_font_override("font", UiPalette.make_bold_font())
+	b.add_theme_font_size_override("font_size", UiPalette.FONT_DISPLAY)
+	UiPalette.style_button(b, false)
+	return b
+
+
+## Move the pager by `delta` tabs, clamped to [0, deepest reached epoch] so you can't page into
+## an epoch you haven't opened yet.
+func _step_epoch_tab(delta: int) -> void:
+	_set_epoch_tab(_epoch_tab + delta)
+
+
+## Switch to a tab: gate every row's liveness to it (only this tab refreshes + draws), then
+## repaint the pager. Safe to call before the rows exist (used from _on_contact_made too).
+func _set_epoch_tab(tab: int) -> void:
+	_epoch_tab = clampi(tab, 0, _epoch_tab_max())
+	# Viewing a tab marks it seen, so it never triggers the "new ventures" nudge afterward.
+	if _epoch_tab < _tab_seen.size():
+		_tab_seen[_epoch_tab] = true
+	for row_variant in _rows:
+		var row := row_variant as PropertyRow
+		row.set_tab_active(_epoch_tab_of(row.prop_index) == _epoch_tab)
+	_update_epoch_pager()
+
+
+## Repaint the pager label/subtitle, arrow enabled-state, and dots for the current tab.
+func _update_epoch_pager() -> void:
+	if _epoch_pager_label == null:
+		return
+	_epoch_pager_label.text = _epoch_tab_name(_epoch_tab)
+	var sub := _epoch_tab_sub(_epoch_tab)
+	_epoch_pager_sub.text = sub
+	_epoch_pager_sub.visible = sub != ""
+	var last := _epoch_tab_max()
+	_epoch_prev_button.disabled = _epoch_tab <= 0
+	_epoch_next_button.disabled = _epoch_tab >= last
+	# One dot per UNLOCKED tab (0..last are open, contiguous). Hide the row entirely while only
+	# one tab is open — a lone dot indicates nothing, and the arrows already read as disabled.
+	var unlocked_count := last + 1
+	_epoch_pager_dots.visible = unlocked_count > 1
+	_epoch_pager_dots.set_state(unlocked_count, _epoch_tab)
+
+
+## Read horizontal swipes over the ladder to change tabs. Handled in _input WITHOUT consuming the
+## event, so the row buttons still get their taps and the ScrollContainer still scrolls vertically:
+## a tap moves ~0px (no tab change), a big horizontal drag turns the page (and naturally cancels
+## any button press it started on). Only gestures that BEGIN on the "page" — the pager title strip
+## or the property list — count, so swipes over the income panel / wage button / bottom bar are ignored.
+func _input(event: InputEvent) -> void:
+	if _ladder_area == null or _epoch_pager_box == null:
+		return
+	if event is InputEventScreenTouch:
+		if event.pressed:
+			# Swipe anywhere on the "page" — the pager title strip OR the property list below it.
+			var region := _epoch_pager_box.get_global_rect().merge(_ladder_area.get_global_rect())
+			_swipe_tracking = region.has_point(event.position)
+			_swipe_start = event.position
+			_swipe_delta = Vector2.ZERO
+		elif _swipe_tracking:
+			_swipe_tracking = false
+			# A press held long enough to trigger a hold (auto-rush / hold-to-buy / hold-to-hire)
+			# owns the finger — don't also flip the tab if it drifted sideways (Tim 2026-07-11).
+			if _any_row_holding():
+				return
+			# Swipe LEFT (negative x) advances to the next epoch, like turning a page forward.
+			if absf(_swipe_delta.x) >= EPOCH_SWIPE_THRESHOLD and absf(_swipe_delta.x) > absf(_swipe_delta.y):
+				_step_epoch_tab(1 if _swipe_delta.x < 0.0 else -1)
+	elif event is InputEventScreenDrag and _swipe_tracking:
+		_swipe_delta = event.position - _swipe_start
+
+
+## True if any property row currently has a held action engaged (so a sideways drift during a
+## hold shouldn't be read as an epoch swipe). Only the active tab's rows can be held.
+func _any_row_holding() -> bool:
+	for row_variant in _rows:
+		if (row_variant as PropertyRow).is_hold_active():
+			return true
+	return false
+
+
+## Nudge the player toward the lowest UNOPENED, reachable tab whose cheapest venture they can now
+## afford (and own none of) — a one-time pointer so the pager's hidden tabs stay discoverable.
+func _check_new_ventures() -> void:
+	if _tab_seen.is_empty() or _venture_overlay.visible:
+		return
+	for tab in range(_epoch_tab_count()):
+		if tab == _epoch_tab or not bool(_tab_unlocked[tab]):
+			continue  # the tab you're already on, or one not open yet
+		if bool(_tab_seen[tab]) or bool(_tab_nudged[tab]):
+			continue
+		if _tab_is_new_and_affordable(tab):
+			_tab_nudged[tab] = true
+			_pending_venture_tab = tab
+			_venture_overlay.show_for(_epoch_tab_name(tab), _epoch_tab_sub(tab))
+			return  # one nudge at a time
+
+
+## True when the player owns NOTHING in `tab` yet and can afford its cheapest property — i.e. the
+## tab has just become a place worth visiting.
+func _tab_is_new_and_affordable(tab: int) -> bool:
+	var cheapest := INF
+	var found := false
+	for i in range(game.economy.properties.size()):
+		if _epoch_tab_of(i) != tab:
+			continue
+		var prop := game.economy.properties[i] as PropertyState
+		if prop.units_owned > 0:
+			return false  # already engaged with this tab — not "new"
+		cheapest = minf(cheapest, prop.get_bulk_cost(1))
+		found = true
+	return found and game.economy.cash >= cheapest
+
+
+## "SHOW ME" on the nudge — page the player to the tab it pointed at.
+func _on_venture_show_requested() -> void:
+	if _pending_venture_tab >= 0:
+		_set_epoch_tab(_pending_venture_tab)
+		_pending_venture_tab = -1
 
 
 ## Estate Planning tab: the prestige hub — the "Plan the Estate" succession action on
@@ -1056,6 +1379,10 @@ func _on_contact_made(new_tier: int) -> void:
 	# Swap the play-field backdrop to match the newly reached epoch before the beat plays,
 	# so when the first-contact overlay clears the player is looking at the new world.
 	_background.texture = load(_background_path_for_tier(new_tier))
+	# The new epoch just opened its pager tab — unlock it, then jump to it so that when the contact
+	# beat (and any trade-deal minigame) clears, the player is looking at the new civ's properties.
+	_update_tab_unlocks()
+	_set_epoch_tab(new_tier)
 	_pending_contact_tier = new_tier
 	_first_contact_overlay.show_contact(new_tier)
 
@@ -1345,3 +1672,36 @@ func _buy_mode_caption(mode: PropertyRow.BuyMode) -> String:
 		PropertyRow.BuyMode.MAX:
 			return "MAX"
 	return "×1"
+
+
+# ---------------------------------------------------------------------------
+# Epoch pager position dots
+# ---------------------------------------------------------------------------
+
+## The pager's position indicator: one dot per UNLOCKED tab only (locked/undiscovered tabs get no
+## dot at all — Tim 2026-07-12), so the row grows as tabs open. The current tab is a large gold dot;
+## the other open tabs are smaller navy dots. Purely an indicator (navigation is the arrows/swipe).
+class EpochPagerDots extends Control:
+	var _count := 0
+	var _current := 0
+	const DOT_SPACING := 36.0
+	const DOT_RADIUS := 10.0
+
+	func set_state(count: int, current: int) -> void:
+		_count = count
+		_current = current
+		custom_minimum_size = Vector2(0, DOT_RADIUS * 2.0 + 14.0)
+		queue_redraw()
+
+	func _draw() -> void:
+		if _count <= 0:
+			return
+		var span := float(_count - 1) * DOT_SPACING
+		var start_x := (size.x - span) * 0.5
+		var y := size.y * 0.5
+		for i in range(_count):
+			var pos := Vector2(start_x + float(i) * DOT_SPACING, y)
+			if i == _current:
+				draw_circle(pos, DOT_RADIUS, UiPalette.MUSTARD_GOLD)
+			else:
+				draw_circle(pos, DOT_RADIUS * 0.6, UiPalette.INK_NAVY)

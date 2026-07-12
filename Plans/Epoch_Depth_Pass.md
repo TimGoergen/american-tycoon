@@ -1,6 +1,36 @@
 # Epoch Depth Pass — Implementation Plan
 
-**Status:** DRAFT for Tim's review. Written 2026-07-04.
+**Status:** Phase 1 & 2 SHIPPED (on main). **Phase 3 pacing retune BUILT + sim-verified
+2026-07-11** on `feature/epoch-depth-phase3` (device pass = Phase 4, owed). Written 2026-07-04.
+
+**PHASE 3 SHIPPED SUMMARY (2026-07-11).** The retune is done and verified in the sim.
+Decisions of record:
+- **Root cause found:** the first-pass alien magnitudes were ~50× too hot for their epoch
+  threshold, so a new cohort instantly out-earned the whole economy before it and every epoch
+  collapsed to seconds. Fixed by sizing magnitudes from a THRESHOLD-ANCHORED formula.
+- **economy_step 30 → 60** (EpochCatalog.economy_scale = 60^(tier-1)); bigger numbers (Tim) and
+  wider band for the cohort. **Cohort size 4 → 5** per epoch (Tim 2026-07-11).
+- **Magnitude formula — cost and income DECOUPLED** (per alien property, epoch T = unlock_tier,
+  slot k = 0..4 by cost). Income is an INDEPENDENT anchor, NOT `cost × payback` — the first pass
+  tied them and made alien income ≈ Earth's base, so a staffed Earth property (carrying the big
+  per-block staff multiplier) out-earned a new flagship. Tim 2026-07-11: "flagship should be 3×
+  my best Earth prop." Fix:
+  `base_cost   = earth_target × (economy_step/DRIFT)^(T-1) × COST_FRACTION × SPACING^k`,
+  `base_income = INCOME_ANCHOR × (economy_step/DRIFT)^(T-1) × SPACING^k`,
+  `base_cycle  = 240 × (1 − 0.05k)`.
+  Shipped values: **DRIFT 0.95, COST_FRACTION 0.001, INCOME_ANCHOR 2.30e11, SPACING 2.75**.
+- **Step-up result:** the flagship (1 unit, staffed to the epoch cap) earns **×3.00** a staffed
+  Executive Assets at epoch 2, rising to ×4.7 / ×7.5 / ×11.8 / ×18.6 by epoch 6 (alien income grows
+  at economy_step/DRIFT ≈ 63× while Earth staff grows ~40× per epoch, so aliens increasingly
+  dominate — the intended "new epoch = bigger business"). Guarded permanently by the sim's step-up
+  CHECK. COST_FRACTION is the pacing/save-up knob; INCOME_ANCHOR is the step-up-strength knob.
+- **Pacing result:** no cliff; the two sim instruments BRACKET the per-epoch ratio at ~1.0–1.05
+  (fixed-depth ~0.96 over-credits accumulated Earth staff; the faithful cost-gated playout shows
+  warm epochs rising ~1.08–1.16). DRIFT is the knob to shift the rise; Phase 4 device pass confirms.
+- **Instruments added** to `sim/Sim.gd`: pacing MEASUREMENT (fixed-depth), cohort SWEEP
+  (threshold-anchored candidates), and cost-curve-aware PLAYOUT (a heir plays all epochs).
+- 5 new properties authored (Starcore Syndicate, Singularity Holdings, Biosphere Trust, Geode
+  Dominion, Causality Capital) + 30 staffer names; ladder now **37 rungs** (12 Earth + 25 alien).
 **Author:** Claude.
 **Decisions of record:** GDD §6.1/§6.2 playtest-verdict + directive blocks (2026-07-03);
 `Per_Epoch_Upgrade_Track.md` and `First_Contact_Property_Reward.md` addenda (decisions
@@ -243,7 +273,8 @@ cohort payback ratios. Constraint kept: time-to-first-contact ≈ today's.
 - `_run_epoch_timing_study` (Sim.gd): replace the tier-multiplier projection with a
   playout-informed model that folds in (a) cohort buy staging, (b) block-level buying
   with home-epoch costs, (c) the cohort-wide contact bonus. Print per-epoch projected
-  duration + ratio; verdict passes at ratio ∈ [1.0, ~1.4].
+  duration + ratio; verdict passes at ratio ≈ 1.05 per epoch (Tim's target, §6 Q5;
+  accept ~[1.0, 1.12]).
 - Playout policies (`Sim.gd`, `PaceStudy.gd`): teach the greedy policy to buy staff
   levels (a known scope cut today) and cohort properties.
 - `EpochTest.gd`: new pins — sequential ordering (can't buy block b+1 rung before
@@ -302,11 +333,18 @@ docs (GDD §5.5/§6, Spec §3.6/§6) sync at each phase like the epoch-staffing 
    Pre-redesign retained TIERS migrate as one full block of levels each. UX note:
    deep retention means many taps — a hold-to-repeat or "retain to current" bulk
    affordance may be wanted after device feel (flagged, not built).
-4. **(Phase 2) Cohort size four** (vs 3 or 5) and the first-pass names above — veto
-   freely, they're placeholders.
-5. **(Phase 3) Duration target:** each epoch ≈ same length as the previous (flat), or
-   drifting slightly longer (~1.2×)? Recommendation: flat-to-1.2×, decided by feel
-   after the study prints both.
+4. **(Phase 2) Cohort size — DECIDED (Tim, 2026-07-11): FIVE per epoch.** Raised 4→5
+   for richer epochs (Tim's original "3–5" ask); the step-60 band has room for 5 at ×2.75
+   spacing. The 5th (grandest, most-absurd) member per civ: Starcore Syndicate, Singularity
+   Holdings, Biosphere Trust, Geode Dominion, Causality Capital. Ladder now 37 rungs.
+5. **(Phase 3) Duration target — DECIDED (Tim, 2026-07-11): ~1.05× per epoch.** Each
+   post-Earth epoch runs slightly longer than the one before it — a gentle drift, NOT
+   flat and NOT the ~1.2× upper option. Over the five alien epochs this compounds to
+   only ~1.28× total spread (1.05⁵), so late epochs feel a touch weightier without
+   dragging; prestige stays the sole acceleration fantasy. The study's pass band
+   therefore centers on 1.05 (accept ratio ∈ ~[1.0, 1.12] per epoch). Watch item: 1.05
+   is subtle — the study must confirm the per-epoch duration deltas are large enough to
+   read as intentional (not indistinguishable from flat); it's a knob, retune if so.
 
 ---
 

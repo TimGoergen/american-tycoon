@@ -4,12 +4,12 @@
 
 [resource]
 script = ExtResource("1")
-property_id = 16
-display_name = "Prism Vault"
+property_id = 36
+display_name = "Geode Dominion"
 unlock_tier = 5
-base_cost = 1647999999999999700.0
+base_cost = 94280000000000000000.0
 r0 = 1.09
-base_income_per_unit = 3659999999999999500.0
-base_cycle_length = 240.0
-staffer_name = "Prism Vault Keeper"
+base_income_per_unit = 209300000000000000000.0
+base_cycle_length = 192.0
+staffer_name = "Geode Sovereign"
 accent_color = Color(0.85, 0.45, 0.7, 1)

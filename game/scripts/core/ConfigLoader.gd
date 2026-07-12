@@ -21,23 +21,24 @@ const PROPERTY_PATHS := [
 	"res://config/properties/12_executive_assets.tres",
 	# Alien property types (GDD §5.5 site 2): each is locked behind its epoch (unlock_tier)
 	# and opened by that civilization's First Contact trade-deal minigame — one new kind of
-	# business per alien epoch (Luminari → Chronophage). Each is a fixed flagship magnitude
-	# (~5× Earth's Executive Assets); its income scales across epochs PURELY through staffing,
-	# like every property, so it accelerates with the empire instead of running away. (An earlier
-	# pass scaled base magnitude by economy_scale too — that double-counted the epoch and let a
-	# few units clear a whole epoch instantly. See sim/Sim.gd _print_alien_property_economics.)
+	# business per alien epoch (Luminari → Chronophage). Phase 3 (2026-07-11) sizes each
+	# alien magnitude from a threshold-anchored formula (grows at economy_step / DRIFT per
+	# epoch), tuned so a new cohort does NOT out-earn the whole economy before it — the fix
+	# for "every epoch too fast." See Plans/Epoch_Depth_Pass.md §4 + the sim's pacing
+	# MEASUREMENT/PLAYOUT (sim/Sim.gd), which build the real economy to verify the pace.
 	"res://config/properties/13_photon_exchange.tres",   # epoch 2 — Luminari Collective
 	"res://config/properties/14_data_foundry.tres",      # epoch 3 — Geth-Sentinel Grid
 	"res://config/properties/15_spore_bank.tres",        # epoch 4 — Mycelium Unity
 	"res://config/properties/16_prism_vault.tres",       # epoch 5 — Quartzite Conglomerate
 	"res://config/properties/17_time_bank.tres",         # epoch 6 — Chronophage Enclave
-	# COHORT SIBLINGS (Epoch_Depth_Pass Phase 2, 2026-07-08): each alien epoch now has
-	# FOUR properties — the flagship above plus three siblings ×3 apart in magnitude, so
-	# a cohort spans ~27× and hands off cleanly to the next epoch's flagship at ~30×.
-	# APPENDED here (not re-slotted next to their flagships) ON PURPOSE: this array's
-	# order is every save's property INDEX — retention keys, per-property save rows,
-	# staffer rosters — so inserting mid-list would force an index migration. The LADDER
-	# shows cost order instead (Main sorts the rows for display); indices stay stable.
+	# COHORT SIBLINGS (Epoch_Depth_Pass Phase 2/3): each alien epoch has FIVE properties —
+	# the flagship above plus four siblings ×2.75 apart in magnitude (Phase 3 raised cohorts
+	# 4→5, Tim 2026-07-11), so a cohort spans ~57× ≈ one economy_step-60 band and hands off
+	# cleanly to the next epoch's flagship. APPENDED here (not re-slotted next to their
+	# flagships) ON PURPOSE: this array's order is every save's property INDEX — retention
+	# keys, per-property save rows, staffer rosters — so inserting mid-list would force an
+	# index migration. The LADDER shows cost order instead (Main sorts the rows for display);
+	# indices stay stable.
 	"res://config/properties/18_beam_utilities.tres",     # epoch 2
 	"res://config/properties/19_solar_futures_desk.tres", # epoch 2
 	"res://config/properties/20_dyson_holdings.tres",     # epoch 2
@@ -53,6 +54,12 @@ const PROPERTY_PATHS := [
 	"res://config/properties/30_deadline_futures.tres",   # epoch 6
 	"res://config/properties/31_moment_market.tres",      # epoch 6
 	"res://config/properties/32_eternity_escrow.tres",    # epoch 6
+	# The 5th (grandest, most-absurd) member of each cohort (Phase 3, 2026-07-11).
+	"res://config/properties/33_starcore_syndicate.tres",   # epoch 2 — Luminari
+	"res://config/properties/34_singularity_holdings.tres", # epoch 3 — Geth-Sentinel
+	"res://config/properties/35_biosphere_trust.tres",      # epoch 4 — Mycelium
+	"res://config/properties/36_geode_dominion.tres",       # epoch 5 — Quartzite
+	"res://config/properties/37_causality_capital.tres",    # epoch 6 — Chronophage
 ]
 
 ## Returns null (with an error pushed) if the tuning file is missing.

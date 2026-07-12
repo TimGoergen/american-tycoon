@@ -65,7 +65,8 @@ var _epoch_pager_sub: Label         # the "Blue Collar" / "White Collar" subtitl
 var _epoch_prev_button: Button
 var _epoch_next_button: Button
 var _epoch_pager_dots: EpochPagerDots
-var _ladder_area: Control           # the property-list region; swipes here change epoch tabs
+var _epoch_pager_box: Control       # the pager header (label + arrows + dots)
+var _ladder_area: Control           # the property-list region; swipes over either change tabs
 var _swipe_tracking := false        # a touch is down on the ladder, tracking for a horizontal swipe
 var _swipe_start := Vector2.ZERO
 var _swipe_delta := Vector2.ZERO
@@ -565,7 +566,8 @@ func _build_property_tab() -> Control:
 	# Epoch pager header: the big epoch label + ‹ › arrows + position dots, above the ladder.
 	# Only the active epoch's rows are drawn (PropertyRow.set_tab_active), so the property
 	# count on screen stays ~6 no matter how deep the run is (Tim 2026-07-11).
-	v.add_child(_build_epoch_pager())
+	_epoch_pager_box = _build_epoch_pager()
+	v.add_child(_epoch_pager_box)
 
 	# The property ladder: the rows in a vertical scroll (GDD §2), hosted in a plain
 	# Control so the two overlays can sit ON the list without reserving layout space:
@@ -772,14 +774,16 @@ func _update_epoch_pager() -> void:
 ## Read horizontal swipes over the ladder to change tabs. Handled in _input WITHOUT consuming the
 ## event, so the row buttons still get their taps and the ScrollContainer still scrolls vertically:
 ## a tap moves ~0px (no tab change), a big horizontal drag turns the page (and naturally cancels
-## any button press it started on). Only gestures that BEGIN inside the ladder region count, so
-## swipes over the income panel / wage button / bottom tab bar are ignored.
+## any button press it started on). Only gestures that BEGIN on the "page" — the pager title strip
+## or the property list — count, so swipes over the income panel / wage button / bottom bar are ignored.
 func _input(event: InputEvent) -> void:
-	if _ladder_area == null:
+	if _ladder_area == null or _epoch_pager_box == null:
 		return
 	if event is InputEventScreenTouch:
 		if event.pressed:
-			_swipe_tracking = _ladder_area.get_global_rect().has_point(event.position)
+			# Swipe anywhere on the "page" — the pager title strip OR the property list below it.
+			var region := _epoch_pager_box.get_global_rect().merge(_ladder_area.get_global_rect())
+			_swipe_tracking = region.has_point(event.position)
 			_swipe_start = event.position
 			_swipe_delta = Vector2.ZERO
 		elif _swipe_tracking:

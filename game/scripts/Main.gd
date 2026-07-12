@@ -65,6 +65,7 @@ var _epoch_pager_sub: Label         # the "Blue Collar" / "White Collar" subtitl
 var _epoch_prev_button: Button
 var _epoch_next_button: Button
 var _epoch_pager_dots: EpochPagerDots
+var _ladder_area: Control           # the property-list region; swipes here change epoch tabs
 var _swipe_tracking := false        # a touch is down on the ladder, tracking for a horizontal swipe
 var _swipe_start := Vector2.ZERO
 var _swipe_delta := Vector2.ZERO
@@ -592,14 +593,11 @@ func _build_property_tab() -> Control:
 	ghost_bar.setup(scroll)
 	ladder_area.add_child(ghost_bar)
 
-	# A transparent overlay that reads horizontal swipes to change epoch tabs. MOUSE_FILTER_PASS
-	# lets a touch still reach the scroll (vertical) and the row buttons below it; horizontal
-	# scrolling is disabled, so a left/right swipe conflicts with nothing.
-	var swipe_catcher := Control.new()
-	swipe_catcher.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	swipe_catcher.mouse_filter = Control.MOUSE_FILTER_PASS
-	swipe_catcher.gui_input.connect(_on_ladder_swipe_input)
-	ladder_area.add_child(swipe_catcher)
+	# Horizontal swipes over this region change epoch tabs — detected in _input (which never
+	# consumes the event), so the row buttons and vertical scroll keep working. (An earlier
+	# MOUSE_FILTER_PASS overlay here swallowed the buy-button taps: a PASS control forwards to
+	# its PARENT, not to the buttons it covers.)
+	_ladder_area = ladder_area
 
 	var ladder := VBoxContainer.new()
 	ladder.add_theme_constant_override("separation", 10)
@@ -771,13 +769,17 @@ func _update_epoch_pager() -> void:
 	_epoch_pager_dots.set_state(_epoch_tab_count(), _epoch_tab, last)
 
 
-## Read horizontal swipes over the ladder to change tabs (arrows and swipe both work). The
-## overlay is MOUSE_FILTER_PASS, so taps still reach the row buttons and vertical touches still
-## scroll; only a clearly-horizontal drag past the threshold turns the page.
-func _on_ladder_swipe_input(event: InputEvent) -> void:
+## Read horizontal swipes over the ladder to change tabs. Handled in _input WITHOUT consuming the
+## event, so the row buttons still get their taps and the ScrollContainer still scrolls vertically:
+## a tap moves ~0px (no tab change), a big horizontal drag turns the page (and naturally cancels
+## any button press it started on). Only gestures that BEGIN inside the ladder region count, so
+## swipes over the income panel / wage button / bottom tab bar are ignored.
+func _input(event: InputEvent) -> void:
+	if _ladder_area == null:
+		return
 	if event is InputEventScreenTouch:
 		if event.pressed:
-			_swipe_tracking = true
+			_swipe_tracking = _ladder_area.get_global_rect().has_point(event.position)
 			_swipe_start = event.position
 			_swipe_delta = Vector2.ZERO
 		elif _swipe_tracking:

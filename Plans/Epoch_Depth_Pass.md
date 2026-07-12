@@ -10,13 +10,20 @@ Decisions of record:
   collapsed to seconds. Fixed by sizing magnitudes from a THRESHOLD-ANCHORED formula.
 - **economy_step 30 → 60** (EpochCatalog.economy_scale = 60^(tier-1)); bigger numbers (Tim) and
   wider band for the cohort. **Cohort size 4 → 5** per epoch (Tim 2026-07-11).
-- **Magnitude formula** (per alien property, epoch T = unlock_tier, slot k = 0..4 by cost):
-  `base_cost = earth_target × (economy_step/DRIFT)^(T-1) × COST_FRACTION × SPACING^k`,
-  `base_income = base_cost × PAYBACK`, `base_cycle = 240 × (1 − 0.05k)`.
-  Shipped values: **DRIFT 0.95, COST_FRACTION 0.001, PAYBACK 0.0043, SPACING 2.75**.
-- **"Middle" feel** (Tim): flagship ~0.09% of its epoch economy, ~100-cycle recoup. NOTE: the
-  cost/payback split is pace-FREE (only their product matters) — proven by the cost-curve-aware
-  playout — so the split is a pure feel choice.
+- **Magnitude formula — cost and income DECOUPLED** (per alien property, epoch T = unlock_tier,
+  slot k = 0..4 by cost). Income is an INDEPENDENT anchor, NOT `cost × payback` — the first pass
+  tied them and made alien income ≈ Earth's base, so a staffed Earth property (carrying the big
+  per-block staff multiplier) out-earned a new flagship. Tim 2026-07-11: "flagship should be 3×
+  my best Earth prop." Fix:
+  `base_cost   = earth_target × (economy_step/DRIFT)^(T-1) × COST_FRACTION × SPACING^k`,
+  `base_income = INCOME_ANCHOR × (economy_step/DRIFT)^(T-1) × SPACING^k`,
+  `base_cycle  = 240 × (1 − 0.05k)`.
+  Shipped values: **DRIFT 0.95, COST_FRACTION 0.001, INCOME_ANCHOR 2.30e11, SPACING 2.75**.
+- **Step-up result:** the flagship (1 unit, staffed to the epoch cap) earns **×3.00** a staffed
+  Executive Assets at epoch 2, rising to ×4.7 / ×7.5 / ×11.8 / ×18.6 by epoch 6 (alien income grows
+  at economy_step/DRIFT ≈ 63× while Earth staff grows ~40× per epoch, so aliens increasingly
+  dominate — the intended "new epoch = bigger business"). Guarded permanently by the sim's step-up
+  CHECK. COST_FRACTION is the pacing/save-up knob; INCOME_ANCHOR is the step-up-strength knob.
 - **Pacing result:** no cliff; the two sim instruments BRACKET the per-epoch ratio at ~1.0–1.05
   (fixed-depth ~0.96 over-credits accumulated Earth staff; the faithful cost-gated playout shows
   warm epochs rising ~1.08–1.16). DRIFT is the knob to shift the rise; Phase 4 device pass confirms.

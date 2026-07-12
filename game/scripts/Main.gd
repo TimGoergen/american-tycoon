@@ -846,7 +846,11 @@ func _update_epoch_pager() -> void:
 	var last := _epoch_tab_max()
 	_epoch_prev_button.disabled = _epoch_tab <= 0
 	_epoch_next_button.disabled = _epoch_tab >= last
-	_epoch_pager_dots.set_state(_epoch_tab_count(), _epoch_tab, last)
+	# One dot per UNLOCKED tab (0..last are open, contiguous). Hide the row entirely while only
+	# one tab is open — a lone dot indicates nothing, and the arrows already read as disabled.
+	var unlocked_count := last + 1
+	_epoch_pager_dots.visible = unlocked_count > 1
+	_epoch_pager_dots.set_state(unlocked_count, _epoch_tab)
 
 
 ## Read horizontal swipes over the ladder to change tabs. Handled in _input WITHOUT consuming the
@@ -1674,34 +1678,30 @@ func _buy_mode_caption(mode: PropertyRow.BuyMode) -> String:
 # Epoch pager position dots
 # ---------------------------------------------------------------------------
 
-## The pager's position indicator: one dot per tab. The current tab is a large gold dot; other
-## reached tabs are smaller navy dots; locked (not-yet-reached) epochs are faint navy dots — a
-## quiet tease of how many epochs lie ahead. Purely an indicator (navigation is the arrows/swipe).
+## The pager's position indicator: one dot per UNLOCKED tab only (locked/undiscovered tabs get no
+## dot at all — Tim 2026-07-12), so the row grows as tabs open. The current tab is a large gold dot;
+## the other open tabs are smaller navy dots. Purely an indicator (navigation is the arrows/swipe).
 class EpochPagerDots extends Control:
-	var _total := 0
+	var _count := 0
 	var _current := 0
-	var _max_available := 0
 	const DOT_SPACING := 36.0
 	const DOT_RADIUS := 10.0
 
-	func set_state(total: int, current: int, max_available: int) -> void:
-		_total = total
+	func set_state(count: int, current: int) -> void:
+		_count = count
 		_current = current
-		_max_available = max_available
 		custom_minimum_size = Vector2(0, DOT_RADIUS * 2.0 + 14.0)
 		queue_redraw()
 
 	func _draw() -> void:
-		if _total <= 0:
+		if _count <= 0:
 			return
-		var span := float(_total - 1) * DOT_SPACING
+		var span := float(_count - 1) * DOT_SPACING
 		var start_x := (size.x - span) * 0.5
 		var y := size.y * 0.5
-		for i in range(_total):
+		for i in range(_count):
 			var pos := Vector2(start_x + float(i) * DOT_SPACING, y)
 			if i == _current:
 				draw_circle(pos, DOT_RADIUS, UiPalette.MUSTARD_GOLD)
-			elif i <= _max_available:
-				draw_circle(pos, DOT_RADIUS * 0.6, UiPalette.INK_NAVY)
 			else:
-				draw_circle(pos, DOT_RADIUS * 0.5, Color(UiPalette.INK_NAVY, 0.25))
+				draw_circle(pos, DOT_RADIUS * 0.6, UiPalette.INK_NAVY)

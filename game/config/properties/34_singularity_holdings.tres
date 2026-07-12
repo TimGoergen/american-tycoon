@@ -4,12 +4,12 @@
 
 [resource]
 script = ExtResource("1")
-property_id = 21
-display_name = "Server Metropolis"
+property_id = 34
+display_name = "Singularity Holdings"
 unlock_tier = 3
-base_cost = 1136000000000000.0
+base_cost = 23630000000000000.0
 r0 = 1.09
-base_income_per_unit = 4885000000000.0
-base_cycle_length = 228.0
-staffer_name = "Rack City Warden"
+base_income_per_unit = 101600000000000.0
+base_cycle_length = 192.0
+staffer_name = "Singularity Overmind"
 accent_color = Color(0.2, 0.7, 0.75, 1)

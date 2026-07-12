@@ -933,8 +933,10 @@ func _measure_epoch_income(tier: int, configs: Array) -> Dictionary:
 # smaller cohort_step, so income grows slower than the threshold and each epoch runs ~DRIFT
 # longer than the last. DRIFT is the pacing-drift target (1.05); PAYBACK sets the absolute clock.
 
-const COHORT_SPACING := 3.0          # cost/income ratio between adjacent cohort members
+const COHORT_SPACING := 2.75         # cost/income ratio between adjacent cohort members
 const COHORT_CYCLE_BASE := 240.0     # seconds; matches the current alien cycle band
+# FIVE members per cohort (Tim 2026-07-11). Spaced x2.75 they span 2.75^4 ~= 57x, ~one
+# economy_step-60 band, so the top member hands off cleanly to the next epoch's flagship.
 
 
 func _run_cohort_sweep() -> void:
@@ -945,12 +947,14 @@ func _run_cohort_sweep() -> void:
 	# economy_step sets number size + cohort spacing room; DRIFT tilts magnitudes below the
 	# threshold so each epoch runs slightly longer (the 1.05 target); PAYBACK sets the absolute
 	# clock. Tim wants big numbers, so candidates sit at step x50-60.
+	# FIVE members per cohort now: the extra top member adds income, so the product must
+	# drop ~2.2x from the 4-member value to hold the pace. cost_frac 0.001 keeps the "middle"
+	# feel Tim chose; sweep payback around the expected ~0.004 to re-hit 1.05 at step60/drift1.08.
 	var candidates := [
-		{"step": 50.0, "drift": 1.05, "cost_frac": 0.008, "payback": 0.0020},
-		{"step": 50.0, "drift": 1.05, "cost_frac": 0.008, "payback": 0.0012},
-		{"step": 50.0, "drift": 1.08, "cost_frac": 0.008, "payback": 0.0012},
-		{"step": 60.0, "drift": 1.05, "cost_frac": 0.008, "payback": 0.0015},
-		{"step": 60.0, "drift": 1.08, "cost_frac": 0.008, "payback": 0.0012},
+		{"step": 60.0, "drift": 1.00, "cost_frac": 0.001, "payback": 0.0043},
+		{"step": 60.0, "drift": 0.95, "cost_frac": 0.001, "payback": 0.0043},
+		{"step": 60.0, "drift": 0.90, "cost_frac": 0.001, "payback": 0.0043},
+		{"step": 60.0, "drift": 0.85, "cost_frac": 0.001, "payback": 0.0043},
 	]
 	for candidate in candidates:
 		_print_cohort_candidate(
@@ -958,7 +962,7 @@ func _run_cohort_sweep() -> void:
 			float(candidate["cost_frac"]), float(candidate["payback"]))
 
 	# The proposed winner's actual per-property magnitudes, for review before writing .tres.
-	_print_proposed_cohort_configs(60.0, 1.08, 0.008, 0.0012)
+	_print_proposed_cohort_configs(60.0, 0.95, 0.001, 0.0043)
 
 
 ## Print each alien property's proposed magnitudes for one candidate — the concrete numbers
@@ -1083,10 +1087,14 @@ func _run_epoch_playout_study() -> void:
 	# is the SAME across the feel range (so the feel is a free choice). step60/drift1.08.
 	# Epoch 1 (Earth) reads long here because a BARE heir cold-starts from $0 — that one-time
 	# bootstrap is unique to Earth; the steady per-epoch pace is the epoch 2->5 ratios.
+	# The real validation: the SHIPPED .tres, exactly as they'll play (no synthesis).
+	_print_playout("SHIPPED .tres · bare heir (the actual game files)", 0, _property_configs)
+	# Two synthesized cost/payback splits with the SAME product show the pace is identical
+	# across the feel range (so the feel is a free choice). step60/drift1.08.
 	var cohort_step := 60.0 / 1.08
-	_print_playout("BARE heir · expensive/slow-burn  (cost_frac 0.0080, payback 0.0012)", 0,
+	_print_playout("SYNTH · expensive/slow-burn  (cost_frac 0.0080, payback 0.0012)", 0,
 		_synthesize_cohort_configs(cohort_step, 0.0080, 0.0012))
-	_print_playout("BARE heir · cheap/Earth-like flip (cost_frac 0.00006, payback 0.16)", 0,
+	_print_playout("SYNTH · cheap/Earth-like flip (cost_frac 0.00006, payback 0.16)", 0,
 		_synthesize_cohort_configs(cohort_step, 0.00006, 0.16))
 
 

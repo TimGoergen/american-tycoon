@@ -60,8 +60,8 @@ func _test_thresholds(tuning: TuningConfig) -> void:
 	var earth := tuning.earth_economy_target
 	_check("Earth (tier 1) consume threshold == Earth target",
 		is_equal_approx(EpochCatalog.consume_threshold(1, earth), earth))
-	_check("Luminari (tier 2) threshold == Earth target x30 (2026-06-27 ladder)",
-		is_equal_approx(EpochCatalog.consume_threshold(2, earth), earth * 30.0))
+	_check("Luminari (tier 2) threshold == Earth target x60 (Phase 3 ladder, 2026-07-11)",
+		is_equal_approx(EpochCatalog.consume_threshold(2, earth), earth * 60.0))
 	_check("There are 6 epochs (Earth + 5 aliens)", EpochCatalog.tier_count() == 6)
 	_check("Earth staffer multiplier is 1.0 (no income change)",
 		is_equal_approx(EpochCatalog.staff_income_multiplier(1), 1.0))
@@ -383,21 +383,21 @@ func _test_epoch_locked_properties(configs: Array, tuning: TuningConfig) -> void
 ## gated to epoch 2, the tier→property lookup finds it, and grant_starting_units hands over free
 ## units (the negotiation head start) without counting them as spend on the estate's book value.
 func _test_first_contact_grant(configs: Array, tuning: TuningConfig) -> void:
-	print("\n10. First Contact opens a four-property cohort per epoch (tier→cohort lookup)")
+	print("\n10. First Contact opens a five-property cohort per epoch (tier→cohort lookup)")
 
-	# Every alien epoch (2..last) ships a FOUR-property cohort gated to it (Epoch Depth
-	# Phase 2), the cohort lookup returns all four with the FLAGSHIP (cheapest member)
-	# first — the order the trade-deal minigame and the bonus loop rely on — and the
-	# singular lookup still resolves that flagship.
+	# Every alien epoch (2..last) ships a FIVE-property cohort gated to it (Epoch Depth
+	# Phase 3 raised cohorts 4→5, Tim 2026-07-11), the cohort lookup returns all five with
+	# the FLAGSHIP (cheapest member) first — the order the trade-deal minigame and the bonus
+	# loop rely on — and the singular lookup still resolves that flagship.
 	var game_for_lookup := GameState.new(configs, tuning)
 	for tier in range(2, EpochCatalog.tier_count() + 1):
 		var gated := 0
 		for cfg in configs:
 			if (cfg as PropertyConfig).unlock_tier == tier:
 				gated += 1
-		_check("epoch %d ships a four-property cohort" % tier, gated == 4)
+		_check("epoch %d ships a five-property cohort" % tier, gated == 5)
 		var cohort := game_for_lookup.economy.get_property_indices_for_unlock_tier(tier)
-		_check("epoch %d's cohort lookup returns all four members" % tier, cohort.size() == 4)
+		_check("epoch %d's cohort lookup returns all five members" % tier, cohort.size() == 5)
 		if cohort.is_empty():
 			continue
 		_check("epoch %d's flagship resolves via the singular tier lookup" % tier,
@@ -424,7 +424,7 @@ func _test_first_contact_grant(configs: Array, tuning: TuningConfig) -> void:
 		if not is_equal_approx(prop_state.first_contact_income_multiplier, 1.4) \
 				or not is_equal_approx(prop_state.first_contact_cycle_multiplier, 0.88):
 			all_bonused = false
-	_check("a cohort-wide First Contact bonus reaches all four members", all_bonused)
+	_check("a cohort-wide First Contact bonus reaches all five members", all_bonused)
 
 	# The shipped ladder includes at least one alien property gated to a later epoch.
 	var alien_index := -1

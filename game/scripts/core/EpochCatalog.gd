@@ -23,19 +23,20 @@ class_name EpochCatalog
 # v1 ships Earth + 5 alien races (Plans doc §8 named the first 3; Quartzite and
 # Chronophage were added in Phase 4).
 #
-# EPOCH PACING (reworked 2026-06-27 — the "second epoch stalls out" fix). The two
-# ladders below race each other: economy_scale sets how much you must EARN to clear
-# an epoch, and staff_income_multiplier sets how much your income GROWS in it. Time
-# to clear an epoch is roughly (must-earn) / (income), so the per-epoch duration
-# ratio is economy_step / staff_step (proven by sim/Sim.gd _run_epoch_timing_study).
-# The old v1 numbers (economy ×1000/epoch, staff ×~17/epoch) made every epoch ~60×
-# LONGER than the last — a guaranteed wall by epoch 2. We now use matched GEOMETRIC
-# ladders with staff stepping slightly faster than the economy:
-#   economy_scale          = 30^(tier-1)  -> 1, 30, 900, 27k, 810k, 24.3M
-#   staff_income_multiplier = 40^(tier-1) -> 1, 40, 1.6k, 64k, 2.56M, 102.4M
-# Because staff_step (40) > economy_step (30), each epoch is a touch FASTER than the
-# one before (ratio ~0.75) — the GDD §5.1 "it speeds up every time" feel — instead of
-# slower. Still first-pass feel-tuning values; the dynasty sim + epoch study verify them.
+# EPOCH PACING (Phase 3 rework, 2026-07-11 — the "every epoch too fast" fix; plan
+# Plans/Epoch_Depth_Pass.md §4). economy_scale sets how much you must EARN to clear an
+# epoch; the alien COHORT magnitudes (per-property .tres) set how much your income grows
+# in it. Time to clear ~= (must-earn) / (income).
+#   economy_scale = 60^(tier-1)  -> 1, 60, 3.6k, 216k, 12.96M, 777.6M   (the threshold ladder)
+# The cohort .tres magnitudes are generated to grow at a slightly SMALLER step than the
+# threshold (economy_step / DRIFT, DRIFT ~1.08), so income grows a touch slower than the
+# goalpost and each epoch runs ~1.05x LONGER than the last — Tim's 2026-07-11 target (gentle
+# drift; prestige, not epoch churn, is the acceleration fantasy). The earlier 30^/40^ "race"
+# model is retired: it assumed a linear per-tier staff factor that the Phase 1/2 per-block
+# staff ladder + four-property cohorts broke (see the sim's pacing MEASUREMENT + PLAYOUT,
+# which build the real economy instead of projecting). staff_income_multiplier below is now
+# only the per-block staff STEP scaler, not the epoch income law. First-pass; sim-verified,
+# device pass owed (Phase 4).
 
 
 # Each epoch is one dictionary with these keys:
@@ -82,6 +83,10 @@ const EPOCHS := [
 			"Network Line Manager", "Refinery Foreman", "Co-op Chairman",
 			"Gem Floor Manager", "Lens Works Foreman", "Realty Broker",
 			"Deadline Desk Manager", "Market Stall Keeper", "Escrow Officer",
+			# Cohort 5th members (Phase 3, indices 32–36): Starcore, Singularity, Biosphere,
+			# Geode, Causality. Earth never staffs them; the roster stays ladder-length.
+			"Starcore Site Manager", "Singularity Project Director", "Biosphere Estate Director",
+			"Geode Holdings Director", "Causality Fund Director",
 		],
 	},
 	{
@@ -89,7 +94,7 @@ const EPOCHS := [
 		"civilization": "Luminari Collective",
 		"home_planet": "Solaria Prime",
 		"currency_flavor": "Photons",
-		"economy_scale": 30.0,
+		"economy_scale": 60.0,
 		"staff_income_multiplier": 40.0,
 		# Energy/light beings — money now moves at the speed of light. The hail is THEIR
 		# first words (radiant, warm, faintly condescending); the contact_line is our
@@ -114,6 +119,10 @@ const EPOCHS := [
 			"Lightline Weaver", "Solar Compost Refiner", "Terraform Ray Steward",
 			"Prism Floor Trader", "Sunbeam Lens Grinder", "Lightspire Concierge",
 			"Sundial Enforcer", "Golden-Hour Appraiser", "Eternal Dawn Notary",
+			# Cohort 5th members (indices 32–36); index 32 (Starcore Syndicate) is the Luminari's
+			# own grandest home-epoch venture, mirroring its .tres staffer_name.
+			"Stellar Core Magnate", "Event-Horizon Financier", "Living-World Radiance Steward",
+			"Prismatic Dominion Curator", "Lightcone Causality Broker",
 		],
 	},
 	{
@@ -121,7 +130,7 @@ const EPOCHS := [
 		"civilization": "Geth-Sentinel Grid",
 		"home_planet": "Rannoch-01",
 		"currency_flavor": "Logic Nodes",
-		"economy_scale": 900.0,
+		"economy_scale": 3_600.0,
 		"staff_income_multiplier": 1_600.0,
 		# Cybernetic collective — finance run entirely by machines. Hail = machine-log
 		# fragments, all protocol, no warmth.
@@ -144,6 +153,10 @@ const EPOCHS := [
 			"Network Crawler Prime", "Biomass Process Unit", "Terraforming Compiler",
 			"Gem Sorting Array", "Lens Calibration Bot", "Monolith Logic Broker",
 			"Deadline Scheduler Daemon", "Momentary Cache Trader", "Escrow Checksum Warden",
+			# Cohort 5th members (indices 32–36); index 33 (Singularity Holdings) is the Grid's
+			# own grandest home-epoch venture, mirroring its .tres staffer_name.
+			"Stellar Core Overseer", "Singularity Overmind", "Biosphere Management Engine",
+			"Geode Dominion Core", "Causality Compiler",
 		],
 	},
 	{
@@ -151,7 +164,7 @@ const EPOCHS := [
 		"civilization": "Mycelium Unity",
 		"home_planet": "Spore-Deep",
 		"currency_flavor": "Spores",
-		"economy_scale": 27_000.0,
+		"economy_scale": 216_000.0,
 		"staff_income_multiplier": 64_000.0,
 		# Fungal hive-mind — money that literally spreads and self-replicates. Hail =
 		# a creeping lowercase whisper, plural and patient.
@@ -174,6 +187,10 @@ const EPOCHS := [
 			"Hyphae Line-Tender", "Decay Refiner", "Sporefall Steward",
 			"Crystal Mold Trader", "Spore Lens Polisher", "Overgrowth Realtor",
 			"Rot-Clock Keeper", "Momentary Bloom Broker", "Everspore Notary",
+			# Cohort 5th members (indices 32–36); index 34 (Biosphere Trust) is the Unity's own
+			# grandest home-epoch venture, mirroring its .tres staffer_name.
+			"Starcore Grove-Baron", "Void-Rooted Overgrowth", "All-Biosphere Overlord",
+			"Geode-Vein Colonist", "Root-of-Consequence Tender",
 		],
 	},
 	{
@@ -181,7 +198,7 @@ const EPOCHS := [
 		"civilization": "Quartzite Conglomerate",
 		"home_planet": "Geode-7",
 		"currency_flavor": "Prisms",
-		"economy_scale": 810_000.0,
+		"economy_scale": 12_960_000.0,
 		"staff_income_multiplier": 2_560_000.0,
 		# Crystalloid life — capital made permanent, faceted, light bent to its will.
 		# Hail = a cold appraisal, unimpressed and precise.
@@ -203,6 +220,10 @@ const EPOCHS := [
 			"Lattice Network Fitter", "Petrified Biomass Refiner", "Crystal Terraform Sculptor",
 			"Facet Floor Trader", "Lens Grinder Prime", "Monolith Concierge",
 			"Hourstone Enforcer", "Moment Crystal Appraiser", "Amber Escrow Keeper",
+			# Cohort 5th members (indices 32–36); index 35 (Geode Dominion) is the Conglomerate's
+			# own grandest home-epoch venture, mirroring its .tres staffer_name.
+			"Starcore Facet-Lord", "Compressed-Core Magnate", "Petrified Biosphere Warden",
+			"Geode Sovereign", "Crystallized Causality Assayer",
 		],
 	},
 	{
@@ -210,7 +231,7 @@ const EPOCHS := [
 		"civilization": "Chronophage Enclave",
 		"home_planet": "Tempus",
 		"currency_flavor": "Seconds",
-		"economy_scale": 24_300_000.0,
+		"economy_scale": 777_600_000.0,
 		"staff_income_multiplier": 102_400_000.0,
 		# Time-eaters — they trade in stolen moments; your money compounds across hours
 		# that were taken from someone else. Hail = politely terrifying, and it knows
@@ -234,6 +255,10 @@ const EPOCHS := [
 			"Timeline Network Splicer", "Fossil Biomass Refiner", "Epoch Terraformer",
 			"Age-of-Gems Trader", "Timelens Grinder", "Monolith-of-Hours Warden",
 			"Deadline Enforcer", "Moment Appraiser", "Eternity Notary",
+			# Cohort 5th members (indices 32–36); index 36 (Causality Capital) is the Enclave's
+			# own grandest home-epoch venture, mirroring its .tres staffer_name.
+			"Stellar Lifespan Broker", "Infinite-Density Usurer", "Evergrowth Time-Baron",
+			"Ageless Geode Warden", "Sovereign of Cause & Effect",
 		],
 	},
 ]

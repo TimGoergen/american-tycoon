@@ -4,12 +4,12 @@
 
 [resource]
 script = ExtResource("1")
-property_id = 15
-display_name = "Spore Bank"
+property_id = 35
+display_name = "Biosphere Trust"
 unlock_tier = 4
-base_cost = 26100000000000000.0
+base_cost = 1493000000000000000.0
 r0 = 1.09
-base_income_per_unit = 112200000000000.0
-base_cycle_length = 240.0
-staffer_name = "Spore Banker"
+base_income_per_unit = 6420000000000000.0
+base_cycle_length = 192.0
+staffer_name = "All-Biosphere Overlord"
 accent_color = Color(0.55, 0.3, 0.65, 1)

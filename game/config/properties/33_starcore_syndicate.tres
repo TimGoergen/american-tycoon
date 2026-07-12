@@ -4,12 +4,12 @@
 
 [resource]
 script = ExtResource("1")
-property_id = 13
-display_name = "Photon Exchange"
+property_id = 33
+display_name = "Starcore Syndicate"
 unlock_tier = 2
-base_cost = 6543000000000.0
+base_cost = 374200000000000.0
 r0 = 1.09
-base_income_per_unit = 28130000000.0
-base_cycle_length = 240.0
-staffer_name = "Photon Exchange Director"
+base_income_per_unit = 1609000000000.0
+base_cycle_length = 192.0
+staffer_name = "Stellar Core Magnate"
 accent_color = Color(0.98, 0.8, 0.25, 1)

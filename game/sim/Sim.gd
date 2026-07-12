@@ -60,7 +60,15 @@ func _initialize() -> void:
 
 	# Epoch transition study: does each alien epoch take longer or shorter than
 	# the last? (The "second epoch stalls out" investigation, 2026-06-27.)
+	# NOTE: this prints a LINEAR projection that predates the Phase 2 cohort model;
+	# it is kept only as a first-order reference. The real per-epoch pacing now comes
+	# from the measurement below, which builds the actual cohort + per-block staff.
 	_run_epoch_timing_study()
+
+	# Epoch pacing MEASUREMENT (Phase 3, 2026-07-11): build each epoch's real economy
+	# (four-property cohort magnitudes + per-block staff levels) and measure the actual
+	# per-epoch duration ratio against Tim's ~1.05x target.
+	_run_epoch_pacing_measurement()
 
 	# Legacy-gem conversion study: how many gems does a run of a given size mint,
 	# under the live curve vs candidate curves? (Tim 2026-07-02: "I rarely earn
@@ -740,6 +748,98 @@ func _measure_tier1_plateau_income() -> float:
 	# The passive (staffed) rate excludes the temporary frenzy multiplier, so it is
 	# the steady income the epoch climb actually runs on.
 	return game.economy.get_passive_income_per_sec()
+
+
+# ---------------------------------------------------------------------------
+# Epoch pacing MEASUREMENT (Phase 3) — the real per-epoch duration ratio
+# ---------------------------------------------------------------------------
+#
+# WHY THIS REPLACES THE PROJECTION ABOVE. The old study assumed income scales as a
+# single linear factor per epoch (base_earth_ips × staff_income_multiplier(tier)).
+# Phase 2 broke that: each alien epoch is now a four-property COHORT whose base
+# magnitudes scale with the epoch, and Phase 1 made staff a per-epoch BLOCK ladder
+# where an alien property's own ladder restarts at block 1 (multiplier 1.0) each
+# epoch. So income per epoch grows from two entangled sources at once — cohort base
+# magnitude AND accumulated staff blocks — and which one dominates decides the pace.
+# You cannot hand-derive that; you have to build the economy and read the number.
+#
+# THE MODEL. For each epoch T we build a REPRESENTATIVE, self-similar portfolio —
+# the same unit depth on every property the epoch has unlocked, each staffed to the
+# reached-epoch cap — and read the real passive income/sec. Then
+#   duration(T) ≈ (dollars you must earn in epoch T) / (that income).
+# The unit depth is a shared constant, so it cancels out of the epoch-to-epoch RATIO
+# (the thing we tune); only the absolute clock depends on it. This intentionally
+# mirrors the old study's "plateau income → duration" structure, but the income is
+# now measured from the actual cohort + staff economy instead of assumed linear.
+
+## Representative build depth: how many units of each unlocked property the measured
+## portfolio owns. Cancels out of the epoch RATIO (self-similar across epochs); it
+## only sets the absolute-clock scale, so any sane mid-build number works. First-pass.
+const EPOCH_STUDY_UNITS_PER_PROP := 25
+
+
+func _run_epoch_pacing_measurement() -> void:
+	print("")
+	print("=== Epoch pacing MEASUREMENT (real cohort magnitudes + per-block staff) ===")
+	print("    Model: own %d units of every unlocked property, staffed to the reached-epoch" % EPOCH_STUDY_UNITS_PER_PROP)
+	print("    cap; read the real passive income/sec, then duration = must-earn / income.")
+	print("    Self-similar across epochs, so the RATIO is the signal (the absolute clock")
+	print("    scales with the unit depth). Target (Tim 2026-07-11): each epoch ~1.05x the last.")
+	print("")
+	print("    epoch  econ_scale   props   staff lv       income/sec         must earn        duration    vs prev")
+	var earth_target := _tuning.earth_economy_target
+	var prev_threshold := 0.0
+	var prev_duration := 0.0
+	var total := 0.0
+	for tier in range(1, EpochCatalog.tier_count() + 1):
+		var threshold := EpochCatalog.consume_threshold(tier, earth_target)
+		var must_earn := threshold - prev_threshold
+		var measured := _measure_epoch_income(tier)
+		var income: float = measured["income"]
+		var duration := must_earn / income if income > 0.0 else INF
+		total += duration
+		var ratio_text := "—"
+		if prev_duration > 0.0 and is_finite(duration):
+			ratio_text = "x%.2f" % (duration / prev_duration)
+		print("    %4d   %10s   %5d   %8d   %16s   %14s   %10s   %7s" % [
+			tier,
+			_format_scale(EpochCatalog.economy_scale(tier)),
+			int(measured["properties"]),
+			int(measured["staff_levels"]),
+			Money.of(income).display() + "/s",
+			Money.of(must_earn).display(),
+			_format_duration(duration),
+			ratio_text,
+		])
+		prev_threshold = threshold
+		prev_duration = duration
+	print("    total time across all %d epochs: %s" % [EpochCatalog.tier_count(), _format_duration(total)])
+
+
+## Build epoch T's representative economy and return its real passive income/sec plus
+## what got built. Sets the reached epoch to T, then gives every unlocked property the
+## shared unit depth and staffs it to T's cap. Directly sets the state (units + staff
+## level) rather than earning/paying for it: this measures the income the built economy
+## RUNS at, and the build cost is irrelevant to that rate. Bare GameState (no Legacy),
+## so it reads the raw epoch pacing, not a juiced heir.
+func _measure_epoch_income(tier: int) -> Dictionary:
+	var game := GameState.new(_property_configs, _tuning)
+	game.epoch.current_tier = tier
+	var properties_built := 0
+	var total_staff_levels := 0
+	for i in range(game.economy.properties.size()):
+		if not game.economy.is_property_unlocked(i, tier):
+			continue
+		var prop := game.economy.properties[i] as PropertyState
+		prop.units_owned = EPOCH_STUDY_UNITS_PER_PROP
+		prop.staff_level = game.economy.get_staff_level_cap(i, tier)
+		properties_built += 1
+		total_staff_levels += prop.staff_level
+	return {
+		"income": game.economy.get_passive_income_per_sec(),
+		"properties": properties_built,
+		"staff_levels": total_staff_levels,
+	}
 
 
 ## Build a geometric ladder [1, step, step^2, ...] of `count` tiers (tier 1 = 1.0).

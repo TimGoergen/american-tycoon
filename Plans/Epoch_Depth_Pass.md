@@ -243,7 +243,8 @@ cohort payback ratios. Constraint kept: time-to-first-contact ≈ today's.
 - `_run_epoch_timing_study` (Sim.gd): replace the tier-multiplier projection with a
   playout-informed model that folds in (a) cohort buy staging, (b) block-level buying
   with home-epoch costs, (c) the cohort-wide contact bonus. Print per-epoch projected
-  duration + ratio; verdict passes at ratio ∈ [1.0, ~1.4].
+  duration + ratio; verdict passes at ratio ≈ 1.05 per epoch (Tim's target, §6 Q5;
+  accept ~[1.0, 1.12]).
 - Playout policies (`Sim.gd`, `PaceStudy.gd`): teach the greedy policy to buy staff
   levels (a known scope cut today) and cohort properties.
 - `EpochTest.gd`: new pins — sequential ordering (can't buy block b+1 rung before
@@ -304,9 +305,14 @@ docs (GDD §5.5/§6, Spec §3.6/§6) sync at each phase like the epoch-staffing 
    affordance may be wanted after device feel (flagged, not built).
 4. **(Phase 2) Cohort size four** (vs 3 or 5) and the first-pass names above — veto
    freely, they're placeholders.
-5. **(Phase 3) Duration target:** each epoch ≈ same length as the previous (flat), or
-   drifting slightly longer (~1.2×)? Recommendation: flat-to-1.2×, decided by feel
-   after the study prints both.
+5. **(Phase 3) Duration target — DECIDED (Tim, 2026-07-11): ~1.05× per epoch.** Each
+   post-Earth epoch runs slightly longer than the one before it — a gentle drift, NOT
+   flat and NOT the ~1.2× upper option. Over the five alien epochs this compounds to
+   only ~1.28× total spread (1.05⁵), so late epochs feel a touch weightier without
+   dragging; prestige stays the sole acceleration fantasy. The study's pass band
+   therefore centers on 1.05 (accept ratio ∈ ~[1.0, 1.12] per epoch). Watch item: 1.05
+   is subtle — the study must confirm the per-epoch duration deltas are large enough to
+   read as intentional (not indistinguishable from flat); it's a knob, retune if so.
 
 ---
 

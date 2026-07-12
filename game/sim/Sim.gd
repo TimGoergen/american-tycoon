@@ -74,6 +74,11 @@ func _initialize() -> void:
 	# threshold-anchored formula and measure candidates until one paces at ~1.05x.
 	_run_cohort_sweep()
 
+	# Epoch pacing PLAYOUT (Phase 3): the cost-curve-aware instrument — a heir actually
+	# plays through all six epochs, so cost gates unit counts and the cost/payback feel
+	# can be weighed against real dynamics.
+	_run_epoch_playout_study()
+
 	# Legacy-gem conversion study: how many gems does a run of a given size mint,
 	# under the live curve vs candidate curves? (Tim 2026-07-02: "I rarely earn
 	# more than ~70 gems even when I out-earn a previous run" — the log² curve is
@@ -300,6 +305,69 @@ func _greedy_buy_spree(game: GameState) -> int:
 		units_bought += 1
 
 	return units_bought
+
+
+## A fuller greedy build than _greedy_buy_spree: each step buys whichever single action —
+## one more unit OR the next staff LEVEL — adds the most passive income/sec per dollar, then
+## hires (level 1, automation) any owned-but-unstaffed property and restarts idle cycles.
+## Used by the cost-curve-aware epoch playout, where staff-block levels are a real income
+## source that _greedy_buy_spree (units only) would miss. Capped per call so a huge cash
+## pile mid-epoch can't spin the loop forever; leftover cash simply carries to the next tick.
+func _greedy_build_out(game: GameState) -> void:
+	var reached := game.epoch.current_tier
+	var actions := 0
+	while actions < 400:
+		actions += 1
+		var best_index := -1
+		var best_is_staff := false
+		var best_value := 0.0  # marginal passive income/sec per dollar
+		for i in range(game.economy.properties.size()):
+			var prop := game.economy.properties[i] as PropertyState
+			if not game.economy.is_property_unlocked(i, reached):
+				continue
+			# Option A — one more unit.
+			var unit_cost := prop.get_next_cost()
+			if unit_cost > 0.0 and game.economy.cash >= unit_cost:
+				var before_units := prop.get_income_per_sec()
+				prop.units_owned += 1
+				var after_units := prop.get_income_per_sec()
+				prop.units_owned -= 1
+				var unit_value := (after_units - before_units) / unit_cost
+				if unit_value > best_value:
+					best_value = unit_value
+					best_index = i
+					best_is_staff = false
+			# Option B — the next staff level (only worth peeking once a unit is owned; the
+			# hire itself, level 1, adds no income and is handled by the hire pass below).
+			if prop.units_owned > 0 and prop.staff_level >= 1 \
+					and not game.economy.is_staff_level_maxed(i, reached):
+				var level_cost := game.economy.get_next_staff_level_cost(i)
+				if level_cost > 0.0 and game.economy.cash >= level_cost:
+					var before_level := prop.get_income_per_sec()
+					prop.staff_level += 1
+					var after_level := prop.get_income_per_sec()
+					prop.staff_level -= 1
+					var level_value := (after_level - before_level) / level_cost
+					if level_value > best_value:
+						best_value = level_value
+						best_index = i
+						best_is_staff = true
+		if best_index == -1:
+			break
+		if best_is_staff:
+			game.try_buy_staff_level(best_index)
+		else:
+			game.try_buy(best_index, 1)
+	# Automation pass: hire (level 1) any owned property still unstaffed, and restart any
+	# idle cycle. Unstaffed properties stop after each payout (Spec §4), so an active player
+	# keeps re-tapping — the playout does the same so income never silently stalls.
+	for i in range(game.economy.properties.size()):
+		var prop := game.economy.properties[i] as PropertyState
+		if prop.units_owned > 0:
+			if not prop.is_staffed:
+				game.try_buy_staff_level(i)
+			if not prop.is_cycle_running:
+				game.tap_property(i)
 
 
 # ---------------------------------------------------------------------------
@@ -988,6 +1056,106 @@ func _print_cohort_candidate(economy_step: float, drift: float, cost_fraction: f
 		prev_threshold = threshold
 		prev_duration = duration
 	print("    total time across all %d epochs: %s" % [EpochCatalog.tier_count(), _format_duration(total)])
+
+
+# ---------------------------------------------------------------------------
+# Epoch pacing PLAYOUT (Phase 3) — cost-curve-aware, the faithful instrument
+# ---------------------------------------------------------------------------
+#
+# The fixed-depth measurement gives every property the same 25 units, so it IGNORES
+# the cost curve — it cannot tell an expensive-slow-burn property from a cheap-quick-
+# flip one, because both get 25 units regardless. This playout fixes that: one bare
+# heir actually plays from $0 through all six epochs, reinvesting greedily, so the
+# cost curve (r0 steepening + the cohort's base_cost) genuinely decides how many units
+# get owned. We record the wall-clock spent in each epoch. This is the instrument that
+# can weigh the cost-vs-payback feel, because now cost has consequences.
+
+const PLAYOUT_TIME_CAP := 21600.0    # 6 sim-hours; a candidate that can't clear by then is too slow
+
+
+func _run_epoch_playout_study() -> void:
+	print("")
+	print("=== Epoch pacing PLAYOUT (cost-curve-aware; a heir plays through the epochs) ===")
+	print("    A bare heir plays from $0, reinvesting greedily, so base_cost + the r0 curve")
+	print("    decide unit counts. Two cost/payback splits with the SAME product show the pace")
+	print("    is identical across the feel range — so the cost/payback split is a free feel choice.")
+	# Two cost/payback splits sharing the same cost_frac x payback product, to show the pace
+	# is the SAME across the feel range (so the feel is a free choice). step60/drift1.08.
+	# Epoch 1 (Earth) reads long here because a BARE heir cold-starts from $0 — that one-time
+	# bootstrap is unique to Earth; the steady per-epoch pace is the epoch 2->5 ratios.
+	var cohort_step := 60.0 / 1.08
+	_print_playout("BARE heir · expensive/slow-burn  (cost_frac 0.0080, payback 0.0012)", 0,
+		_synthesize_cohort_configs(cohort_step, 0.0080, 0.0012))
+	_print_playout("BARE heir · cheap/Earth-like flip (cost_frac 0.00006, payback 0.16)", 0,
+		_synthesize_cohort_configs(cohort_step, 0.00006, 0.16))
+
+
+## Play one heir (bare if heir_legacy is 0, else juiced) with the given cohort configs and
+## print the wall-clock spent in each NON-terminal epoch (+ ratio vs the previous). The final
+## epoch is the terminal state — there is nothing beyond it to advance to — so it has no
+## duration and is omitted. The real pacing test: cost gates units in the playout.
+func _print_playout(label: String, heir_legacy: int, configs: Array) -> void:
+	print("")
+	print("  --- %s ---" % label)
+	var result := _measure_epoch_durations_via_playout(configs, heir_legacy)
+	var durations: Dictionary = result["durations"]
+	print("    epoch     duration    vs prev")
+	var prev := 0.0
+	# Skip the last tier: reaching it ENDS the climb, so its recorded time is not a cleared-epoch
+	# duration (the loop stops the instant it is reached).
+	for tier in range(1, EpochCatalog.tier_count()):
+		if not durations.has(tier):
+			continue
+		var d: float = durations[tier]
+		var ratio_text := "—"
+		if prev > 0.0 and d > 0.0:
+			ratio_text = "x%.2f" % (d / prev)
+		print("    %4d   %10s   %7s" % [tier, _format_duration(d), ratio_text])
+		prev = d
+	if not result["completed"]:
+		print("    (did not reach the final epoch within the %s sim-time cap)" % _format_duration(PLAYOUT_TIME_CAP))
+	print("    total to final contact: %s" % _format_duration(result["sim_time"]))
+
+
+## Play a bare heir from $0 with the given configs, ticking until every epoch is cleared
+## (or the time cap). Returns per-tier wall-clock durations, whether it finished, and the
+## total sim time. Active-play model: wage taps to bootstrap, greedy reinvest each tick
+## (buys units + staff + hires + restarts cycles), frenzy popped when ready.
+func _measure_epoch_durations_via_playout(configs: Array, heir_legacy: int) -> Dictionary:
+	# Always via a DynastyState so a juiced heir can spend Legacy on upgrades first (the
+	# dynasty tick also applies the Family Fortune income multiplier). heir_legacy 0 = bare.
+	var dynasty := DynastyState.new(configs, _tuning)
+	if heir_legacy > 0:
+		dynasty.upgrades.award(heir_legacy)
+		_buy_upgrades_greedily(dynasty)
+	var game := dynasty.current
+	game.economy.award_cash(_tuning.m1_starting_cash)
+	var sim_time := 0.0
+	var next_wage_tap := 0.0
+	var last_tier := game.epoch.current_tier
+	var tier_started := {last_tier: 0.0}
+	var tier_durations := {}
+	while game.epoch.current_tier < EpochCatalog.tier_count() and sim_time < PLAYOUT_TIME_CAP:
+		if sim_time >= next_wage_tap:
+			game.tap_wage()
+			next_wage_tap += WAGE_TAP_PERIOD
+		game.pop_frenzy()
+		_greedy_build_out(game)
+		dynasty.tick(TICK_SIZE)
+		sim_time += TICK_SIZE
+		if game.epoch.current_tier > last_tier:
+			# Close out every tier the tick crossed (a fine 0.1 s tick rarely crosses more
+			# than one, but be safe: assign the split time to the tier that just ended).
+			tier_durations[last_tier] = sim_time - float(tier_started[last_tier])
+			tier_started[game.epoch.current_tier] = sim_time
+			last_tier = game.epoch.current_tier
+	# Record the final (possibly incomplete) tier's time so far.
+	tier_durations[last_tier] = sim_time - float(tier_started.get(last_tier, sim_time))
+	return {
+		"durations": tier_durations,
+		"completed": game.epoch.current_tier >= EpochCatalog.tier_count(),
+		"sim_time": sim_time,
+	}
 
 
 ## Build a geometric ladder [1, step, step^2, ...] of `count` tiers (tier 1 = 1.0).

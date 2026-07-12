@@ -693,6 +693,14 @@ func _pump_held_hire(delta: float) -> void:
 			_on_hire_pressed()
 
 
+## True while a HELD action is engaged on this row: auto-rush (held past RUSH_ENGAGE_SEC), or
+## hold-to-buy / hold-to-hire once they start repeating. Main checks this so a press that's held
+## long enough to trigger a hold and then drifts sideways does NOT also flip the epoch tab
+## (Tim 2026-07-11 — a hold owns the finger).
+func is_hold_active() -> bool:
+	return _buy_hold_repeating or _hire_hold_repeating or _rush_hold_seconds >= RUSH_ENGAGE_SEC
+
+
 func _refresh(delta: float) -> void:
 	# Ladder visibility (Phase 3 tabs, Tim 2026-07-11): the pager (Main) groups properties into
 	# epoch tabs and shows one tab at a time, so within the ACTIVE tab every unlocked property is

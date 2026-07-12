@@ -788,11 +788,24 @@ func _input(event: InputEvent) -> void:
 			_swipe_delta = Vector2.ZERO
 		elif _swipe_tracking:
 			_swipe_tracking = false
+			# A press held long enough to trigger a hold (auto-rush / hold-to-buy / hold-to-hire)
+			# owns the finger — don't also flip the tab if it drifted sideways (Tim 2026-07-11).
+			if _any_row_holding():
+				return
 			# Swipe LEFT (negative x) advances to the next epoch, like turning a page forward.
 			if absf(_swipe_delta.x) >= EPOCH_SWIPE_THRESHOLD and absf(_swipe_delta.x) > absf(_swipe_delta.y):
 				_step_epoch_tab(1 if _swipe_delta.x < 0.0 else -1)
 	elif event is InputEventScreenDrag and _swipe_tracking:
 		_swipe_delta = event.position - _swipe_start
+
+
+## True if any property row currently has a held action engaged (so a sideways drift during a
+## hold shouldn't be read as an epoch swipe). Only the active tab's rows can be held.
+func _any_row_holding() -> bool:
+	for row_variant in _rows:
+		if (row_variant as PropertyRow).is_hold_active():
+			return true
+	return false
 
 
 ## Estate Planning tab: the prestige hub — the "Plan the Estate" succession action on

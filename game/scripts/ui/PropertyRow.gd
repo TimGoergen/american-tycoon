@@ -521,7 +521,24 @@ func set_buy_mode(mode: BuyMode) -> void:
 	_buy_mode = mode
 
 
+## When false, this row belongs to an epoch/tab the pager is NOT currently showing: the row
+## hides and skips ALL per-frame work (refresh + carbonation draw), so only the active tab's
+## ~6 rows ever cost anything. Set by Main via set_tab_active(). Default true so the row still
+## works if the pager never touches it.
+var _tab_active: bool = true
+
+
+## Main's pager calls this when the player swipes to another epoch/tab: only the active tab's
+## rows stay live. Hiding stops the Control (and its GoldBubbles) from drawing.
+func set_tab_active(active: bool) -> void:
+	_tab_active = active
+	if not active:
+		visible = false
+
+
 func _process(delta: float) -> void:
+	if not _tab_active:
+		return  # a hidden tab: no refresh, no bar/bubble draw — the whole point of the pager
 	_refresh(delta)
 	_pump_held_rush(delta)
 	_pump_held_buy(delta)
@@ -677,20 +694,13 @@ func _pump_held_hire(delta: float) -> void:
 
 
 func _refresh(delta: float) -> void:
-	# Ladder visibility (Tim, 2026-06-16): show every rung the player owns, plus every
-	# rung they can already afford one unit of (buy button live), plus exactly the
-	# single cheapest rung they cannot yet afford (grayed, a peek at what's next).
-	# Everything beyond that one peek stays hidden. An invisible child takes no space in
-	# the VBox, so the list grows as the player's reach grows.
-	# A property still locked behind a later epoch never shows — not even as the grayed
-	# peek rung. It is revealed only once First Contact opens its epoch (GDD §5.5 site 2).
+	# Ladder visibility (Phase 3 tabs, Tim 2026-07-11): the pager (Main) groups properties into
+	# epoch tabs and shows one tab at a time, so within the ACTIVE tab every unlocked property is
+	# shown — the old single-cheapest "peek" rule is replaced by the tab grouping. This func only
+	# runs at all when _tab_active is true (see _process), so a row is visible iff its property is
+	# unlocked. A property locked behind a later epoch still never shows (its tab isn't reachable).
 	var current_tier := _epoch.current_tier
-	var unlocked := _economy.is_property_unlocked(prop_index, current_tier)
-	var can_afford_one := _economy.cash >= _prop.get_bulk_cost(1)
-	visible = unlocked and ( \
-			_prop.units_owned > 0 \
-			or can_afford_one \
-			or prop_index == _economy.get_cheapest_unaffordable_unowned_index(current_tier))
+	visible = _economy.is_property_unlocked(prop_index, current_tier)
 
 	var config := _prop.config as PropertyConfig
 	# Row 1 is just the property name (bold). The owned-count and next-milestone threshold now live

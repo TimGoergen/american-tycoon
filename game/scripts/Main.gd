@@ -55,6 +55,21 @@ var _lifetime_earned_label: RichTextLabel
 var _shown_lifetime_earned := -1
 var _rows: Array = []
 
+# Epoch PAGER (Tim 2026-07-11): the property ladder is split into epoch "tabs" — Earth Blue
+# Collar (indices 0-5), Earth White Collar (6-11), then one tab per alien epoch. The pager
+# shows ONE tab at a time (big label + ‹ › arrows + dots + swipe), so only that tab's ~6 rows
+# ever draw (the CPU win at 37 properties). Tab index: 0/1 = Earth, 2..tier_count = epoch N.
+var _epoch_tab := 0
+var _epoch_pager_label: Label       # the big civilization / "EARTH" name
+var _epoch_pager_sub: Label         # the "Blue Collar" / "White Collar" subtitle (blank for aliens)
+var _epoch_prev_button: Button
+var _epoch_next_button: Button
+var _epoch_pager_dots: EpochPagerDots
+var _swipe_tracking := false        # a touch is down on the ladder, tracking for a horizontal swipe
+var _swipe_start := Vector2.ZERO
+var _swipe_delta := Vector2.ZERO
+const EPOCH_SWIPE_THRESHOLD := 60.0  # px of horizontal travel to count as a tab swipe
+
 # Bottom tab bar (UI Notes §7). The four surfaces share one content slot; one is
 # visible at a time, switched by the icon buttons pinned along the bottom.
 const TAB_PROPERTY := 0
@@ -546,6 +561,11 @@ func _build_property_tab() -> Control:
 	_buy_mode_button.add_child(SecondaryTapButton.new())
 	action_row.add_child(_buy_mode_button)
 
+	# Epoch pager header: the big epoch label + ‹ › arrows + position dots, above the ladder.
+	# Only the active epoch's rows are drawn (PropertyRow.set_tab_active), so the property
+	# count on screen stays ~6 no matter how deep the run is (Tim 2026-07-11).
+	v.add_child(_build_epoch_pager())
+
 	# The property ladder: the rows in a vertical scroll (GDD §2), hosted in a plain
 	# Control so the two overlays can sit ON the list without reserving layout space:
 	# the ScrollEdgeArrows paging strips (Tim, 2026-07-05), and the GhostScrollBar.
@@ -571,6 +591,15 @@ func _build_property_tab() -> Control:
 	var ghost_bar := GhostScrollBar.new()
 	ghost_bar.setup(scroll)
 	ladder_area.add_child(ghost_bar)
+
+	# A transparent overlay that reads horizontal swipes to change epoch tabs. MOUSE_FILTER_PASS
+	# lets a touch still reach the scroll (vertical) and the row buttons below it; horizontal
+	# scrolling is disabled, so a left/right swipe conflicts with nothing.
+	var swipe_catcher := Control.new()
+	swipe_catcher.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	swipe_catcher.mouse_filter = Control.MOUSE_FILTER_PASS
+	swipe_catcher.gui_input.connect(_on_ladder_swipe_input)
+	ladder_area.add_child(swipe_catcher)
 
 	var ladder := VBoxContainer.new()
 	ladder.add_theme_constant_override("separation", 10)
@@ -598,6 +627,9 @@ func _build_property_tab() -> Control:
 		ladder.add_child(row)
 		_rows.append(row)
 
+	# Open on the deepest reached epoch (where the player is actively buying) and paint the pager.
+	_set_epoch_tab(_epoch_default_tab())
+
 	_wage_panel = WagePanel.new()
 	_wage_panel.setup(game.wage, tuning, game.frenzy)
 	_wage_panel.wage_tapped.connect(_on_wage_tapped)
@@ -605,6 +637,156 @@ func _build_property_tab() -> Control:
 	v.add_child(_wage_panel)
 
 	return v
+
+
+# ---------------------------------------------------------------------------
+# Epoch pager — the property ladder's per-epoch tabs (Tim 2026-07-11)
+# ---------------------------------------------------------------------------
+
+## Number of pager tabs: 2 Earth (Blue/White Collar) + one per alien epoch.
+func _epoch_tab_count() -> int:
+	return EpochCatalog.tier_count() + 1
+
+
+## Which tab a property index belongs to: 0 = Earth Blue Collar (indices 0-5), 1 = Earth White
+## Collar (6-11), else the property's alien epoch (unlock_tier 2..tier_count).
+func _epoch_tab_of(prop_index: int) -> int:
+	if prop_index <= 5:
+		return 0
+	if prop_index <= 11:
+		return 1
+	var prop := game.economy.properties[prop_index] as PropertyState
+	return (prop.config as PropertyConfig).unlock_tier
+
+
+## The highest tab the player can currently open (the navigation upper bound). BOTH Earth collar
+## tabs (0, 1) are always open; alien epoch tabs open one at a time at First Contact. So the max
+## is the reached epoch, but never below 1 (White Collar is reachable from the very start).
+func _epoch_tab_max() -> int:
+	return maxi(1, game.epoch.current_tier)
+
+
+## The tab to open on load: the deepest alien epoch if one is reached, else Earth Blue Collar
+## (tab 0) — the start of the ladder, where a fresh founder begins.
+func _epoch_default_tab() -> int:
+	if game.epoch.current_tier >= 2:
+		return game.epoch.current_tier
+	return 0
+
+
+## The big label for a tab: "EARTH" for the two Earth tabs, else the civilization's name.
+func _epoch_tab_name(tab: int) -> String:
+	if tab <= 1:
+		return "EARTH"
+	return String(EpochCatalog.get_epoch(tab).get("civilization", "")).to_upper()
+
+
+## The subtitle under the name: the collar for Earth, blank for aliens (the civ name stands alone).
+func _epoch_tab_sub(tab: int) -> String:
+	if tab == 0:
+		return "BLUE COLLAR"
+	if tab == 1:
+		return "WHITE COLLAR"
+	return ""
+
+
+func _build_epoch_pager() -> Control:
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 4)
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	box.add_child(row)
+
+	_epoch_prev_button = _make_pager_arrow("‹")
+	_epoch_prev_button.pressed.connect(func() -> void: _step_epoch_tab(-1))
+	row.add_child(_epoch_prev_button)
+
+	var center := VBoxContainer.new()
+	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	center.add_theme_constant_override("separation", 0)
+	row.add_child(center)
+
+	_epoch_pager_label = Label.new()
+	_epoch_pager_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_epoch_pager_label.add_theme_font_override("font", UiPalette.make_bold_font())
+	_epoch_pager_label.add_theme_font_size_override("font_size", UiPalette.FONT_DISPLAY)
+	_epoch_pager_label.add_theme_color_override("font_color", UiPalette.NAVY)
+	center.add_child(_epoch_pager_label)
+
+	_epoch_pager_sub = Label.new()
+	_epoch_pager_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_epoch_pager_sub.add_theme_font_override("font", UiPalette.make_bold_font())
+	_epoch_pager_sub.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
+	_epoch_pager_sub.add_theme_color_override("font_color", UiPalette.DARK_GOLD)
+	center.add_child(_epoch_pager_sub)
+
+	_epoch_next_button = _make_pager_arrow("›")
+	_epoch_next_button.pressed.connect(func() -> void: _step_epoch_tab(1))
+	row.add_child(_epoch_next_button)
+
+	_epoch_pager_dots = EpochPagerDots.new()
+	box.add_child(_epoch_pager_dots)
+	return box
+
+
+## A large, readable ‹ / › stepper button for the pager.
+func _make_pager_arrow(glyph: String) -> Button:
+	var b := Button.new()
+	b.text = glyph
+	b.custom_minimum_size = Vector2(96, UiPalette.STANDARD_BUTTON_HEIGHT)
+	b.add_theme_font_override("font", UiPalette.make_bold_font())
+	b.add_theme_font_size_override("font_size", UiPalette.FONT_DISPLAY)
+	UiPalette.style_button(b, false)
+	return b
+
+
+## Move the pager by `delta` tabs, clamped to [0, deepest reached epoch] so you can't page into
+## an epoch you haven't opened yet.
+func _step_epoch_tab(delta: int) -> void:
+	_set_epoch_tab(_epoch_tab + delta)
+
+
+## Switch to a tab: gate every row's liveness to it (only this tab refreshes + draws), then
+## repaint the pager. Safe to call before the rows exist (used from _on_contact_made too).
+func _set_epoch_tab(tab: int) -> void:
+	_epoch_tab = clampi(tab, 0, _epoch_tab_max())
+	for row_variant in _rows:
+		var row := row_variant as PropertyRow
+		row.set_tab_active(_epoch_tab_of(row.prop_index) == _epoch_tab)
+	_update_epoch_pager()
+
+
+## Repaint the pager label/subtitle, arrow enabled-state, and dots for the current tab.
+func _update_epoch_pager() -> void:
+	if _epoch_pager_label == null:
+		return
+	_epoch_pager_label.text = _epoch_tab_name(_epoch_tab)
+	var sub := _epoch_tab_sub(_epoch_tab)
+	_epoch_pager_sub.text = sub
+	_epoch_pager_sub.visible = sub != ""
+	var last := _epoch_tab_max()
+	_epoch_prev_button.disabled = _epoch_tab <= 0
+	_epoch_next_button.disabled = _epoch_tab >= last
+	_epoch_pager_dots.set_state(_epoch_tab_count(), _epoch_tab, last)
+
+
+## Read horizontal swipes over the ladder to change tabs (arrows and swipe both work). The
+## overlay is MOUSE_FILTER_PASS, so taps still reach the row buttons and vertical touches still
+## scroll; only a clearly-horizontal drag past the threshold turns the page.
+func _on_ladder_swipe_input(event: InputEvent) -> void:
+	if event is InputEventScreenTouch:
+		if event.pressed:
+			_swipe_tracking = true
+			_swipe_start = event.position
+			_swipe_delta = Vector2.ZERO
+		elif _swipe_tracking:
+			_swipe_tracking = false
+			# Swipe LEFT (negative x) advances to the next epoch, like turning a page forward.
+			if absf(_swipe_delta.x) >= EPOCH_SWIPE_THRESHOLD and absf(_swipe_delta.x) > absf(_swipe_delta.y):
+				_step_epoch_tab(1 if _swipe_delta.x < 0.0 else -1)
+	elif event is InputEventScreenDrag and _swipe_tracking:
+		_swipe_delta = event.position - _swipe_start
 
 
 ## Estate Planning tab: the prestige hub — the "Plan the Estate" succession action on
@@ -1056,6 +1238,9 @@ func _on_contact_made(new_tier: int) -> void:
 	# Swap the play-field backdrop to match the newly reached epoch before the beat plays,
 	# so when the first-contact overlay clears the player is looking at the new world.
 	_background.texture = load(_background_path_for_tier(new_tier))
+	# The new epoch just opened its pager tab — jump to it so that when the contact beat (and any
+	# trade-deal minigame) clears, the player is looking at the new civilization's properties.
+	_set_epoch_tab(new_tier)
 	_pending_contact_tier = new_tier
 	_first_contact_overlay.show_contact(new_tier)
 
@@ -1345,3 +1530,40 @@ func _buy_mode_caption(mode: PropertyRow.BuyMode) -> String:
 		PropertyRow.BuyMode.MAX:
 			return "MAX"
 	return "×1"
+
+
+# ---------------------------------------------------------------------------
+# Epoch pager position dots
+# ---------------------------------------------------------------------------
+
+## The pager's position indicator: one dot per tab. The current tab is a large gold dot; other
+## reached tabs are smaller navy dots; locked (not-yet-reached) epochs are faint navy dots — a
+## quiet tease of how many epochs lie ahead. Purely an indicator (navigation is the arrows/swipe).
+class EpochPagerDots extends Control:
+	var _total := 0
+	var _current := 0
+	var _max_available := 0
+	const DOT_SPACING := 36.0
+	const DOT_RADIUS := 10.0
+
+	func set_state(total: int, current: int, max_available: int) -> void:
+		_total = total
+		_current = current
+		_max_available = max_available
+		custom_minimum_size = Vector2(0, DOT_RADIUS * 2.0 + 14.0)
+		queue_redraw()
+
+	func _draw() -> void:
+		if _total <= 0:
+			return
+		var span := float(_total - 1) * DOT_SPACING
+		var start_x := (size.x - span) * 0.5
+		var y := size.y * 0.5
+		for i in range(_total):
+			var pos := Vector2(start_x + float(i) * DOT_SPACING, y)
+			if i == _current:
+				draw_circle(pos, DOT_RADIUS, UiPalette.MUSTARD_GOLD)
+			elif i <= _max_available:
+				draw_circle(pos, DOT_RADIUS * 0.6, UiPalette.INK_NAVY)
+			else:
+				draw_circle(pos, DOT_RADIUS * 0.5, Color(UiPalette.INK_NAVY, 0.25))

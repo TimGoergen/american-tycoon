@@ -23,20 +23,18 @@ class_name EpochCatalog
 # v1 ships Earth + 5 alien races (Plans doc §8 named the first 3; Quartzite and
 # Chronophage were added in Phase 4).
 #
-# EPOCH PACING (Phase 3 rework, 2026-07-11 — the "every epoch too fast" fix; plan
-# Plans/Epoch_Depth_Pass.md §4). economy_scale sets how much you must EARN to clear an
-# epoch; the alien COHORT magnitudes (per-property .tres) set how much your income grows
-# in it. Time to clear ~= (must-earn) / (income).
-#   economy_scale = 60^(tier-1)  -> 1, 60, 3.6k, 216k, 12.96M, 777.6M   (the threshold ladder)
-# The cohort .tres magnitudes are generated to grow at a slightly SMALLER step than the
-# threshold (economy_step / DRIFT, DRIFT ~1.08), so income grows a touch slower than the
-# goalpost and each epoch runs ~1.05x LONGER than the last — Tim's 2026-07-11 target (gentle
-# drift; prestige, not epoch churn, is the acceleration fantasy). The earlier 30^/40^ "race"
-# model is retired: it assumed a linear per-tier staff factor that the Phase 1/2 per-block
-# staff ladder + four-property cohorts broke (see the sim's pacing MEASUREMENT + PLAYOUT,
-# which build the real economy instead of projecting). staff_income_multiplier below is now
-# only the per-block staff STEP scaler, not the epoch income law. First-pass; sim-verified,
-# device pass owed (Phase 4).
+# EPOCH PACING (Continuous-ladder rework, 2026-07-12 — Tim's "each new property is a ~7×
+# jump from the last, like a new property on Earth" model). The 37 properties are now ONE
+# continuous geometric ladder at ~7×/rung: Earth's 12 are unchanged (they already run ~7×/rung,
+# ATM $50 → Executive Assets $100B) and the 25 alien rungs CONTINUE it from Executive Assets,
+# 5 rungs per epoch. Epochs are thematic milestones on the ladder, not magnitude cliffs.
+#   economy_scale = 7^(5·(tier-1)) = (7^5)^(tier-1) -> 1, 16807, 2.82e8, 4.75e12, 7.98e16, 1.34e21
+# i.e. the earn-to-clear threshold grows one 5-rung ladder block per epoch, matching how far the
+# property magnitudes climb in that epoch — so pacing stays ~flat and you can never trivially buy
+# across epochs (a rung 5 blocks up is 7^25× more expensive). The property BASE magnitude carries
+# each step; staff is now only a MODEST boost, so staff_income_multiplier is FLAT (1.0 every tier)
+# — the old 40^ ladder ballooned staffed old properties and fought the "ladder carries the leap"
+# intent (it made aliens feel weak, then trivially cheap). First-pass; sim-verified, device pass owed.
 
 
 # Each epoch is one dictionary with these keys:
@@ -94,8 +92,8 @@ const EPOCHS := [
 		"civilization": "Luminari Collective",
 		"home_planet": "Solaria Prime",
 		"currency_flavor": "Photons",
-		"economy_scale": 60.0,
-		"staff_income_multiplier": 40.0,
+		"economy_scale": 16807.0,
+		"staff_income_multiplier": 1.0,
 		# Energy/light beings — money now moves at the speed of light. The hail is THEIR
 		# first words (radiant, warm, faintly condescending); the contact_line is our
 		# narrator's deadpan capper. Each civilization gets its own voice + accent color
@@ -130,8 +128,8 @@ const EPOCHS := [
 		"civilization": "Geth-Sentinel Grid",
 		"home_planet": "Rannoch-01",
 		"currency_flavor": "Logic Nodes",
-		"economy_scale": 3_600.0,
-		"staff_income_multiplier": 1_600.0,
+		"economy_scale": 282_475_249.0,
+		"staff_income_multiplier": 1.0,
 		# Cybernetic collective — finance run entirely by machines. Hail = machine-log
 		# fragments, all protocol, no warmth.
 		"hail": "HANDSHAKE ACCEPTED. ASSETS: CATALOGUED. OWNER: DESIGNATED " \
@@ -164,8 +162,8 @@ const EPOCHS := [
 		"civilization": "Mycelium Unity",
 		"home_planet": "Spore-Deep",
 		"currency_flavor": "Spores",
-		"economy_scale": 216_000.0,
-		"staff_income_multiplier": 64_000.0,
+		"economy_scale": 4_747_561_509_943.0,
+		"staff_income_multiplier": 1.0,
 		# Fungal hive-mind — money that literally spreads and self-replicates. Hail =
 		# a creeping lowercase whisper, plural and patient.
 		"hail": "we felt you buying… through the roots… through the dark… " \
@@ -198,8 +196,8 @@ const EPOCHS := [
 		"civilization": "Quartzite Conglomerate",
 		"home_planet": "Geode-7",
 		"currency_flavor": "Prisms",
-		"economy_scale": 12_960_000.0,
-		"staff_income_multiplier": 2_560_000.0,
+		"economy_scale": 79_792_266_297_612_000.0,
+		"staff_income_multiplier": 1.0,
 		# Crystalloid life — capital made permanent, faceted, light bent to its will.
 		# Hail = a cold appraisal, unimpressed and precise.
 		"hail": "Appraisal complete. Your empire is… adequate. Inclusions detected. " \
@@ -231,8 +229,8 @@ const EPOCHS := [
 		"civilization": "Chronophage Enclave",
 		"home_planet": "Tempus",
 		"currency_flavor": "Seconds",
-		"economy_scale": 777_600_000.0,
-		"staff_income_multiplier": 102_400_000.0,
+		"economy_scale": 1_341_068_619_663_964_900_000.0,
+		"staff_income_multiplier": 1.0,
 		# Time-eaters — they trade in stolen moments; your money compounds across hours
 		# that were taken from someone else. Hail = politely terrifying, and it knows
 		# exactly how much of you is left.

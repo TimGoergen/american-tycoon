@@ -60,12 +60,15 @@ func _test_thresholds(tuning: TuningConfig) -> void:
 	var earth := tuning.earth_economy_target
 	_check("Earth (tier 1) consume threshold == Earth target",
 		is_equal_approx(EpochCatalog.consume_threshold(1, earth), earth))
-	_check("Luminari (tier 2) threshold == Earth target x60 (Phase 3 ladder, 2026-07-11)",
-		is_equal_approx(EpochCatalog.consume_threshold(2, earth), earth * 60.0))
+	# Continuous-ladder rework (2026-07-12): the threshold grows one 5-rung ladder block per epoch
+	# (7^5 = 16807x), and staff is now a FLAT modest boost — staff_income_multiplier is 1.0 every tier.
+	_check("Luminari (tier 2) threshold == Earth target x16807 (7^5, continuous ladder)",
+		is_equal_approx(EpochCatalog.consume_threshold(2, earth), earth * 16807.0))
 	_check("There are 6 epochs (Earth + 5 aliens)", EpochCatalog.tier_count() == 6)
-	_check("Earth staffer multiplier is 1.0 (no income change)",
-		is_equal_approx(EpochCatalog.staff_income_multiplier(1), 1.0))
-	_check("Alien staffer multiplier is > 1.0", EpochCatalog.staff_income_multiplier(2) > 1.0)
+	_check("Staffer multiplier is FLAT 1.0 at every tier (the ladder carries the leap, not staff)",
+		is_equal_approx(EpochCatalog.staff_income_multiplier(1), 1.0) \
+			and is_equal_approx(EpochCatalog.staff_income_multiplier(2), 1.0) \
+			and is_equal_approx(EpochCatalog.staff_income_multiplier(6), 1.0))
 
 
 func _test_epoch_advances(configs: Array, tuning: TuningConfig) -> void:
@@ -116,16 +119,17 @@ func _test_staff_ladder_basics(configs: Array, tuning: TuningConfig) -> void:
 	_check("the Luminari hire (level %d) is refused before contact" % (per_block + 1),
 		not game.try_buy_staff_level(0))
 
-	# Contact: the next block opens; its level 1 is the Luminari hire with the big entry step.
+	# Contact: the next block opens; its level 1 is the Luminari hire. Under the FLAT staff model
+	# (continuous-ladder rework, 2026-07-12) a hire is automation only — no entry jump — and every
+	# block's per-level step is the SAME modest size (the property's base magnitude carries the leap).
 	game.epoch.current_tier = 2
 	var multiplier_before := atm._effective_staff_multiplier()
 	_check("the Luminari hire succeeds after contact", game.try_buy_staff_level(0))
 	_check("derived staff tier advanced to 2", atm.staff_tier == 2)
-	_check("block 2's level 1 adds its big entry step",
-		is_equal_approx(atm._effective_staff_multiplier(), multiplier_before + atm.staff_entry_step(2)))
-	# ...and block 2's small steps are sized to ITS epoch, larger than Earth's.
-	_check("block 2's per-level step outweighs Earth's",
-		atm.staff_small_step(2) > atm.staff_small_step(1))
+	_check("block 2's hire adds no entry jump (flat staff)",
+		is_equal_approx(atm.staff_entry_step(2), 0.0))
+	_check("block 2's per-level step equals Earth's (flat staff)",
+		is_equal_approx(atm.staff_small_step(2), atm.staff_small_step(1)))
 
 
 func _test_save_round_trip(configs: Array, tuning: TuningConfig) -> void:

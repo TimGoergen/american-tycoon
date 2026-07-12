@@ -66,13 +66,13 @@ func _initialize() -> void:
 	_run_epoch_timing_study()
 
 	# Epoch pacing MEASUREMENT (Phase 3, 2026-07-11): build each epoch's real economy
-	# (four-property cohort magnitudes + per-block staff levels) and measure the actual
+	# (five-property cohort magnitudes + per-block staff levels) and measure the actual
 	# per-epoch duration ratio against Tim's ~1.05x target.
 	_run_epoch_pacing_measurement()
 
-	# Cohort magnitude SWEEP (Phase 3): regenerate the alien magnitudes from a
-	# threshold-anchored formula and measure candidates until one paces at ~1.05x.
-	_run_cohort_sweep()
+	# Step-up CHECK (Phase 3, Tim 2026-07-11): each epoch's flagship must clearly OUT-EARN
+	# the best staffed Earth property, or a new epoch feels like a downgrade. Prints the ratio.
+	_run_step_up_check()
 
 	# Epoch pacing PLAYOUT (Phase 3): the cost-curve-aware instrument — a heir actually
 	# plays through all six epochs, so cost gates unit counts and the cost/payback feel
@@ -915,151 +915,63 @@ func _measure_epoch_income(tier: int, configs: Array) -> Dictionary:
 
 
 # ---------------------------------------------------------------------------
-# Cohort magnitude SWEEP (Phase 3) — find numbers that pace each epoch at ~1.05x
+# Step-up CHECK (Phase 3) — is a new epoch's flagship a genuine upgrade?
 # ---------------------------------------------------------------------------
 #
-# The measurement above proved the first-pass alien magnitudes are ~50x too hot for
-# their epoch threshold, so a new cohort instantly out-earns everything before it and
-# each epoch collapses to seconds. This sweep regenerates the cohort magnitudes from a
-# THRESHOLD-ANCHORED formula and measures the resulting pacing, so we can pick constants
-# that hit Tim's 1.05x target (2026-07-11) before writing any .tres.
-#
-# The formula (per alien property, epoch T = unlock_tier, cohort slot k = 0..3 by cost):
-#   cohort_step = economy_step / DRIFT        (magnitudes grow a touch SLOWER than the threshold)
-#   base_cost   = earth_target * cohort_step^(T-1) * COST_FRACTION * SPACING^k
-#   base_income = base_cost * PAYBACK          (dollars earned per cycle per unit)
-#   base_cycle  = CYCLE_BASE * (1 - 0.05*k)    (later members pay a touch faster)
-# The threshold grows at economy_step (sets number size); magnitudes grow at the slightly
-# smaller cohort_step, so income grows slower than the threshold and each epoch runs ~DRIFT
-# longer than the last. DRIFT is the pacing-drift target (1.05); PAYBACK sets the absolute clock.
+# Tim 2026-07-11: after reaching epoch 2 he owned 25+ Executive Assets, and even after
+# buying several Photon Exchanges they earned LESS than one Executive Assets — a new
+# epoch felt like a downgrade. Root cause: the first Phase-3 formula tied alien income to
+# cost via a low payback, so alien income/unit ≈ Earth's base while a staffed Earth
+# property carries the big per-block staff multiplier. Fix: alien income is now an
+# INDEPENDENT anchor (decoupled from cost), sized so each flagship clearly OUT-EARNS a
+# staffed Earth property. This check prints that ratio per epoch so the regression can
+# never sneak back: the flagship (1 unit, staffed to the epoch cap) vs the best Earth
+# property (Executive Assets, likewise). Target: flagship >= ~3x Earth (Tim's call).
 
-const COHORT_SPACING := 2.75         # cost/income ratio between adjacent cohort members
-const COHORT_CYCLE_BASE := 240.0     # seconds; matches the current alien cycle band
-# FIVE members per cohort (Tim 2026-07-11). Spaced x2.75 they span 2.75^4 ~= 57x, ~one
-# economy_step-60 band, so the top member hands off cleanly to the next epoch's flagship.
+const STEP_UP_EARTH_INDEX := 11      # Executive Assets — the strongest Earth property (ladder index)
 
 
-func _run_cohort_sweep() -> void:
+func _run_step_up_check() -> void:
 	print("")
-	print("=== Cohort magnitude SWEEP (Phase 3): find ~1.05x pacing ===")
-	print("    Regenerates alien magnitudes from a threshold-anchored formula and measures the")
-	print("    resulting per-epoch pacing. Goal: every 'vs prev' ratio near x1.05 (Tim 2026-07-11).")
-	# economy_step sets number size + cohort spacing room; DRIFT tilts magnitudes below the
-	# threshold so each epoch runs slightly longer (the 1.05 target); PAYBACK sets the absolute
-	# clock. Tim wants big numbers, so candidates sit at step x50-60.
-	# FIVE members per cohort now: the extra top member adds income, so the product must
-	# drop ~2.2x from the 4-member value to hold the pace. cost_frac 0.001 keeps the "middle"
-	# feel Tim chose; sweep payback around the expected ~0.004 to re-hit 1.05 at step60/drift1.08.
-	var candidates := [
-		{"step": 60.0, "drift": 1.00, "cost_frac": 0.001, "payback": 0.0043},
-		{"step": 60.0, "drift": 0.95, "cost_frac": 0.001, "payback": 0.0043},
-		{"step": 60.0, "drift": 0.90, "cost_frac": 0.001, "payback": 0.0043},
-		{"step": 60.0, "drift": 0.85, "cost_frac": 0.001, "payback": 0.0043},
-	]
-	for candidate in candidates:
-		_print_cohort_candidate(
-			float(candidate["step"]), float(candidate["drift"]),
-			float(candidate["cost_frac"]), float(candidate["payback"]))
-
-	# The proposed winner's actual per-property magnitudes, for review before writing .tres.
-	_print_proposed_cohort_configs(60.0, 0.95, 0.001, 0.0043)
-
-
-## Print each alien property's proposed magnitudes for one candidate — the concrete numbers
-## that would be written into the .tres files, so they can be eyeballed before authoring.
-func _print_proposed_cohort_configs(economy_step: float, drift: float, cost_fraction: float, payback: float) -> void:
-	print("")
-	print("  --- PROPOSED cohort .tres magnitudes (step x%.0f, drift x%.2f, cost_frac %.4f, payback %.4f) ---" % [
-		economy_step, drift, cost_fraction, payback])
-	print("    property              epoch    base_cost      income/unit     cycle    income/unit/s")
-	var configs := _synthesize_cohort_configs(economy_step / drift, cost_fraction, payback)
-	for cfg_variant in configs:
-		var cfg := cfg_variant as PropertyConfig
-		if cfg.unlock_tier < 2:
-			continue
-		var ips := cfg.base_income_per_unit / cfg.base_cycle_length
-		print("    %-20s  %4d   %12s   %14s   %5.0fs   %12s" % [
-			cfg.display_name,
-			cfg.unlock_tier,
-			Money.of(cfg.base_cost).display(),
-			Money.of(cfg.base_income_per_unit).display(),
-			cfg.base_cycle_length,
-			Money.of(ips).display() + "/s",
-		])
-
-
-## Return a copy of the property configs with every alien (unlock_tier >= 2) magnitude
-## regenerated from the threshold-anchored formula. Earth configs pass through untouched.
-## Order and index are preserved — the economy identifies properties by index (save keys,
-## retention, ladder highs), so the synthesized array must line up one-to-one.
-func _synthesize_cohort_configs(cohort_step: float, cost_fraction: float, payback: float) -> Array:
-	var earth_target := _tuning.earth_economy_target
-	# Group alien configs by epoch so each cohort's members can be ranked by cost into slots.
-	var by_tier := {}
-	for cfg_variant in _property_configs:
-		var cfg := cfg_variant as PropertyConfig
-		if cfg.unlock_tier < 2:
-			continue
-		if not by_tier.has(cfg.unlock_tier):
-			by_tier[cfg.unlock_tier] = []
-		by_tier[cfg.unlock_tier].append(cfg)
-	# Assign slot k (0 = cheapest flagship .. 3) within each cohort by current cost order.
-	var slot_of := {}
-	for tier in by_tier:
-		var members: Array = by_tier[tier]
-		members.sort_custom(func(a, b): return (a as PropertyConfig).base_cost < (b as PropertyConfig).base_cost)
-		for k in range(members.size()):
-			slot_of[members[k]] = k
-	var out: Array = []
-	for cfg_variant in _property_configs:
-		var cfg := cfg_variant as PropertyConfig
-		if cfg.unlock_tier < 2:
-			out.append(cfg)
-			continue
-		var k: int = slot_of[cfg]
-		var copy := cfg.duplicate() as PropertyConfig
-		var band := pow(cohort_step, float(cfg.unlock_tier - 1))
-		copy.base_cost = earth_target * band * cost_fraction * pow(COHORT_SPACING, float(k))
-		copy.base_income_per_unit = copy.base_cost * payback
-		copy.base_cycle_length = COHORT_CYCLE_BASE * (1.0 - 0.05 * float(k))
-		out.append(copy)
-	return out
-
-
-## Measure and print one candidate's per-epoch pacing. Thresholds are computed from the
-## candidate's economy_step (not the live catalog) so the step can be swept freely; income
-## is measured from the synthesized cohort economy at the shared unit depth.
-func _print_cohort_candidate(economy_step: float, drift: float, cost_fraction: float, payback: float) -> void:
-	print("")
-	print("  --- econ_step x%.0f | drift x%.2f | cost_fraction %.4f | payback %.4f/cycle ---" % [
-		economy_step, drift, cost_fraction, payback])
-	print("    epoch       income/sec          must earn         duration    vs prev")
-	# Magnitudes grow at cohort_step = economy_step / drift, a touch slower than the threshold.
-	var configs := _synthesize_cohort_configs(economy_step / drift, cost_fraction, payback)
-	var earth_target := _tuning.earth_economy_target
-	var prev_threshold := 0.0
-	var prev_duration := 0.0
-	var total := 0.0
-	for tier in range(1, EpochCatalog.tier_count() + 1):
-		var threshold := earth_target * pow(economy_step, float(tier - 1))
-		var must_earn := threshold - prev_threshold
-		var measured := _measure_epoch_income(tier, configs)
-		var income: float = measured["income"]
-		var duration := must_earn / income if income > 0.0 else INF
-		total += duration
-		var ratio_text := "—"
-		if prev_duration > 0.0 and is_finite(duration):
-			ratio_text = "x%.2f" % (duration / prev_duration)
-		print("    %4d   %16s   %16s   %10s   %7s" % [
+	print("=== Step-up CHECK: each epoch's flagship vs the best staffed Earth property ===")
+	print("    One unit, staffed to the epoch cap. Target: flagship >= ~3x Executive Assets (Tim).")
+	print("    epoch   Executive Assets      flagship                        flagship/Earth")
+	for tier in range(2, EpochCatalog.tier_count() + 1):
+		var earth_ips := _staffed_unit_income(tier, STEP_UP_EARTH_INDEX)
+		var flagship_index := _cheapest_index_for_tier(tier)
+		var flag_ips := _staffed_unit_income(tier, flagship_index)
+		var flag_name := (_property_configs[flagship_index] as PropertyConfig).display_name
+		var ratio := flag_ips / earth_ips if earth_ips > 0.0 else 0.0
+		print("    %4d   %14s/s   %-22s %12s/s   x%.2f%s" % [
 			tier,
-			Money.of(income).display() + "/s",
-			Money.of(must_earn).display(),
-			_format_duration(duration),
-			ratio_text,
+			Money.of(earth_ips).display(),
+			flag_name,
+			Money.of(flag_ips).display(),
+			ratio,
+			"" if ratio >= 2.5 else "   <-- TOO WEAK",
 		])
-		prev_threshold = threshold
-		prev_duration = duration
-	print("    total time across all %d epochs: %s" % [EpochCatalog.tier_count(), _format_duration(total)])
+
+
+## Effective income/sec of ONE unit of property `index`, staffed to the reached-epoch cap.
+func _staffed_unit_income(tier: int, index: int) -> float:
+	var game := GameState.new(_property_configs, _tuning)
+	game.epoch.current_tier = tier
+	var prop := game.economy.properties[index] as PropertyState
+	prop.units_owned = 1
+	prop.staff_level = game.economy.get_staff_level_cap(index, tier)
+	return prop.get_income_per_sec()
+
+
+## The cheapest property whose unlock_tier == tier — a cohort's flagship.
+func _cheapest_index_for_tier(tier: int) -> int:
+	var best := -1
+	var best_cost := INF
+	for i in range(_property_configs.size()):
+		var cfg := _property_configs[i] as PropertyConfig
+		if cfg.unlock_tier == tier and cfg.base_cost < best_cost:
+			best_cost = cfg.base_cost
+			best = i
+	return best
 
 
 # ---------------------------------------------------------------------------
@@ -1080,22 +992,11 @@ const PLAYOUT_TIME_CAP := 21600.0    # 6 sim-hours; a candidate that can't clear
 func _run_epoch_playout_study() -> void:
 	print("")
 	print("=== Epoch pacing PLAYOUT (cost-curve-aware; a heir plays through the epochs) ===")
-	print("    A bare heir plays from $0, reinvesting greedily, so base_cost + the r0 curve")
-	print("    decide unit counts. Two cost/payback splits with the SAME product show the pace")
-	print("    is identical across the feel range — so the cost/payback split is a free feel choice.")
-	# Two cost/payback splits sharing the same cost_frac x payback product, to show the pace
-	# is the SAME across the feel range (so the feel is a free choice). step60/drift1.08.
-	# Epoch 1 (Earth) reads long here because a BARE heir cold-starts from $0 — that one-time
-	# bootstrap is unique to Earth; the steady per-epoch pace is the epoch 2->5 ratios.
-	# The real validation: the SHIPPED .tres, exactly as they'll play (no synthesis).
+	print("    A bare heir plays from $0 through the SHIPPED .tres, reinvesting greedily so base_cost")
+	print("    + the r0 curve decide unit counts. Epoch 1 (Earth) reads long only because a bare heir")
+	print("    cold-starts from $0 — that one-time bootstrap is unique to Earth; the steady per-epoch")
+	print("    pace is the epoch 2->5 ratios (each ~as long as, to slightly longer than, the last).")
 	_print_playout("SHIPPED .tres · bare heir (the actual game files)", 0, _property_configs)
-	# Two synthesized cost/payback splits with the SAME product show the pace is identical
-	# across the feel range (so the feel is a free choice). step60/drift1.08.
-	var cohort_step := 60.0 / 1.08
-	_print_playout("SYNTH · expensive/slow-burn  (cost_frac 0.0080, payback 0.0012)", 0,
-		_synthesize_cohort_configs(cohort_step, 0.0080, 0.0012))
-	_print_playout("SYNTH · cheap/Earth-like flip (cost_frac 0.00006, payback 0.16)", 0,
-		_synthesize_cohort_configs(cohort_step, 0.00006, 0.16))
 
 
 ## Play one heir (bare if heir_legacy is 0, else juiced) with the given cohort configs and

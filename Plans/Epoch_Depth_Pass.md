@@ -1,6 +1,29 @@
 # Epoch Depth Pass — Implementation Plan
 
-**Status:** DRAFT for Tim's review. Written 2026-07-04.
+**Status:** Phase 1 & 2 SHIPPED (on main). **Phase 3 pacing retune BUILT + sim-verified
+2026-07-11** on `feature/epoch-depth-phase3` (device pass = Phase 4, owed). Written 2026-07-04.
+
+**PHASE 3 SHIPPED SUMMARY (2026-07-11).** The retune is done and verified in the sim.
+Decisions of record:
+- **Root cause found:** the first-pass alien magnitudes were ~50× too hot for their epoch
+  threshold, so a new cohort instantly out-earned the whole economy before it and every epoch
+  collapsed to seconds. Fixed by sizing magnitudes from a THRESHOLD-ANCHORED formula.
+- **economy_step 30 → 60** (EpochCatalog.economy_scale = 60^(tier-1)); bigger numbers (Tim) and
+  wider band for the cohort. **Cohort size 4 → 5** per epoch (Tim 2026-07-11).
+- **Magnitude formula** (per alien property, epoch T = unlock_tier, slot k = 0..4 by cost):
+  `base_cost = earth_target × (economy_step/DRIFT)^(T-1) × COST_FRACTION × SPACING^k`,
+  `base_income = base_cost × PAYBACK`, `base_cycle = 240 × (1 − 0.05k)`.
+  Shipped values: **DRIFT 0.95, COST_FRACTION 0.001, PAYBACK 0.0043, SPACING 2.75**.
+- **"Middle" feel** (Tim): flagship ~0.09% of its epoch economy, ~100-cycle recoup. NOTE: the
+  cost/payback split is pace-FREE (only their product matters) — proven by the cost-curve-aware
+  playout — so the split is a pure feel choice.
+- **Pacing result:** no cliff; the two sim instruments BRACKET the per-epoch ratio at ~1.0–1.05
+  (fixed-depth ~0.96 over-credits accumulated Earth staff; the faithful cost-gated playout shows
+  warm epochs rising ~1.08–1.16). DRIFT is the knob to shift the rise; Phase 4 device pass confirms.
+- **Instruments added** to `sim/Sim.gd`: pacing MEASUREMENT (fixed-depth), cohort SWEEP
+  (threshold-anchored candidates), and cost-curve-aware PLAYOUT (a heir plays all epochs).
+- 5 new properties authored (Starcore Syndicate, Singularity Holdings, Biosphere Trust, Geode
+  Dominion, Causality Capital) + 30 staffer names; ladder now **37 rungs** (12 Earth + 25 alien).
 **Author:** Claude.
 **Decisions of record:** GDD §6.1/§6.2 playtest-verdict + directive blocks (2026-07-03);
 `Per_Epoch_Upgrade_Track.md` and `First_Contact_Property_Reward.md` addenda (decisions
@@ -303,8 +326,10 @@ docs (GDD §5.5/§6, Spec §3.6/§6) sync at each phase like the epoch-staffing 
    Pre-redesign retained TIERS migrate as one full block of levels each. UX note:
    deep retention means many taps — a hold-to-repeat or "retain to current" bulk
    affordance may be wanted after device feel (flagged, not built).
-4. **(Phase 2) Cohort size four** (vs 3 or 5) and the first-pass names above — veto
-   freely, they're placeholders.
+4. **(Phase 2) Cohort size — DECIDED (Tim, 2026-07-11): FIVE per epoch.** Raised 4→5
+   for richer epochs (Tim's original "3–5" ask); the step-60 band has room for 5 at ×2.75
+   spacing. The 5th (grandest, most-absurd) member per civ: Starcore Syndicate, Singularity
+   Holdings, Biosphere Trust, Geode Dominion, Causality Capital. Ladder now 37 rungs.
 5. **(Phase 3) Duration target — DECIDED (Tim, 2026-07-11): ~1.05× per epoch.** Each
    post-Earth epoch runs slightly longer than the one before it — a gentle drift, NOT
    flat and NOT the ~1.2× upper option. Over the five alien epochs this compounds to

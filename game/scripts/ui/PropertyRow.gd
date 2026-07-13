@@ -848,9 +848,17 @@ func _refresh(delta: float) -> void:
 	if not owned or effective_length <= 0.0:
 		_displayed_income_per_sec = 0.0
 	elif rushed_fractions_per_second > 0.0:
+		# Being rushed: it really earns at this rate right now (even an unstaffed rung, while held).
 		_displayed_income_per_sec = per_cycle * rushed_fractions_per_second
-	else:
+	elif _prop.is_staffed:
+		# Staffed: it auto-runs, so it earns this passive rate hands-off.
 		_displayed_income_per_sec = per_cycle / effective_length
+	else:
+		# Owned but UNSTAFFED and not being rushed: it stops after each payout and needs a manual
+		# tap to run again, so it earns nothing passively — it must NOT inflate the income headline
+		# (Tim 2026-07-13: two staffed properties made ~70 B/s, but the headline read ~80 B/s, the
+		# extra coming from owned-but-unstaffed rungs' theoretical rates being summed in).
+		_displayed_income_per_sec = 0.0
 
 	# Smooth, constant-velocity cycle bar (see _displayed_cycle_fraction above). Measured
 	# against the EFFECTIVE (sped-up) cycle length so the bar still fills all the way to the

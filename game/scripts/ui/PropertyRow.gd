@@ -26,6 +26,9 @@ var prop_index: int = -1
 var _prop: PropertyState
 var _economy: EconomyState
 var _frenzy: FrenzyState
+## The live Rush Momentum bonus, applied to the displayed income exactly as it is to the payout,
+## so the readout never drifts from what the player actually collects.
+var _rush_momentum: RushMomentumState
 ## The generation's reached epoch — the highest staffer tier any property may be hired
 ## or upgraded to right now. Read live so the hire button unlocks the moment a new
 ## civilization is contacted (EpochState.current_tier).
@@ -289,11 +292,13 @@ var _ownership_style_applied := -1
 
 
 ## Call before adding to the tree.
-func setup(p_index: int, prop: PropertyState, economy: EconomyState, frenzy: FrenzyState, epoch: EpochState) -> void:
+func setup(p_index: int, prop: PropertyState, economy: EconomyState, frenzy: FrenzyState,
+		rush_momentum: RushMomentumState, epoch: EpochState) -> void:
 	prop_index = p_index
 	_prop = prop
 	_economy = economy
 	_frenzy = frenzy
+	_rush_momentum = rush_momentum
 	_epoch = epoch
 
 
@@ -775,10 +780,11 @@ func _refresh(delta: float) -> void:
 	var bar_is_solid := owned and _prop.is_cycle_running \
 		and effective_length > 0.0 and effective_length < SOLID_BAR_THRESHOLD_SEC
 	# The amount paid per completed cycle. For an OWNED rung get_income_per_cycle() already folds in
-	# the staffer and Family Fortune (Legacy) multipliers, with frenzy applied live on top so it
-	# matches what the player receives; for an UNOWNED rung it's the per-cycle value of a single
-	# unit (a buy-in preview).
-	var per_cycle := _prop.get_income_per_cycle() * _frenzy.get_multiplier() if owned \
+	# the staffer and Family Fortune (Legacy) multipliers, with frenzy AND Rush Momentum applied live
+	# on top so it matches what the player receives; for an UNOWNED rung it's the per-cycle value of a
+	# single unit (a buy-in preview). Momentum is a global bonus while rushing, so it lifts every
+	# owned row's readout (not just the rushed one), exactly as it lifts every property's payout.
+	var per_cycle := _prop.get_income_per_cycle() * _frenzy.get_multiplier() * _rush_momentum.factor() if owned \
 		else _prop.get_single_unit_income_per_cycle()
 	# Rate context on the payout (Tim, 2026-07-02): a cycle of a second or more shows the per-cycle
 	# payout WITH its cycle length, scaled to a sensible unit — "$X/4.3m" is $X every 4.3 minutes —

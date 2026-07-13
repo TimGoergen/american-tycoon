@@ -34,6 +34,7 @@ var _background: TextureRect
 ## with (the reached epoch). Updates the moment a first contact advances the epoch.
 var _first_contact_overlay: FirstContactOverlay
 var _frenzy_bar: FrenzyBar
+var _momentum_bar: MomentumBar
 var _wage_panel: WagePanel
 var _welcome_overlay: WelcomeBackOverlay
 var _about_screen: AboutScreen
@@ -560,6 +561,13 @@ func _build_property_tab() -> Control:
 	# (Tim, 2026-07-01: uniform margin around the button groups, but not between the two buttons).
 	v.add_theme_constant_override("separation", 24)
 
+	# Rush Momentum meter: fills as sustained rushing builds the income bonus, drains when the player
+	# stops. Sits directly above the frenzy/TURBO row so the two reward meters read as a pair. It
+	# updates itself (its own _process reads game.rush_momentum), so nothing drives it from here.
+	_momentum_bar = MomentumBar.new()
+	_momentum_bar.setup(game.rush_momentum, tuning)
+	v.add_child(_momentum_bar)
+
 	# Action row: the TURBO button (its background is the frenzy meter) takes the larger
 	# share; the buy-mode toggle takes the rest.
 	var action_row := HBoxContainer.new()
@@ -643,7 +651,7 @@ func _build_property_tab() -> Control:
 		return cost_a < cost_b)
 	for i in ladder_order:
 		var row := PropertyRow.new()
-		row.setup(i, game.economy.properties[i] as PropertyState, game.economy, game.frenzy, game.epoch)
+		row.setup(i, game.economy.properties[i] as PropertyState, game.economy, game.frenzy, game.rush_momentum, game.epoch)
 		row.buy_requested.connect(_on_buy_requested)
 		row.tap_requested.connect(_on_tap_requested)
 		row.hold_rush_requested.connect(_on_hold_rush_requested)

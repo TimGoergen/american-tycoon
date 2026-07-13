@@ -274,6 +274,10 @@ func _apply_upgrade_effects(game: GameState) -> void:
 	game.wage.wage_multiplier = upgrades.wage_multiplier()
 	game.wage.auto_tap_speed_multiplier = auto_speed
 	game.wage.auto_tap_power_multiplier = upgrades.auto_click_power_multiplier()
+	# Frenzy (TURBO) upgrades: a bigger popped multiplier (Killer Instinct) and a longer burn
+	# (Second Wind). Read live by FrenzyState.pop()/tick().
+	game.frenzy.intensity_multiplier = upgrades.frenzy_intensity_multiplier()
+	game.frenzy.duration_multiplier = upgrades.frenzy_duration_multiplier()
 
 
 ## Re-apply upgrade effects to the LIVING generation. Called after a purchase so a

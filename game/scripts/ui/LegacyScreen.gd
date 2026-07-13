@@ -253,6 +253,8 @@ func _category_color(category: String) -> Color:
 			return UiPalette.BRICK
 		"Household Staff":
 			return UiPalette.MONEY_GREEN
+		"Frenzy":
+			return UiPalette.DARK_GOLD
 	return UiPalette.NAVY
 
 

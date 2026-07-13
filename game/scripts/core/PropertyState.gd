@@ -408,13 +408,23 @@ func rush_cycle(income_multiplier: float = 1.0) -> float:
 	cycle_progress += rush_fraction * effective_length
 	if cycle_progress < effective_length:
 		return 0.0
-	# The rush filled the cycle — pay it out now, mirroring tick()'s completion branch.
-	cycle_progress = 0.0
-	var earned := _collect(income_multiplier)
+	# One rush pulse can fill MORE than a whole cycle — a big Strong-Arm Tactics rush_power, or a
+	# short cycle — so collect EVERY complete cycle the progress now covers and CARRY THE REMAINDER
+	# forward. Resetting to 0 (paying just one cycle) discarded the overshoot, so the player
+	# collected far less than the rushed rate the row displays (Tim 2026-07-12: "collecting less than
+	# the readout says"). This mirrors tick(), which also completes multiple cycles per step.
+	var earned := 0.0
 	if is_staffed:
-		_start_cycle_internal()  # auto-restart, same as the tick
+		# Staffed: pay every full cycle covered, keep the leftover progress, and stay running.
+		var completed := int(cycle_progress / effective_length)
+		cycle_progress -= float(completed) * effective_length
+		for _i in range(completed):
+			earned += _collect(income_multiplier)
 	else:
-		is_cycle_running = false  # manual: stops after one pay (a held pulse re-taps to restart)
+		# Manual (unstaffed): pays exactly one cycle then stops (Spec §4; a held pulse re-taps it).
+		cycle_progress = 0.0
+		earned = _collect(income_multiplier)
+		is_cycle_running = false
 	return earned
 
 

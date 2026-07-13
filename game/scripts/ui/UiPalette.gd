@@ -51,6 +51,11 @@ const CYCLE_BLUE := Color("#5E86B8")
 ## era palette so the bubbles glow against the CYCLE_BLUE fill (Tim, 2026-07-06).
 const NEON_BLUE := Color("#4DE8FF")
 
+## Rush Momentum meter fill, with DARK_PURPLE carbonation on top — the same light-fill / dark-bubble
+## pairing the frenzy meter uses (MUSTARD_GOLD + DARK_GOLD), in a distinct hue (Tim, 2026-07-13).
+const PURPLE := Color("#9B5DE5")
+const DARK_PURPLE := Color("#5E3499")
+
 # ---------------------------------------------------------------------------
 # Type scale — the single source of truth for UI font sizes (Tim's "chunkier UI"
 # pass, 2026-06-21). Named semantic tiers replace the ~24 scattered magic numbers.

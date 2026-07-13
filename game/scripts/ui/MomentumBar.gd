@@ -34,9 +34,19 @@ func _ready() -> void:
 	# but still tall enough to read at a glance.
 	custom_minimum_size = Vector2(0, int(UiPalette.STANDARD_BUTTON_HEIGHT * 0.7))
 	size_flags_vertical = Control.SIZE_FILL
-	# Cool NEON_BLUE fill: energetic and clearly distinct from the frenzy meter's warm gold/red
-	# sitting just below it, so the two reward meters never read as the same thing.
-	UiPalette.style_framed_progress(self, UiPalette.NEON_BLUE, UiPalette.PROGRESS_TRACK_GRAY)
+	# PURPLE fill: a distinct hue from the frenzy meter's warm gold/red sitting just below it, so the
+	# two reward meters never read as the same thing.
+	UiPalette.style_framed_progress(self, UiPalette.PURPLE, UiPalette.PROGRESS_TRACK_GRAY)
+
+	# Carbonation in the fill, the same "value accruing automatically" cue the frenzy meter and the
+	# property/economy bars carry: momentum builds on its own while you rush. DARK_PURPLE bubbles so
+	# they contrast against the lighter purple fill (the frenzy meter uses DARK_GOLD on gold the same
+	# way). Added BEFORE the label overlay so the readout draws over the bubbles.
+	var bubbles := GoldBubbles.new()
+	bubbles.edge_inset = 3.0  # match the framed fill's 3px inset (style_framed_progress)
+	bubbles.bubble_color = UiPalette.DARK_PURPLE
+	bubbles.tier = GoldBubbles.Tier.FLOWING  # steady automatic accrual, like TURBO charging
+	add_child(bubbles)
 
 	# Overlay: a left caption and the big "+XX%" readout on the right. It ignores the mouse so it
 	# never eats a tap meant for the rows or buttons around it.

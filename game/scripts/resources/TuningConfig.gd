@@ -194,8 +194,9 @@ extends Resource
 # meaningfully faster than an idler. It bleeds when you stop and resets at each First Contact, so
 # it stays a pinch that can't snowball into an epoch-skip. Tuned via the Sim active-rush playout.
 
-## Cap on the momentum bonus, as a fraction of property income (0.6 = up to +60% at full momentum).
-@export var rush_momentum_max_bonus: float = 0.6  # TBD-SIM
+## Cap on the momentum bonus, as a fraction of property income (0.3 = up to +30% at full momentum).
+## Was 0.6 — Tim found the rush overpowered on device (2026-07-13); halved as a first cut, live-tunable.
+@export var rush_momentum_max_bonus: float = 0.3  # feel-tune
 
 ## How fast momentum climbs while actively rushing, in bonus-fraction per second
 ## (0.05 = +5%/s, so it takes ~12 s of sustained rushing to reach a +60% cap).

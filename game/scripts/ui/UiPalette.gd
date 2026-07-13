@@ -55,6 +55,9 @@ const NEON_BLUE := Color("#4DE8FF")
 ## pairing the frenzy meter uses (MUSTARD_GOLD + DARK_GOLD), in a distinct hue (Tim, 2026-07-13).
 const PURPLE := Color("#9B5DE5")
 const DARK_PURPLE := Color("#5E3499")
+## Bright purple carbonation added to every property bar while Rush Momentum is MAXED — a vivid
+## glow against the green/blue cycle fills, distinct from the always-present gold (Tim, 2026-07-13).
+const BRIGHT_PURPLE := Color("#C77DFF")
 
 # ---------------------------------------------------------------------------
 # Type scale — the single source of truth for UI font sizes (Tim's "chunkier UI"

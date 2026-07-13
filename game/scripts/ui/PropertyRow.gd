@@ -264,6 +264,9 @@ var _income_label: Label
 var _income_icon: TextureRect
 var _cycle_bar: ProgressBar
 var _cycle_bubbles: GoldBubbles
+## A second, bright-purple bubble layer shown ONLY while Rush Momentum is maxed — extra carbonation
+## on top of the gold to signal the peak-rush state (Tim, 2026-07-13).
+var _cycle_purple_bubbles: GoldBubbles
 ## Diagnosis readout over the bar, shown when tuning.carb_debug_overlay = 1.
 var _carb_debug_label: Label
 var _buy_button: Button
@@ -398,6 +401,15 @@ func _ready() -> void:
 	# Kept as a member: the refresh commands their flow speed while the bar is pinned solid.
 	_cycle_bubbles = GoldBubbles.new()
 	_cycle_bar.add_child(_cycle_bubbles)
+
+	# A second, bright-purple carbonation layer, hidden until Rush Momentum is maxed (see _process).
+	# variant_salt is set BEFORE add_child (the trait cache builds in _ready) so its crowd is offset
+	# from the gold layer — the two intermix instead of overlapping, showing both colors at once.
+	_cycle_purple_bubbles = GoldBubbles.new()
+	_cycle_purple_bubbles.variant_salt = 0.5
+	_cycle_purple_bubbles.bubble_color = UiPalette.BRIGHT_PURPLE
+	_cycle_purple_bubbles.visible = false
+	_cycle_bar.add_child(_cycle_purple_bubbles)
 
 	# Tiny diagnosis readout over the bar (tuning.carb_debug_overlay = 1 in Balance
 	# Tuning): the live numbers driving the carbonation, so an on-device eye report can
@@ -952,6 +964,15 @@ func _refresh(delta: float) -> void:
 	else:
 		_cycle_bubbles.tier = GoldBubbles.Tier.IDLE
 	_cycle_bubbles.tier_ease_tau = _prop.tuning.carb_tier_ease
+
+	# Bright-purple carbonation on top of the gold ONLY while Rush Momentum is maxed — a whole-ladder
+	# "peak rush" glow. It mirrors the gold layer's tier so both crowds flow together (just offset by
+	# variant_salt and tinted purple). Hidden otherwise, so it costs nothing until the player earns it.
+	var momentum_maxed := _rush_momentum.bonus >= _prop.tuning.rush_momentum_max_bonus - 0.001
+	_cycle_purple_bubbles.visible = owned and momentum_maxed
+	if _cycle_purple_bubbles.visible:
+		_cycle_purple_bubbles.tier = _cycle_bubbles.tier
+		_cycle_purple_bubbles.tier_ease_tau = _prop.tuning.carb_tier_ease
 
 	# The diagnosis overlay: live values driving this row's carbonation (reading the
 	# bubbles' internals directly is fine here — this label exists only to expose them).

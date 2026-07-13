@@ -126,8 +126,10 @@ func tap_property(prop_index: int) -> void:
 	frenzy.on_tap()
 	var prop := economy.properties[prop_index] as PropertyState
 	if prop.is_cycle_running:
-		# Rush pays at the current frenzy multiplier and credits immediately if it completes.
-		economy.credit_property_income(prop.rush_cycle(frenzy.get_multiplier()))
+		# Rush pays at the SAME multiplier the tick uses — frenzy AND the dynasty's Family Fortune
+		# (legacy_income_multiplier) — so a rushed cycle collects the full rate the row displays.
+		# Passing only frenzy dropped Family Fortune, so rushed income fell short (Tim 2026-07-12).
+		economy.credit_property_income(prop.rush_cycle(frenzy.get_multiplier() * prop.legacy_income_multiplier))
 	else:
 		prop.start_cycle()
 
@@ -140,9 +142,10 @@ func hold_rush_property(prop_index: int) -> void:
 	if not prop.is_cycle_running:
 		return
 	frenzy.on_tap(tuning.frenzy_fill_hold_factor)
-	# Rush pays at the current frenzy multiplier and credits immediately if it completes,
-	# so the cash keeps pace with the rushed bar instead of waiting for the next tick.
-	economy.credit_property_income(prop.rush_cycle(frenzy.get_multiplier()))
+	# Rush pays at the SAME multiplier the tick uses — frenzy AND the dynasty's Family Fortune
+	# (legacy_income_multiplier) — and credits immediately if it completes, so the cash keeps pace
+	# with the rushed bar AND the full displayed rate (Tim 2026-07-12: rush dropped Family Fortune).
+	economy.credit_property_income(prop.rush_cycle(frenzy.get_multiplier() * prop.legacy_income_multiplier))
 
 
 ## Pop the frenzy meter if allowed. Returns true if a burn started.

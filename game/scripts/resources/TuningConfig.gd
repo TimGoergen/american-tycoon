@@ -188,6 +188,28 @@ extends Resource
 ## Minimum meter charge at which the player can trigger a frenzy pop.
 @export var frenzy_pop_floor: float = 0.15  # feel-tune M1
 
+# --- Rush Momentum (Tim 2026-07-12: the "pinch of active progression") ---
+# Sustained rushing builds a climbing PROPERTY-income bonus that lifts your late-epoch income
+# (when it matters most for crossing the threshold), so an active rusher reaches the next epoch
+# meaningfully faster than an idler. It bleeds when you stop and resets at each First Contact, so
+# it stays a pinch that can't snowball into an epoch-skip. Tuned via the Sim active-rush playout.
+
+## Cap on the momentum bonus, as a fraction of property income (0.6 = up to +60% at full momentum).
+@export var rush_momentum_max_bonus: float = 0.6  # TBD-SIM
+
+## How fast momentum climbs while actively rushing, in bonus-fraction per second
+## (0.05 = +5%/s, so it takes ~12 s of sustained rushing to reach a +60% cap).
+@export var rush_momentum_build_per_second: float = 0.05  # TBD-SIM
+
+## How fast momentum bleeds away when NOT rushing, in bonus-fraction per second
+## (0.10 = loses 10%/s, so a full +60% is gone ~6 s after you stop — hold to keep it).
+@export var rush_momentum_bleed_per_second: float = 0.10  # TBD-SIM
+
+## Grace window (seconds): you still count as "rushing" for momentum this long after your last
+## rush. Must exceed the rush pulse interval (1 / hold_rush_per_second = 0.2 s at 5/s) so momentum
+## keeps building smoothly BETWEEN the discrete auto-rush pulses instead of bleeding in the gaps.
+@export var rush_momentum_grace_seconds: float = 0.5  # feel-tune
+
 # --- Estate & tax (Spec §9) ---
 
 ## Base estate-tax exemption in dollars.

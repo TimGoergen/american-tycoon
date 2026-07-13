@@ -286,6 +286,12 @@ extends Resource
 ## bonus. Below the "full" line = bad (keep nothing); at/above full but under this = normal.
 @export var legacy_bonus_great_threshold: float = 0.75  # feel-tune
 
+## Extra multiplier on the Legacy-gem grant at a FIRST CONTACT (epoch-transition) minigame only —
+## reaching a new civilization is a milestone, so its gem is worth much more than a routine
+## welcome-back / succession gem (Tim 2026-07-12: the epoch-transition gem paid too few gems).
+## 1.0 = same as any other site; higher = a bigger epoch-transition windfall.
+@export var legacy_bonus_first_contact_multiplier: float = 10.0  # feel-tune
+
 ## Per-game chance a Legacy gem becomes available in a round (small), a per-round appearance chance.
 ## (Match-3 has NO random chance — its Legacy gems come only from 5+ matches — so it has no knob.)
 @export var legacy_gem_chance_catch: float = 0.12  # feel-tune

@@ -1408,8 +1408,10 @@ func _on_contact_dismissed() -> void:
 	_minigame_site = MinigameSite.FIRST_CONTACT
 	_first_contact_bonus_tier = tier
 	# Set the dynasty's lifetime Legacy so a Legacy gem collected during this negotiation can be
-	# sized/granted (the Legacy Bonus system now reaches the First Contact site too).
+	# sized/granted (the Legacy Bonus system now reaches the First Contact site too), then boost it:
+	# an epoch transition is a milestone, so its gem pays much more than a routine gem (Tim 2026-07-12).
 	_minigame_screen.set_legacy_lifetime(dynasty.upgrades.earned_lifetime)
+	_minigame_screen.set_legacy_bonus_multiplier(tuning.legacy_bonus_first_contact_multiplier)
 	# Frame the negotiation around the FLAGSHIP's per-unit base income (the concrete
 	# number being talked up), but pitched at the civilization: the terms struck here
 	# apply to the epoch's whole cohort (Phase 2).

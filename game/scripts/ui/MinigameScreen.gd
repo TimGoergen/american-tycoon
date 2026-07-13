@@ -110,6 +110,10 @@ var _bonus_max: float = 0.25
 ## The dynasty's lifetime-earned Legacy, set by Main before a real round so the host can size the
 ## Legacy-gem bonus (0.1% of this per gem). Stays 0 in review/Challenge → no bonus is ever granted.
 var _legacy_lifetime: int = 0
+## Site-specific multiplier on the Legacy-gem grant (1.0 by default; First Contact sets it higher so
+## the epoch-transition gem is a bigger windfall). Reset to 1.0 by set_legacy_lifetime so it can
+## never leak from one site's minigame to the next.
+var _legacy_bonus_multiplier: float = 1.0
 var _seconds_left: float = 0.0
 var _playing: bool = false
 var _opt_out: bool = false
@@ -231,6 +235,13 @@ func setup(tuning: TuningConfig) -> void:
 ## size any Legacy-gem bonus. Left at 0 for review/Challenge rounds, which never grant a bonus.
 func set_legacy_lifetime(lifetime: int) -> void:
 	_legacy_lifetime = maxi(0, lifetime)
+	_legacy_bonus_multiplier = 1.0  # default; a caller (First Contact) may raise it right after
+
+
+## Scale this round's Legacy-gem grant (First Contact sets it > 1 so an epoch-transition gem pays
+## more). Call AFTER set_legacy_lifetime, which resets it to 1.0.
+func set_legacy_bonus_multiplier(multiplier: float) -> void:
+	_legacy_bonus_multiplier = maxf(0.0, multiplier)
 
 
 func _ready() -> void:
@@ -1565,7 +1576,9 @@ func _legacy_bonus_amount(mult: float) -> int:
 	if collected <= 0 or factor <= 0.0 or _legacy_lifetime <= 0:
 		return 0
 	var counted := mini(collected, maxi(1, _tuning.legacy_bonus_max_gems))
-	var raw := float(counted) * factor * _tuning.legacy_bonus_fraction * float(_legacy_lifetime)
+	# _legacy_bonus_multiplier is the site boost (1.0 normally; higher for a First Contact milestone).
+	var raw := float(counted) * factor * _tuning.legacy_bonus_fraction * float(_legacy_lifetime) \
+			* _legacy_bonus_multiplier
 	return maxi(1, int(floor(raw)))
 
 

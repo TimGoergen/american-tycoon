@@ -651,7 +651,7 @@ func _build_property_tab() -> Control:
 		return cost_a < cost_b)
 	for i in ladder_order:
 		var row := PropertyRow.new()
-		row.setup(i, game.economy.properties[i] as PropertyState, game.economy, game.frenzy, game.rush_momentum, game.epoch)
+		row.setup(i, game.economy.properties[i] as PropertyState, game.economy, game.frenzy, game.epoch)
 		row.buy_requested.connect(_on_buy_requested)
 		row.tap_requested.connect(_on_tap_requested)
 		row.hold_rush_requested.connect(_on_hold_rush_requested)

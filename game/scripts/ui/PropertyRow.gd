@@ -26,9 +26,6 @@ var prop_index: int = -1
 var _prop: PropertyState
 var _economy: EconomyState
 var _frenzy: FrenzyState
-## The live Rush Momentum bonus, applied to the displayed income exactly as it is to the payout,
-## so the readout never drifts from what the player actually collects.
-var _rush_momentum: RushMomentumState
 ## The generation's reached epoch — the highest staffer tier any property may be hired
 ## or upgraded to right now. Read live so the hire button unlocks the moment a new
 ## civilization is contacted (EpochState.current_tier).
@@ -296,12 +293,11 @@ var _ownership_style_applied := -1
 
 ## Call before adding to the tree.
 func setup(p_index: int, prop: PropertyState, economy: EconomyState, frenzy: FrenzyState,
-		rush_momentum: RushMomentumState, epoch: EpochState) -> void:
+		epoch: EpochState) -> void:
 	prop_index = p_index
 	_prop = prop
 	_economy = economy
 	_frenzy = frenzy
-	_rush_momentum = rush_momentum
 	_epoch = epoch
 
 
@@ -973,11 +969,13 @@ func _refresh(delta: float) -> void:
 		_cycle_bubbles.tier = GoldBubbles.Tier.IDLE
 	_cycle_bubbles.tier_ease_tau = _prop.tuning.carb_tier_ease
 
-	# Bright-purple carbonation on top of the gold ONLY while Rush Momentum is maxed — a whole-ladder
-	# "peak rush" glow. It mirrors the gold layer's tier so both crowds flow together (just offset by
-	# variant_salt and tinted purple). Hidden otherwise, so it costs nothing until the player earns it.
-	var momentum_maxed := _rush_momentum.bonus >= _prop.tuning.rush_momentum_max_bonus - 0.001
-	_cycle_purple_bubbles.visible = owned and momentum_maxed
+	# Bright-purple carbonation on top of the gold ONLY on a property that is ITSELF being rushed at
+	# max momentum. Momentum applies only to the rushed property, so no other row may show any change
+	# (Tim 2026-07-13) — so this keys off THIS property's own momentum factor, not the global meter.
+	# (rush_momentum_factor is 1 + bonus while the property is within its rush grace, so at max
+	# momentum it equals 1 + the cap.) Mirrors the gold layer's tier so both crowds flow together.
+	var rushed_at_max_momentum := _prop.rush_momentum_factor >= 1.0 + _prop.tuning.rush_momentum_max_bonus - 0.001
+	_cycle_purple_bubbles.visible = owned and rushed_at_max_momentum
 	if _cycle_purple_bubbles.visible:
 		_cycle_purple_bubbles.tier = _cycle_bubbles.tier
 		_cycle_purple_bubbles.tier_ease_tau = _prop.tuning.carb_tier_ease

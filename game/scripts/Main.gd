@@ -795,6 +795,13 @@ func _build_epoch_pager() -> Control:
 	_epoch_pager_label.add_theme_font_override("font", UiPalette.make_bold_font())
 	_epoch_pager_label.add_theme_font_size_override("font_size", UiPalette.FONT_DISPLAY)
 	_epoch_pager_label.add_theme_color_override("font_color", UiPalette.NAVY)
+	# Fill the space between the arrows and WRAP a long property name onto a second line rather than
+	# forcing the whole tab column wider than the screen (Tim, 2026-07-13: "QUARTZITE CONGLOMERATE"
+	# pushed everything off the right edge). A wrapped name stays fully readable; if even wrapped it
+	# can't fit, the last line ellipsizes instead of overflowing.
+	_epoch_pager_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_epoch_pager_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_epoch_pager_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	center.add_child(_epoch_pager_label)
 
 	_epoch_pager_sub = Label.new()
@@ -802,6 +809,9 @@ func _build_epoch_pager() -> Control:
 	_epoch_pager_sub.add_theme_font_override("font", UiPalette.make_bold_font())
 	_epoch_pager_sub.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
 	_epoch_pager_sub.add_theme_color_override("font_color", UiPalette.DARK_GOLD)
+	_epoch_pager_sub.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_epoch_pager_sub.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_epoch_pager_sub.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	center.add_child(_epoch_pager_sub)
 
 	_epoch_next_button = _make_pager_arrow("›")

@@ -84,6 +84,17 @@ var rush_power_multiplier: float = 1.0
 ## base). The held-rush pulse RATE in PropertyRow is multiplied by this. Set by DynastyState.
 var auto_rush_speed_multiplier: float = 1.0
 
+## Rush Momentum multiplier currently applied to THIS property: 1.0 normally, (1 + bonus) while the
+## player is ACTIVELY rushing it. Momentum boosts only the property being rushed, not the whole
+## economy (Tim 2026-07-13), so it multiplies this property's income in both _collect (what it pays)
+## and get_income_per_cycle (what its row shows). GameState sets it each tick from the grace below.
+var rush_momentum_factor: float = 1.0
+
+## Seconds of "actively rushed" credit left. Each rush verb refills it (see GameState); the tick
+## decays it and drops rush_momentum_factor back to 1.0 when it runs out, so the boost fades a beat
+## after the player stops rushing this property. The grace bridges the gaps between rush pulses.
+var rush_active_grace: float = 0.0
+
 ## Dynasty-wide property-income multiplier (the Legacy "Family Fortune" upgrade), mirrored
 ## here for DISPLAY only so the row's per-cycle figure reflects it (the live tick applies
 ## the same factor at point of payment via the global multiplier). Set by DynastyState.
@@ -449,10 +460,11 @@ func get_income_per_sec() -> float:
 func get_income_per_cycle() -> float:
 	if units_owned == 0:
 		return 0.0
-	# Includes the staffer-tier multiplier AND the dynasty Family Fortune multiplier, so
-	# the displayed figure tracks a Legacy income upgrade (which the live tick also applies
-	# at payment). Frenzy/event multipliers still apply on top, at payment.
-	return floor(units_owned * income_per_unit * _effective_income_multiplier() * legacy_income_multiplier)
+	# Includes the staffer-tier multiplier, the dynasty Family Fortune multiplier, AND the per-
+	# property Rush Momentum factor (>1 only while this property is being actively rushed), so the
+	# displayed figure tracks all three — matching what the live tick/rush pay. Frenzy/event
+	# multipliers still apply on top, at payment.
+	return floor(units_owned * income_per_unit * _effective_income_multiplier() * legacy_income_multiplier * rush_momentum_factor)
 
 
 ## Cash a SINGLE unit of this property would pay per cycle right now (Family Fortune
@@ -493,8 +505,9 @@ func _start_cycle_internal() -> void:
 func _collect(income_multiplier: float = 1.0) -> float:
 	# _effective_staff_multiplier() is this property's own alien-staffer bonus (tier entry
 	# multiplier × within-epoch levels); the passed-in income_multiplier is the global
-	# frenzy × Legacy factor. Both apply here, at point of payment, then floor (Spec §1, §3.4).
-	return floorf(units_owned * income_per_unit * _effective_income_multiplier() * income_multiplier)
+	# frenzy × Legacy factor; rush_momentum_factor is >1 only while THIS property is being actively
+	# rushed. All apply here, at point of payment, then floor (Spec §1, §3.4).
+	return floorf(units_owned * income_per_unit * _effective_income_multiplier() * income_multiplier * rush_momentum_factor)
 
 
 ## Check whether a milestone has been crossed and apply the adaptive reward.

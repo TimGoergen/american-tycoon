@@ -89,11 +89,20 @@ func _init(property_configs: Array, p_tuning: TuningConfig) -> void:
 func tick(delta: float, extra_property_multiplier: float = 1.0) -> void:
 	frenzy.tick(delta)
 	# Rush Momentum climbs while the player is actively rushing (rushed within the grace window)
-	# and bleeds otherwise. It scales PROPERTY income alongside frenzy and Legacy.
+	# and bleeds otherwise. The bonus MAGNITUDE is global, but it is applied ONLY to the properties
+	# being actively rushed (Tim 2026-07-13) — via each property's own rush_momentum_factor below,
+	# NOT the whole-economy tick multiplier.
 	rush_momentum.tick(delta, _rush_grace_remaining > 0.0)
 	_rush_grace_remaining = maxf(_rush_grace_remaining - delta, 0.0)
+	# Point each property's momentum factor at the current bonus while it is still inside its
+	# actively-rushed grace, else back to 1.0; then decay that grace so the boost fades a beat after
+	# the player stops rushing it. This is what confines momentum to the rushed property.
+	for prop_variant in economy.properties:
+		var p := prop_variant as PropertyState
+		p.rush_momentum_factor = rush_momentum.factor() if p.rush_active_grace > 0.0 else 1.0
+		p.rush_active_grace = maxf(p.rush_active_grace - delta, 0.0)
 	var tier_before := epoch.current_tier
-	economy.tick(delta, frenzy.get_multiplier() * extra_property_multiplier * rush_momentum.factor())
+	economy.tick(delta, frenzy.get_multiplier() * extra_property_multiplier)
 	peak_net_worth = maxf(peak_net_worth, economy.get_net_worth())
 	# Advance the alien epoch if this generation has now earned enough to consume the
 	# current economy. Reads the same lifetime-earned tally the estate waterfall uses.
@@ -147,14 +156,16 @@ func tap_property(prop_index: int) -> void:
 	frenzy.on_tap()
 	var prop := economy.properties[prop_index] as PropertyState
 	if prop.is_cycle_running:
-		# This rush keeps Rush Momentum building through the grace window (consumed in tick()).
+		# Keep the global momentum meter building, and mark THIS property as actively rushed so the
+		# bonus applies to it and only it. Its rush_momentum_factor is refreshed now, so this very
+		# payout already carries the bonus, and the tick keeps it lit while the grace holds.
 		_rush_grace_remaining = tuning.rush_momentum_grace_seconds
-		# Rush pays at the SAME multiplier the tick uses — frenzy, the dynasty's Family Fortune
-		# (legacy_income_multiplier), AND Rush Momentum — so a rushed cycle collects the full rate
-		# the row displays. Passing only frenzy dropped Family Fortune, so rushed income fell short
-		# (Tim 2026-07-12); Rush Momentum then joined the same chain.
-		economy.credit_property_income(prop.rush_cycle(
-			frenzy.get_multiplier() * prop.legacy_income_multiplier * rush_momentum.factor()))
+		prop.rush_active_grace = tuning.rush_momentum_grace_seconds
+		prop.rush_momentum_factor = rush_momentum.factor()
+		# Rush pays at the SAME multiplier the tick uses — frenzy and the dynasty's Family Fortune;
+		# Rush Momentum is now folded in per-property via _collect's rush_momentum_factor (set just
+		# above), so the rushed cycle collects exactly the full rate the row shows (Tim 2026-07-12/13).
+		economy.credit_property_income(prop.rush_cycle(frenzy.get_multiplier() * prop.legacy_income_multiplier))
 	else:
 		prop.start_cycle()
 
@@ -167,14 +178,17 @@ func hold_rush_property(prop_index: int) -> void:
 	if not prop.is_cycle_running:
 		return
 	frenzy.on_tap(tuning.frenzy_fill_hold_factor)
-	# This rush keeps Rush Momentum building through the grace window (consumed in tick()).
+	# Keep the global momentum meter building, and mark THIS property as actively rushed so the
+	# bonus applies to it and only it (refreshed now so this payout already carries it; the tick
+	# keeps it lit while the grace holds).
 	_rush_grace_remaining = tuning.rush_momentum_grace_seconds
-	# Rush pays at the SAME multiplier the tick uses — frenzy, the dynasty's Family Fortune
-	# (legacy_income_multiplier), AND Rush Momentum — and credits immediately if it completes, so
-	# the cash keeps pace with the rushed bar AND the full displayed rate (Tim 2026-07-12: rush
-	# dropped Family Fortune; Rush Momentum then joined the same chain).
-	economy.credit_property_income(prop.rush_cycle(
-		frenzy.get_multiplier() * prop.legacy_income_multiplier * rush_momentum.factor()))
+	prop.rush_active_grace = tuning.rush_momentum_grace_seconds
+	prop.rush_momentum_factor = rush_momentum.factor()
+	# Rush pays at the SAME multiplier the tick uses — frenzy and the dynasty's Family Fortune — and
+	# credits immediately if it completes; Rush Momentum is folded in per-property via _collect's
+	# rush_momentum_factor (set just above), so the cash keeps pace with the rushed bar AND the full
+	# displayed rate (Tim 2026-07-12: rush dropped Family Fortune; 07-13: momentum now rush-only).
+	economy.credit_property_income(prop.rush_cycle(frenzy.get_multiplier() * prop.legacy_income_multiplier))
 
 
 ## Pop the frenzy meter if allowed. Returns true if a burn started.

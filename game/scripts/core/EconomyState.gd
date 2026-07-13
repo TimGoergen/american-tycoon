@@ -210,6 +210,10 @@ func rush_cycle(prop_index: int, income_multiplier: float = 1.0) -> void:
 	credit_property_income((properties[prop_index] as PropertyState).rush_cycle(income_multiplier))
 
 
+## Cumulative income that arrived via an off-tick RUSH payout (diagnostic only — the sim reads it
+## to see what fraction of income comes from rushing vs the passive tick).
+var rush_income_total: float = 0.0
+
 ## Credit income from an OFF-tick property payout (a rushed cycle that completed immediately),
 ## exactly the way tick() credits it — cash, total_income, and the lifetime-earned accumulator —
 ## so an instant rush payout is indistinguishable from one collected on a tick.
@@ -219,6 +223,7 @@ func credit_property_income(amount: float) -> void:
 	cash += amount
 	total_income += amount
 	cash_earned_this_gen += amount
+	rush_income_total += amount
 
 
 # ---------------------------------------------------------------------------

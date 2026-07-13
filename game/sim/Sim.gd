@@ -991,22 +991,26 @@ const PLAYOUT_TIME_CAP := 21600.0    # 6 sim-hours; a candidate that can't clear
 
 func _run_epoch_playout_study() -> void:
 	print("")
-	print("=== Epoch pacing PLAYOUT (cost-curve-aware; a heir plays through the epochs) ===")
-	print("    A bare heir plays from $0 through the SHIPPED .tres, reinvesting greedily so base_cost")
-	print("    + the r0 curve decide unit counts. Epoch 1 (Earth) reads long only because a bare heir")
-	print("    cold-starts from $0 — that one-time bootstrap is unique to Earth; the steady per-epoch")
-	print("    pace is the epoch 2->5 ratios (each ~as long as, to slightly longer than, the last).")
-	_print_playout("SHIPPED .tres · bare heir (the actual game files)", 0, _property_configs)
+	print("=== Epoch pacing PLAYOUT: IDLE vs ACTIVE-RUSH (the core loop) ===")
+	print("    A heir plays from $0 through the SHIPPED .tres, reinvesting greedily. IDLE = passive")
+	print("    (staffed cycles + the tick only). ACTIVE = ALSO holds rush on the top 2 earners — the")
+	print("    game's real loop. Per-epoch durations show how much rushing turbo-boosts each scale.")
+	print("    Epoch 1 (Earth) reads long only because a bare heir cold-starts from $0 (a one-time")
+	print("    bootstrap); the steady signal is the epoch 2->5 durations + their vs-prev ratios.")
+	_print_playout("IDLE — no rush (passive floor)", 0, _property_configs, 0, 1.0)
+	_print_playout("ACTIVE — rush top 2, no Strong-Arm (rush_power 1)", 0, _property_configs, 2, 1.0)
+	_print_playout("ACTIVE — rush top 2, Strong-Arm ~lv10 (rush_power 6)", 0, _property_configs, 2, 6.0)
 
 
 ## Play one heir (bare if heir_legacy is 0, else juiced) with the given cohort configs and
 ## print the wall-clock spent in each NON-terminal epoch (+ ratio vs the previous). The final
 ## epoch is the terminal state — there is nothing beyond it to advance to — so it has no
 ## duration and is omitted. The real pacing test: cost gates units in the playout.
-func _print_playout(label: String, heir_legacy: int, configs: Array) -> void:
+func _print_playout(label: String, heir_legacy: int, configs: Array,
+		rush_top_n: int = 0, rush_power: float = 1.0) -> void:
 	print("")
 	print("  --- %s ---" % label)
-	var result := _measure_epoch_durations_via_playout(configs, heir_legacy)
+	var result := _measure_epoch_durations_via_playout(configs, heir_legacy, rush_top_n, rush_power)
 	var durations: Dictionary = result["durations"]
 	print("    epoch     duration    vs prev")
 	var prev := 0.0
@@ -1023,14 +1027,16 @@ func _print_playout(label: String, heir_legacy: int, configs: Array) -> void:
 		prev = d
 	if not result["completed"]:
 		print("    (did not reach the final epoch within the %s sim-time cap)" % _format_duration(PLAYOUT_TIME_CAP))
-	print("    total to final contact: %s" % _format_duration(result["sim_time"]))
+	print("    total to final contact: %s   |   rush share of income: %.0f%%" % [
+		_format_duration(result["sim_time"]), float(result["rush_fraction"]) * 100.0])
 
 
 ## Play a bare heir from $0 with the given configs, ticking until every epoch is cleared
 ## (or the time cap). Returns per-tier wall-clock durations, whether it finished, and the
 ## total sim time. Active-play model: wage taps to bootstrap, greedy reinvest each tick
 ## (buys units + staff + hires + restarts cycles), frenzy popped when ready.
-func _measure_epoch_durations_via_playout(configs: Array, heir_legacy: int) -> Dictionary:
+func _measure_epoch_durations_via_playout(configs: Array, heir_legacy: int,
+		rush_top_n: int = 0, rush_power: float = 1.0) -> Dictionary:
 	# Always via a DynastyState so a juiced heir can spend Legacy on upgrades first (the
 	# dynasty tick also applies the Family Fortune income multiplier). heir_legacy 0 = bare.
 	var dynasty := DynastyState.new(configs, _tuning)
@@ -1039,8 +1045,16 @@ func _measure_epoch_durations_via_playout(configs: Array, heir_legacy: int) -> D
 		_buy_upgrades_greedily(dynasty)
 	var game := dynasty.current
 	game.economy.award_cash(_tuning.m1_starting_cash)
+	# ACTIVE-RUSH model (rush_top_n > 0): the player holds rush on their top earners — the core
+	# engagement loop. Give every property the chosen rush_power (Strong-Arm Tactics level), since
+	# an active player has some and it drives the rush throughput. rush_top_n 0 = pure idle/passive.
+	if rush_top_n > 0:
+		for prop_variant in game.economy.properties:
+			(prop_variant as PropertyState).rush_power_multiplier = rush_power
 	var sim_time := 0.0
 	var next_wage_tap := 0.0
+	var rush_accumulator := 0.0
+	var rush_pulse_interval := 1.0 / _tuning.hold_rush_per_second
 	var last_tier := game.epoch.current_tier
 	var tier_started := {last_tier: 0.0}
 	var tier_durations := {}
@@ -1050,6 +1064,15 @@ func _measure_epoch_durations_via_playout(configs: Array, heir_legacy: int) -> D
 			next_wage_tap += WAGE_TAP_PERIOD
 		game.pop_frenzy()
 		_greedy_build_out(game)
+		# Hold rush on the top N earners at hold_rush_per_second (an engaged, rushing player). Pick
+		# the targets once per step; a fast rush completes many cycles between the 10 Hz build steps.
+		if rush_top_n > 0:
+			var targets := _top_running_property_indices(game, rush_top_n)
+			rush_accumulator += TICK_SIZE
+			while rush_accumulator >= rush_pulse_interval:
+				rush_accumulator -= rush_pulse_interval
+				for idx in targets:
+					game.hold_rush_property(idx)
 		dynasty.tick(TICK_SIZE)
 		sim_time += TICK_SIZE
 		if game.epoch.current_tier > last_tier:
@@ -1060,11 +1083,31 @@ func _measure_epoch_durations_via_playout(configs: Array, heir_legacy: int) -> D
 			last_tier = game.epoch.current_tier
 	# Record the final (possibly incomplete) tier's time so far.
 	tier_durations[last_tier] = sim_time - float(tier_started.get(last_tier, sim_time))
+	var rush_fraction := 0.0
+	if game.economy.total_income > 0.0:
+		rush_fraction = game.economy.rush_income_total / game.economy.total_income
 	return {
 		"durations": tier_durations,
 		"completed": game.epoch.current_tier >= EpochCatalog.tier_count(),
 		"sim_time": sim_time,
+		"rush_fraction": rush_fraction,
 	}
+
+
+## The indices of the top `n` owned + running properties by income/sec — the ones an active player
+## would hold rush on (their biggest earners). Recomputed each build step, so as the player climbs
+## the ladder the rush follows their new top properties.
+func _top_running_property_indices(game: GameState, n: int) -> Array:
+	var candidates: Array = []
+	for i in range(game.economy.properties.size()):
+		var prop := game.economy.properties[i] as PropertyState
+		if prop.units_owned > 0 and prop.is_cycle_running:
+			candidates.append({"i": i, "ips": prop.get_income_per_sec()})
+	candidates.sort_custom(func(a, b): return float(a["ips"]) > float(b["ips"]))
+	var out: Array = []
+	for j in range(mini(n, candidates.size())):
+		out.append(int(candidates[j]["i"]))
+	return out
 
 
 ## Build a geometric ladder [1, step, step^2, ...] of `count` tiers (tier 1 = 1.0).

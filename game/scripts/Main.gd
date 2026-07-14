@@ -73,6 +73,9 @@ var _swipe_start := Vector2.ZERO
 var _swipe_delta := Vector2.ZERO
 var _swipe_hold_seen := false       # a held action (rush/buy/hire) was engaged at some point this
                                     # gesture — if so, this gesture can NEVER become a tab swipe
+var _swipe_start_scroll := 0        # the ladder scroll when this gesture began — restored before a
+                                    # swipe switches tabs, so the swipe's own drag doesn't corrupt
+                                    # the leaving tab's remembered scroll position
 const EPOCH_SWIPE_THRESHOLD := 60.0  # px of horizontal travel to count as a tab swipe
 
 # "New ventures" nudge: pop a modal the first time a tab the player hasn't opened has a property
@@ -903,6 +906,7 @@ func _input(event: InputEvent) -> void:
 			_swipe_start = event.position
 			_swipe_delta = Vector2.ZERO
 			_swipe_hold_seen = false
+			_swipe_start_scroll = _ladder_scroll.scroll_vertical if _ladder_scroll != null else 0
 		elif _swipe_tracking:
 			_swipe_tracking = false
 			# A press held long enough to trigger a hold (auto-rush / hold-to-buy / hold-to-hire)
@@ -914,6 +918,11 @@ func _input(event: InputEvent) -> void:
 				return
 			# Swipe LEFT (negative x) advances to the next epoch, like turning a page forward.
 			if absf(_swipe_delta.x) >= EPOCH_SWIPE_THRESHOLD and absf(_swipe_delta.x) > absf(_swipe_delta.y):
+				# The swipe's drag nudged this tab's vertical scroll; undo that first, so the tab we
+				# leave saves where the player actually left it — not where the swipe dragged it to
+				# (Tim 2026-07-13: swipes lost the per-tab scroll that the pager buttons preserved).
+				if _ladder_scroll != null:
+					_ladder_scroll.scroll_vertical = _swipe_start_scroll
 				_step_epoch_tab(1 if _swipe_delta.x < 0.0 else -1)
 	elif event is InputEventScreenDrag and _swipe_tracking:
 		_swipe_delta = event.position - _swipe_start

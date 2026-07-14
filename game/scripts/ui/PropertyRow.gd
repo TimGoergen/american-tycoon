@@ -832,7 +832,16 @@ func _refresh(delta: float) -> void:
 	# The leading "$" is now shown as the dollar-bill icon just left of the label (see
 	# _income_icon), so strip it off every amount before it goes into the text (Tim, 2026-07-09).
 	if rushed_fractions_per_second > 0.0:
-		_income_label.text = Money.of(per_cycle * rushed_fractions_per_second).display().trim_prefix("$") + " / s"
+		# While rushing, the cycle completes every 1/rushed_fractions_per_second seconds. Apply the
+		# SAME rule as an un-rushed cycle: a sub-second effective cycle reads as a per-second RATE,
+		# but a cycle longer than a second reads as the per-cycle payout WITH its (rush-shortened)
+		# duration — the money lands in lumps that far apart, so "16 T / 2s" is honest where "8.1 T/s"
+		# implies a smooth per-second trickle it never delivers (Tim, 2026-07-13).
+		var rushed_cycle_time := 1.0 / rushed_fractions_per_second
+		if rushed_cycle_time <= PER_SECOND_READOUT_THRESHOLD_SEC:
+			_income_label.text = Money.of(per_cycle * rushed_fractions_per_second).display().trim_prefix("$") + " / s"
+		else:
+			_income_label.text = "%s / %s" % [Money.of(per_cycle).display().trim_prefix("$"), _format_cycle_duration(rushed_cycle_time)]
 	elif effective_length > 0.0 and effective_length <= PER_SECOND_READOUT_THRESHOLD_SEC:
 		_income_label.text = Money.of(per_cycle / effective_length).display().trim_prefix("$") + " / s"
 	else:

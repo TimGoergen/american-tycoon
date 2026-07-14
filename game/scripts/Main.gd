@@ -850,6 +850,12 @@ func _set_epoch_tab(tab: int) -> void:
 	for row_variant in _rows:
 		var row := row_variant as PropertyRow
 		row.set_tab_active(_epoch_tab_of(row.prop_index) == _epoch_tab)
+	# Open every tab at the TOP of its list. Without this the scroll keeps the previous tab's
+	# offset, which lands you partway (often at the bottom) of the new tab (Tim, 2026-07-13).
+	# Deferred as well, so it also wins after the row-visibility change re-lays-out the list.
+	if _ladder_scroll != null:
+		_ladder_scroll.scroll_vertical = 0
+		_ladder_scroll.set_deferred("scroll_vertical", 0)
 	_update_epoch_pager()
 
 

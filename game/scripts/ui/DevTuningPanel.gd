@@ -40,6 +40,14 @@ signal defaults_requested
 ## reset). Destructive — the panel two-taps to confirm before emitting this.
 signal reset_dynasty_requested
 
+## Playtest "jump ahead" tools (Tim 2026-07-13) — Main applies each to the live game, saves, and
+## reloads, so the mid/late game and a prestiged heir can be sampled in seconds. jump_epoch teleports
+## to a tier; grant_legacy adds Legacy to spend; grant_cash adds spending money as a multiple of the
+## current epoch's clear target.
+signal jump_epoch_requested(tier: int)
+signal grant_legacy_requested(amount: int)
+signal grant_cash_requested(epoch_target_multiplier: float)
+
 
 # Large, legible type for phone reading (UI notes §1) — sized up 25% from the first
 # pass for on-device readability (Tim). Still denser than the ceremony screens, since
@@ -378,6 +386,68 @@ func _add_collapsible_section(title: String) -> VBoxContainer:
 	return body
 
 
+## The Playtest "jump ahead" section: teleport to any epoch, grant Legacy, or grant spending cash —
+## so the mid/late game and a prestiged heir can be sampled in seconds instead of the hours a real
+## run takes (Tim 2026-07-13). Each button just emits a signal; Main applies it to the live game,
+## saves, and reloads. Starts EXPANDED, since it is the reason a tester opens this panel.
+func _add_playtest_section() -> void:
+	var title := "Playtest — jump ahead"
+	var body := _add_collapsible_section(title)
+
+	body.add_child(_playtest_label("Jump to epoch (teleport + entry cash):"))
+	var epoch_row := HBoxContainer.new()
+	epoch_row.add_theme_constant_override("separation", 8)
+	for tier in range(1, EpochCatalog.tier_count() + 1):
+		var t := tier
+		var eb := _playtest_button("E%d" % t)
+		eb.pressed.connect(func() -> void: jump_epoch_requested.emit(t))
+		epoch_row.add_child(eb)
+	body.add_child(epoch_row)
+
+	body.add_child(_playtest_label("Grant Legacy (to spend in the Estate Office):"))
+	var legacy_row := HBoxContainer.new()
+	legacy_row.add_theme_constant_override("separation", 8)
+	for pair in [["+1K", 1000], ["+100K", 100_000], ["+10M", 10_000_000]]:
+		var amount := int(pair[1])
+		var lb := _playtest_button(String(pair[0]))
+		lb.pressed.connect(func() -> void: grant_legacy_requested.emit(amount))
+		legacy_row.add_child(lb)
+	body.add_child(legacy_row)
+
+	body.add_child(_playtest_label("Grant spending cash (× this epoch's clear target):"))
+	var cash_row := HBoxContainer.new()
+	cash_row.add_theme_constant_override("separation", 8)
+	for mult in [1.0, 10.0, 100.0]:
+		var m: float = mult
+		var cb := _playtest_button("x%d" % int(m))
+		cb.pressed.connect(func() -> void: grant_cash_requested.emit(m))
+		cash_row.add_child(cb)
+	body.add_child(cash_row)
+
+	_toggle_section(title)  # open it by default
+
+
+## A wide button for the Playtest section, sharing its row evenly with its siblings.
+func _playtest_button(text: String) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.custom_minimum_size = Vector2(0, 84)
+	button.add_theme_font_size_override("font_size", BUTTON_SIZE)
+	UiPalette.style_button(button, false)
+	return button
+
+
+## A caption line above a Playtest button row.
+func _playtest_label(text: String) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
+	label.add_theme_color_override("font_color", UiPalette.INK_NAVY)
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	return label
+
+
 ## A blue plate (dev-tool CYCLE_BLUE fill, navy border) for a section header button — the same
 ## plate shape as the Estate tab's section headers, but one shared color for the whole panel.
 func _make_section_plate(color: Color) -> StyleBoxFlat:
@@ -445,6 +515,9 @@ func open(effective_tuning: TuningConfig, baked_tuning: TuningConfig) -> void:
 	_sections.clear()
 	for child in _list.get_children():
 		child.queue_free()
+
+	# Playtest jump tools first, above the tuning-knob sections (Tim 2026-07-13).
+	_add_playtest_section()
 
 	# Reflection: every exported int/float on TuningConfig, in declaration order (so related
 	# constants stay grouped exactly as they read in the source file). We first sort each knob

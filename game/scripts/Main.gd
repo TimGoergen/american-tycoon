@@ -1159,6 +1159,9 @@ func _build_settings_tab() -> Control:
 	_dev_panel.apply_requested.connect(_on_dev_apply_requested)
 	_dev_panel.defaults_requested.connect(_on_dev_defaults_requested)
 	_dev_panel.reset_dynasty_requested.connect(_on_dev_reset_dynasty_requested)
+	_dev_panel.jump_epoch_requested.connect(_on_dev_jump_epoch)
+	_dev_panel.grant_legacy_requested.connect(_on_dev_grant_legacy)
+	_dev_panel.grant_cash_requested.connect(_on_dev_grant_cash)
 	_dev_panel.closed.connect(_on_dev_closed)
 	stack.add_child(_dev_panel)
 
@@ -1377,6 +1380,38 @@ func _on_dev_defaults_requested() -> void:
 ## reload, which re-runs startup with no save present and so begins a fresh run.
 func _on_dev_reset_dynasty_requested() -> void:
 	SaveManager.delete_save_file()
+	get_tree().reload_current_scene()
+
+
+## Playtest: teleport this generation to `tier`. Set lifetime-earned to that epoch's ENTRY threshold
+## (so the epoch state is coherent and won't immediately re-advance) and hand over the same amount as
+## spending cash to build the new cohort. restore() sets the tier directly, skipping the First Contact
+## beats — a clean teleport. Save + reload so the pager, unlocked rows, and staff caps rebuild.
+func _on_dev_jump_epoch(tier: int) -> void:
+	var entry_earned := 0.0
+	if tier > 1:
+		entry_earned = EpochCatalog.consume_threshold(tier - 1, tuning.earth_economy_target)
+	game.economy.cash_earned_this_gen = entry_earned
+	game.economy.cash = entry_earned
+	game.epoch.restore(tier)
+	SaveManager.save_dict_to_file(dynasty.to_save_dict())
+	get_tree().reload_current_scene()
+
+
+## Playtest: grant Legacy to spend in the Estate Office (to feel a prestiged heir). Save + reload.
+func _on_dev_grant_legacy(amount: int) -> void:
+	dynasty.upgrades.award(amount)
+	SaveManager.save_dict_to_file(dynasty.to_save_dict())
+	get_tree().reload_current_scene()
+
+
+## Playtest: grant spending cash as a multiple of the current epoch's clear target — always a
+## meaningful amount whatever the scale. award_cash never touches lifetime-earned, so it can't
+## advance the epoch or inflate the estate; it is pure buying power. Save + reload.
+func _on_dev_grant_cash(epoch_target_multiplier: float) -> void:
+	var target := EpochCatalog.consume_threshold(game.epoch.current_tier, tuning.earth_economy_target)
+	game.economy.award_cash(target * epoch_target_multiplier)
+	SaveManager.save_dict_to_file(dynasty.to_save_dict())
 	get_tree().reload_current_scene()
 
 

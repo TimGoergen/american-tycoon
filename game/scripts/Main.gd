@@ -79,6 +79,7 @@ var _venture_overlay: NewVenturesOverlay
 var _tab_unlocked: Array = []         # tabs the player can open yet (persisted once true)
 var _tab_seen: Array = []             # tabs the player has viewed — a seen tab is never nudged
 var _tab_nudged: Array = []           # tabs already nudged — fire at most once each
+var _tab_scroll: Array = []           # each tab's last scroll offset (0 = first visit / top)
 var _pending_venture_tab := -1        # the tab the live nudge points at (for its "SHOW ME")
 var _venture_check_timer := 0.0
 const VENTURE_CHECK_INTERVAL := 0.5   # how often to scan for a newly-affordable unopened tab
@@ -669,6 +670,9 @@ func _build_property_tab() -> Control:
 	_tab_seen.fill(false)
 	_tab_nudged.resize(_epoch_tab_count())
 	_tab_nudged.fill(false)
+	# Each tab remembers its own scroll offset; 0 means never-visited (opens at the top).
+	_tab_scroll.resize(_epoch_tab_count())
+	_tab_scroll.fill(0)
 	_update_tab_unlocks()
 	# Open on the deepest UNLOCKED tab (where the player is actively buying) and paint the pager.
 	_set_epoch_tab(_epoch_default_tab())
@@ -843,6 +847,9 @@ func _step_epoch_tab(delta: int) -> void:
 ## Switch to a tab: gate every row's liveness to it (only this tab refreshes + draws), then
 ## repaint the pager. Safe to call before the rows exist (used from _on_contact_made too).
 func _set_epoch_tab(tab: int) -> void:
+	# Remember where the player left the tab we're leaving, so returning to it restores that spot.
+	if _ladder_scroll != null and _epoch_tab >= 0 and _epoch_tab < _tab_scroll.size():
+		_tab_scroll[_epoch_tab] = _ladder_scroll.scroll_vertical
 	_epoch_tab = clampi(tab, 0, _epoch_tab_max())
 	# Viewing a tab marks it seen, so it never triggers the "new ventures" nudge afterward.
 	if _epoch_tab < _tab_seen.size():
@@ -850,12 +857,13 @@ func _set_epoch_tab(tab: int) -> void:
 	for row_variant in _rows:
 		var row := row_variant as PropertyRow
 		row.set_tab_active(_epoch_tab_of(row.prop_index) == _epoch_tab)
-	# Open every tab at the TOP of its list. Without this the scroll keeps the previous tab's
-	# offset, which lands you partway (often at the bottom) of the new tab (Tim, 2026-07-13).
-	# Deferred as well, so it also wins after the row-visibility change re-lays-out the list.
+	# Restore THIS tab's own last scroll offset (0 the first time it is opened, so a never-visited
+	# tab starts at the top — Tim, 2026-07-13). Deferred as well, so it also wins after the row-
+	# visibility change re-lays-out the list (an immediate set can be clamped by the stale height).
 	if _ladder_scroll != null:
-		_ladder_scroll.scroll_vertical = 0
-		_ladder_scroll.set_deferred("scroll_vertical", 0)
+		var target: int = int(_tab_scroll[_epoch_tab]) if _epoch_tab < _tab_scroll.size() else 0
+		_ladder_scroll.scroll_vertical = target
+		_ladder_scroll.set_deferred("scroll_vertical", target)
 	_update_epoch_pager()
 
 

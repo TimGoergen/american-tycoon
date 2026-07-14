@@ -1553,6 +1553,11 @@ func _build_retention_entries() -> Array:
 		if next_level <= best_levels:
 			cost = dynasty.staff_retention.cost_for_level(i, next_level)
 			can_afford = dynasty.upgrades.available >= cost
+		# Gems already spent retaining this staffer — the sum of every retained level's cost.
+		# Lets the Estate Office show the Household Staff category's total invested (Tim 2026-07-13).
+		var gems_spent := 0
+		for level in range(1, retained_levels + 1):
+			gems_spent += dynasty.staff_retention.cost_for_level(i, level)
 		# Show the roster's face: the staffer of the deepest block the bloodline has
 		# reached, named by that block's absolute epoch on this property's ladder.
 		var shown_blocks := prop.staff_block_of_level(maxi(maxi(best_levels, retained_levels), 1))
@@ -1564,6 +1569,7 @@ func _build_retention_entries() -> Array:
 			"retained_levels": retained_levels,
 			"cost": cost,
 			"can_afford": can_afford,
+			"gems_spent": gems_spent,
 		})
 	return entries
 

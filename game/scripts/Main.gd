@@ -1443,7 +1443,7 @@ func _update_plan_button() -> void:
 	if can_succeed:
 		# Two centered rows (Tim, 2026-07-05): the verb on top, the banked gems beneath —
 		# "(+x [gem])", the legacy-gem image standing in for the word "Legacy".
-		_plan_label.text = "[center]PASS THE TORCH\n+%d [img width=70 height=70]res://art/icons/legacy_gem.svg[/img][/center]" % dynasty.projected_legacy_gain()
+		_plan_label.text = "[center]PASS THE TORCH\n+%s [img width=70 height=70]res://art/icons/legacy_gem.svg[/img][/center]" % Money.abbrev(dynasty.projected_legacy_gain())
 	else:
 		_plan_label.text = "[center]PASS THE TORCH[/center]"
 
@@ -1452,7 +1452,7 @@ func _update_plan_button() -> void:
 	if dynasty.upgrades.earned_lifetime != _shown_lifetime_earned:
 		_shown_lifetime_earned = dynasty.upgrades.earned_lifetime
 		# Gem image scaled with the 66px text so the pair keeps its proportions.
-		_lifetime_earned_label.text = "[center][img width=67 height=67]res://art/icons/legacy_gem.svg[/img] Lifetime Earned: %d[/center]" % _shown_lifetime_earned
+		_lifetime_earned_label.text = "[center][img width=67 height=67]res://art/icons/legacy_gem.svg[/img] Lifetime Earned: %s[/center]" % Money.abbrev(_shown_lifetime_earned)
 
 
 ## First contact: a new epoch was reached this tick. Show the beat (Main's _process

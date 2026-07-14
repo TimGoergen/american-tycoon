@@ -71,6 +71,8 @@ var _ladder_area: Control           # the property-list region; swipes over eith
 var _swipe_tracking := false        # a touch is down on the ladder, tracking for a horizontal swipe
 var _swipe_start := Vector2.ZERO
 var _swipe_delta := Vector2.ZERO
+var _swipe_hold_seen := false       # a held action (rush/buy/hire) was engaged at some point this
+                                    # gesture — if so, this gesture can NEVER become a tab swipe
 const EPOCH_SWIPE_THRESHOLD := 60.0  # px of horizontal travel to count as a tab swipe
 
 # "New ventures" nudge: pop a modal the first time a tab the player hasn't opened has a property
@@ -900,17 +902,24 @@ func _input(event: InputEvent) -> void:
 			_swipe_tracking = region.has_point(event.position)
 			_swipe_start = event.position
 			_swipe_delta = Vector2.ZERO
+			_swipe_hold_seen = false
 		elif _swipe_tracking:
 			_swipe_tracking = false
 			# A press held long enough to trigger a hold (auto-rush / hold-to-buy / hold-to-hire)
-			# owns the finger — don't also flip the tab if it drifted sideways (Tim 2026-07-11).
-			if _any_row_holding():
+			# owns the finger — don't also flip the tab if it drifted sideways (Tim 2026-07-11). We
+			# LATCH this across the whole gesture (_swipe_hold_seen), so once a continuous state has
+			# started the swipe is dead until the player lifts and swipes again — even if the hold
+			# lapses before release, e.g. the finger drifts off the portrait (Tim 2026-07-13).
+			if _swipe_hold_seen or _any_row_holding():
 				return
 			# Swipe LEFT (negative x) advances to the next epoch, like turning a page forward.
 			if absf(_swipe_delta.x) >= EPOCH_SWIPE_THRESHOLD and absf(_swipe_delta.x) > absf(_swipe_delta.y):
 				_step_epoch_tab(1 if _swipe_delta.x < 0.0 else -1)
 	elif event is InputEventScreenDrag and _swipe_tracking:
 		_swipe_delta = event.position - _swipe_start
+		# Latch the moment a held action is engaged, so the rest of this gesture can't become a swipe.
+		if _any_row_holding():
+			_swipe_hold_seen = true
 
 
 ## True if any property row currently has a held action engaged (so a sideways drift during a

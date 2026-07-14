@@ -1546,7 +1546,7 @@ func _refresh_legacy_result_line(mult: float) -> void:
 	var amount := _legacy_bonus_amount(mult)
 	if amount > 0:
 		var great := _legacy_bonus_factor(mult) > 1.0
-		_result_legacy_label.text = ("LEGACY BONUS  +%d gems!" % amount) + ("  (great round!)" if great else "")
+		_result_legacy_label.text = ("LEGACY BONUS  +%s gems!" % Money.abbrev(amount)) + ("  (great round!)" if great else "")
 		_result_legacy_label.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD)
 	else:
 		# Collected a gem but the round was too weak to keep it (bad result → keep nothing).

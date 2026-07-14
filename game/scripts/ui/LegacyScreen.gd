@@ -380,11 +380,28 @@ func set_all_collapsed(collapsed: bool) -> void:
 
 
 ## Refresh a section header's caret + name to match its expanded state. "+" invites a tap to
-## open a collapsed section; "-" shows it is already open.
+## open a collapsed section; "-" shows it is already open. The name is followed by the total gems
+## the player has invested in this category so far, formatted like money (Tim, 2026-07-13) — shown
+## only for catalog categories (Household Staff's retention isn't a catalog upgrade, so it has no id
+## list and no total).
 func _update_section_header(category: String) -> void:
 	var section: Dictionary = _sections[category]
 	var marker := "-" if bool(section["expanded"]) else "+"
-	(section["button"] as Button).text = "%s  %s" % [marker, category.to_upper()]
+	var invested_suffix := ""
+	if not (section["upgrade_ids"] as Array).is_empty():
+		invested_suffix = "  (%s)" % Money.abbrev(_category_gems_invested(category))
+	(section["button"] as Button).text = "%s  %s%s" % [marker, category.to_upper(), invested_suffix]
+
+
+## Total Legacy gems the player has spent buying every level of every upgrade in this category —
+## the sum of each upgrade's per-level costs from level 1 up to its current level.
+func _category_gems_invested(category: String) -> int:
+	var total := 0
+	for id_variant in _sections[category]["upgrade_ids"]:
+		var id := String(id_variant)
+		for level in range(1, _upgrades.get_level(id) + 1):
+			total += LegacyUpgradeCatalog.cost_for_level(id, level)
+	return total
 
 
 ## Refresh a collapsed section header's right-aligned "+x affordable" badge (Tim, 2026-06-24).
@@ -618,7 +635,7 @@ func _apply_retention_entry(entry: Dictionary) -> void:
 		button.text = "RETAINED"
 		button.disabled = true
 	else:
-		button.text = "RETAIN LVL %d\n%d Gems" % [int(entry["retained_levels"]) + 1, cost]
+		button.text = "RETAIN LVL %d\n%s Gems" % [int(entry["retained_levels"]) + 1, Money.abbrev(cost)]
 		button.disabled = not bool(entry["can_afford"])
 
 
@@ -629,7 +646,8 @@ func _apply_retention_entry(entry: Dictionary) -> void:
 ## Re-read the live state and update the wallet readout and every card.
 func refresh() -> void:
 	# Just the number — the gem icon beside it stands in for the word "Legacy" (Tim, 2026-06-28).
-	_wallet_label.text = "%d" % _upgrades.available
+	# Formatted like money (45, 1.5K, 10M) rather than a raw integer (Tim, 2026-07-13).
+	_wallet_label.text = Money.abbrev(_upgrades.available)
 
 	for definition in LegacyUpgradeCatalog.all():
 		var id := String(definition["id"])
@@ -649,12 +667,14 @@ func refresh() -> void:
 			var cost := _upgrades.get_next_cost(id)
 			# The legacy-gem icon replaces the word "BUY"; the cost follows it (Tim, 2026-06-28).
 			buy_button.icon = GEM_TEX
-			buy_button.text = "  %d" % cost
+			buy_button.text = "  %s" % Money.abbrev(cost)
 			# Greyed out (but still readable) when the player can't afford it.
 			buy_button.disabled = not _upgrades.can_buy(id)
 
-	# Update every collapsed section's "+x affordable" badge to match the new wallet/levels.
+	# Update every section's header (its invested-gems total may have changed after a buy) and its
+	# collapsed "+x affordable" badge, to match the new wallet/levels.
 	for category in _sections:
+		_update_section_header(String(category))
 		_update_section_count(String(category))
 
 

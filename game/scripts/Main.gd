@@ -72,10 +72,10 @@ var _swipe_tracking := false        # a touch is down on the ladder, tracking fo
 var _swipe_start := Vector2.ZERO
 var _swipe_delta := Vector2.ZERO
 var _swipe_hold_seen := false       # a held action (rush/buy/hire) was engaged at some point this
-                                    # gesture — if so, this gesture can NEVER become a tab swipe
+									# gesture — if so, this gesture can NEVER become a tab swipe
 var _swipe_start_scroll := 0        # the ladder scroll when this gesture began — restored before a
-                                    # swipe switches tabs, so the swipe's own drag doesn't corrupt
-                                    # the leaving tab's remembered scroll position
+									# swipe switches tabs, so the swipe's own drag doesn't corrupt
+									# the leaving tab's remembered scroll position
 const EPOCH_SWIPE_THRESHOLD := 60.0  # px of horizontal travel to count as a tab swipe
 
 # "New ventures" nudge: pop a modal the first time a tab the player hasn't opened has a property

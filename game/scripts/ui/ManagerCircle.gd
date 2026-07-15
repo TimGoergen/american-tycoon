@@ -31,6 +31,9 @@ const RESTART_TEX := preload("res://art/icons/restart.svg")
 const INFINITY_TEX := preload("res://art/icons/infinity.svg")
 
 const OUTLINE_WIDTH := 2.0
+## Thicker outline ring while the portrait is held for a rush, so the circle visibly "charges up"
+## under the finger (Tim, 2026-07-14).
+const RUSH_OUTLINE_WIDTH := 6.0
 
 ## Side of the icon's draw box as a fraction of the circle's diameter — the icon sits
 ## centered and a little inside the outline ring.
@@ -164,8 +167,10 @@ func _draw() -> void:
 		draw_string(_level_font, Vector2(0.0, baseline_y), "LVL %d" % _staff_level,
 				HORIZONTAL_ALIGNMENT_CENTER, size.x, font_size, Color.BLACK)
 
-	# Navy outline ring on top, so the edge stays crisp over any fill or icon.
-	draw_arc(center, radius - OUTLINE_WIDTH, 0.0, TAU, 64, UiPalette.NAVY, OUTLINE_WIDTH, true)
+	# Navy outline ring on top, so the edge stays crisp over any fill or icon. The ring thickens
+	# while the portrait is held for a rush (_show_rush_icon), so the circle reads as "charging".
+	var outline_width := RUSH_OUTLINE_WIDTH if _show_rush_icon else OUTLINE_WIDTH
+	draw_arc(center, radius - outline_width, 0.0, TAU, 64, UiPalette.NAVY, outline_width, true)
 
 
 ## Draw one white-authored state icon, tinted to `color`, in a box whose side is the

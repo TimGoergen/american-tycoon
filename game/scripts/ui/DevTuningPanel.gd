@@ -138,7 +138,8 @@ const DESCRIPTIONS := {
 	"estate_tax_rate_base": "Estate tax rate before loopholes (0–1).",
 	"loophole_rate_floor": "Lowest the estate tax can fall via loopholes.",
 	"k_legacy": "Legacy payout scale on the power curve (K × (net/floor) ^ alpha).",
-	"alpha_legacy": "Legacy curve exponent; ~0.30 doubles gems per 10x estate.",
+	"alpha_legacy": "Legacy curve exponent; lower = flatter yield, tames the prestige runaway.",
+	"legacy_upgrade_cost_multiplier": "Global x on every Legacy upgrade cost — the prestige-power brake (higher = a prestige buys fewer levels).",
 	"crash_multiplier": "Income multiplier during a Market Crash event.",
 	"crash_duration_minutes": "Market Crash length (active minutes).",
 	"audit_settle_rate": "Audit settlement cost as a fraction of net worth.",
@@ -161,6 +162,7 @@ const DISPLAY_NAMES := {
 	"rush_momentum_grace_seconds": "Momentum Grace Sec",
 	"k_legacy": "Legacy Payout Scale",
 	"alpha_legacy": "Legacy Payout Curve",
+	"legacy_upgrade_cost_multiplier": "Legacy Upgrade Cost x",
 	"minigame_duration_seconds": "Minigame Timer Seconds",
 	"minigame_keep_floor": "Minigame Downside Floor",
 	"minigame_full_performance": "Minigame Neutral Point",
@@ -207,7 +209,7 @@ const SECTIONS := [
 	{"title": "Minigames", "prefixes": ["minigame_", "match3_", "basketball_"]},
 	{"title": "Legacy Bonus", "prefixes": ["legacy_bonus_", "legacy_gem_chance_"]},
 	{"title": "Offline", "prefixes": ["offline_"]},
-	{"title": "Estate & Legacy", "prefixes": ["estate_", "loophole_", "k_legacy", "alpha_legacy"]},
+	{"title": "Estate & Legacy", "prefixes": ["estate_", "loophole_", "k_legacy", "alpha_legacy", "legacy_upgrade_cost_multiplier"]},
 	{"title": "Events", "prefixes": ["crash_", "audit_"]},
 ]
 

@@ -117,6 +117,9 @@ func _configure_retention_pricing() -> void:
 		tuning.retention_cost_growth,
 		tuning.retention_property_step
 	)
+	# Push the global Legacy-upgrade cost multiplier into the (stateless) catalog too, so every
+	# upgrade price reflects the tuning knob (Tim 2026-07-14 — the prestige-runaway brake).
+	LegacyUpgradeCatalog.cost_multiplier = tuning.legacy_upgrade_cost_multiplier
 
 
 # ---------------------------------------------------------------------------

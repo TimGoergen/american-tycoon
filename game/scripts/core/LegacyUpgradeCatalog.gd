@@ -200,6 +200,15 @@ static func get_definition(id: String) -> Dictionary:
 	return {}
 
 
+## A global multiplier on EVERY Legacy upgrade's cost — the "how much a prestige buys" dial. 1.0 =
+## the authored prices; >1 makes upgrades pricier so the same gems buy fewer levels, which slows the
+## prestige multiplier runaway (Tim 2026-07-14). A `static var` (not const) so DynastyState can set
+## it from tuning.legacy_upgrade_cost_multiplier at construction/load — the same "config a stateless
+## table from tuning" pattern GoldBubbles.tier_speed_px uses. Applied in cost_for_level below, so
+## every cost query (buy, badge, invested total) sees the same price.
+static var cost_multiplier := 1.0
+
+
 ## Legacy cost to buy a specific level of an upgrade (levels are 1-based).
 ## Level 1 costs base_cost; each further level multiplies by cost_growth.
 ## Returns 0 for an invalid level so callers never divide by a bogus price.
@@ -209,8 +218,9 @@ static func cost_for_level(id: String, level: int) -> int:
 		return 0
 	var base_cost := float(definition["base_cost"])
 	var growth := float(definition["cost_growth"])
-	# Geometric growth: level 1 = base, level 2 = base×growth, level 3 = base×growth², …
-	return int(floor(base_cost * pow(growth, float(level - 1))))
+	# Geometric growth: level 1 = base, level 2 = base×growth, level 3 = base×growth², … then the
+	# global cost_multiplier scales the whole ladder.
+	return int(floor(base_cost * pow(growth, float(level - 1)) * cost_multiplier))
 
 
 ## A human-readable summary of what ONE upgrade does at a given level — shown on

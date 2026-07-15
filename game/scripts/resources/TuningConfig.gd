@@ -226,14 +226,21 @@ extends Resource
 
 ## Coefficient on the Legacy gain curve (see EstateWaterfall.legacy_gain): legacy =
 ## floor(K_LEGACY × (estate_net / floor) ^ ALPHA), where the floor is EstateWaterfall.LEGACY_BASE.
-## Solved from a $10T → ~45 gems anchor for the gentle power curve (Tim, 2026-07-02).
-@export var k_legacy: float = 0.045  # feel-tune
+## Raised 0.045 → 0.50 (Tim 2026-07-14) to keep the FIRST prestige near its old ~350 gems after
+## alpha_legacy was lowered to 0.22 — the two move together (a lower exponent needs a higher
+## coefficient to hold the same yield at the founder's estate scale).
+@export var k_legacy: float = 0.50  # feel-tune
 
 ## Exponent on the estate-magnitude term of the Legacy curve — how fast gems grow with earnings.
-## ~0.30 means gems roughly DOUBLE per 10× of estate, so a better run is clearly rewarded (the old
-## log² curve was ~flat: doubling a run added only ~3 gems). Higher = punchier AND faster late
-## growth; the Legacy shop's geometric costs are the real brake on any windfall (Tim, 2026-07-02).
-@export var alpha_legacy: float = 0.30  # feel-tune
+## Lowered 0.30 → 0.22 (Tim 2026-07-14) to flatten the prestige runaway (at 0.30 the yield compounded
+## ~18× per epoch, driving income to ×237 over a dynasty); paired with the upgrade-cost nerf below so
+## the correction is split. Still rewards a better run (~+16% gems per 2× estate), just less punchy.
+@export var alpha_legacy: float = 0.22  # feel-tune
+
+## Global multiplier on EVERY Legacy upgrade's cost (LegacyUpgradeCatalog.cost_multiplier). 1.0 = the
+## authored prices; >1 makes a prestige's gems buy fewer upgrade levels, the second brake (with the
+## lower alpha_legacy) on the multiplier runaway that made late epochs trivial (Tim 2026-07-14).
+@export var legacy_upgrade_cost_multiplier: float = 2.0  # feel-tune
 
 # Note: the old k_sprint / beta_sprint / k_residual constants were removed when
 # Legacy became a spendable upgrade currency. Per-level upgrade magnitudes and

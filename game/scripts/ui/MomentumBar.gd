@@ -14,6 +14,10 @@ var _tuning: TuningConfig
 ## The big bonus readout ("+42%"), right-aligned; the caption on the left names the meter.
 var _label: Label
 
+## Fast neon-salmon streaks shown only when momentum is MAXED — the same effect the rushed property
+## bars get, so peak momentum reads the same everywhere (Tim, 2026-07-14).
+var _streaks: MomentumStreaks
+
 ## Eased fill: the true bonus is driven by the 10 Hz logic tick, so we glide the shown fill toward
 ## it each frame instead of copying it raw — otherwise the bar visibly steps ~10 times a second
 ## (the same smoothing the frenzy meter uses; see BarSmoothing).
@@ -47,6 +51,13 @@ func _ready() -> void:
 	bubbles.bubble_color = UiPalette.DARK_PURPLE
 	bubbles.tier = GoldBubbles.Tier.FLOWING  # steady automatic accrual, like TURBO charging
 	add_child(bubbles)
+
+	# Neon-salmon streaks over the fill, shown only at MAX momentum (see _process). Added over the
+	# gold bubbles but under the label overlay, so the "+XX%" still draws on top.
+	_streaks = MomentumStreaks.new()
+	_streaks.color = UiPalette.NEON_SALMON
+	_streaks.visible = false
+	add_child(_streaks)
 
 	# Overlay: a left caption and the big "+XX%" readout on the right. It ignores the mouse so it
 	# never eats a tap meant for the rows or buttons around it.
@@ -93,3 +104,5 @@ func _process(delta: float) -> void:
 	_displayed_fill = BarSmoothing.approach(_displayed_fill, target_fill, delta)
 	value = _displayed_fill
 	_label.text = "+%d%%" % int(round(_rush_momentum.bonus * 100.0))
+	# The salmon streaks only appear once momentum is fully charged — the peak-rush signal.
+	_streaks.visible = _rush_momentum.bonus >= _tuning.rush_momentum_max_bonus - 0.001

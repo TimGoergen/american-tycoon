@@ -58,6 +58,9 @@ const DARK_PURPLE := Color("#5E3499")
 ## Bright purple carbonation added to every property bar while Rush Momentum is MAXED — a vivid
 ## glow against the green/blue cycle fills, distinct from the always-present gold (Tim, 2026-07-13).
 const BRIGHT_PURPLE := Color("#C77DFF")
+## Bright neon salmon for the MAX-Rush-Momentum streaks — tiny dots that fly fast in a straight line
+## (MomentumStreaks), a deliberate contrast to the swaying gold carbonation (Tim, 2026-07-14).
+const NEON_SALMON := Color("#FF7A6B")
 
 # ---------------------------------------------------------------------------
 # Type scale — the single source of truth for UI font sizes (Tim's "chunkier UI"

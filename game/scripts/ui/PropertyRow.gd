@@ -261,9 +261,9 @@ var _income_label: Label
 var _income_icon: TextureRect
 var _cycle_bar: ProgressBar
 var _cycle_bubbles: GoldBubbles
-## A second, bright-purple bubble layer shown ONLY while Rush Momentum is maxed — extra carbonation
-## on top of the gold to signal the peak-rush state (Tim, 2026-07-13).
-var _cycle_purple_bubbles: GoldBubbles
+## Fast neon-salmon streaks shown ONLY while THIS property is being rushed at max Rush Momentum —
+## tiny dots flying in a straight line, contrasting the swaying gold carbonation (Tim, 2026-07-14).
+var _cycle_momentum_streaks: MomentumStreaks
 ## Diagnosis readout over the bar, shown when tuning.carb_debug_overlay = 1.
 var _carb_debug_label: Label
 var _buy_button: Button
@@ -398,14 +398,12 @@ func _ready() -> void:
 	_cycle_bubbles = GoldBubbles.new()
 	_cycle_bar.add_child(_cycle_bubbles)
 
-	# A second, bright-purple carbonation layer, hidden until Rush Momentum is maxed (see _process).
-	# variant_salt is set BEFORE add_child (the trait cache builds in _ready) so its crowd is offset
-	# from the gold layer — the two intermix instead of overlapping, showing both colors at once.
-	_cycle_purple_bubbles = GoldBubbles.new()
-	_cycle_purple_bubbles.variant_salt = 0.5
-	_cycle_purple_bubbles.bubble_color = UiPalette.BRIGHT_PURPLE
-	_cycle_purple_bubbles.visible = false
-	_cycle_bar.add_child(_cycle_purple_bubbles)
+	# Fast neon-salmon streaks over the gold, hidden until this property is rushed at max Rush
+	# Momentum (see _process). They fly straight and fast to contrast the swaying gold carbonation.
+	_cycle_momentum_streaks = MomentumStreaks.new()
+	_cycle_momentum_streaks.color = UiPalette.NEON_SALMON
+	_cycle_momentum_streaks.visible = false
+	_cycle_bar.add_child(_cycle_momentum_streaks)
 
 	# Tiny diagnosis readout over the bar (tuning.carb_debug_overlay = 1 in Balance
 	# Tuning): the live numbers driving the carbonation, so an on-device eye report can
@@ -978,16 +976,13 @@ func _refresh(delta: float) -> void:
 		_cycle_bubbles.tier = GoldBubbles.Tier.IDLE
 	_cycle_bubbles.tier_ease_tau = _prop.tuning.carb_tier_ease
 
-	# Bright-purple carbonation on top of the gold ONLY on a property that is ITSELF being rushed at
-	# max momentum. Momentum applies only to the rushed property, so no other row may show any change
+	# Fast neon-salmon streaks over the gold ONLY on a property that is ITSELF being rushed at max
+	# momentum. Momentum applies only to the rushed property, so no other row may show any change
 	# (Tim 2026-07-13) — so this keys off THIS property's own momentum factor, not the global meter.
 	# (rush_momentum_factor is 1 + bonus while the property is within its rush grace, so at max
-	# momentum it equals 1 + the cap.) Mirrors the gold layer's tier so both crowds flow together.
+	# momentum it equals 1 + the cap.)
 	var rushed_at_max_momentum := _prop.rush_momentum_factor >= 1.0 + _prop.tuning.rush_momentum_max_bonus - 0.001
-	_cycle_purple_bubbles.visible = owned and rushed_at_max_momentum
-	if _cycle_purple_bubbles.visible:
-		_cycle_purple_bubbles.tier = _cycle_bubbles.tier
-		_cycle_purple_bubbles.tier_ease_tau = _prop.tuning.carb_tier_ease
+	_cycle_momentum_streaks.visible = owned and rushed_at_max_momentum
 
 	# The diagnosis overlay: live values driving this row's carbonation (reading the
 	# bubbles' internals directly is fine here — this label exists only to expose them).

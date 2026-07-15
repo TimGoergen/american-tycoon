@@ -1,104 +1,84 @@
 class_name MomentumStreaks
 extends Control
 
-# Small bright neon-salmon dots that fly FAST in a STRAIGHT horizontal line, each trailing a fading
-# line behind it — a deliberate contrast to the swaying, comet-like gold carbonation (GoldBubbles).
-# Shown while a property is being rushed at MAX Rush Momentum, and on the Rush Momentum bar itself
-# (Tim 2026-07-14). Draws over the parent bar's FILLED region only, reading the parent Range's ratio
-# the same way GoldBubbles does. Deliberately cheap: a handful of dots, each one short polyline.
+# Bright neon-salmon LASER SHOTS for the MAX-Rush-Momentum effect (Tim 2026-07-14): short straight
+# horizontal lines, each no longer than 10% of the bar width, flying fast and dead-straight from left
+# to right, spawning at RANDOM heights — a deliberate contrast to the side-to-side sway of the gold
+# carbonation. Each shot fades from a bright leading head to a transparent tail so its direction
+# reads. Deliberately cheap: a handful of gradient line segments, drawn across the WHOLE bar.
 
-const MAX_STREAKS := 40
-## One streak per this many px of bar width — constant density across any bar size.
-const SPACING_PX := 24.0
-const HEAD_RADIUS := 2.4
-## Very fast, constant px/s — the whole point is that these outrun the gentle gold drift.
-const SPEED_PX := 900.0
-## The trailing line's length (px) and how many points sample it (fading alpha back to the tail).
-const TRAIL_LEN_PX := 54.0
-const TRAIL_SAMPLES := 7
-const TRAIL_WIDTH_VS_RADIUS := 1.3
+## How many shots are in flight at once. With random heights they read as a scattered volley.
+const SHOT_COUNT := 12
+## Each shot's length as a fraction of the bar width — Tim: "no more than 10%."
+const SHOT_LEN_FRAC := 0.10
+## Very fast, constant px/s — the point is that these outrun the gentle gold drift.
+const SPEED_PX := 1000.0
+const LINE_WIDTH := 2.8
+## Left/right inset so shots stay off the framed meter's border (matches the fill's 3px inset).
 const EDGE_INSET := 3.0
-const MIN_FILLED_WIDTH_PX := 14.0
-## Keep the lanes off the very top/bottom edge so streaks read as flowing inside the fill.
-const LANE_INSET_FRAC := 0.14
+## Keep spawn heights off the very top/bottom edge.
+const HEIGHT_INSET_FRAC := 0.10
 
-## The streak tint — the host sets this to UiPalette.NEON_SALMON.
+## The shot tint — the host sets this to UiPalette.NEON_SALMON.
 var color := Color("#FF7A6B")
 
-var _explicit_fraction := -1.0
-var _pos: Array[float] = []        # x position along the bar (px), per streak
-var _lane_frac: Array[float] = []  # fixed vertical lane (0..1 of height), per streak — the straight line
+var _head: Array[float] = []  # each shot's head x within the track (px)
+var _y: Array[float] = []     # each shot's height (px) — re-rolled random on every respawn
 var _seeded := false
 
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	for i in range(MAX_STREAKS):
-		_pos.append(0.0)
-		# Golden-ratio spread so lanes don't line up into rows.
-		_lane_frac.append(lerpf(LANE_INSET_FRAC, 1.0 - LANE_INSET_FRAC, fmod(float(i) * 0.61803, 1.0)))
+	clip_contents = true  # so a shot entering/leaving is clipped cleanly to the bar
+	for i in range(SHOT_COUNT):
+		_head.append(0.0)
+		_y.append(0.0)
 
 
-## Feed the fill fraction (0–1) for a bar this node can't read on its own; else it reads the parent.
-func set_fill_fraction(fraction: float) -> void:
-	_explicit_fraction = clampf(fraction, 0.0, 1.0)
-
-
-func _current_fraction() -> float:
-	if _explicit_fraction >= 0.0:
-		return _explicit_fraction
-	var bar := get_parent() as Range
-	return clampf(bar.ratio, 0.0, 1.0) if bar != null else 0.0
+## A fresh random height within the bar (kept off the very top/bottom edge).
+func _random_height() -> float:
+	return lerpf(HEIGHT_INSET_FRAC, 1.0 - HEIGHT_INSET_FRAC, randf()) * size.y
 
 
 func _process(delta: float) -> void:
 	if not visible:
 		return
 	var track := maxf(0.0, size.x - EDGE_INSET * 2.0)
-	if track < MIN_FILLED_WIDTH_PX:
+	if track < 8.0:
 		return
+	var shot_len := track * SHOT_LEN_FRAC
 	if not _seeded:
-		for i in range(MAX_STREAKS):
-			_pos[i] = fmod(float(i) * 0.61803, 1.0) * track
+		# Stagger the initial heads across the bar (each at its own random height) so they read as a
+		# stream from the first frame rather than all launching together.
+		for i in range(SHOT_COUNT):
+			_head[i] = (float(i) + 0.5) / float(SHOT_COUNT) * track
+			_y[i] = _random_height()
 		_seeded = true
-	# Constant fast drift, wrapping across the whole bar (only the ones under the fill are drawn).
-	for i in range(MAX_STREAKS):
-		_pos[i] = fposmod(_pos[i] + SPEED_PX * delta, track)
+	for i in range(SHOT_COUNT):
+		_head[i] += SPEED_PX * delta
+		if _head[i] - shot_len > track:
+			# The whole shot has cleared the right edge — wrap it back to the left (tail off-screen)
+			# at a NEW random height for its next pass.
+			_head[i] -= track + shot_len
+			_y[i] = _random_height()
 	queue_redraw()
 
 
-func _pool_count(track_width: float) -> int:
-	return clampi(int(track_width / SPACING_PX), 0, MAX_STREAKS)
-
-
 func _draw() -> void:
-	var fraction := _current_fraction()
 	var track := maxf(0.0, size.x - EDGE_INSET * 2.0)
-	var filled := fraction * track
-	if filled < MIN_FILLED_WIDTH_PX:
+	if track < 8.0:
 		return
-	var gap := TRAIL_LEN_PX / float(TRAIL_SAMPLES)
-	for i in range(_pool_count(track)):
-		if _pos[i] > filled:
-			continue
-		var y := _lane_frac[i] * size.y
-		var head_x := clampf(EDGE_INSET + _pos[i], EDGE_INSET + HEAD_RADIUS, EDGE_INSET + filled - HEAD_RADIUS)
-		# The trailing line: points back along the same lane (streaks move left→right, so the trail is
-		# to the LEFT), alpha fading to the tail; clipped at the fill's left edge.
-		var pts := PackedVector2Array()
-		var cols := PackedColorArray()
-		pts.append(Vector2(head_x, y))
-		cols.append(color)
-		for s in range(1, TRAIL_SAMPLES + 1):
-			var tx := head_x - gap * float(s)
-			if tx < EDGE_INSET:
-				break
-			pts.append(Vector2(tx, y))
-			var faded := color
-			faded.a = color.a * (1.0 - float(s) / float(TRAIL_SAMPLES + 1))
-			cols.append(faded)
-		if pts.size() >= 2:
-			draw_polyline_colors(pts, cols, HEAD_RADIUS * TRAIL_WIDTH_VS_RADIUS, true)
-		# The bright head dot on top of its trail.
-		draw_circle(Vector2(head_x, y), HEAD_RADIUS, color, true, -1.0, true)
+	var shot_len := track * SHOT_LEN_FRAC
+	var tail_color := color
+	tail_color.a = 0.0
+	for i in range(SHOT_COUNT):
+		var head_x := EDGE_INSET + _head[i]
+		var tail_x := head_x - shot_len
+		var y := _y[i]
+		# A laser: bright at the leading (right) head, fading to a transparent tail on the left, so
+		# the direction of travel reads. clip_contents trims anything past the bar's edges.
+		draw_polyline_colors(
+			PackedVector2Array([Vector2(tail_x, y), Vector2(head_x, y)]),
+			PackedColorArray([tail_color, color]),
+			LINE_WIDTH, true)

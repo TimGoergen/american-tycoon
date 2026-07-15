@@ -14,7 +14,9 @@ const SHOT_COUNT := 5
 const SHOT_LEN_FRAC := 0.10
 ## Very fast, constant px/s — the point is that these outrun the gentle gold drift.
 const SPEED_PX := 1000.0
-const LINE_WIDTH := 2.8
+## Thickness of the bright HEAD, in px — 3x the old 2.8 line (Tim 2026-07-14). The tail tapers from
+## this down to a point, so each shot is a thick head with a thinning trail.
+const HEAD_WIDTH := 8.4
 ## Left/right inset so shots stay off the framed meter's border (matches the fill's 3px inset).
 const EDGE_INSET := 3.0
 ## Keep spawn heights off the very top/bottom edge.
@@ -90,23 +92,28 @@ func _draw() -> void:
 		return
 	var shot_len := track * SHOT_LEN_FRAC
 	var fill_right := EDGE_INSET + filled
-	var head_color := color
-	var tail_color := color
-	tail_color.a = 0.0
 	for i in range(SHOT_COUNT):
 		var head_x := EDGE_INSET + _head[i]
 		var tail_x := head_x - shot_len
 		# Clip the shot to the FILLED region so it never draws past the progress into the empty track.
-		var a := maxf(tail_x, EDGE_INSET)
-		var b := minf(head_x, fill_right)
-		if b <= a:
+		var left_x := maxf(tail_x, EDGE_INSET)
+		var right_x := minf(head_x, fill_right)
+		if right_x <= left_x:
 			continue
 		var y := _y[i]
-		# Interpolate the tail→head fade at the (possibly clipped) endpoints so the gradient stays
-		# correct: transparent at the tail, bright at the leading head.
-		var col_a := tail_color.lerp(head_color, clampf((a - tail_x) / shot_len, 0.0, 1.0))
-		var col_b := tail_color.lerp(head_color, clampf((b - tail_x) / shot_len, 0.0, 1.0))
-		draw_polyline_colors(
-			PackedVector2Array([Vector2(a, y), Vector2(b, y)]),
-			PackedColorArray([col_a, col_b]),
-			LINE_WIDTH, true)
+		# Both the WIDTH and the alpha taper from ~0 at the tail (left) to full at the head (right),
+		# so each shot is a thick bright head with a thinning, fading trail. Drawn as a filled quad
+		# (a line can't vary its width), with per-vertex color for the fade.
+		var frac_left := clampf((left_x - tail_x) / shot_len, 0.0, 1.0)
+		var frac_right := clampf((right_x - tail_x) / shot_len, 0.0, 1.0)
+		var half_left := HEAD_WIDTH * 0.5 * frac_left
+		var half_right := HEAD_WIDTH * 0.5 * frac_right
+		var col_left := color
+		col_left.a = color.a * frac_left
+		var col_right := color
+		col_right.a = color.a * frac_right
+		draw_polygon(
+			PackedVector2Array([
+				Vector2(left_x, y - half_left), Vector2(right_x, y - half_right),
+				Vector2(right_x, y + half_right), Vector2(left_x, y + half_left)]),
+			PackedColorArray([col_left, col_right, col_right, col_left]))

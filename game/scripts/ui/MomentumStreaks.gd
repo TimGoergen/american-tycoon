@@ -9,12 +9,12 @@ extends Control
 # GoldBubbles), so they never spill past the progress into the empty track. Cheap: a few line segments.
 
 ## How many shots exist at once, spread across the bar. Kept small so it reads as a sparse volley.
-const SHOT_COUNT := 5
+const SHOT_COUNT := 6
 ## Each shot's length as a fraction of the (full) bar width. 4x longer than the original 10% for
 ## bigger, more visible bolts (Tim 2026-07-14).
 const SHOT_LEN_FRAC := 0.40
 ## Very fast, constant px/s — the point is that these outrun the gentle gold drift.
-const SPEED_PX := 1000.0
+const SPEED_PX := 1400.0
 ## Thickness of the bright HEAD, in px — 3x the old 2.8 line (Tim 2026-07-14). The tail tapers from
 ## this down to a point, so each shot is a thick head with a thinning trail.
 const HEAD_WIDTH := 8.4
@@ -25,7 +25,8 @@ const HEIGHT_INSET_FRAC := 0.10
 const MIN_FILLED_WIDTH_PX := 10.0
 ## On respawn a shot restarts this far (at most) off the left edge, chosen at random, so shots
 ## re-enter at randomized times rather than a fixed cadence. As a fraction of the bar width.
-const SPAWN_DELAY_FRAC := 1.5
+## Smaller than before so shots re-enter a little sooner (slightly higher spawn rate, Tim 2026-07-14).
+const SPAWN_DELAY_FRAC := 1.1
 
 ## The shot tint — the host sets this to UiPalette.NEON_SALMON.
 var color := Color("#FF7A6B")

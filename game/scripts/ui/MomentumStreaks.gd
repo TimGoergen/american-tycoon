@@ -10,8 +10,9 @@ extends Control
 
 ## How many shots exist at once, spread across the bar. Kept small so it reads as a sparse volley.
 const SHOT_COUNT := 5
-## Each shot's length as a fraction of the (full) bar width — Tim: "no more than 10%."
-const SHOT_LEN_FRAC := 0.10
+## Each shot's length as a fraction of the (full) bar width. 4x longer than the original 10% for
+## bigger, more visible bolts (Tim 2026-07-14).
+const SHOT_LEN_FRAC := 0.40
 ## Very fast, constant px/s — the point is that these outrun the gentle gold drift.
 const SPEED_PX := 1000.0
 ## Thickness of the bright HEAD, in px — 3x the old 2.8 line (Tim 2026-07-14). The tail tapers from

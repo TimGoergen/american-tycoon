@@ -31,7 +31,7 @@ const CASH_FONT_SIZE := INCOME_FONT_SIZE
 # the icon row, so it reads as one band: "$/s … EPOCH … 💵". Uses UiPalette.FONT_SUBHEAD
 # (Tim's call) so the epoch name carries weight. The value shown is the civilization Earth
 # is currently trading with ("Earth" on tier 1, an alien race's name on later epochs).
-const NAME_FONT_SIZE := UiPalette.FONT_SUBHEAD
+const NAME_FONT_SIZE := int(UiPalette.FONT_SUBHEAD * 1.10)  # civ name +10% (Tim 2026-07-14)
 const INCOME_BOLD := 3
 const CASH_BOLD := 2
 const NAME_BOLD := 2
@@ -48,7 +48,9 @@ const CASH_BILL_SIZE := Vector2(130, 65)
 const CASH_BILL_EDGE_PAD := 14
 
 # The bold-gold "/ s" beside the income dollar bill (replaced the "$/clock" icon, Tim 2026-07-09).
-const INCOME_PER_FONT_SIZE := UiPalette.FONT_HEADLINE
+const INCOME_SLASH_FONT_SIZE := UiPalette.FONT_HERO       # the "/" — two UiPalette sizes above the "s"
+const INCOME_S_FONT_SIZE := UiPalette.FONT_HEADLINE       # the "s" after the slash
+const INCOME_SLASH_S_GAP := -6.0  # tuck the "s" snug against the slash's trailing space (Tim 2026-07-14)
 const INCOME_PER_GAP := 4.0  # space between the income bill and the "/s" text (tight — Tim, 2026-07-09)
 const BILL_TOP_GAP := 4.0  # small gap between an amount and the dollar bill just beneath it
 
@@ -125,7 +127,8 @@ var _content: Control
 var _income_label: Label
 var _cash_label: Label
 var _income_bill: TextureRect  # dollar-bill icon beneath the income number, left-aligned
-var _income_per_label: Label  # bold-gold "/ s" beside the income bill (marks the per-second rate)
+var _income_slash_label: Label  # the big bold-gold "/" beside the income bill
+var _income_s_label: Label  # the smaller "s" after the slash (marks the per-second rate)
 var _cash_bill: TextureRect  # dollar-bill icon beneath the cash number, right-aligned (was beside "CASH")
 var _epoch_label: Label  # the current epoch / civilization name (was the heir name)
 ## Contact progress — how much of this epoch's economy the generation has consumed — shown
@@ -173,7 +176,7 @@ func _ready() -> void:
 	# Cream plate (Tim, 2026-06-28: every control uses the cream ground) with the red ticket
 	# frame; the planet watermark and navy numerals still read cleanly over the warm tan.
 	style.bg_color = UiPalette.CREAM
-	style.border_color = UiPalette.KETCHUP_RED  # the red ticket frame (§8)
+	style.border_color = UiPalette.NAVY  # navy, matching the bottom tab buttons (Tim 2026-07-14); was:  # the red ticket frame (§8)
 	style.set_border_width_all(12)  # outline +300% (3 -> 12) at Tim's request (2026-06-23)
 	# Round the TOP corners to nest inside the phone's rounded screen corners (Tim,
 	# 2026-06-22); the bottom corners keep the standard small radius.
@@ -205,7 +208,7 @@ func _ready() -> void:
 	_income_label = _make_label(UiPalette.NAVY, INCOME_FONT_SIZE, INCOME_BOLD)
 	_content.add_child(_income_label)
 
-	_cash_label = _make_label(UiPalette.DARK_MONEY_GREEN, CASH_FONT_SIZE, CASH_BOLD)
+	_cash_label = _make_label(UiPalette.NAVY, CASH_FONT_SIZE, CASH_BOLD)
 	_content.add_child(_cash_label)
 
 	# Beneath each value sits its currency symbol (Tim, 2026-07-09): a dollar bill under BOTH numbers,
@@ -220,10 +223,13 @@ func _ready() -> void:
 	_income_bill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_content.add_child(_income_bill)
 
-	_income_per_label = _make_label(UiPalette.MUSTARD_GOLD, INCOME_PER_FONT_SIZE, 3)  # outline 3 = bold
+	_income_slash_label = _make_label(UiPalette.MUSTARD_GOLD, INCOME_SLASH_FONT_SIZE, 3)  # outline 3 = bold
 	# Tight spacing around the slash (Tim, 2026-07-09): no internal space, small bill gap above.
-	_income_per_label.text = "/s"
-	_content.add_child(_income_per_label)
+	_income_slash_label.text = "/"
+	_content.add_child(_income_slash_label)
+	_income_s_label = _make_label(UiPalette.MUSTARD_GOLD, INCOME_S_FONT_SIZE, 3)
+	_income_s_label.text = "s"
+	_content.add_child(_income_s_label)
 
 	_cash_bill = TextureRect.new()
 	_cash_bill.texture = load(CASH_BILL_ICON_PATH)
@@ -256,7 +262,7 @@ func _ready() -> void:
 	# The panel's own red frame closes the bar's other three sides. Positioned by hand in
 	# _layout_labels like everything else in _content.
 	_economy_divider = ColorRect.new()
-	_economy_divider.color = UiPalette.KETCHUP_RED
+	_economy_divider.color = UiPalette.NAVY  # matches the navy panel frame (Tim 2026-07-14)
 	_economy_divider.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_content.add_child(_economy_divider)
 
@@ -519,10 +525,17 @@ func _layout_labels() -> void:
 	# is inset by the bill's centering padding so its left edge lines up with the visible bill below.
 	_income_label.position = Vector2(EDGE_MARGIN + bill_side_pad, amount_top)
 	_income_bill.position = Vector2(EDGE_MARGIN, bill_row_y)
-	_income_per_label.size = _income_per_label.get_minimum_size()
-	_income_per_label.position = Vector2(
-		EDGE_MARGIN + CASH_BILL_SIZE.x + INCOME_PER_GAP,
-		bill_row_y + (CASH_BILL_SIZE.y - _income_per_label.size.y) / 2.0)
+	# The "/" hugs the VISIBLE bill (subtract the bill box's transparent side padding so it sits by
+	# the bill, not the box edge), centered in the bill row; the smaller "s" bottom-aligns to the
+	# slash so "/s" reads on one baseline (Tim 2026-07-14).
+	_income_slash_label.size = _income_slash_label.get_minimum_size()
+	_income_s_label.size = _income_s_label.get_minimum_size()
+	var slash_x := EDGE_MARGIN + CASH_BILL_SIZE.x - bill_side_pad + INCOME_PER_GAP
+	var slash_y := bill_row_y + (CASH_BILL_SIZE.y - _income_slash_label.size.y) / 2.0
+	_income_slash_label.position = Vector2(slash_x, slash_y)
+	_income_s_label.position = Vector2(
+		slash_x + _income_slash_label.size.x + INCOME_SLASH_S_GAP,
+		slash_y + _income_slash_label.size.y - _income_s_label.size.y)
 
 	# Cash (right edge): amount, then the dollar bill right-aligned to the amount's right edge. The
 	# amount is pulled in by the same padding so its right edge lines up with the visible bill below.
@@ -533,9 +546,14 @@ func _layout_labels() -> void:
 	# elements share one baseline; the taller name grows upward only.
 	_epoch_label.size = _epoch_label.get_minimum_size()
 	var icon_baseline_y := bill_row_y + CASH_BILL_SIZE.y
+	# Drop the civilization name toward the bottom of the income content: cut the gap between its
+	# bottom and the top of the economy strip by 40% (Tim 2026-07-14). It no longer shares the bill
+	# baseline — it sits closer to the economy bar.
+	var strip_top := area.y - ECONOMY_BAR_HEIGHT - ECONOMY_DIVIDER_HEIGHT
+	var name_bottom := icon_baseline_y + (strip_top - icon_baseline_y) * 0.40
 	_epoch_label.position = Vector2(
 		(area.x - _epoch_label.size.x) / 2.0,
-		icon_baseline_y - _epoch_label.size.y
+		name_bottom - _epoch_label.size.y
 	)
 
 	# The faint white backing tracks the name so it reads cleanly over the globe.

@@ -44,9 +44,16 @@ const RUSH_POWER := 6.0
 ## lands exactly one rung ratio above the top rung of epoch T).
 const EPOCH_LADDER_SPAN := 16807.0
 
-## Candidate rung counts per alien epoch. -1 = the live shipped ladder (5 rungs
-## at x7), included first as the anchor every variant is read against.
-const CANDIDATE_RUNGS: Array = [-1, 6, 8, 10]
+## Candidates. rungs -1 = the live shipped ladder (5 rungs at x7), the anchor
+## every variant is read against. flat N = every alien epoch gets N rungs.
+## escalate_from N = epoch 2 gets N rungs and each later epoch gets one more
+## (Tim 2026-07-15: "each epoch having 1 more property than the last") — the
+## flat-cadence shape, since epoch durations creep up ~1.2x each.
+const CANDIDATES: Array = [
+	{"label": "LIVE — 5 rungs/epoch (x7.00/rung)", "rungs": -1},
+	{"label": "flat 8 rungs/epoch (x3.37/rung)", "rungs": 8},
+	{"label": "escalating 6,7,8,9 rungs (epochs 2-5)", "escalate_from": 6},
+]
 
 
 func _initialize() -> void:
@@ -64,10 +71,9 @@ func _initialize() -> void:
 	_print_live_ladder_pattern()
 
 	var summaries: Array = []
-	for rungs in CANDIDATE_RUNGS:
-		var label := "LIVE — 5 rungs/epoch (x7.00/rung)" if rungs < 0 \
-				else "%d rungs/epoch (x%.2f/rung)" % [rungs, pow(EPOCH_LADDER_SPAN, 1.0 / float(rungs))]
-		var configs := _property_configs if rungs < 0 else _make_variant_ladder(rungs)
+	for candidate in CANDIDATES:
+		var label: String = candidate["label"]
+		var configs := _configs_for_candidate(candidate)
 		print("")
 		print("--- %s (%d properties total) ---" % [label, configs.size()])
 		var result := _play_unlock_run(configs)
@@ -120,24 +126,43 @@ func _cohort_sorted_by_cost(configs: Array, tier: int) -> Array:
 # Variant ladder construction — same span, more rungs
 # ---------------------------------------------------------------------------
 
-## Rebuild the alien ladder with `rungs_per_epoch` properties per epoch. Earth's
-## 12 configs pass through untouched. Each alien epoch keeps its live flagship as
-## the anchor (same cost, same income, same cycle — so the epoch-entry save-up
-## and the 3x step-up are preserved) and fills the SAME x16807 span above it
-## geometrically, income scaling with cost (the live cohorts hold income/cost
-## constant — verified by the pattern printout above).
-func _make_variant_ladder(rungs_per_epoch: int) -> Array:
+## Resolve a candidate entry to its property configs: the live ladder, a flat
+## rung count, or an escalating count (epoch 2 = N, each later epoch +1).
+func _configs_for_candidate(candidate: Dictionary) -> Array:
+	if candidate.has("escalate_from"):
+		var start: int = candidate["escalate_from"]
+		var per_tier: Array = []
+		for tier in range(2, EpochCatalog.tier_count() + 1):
+			per_tier.append(start + (tier - 2))
+		return _make_variant_ladder(per_tier)
+	var rungs: int = candidate["rungs"]
+	if rungs < 0:
+		return _property_configs
+	var flat: Array = []
+	for _tier in range(2, EpochCatalog.tier_count() + 1):
+		flat.append(rungs)
+	return _make_variant_ladder(flat)
+
+
+## Rebuild the alien ladder with `rungs_per_tier[T-2]` properties in epoch T.
+## Earth's 12 configs pass through untouched. Each alien epoch keeps its live
+## flagship as the anchor (same cost, same income, same cycle — so the
+## epoch-entry save-up and the 3x step-up are preserved) and fills the SAME
+## x16807 span above it geometrically, income scaling with cost (the live
+## cohorts hold income/cost constant — verified by the pattern printout above).
+func _make_variant_ladder(rungs_per_tier: Array) -> Array:
 	var variants: Array = []
 	for cfg in _property_configs:
 		if (cfg as PropertyConfig).unlock_tier == 1:
 			variants.append(cfg)
-	var rung_ratio := pow(EPOCH_LADDER_SPAN, 1.0 / float(rungs_per_epoch))
 	for tier in range(2, EpochCatalog.tier_count() + 1):
 		var cohort := _cohort_sorted_by_cost(_property_configs, tier)
 		if cohort.is_empty():
 			continue
+		var rungs: int = rungs_per_tier[tier - 2]
+		var rung_ratio := pow(EPOCH_LADDER_SPAN, 1.0 / float(rungs))
 		var flagship := cohort[0] as PropertyConfig
-		for k in range(rungs_per_epoch):
+		for k in range(rungs):
 			var dup := flagship.duplicate() as PropertyConfig
 			var step := pow(rung_ratio, float(k))
 			dup.display_name = "%s +%d" % [flagship.display_name, k]

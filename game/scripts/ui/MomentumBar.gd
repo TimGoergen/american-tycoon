@@ -38,17 +38,19 @@ func _ready() -> void:
 	# but still tall enough to read at a glance.
 	custom_minimum_size = Vector2(0, int(UiPalette.STANDARD_BUTTON_HEIGHT * 0.7))
 	size_flags_vertical = Control.SIZE_FILL
-	# PURPLE fill: a distinct hue from the frenzy meter's warm gold/red sitting just below it, so the
-	# two reward meters never read as the same thing.
-	UiPalette.style_framed_progress(self, UiPalette.PURPLE, UiPalette.PROGRESS_TRACK_GRAY)
+	# DARK_PURPLE fill: a distinct hue from the frenzy meter's warm gold/red sitting just below it,
+	# so the two reward meters never read as the same thing. Darkened from the lighter PURPLE
+	# (Tim 2026-07-15) so the bright bubbles and white text pop against it.
+	UiPalette.style_framed_progress(self, UiPalette.DARK_PURPLE, UiPalette.PROGRESS_TRACK_GRAY)
 
 	# Carbonation in the fill, the same "value accruing automatically" cue the frenzy meter and the
-	# property/economy bars carry: momentum builds on its own while you rush. DARK_PURPLE bubbles so
-	# they contrast against the lighter purple fill (the frenzy meter uses DARK_GOLD on gold the same
-	# way). Added BEFORE the label overlay so the readout draws over the bubbles.
+	# property/economy bars carry: momentum builds on its own while you rush. BRIGHT_PURPLE bubbles
+	# glowing against the dark fill (flipped from dark-on-light, Tim 2026-07-15 — the same pairing
+	# the maxed-momentum property bars use). Added BEFORE the label overlay so the readout draws
+	# over the bubbles.
 	var bubbles := GoldBubbles.new()
 	bubbles.edge_inset = 3.0  # match the framed fill's 3px inset (style_framed_progress)
-	bubbles.bubble_color = UiPalette.DARK_PURPLE
+	bubbles.bubble_color = UiPalette.BRIGHT_PURPLE
 	bubbles.tier = GoldBubbles.Tier.FLOWING  # steady automatic accrual, like TURBO charging
 	add_child(bubbles)
 
@@ -73,14 +75,14 @@ func _ready() -> void:
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	overlay.add_child(row)
 
-	# Left: the meter's name. Dark ink so it reads over both the pale empty track and the bright
-	# neon fill (the caption sits at the left edge, filled first as momentum climbs).
+	# Left: the meter's name. White (Tim 2026-07-15) so it reads over the dark purple fill (the
+	# caption sits at the left edge, filled first as momentum climbs).
 	var caption := Label.new()
 	caption.text = "RUSH MOMENTUM"
 	caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	caption.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
 	caption.add_theme_font_override("font", UiPalette.make_bold_font())
-	caption.add_theme_color_override("font_color", UiPalette.INK_NAVY)
+	caption.add_theme_color_override("font_color", Color.WHITE)
 	caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(caption)
 
@@ -92,7 +94,7 @@ func _ready() -> void:
 	_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_label.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
 	_label.add_theme_font_override("font", UiPalette.make_bold_font())
-	_label.add_theme_color_override("font_color", UiPalette.INK_NAVY)
+	_label.add_theme_color_override("font_color", Color.WHITE)
 	_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(_label)
 

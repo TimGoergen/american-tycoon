@@ -51,8 +51,9 @@ const CYCLE_BLUE := Color("#5E86B8")
 ## era palette so the bubbles glow against the CYCLE_BLUE fill (Tim, 2026-07-06).
 const NEON_BLUE := Color("#4DE8FF")
 
-## Rush Momentum meter fill, with DARK_PURPLE carbonation on top — the same light-fill / dark-bubble
-## pairing the frenzy meter uses (MUSTARD_GOLD + DARK_GOLD), in a distinct hue (Tim, 2026-07-13).
+## The Rush Momentum meter's purples: DARK_PURPLE is the fill with BRIGHT_PURPLE carbonation on
+## top (dark-fill / bright-bubble since Tim 2026-07-15; it launched light-fill / dark-bubble).
+## PURPLE is the original lighter fill hue, kept in the palette for future use.
 const PURPLE := Color("#9B5DE5")
 const DARK_PURPLE := Color("#5E3499")
 ## Bright purple carbonation added to every property bar while Rush Momentum is MAXED — a vivid

@@ -570,9 +570,12 @@ func _build_property_tab() -> Control:
 
 	# Rush Momentum meter: fills as sustained rushing builds the income bonus, drains when the player
 	# stops. Sits directly above the frenzy/TURBO row so the two reward meters read as a pair. It
-	# updates itself (its own _process reads game.rush_momentum), so nothing drives it from here.
+	# updates itself (its own _process reads game.rush_momentum); the one verb it emits is the
+	# OVERDRIVE tap (Plans/Rush_Cruise_Control.md), routed to GameState here — the same seam as
+	# the frenzy bar's pop_requested below.
 	_momentum_bar = MomentumBar.new()
 	_momentum_bar.setup(game.rush_momentum, tuning)
+	_momentum_bar.overdrive_requested.connect(_on_overdrive_requested)
 	v.add_child(_momentum_bar)
 
 	# Action row: the TURBO button (its background is the frenzy meter) takes the larger
@@ -1349,6 +1352,13 @@ func _on_wage_hold_tapped() -> void:
 
 func _on_pop_requested() -> void:
 	game.pop_frenzy()
+
+
+## OVERDRIVE tapped on the momentum bar: opt in to the danger bands for this excursion
+## (Plans/Rush_Cruise_Control.md). GameState gates the verb on can_rush(), so a stray tap
+## racing a lockout is refused there rather than here.
+func _on_overdrive_requested() -> void:
+	game.engage_rush_overdrive()
 
 
 ## Player opened Balance Tuning: swap it into the Settings tab's slot, seeded with the

@@ -1,13 +1,14 @@
 class_name MomentumBar
-extends ProgressBar
+extends HBoxContainer
 
-# The Rush Momentum / Heat meter (Tim 2026-07-12; Rush Overheat rework Tim 2026-07-15): a
-# display-only bar that fills as sustained rushing HEATS the property up and drains when the
-# player stops. Unlike the frenzy meter it is NOT a button — momentum is earned by rushing the
-# PROPERTIES, not by tapping this bar — so there is no overlaid Button here.
+# The Rush Momentum / Heat control (Tim 2026-07-12; Rush Overheat rework Tim 2026-07-15;
+# Cruise Control amendment Tim 2026-07-16): the OVERDRIVE button beside a display-only heat
+# meter — the same square-button-plus-meter shape as the frenzy TURBO control (FrenzyBar).
+# Momentum is earned by rushing the PROPERTIES, so the meter itself is still not a button;
+# the OVERDRIVE button is the ONE tappable piece, and it only exists mid-hold (see below).
 #
 # Overheat (Plans/Rush_Overheat.md) turned the old 0..cap meter into a push-your-luck heat
-# gauge, so the bar now shows the FULL heat range 0..ceiling_max:
+# gauge, so the meter shows the FULL heat range 0..ceiling_max:
 #   • a thin white TICK marks heat == 1.0 (the old cap) — everything left of it is safe;
 #   • the Hot band [1.0 .. critical_start] is a subtle amber wash on the track;
 #   • the Critical band [critical_start .. ceiling_max] is hazard-striped dark red — the real
@@ -21,9 +22,30 @@ extends ProgressBar
 #     (entering Hot is chipless: the fill shift and streaks carry it; Tim 2026-07-15);
 #   • on overheat the label swaps to "OVERHEATED" while the fill visibly drains (the drain IS
 #     the cooldown display), then "COOLING…" through the re-arm delay, then a bright READY flash.
+#
+# Cruise Control (Plans/Rush_Cruise_Control.md) made the danger bands OPT-IN: holding rush is
+# safe forever, with heat clamped at the cruise point, until the player taps OVERDRIVE.
+#   • The OVERDRIVE button is visible ONLY while is_cruising() — a rush hold is live, overdrive
+#     is not yet engaged, no lockout. Hidden otherwise, so the bar stays calm during idle play;
+#     appearing and disappearing with the hold is the intended behaviour.
+#   • While the clamp is holding, the readout reads "CRUISE +25%" in a calm teal — a steady,
+#     CONTENT state, clearly apart from the amber/red danger escalation. A small teal tick on
+#     the track marks the cruise point itself.
+#   • Once overdrive engages, everything above presents exactly as shipped.
+
+## The player tapped OVERDRIVE: release the cruise clamp for this excursion. Main routes this
+## to GameState.engage_rush_overdrive() — the same seam as FrenzyBar.pop_requested.
+signal overdrive_requested
 
 var _rush_momentum: RushMomentumState
 var _tuning: TuningConfig
+
+## The OVERDRIVE button, pinned left of the meter (the FrenzyBar layout). Only visible while
+## cruising — see _process.
+var _overdrive_button: Button
+
+## The display-only heat meter. All the overlays below live inside it.
+var _meter: ProgressBar
 
 ## The big bonus readout ("+42%"), right-aligned; the caption on the left names the meter.
 var _label: Label
@@ -31,11 +53,12 @@ var _label: Label
 ## Carbonation in the fill; hidden while overheated (a locked meter is not accruing anything).
 var _bubbles: GoldBubbles
 
-## Fast neon-salmon streaks shown while heat is at/over the old cap (the Hot tick) and rushing is
+## Fast neon-salmon streaks shown while heat is past the old cap (the Hot tick) and rushing is
 ## not locked out — "you are in overdrive" (was: only at max bonus; Tim 2026-07-15).
 var _streaks: MomentumStreaks
 
-## The custom-drawn band overlay: Hot/Critical track segments, hazard stripes, and the 1.0 tick.
+## The custom-drawn band overlay: Hot/Critical track segments, hazard stripes, the 1.0 tick,
+## and the cruise-point tick.
 var _zones: BandZoneOverlay
 
 ## The short-lived "CRITICAL +55%!" chip shown on entering the Critical band.
@@ -44,7 +67,7 @@ var _tier_chip_label: Label
 var _tier_chip_tween: Tween
 
 ## Full-rect white flash played when rush re-arms — re-availability must be unmissable
-## (Tim 2026-07-15), so the whole bar blinks bright once alongside the label reverting.
+## (Tim 2026-07-15), so the whole meter blinks bright once alongside the label reverting.
 var _ready_flash: ColorRect
 
 ## Eased fill: heat is driven by the 10 Hz logic tick, so we glide the shown fill toward it each
@@ -62,7 +85,7 @@ var _blink_phase := 0.0
 
 ## Which label state is currently applied (see _LabelState), so the color/outline overrides are
 ## only rebuilt when the state flips, not every frame.
-enum _LabelState { NORMAL, OVERHEATED, COOLING }
+enum _LabelState { NORMAL, CRUISING, OVERHEATED, COOLING }
 var _label_state_applied: int = -1
 
 ## Blink ramp: frequency (Hz) and color-pulse strength at the START of Critical vs. at the very
@@ -94,27 +117,58 @@ func setup(rush_momentum: RushMomentumState, tuning: TuningConfig) -> void:
 
 
 func _ready() -> void:
-	min_value = 0.0
-	max_value = 1.0
-	show_percentage = false
+	add_theme_constant_override("separation", 8)  # match the TURBO row's button/meter gap
+
+	# The OVERDRIVE button, left of the meter like FrenzyBar's TURBO button. A bold text label
+	# rather than an icon: "OVERDRIVE" must be unambiguous the first time it ever appears, and
+	# no symbol says it as plainly as the word (Plans/Rush_Cruise_Control.md UI notes). The red
+	# action plate (§8: red = spend/act) marks it as the opt-in gamble, apart from gold TURBO.
+	_overdrive_button = Button.new()
+	_overdrive_button.text = "OVERDRIVE"
+	_overdrive_button.add_theme_font_size_override("font_size", UiPalette.FONT_BUTTON)
+	_overdrive_button.add_theme_font_override("font", UiPalette.make_bold_font())
+	UiPalette.style_button(_overdrive_button, true)
+	# Fill the row's height (the meter's 0.7 × standard-button height) rather than forcing the
+	# whole momentum row taller: matching TURBO's full height would grow the row when the button
+	# appears, shifting the ladder under the finger that is mid-rush-hold. The word makes the
+	# button wide, so the tap target stays large. Flagged for Tim's device pass.
+	_overdrive_button.size_flags_vertical = Control.SIZE_FILL
+	_overdrive_button.pressed.connect(func() -> void: overdrive_requested.emit())
+	# ESSENTIAL, not just convenient: the button only exists while a rush hold is live, so the
+	# tap that presses it is ALWAYS a second finger — without this node it could never fire
+	# on a phone (Godot only emulates the mouse from the gesture's first finger).
+	_overdrive_button.add_child(SecondaryTapButton.new())
+	_overdrive_button.visible = false  # _process shows it only while cruising
+	add_child(_overdrive_button)
+
+	# The heat meter itself — display only, so it ignores the mouse entirely (FrenzyBar's meter
+	# does the same); the button above is this control's one tappable piece.
+	_meter = ProgressBar.new()
+	_meter.min_value = 0.0
+	_meter.max_value = 1.0
+	_meter.show_percentage = false
 	# A touch shorter than a full action button — it is a secondary read-out, not a tap target,
 	# but still tall enough to read at a glance.
-	custom_minimum_size = Vector2(0, int(UiPalette.STANDARD_BUTTON_HEIGHT * 0.7))
-	size_flags_vertical = Control.SIZE_FILL
+	_meter.custom_minimum_size = Vector2(0, int(UiPalette.STANDARD_BUTTON_HEIGHT * 0.7))
+	_meter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_meter.size_flags_vertical = Control.SIZE_FILL
+	_meter.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	# DARK_PURPLE fill: a distinct hue from the frenzy meter's warm gold/red sitting just below it,
 	# so the two reward meters never read as the same thing. Darkened from the lighter PURPLE
 	# (Tim 2026-07-15) so the bright bubbles and white text pop against it.
-	UiPalette.style_framed_progress(self, UiPalette.DARK_PURPLE, UiPalette.PROGRESS_TRACK_GRAY)
+	UiPalette.style_framed_progress(_meter, UiPalette.DARK_PURPLE, UiPalette.PROGRESS_TRACK_GRAY)
+	add_child(_meter)
 	# Keep a handle on the fill stylebox so the band coloring / Critical blink can mutate its
 	# bg_color per frame instead of rebuilding styleboxes (see _process).
-	_fill_style = get_theme_stylebox("fill") as StyleBoxFlat
+	_fill_style = _meter.get_theme_stylebox("fill") as StyleBoxFlat
 
-	# Band zones + the 1.0 tick, custom-drawn (the same approach as MomentumStreaks). Added FIRST
-	# among the overlays: it paints the Hot/Critical segments only over the UNFILLED track (the
-	# fill covers them as it advances, so they read as track decoration behind the fill), plus the
-	# always-on-top tick line. Everything after it (bubbles, streaks, label) draws over it.
+	# Band zones + the 1.0 and cruise ticks, custom-drawn (the same approach as MomentumStreaks).
+	# Added FIRST among the meter's overlays: it paints the Hot/Critical segments only over the
+	# UNFILLED track (the fill covers them as it advances, so they read as track decoration behind
+	# the fill), plus the always-on-top tick lines. Everything after it (bubbles, streaks, label)
+	# draws over it.
 	_zones = BandZoneOverlay.new()
-	add_child(_zones)
+	_meter.add_child(_zones)
 
 	# Carbonation in the fill, the same "value accruing automatically" cue the frenzy meter and the
 	# property/economy bars carry: heat builds on its own while you rush. BRIGHT_PURPLE bubbles
@@ -125,14 +179,14 @@ func _ready() -> void:
 	_bubbles.edge_inset = 3.0  # match the framed fill's 3px inset (style_framed_progress)
 	_bubbles.bubble_color = UiPalette.BRIGHT_PURPLE
 	_bubbles.tier = GoldBubbles.Tier.FLOWING  # steady automatic accrual, like TURBO charging
-	add_child(_bubbles)
+	_meter.add_child(_bubbles)
 
-	# Neon-salmon streaks over the fill, shown while heat rides at/over the old cap (see _process).
+	# Neon-salmon streaks over the fill, shown while heat rides past the old cap (see _process).
 	# Added over the gold bubbles but under the label overlay, so the "+XX%" still draws on top.
 	_streaks = MomentumStreaks.new()
 	_streaks.color = UiPalette.NEON_SALMON
 	_streaks.visible = false
-	add_child(_streaks)
+	_meter.add_child(_streaks)
 
 	# READY flash: a full-rect white wash, normally invisible; _on_rush_ready tweens it bright and
 	# back so the re-armed meter is unmissable even in peripheral vision (Tim's vision, §1b).
@@ -140,7 +194,7 @@ func _ready() -> void:
 	_ready_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_ready_flash.color = Color(1, 1, 1, 0)
 	_ready_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_ready_flash)
+	_meter.add_child(_ready_flash)
 
 	# Overlay: a left caption and the big "+XX%" readout on the right. It ignores the mouse so it
 	# never eats a tap meant for the rows or buttons around it.
@@ -149,7 +203,7 @@ func _ready() -> void:
 	overlay.add_theme_constant_override("margin_left", 16)
 	overlay.add_theme_constant_override("margin_right", 16)
 	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(overlay)
+	_meter.add_child(overlay)
 
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
@@ -180,7 +234,7 @@ func _ready() -> void:
 	row.add_child(_label)
 	_apply_label_state(_LabelState.NORMAL)
 
-	# The tier chip: a large bold plate that eases in over the bar on an upward band crossing,
+	# The tier chip: a large bold plate that eases in over the meter on an upward band crossing,
 	# holds ~1 s, then fades (see _show_tier_chip). Centered over the meter; z_index lifts it
 	# above the siblings drawn after this bar (the TURBO row sits right below).
 	_tier_chip = PanelContainer.new()
@@ -190,7 +244,7 @@ func _ready() -> void:
 	_tier_chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_tier_chip.z_index = 10
 	_tier_chip.visible = false
-	add_child(_tier_chip)
+	_meter.add_child(_tier_chip)
 
 	_tier_chip_label = Label.new()
 	_tier_chip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -210,29 +264,45 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	# The bar spans the FULL heat range: fill fraction = heat / ceiling_max, so the Hot tick and
+	# The meter spans the FULL heat range: fill fraction = heat / ceiling_max, so the Hot tick and
 	# the Critical hazard zone sit at fixed positions on the track and the fill physically enters
 	# them as heat climbs. Guard the knob so a 0 can't divide by zero.
 	var ceiling_max: float = maxf(_tuning.rush_momentum_ceiling_max, 0.0001)
 	var target_fill: float = clampf(_rush_momentum.heat / ceiling_max, 0.0, 1.0)
 	_displayed_fill = BarSmoothing.approach(_displayed_fill, target_fill, delta)
-	value = _displayed_fill
+	_meter.value = _displayed_fill
 
-	# Feed the zone overlay the band edges (as fill fractions) and the current fill edge, so it
-	# can paint the Hot/Critical segments only over the still-unfilled track.
+	# Feed the zone overlay the band edges and the cruise point (as fill fractions) plus the
+	# current fill edge, so it can paint the Hot/Critical segments only over the still-unfilled
+	# track and keep the cruise tick where the clamp actually sits (Legacy can move it).
 	var critical_start_frac: float = clampf(_tuning.rush_momentum_critical_start / ceiling_max, 0.0, 1.0)
-	_zones.update_zones(1.0 / ceiling_max, critical_start_frac, _displayed_fill)
+	var cruise_frac: float = clampf(_rush_momentum.cruise_heat() / ceiling_max, 0.0, 1.0)
+	_zones.update_zones(1.0 / ceiling_max, critical_start_frac, cruise_frac, _displayed_fill)
 
 	var locked_out := _rush_momentum.is_locked_out()
+	var cruising := _rush_momentum.is_cruising()
 
-	# The label: the live bonus normally; the lockout narration while shut down. is_rearming is
-	# checked FIRST — it is a sub-state of is_locked_out (both true during the re-arm delay).
+	# The OVERDRIVE button exists exactly while cruising: a rush hold is live, overdrive is not
+	# yet engaged, and no lockout is active. Any other time it hides, so the bar stays calm
+	# during idle play and never dangles a button that could do nothing.
+	_overdrive_button.visible = cruising
+
+	# The label: the live bonus normally; "CRUISE +X%" while the clamp is holding steady; the
+	# lockout narration while shut down. is_rearming is checked FIRST — it is a sub-state of
+	# is_locked_out (both true during the re-arm delay).
 	if _rush_momentum.is_rearming():
 		_label.text = "COOLING…"
 		_apply_label_state(_LabelState.COOLING)
 	elif locked_out:
 		_label.text = "OVERHEATED"
 		_apply_label_state(_LabelState.OVERHEATED)
+	elif cruising and is_equal_approx(_rush_momentum.heat, _rush_momentum.cruise_heat()):
+		# Sitting exactly on the clamp: the steady, content cruise state. The bonus quotes
+		# effective_cruise_bonus() (base +25% plus Cooling Systems levels), never a hardcoded
+		# number. While still CLIMBING toward the clamp the normal "+X%" branch below narrates
+		# the climb, exactly as before.
+		_label.text = "CRUISE +%d%%" % int(round(_rush_momentum.effective_cruise_bonus() * 100.0))
+		_apply_label_state(_LabelState.CRUISING)
 	else:
 		_label.text = "+%d%%" % int(round(_rush_momentum.bonus * 100.0))
 		_apply_label_state(_LabelState.NORMAL)
@@ -241,18 +311,20 @@ func _process(delta: float) -> void:
 	# shutdown reads as dead air, not business as usual.
 	_bubbles.visible = not locked_out
 
-	# The salmon streaks mark OVERDRIVE — heat at or past the old cap (the tick) while rushing is
-	# still allowed (Tim 2026-07-15; was "only at max bonus" before overheat existed).
-	_streaks.visible = _rush_momentum.heat >= 1.0 and not locked_out
+	# The salmon streaks mark riding the danger bands — heat at or past the old cap (the tick)
+	# while rushing is still allowed (Tim 2026-07-15). NOT while cruising: with max Cooling
+	# Systems the cruise clamp sits exactly at heat 1.0, and cruising there must stay a calm
+	# state, never a Hot one (the boundary rule, Plans/Rush_Cruise_Control.md).
+	_streaks.visible = _rush_momentum.heat >= 1.0 and not locked_out and not cruising
 
-	_update_fill_color(delta, locked_out)
+	_update_fill_color(delta, locked_out, cruising)
 
 
-## Recolor the fill for the current band: DARK_PURPLE while Building, shifting to amber across
-## Hot, and blinking red in Critical — the blink ramping faster and harder as heat approaches the
-## top of the bar (deeper into the secret-ceiling zone = more urgent). Mutates the cached fill
-## stylebox's bg_color, so no styleboxes are rebuilt.
-func _update_fill_color(delta: float, locked_out: bool) -> void:
+## Recolor the fill for the current band: DARK_PURPLE while Building (and always while cruising),
+## shifting to amber across Hot, and blinking red in Critical — the blink ramping faster and
+## harder as heat approaches the top of the bar (deeper into the secret-ceiling zone = more
+## urgent). Mutates the cached fill stylebox's bg_color, so no styleboxes are rebuilt.
+func _update_fill_color(delta: float, locked_out: bool, cruising: bool) -> void:
 	var heat: float = _rush_momentum.heat
 	var critical_start: float = _tuning.rush_momentum_critical_start
 	var ceiling_max: float = maxf(_tuning.rush_momentum_ceiling_max, 0.0001)
@@ -261,6 +333,14 @@ func _update_fill_color(delta: float, locked_out: bool) -> void:
 		# Draining after an overheat: a flat dark red — the punishment color, no blink (the
 		# urgency is over; the player is just watching the cooldown empty out).
 		_fill_style.bg_color = UiPalette.BRICK
+		return
+
+	if cruising:
+		# Cruising is a steady, CONTENT state whatever the exact heat — including the max-Legacy
+		# edge where the clamp sits exactly at 1.0, which must never wear Hot's amber (the
+		# boundary rule, Plans/Rush_Cruise_Control.md).
+		_fill_style.bg_color = UiPalette.DARK_PURPLE
+		_blink_phase = 0.0
 		return
 
 	match _rush_momentum.current_band():
@@ -287,7 +367,7 @@ func _update_fill_color(delta: float, locked_out: bool) -> void:
 			_fill_style.bg_color = UiPalette.KETCHUP_RED.lerp(UiPalette.PALE_GOLD, pulse)
 
 
-## Swap the readout label's look per lockout state. Only rebuilds the overrides on a change.
+## Swap the readout label's look per state. Only rebuilds the overrides on a change.
 ## OVERHEATED reads in red with a cream outline — the fill behind it is dark red while draining,
 ## so the outline carries the contrast (§1b: the failure state must be readable, not subtle).
 func _apply_label_state(state: int) -> void:
@@ -295,6 +375,13 @@ func _apply_label_state(state: int) -> void:
 		return
 	_label_state_applied = state
 	match state:
+		_LabelState.CRUISING:
+			# Calm teal: the "settled in, safe forever" color — deliberately nothing like the
+			# amber/red danger escalation. The navy outline keeps it readable over both the
+			# dark purple fill and the pale track.
+			_label.add_theme_color_override("font_color", UiPalette.ATOMIC_TEAL)
+			_label.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
+			_label.add_theme_constant_override("outline_size", 6)
 		_LabelState.OVERHEATED:
 			_label.add_theme_color_override("font_color", UiPalette.KETCHUP_RED)
 			_label.add_theme_color_override("font_outline_color", UiPalette.CREAM)
@@ -330,7 +417,7 @@ func _on_overheated() -> void:
 	_vibrate(HAPTIC_OVERHEAT_MS)
 
 
-## The re-arm delay finished: rush is available again. Flash the whole bar bright once (plus a
+## The re-arm delay finished: rush is available again. Flash the whole meter bright once (plus a
 ## short haptic tick) so re-availability is unmissable — the label reverts to "+0%" on its own
 ## via _process now that is_locked_out() is false.
 func _on_rush_ready() -> void:
@@ -376,14 +463,15 @@ func _vibrate(duration_ms: int) -> void:
 # ---------------------------------------------------------------------------
 
 ## Custom-drawn track decoration for the heat bands (the same _draw approach MomentumStreaks
-## uses): the subtle amber Hot segment, the hazard-striped dark-red Critical segment, and the
-## thin white tick at heat == 1.0 (the old cap — the "safe range ends here" line).
+## uses): the subtle amber Hot segment, the hazard-striped dark-red Critical segment, the thin
+## white tick at heat == 1.0 (the old cap — the "safe range ends here" line), and the small teal
+## tick at the CRUISE POINT (where the hold clamps without overdrive).
 ##
 ## The bar's fill is painted by the ProgressBar itself, UNDER all child overlays — so to make the
 ## zones read as if they were on the track BEHIND the fill, each segment is clipped to start at
 ## the CURRENT fill edge: the advancing fill "covers" the zone exactly as a background segment
-## would be covered. The tick, by contrast, is always drawn — over fill and track alike — so the
-## safe-range boundary never disappears.
+## would be covered. The ticks, by contrast, are always drawn — over fill and track alike — so
+## the safe-range boundary and the cruise point never disappear.
 class BandZoneOverlay extends Control:
 	## Match the framed fill's 3px inset (UiPalette.style_framed_progress) so the segments sit
 	## inside the navy frame exactly like the fill does.
@@ -399,11 +487,18 @@ class BandZoneOverlay extends Control:
 	## The heat == 1.0 tick: thin, light, always visible.
 	const TICK_WIDTH := 3.0
 	const TICK_COLOR := Color(1, 1, 1, 0.9)
+	## The cruise-point tick: the same calm teal as the CRUISE readout, so the marker and the
+	## label read as one idea ("the hold settles here").
+	const CRUISE_TICK_COLOR := Color("#9FD8D4", 0.9)  # ATOMIC_TEAL
+	## Skip drawing the cruise tick when it sits this close (px) to the 1.0 tick — at max
+	## Cooling Systems the cruise point IS the old cap, and two overlapping ticks read as smear.
+	const CRUISE_TICK_MERGE_PX := 6.0
 
-	## Band edges and the current fill edge, all as fractions of the full bar (0..1). Fed every
-	## frame by the host's _process via update_zones.
+	## Band edges, the cruise point, and the current fill edge, all as fractions of the full bar
+	## (0..1). Fed every frame by the host's _process via update_zones.
 	var _hot_start_frac := 0.625
 	var _critical_start_frac := 0.78125
+	var _cruise_frac := 0.0
 	var _fill_frac := 0.0
 
 	func _ready() -> void:
@@ -411,13 +506,16 @@ class BandZoneOverlay extends Control:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	## Update the geometry; redraws only when something actually moved.
-	func update_zones(hot_start_frac: float, critical_start_frac: float, fill_frac: float) -> void:
+	func update_zones(hot_start_frac: float, critical_start_frac: float, cruise_frac: float,
+			fill_frac: float) -> void:
 		if is_equal_approx(hot_start_frac, _hot_start_frac) \
 				and is_equal_approx(critical_start_frac, _critical_start_frac) \
+				and is_equal_approx(cruise_frac, _cruise_frac) \
 				and is_equal_approx(fill_frac, _fill_frac):
 			return
 		_hot_start_frac = hot_start_frac
 		_critical_start_frac = critical_start_frac
+		_cruise_frac = cruise_frac
 		_fill_frac = fill_frac
 		queue_redraw()
 
@@ -447,6 +545,14 @@ class BandZoneOverlay extends Control:
 		if right_x > crit_left:
 			draw_rect(Rect2(crit_left, top, right_x - crit_left, bottom - top), CRITICAL_BASE)
 			_draw_hazard_stripes(crit_left, right_x, top, bottom)
+
+		# The cruise tick — where a plain hold clamps (Plans/Rush_Cruise_Control.md). Same
+		# fill-coordinate mapping as everything above. Skipped when Legacy has pushed the cruise
+		# point up onto the 1.0 tick itself, so the two markers never smear together.
+		var cruise_x := maxf(_cruise_frac * size.x - EDGE_INSET, EDGE_INSET)
+		if _cruise_frac > 0.0 and absf(cruise_x - hot_x) > CRUISE_TICK_MERGE_PX:
+			draw_rect(Rect2(cruise_x - TICK_WIDTH * 0.5, top, TICK_WIDTH, bottom - top),
+					CRUISE_TICK_COLOR)
 
 		# The tick at heat == 1.0 — ALWAYS drawn, over fill and track alike, so the "end of the
 		# safe range" line is spatially real whatever the meter is doing.

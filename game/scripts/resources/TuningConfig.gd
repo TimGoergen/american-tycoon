@@ -229,6 +229,12 @@ extends Resource
 ## Highest possible overheat ceiling, and the heat at which the bonus reaches its peak.
 @export var rush_momentum_ceiling_max: float = 1.60  # feel-tune
 
+## The sustainable "cruise" bonus while holding rush WITHOUT overdrive engaged (0.25 = +25%).
+## Heat clamps at the matching point on the Building band and can never overheat there — the
+## danger bands are opt-in via the OVERDRIVE button (Plans/Rush_Cruise_Control.md). The Cooling
+## Systems Legacy upgrade adds to this, hard-capped at rush_momentum_bonus_at_hot (the old +30%).
+@export var rush_momentum_cruise_bonus: float = 0.25  # feel-tune
+
 ## Bonus at the Hot edge (heat 1.0), as a fraction of property income. 0.30 keeps the old cap's
 ## value — the Building band is exactly the pre-overheat meter.
 @export var rush_momentum_bonus_at_hot: float = 0.30  # feel-tune

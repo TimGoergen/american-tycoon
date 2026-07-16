@@ -131,6 +131,7 @@ const DESCRIPTIONS := {
 	"rush_momentum_critical_start": "Heat where the Critical band begins (Hot spans 1.0 to here, always safe).",
 	"rush_momentum_ceiling_min": "Lowest possible overheat point (rolled each climb; min Critical depth).",
 	"rush_momentum_ceiling_max": "Highest possible overheat point, and where the bonus peaks.",
+	"rush_momentum_cruise_bonus": "Safe rush bonus while holding WITHOUT overdrive (0.25 = +25%; capped at the Hot-edge bonus).",
 	"rush_momentum_bonus_at_hot": "Income bonus at the Hot edge, heat 1.0 (0.30 = +30%).",
 	"rush_momentum_bonus_at_critical": "Income bonus at the Critical edge (0.40 = +40%).",
 	"rush_momentum_bonus_peak": "Income bonus at max possible heat (0.55 = +55%).",

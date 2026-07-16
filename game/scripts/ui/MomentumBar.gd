@@ -5,7 +5,7 @@ extends HBoxContainer
 # Cruise Control amendment Tim 2026-07-16): the OVERDRIVE button beside a display-only heat
 # meter — the same square-button-plus-meter shape as the frenzy TURBO control (FrenzyBar).
 # Momentum is earned by rushing the PROPERTIES, so the meter itself is still not a button;
-# the OVERDRIVE button is the ONE tappable piece, and it only exists mid-hold (see below).
+# the OVR button is the ONE tappable piece, enabled only mid-hold (see below).
 #
 # Overheat (Plans/Rush_Overheat.md) turned the old 0..cap meter into a push-your-luck heat
 # gauge, so the meter shows the FULL heat range 0..ceiling_max:
@@ -29,9 +29,9 @@ extends HBoxContainer
 #
 # Cruise Control (Plans/Rush_Cruise_Control.md) made the danger bands OPT-IN: holding rush is
 # safe forever, with heat clamped at the cruise point, until the player taps OVERDRIVE.
-#   • The OVERDRIVE button is visible ONLY while is_cruising() — a rush hold is live, overdrive
-#     is not yet engaged, no lockout. Hidden otherwise, so the bar stays calm during idle play;
-#     appearing and disappearing with the hold is the intended behaviour.
+#   • The OVR button is ALWAYS visible (Tim 2026-07-16: moving UI elements are annoying) but
+#     ENABLED only while is_cruising() — a rush hold is live, overdrive is not yet engaged, no
+#     lockout. Any other time it wears the gray-outlined "can't trigger" plate, like TURBO.
 #   • While the clamp is holding, the readout reads "CRUISE +25%" in a calm teal — a steady,
 #     CONTENT state, clearly apart from the amber/red danger escalation. The wide teal cruise
 #     bar on the track marks the cruise point itself.
@@ -44,8 +44,8 @@ signal overdrive_requested
 var _rush_momentum: RushMomentumState
 var _tuning: TuningConfig
 
-## The OVERDRIVE button, pinned left of the meter (the FrenzyBar layout). Only visible while
-## cruising — see _process.
+## The OVR button, pinned left of the meter (the FrenzyBar layout). Always visible; enabled
+## only while cruising — see _process.
 var _overdrive_button: Button
 
 ## The display-only heat meter. All the overlays below live inside it.
@@ -123,26 +123,39 @@ func setup(rush_momentum: RushMomentumState, tuning: TuningConfig) -> void:
 func _ready() -> void:
 	add_theme_constant_override("separation", 8)  # match the TURBO row's button/meter gap
 
-	# The OVERDRIVE button, left of the meter like FrenzyBar's TURBO button. A bold text label
-	# rather than an icon: "OVERDRIVE" must be unambiguous the first time it ever appears, and
-	# no symbol says it as plainly as the word (Plans/Rush_Cruise_Control.md UI notes). The red
-	# action plate (§8: red = spend/act) marks it as the opt-in gamble, apart from gold TURBO.
+	# The OVR button, left of the meter like FrenzyBar's TURBO button. ALWAYS visible — it began
+	# life appearing only mid-hold, but a control that pops in and out is annoying (Tim
+	# 2026-07-16); a permanent fixture also earns the short "OVR" label, since it is learned
+	# once rather than having to explain itself the instant it appears. The red action plate
+	# (§8: red = spend/act) marks it as the opt-in gamble, apart from gold TURBO.
 	_overdrive_button = Button.new()
-	_overdrive_button.text = "OVERDRIVE"
-	_overdrive_button.add_theme_font_size_override("font_size", UiPalette.FONT_BUTTON)
+	_overdrive_button.text = "OVR"
+	# FONT_HEADLINE, not FONT_BUTTON: three letters can afford to be huge, and the button is
+	# the meter row's one action so it should land at a glance (Tim's vision, §1b).
+	_overdrive_button.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
 	_overdrive_button.add_theme_font_override("font", UiPalette.make_bold_font())
 	UiPalette.style_button(_overdrive_button, true)
+	# When overdrive can't engage (no live rush hold, or locked out) the button grays its
+	# OUTLINE too, exactly like the frenzy pop button — "can't trigger" must read at a glance
+	# (Tim 2026-07-15). The standard disabled plate keeps the navy frame; swap ours for gray.
+	var disabled_plate := StyleBoxFlat.new()
+	disabled_plate.bg_color = UiPalette.CREAM
+	disabled_plate.border_color = UiPalette.MID_GRAY
+	disabled_plate.set_border_width_all(3)
+	disabled_plate.set_corner_radius_all(4)
+	disabled_plate.set_content_margin_all(12)
+	_overdrive_button.add_theme_stylebox_override("disabled", disabled_plate)
 	# Fill the row's height (the meter's 0.7 × standard-button height) rather than forcing the
-	# whole momentum row taller: matching TURBO's full height would grow the row when the button
-	# appears, shifting the ladder under the finger that is mid-rush-hold. The word makes the
-	# button wide, so the tap target stays large. Flagged for Tim's device pass.
+	# whole momentum row taller than the meter; the minimum WIDTH keeps the tap target generous
+	# now that the label is only three letters.
+	_overdrive_button.custom_minimum_size = Vector2(UiPalette.STANDARD_BUTTON_HEIGHT, 0)
 	_overdrive_button.size_flags_vertical = Control.SIZE_FILL
 	_overdrive_button.pressed.connect(func() -> void: overdrive_requested.emit())
-	# ESSENTIAL, not just convenient: the button only exists while a rush hold is live, so the
-	# tap that presses it is ALWAYS a second finger — without this node it could never fire
+	# ESSENTIAL, not just convenient: the button is only ENABLED while a rush hold is live, so
+	# the tap that presses it is ALWAYS a second finger — without this node it could never fire
 	# on a phone (Godot only emulates the mouse from the gesture's first finger).
 	_overdrive_button.add_child(SecondaryTapButton.new())
-	_overdrive_button.visible = false  # _process shows it only while cruising
+	_overdrive_button.disabled = true  # _process enables it only while cruising
 	add_child(_overdrive_button)
 
 	# The heat meter itself — display only, so it ignores the mouse entirely (FrenzyBar's meter
@@ -286,10 +299,10 @@ func _process(delta: float) -> void:
 	var locked_out := _rush_momentum.is_locked_out()
 	var cruising := _rush_momentum.is_cruising()
 
-	# The OVERDRIVE button exists exactly while cruising: a rush hold is live, overdrive is not
-	# yet engaged, and no lockout is active. Any other time it hides, so the bar stays calm
-	# during idle play and never dangles a button that could do nothing.
-	_overdrive_button.visible = cruising
+	# The OVR button is a permanent fixture (Tim 2026-07-16: moving UI elements are annoying);
+	# it ENABLES exactly while cruising — a rush hold is live, overdrive is not yet engaged,
+	# and no lockout is active — and shows the gray "can't trigger" plate any other time.
+	_overdrive_button.disabled = not cruising
 
 	# The label: the live bonus normally; "CRUISE +X%" while the clamp is holding steady; the
 	# lockout narration while shut down. is_rearming is checked FIRST — it is a sub-state of

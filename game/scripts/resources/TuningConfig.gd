@@ -48,6 +48,13 @@ extends Resource
 ## on top of passive income.
 @export var wage_passive_fraction: float = 0.25  # feel-tune
 
+## Executive-pay bonus per clock-in level, as a fraction of the floor (0.05 = +5%/level).
+## Scales the executive floor by (1 + this × level) so a level-up ALWAYS visibly raises the
+## per-tap payout — without it, once the floor overtook the ladder wage, leveling up changed
+## nothing and the ladder felt dead (Tim, 2026-07-15). A steady multiplier of the floor, so
+## it tracks the economy rather than compounding past it.
+@export var wage_floor_bonus_per_level: float = 0.05  # feel-tune
+
 ## Frenzy fill per held-rush pulse, as a fraction of a manual tap's fill.
 ## Holding is convenient, so it charges the meter slower than real tapping.
 @export var frenzy_fill_hold_factor: float = 0.6  # feel-tune M1

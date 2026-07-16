@@ -82,6 +82,7 @@ const DESCRIPTIONS := {
 	"hold_rush_per_second": "Auto-rush pulses per second while holding a property.",
 	"wage_hold_taps_per_second": "Auto wage-taps per second while holding Clock In.",
 	"wage_passive_fraction": "Seconds of passive income one Clock In tap pays (the executive-pay floor).",
+	"wage_floor_bonus_per_level": "Executive-pay bonus per clock-in level (0.05 = +5% of the floor per level).",
 	"frenzy_fill_hold_factor": "Frenzy charge from a held-rush pulse vs a real tap.",
 	"buy_hold_initial_delay": "Pause before a held Buy button starts repeating (seconds).",
 	"buy_hold_repeat_interval": "Gap between Buy auto-repeats while held (seconds).",

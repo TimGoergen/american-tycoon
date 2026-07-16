@@ -118,6 +118,7 @@ func tick(delta: float, extra_property_multiplier: float = 1.0) -> void:
 	# computed: a clock-in tap pays a fraction of a second of the empire's income
 	# whenever that beats the ladder wage (Tim, 2026-07-05 — see WageState's header).
 	wage.executive_wage_floor = tuning.wage_passive_fraction * displayed_income_per_sec
+	wage.executive_floor_bonus_per_level = tuning.wage_floor_bonus_per_level
 
 
 ## Recompute the headline income/sec as the theoretical passive rate from current assets.

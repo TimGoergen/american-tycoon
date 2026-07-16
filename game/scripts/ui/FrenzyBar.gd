@@ -32,7 +32,17 @@ var _meter: ProgressBar
 var _label: Label
 ## The carbonation overlay — kept so _set_burn_style can restyle it with the fill.
 var _bubbles: GoldBubbles
+## The pop-floor marker: a vertical line on the meter at the charge needed before TURBO can
+## fire early, so the player can see how far away "poppable" is (Tim 2026-07-15). Hidden
+## while burning — the bar is a countdown timer then, and the floor means nothing.
+var _floor_marker: Control
 var _showing_burn_style := false
+
+## Width of the pop-floor marker line, in px.
+const FLOOR_MARKER_WIDTH := 4.0
+## Inset matching the framed meter's border (style_framed_progress), so the marker spans
+## exactly the track the fill moves through.
+const METER_FRAME_INSET := 3.0
 
 ## Eased fill shown on the meter. The true meter is driven by the 10 Hz logic tick,
 ## so we glide the displayed fill toward it each frame instead of copying it raw —
@@ -100,6 +110,13 @@ func _ready() -> void:
 	_bubbles.density_scale = CHARGING_BUBBLE_DENSITY  # the meter starts in the charging state
 	_meter.add_child(_bubbles)
 
+	# The pop-floor marker, over the bubbles but under the readout.
+	_floor_marker = Control.new()
+	_floor_marker.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_floor_marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_floor_marker.draw.connect(_draw_floor_marker)
+	_meter.add_child(_floor_marker)
+
 	# Overlay on the meter carrying the reward readout, right-aligned. Mouse-ignoring — the
 	# meter is not a button, so nothing here should catch a tap. The side margins keep the
 	# text clear of the navy frame.
@@ -152,6 +169,8 @@ func _set_burn_style(burning: bool) -> void:
 	_showing_burn_style = burning
 	var fill := UiPalette.KETCHUP_RED if burning else UiPalette.DARK_GOLD
 	UiPalette.style_framed_progress(_meter, fill, UiPalette.PROGRESS_TRACK_GRAY)
+	# The pop-floor marker only means something while charging.
+	_floor_marker.visible = not burning
 	# Burning drains the meter right-to-left, so the liquid flows that way too, with the
 	# full crowd; charging fills left-to-right with the reduced crowd (Tim, 2026-07-06).
 	# The bright-gold bubble color reads on both fills, so it no longer swaps here.
@@ -160,3 +179,17 @@ func _set_burn_style(burning: bool) -> void:
 	# Carbonation TIER (Tim, 2026-07-10): burning discharges the multiplier — a livelier RUSHED
 	# flow; charging is the steady FLOWING accrual. Speeds are per-tier static values.
 	_bubbles.tier = GoldBubbles.Tier.RUSHED if burning else GoldBubbles.Tier.FLOWING
+
+
+## Draw the vertical pop-floor line at tuning.frenzy_pop_floor across the meter's track:
+## charge past this line and TURBO can be triggered early. Navy, like the meter's frame, so
+## it reads on both the dark-gold fill behind it and the pale empty track ahead of it.
+func _draw_floor_marker() -> void:
+	var track := _floor_marker.size.x - METER_FRAME_INSET * 2.0
+	if track <= 0.0:
+		return
+	var x := METER_FRAME_INSET + clampf(_tuning.frenzy_pop_floor, 0.0, 1.0) * track
+	_floor_marker.draw_rect(
+		Rect2(x - FLOOR_MARKER_WIDTH / 2.0, METER_FRAME_INSET,
+			FLOOR_MARKER_WIDTH, _floor_marker.size.y - METER_FRAME_INSET * 2.0),
+		UiPalette.INK_NAVY)

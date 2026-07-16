@@ -9,14 +9,18 @@ extends HBoxContainer
 #
 # Overheat (Plans/Rush_Overheat.md) turned the old 0..cap meter into a push-your-luck heat
 # gauge, so the meter shows the FULL heat range 0..ceiling_max:
-#   • a thin white TICK marks heat == 1.0 (the old cap) — everything left of it is safe;
-#   • the Hot band [1.0 .. critical_start] is a subtle amber wash on the track;
+#   • a wide teal CRUISE bar marks the cruise point — everything left of it is safe;
+#   • from the cruise bar to the hazard zone the track is ONE continuous amber ramp in a single
+#     hue, deepening across its whole width, with NO internal tick lines (Tim 2026-07-16: one
+#     continuous section, a single base color, the effect changing throughout — this replaced
+#     the original thin white heat==1.0 tick + flat amber Hot wash);
 #   • the Critical band [critical_start .. ceiling_max] is hazard-striped dark red — the real
 #     overheat point is rolled secretly inside it every excursion, so the WHOLE zone reads as
 #     "gamble territory" rather than promising a precise edge (Tim 2026-07-15: the exact point
 #     of overheating should not be predictable);
-#   • the fill shifts purple → amber → blinking red as heat climbs the bands, the blink growing
-#     faster and harder the deeper into Critical the player pushes;
+#   • the fill and its bubbles shift purple → amber continuously from the cruise point to the
+#     hazard zone, then blinking red inside Critical, the blink growing faster and harder the
+#     deeper the player pushes;
 #   • crossing into Critical pops a large tier chip ("CRITICAL +55%!") quoting the peak bonus —
 #     the prize being approached — so the escalation is legible without reading the number
 #     (entering Hot is chipless: the fill shift and streaks carry it; Tim 2026-07-15);
@@ -29,8 +33,8 @@ extends HBoxContainer
 #     is not yet engaged, no lockout. Hidden otherwise, so the bar stays calm during idle play;
 #     appearing and disappearing with the hold is the intended behaviour.
 #   • While the clamp is holding, the readout reads "CRUISE +25%" in a calm teal — a steady,
-#     CONTENT state, clearly apart from the amber/red danger escalation. A small teal tick on
-#     the track marks the cruise point itself.
+#     CONTENT state, clearly apart from the amber/red danger escalation. The wide teal cruise
+#     bar on the track marks the cruise point itself.
 #   • Once overdrive engages, everything above presents exactly as shipped.
 
 ## The player tapped OVERDRIVE: release the cruise clamp for this excursion. Main routes this
@@ -57,8 +61,8 @@ var _bubbles: GoldBubbles
 ## not locked out — "you are in overdrive" (was: only at max bonus; Tim 2026-07-15).
 var _streaks: MomentumStreaks
 
-## The custom-drawn band overlay: Hot/Critical track segments, hazard stripes, the 1.0 tick,
-## and the cruise-point tick.
+## The custom-drawn band overlay: the wide teal cruise bar, the continuous amber ramp from it
+## to the hazard zone, and the hazard-striped Critical segment.
 var _zones: BandZoneOverlay
 
 ## The short-lived "CRITICAL +55%!" chip shown on entering the Critical band.
@@ -272,12 +276,12 @@ func _process(delta: float) -> void:
 	_displayed_fill = BarSmoothing.approach(_displayed_fill, target_fill, delta)
 	_meter.value = _displayed_fill
 
-	# Feed the zone overlay the band edges and the cruise point (as fill fractions) plus the
-	# current fill edge, so it can paint the Hot/Critical segments only over the still-unfilled
-	# track and keep the cruise tick where the clamp actually sits (Legacy can move it).
+	# Feed the zone overlay the cruise point and the hazard edge (as fill fractions) plus the
+	# current fill edge, so it can paint the ramp/hazard segments only over the still-unfilled
+	# track and keep the cruise bar where the clamp actually sits (Legacy can move it).
 	var critical_start_frac: float = clampf(_tuning.rush_momentum_critical_start / ceiling_max, 0.0, 1.0)
 	var cruise_frac: float = clampf(_rush_momentum.cruise_heat() / ceiling_max, 0.0, 1.0)
-	_zones.update_zones(1.0 / ceiling_max, critical_start_frac, cruise_frac, _displayed_fill)
+	_zones.update_zones(cruise_frac, critical_start_frac, _displayed_fill)
 
 	var locked_out := _rush_momentum.is_locked_out()
 	var cruising := _rush_momentum.is_cruising()
@@ -311,21 +315,26 @@ func _process(delta: float) -> void:
 	# shutdown reads as dead air, not business as usual.
 	_bubbles.visible = not locked_out
 
-	# The salmon streaks mark riding the danger bands — heat at or past the old cap (the tick)
-	# while rushing is still allowed (Tim 2026-07-15). NOT while cruising: with max Cooling
-	# Systems the cruise clamp sits exactly at heat 1.0, and cruising there must stay a calm
-	# state, never a Hot one (the boundary rule, Plans/Rush_Cruise_Control.md).
-	_streaks.visible = _rush_momentum.heat >= 1.0 and not locked_out and not cruising
+	# The salmon streaks mark riding past the cruise point — the whole overdrive ramp is danger
+	# territory now that the old-cap tick is gone (Tim 2026-07-16: one continuous section past
+	# cruise). NOT while cruising: with max Cooling Systems the cruise clamp sits exactly at
+	# heat 1.0, and cruising there must stay a calm state (the boundary rule,
+	# Plans/Rush_Cruise_Control.md).
+	_streaks.visible = _rush_momentum.heat > _rush_momentum.cruise_heat() \
+			and not locked_out and not cruising
 
 	_update_fill_color(delta, locked_out, cruising)
 
 
-## Recolor the fill for the current band: DARK_PURPLE while Building (and always while cruising),
-## shifting to amber across Hot, and blinking red in Critical — the blink ramping faster and
-## harder as heat approaches the top of the bar (deeper into the secret-ceiling zone = more
-## urgent). Mutates the cached fill stylebox's bg_color, so no styleboxes are rebuilt.
+## Recolor the fill AND its bubbles for the current heat: DARK_PURPLE at or below the cruise
+## point (and always while cruising), then one continuous purple → amber slide from the cruise
+## point all the way to the hazard edge — a single unbroken color story across the whole ramp
+## section, no seam at the old heat-1.0 cap (Tim 2026-07-16) — then blinking red inside
+## Critical, the blink ramping faster and harder as heat approaches the top of the bar.
+## Mutates the cached fill stylebox's bg_color, so no styleboxes are rebuilt.
 func _update_fill_color(delta: float, locked_out: bool, cruising: bool) -> void:
 	var heat: float = _rush_momentum.heat
+	var cruise_heat: float = _rush_momentum.cruise_heat()
 	var critical_start: float = _tuning.rush_momentum_critical_start
 	var ceiling_max: float = maxf(_tuning.rush_momentum_ceiling_max, 0.0001)
 
@@ -333,38 +342,41 @@ func _update_fill_color(delta: float, locked_out: bool, cruising: bool) -> void:
 		# Draining after an overheat: a flat dark red — the punishment color, no blink (the
 		# urgency is over; the player is just watching the cooldown empty out).
 		_fill_style.bg_color = UiPalette.BRICK
+		_bubbles.bubble_color = UiPalette.BRIGHT_PURPLE
 		return
 
-	if cruising:
-		# Cruising is a steady, CONTENT state whatever the exact heat — including the max-Legacy
-		# edge where the clamp sits exactly at 1.0, which must never wear Hot's amber (the
-		# boundary rule, Plans/Rush_Cruise_Control.md).
+	if cruising or heat <= cruise_heat:
+		# Cruising (or simply below the cruise point): the steady, CONTENT look — including the
+		# max-Legacy edge where the clamp sits exactly at 1.0, which must never wear the danger
+		# ramp's amber (the boundary rule, Plans/Rush_Cruise_Control.md).
 		_fill_style.bg_color = UiPalette.DARK_PURPLE
+		_bubbles.bubble_color = UiPalette.BRIGHT_PURPLE
 		_blink_phase = 0.0
 		return
 
-	match _rush_momentum.current_band():
-		RushMomentumState.Band.BUILDING:
-			_fill_style.bg_color = UiPalette.DARK_PURPLE
-			_blink_phase = 0.0
-		RushMomentumState.Band.HOT:
-			# Slide purple → amber across the Hot band so the fill itself narrates the climb.
-			var hot_span: float = maxf(critical_start - 1.0, 0.0001)
-			var hot_depth: float = clampf((heat - 1.0) / hot_span, 0.0, 1.0)
-			_fill_style.bg_color = UiPalette.DARK_PURPLE.lerp(UiPalette.MUSTARD_GOLD, hot_depth)
-			_blink_phase = 0.0
-		RushMomentumState.Band.CRITICAL:
-			# Blinking red, ramping with depth. Phase accumulates at the CURRENT frequency so the
-			# ramp never makes the sine jump; strength widens the red↔pale-gold pulse.
-			var crit_span: float = maxf(ceiling_max - critical_start, 0.0001)
-			var crit_depth: float = clampf((heat - critical_start) / crit_span, 0.0, 1.0)
-			var blink_hz: float = lerpf(BLINK_HZ_MIN, BLINK_HZ_MAX, crit_depth)
-			var strength: float = lerpf(BLINK_STRENGTH_MIN, BLINK_STRENGTH_MAX, crit_depth)
-			_blink_phase += delta * blink_hz * TAU
-			# sin mapped to 0..1, scaled by strength: the fill pulses between pure KETCHUP_RED
-			# and a bright warning flash toward PALE_GOLD.
-			var pulse: float = (sin(_blink_phase) * 0.5 + 0.5) * strength
-			_fill_style.bg_color = UiPalette.KETCHUP_RED.lerp(UiPalette.PALE_GOLD, pulse)
+	if heat < critical_start:
+		# The overdrive ramp [cruise point .. hazard edge]: fill and bubbles slide purple → amber
+		# by depth across the ENTIRE section, matching the track wash beneath.
+		var ramp_span: float = maxf(critical_start - cruise_heat, 0.0001)
+		var ramp_depth: float = clampf((heat - cruise_heat) / ramp_span, 0.0, 1.0)
+		_fill_style.bg_color = UiPalette.DARK_PURPLE.lerp(UiPalette.MUSTARD_GOLD, ramp_depth)
+		_bubbles.bubble_color = UiPalette.BRIGHT_PURPLE.lerp(UiPalette.PALE_GOLD, ramp_depth)
+		_blink_phase = 0.0
+		return
+
+	# Critical: blinking red, ramping with depth. Phase accumulates at the CURRENT frequency so
+	# the ramp never makes the sine jump; strength widens the red↔pale-gold pulse.
+	var crit_span: float = maxf(ceiling_max - critical_start, 0.0001)
+	var crit_depth: float = clampf((heat - critical_start) / crit_span, 0.0, 1.0)
+	var blink_hz: float = lerpf(BLINK_HZ_MIN, BLINK_HZ_MAX, crit_depth)
+	var strength: float = lerpf(BLINK_STRENGTH_MIN, BLINK_STRENGTH_MAX, crit_depth)
+	_blink_phase += delta * blink_hz * TAU
+	# sin mapped to 0..1, scaled by strength: the fill pulses between pure KETCHUP_RED
+	# and a bright warning flash toward PALE_GOLD; the bubbles stay bright gold so they
+	# read through the pulse.
+	var pulse: float = (sin(_blink_phase) * 0.5 + 0.5) * strength
+	_fill_style.bg_color = UiPalette.KETCHUP_RED.lerp(UiPalette.PALE_GOLD, pulse)
+	_bubbles.bubble_color = UiPalette.PALE_GOLD
 
 
 ## Swap the readout label's look per state. Only rebuilds the overrides on a change.
@@ -462,43 +474,45 @@ func _vibrate(duration_ms: int) -> void:
 # The band-zone overlay
 # ---------------------------------------------------------------------------
 
-## Custom-drawn track decoration for the heat bands (the same _draw approach MomentumStreaks
-## uses): the subtle amber Hot segment, the hazard-striped dark-red Critical segment, the thin
-## white tick at heat == 1.0 (the old cap — the "safe range ends here" line), and the small teal
-## tick at the CRUISE POINT (where the hold clamps without overdrive).
+## Custom-drawn track decoration for the heat ranges (the same _draw approach MomentumStreaks
+## uses): the wide teal CRUISE bar (where a plain hold clamps), then ONE continuous amber wash
+## deepening from the cruise bar all the way to the hazard edge — a single section in a single
+## hue with no internal tick lines (Tim 2026-07-16; this replaced the thin white heat==1.0 tick
+## and the flat Hot segment) — then the hazard-striped dark-red Critical segment.
 ##
 ## The bar's fill is painted by the ProgressBar itself, UNDER all child overlays — so to make the
 ## zones read as if they were on the track BEHIND the fill, each segment is clipped to start at
 ## the CURRENT fill edge: the advancing fill "covers" the zone exactly as a background segment
-## would be covered. The ticks, by contrast, are always drawn — over fill and track alike — so
-## the safe-range boundary and the cruise point never disappear.
+## would be covered. The cruise bar, by contrast, is always drawn — over fill and track alike —
+## so the "safe range ends here" marker never disappears.
 class BandZoneOverlay extends Control:
 	## Match the framed fill's 3px inset (UiPalette.style_framed_progress) so the segments sit
 	## inside the navy frame exactly like the fill does.
 	const EDGE_INSET := 3.0
-	## Hot segment: a quiet amber wash — a hint, not a warning (the warning is Critical's job).
-	const HOT_WASH := Color("#E3B23C", 0.35)  # MUSTARD_GOLD at low alpha
+	## The ramp wash: one hue (amber), alpha deepening across the section's whole width — a
+	## continuous "warmer and warmer" read instead of discrete bands.
+	const RAMP_COLOR := Color("#E3B23C")  # MUSTARD_GOLD
+	const RAMP_ALPHA_START := 0.08
+	const RAMP_ALPHA_END := 0.45
+	## How many vertical slices approximate the wash's left-to-right alpha gradient (draw_rect
+	## has no gradient fill; ~24 slices are indistinguishable from smooth at bar height).
+	const RAMP_SLICES := 24
 	## Critical segment: a dark red base with brighter red diagonal hazard stripes over it.
 	const CRITICAL_BASE := Color("#8E2F1E", 0.55)   # BRICK, translucent over the gray track
 	const CRITICAL_STRIPE := Color("#B5402A", 0.60)  # KETCHUP_RED stripes
 	const STRIPE_WIDTH := 8.0
 	## Horizontal distance between stripe left edges. Stripes run at 45°.
 	const STRIPE_SPACING := 26.0
-	## The heat == 1.0 tick: thin, light, always visible.
-	const TICK_WIDTH := 3.0
-	const TICK_COLOR := Color(1, 1, 1, 0.9)
-	## The cruise-point tick: the same calm teal as the CRUISE readout, so the marker and the
-	## label read as one idea ("the hold settles here").
-	const CRUISE_TICK_COLOR := Color("#9FD8D4", 0.9)  # ATOMIC_TEAL
-	## Skip drawing the cruise tick when it sits this close (px) to the 1.0 tick — at max
-	## Cooling Systems the cruise point IS the old cap, and two overlapping ticks read as smear.
-	const CRUISE_TICK_MERGE_PX := 6.0
+	## The cruise-point bar: WIDE (Tim 2026-07-16 — it is the one safety landmark on the track,
+	## so it must land at a glance), in the same calm teal as the CRUISE readout so the marker
+	## and the label read as one idea ("the hold settles here").
+	const CRUISE_BAR_WIDTH := 10.0
+	const CRUISE_BAR_COLOR := Color("#9FD8D4", 0.9)  # ATOMIC_TEAL
 
-	## Band edges, the cruise point, and the current fill edge, all as fractions of the full bar
-	## (0..1). Fed every frame by the host's _process via update_zones.
-	var _hot_start_frac := 0.625
-	var _critical_start_frac := 0.78125
+	## The cruise point, the hazard edge, and the current fill edge, all as fractions of the full
+	## bar (0..1). Fed every frame by the host's _process via update_zones.
 	var _cruise_frac := 0.0
+	var _critical_start_frac := 0.78125
 	var _fill_frac := 0.0
 
 	func _ready() -> void:
@@ -506,16 +520,13 @@ class BandZoneOverlay extends Control:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	## Update the geometry; redraws only when something actually moved.
-	func update_zones(hot_start_frac: float, critical_start_frac: float, cruise_frac: float,
-			fill_frac: float) -> void:
-		if is_equal_approx(hot_start_frac, _hot_start_frac) \
+	func update_zones(cruise_frac: float, critical_start_frac: float, fill_frac: float) -> void:
+		if is_equal_approx(cruise_frac, _cruise_frac) \
 				and is_equal_approx(critical_start_frac, _critical_start_frac) \
-				and is_equal_approx(cruise_frac, _cruise_frac) \
 				and is_equal_approx(fill_frac, _fill_frac):
 			return
-		_hot_start_frac = hot_start_frac
-		_critical_start_frac = critical_start_frac
 		_cruise_frac = cruise_frac
+		_critical_start_frac = critical_start_frac
 		_fill_frac = fill_frac
 		queue_redraw()
 
@@ -530,33 +541,41 @@ class BandZoneOverlay extends Control:
 		# the inset track instead put the tick/zones ~1-2px right of the true fill edge — the same
 		# off-by-inset the frenzy pop-floor marker had (Tim 2026-07-15). At fraction 1.0 this
 		# lands on size.x − inset, flush with the frame's inner right edge.
-		var hot_x := maxf(_hot_start_frac * size.x - EDGE_INSET, EDGE_INSET)
+		var cruise_x := maxf(_cruise_frac * size.x - EDGE_INSET, EDGE_INSET)
 		var critical_x := maxf(_critical_start_frac * size.x - EDGE_INSET, EDGE_INSET)
 		var right_x := size.x - EDGE_INSET
 		var fill_x := maxf(_fill_frac * size.x - EDGE_INSET, EDGE_INSET)
 
-		# Hot segment (amber), clipped to the unfilled track (see the class comment).
-		var hot_left := maxf(hot_x, fill_x)
-		if critical_x > hot_left:
-			draw_rect(Rect2(hot_left, top, critical_x - hot_left, bottom - top), HOT_WASH)
+		# The ramp wash [cruise bar .. hazard edge]: sliced left-to-right, each slice's alpha
+		# interpolated across the FULL section width, then clipped to the unfilled track (see the
+		# class comment). Slicing the full span and skipping covered slices keeps the gradient
+		# anchored to the track — it never re-stretches as the fill advances.
+		if critical_x > cruise_x:
+			var span := critical_x - cruise_x
+			var slice_width := span / float(RAMP_SLICES)
+			for i in range(RAMP_SLICES):
+				var slice_left := cruise_x + slice_width * float(i)
+				var slice_right := slice_left + slice_width
+				if slice_right <= fill_x:
+					continue
+				var alpha := lerpf(RAMP_ALPHA_START, RAMP_ALPHA_END,
+						(float(i) + 0.5) / float(RAMP_SLICES))
+				var visible_left := maxf(slice_left, fill_x)
+				draw_rect(Rect2(visible_left, top, slice_right - visible_left, bottom - top),
+						Color(RAMP_COLOR, alpha))
 
-		# Critical segment (dark red + hazard stripes), same clip.
+		# Critical segment (dark red + hazard stripes), clipped to the unfilled track.
 		var crit_left := maxf(critical_x, fill_x)
 		if right_x > crit_left:
 			draw_rect(Rect2(crit_left, top, right_x - crit_left, bottom - top), CRITICAL_BASE)
 			_draw_hazard_stripes(crit_left, right_x, top, bottom)
 
-		# The cruise tick — where a plain hold clamps (Plans/Rush_Cruise_Control.md). Same
-		# fill-coordinate mapping as everything above. Skipped when Legacy has pushed the cruise
-		# point up onto the 1.0 tick itself, so the two markers never smear together.
-		var cruise_x := maxf(_cruise_frac * size.x - EDGE_INSET, EDGE_INSET)
-		if _cruise_frac > 0.0 and absf(cruise_x - hot_x) > CRUISE_TICK_MERGE_PX:
-			draw_rect(Rect2(cruise_x - TICK_WIDTH * 0.5, top, TICK_WIDTH, bottom - top),
-					CRUISE_TICK_COLOR)
-
-		# The tick at heat == 1.0 — ALWAYS drawn, over fill and track alike, so the "end of the
-		# safe range" line is spatially real whatever the meter is doing.
-		draw_rect(Rect2(hot_x - TICK_WIDTH * 0.5, top, TICK_WIDTH, bottom - top), TICK_COLOR)
+		# The cruise bar — where a plain hold clamps (Plans/Rush_Cruise_Control.md). ALWAYS
+		# drawn, over fill and track alike, so the safety landmark is spatially real whatever
+		# the meter is doing. Drawn LAST so the ramp wash never tints it.
+		if _cruise_frac > 0.0:
+			draw_rect(Rect2(cruise_x - CRUISE_BAR_WIDTH * 0.5, top, CRUISE_BAR_WIDTH,
+					bottom - top), CRUISE_BAR_COLOR)
 
 	## Diagonal 45° hazard stripes across [left_x, right_x]. Each stripe is a thick line from the
 	## bottom edge up-right to the top edge; its endpoints are clipped in 1D along the line so no

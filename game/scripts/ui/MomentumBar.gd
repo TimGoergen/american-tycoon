@@ -30,8 +30,9 @@ extends HBoxContainer
 # Cruise Control (Plans/Rush_Cruise_Control.md) made the danger bands OPT-IN: holding rush is
 # safe forever, with heat clamped at the cruise point, until the player taps OVERDRIVE.
 #   • The OVR button is ALWAYS visible (Tim 2026-07-16: moving UI elements are annoying) but
-#     ENABLED only while is_cruising() — a rush hold is live, overdrive is not yet engaged, no
-#     lockout. Any other time it wears the gray-outlined "can't trigger" plate, like TURBO.
+#     ENABLED only once the hold has REACHED the cruise clamp — is_cruising() AND heat at the
+#     cruise point; the climb toward the clamp stays gray (Tim 2026-07-16). Any other time it
+#     wears the gray-outlined "can't trigger" plate, like TURBO.
 #   • While the clamp is holding, the readout reads "CRUISE +25%" in a calm teal — a steady,
 #     CONTENT state, clearly apart from the amber/red danger escalation. The wide teal cruise
 #     bar on the track marks the cruise point itself.
@@ -300,9 +301,14 @@ func _process(delta: float) -> void:
 	var cruising := _rush_momentum.is_cruising()
 
 	# The OVR button is a permanent fixture (Tim 2026-07-16: moving UI elements are annoying);
-	# it ENABLES exactly while cruising — a rush hold is live, overdrive is not yet engaged,
-	# and no lockout is active — and shows the gray "can't trigger" plate any other time.
-	_overdrive_button.disabled = not cruising
+	# it ENABLES only once the hold has actually REACHED the cruise clamp (Tim 2026-07-16) —
+	# cruising during the climb toward it stays gray — and shows the gray "can't trigger"
+	# plate any other time. The >= (not ==) covers the re-press-while-still-hot case: heat
+	# bleeding DOWN toward the clamp is already at cruise depth, so the gamble is available
+	# immediately rather than after the cooldown dips below and climbs back.
+	var at_cruise_depth: bool = _rush_momentum.heat >= _rush_momentum.cruise_heat() \
+			or is_equal_approx(_rush_momentum.heat, _rush_momentum.cruise_heat())
+	_overdrive_button.disabled = not (cruising and at_cruise_depth)
 
 	# The label: the live bonus normally; "CRUISE +X%" while the clamp is holding steady; the
 	# lockout narration while shut down. is_rearming is checked FIRST — it is a sub-state of

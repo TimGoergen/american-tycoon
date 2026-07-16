@@ -241,10 +241,12 @@ func _process(delta: float) -> void:
 		_update_tab_unlocks()
 		_check_new_ventures()
 
-	# The hero stat tracks the current planet (the civilization NAME moved to the epoch pager —
-	# Tim 2026-07-15, it was duplicative here); the prestige-exit button and the Estate Office
-	# button (with its Legacy balance) reflect the live state.
-	_hero_stat.set_planet_tier(game.epoch.current_tier)
+	# The hero stat's planet watermark follows the epoch pager's ACTIVE TAB, not the reached
+	# epoch (Tim 2026-07-15) — page back to Earth and the header shows Earth. Both Earth tabs
+	# (Blue/White Collar, 0 and 1) are tier 1; every alien tab's index IS its tier. (The
+	# civilization NAME moved to the pager itself — it was duplicative here.) The prestige-exit
+	# button and the Estate Office button (with its Legacy balance) reflect the live state.
+	_hero_stat.set_planet_tier(1 if _epoch_tab <= 1 else _epoch_tab)
 	_refresh_contact_progress()
 	_update_plan_button()
 	_update_estate_badge()

@@ -26,15 +26,10 @@ const INCOME_FONT_SIZE := UiPalette.FONT_HERO
 # Cash on hand reads at the same size as income/sec (Tim's call) — kept tied to
 # INCOME_FONT_SIZE so the two stay matched if that value is ever retuned.
 const CASH_FONT_SIZE := INCOME_FONT_SIZE
-# The current EPOCH name lives in this panel (Tim, 2026-06-27 — it replaced the
-# heir/dynasty name). It sits centered between the two edge values, bottom-aligned with
-# the icon row, so it reads as one band: "$/s … EPOCH … 💵". Uses UiPalette.FONT_SUBHEAD
-# (Tim's call) so the epoch name carries weight. The value shown is the civilization Earth
-# is currently trading with ("Earth" on tier 1, an alien race's name on later epochs).
-const NAME_FONT_SIZE := int(UiPalette.FONT_SUBHEAD * 1.10)  # civ name +10% (Tim 2026-07-14)
+# (The civilization name used to live in this panel too — removed 2026-07-15 (Tim): the
+# epoch pager above the property list already names the civilization, so it was duplicative.)
 const INCOME_BOLD := 3
 const CASH_BOLD := 2
-const NAME_BOLD := 2
 
 # The dollar-bill icon shown beneath the CASH number, right-aligned to the panel edge
 # (the "CASH" word was removed, Tim 2026-06-28). The art is a 2:1 green-and-gold bill.
@@ -80,13 +75,16 @@ const LABEL_LAYOUT_HEIGHT := 247
 #      not work when a SECOND clip_children group exists elsewhere in the tree (Main already has
 #      one). So we round the corners by writing transparency into the image's own alpha instead.
 #
-# FILL_FRACTION is how much of the plate's height the globe spans once scaled (1.0 = exactly
-# fits; above 1.0 it OVERFLOWS — the globe's top stays pinned to the plate top and the excess
-# runs off the plate bottom, clipped away). 2.0 = the planet is twice the plate height, so
-# fully HALF of it hangs off the panel's bottom edge (Tim, 2026-07-04, second enlargement —
-# was 1.5/bottom-third). WATERMARK_ALPHA fades the globe so it reads as a background, not a
-# foreground graphic. Both are art-direction knobs for Tim to eyeball — change them, not the
-# layout code.
+# FILL_FRACTION is how much of the globe's AVAILABLE height it spans once scaled (1.0 =
+# exactly fits; above 1.0 it OVERFLOWS — the excess runs off the plate bottom, clipped away).
+# 2.0 = the planet is twice the available height, so fully HALF of it hangs off the panel's
+# bottom edge (Tim, 2026-07-04, second enlargement — was 1.5/bottom-third). The available
+# height is the plate MINUS the phone's top camera-cutout band: the globe's top starts at or
+# below the cutout instead of the plate top, shrunk so the same half-visible look is kept
+# (Tim, 2026-07-15 — the Pixel's punch-hole camera sat over the planet art). On screens with
+# no cutout the offset is 0 and the globe fills the plate exactly as before. WATERMARK_ALPHA
+# fades the globe so it reads as a background, not a foreground graphic. Both are
+# art-direction knobs for Tim to eyeball — change them, not the layout code.
 const PLANET_FILL_FRACTION := 2.0
 const PLANET_WATERMARK_ALPHA := 0.6
 # Corner rounding baked into the watermark, in pixels. Matches the cream plate's own corners as
@@ -107,6 +105,7 @@ const PLANET_IMAGE_PATHS := [
 var _planet_image: TextureRect
 var _shown_planet_tier := 0  # which tier's image is currently loaded (0 = none yet)
 var _baked_planet_size := Vector2i.ZERO  # plate size the current watermark was baked for
+var _baked_cutout_offset := -1  # camera-cutout top offset the current watermark was baked with
 
 # The brightness flash briefly lifts the whole panel toward white and eases back.
 # Multiplying modulate (rather than tinting the background) keeps the hue exactly
@@ -130,7 +129,6 @@ var _income_bill: TextureRect  # dollar-bill icon beneath the income number, lef
 var _income_slash_label: Label  # the big bold-gold "/" beside the income bill
 var _income_s_label: Label  # the smaller "s" after the slash (marks the per-second rate)
 var _cash_bill: TextureRect  # dollar-bill icon beneath the cash number, right-aligned (was beside "CASH")
-var _epoch_label: Label  # the current epoch / civilization name (was the heir name)
 ## Contact progress — how much of this epoch's economy the generation has consumed — shown
 ## as a GREEN BAR pinned to the bottom of this panel (Tim, 2026-07-03: replaced the earlier
 ## "42% · $43.5T of $103.6T" text line). The panel's own red frame outlines the bar on three
@@ -146,21 +144,6 @@ var _economy_divider: ColorRect
 ## the panel frame's 12px thickness so it reads as the same line).
 const ECONOMY_BAR_HEIGHT := 54  # 26 + 30% -> 34, then +60% -> 54 (Tim, 2026-07-06)
 const ECONOMY_DIVIDER_HEIGHT := 12
-## A soft white plate behind the civilization name — in FRONT of the planet watermark but BEHIND
-## the name text — so the name stays legible over the busy globe (Tim, 2026-07-01). It's a RADIAL
-## gradient: opaque white at the center fading to transparent at the edges. Sized to the name each
-## frame in _layout_labels; the gradient is resolution-independent so it just scales to that rect.
-var _epoch_name_backing: TextureRect
-## Center opacity of that backing (Godot alpha is 0.0–1.0). The gradient fades from this at the
-## middle to EPOCH_BACKING_EDGE_ALPHA at the edges.
-const EPOCH_BACKING_ALPHA := 0.95
-## Edge opacity of the radial backing — kept low so the plate still feathers out, but no longer
-## fully transparent, so the whole plate reads more opaque (Tim, 2026-07-01).
-const EPOCH_BACKING_EDGE_ALPHA := 0.2
-const EPOCH_BACKING_PAD := Vector2(8, 4)
-## Vertical-only scale of the backing about the name's center — 0.85 shrinks the plate's HEIGHT 15%
-## while its width stays at the name + padding (Tim, 2026-07-01).
-const EPOCH_BACKING_SCALE := 0.85
 
 # Frenzy glow: while a burn is active the ticket pulses toward red to signal the
 # accelerated state. Subtle — navy numerals stay readable over the tint.
@@ -240,23 +223,6 @@ func _ready() -> void:
 	_cash_bill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_content.add_child(_cash_bill)
 
-	# The soft radial plate behind the civilization name. Added to _content (so it draws over the
-	# planet watermark) but BEFORE the name label (so the name draws over it). Positioned/sized in
-	# _layout_labels. STRETCH_SCALE + EXPAND_IGNORE_SIZE let the gradient fill whatever rect we set
-	# without inflating the panel's minimum size. Ignores the mouse so it never intercepts input.
-	_epoch_name_backing = TextureRect.new()
-	_epoch_name_backing.texture = _make_radial_backing_texture()
-	_epoch_name_backing.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_epoch_name_backing.stretch_mode = TextureRect.STRETCH_SCALE
-	_epoch_name_backing.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_content.add_child(_epoch_name_backing)
-
-	# The current epoch / civilization name, centered between the two edge values and laid
-	# out on the caption line (see _layout_labels). Navy to match the income side; Main feeds
-	# it via set_epoch_name each frame.
-	_epoch_label = _make_label(UiPalette.NAVY, NAME_FONT_SIZE, NAME_BOLD)
-	_content.add_child(_epoch_label)
-
 	# The economy progress strip pinned to the panel's bottom edge: a red divider (reading
 	# as the single line between the income content and the bar) over a green progress bar.
 	# The panel's own red frame closes the bar's other three sides. Positioned by hand in
@@ -305,24 +271,6 @@ func _make_label(color: Color, font_size: int, outline: int) -> Label:
 	return label
 
 
-## Build the radial white gradient used behind the civilization name: opaque-ish white at the center
-## fading to transparent at the edges. GradientTexture2D's radial fill works in normalized UV, so the
-## soft falloff stretches to whatever (wide, short) rect the backing is scaled to, feathering out on
-## all four sides. A modest texture size is plenty — it's scaled up and bilinear-filtered.
-func _make_radial_backing_texture() -> GradientTexture2D:
-	var gradient := Gradient.new()
-	gradient.set_color(0, Color(1, 1, 1, EPOCH_BACKING_ALPHA))       # center
-	gradient.set_color(1, Color(1, 1, 1, EPOCH_BACKING_EDGE_ALPHA))  # edge
-	var texture := GradientTexture2D.new()
-	texture.gradient = gradient
-	texture.fill = GradientTexture2D.FILL_RADIAL
-	texture.fill_from = Vector2(0.5, 0.5)   # center of the rect
-	texture.fill_to = Vector2(1.0, 0.5)     # radius reaches the edge (corners clamp to transparent)
-	texture.width = 128
-	texture.height = 128
-	return texture
-
-
 ## Record the latest income/sec. The label itself only repaints on the throttled
 ## cadence in _process, so the displayed number stays still long enough to read.
 func set_income_per_sec(income_per_sec: float) -> void:
@@ -333,12 +281,6 @@ func set_cash(cash: float) -> void:
 	# The cash balance uses its own fuller formatting (commas to 999,999, cents below 1,000,
 	# "1.00 M" above). No leading "$" — the dollar-bill icon beneath it carries that (Tim, 2026-07-09).
 	_cash_label.text = Money.of(cash).display_cash().trim_prefix("$")
-
-
-## The current epoch / civilization name (e.g. "EARTH", "LUMINARI COLLECTIVE"). Shown
-## UPPERCASE to match the ticket-plate convention. Replaced the heir name (Tim, 2026-06-27).
-func set_epoch_name(epoch_name: String) -> void:
-	_epoch_label.text = epoch_name.to_upper()
 
 
 ## Progress toward the next First Contact: how much of the CURRENT epoch's economy this
@@ -372,16 +314,19 @@ func set_planet_tier(tier: int) -> void:
 	_refresh_planet_watermark()
 
 
-## Build (or rebuild) the baked watermark texture if the tier or the plate size has changed.
-## Called from set_planet_tier and from _process, since the plate's real size is not known until
-## the container has laid this control out (the very first call usually has a zero size).
+## Build (or rebuild) the baked watermark texture if the tier, the plate size, or the camera-
+## cutout offset has changed. Called from set_planet_tier and from _process, since the plate's
+## real size is not known until the container has laid this control out (the very first call
+## usually has a zero size).
 func _refresh_planet_watermark() -> void:
 	var plate_size := Vector2i(_planet_image.size)
 	if plate_size.x <= 0 or plate_size.y <= 0:
 		return  # not laid out yet — try again next frame
-	if plate_size == _baked_planet_size:
-		return  # already baked for this tier and size
+	var cutout_offset := _camera_cutout_offset_in_plate()
+	if plate_size == _baked_planet_size and cutout_offset == _baked_cutout_offset:
+		return  # already baked for this tier, size, and cutout
 	_baked_planet_size = plate_size
+	_baked_cutout_offset = cutout_offset
 
 	var tier := _shown_planet_tier
 	if tier < 1 or tier >= PLANET_IMAGE_PATHS.size():
@@ -391,24 +336,47 @@ func _refresh_planet_watermark() -> void:
 	if source == null:
 		_planet_image.texture = null
 		return
-	_planet_image.texture = _bake_planet_watermark(source.get_image(), plate_size)
+	_planet_image.texture = _bake_planet_watermark(source.get_image(), plate_size, cutout_offset)
+
+
+## How far the phone's camera cutout intrudes into the planet plate, in plate-local pixels
+## (0 on screens with no cutout, e.g. desktop). The display safe area is reported in physical
+## screen pixels, so it is mapped through the viewport's stretch transform into canvas space
+## before being compared against the plate's position (Tim, 2026-07-15 — the Pixel's punch-hole
+## camera sat on top of the planet art).
+func _camera_cutout_offset_in_plate() -> int:
+	var safe_top_screen := float(DisplayServer.get_display_safe_area().position.y)
+	if safe_top_screen <= 0.0:
+		return 0
+	var viewport := get_viewport()
+	if viewport == null:
+		return 0
+	var screen_to_canvas := viewport.get_final_transform().affine_inverse()
+	var safe_top_canvas := (screen_to_canvas * Vector2(0.0, safe_top_screen)).y
+	var plate_top := _planet_image.get_global_rect().position.y
+	return maxi(0, int(safe_top_canvas - plate_top))
 
 
 ## Turn a world image into the plate-sized, rounded, zoomed watermark texture. Done on the CPU
 ## (see the class header for why we copy pixels instead of using the imported texture directly).
-func _bake_planet_watermark(full_image: Image, plate_size: Vector2i) -> ImageTexture:
+## `top_offset` is the camera-cutout band at the top of the plate: the globe starts below it and
+## is scaled against only the remaining height, so the same fraction of the globe stays visible
+## as on a cutout-free screen — just smaller (Tim, 2026-07-15).
+func _bake_planet_watermark(full_image: Image, plate_size: Vector2i, top_offset: int) -> ImageTexture:
 	# 1. Frame the globe itself: crop away the SVG's transparent padding so we work with just the
 	# painted planet. get_used_rect() is the bounding box of the non-transparent pixels (the memory
 	# note on texture sizing: always use it, the canvas carries varying transparent padding).
 	var globe := full_image.get_region(full_image.get_used_rect())
 
-	# 2. Scale the globe against the plate (preserving aspect). At FILL_FRACTION 1.0 this is a
-	# classic "contain" fit; above 1.0 the globe is deliberately taller than the plate so its
-	# bottom overflows (step 3 clips it). The plate is far wider than it is tall, so the height
-	# ratio governs and the sides stay clear.
+	# 2. Scale the globe against the plate's AVAILABLE height — below the camera cutout —
+	# preserving aspect. At FILL_FRACTION 1.0 this is a classic "contain" fit; above 1.0 the
+	# globe is deliberately taller than the available space so its bottom overflows (step 3
+	# clips it). The plate is far wider than it is tall, so the height ratio governs and the
+	# sides stay clear.
+	var available_height := maxi(1, plate_size.y - top_offset)
 	var fit_scale := minf(
 		float(plate_size.x) / globe.get_width(),
-		float(plate_size.y) / globe.get_height()
+		float(available_height) / globe.get_height()
 	) * PLANET_FILL_FRACTION
 	var globe_size := Vector2i(
 		maxi(1, int(globe.get_width() * fit_scale)),
@@ -418,14 +386,15 @@ func _bake_planet_watermark(full_image: Image, plate_size: Vector2i) -> ImageTex
 	globe.convert(Image.FORMAT_RGBA8)  # ensure an alpha channel for the transparent surround
 
 	# 3. Compose the globe onto a transparent plate-sized canvas: centred horizontally, TOP
-	# PINNED to the plate top — so enlarging the globe grows it downward only, and whatever
-	# extends past the plate bottom is simply not blitted (the "bottom third runs off the
-	# panel" look, Tim 2026-07-04). The transparent surround lets the cream plate (and the
-	# frenzy glow) show around the planet.
+	# PINNED just below the camera cutout (the plate top itself when there is none) — so
+	# enlarging the globe grows it downward only, and whatever extends past the plate bottom
+	# is simply not blitted (the "bottom third runs off the panel" look, Tim 2026-07-04; the
+	# clipped bottom edge is what "pins" the visible globe to the panel bottom). The
+	# transparent surround lets the cream plate (and the frenzy glow) show around the planet.
 	var watermark := Image.create(plate_size.x, plate_size.y, false, Image.FORMAT_RGBA8)
 	watermark.fill(Color(0, 0, 0, 0))
-	var top_pinned_offset := Vector2i((plate_size.x - globe_size.x) / 2, 0)
-	var visible_globe := Vector2i(globe_size.x, mini(globe_size.y, plate_size.y))
+	var top_pinned_offset := Vector2i((plate_size.x - globe_size.x) / 2, top_offset)
+	var visible_globe := Vector2i(globe_size.x, mini(globe_size.y, plate_size.y - top_offset))
 	watermark.blit_rect(globe, Rect2i(Vector2i.ZERO, visible_globe), top_pinned_offset)
 
 	# 4. Round the corners by clearing the alpha outside the rounded rectangle, so the watermark
@@ -541,32 +510,6 @@ func _layout_labels() -> void:
 	# amount is pulled in by the same padding so its right edge lines up with the visible bill below.
 	_cash_label.position = Vector2(area.x - _cash_label.size.x - EDGE_MARGIN - bill_side_pad, amount_top)
 	_cash_bill.position = Vector2(area.x - CASH_BILL_SIZE.x - EDGE_MARGIN, bill_row_y)
-
-	# Epoch name: horizontally centered, BOTTOM-aligned with the shared bill row so the three
-	# elements share one baseline; the taller name grows upward only.
-	_epoch_label.size = _epoch_label.get_minimum_size()
-	var icon_baseline_y := bill_row_y + CASH_BILL_SIZE.y
-	# Drop the civilization name toward the bottom of the income content: cut the gap between its
-	# bottom and the top of the economy strip by 40% (Tim 2026-07-14). It no longer shares the bill
-	# baseline — it sits closer to the economy bar.
-	var strip_top := area.y - ECONOMY_BAR_HEIGHT - ECONOMY_DIVIDER_HEIGHT
-	var name_bottom := icon_baseline_y + (strip_top - icon_baseline_y) * 0.40
-	_epoch_label.position = Vector2(
-		(area.x - _epoch_label.size.x) / 2.0,
-		name_bottom - _epoch_label.size.y
-	)
-
-	# The faint white backing tracks the name so it reads cleanly over the globe.
-	var backing_size := Vector2(
-		_epoch_label.size.x + EPOCH_BACKING_PAD.x * 2.0,
-		(_epoch_label.size.y + EPOCH_BACKING_PAD.y * 2.0) * EPOCH_BACKING_SCALE
-	)
-	var backed_center := Vector2(
-		area.x / 2.0,
-		_epoch_label.position.y + _epoch_label.size.y / 2.0
-	)
-	_epoch_name_backing.size = backing_size
-	_epoch_name_backing.position = backed_center - backing_size / 2.0
 
 	# The economy progress strip hugs the panel's bottom edge: the red divider (the single
 	# line between the income content and the bar), then the green bar beneath it. Full

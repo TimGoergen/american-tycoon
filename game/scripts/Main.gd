@@ -241,10 +241,9 @@ func _process(delta: float) -> void:
 		_update_tab_unlocks()
 		_check_new_ventures()
 
-	# The current epoch name rides on the hero stat (replaced the heir name, Tim 2026-06-27);
-	# the prestige-exit button and the Estate Office button (with its Legacy balance) reflect
-	# the live state.
-	_hero_stat.set_epoch_name(EpochCatalog.civilization(game.epoch.current_tier))
+	# The hero stat tracks the current planet (the civilization NAME moved to the epoch pager —
+	# Tim 2026-07-15, it was duplicative here); the prestige-exit button and the Estate Office
+	# button (with its Legacy balance) reflect the live state.
 	_hero_stat.set_planet_tier(game.epoch.current_tier)
 	_refresh_contact_progress()
 	_update_plan_button()

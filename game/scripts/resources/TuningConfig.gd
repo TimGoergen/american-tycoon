@@ -200,6 +200,12 @@ extends Resource
 ## (0.167 ≈ 6 s from cold to the Hot edge — matching the old build feel).
 @export var rush_momentum_heat_build_per_second: float = 0.167  # feel-tune
 
+## How fast heat climbs while rushing ABOVE the Hot edge (heat 1.0), in heat units per second.
+## Slower than the base build so the ride through the danger bands is a real decision window:
+## 0.075 stretches the climb from the Hot edge to the rolled ceiling (0.40–0.60 units) to
+## ~5.3–8 s (Tim 2026-07-15: "at least 5 to 8 seconds in the high heat zone").
+@export var rush_momentum_heat_build_hot_per_second: float = 0.075  # feel-tune
+
 ## How fast heat bleeds away when NOT rushing, in heat units per second
 ## (0.333 ≈ 3 s to fully cool from the Hot edge — matching the old bleed feel).
 @export var rush_momentum_heat_bleed_per_second: float = 0.333  # feel-tune

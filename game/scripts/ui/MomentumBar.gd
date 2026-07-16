@@ -16,8 +16,9 @@ extends ProgressBar
 #     of overheating should not be predictable);
 #   • the fill shifts purple → amber → blinking red as heat climbs the bands, the blink growing
 #     faster and harder the deeper into Critical the player pushes;
-#   • crossing into a band pops a large tier chip ("HOT +40%!") quoting that band's MAX bonus —
-#     the prize being approached — so the escalation is legible without reading the number;
+#   • crossing into Critical pops a large tier chip ("CRITICAL +55%!") quoting the peak bonus —
+#     the prize being approached — so the escalation is legible without reading the number
+#     (entering Hot is chipless: the fill shift and streaks carry it; Tim 2026-07-15);
 #   • on overheat the label swaps to "OVERHEATED" while the fill visibly drains (the drain IS
 #     the cooldown display), then "COOLING…" through the re-arm delay, then a bright READY flash.
 
@@ -37,7 +38,7 @@ var _streaks: MomentumStreaks
 ## The custom-drawn band overlay: Hot/Critical track segments, hazard stripes, and the 1.0 tick.
 var _zones: BandZoneOverlay
 
-## The short-lived "HOT +40%!" / "CRITICAL +55%!" chip shown on an upward band crossing.
+## The short-lived "CRITICAL +55%!" chip shown on entering the Critical band.
 var _tier_chip: PanelContainer
 var _tier_chip_label: Label
 var _tier_chip_tween: Tween
@@ -310,21 +311,16 @@ func _apply_label_state(state: int) -> void:
 			_label.add_theme_constant_override("outline_size", 0)
 
 
-## An upward band crossing (BUILDING→HOT or HOT→CRITICAL): pop the tier chip quoting the band's
-## MAX bonus — the prize the player is climbing toward, not the bonus at the edge just crossed
-## (Tim 2026-07-15: the chip sells the next rung of the gamble). Critical also gets a haptic tap.
+## An upward band crossing. Only CRITICAL pops the tier chip (quoting the band's MAX bonus — the
+## prize being approached) plus a haptic tap; entering HOT is deliberately chipless (Tim
+## 2026-07-15: the amber fill shift and salmon streaks already announce it, and a chip at the
+## old cap read as noise). The chip sells the last rung of the gamble, not every rung.
 func _on_band_entered(band: RushMomentumState.Band) -> void:
-	match band:
-		RushMomentumState.Band.HOT:
-			# Hot's ceiling bonus is the value at the CRITICAL edge.
-			_show_tier_chip(
-				"HOT +%d%%!" % int(round(_tuning.rush_momentum_bonus_at_critical * 100.0)),
-				UiPalette.MUSTARD_GOLD, UiPalette.NAVY)
-		RushMomentumState.Band.CRITICAL:
-			_show_tier_chip(
-				"CRITICAL +%d%%!" % int(round(_tuning.rush_momentum_bonus_peak * 100.0)),
-				UiPalette.KETCHUP_RED, UiPalette.PALE_GOLD)
-			_vibrate(HAPTIC_CRITICAL_MS)
+	if band == RushMomentumState.Band.CRITICAL:
+		_show_tier_chip(
+			"CRITICAL +%d%%!" % int(round(_tuning.rush_momentum_bonus_peak * 100.0)),
+			UiPalette.KETCHUP_RED, UiPalette.PALE_GOLD)
+		_vibrate(HAPTIC_CRITICAL_MS)
 
 
 ## Heat hit the hidden ceiling: the shutdown moment. The label/fill/bubble changes are all

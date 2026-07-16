@@ -20,13 +20,18 @@ every tier is a **heat range**, not a timed state. All feel questions become ban
 
 | Band | Heat range (first-cut) | Time in band while held | Bonus | Signal |
 |---|---|---|---|---|
-| Building | 0 → 100% | ~6 s (current build rate) | 0% → +30% | normal fill |
-| Hot (warning 1) | 100% → 125% | ~3–5 s | +30% → +40% | amber, gentle pulse |
-| Critical (warning 2) | 125% → ceiling | ~2–4 s (random, see below) | +40% → +55% | red, blink + haptic |
+| Building | 0 → 100% | ~6 s (base build rate) | 0% → +30% | normal fill |
+| Hot (warning 1) | 100% → 125% | ~3.3 s (slower overdrive build rate) | +30% → +40% | amber, gentle pulse |
+| Critical (warning 2) | 125% → ceiling | ~2–4.7 s (random, see below) | +40% → +55% | red, blink + haptic |
 | **Overheat** | heat hits ceiling | — | 0%, rush disabled | grayed button, bar drains |
 
-- Bonus climbs **continuously** within each band (smooth, matches the bar); crossing a band edge
-  shows a tier chip ("HOT +40%") so the escalation is legible without reading a number.
+- Above the Hot edge, heat builds at a separate **slower overdrive rate** (first-cut 0.075/s vs
+  0.167/s base), so the whole ride from the tick to the rolled ceiling lasts ~5.3–8 s — a real
+  decision window, not a flash (Tim 2026-07-15: "at least 5 to 8 seconds in the high heat zone").
+- Bonus climbs **continuously** within each band (smooth, matches the bar); only the crossing
+  into Critical shows a tier chip ("CRITICAL +55%") so the escalation is legible without reading
+  a number. Entering Hot is deliberately chipless — the amber fill shift and streaks carry it
+  (Tim 2026-07-15: no chip at the top of the Building stage).
 - Releasing drains heat at the normal bleed rate, sliding back DOWN through the bands. Hysteresis
   falls out for free: escaping Critical costs real depth; there is no timer to game with a
   micro-flick. Re-engaging resumes from wherever you cooled to.
@@ -39,7 +44,7 @@ every tier is a **heat range**, not a timed state. All feel questions become ban
   band from below, roll a fresh ceiling uniformly within the Critical band (first-cut: 140%–160%).
   Re-rolling per excursion prevents probing-and-memorizing.
 - **Guardrail — randomness lives ONLY in Critical.** The ceiling can never land inside Hot; the
-  Hot band's promised 3–5 s is always honored, so the warning tiers stay trustworthy. Hot means
+  Hot band's promised width is always honored, so the warning tiers stay trustworthy. Hot means
   "safe for its width." Critical means "you are now gambling and this run's fuse length is unknown."
 - The random floor (140%) guarantees a minimum ~2 s in Critical before the earliest possible
   shutdown — anti-frustration, tunable.

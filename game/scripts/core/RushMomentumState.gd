@@ -38,7 +38,8 @@ class_name RushMomentumState
 
 enum Band { BUILDING, HOT, CRITICAL }
 
-## Fired on UPWARD band crossings only (BUILDING→HOT, HOT→CRITICAL) — the UI shows a tier chip.
+## Fired on UPWARD band crossings only (BUILDING→HOT, HOT→CRITICAL) — the UI reacts per band
+## (currently only CRITICAL pops a tier chip; HOT is announced by the fill alone).
 ## Sliding back down through a band edge is silent (de-escalation needs no fanfare).
 signal band_entered(band: Band)
 
@@ -98,7 +99,12 @@ func tick(delta: float, rushing: bool, frenzy_burning: bool) -> void:
 
 	var band_before := current_band()
 	if rushing:
-		heat += tuning.rush_momentum_heat_build_per_second * delta
+		# Past the Hot edge the climb slows to the overdrive build rate, stretching the ride
+		# through the danger bands into a real decision window (~5–8 s, Tim 2026-07-15)
+		# without widening the bar's band geometry.
+		var build_rate := tuning.rush_momentum_heat_build_per_second if heat < 1.0 \
+			else tuning.rush_momentum_heat_build_hot_per_second
+		heat += build_rate * delta
 	else:
 		heat = maxf(heat - tuning.rush_momentum_heat_bleed_per_second * delta, 0.0)
 

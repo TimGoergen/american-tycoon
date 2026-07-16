@@ -4,12 +4,12 @@
 
 [resource]
 script = ExtResource("1")
-property_id = 37
-display_name = "Causality Capital"
+property_id = 51
+display_name = "Millennium Mortgage"
 unlock_tier = 6
-base_cost = 5251000000000000000000000000000000.0
+base_cost = 750100000000000000000000000000000.0
 r0 = 1.09
-base_income_per_unit = 95790000000000000000000000000000.0
+base_income_per_unit = 13680000000000000000000000000000.0
 base_cycle_length = 60.0
-staffer_name = "Sovereign of Cause & Effect"
+staffer_name = "Thousand-Year Lienholder"
 accent_color = Color(0.4, 0.6, 0.85, 1)

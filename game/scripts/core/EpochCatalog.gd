@@ -24,9 +24,11 @@ class_name EpochCatalog
 # Chronophage were added in Phase 4).
 #
 # EPOCH PACING (Continuous-ladder rework, 2026-07-12 — Tim's "each new property is a ~7×
-# jump from the last, like a new property on Earth" model). The 37 properties climb at ~7×/rung:
-# Earth's 12 are unchanged (already ~7×/rung, ATM $50 → Executive Assets $100B); the 25 alien rungs
-# continue that ×7 progression, 5 rungs per epoch, but ANCHORED to the player's epoch-entry WEALTH
+# jump from the last, like a new property on Earth" model). The 52 properties climb at ~7×/rung:
+# Earth's 12 are unchanged (already ~7×/rung, ATM $50 → Executive Assets $100B); the 40 alien rungs
+# continue that ×7 progression in an ESCALATING cohort per epoch — 6, 7, 8, 9, 10 properties for
+# epochs 2–6 (Tim's escalating-ladder decision 2026-07-15, the unlock-cadence fix; the 15 new
+# properties are appended at indices 37–51) — ANCHORED to the player's epoch-entry WEALTH
 # (not to the last Earth property) so each flagship is a real SAVE-UP: flagship(T) ≈ 10% of the
 # previous threshold (≈ cash on hand), income anchored separately for a ~3× step-up. So it is ×7
 # within and across alien epochs, with one "catch up to your wealth" jump at the Earth→alien
@@ -78,7 +80,7 @@ const EPOCHS := [
 			"Exchange Floor Boss",
 			"Data Foundry Manager", "Spore Bank Manager", "Vault Keeper", "Time Bank Manager",
 			# Cohort siblings (Phase 2, property indices 17–31). Earth never staffs them
-			# (each is locked until its epoch), but every roster spans all 32 properties.
+			# (each is locked until its epoch), but every roster spans the full 52-property ladder.
 			"Beam Utilities Foreman", "Futures Desk Chief", "Dyson Site Manager",
 			"Server City Superintendent", "Mine Boss", "Labor Agency Director",
 			"Network Line Manager", "Refinery Foreman", "Co-op Chairman",
@@ -88,6 +90,17 @@ const EPOCHS := [
 			# Geode, Causality. Earth never staffs them; the roster stays ladder-length.
 			"Starcore Site Manager", "Singularity Project Director", "Biosphere Estate Director",
 			"Geode Holdings Director", "Causality Fund Director",
+			# Escalating-ladder additions (2026-07-15, indices 37–51): epochs 2–6 now hold
+			# 6/7/8/9/10 properties — 1 new for epoch 2, then 2, 3, 4, 5, cheapest first.
+			# Earth never staffs these either; the entries are plain professional titles.
+			"Stellar Insurance Adjuster",
+			"Sentience Leasing Agent", "Mainframe Operations Director",
+			"Orchard Operations Manager", "Interstellar Logistics Coordinator",
+			"Colony Operations Director",
+			"Annuity Portfolio Manager", "Arbitrage Desk Chief", "Extraction Site Director",
+			"Chief Assay Officer",
+			"Hedge Fund Analyst", "Refinery Operations Manager", "Repossession Agent",
+			"Mortgage Underwriter", "Chief Acquisitions Officer",
 		],
 	},
 	{
@@ -124,6 +137,17 @@ const EPOCHS := [
 			# own grandest home-epoch venture, mirroring its .tres staffer_name.
 			"Stellar Core Magnate", "Event-Horizon Financier", "Living-World Radiance Steward",
 			"Prismatic Dominion Curator", "Lightcone Causality Broker",
+			# Escalating-ladder additions (2026-07-15, indices 37–51); index 37 (Supernova
+			# Underwriters) is the Luminari's own home-epoch venture, mirroring its .tres
+			# staffer_name.
+			"Supernova Underwriter",
+			"Radiant Mind Lessor", "Photonic Mainframe Warden",
+			"Sunripe Orchard Steward", "Lightsail Spore Courier",
+			"Moonglow Colony Warden",
+			"Everlight Annuity Broker", "Solar-Tide Arbitrageur", "Molten Radiance Tapper",
+			"Core-Light Appraiser",
+			"Afterglow Fund Manager", "Golden-Age Glow Refiner", "Lightpath Repossessor",
+			"Thousand-Sunrise Lender", "First-Light Reclaimer",
 		],
 	},
 	{
@@ -158,6 +182,17 @@ const EPOCHS := [
 			# own grandest home-epoch venture, mirroring its .tres staffer_name.
 			"Stellar Core Overseer", "Singularity Overmind", "Biosphere Management Engine",
 			"Geode Dominion Core", "Causality Compiler",
+			# Escalating-ladder additions (2026-07-15, indices 37–51); indices 38–39
+			# (Sentience Leasing Corp, Planetary Mainframe) are the Grid's own home-epoch
+			# ventures, mirroring those .tres staffer_name fields.
+			"Supernova Actuary Engine",
+			"Sentience Lease Daemon", "Planetary Mainframe Core",
+			"Orchard Yield Optimizer", "Panspermia Routing Engine",
+			"Lunar Decomposition Unit",
+			"Annuity Payout Daemon", "Plate Drift Predictor", "Mantle Bore Automaton",
+			"Core Analysis Engine",
+			"Retrospective Trading Engine", "Memory Distillation Unit", "Timeline Reclamation Daemon",
+			"Amortization Horizon Engine", "Genesis Rollback Daemon",
 		],
 	},
 	{
@@ -192,6 +227,17 @@ const EPOCHS := [
 			# grandest home-epoch venture, mirroring its .tres staffer_name.
 			"Starcore Grove-Baron", "Void-Rooted Overgrowth", "All-Biosphere Overlord",
 			"Geode-Vein Colonist", "Root-of-Consequence Tender",
+			# Escalating-ladder additions (2026-07-15, indices 37–51); indices 40–42
+			# (Rotworld Orchards, Panspermia Logistics, Moonrot Colonies) are the Unity's
+			# own home-epoch ventures, mirroring those .tres staffer_name fields.
+			"Nova-Bloom Underwriter",
+			"Borrowed-Mind Cultivator", "World-Root Processor",
+			"Rotworld Orchard-Tender", "Panspermia Drift-Shepherd",
+			"Moonrot Colony-Mother",
+			"Deep-Root Annuitant", "Rift-Root Wedger", "Mantle-Vein Creeper",
+			"Planet-Heart Rooter",
+			"Old-Growth Fund Tender", "Memory-Compost Steeper", "Withered-Branch Pruner",
+			"Heartwood Lienkeeper", "Seed-of-Everything Tender",
 		],
 	},
 	{
@@ -225,6 +271,18 @@ const EPOCHS := [
 			# own grandest home-epoch venture, mirroring its .tres staffer_name.
 			"Starcore Facet-Lord", "Compressed-Core Magnate", "Petrified Biosphere Warden",
 			"Geode Sovereign", "Crystallized Causality Assayer",
+			# Escalating-ladder additions (2026-07-15, indices 37–51); indices 43–46
+			# (Bedrock Annuities, Tectonic Arbitrage, Mantle Extraction Concern, Planetcore
+			# Assay) are the Conglomerate's own home-epoch ventures, mirroring those .tres
+			# staffer_name fields.
+			"Shattered-Star Appraiser",
+			"Crystal-Mind Lessor", "Quartz Mainframe Mason",
+			"Petrified Orchard Keeper", "Seeded-Comet Surveyor",
+			"Hollowed-Moon Mason",
+			"Bedrock Annuity Setter", "Tectonic Plate Broker", "Mantle Vein Magnate",
+			"Planetcore Assay-Lord",
+			"Hindsight Prism Polisher", "Rose-Quartz Memory Cutter", "Cracked-Timeline Lapidary",
+			"Millennial Ledger Mason", "Uncut Universe Appraiser",
 		],
 	},
 	{
@@ -260,6 +318,18 @@ const EPOCHS := [
 			# own grandest home-epoch venture, mirroring its .tres staffer_name.
 			"Stellar Lifespan Broker", "Infinite-Density Usurer", "Evergrowth Time-Baron",
 			"Ageless Geode Warden", "Sovereign of Cause & Effect",
+			# Escalating-ladder additions (2026-07-15, indices 37–51); indices 47–51
+			# (Hindsight Hedge Fund, Nostalgia Refinery, Timeline Repossessions, Millennium
+			# Mortgage, Big Bang Buyback) are the Enclave's own home-epoch ventures,
+			# mirroring those .tres staffer_name fields.
+			"Star-Death Actuary",
+			"Rented-Consciousness Clerk", "World-Clock Overclocker",
+			"Harvest-Season Hoarder", "Million-Year Freight Broker",
+			"Lunar-Month Landlord",
+			"Perpetuity Collections Agent", "Eon-Drift Speculator", "Deep-Time Prospector",
+			"World-Age Auditor",
+			"Hindsight Fund Oracle", "Nostalgia Distiller", "Timeline Repo Agent",
+			"Thousand-Year Lienholder", "Repossessor of the First Second",
 		],
 	},
 ]

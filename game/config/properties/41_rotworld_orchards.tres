@@ -4,12 +4,12 @@
 
 [resource]
 script = ExtResource("1")
-property_id = 28
-display_name = "Laser Lens Works"
-unlock_tier = 5
-base_cost = 427400000000000000000000000.0
+property_id = 41
+display_name = "Rotworld Orchards"
+unlock_tier = 4
+base_cost = 379300000000000000000000.0
 r0 = 1.09
-base_income_per_unit = 7797000000000000000000000.0
+base_income_per_unit = 6922000000000000000000.0
 base_cycle_length = 60.0
-staffer_name = "Lens Grinder Prime"
-accent_color = Color(0.85, 0.45, 0.7, 1)
+staffer_name = "Rotworld Orchard-Tender"
+accent_color = Color(0.55, 0.3, 0.65, 1)

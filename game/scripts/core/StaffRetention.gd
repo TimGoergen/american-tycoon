@@ -27,16 +27,30 @@ var retained_levels: Dictionary = {}
 ## each life's ladder here at succession; during a life the live ladder counts too.
 var ladder_highs: Dictionary = {}
 
-# Cost model: base × property_step^property_index × growth^(level-1). Repriced
+# Cost model: base × property_step^STAFF_PRICE_RANK × growth^(level-1). Repriced
 # 2026-07-07 (Tim's playtest): the old flat model (1 × 1.12^level, no property term)
 # priced the ATM's staff like Executive Assets' and made deep retention near-free at a
 # 350-gem prestige. Now protecting a top earner costs like a top earner, and each
-# further level is a visible commitment. The three knobs live in TuningConfig
+# further level is a visible commitment. Re-anchored 2026-07-15 (escalating ladder
+# rework, Tim): the property term's exponent is the property's STAFF PRICE RANK, not
+# its global array index — see price_ranks below. The three knobs live in TuningConfig
 # (retention_*) so they are editable from the Balance Tuning screen; DynastyState
 # copies them in via configure() — this class stays scene-free and tuning-free.
 var base_cost := 1.0        # Legacy for the FIRST property's FIRST level
 var cost_growth := 1.25     # each additional level costs the previous × this
-var property_step := 1.5    # each higher property multiplies cost by this
+var property_step := 1.5    # each higher price rank multiplies cost by this
+
+## Each property's STAFF PRICE RANK, indexed by property index — the exponent the
+## property term grows by. Pushed in by DynastyState (which computes it with
+## EconomyState.compute_staff_price_ranks, the same rule the dollar staff anchors
+## use). The global array index stopped working as a price exponent when alien
+## cohort siblings were APPENDED to the property array for save compatibility
+## instead of slotted by cost: retaining an epoch-2 mid-rung's staff cost more
+## Legacy than an epoch-6 flagship's (escalating ladder rework, Tim 2026-07-15).
+## Earth properties rank 0–11 (their old indices — Earth prices are unchanged).
+## When empty (a bare, unconfigured StaffRetention), cost_for_level falls back to
+## the raw index, which is only coherent for Earth.
+var price_ranks: Array[int] = []
 
 
 ## Copy the pricing knobs from tuning (called by DynastyState on construction and load).
@@ -44,6 +58,12 @@ func configure(p_base_cost: float, p_cost_growth: float, p_property_step: float)
 	base_cost = p_base_cost
 	cost_growth = p_cost_growth
 	property_step = p_property_step
+
+
+## Install the property-index → staff-price-rank table (called by DynastyState right
+## after configure(); see price_ranks above for why pricing needs it).
+func set_price_ranks(p_price_ranks: Array[int]) -> void:
+	price_ranks = p_price_ranks
 
 
 ## The retained ladder-level count for a property (0 if nothing is retained yet).
@@ -60,12 +80,19 @@ func next_retention_level(property_index: int) -> int:
 ## above): the property term prices WHICH staff is being protected, the level term
 ## prices HOW DEEP. Rounded up so the price always rises by at least a whole point
 ## eventually. Returns 0 for an invalid level so callers never charge a bogus price.
+## Callers pass the property INDEX (the save key everything here is keyed by); the
+## index → price-rank translation happens HERE, inside the formula, so no caller can
+## accidentally price by the incoherent raw index (see price_ranks above).
 func cost_for_level(property_index: int, level: int) -> int:
 	if level < 1 or property_index < 0:
 		return 0
+	# Fall back to the raw index if the rank table was never installed — coherent
+	# for Earth (ranks equal indices there), and better than crashing in tests.
+	var price_rank := price_ranks[property_index] \
+			if property_index < price_ranks.size() else property_index
 	return int(ceil(
 		base_cost
-		* pow(property_step, float(property_index))
+		* pow(property_step, float(price_rank))
 		* pow(cost_growth, float(level - 1))
 	))
 

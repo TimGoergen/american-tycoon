@@ -117,6 +117,14 @@ func _configure_retention_pricing() -> void:
 		tuning.retention_cost_growth,
 		tuning.retention_property_step
 	)
+	# Also install the staff PRICE RANKS retention's property term exponentiates
+	# (escalating ladder rework, Tim 2026-07-15) — the same rank the dollar staff
+	# anchors use, so protecting a staffer in Legacy scales like hiring one did in
+	# dollars. Computed from the dynasty's own configs via EconomyState's static
+	# helper (the single source of the rank rule) rather than read off
+	# current.economy, because `current` does not exist yet when this runs during
+	# _init and load_save_dict.
+	staff_retention.set_price_ranks(EconomyState.compute_staff_price_ranks(_property_configs))
 	# Push the global Legacy-upgrade cost multiplier into the (stateless) catalog too, so every
 	# upgrade price reflects the tuning knob (Tim 2026-07-14 — the prestige-runaway brake).
 	LegacyUpgradeCatalog.cost_multiplier = tuning.legacy_upgrade_cost_multiplier

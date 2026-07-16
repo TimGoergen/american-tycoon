@@ -221,6 +221,17 @@ func _test_staff_retention(configs: Array, tuning: TuningConfig) -> void:
 	_check("Legacy wallet was charged the three levels' cost",
 		dynasty.upgrades.available == wallet_before - expected_spend)
 
+	# Escalating-ladder re-anchor (Tim 2026-07-15): retention prices by STAFF PRICE
+	# RANK, not global array index, so every epoch's flagship prices identically
+	# (rank 12) and an appended cohort sibling can never out-price a later epoch's
+	# flagship the way raw indices did.
+	var flagship_2 := game.economy.get_property_index_for_unlock_tier(2)
+	var flagship_last := game.economy.get_property_index_for_unlock_tier(EpochCatalog.tier_count())
+	_check("every epoch's flagship retention prices identically (rank 12)",
+		flagship_2 >= 0 and flagship_last >= 0
+			and dynasty.staff_retention.cost_for_level(flagship_2, 1)
+				== dynasty.staff_retention.cost_for_level(flagship_last, 1))
+
 	# Pass on with only 3 of the 5 levels retained. The heir is born at the 3 retained
 	# levels — no units — and the bloodline records the ancestor's best (5) forever.
 	dynasty.perform_succession()
@@ -387,38 +398,85 @@ func _test_epoch_locked_properties(configs: Array, tuning: TuningConfig) -> void
 ## gated to epoch 2, the tier→property lookup finds it, and grant_starting_units hands over free
 ## units (the negotiation head start) without counting them as spend on the estate's book value.
 func _test_first_contact_grant(configs: Array, tuning: TuningConfig) -> void:
-	print("\n10. First Contact opens a five-property cohort per epoch (tier→cohort lookup)")
+	print("\n10. First Contact opens an escalating cohort per epoch (tier→cohort lookup)")
 
-	# Every alien epoch (2..last) ships a FIVE-property cohort gated to it (Epoch Depth
-	# Phase 3 raised cohorts 4→5, Tim 2026-07-11), the cohort lookup returns all five with
-	# the FLAGSHIP (cheapest member) first — the order the trade-deal minigame and the bonus
-	# loop rely on — and the singular lookup still resolves that flagship.
+	# Every alien epoch T (2..last) ships an ESCALATING cohort of T + 4 properties gated
+	# to it (escalating ladder rework, Tim 2026-07-15: 6 at epoch 2 up to 10 at epoch 6),
+	# with the total ladder being Earth's 12 plus those cohorts. The cohort lookup returns
+	# every member with the FLAGSHIP (cheapest member) first — the order the trade-deal
+	# minigame and the bonus loop rely on — and the singular lookup resolves that flagship.
 	var game_for_lookup := GameState.new(configs, tuning)
+
+	# Earth's staff price ranks are its indices — the re-anchor changes nothing for Earth.
+	_check("Earth staff price ranks equal their indices (0 and 11 spot-checked)",
+		game_for_lookup.economy.get_staff_price_rank(0) == 0
+			and game_for_lookup.economy.get_staff_price_rank(11) == 11)
+
+	var expected_total := 12
 	for tier in range(2, EpochCatalog.tier_count() + 1):
+		var expected_size := tier + 4  # escalating cohorts: epoch 2 → 6 rungs … epoch 6 → 10
+		expected_total += expected_size
 		var gated := 0
 		for cfg in configs:
 			if (cfg as PropertyConfig).unlock_tier == tier:
 				gated += 1
-		_check("epoch %d ships a five-property cohort" % tier, gated == 5)
+		_check("epoch %d ships a %d-property cohort" % [tier, expected_size],
+			gated == expected_size)
 		var cohort := game_for_lookup.economy.get_property_indices_for_unlock_tier(tier)
-		_check("epoch %d's cohort lookup returns all five members" % tier, cohort.size() == 5)
+		_check("epoch %d's cohort lookup returns all %d members" % [tier, expected_size],
+			cohort.size() == expected_size)
 		if cohort.is_empty():
 			continue
 		_check("epoch %d's flagship resolves via the singular tier lookup" % tier,
 			game_for_lookup.economy.get_property_index_for_unlock_tier(tier) == cohort[0])
-		var flagship_cost := ((game_for_lookup.economy.properties[cohort[0]] \
-				as PropertyState).config as PropertyConfig).base_cost
-		var flagship_is_cheapest := true
+
+		# Gather the cohort's costs, sorted ascending — the cohort's true ladder order
+		# (the array order interleaves original members with appended ones).
+		var sorted_costs: Array[float] = []
 		for member in cohort:
-			var member_cost := ((game_for_lookup.economy.properties[member] \
-					as PropertyState).config as PropertyConfig).base_cost
-			if member_cost < flagship_cost:
-				flagship_is_cheapest = false
-		_check("epoch %d's flagship is its cohort's cheapest member" % tier, flagship_is_cheapest)
+			sorted_costs.append(((game_for_lookup.economy.properties[member] \
+					as PropertyState).config as PropertyConfig).base_cost)
+		sorted_costs.sort()
+		_check("epoch %d's flagship is its cohort's cheapest member" % tier,
+			is_equal_approx(((game_for_lookup.economy.properties[cohort[0]] \
+					as PropertyState).config as PropertyConfig).base_cost, sorted_costs[0]))
+
+		# The cohort spans exactly one epoch's worth of cost (×16807 = 7^5, the threshold
+		# growth) split evenly across its rungs: consecutive sorted costs step by
+		# ~16807^(1/N), so the whole cohort spans ~16807^((N-1)/N). Loose tolerances —
+		# authored costs round to clean numbers.
+		var rung_ratio := pow(16807.0, 1.0 / float(expected_size))
+		var spacing_ok := true
+		for k in range(1, sorted_costs.size()):
+			var step := sorted_costs[k] / sorted_costs[k - 1]
+			if absf(step / rung_ratio - 1.0) > 0.05:
+				spacing_ok = false
+		_check("epoch %d's rungs are spaced ~x%.2f apart (16807^(1/%d))" \
+				% [tier, rung_ratio, expected_size], spacing_ok)
+		var span := sorted_costs[sorted_costs.size() - 1] / sorted_costs[0]
+		var expected_span := pow(rung_ratio, float(expected_size - 1))
+		_check("epoch %d's cohort spans ~x%.0f flagship-to-top" % [tier, expected_span],
+			absf(span / expected_span - 1.0) < 0.10)
+
+		# Staff price ranks (escalating ladder re-anchor): the flagship ranks 12 — its
+		# old global index, so flagship staff prices are unchanged — and the cohort's
+		# ranks are exactly 12..12+N-1 in cost order, regardless of array positions.
+		var cohort_ranks: Array[int] = []
+		for member in cohort:
+			cohort_ranks.append(game_for_lookup.economy.get_staff_price_rank(member))
+		cohort_ranks.sort()
+		var ranks_contiguous := cohort_ranks.size() == expected_size
+		for k in range(cohort_ranks.size()):
+			if cohort_ranks[k] != 12 + k:
+				ranks_contiguous = false
+		_check("epoch %d's staff price ranks run 12..%d (flagship anchored at 12)" \
+				% [tier, 12 + expected_size - 1], ranks_contiguous)
+	_check("the ladder totals 12 Earth + the escalating cohorts (%d)" % expected_total,
+		configs.size() == expected_total)
 
 	# The cohort-wide First Contact bonus: applying a bonus to every member of a tier's
 	# cohort (exactly what Main does when the trade-deal minigame finishes) lands the
-	# same income/cycle multipliers on all four properties.
+	# same income/cycle multipliers on every member.
 	var bonus_game := GameState.new(configs, tuning)
 	for member in bonus_game.economy.get_property_indices_for_unlock_tier(2):
 		(bonus_game.economy.properties[member] as PropertyState).set_first_contact_bonus(1.4, 0.88)
@@ -428,7 +486,7 @@ func _test_first_contact_grant(configs: Array, tuning: TuningConfig) -> void:
 		if not is_equal_approx(prop_state.first_contact_income_multiplier, 1.4) \
 				or not is_equal_approx(prop_state.first_contact_cycle_multiplier, 0.88):
 			all_bonused = false
-	_check("a cohort-wide First Contact bonus reaches all five members", all_bonused)
+	_check("a cohort-wide First Contact bonus reaches every member", all_bonused)
 
 	# The shipped ladder includes at least one alien property gated to a later epoch.
 	var alien_index := -1

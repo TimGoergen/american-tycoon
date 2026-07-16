@@ -29,10 +29,10 @@ extends "res://sim/Sim.gd"
 # the entry drought (contact -> first new unlock), and the median/longest gap
 # between beats. Read the numbers RELATIVELY between candidates.
 #
-# Known softness (fine for a relative read): staff block anchors grow by property
-# INDEX (staff_cost_property_growth^index), so adding rungs nudges deep-ladder
-# staff prices; and the greedy policy buys a new rung the moment it is the best
-# value, which is close to (slightly keener than) a real player.
+# Known softness (fine for a relative read): the greedy policy buys a new rung the
+# moment it is the best value, which is close to (slightly keener than) a real player.
+# (Staff anchors price by cohort rank since the 2026-07-15 re-anchor, so synthesized
+# rungs price coherently.)
 
 ## The standard active-rush playout player: rush the top 2 earners with a
 ## Strong-Arm Tactics investment of ~level 10 (rush_power 6).
@@ -50,7 +50,9 @@ const EPOCH_LADDER_SPAN := 16807.0
 ## (Tim 2026-07-15: "each epoch having 1 more property than the last") — the
 ## flat-cadence shape, since epoch durations creep up ~1.2x each.
 const CANDIDATES: Array = [
-	{"label": "LIVE — 5 rungs/epoch (x7.00/rung)", "rungs": -1},
+	# The shipped .tres ladder — escalating 6,7,8,9,10 rungs since 2026-07-15 (it was the
+	# 5-rungs-at-x7 ladder this study was originally built to diagnose).
+	{"label": "LIVE (shipped ladder)", "rungs": -1},
 	{"label": "flat 8 rungs/epoch (x3.37/rung)", "rungs": 8},
 	{"label": "escalating 6,7,8,9 rungs (epochs 2-5)", "escalate_from": 6},
 ]

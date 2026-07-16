@@ -4,12 +4,12 @@
 
 [resource]
 script = ExtResource("1")
-property_id = 26
-display_name = "Terraforming Co-op"
+property_id = 42
+display_name = "Panspermia Logistics"
 unlock_tier = 4
-base_cost = 112400000000000000000000.0
+base_cost = 1280000000000000000000000.0
 r0 = 1.09
-base_income_per_unit = 2051000000000000000000.0
+base_income_per_unit = 23360000000000000000000.0
 base_cycle_length = 60.0
-staffer_name = "Sporefall Steward"
+staffer_name = "Panspermia Drift-Shepherd"
 accent_color = Color(0.55, 0.3, 0.65, 1)

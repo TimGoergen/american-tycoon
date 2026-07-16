@@ -60,6 +60,27 @@ const PROPERTY_PATHS := [
 	"res://config/properties/35_biosphere_trust.tres",      # epoch 4 — Mycelium
 	"res://config/properties/36_geode_dominion.tres",       # epoch 5 — Quartzite
 	"res://config/properties/37_causality_capital.tres",    # epoch 6 — Chronophage
+	# ESCALATING LADDER additions (Tim 2026-07-15, unlock-cadence fix — see
+	# Plans/Escalating_Ladder.md): each alien epoch now has one more property than the
+	# last (epoch 2 -> 6 ... epoch 6 -> 10), each cohort still spanning ×16807 total so
+	# thresholds and epoch pacing are untouched. The 15 additions sit on the upper-mid
+	# rungs of their epochs (above the original siblings, below the grandest venture),
+	# and are APPENDED here per this array's index-stability rule.
+	"res://config/properties/38_supernova_underwriters.tres",   # epoch 2 — Luminari
+	"res://config/properties/39_sentience_leasing_corp.tres",   # epoch 3 — Geth-Sentinel
+	"res://config/properties/40_planetary_mainframe.tres",      # epoch 3
+	"res://config/properties/41_rotworld_orchards.tres",        # epoch 4 — Mycelium
+	"res://config/properties/42_panspermia_logistics.tres",     # epoch 4
+	"res://config/properties/43_moonrot_colonies.tres",         # epoch 4
+	"res://config/properties/44_bedrock_annuities.tres",        # epoch 5 — Quartzite
+	"res://config/properties/45_tectonic_arbitrage.tres",       # epoch 5
+	"res://config/properties/46_mantle_extraction_concern.tres", # epoch 5
+	"res://config/properties/47_planetcore_assay.tres",         # epoch 5
+	"res://config/properties/48_hindsight_hedge_fund.tres",     # epoch 6 — Chronophage
+	"res://config/properties/49_nostalgia_refinery.tres",       # epoch 6
+	"res://config/properties/50_timeline_repossessions.tres",   # epoch 6
+	"res://config/properties/51_millennium_mortgage.tres",      # epoch 6
+	"res://config/properties/52_big_bang_buyback.tres",         # epoch 6
 ]
 
 ## Returns null (with an error pushed) if the tuning file is missing.

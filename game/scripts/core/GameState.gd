@@ -222,6 +222,16 @@ func release_rush(prop_index: int) -> void:
 	_rush_grace_remaining = 0.0
 
 
+## The OVERDRIVE opt-in (Plans/Rush_Cruise_Control.md): release the cruise clamp so heat resumes
+## climbing into the danger bands — the push-your-luck ride, exactly as it shipped. Gated on
+## can_rush() like every rush verb, so the button is fully dead during an overheat lockout (the
+## state's own locked-out no-op is the belt to this brace, same as the rush verbs above).
+func engage_rush_overdrive() -> void:
+	if not rush_momentum.can_rush():
+		return
+	rush_momentum.engage_overdrive()
+
+
 ## Pop the frenzy meter if allowed. Returns true if a burn started.
 func pop_frenzy() -> bool:
 	if not frenzy.can_pop():

@@ -184,6 +184,25 @@ func frenzy_duration_multiplier() -> float:
 	return pow(1.0 + per_level, float(level))
 
 
+## Extra cruise-bonus POINTS for the rush heat meter (Cooling Systems), as an additive fraction
+## (0.01/level, so level 5 = +0.05 — lifting the +25% cruise back to the old +30% cap). Additive
+## with a hard cap on purpose: a limitation-remover must never compound (see the catalog note).
+## RushMomentumState hard-caps the total at bonus_at_hot regardless, so this getter can stay simple.
+func cruise_bonus_points() -> float:
+	return _per_level(LegacyUpgradeCatalog.COOLING_SYSTEMS) \
+			* float(get_level(LegacyUpgradeCatalog.COOLING_SYSTEMS))
+
+
+## Scale on the TOTAL overheat lockout time (Rapid Restart): 1.0 with nothing bought, 0.5 at the
+## level-5 cap — half the punishment, never zero. RushMomentumState divides the locked drain rate
+## by this and multiplies the re-arm delay by it, so both halves of the lockout shrink together.
+func overheat_lockout_scale() -> float:
+	var reduction := _per_level(LegacyUpgradeCatalog.RAPID_RESTART) \
+			* float(get_level(LegacyUpgradeCatalog.RAPID_RESTART))
+	# Floored well above zero as a guard; the catalog cap (5 × 0.10) already stops at 0.5.
+	return maxf(1.0 - reduction, 0.1)
+
+
 ## The maximum EXTRA-HIGH bonus the prestige minigame can pay, as a fraction above full
 ## (GDD §5.5). 0.25 base (a perfect round keeps +25%), raised +5%/level by Family
 ## Reputation. Additive — a steady, ownable climb. MinigameScreen reads this to size its

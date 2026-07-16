@@ -40,6 +40,8 @@ const RUSH_POWER       := "rush_power"
 const MINIGAME_BONUS   := "minigame_bonus"
 const FRENZY_INTENSITY := "frenzy_intensity"
 const FRENZY_DURATION  := "frenzy_duration"
+const COOLING_SYSTEMS  := "cooling_systems"
+const RAPID_RESTART    := "rapid_restart"
 
 
 # ── The catalog ───────────────────────────────────────────────────────────────
@@ -183,6 +185,33 @@ const UPGRADES := [
 		"cost_growth": 2.0,
 		"effect_per_level": 0.15,     # COMPOUNDING: ×1.15 burn duration per level
 	},
+	{
+		"id": COOLING_SYSTEMS,
+		"name": "Cooling Systems",
+		"category": "Rush",
+		"description": "Better heat sinks. The safe cruise rush bonus climbs a point per level.",
+		# ADDITIVE with a hard cap, NOT compounding: this is a limitation-remover, and a
+		# compounding limitation-remover runs away (see the effect-model note above). Level 5
+		# lifts cruise from +25% to +30% — the old always-on cap, re-earned, NEVER exceeded
+		# (Tim 2026-07-16: Hot/Critical bonuses stay exclusive to riding overdrive).
+		"max_level": 5,
+		"base_cost": 6,
+		"cost_growth": 2.0,
+		"effect_per_level": 0.01,     # +0.01 cruise bonus per level (see LegacyUpgrades getter)
+	},
+	{
+		"id": RAPID_RESTART,
+		"name": "Rapid Restart",
+		"category": "Rush",
+		"description": "Seasoned cool-down crews. Overheat lockouts pass faster.",
+		# ADDITIVE with a hard cap, same rationale as Cooling Systems: level 5 halves the
+		# lockout (drain AND re-arm shrink together) — overheating always stings, but a
+		# storied dynasty recovers faster. Never reaches zero by design.
+		"max_level": 5,
+		"base_cost": 6,
+		"cost_growth": 2.0,
+		"effect_per_level": 0.10,     # −10% total lockout time per level (see LegacyUpgrades getter)
+	},
 ]
 
 
@@ -267,4 +296,10 @@ static func describe_effect(id: String, level: int) -> String:
 			return "×%s TURBO power" % Money.trim(pow(1.0 + per_level, float(shown_level)), 2)
 		FRENZY_DURATION:
 			return "×%s TURBO duration" % Money.trim(pow(1.0 + per_level, float(shown_level)), 2)
+		COOLING_SYSTEMS:
+			# Shown as the POINTS added on top of the tuned cruise base (the base itself is a
+			# live Balance Tuning knob, so the card can't quote a fixed total honestly).
+			return "+%d%% safe cruise rush bonus" % int(round(per_level * 100.0 * float(shown_level)))
+		RAPID_RESTART:
+			return "−%d%% overheat lockout time" % int(round(per_level * 100.0 * float(shown_level)))
 	return ""

@@ -289,6 +289,11 @@ func _apply_upgrade_effects(game: GameState) -> void:
 	# (Second Wind). Read live by FrenzyState.pop()/tick().
 	game.frenzy.intensity_multiplier = upgrades.frenzy_intensity_multiplier()
 	game.frenzy.duration_multiplier = upgrades.frenzy_duration_multiplier()
+	# Rush cruise upgrades: a hotter safe cruise point (Cooling Systems) and a shorter overheat
+	# lockout (Rapid Restart). Read live by RushMomentumState's tick — and because this also runs
+	# via refresh_current_generation_effects, a purchase takes hold mid-life, like every upgrade.
+	game.rush_momentum.legacy_cruise_bonus = upgrades.cruise_bonus_points()
+	game.rush_momentum.lockout_time_scale = upgrades.overheat_lockout_scale()
 
 
 ## Re-apply upgrade effects to the LIVING generation. Called after a purchase so a

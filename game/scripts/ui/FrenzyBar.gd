@@ -191,10 +191,14 @@ func _set_burn_style(burning: bool) -> void:
 ## charge past this line and TURBO can be triggered early. Navy, like the meter's frame, so
 ## it reads on both the dark-gold fill behind it and the pale empty track ahead of it.
 func _draw_floor_marker() -> void:
-	var track := _floor_marker.size.x - METER_FRAME_INSET * 2.0
-	if track <= 0.0:
+	if _floor_marker.size.x <= METER_FRAME_INSET * 2.0:
 		return
-	var x := METER_FRAME_INSET + clampf(_tuning.frenzy_pop_floor, 0.0, 1.0) * track
+	# Match the FILL's coordinate system, not the visual track's: ProgressBar computes its fill
+	# rect across the bar's FULL width (leading edge = fraction × width) and the fill stylebox's
+	# −3px expand margin then pulls the drawn edge back by the inset. Mapping the fraction onto
+	# the inset track instead left the marker ~1px right of the fill edge at the floor
+	# (Tim 2026-07-15).
+	var x := clampf(_tuning.frenzy_pop_floor, 0.0, 1.0) * _floor_marker.size.x - METER_FRAME_INSET
 	_floor_marker.draw_rect(
 		Rect2(x - FLOOR_MARKER_WIDTH / 2.0, METER_FRAME_INSET,
 			FLOOR_MARKER_WIDTH, _floor_marker.size.y - METER_FRAME_INSET * 2.0),

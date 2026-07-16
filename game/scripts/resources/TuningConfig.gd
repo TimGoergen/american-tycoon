@@ -188,23 +188,51 @@ extends Resource
 ## Minimum meter charge at which the player can trigger a frenzy pop.
 @export var frenzy_pop_floor: float = 0.15  # feel-tune M1
 
-# --- Rush Momentum (Tim 2026-07-12: the "pinch of active progression") ---
-# Sustained rushing builds a climbing PROPERTY-income bonus that lifts your late-epoch income
-# (when it matters most for crossing the threshold), so an active rusher reaches the next epoch
-# meaningfully faster than an idler. It bleeds when you stop and resets at each First Contact, so
-# it stays a pinch that can't snowball into an epoch-skip. Tuned via the Sim active-rush playout.
+# --- Rush Momentum / Overheat (Tim 2026-07-15; design: Plans/Rush_Overheat.md) ---
+# Rushing heats the property up — heat IS the momentum meter, in HEAT UNITS where 1.0 = the old
+# momentum cap = the Hot band's lower edge. Deeper heat pays a bigger property-income bonus but
+# risks an overheat shutdown at a secretly rolled ceiling. See RushMomentumState for the model.
+# NOTE: the old bonus-fraction knobs (rush_momentum_max_bonus / _build_per_second /
+# _bleed_per_second) were deliberately RENAMED rather than reused, so a stale user override
+# saved in the old bonus-fraction units can never silently poison the new heat-unit semantics.
 
-## Cap on the momentum bonus, as a fraction of property income (0.3 = up to +30% at full momentum).
-## Was 0.6 — Tim found the rush overpowered on device (2026-07-13); halved as a first cut, live-tunable.
-@export var rush_momentum_max_bonus: float = 0.3  # feel-tune
+## How fast heat climbs while actively rushing, in heat units per second
+## (0.167 ≈ 6 s from cold to the Hot edge — matching the old build feel).
+@export var rush_momentum_heat_build_per_second: float = 0.167  # feel-tune
 
-## How fast momentum climbs while actively rushing, in bonus-fraction per second
-## (0.05 = +5%/s, so it takes ~12 s of sustained rushing to reach a +60% cap).
-@export var rush_momentum_build_per_second: float = 0.05  # TBD-SIM
+## How fast heat bleeds away when NOT rushing, in heat units per second
+## (0.333 ≈ 3 s to fully cool from the Hot edge — matching the old bleed feel).
+@export var rush_momentum_heat_bleed_per_second: float = 0.333  # feel-tune
 
-## How fast momentum bleeds away when NOT rushing, in bonus-fraction per second
-## (0.10 = loses 10%/s, so a full +60% is gone ~6 s after you stop — hold to keep it).
-@export var rush_momentum_bleed_per_second: float = 0.10  # TBD-SIM
+## Heat at which the Critical band (warning 2) begins. The Hot band spans 1.0 to here, and its
+## width is GUARANTEED safe — the random ceiling can never land inside it.
+@export var rush_momentum_critical_start: float = 1.25  # feel-tune
+
+## Lowest possible overheat ceiling (rolled per excursion). Being above critical_start guarantees
+## a minimum stretch of Critical before the earliest possible shutdown — the anti-frustration floor.
+@export var rush_momentum_ceiling_min: float = 1.40  # feel-tune
+
+## Highest possible overheat ceiling, and the heat at which the bonus reaches its peak.
+@export var rush_momentum_ceiling_max: float = 1.60  # feel-tune
+
+## Bonus at the Hot edge (heat 1.0), as a fraction of property income. 0.30 keeps the old cap's
+## value — the Building band is exactly the pre-overheat meter.
+@export var rush_momentum_bonus_at_hot: float = 0.30  # feel-tune
+
+## Bonus at the Critical edge (heat = critical_start).
+@export var rush_momentum_bonus_at_critical: float = 0.40  # feel-tune
+
+## Bonus at the maximum possible heat (ceiling_max). Only ever held for seconds at a time —
+## the realistic average is the ride/vent duty cycle, well below this peak.
+@export var rush_momentum_bonus_peak: float = 0.55  # feel-tune
+
+## Heat drained per second while OVERHEATED (the locked cooldown). 0.16 ≈ a 10 s lockout from a
+## full 1.6 ceiling; the visibly draining bar is the cooldown display.
+@export var rush_momentum_locked_drain_per_second: float = 0.16  # feel-tune
+
+## Extra delay (seconds) after an overheated property fully cools before rushing re-enables —
+## the extra sting Tim asked for beyond the drain itself.
+@export var rush_momentum_rearm_seconds: float = 1.5  # feel-tune
 
 ## Grace window (seconds): you still count as "rushing" for momentum this long after your last
 ## rush. Must exceed the rush pulse interval (1 / hold_rush_per_second = 0.2 s at 5/s) so momentum

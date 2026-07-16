@@ -59,6 +59,12 @@ func tick(delta: float) -> void:
 				_seconds_since_tap = 0.0
 
 
+## True while a popped frenzy is burning down. Rush Overheat reads this each tick: a burn
+## FREEZES the heat model completely (see RushMomentumState — Tim 2026-07-15).
+func is_burning() -> bool:
+	return mode == Mode.BURNING
+
+
 func can_pop() -> bool:
 	return mode == Mode.FILLING and meter >= tuning.frenzy_pop_floor
 

@@ -30,6 +30,11 @@ var prop_index: int = -1
 var _prop: PropertyState
 var _economy: EconomyState
 var _frenzy: FrenzyState
+## The shared Rush Momentum / heat state (Rush Overheat, Tim 2026-07-15). Read-only here: the row
+## checks is_locked_out() so the portrait LOOKS disabled while rushing is shut down — the core
+## already ignores rush requests during lockout, but an unresponsive live-looking button reads as
+## a bug, not a cooldown.
+var _rush_momentum: RushMomentumState
 ## The generation's reached epoch — the highest staffer tier any property may be hired
 ## or upgraded to right now. Read live so the hire button unlocks the moment a new
 ## civilization is contacted (EpochState.current_tier).
@@ -300,12 +305,13 @@ var _ownership_style_applied := -1
 
 ## Call before adding to the tree.
 func setup(p_index: int, prop: PropertyState, economy: EconomyState, frenzy: FrenzyState,
-		epoch: EpochState) -> void:
+		epoch: EpochState, rush_momentum: RushMomentumState) -> void:
 	prop_index = p_index
 	_prop = prop
 	_economy = economy
 	_frenzy = frenzy
 	_epoch = epoch
+	_rush_momentum = rush_momentum
 
 
 func _ready() -> void:
@@ -783,8 +789,17 @@ func _refresh(delta: float) -> void:
 	var portrait_mode := ManagerCircle.PortraitMode.LOCKED
 	if owned:
 		portrait_mode = ManagerCircle.PortraitMode.STAFFED if staffed else ManagerCircle.PortraitMode.UNSTAFFED
-	# The infinity "rushing" icon shows whether the primary Button or a secondary finger holds it.
-	var show_rush_icon := interactive and (_manager_circle.is_held() or _secondary_held("rush"))
+	# Rush Overheat lockout (Tim 2026-07-15): while rushing is shut down the portrait must LOOK
+	# disabled — the core ignores the rush verb during lockout, so a live-looking button that does
+	# nothing would read as a bug. PRESENTATION ONLY: the portrait stays interactive (a tap can
+	# still start an idle cycle, which is not a rush), and buy/hire are untouched. A gray, dimmed
+	# modulate mutes the whole disc; the rush-held look below is suppressed for the duration.
+	var rush_locked := _rush_momentum != null and _rush_momentum.is_locked_out()
+	_manager_circle.modulate = Color(0.55, 0.55, 0.55) if rush_locked else Color.WHITE
+	# The infinity "rushing" icon shows whether the primary Button or a secondary finger holds it
+	# — hidden during lockout, when holding produces no rushes.
+	var show_rush_icon := interactive and not rush_locked \
+			and (_manager_circle.is_held() or _secondary_held("rush"))
 	_manager_circle.set_state(
 		portrait_mode, config.accent_color, config.manager_portrait, show_rush_icon,
 		interactive, _prop.staff_level
@@ -827,8 +842,10 @@ func _refresh(delta: float) -> void:
 	# finger via the raw-touch handler (Tim, 2026-07-07 — rushing two properties at once
 	# left the secondary one with the calm color/rate: it pumped, but this flag only
 	# looked at the Button, so a rushed row didn't always present as rushing).
+	# Also forced OFF while rush is locked out (Rush Overheat): the finger may still be down, but
+	# no rushes are landing, so the boosted readout / vivid green / frenzy fizz would all be lies.
 	var rush_held := (_manager_circle.is_held() or _secondary_held("rush")) \
-			and _prop.units_owned > 0
+			and _prop.units_owned > 0 and not rush_locked
 	# The ENGAGED flag: held long enough to count as a real hold (see RUSH_ENGAGE_SEC).
 	# Every rush-presentation element below keys off THIS, never the raw press, so a
 	# single tap changes nothing on screen (Tim, 2026-07-08).
@@ -992,13 +1009,15 @@ func _refresh(delta: float) -> void:
 		_cycle_bubbles.tier = GoldBubbles.Tier.IDLE
 	_cycle_bubbles.tier_ease_tau = _prop.tuning.carb_tier_ease
 
-	# Fast neon-salmon streaks over the gold ONLY on a property that is ITSELF being rushed at max
-	# momentum. Momentum applies only to the rushed property, so no other row may show any change
+	# Fast neon-salmon streaks over the gold ONLY on a property that is ITSELF being rushed in
+	# OVERDRIVE — its own momentum factor at/past the Hot-band bonus, i.e. heat past the old cap
+	# (Rush Overheat, Tim 2026-07-15; was "at max bonus" when the meter still had a hard cap).
+	# Momentum applies only to the rushed property, so no other row may show any change
 	# (Tim 2026-07-13) — so this keys off THIS property's own momentum factor, not the global meter.
-	# (rush_momentum_factor is 1 + bonus while the property is within its rush grace, so at max
-	# momentum it equals 1 + the cap.)
-	var rushed_at_max_momentum := _prop.rush_momentum_factor >= 1.0 + _prop.tuning.rush_momentum_max_bonus - 0.001
-	_cycle_momentum_streaks.visible = owned and rushed_at_max_momentum
+	# (rush_momentum_factor is 1 + bonus while the property is within its rush grace.)
+	var rushed_in_overdrive := _prop.rush_momentum_factor \
+			>= 1.0 + _prop.tuning.rush_momentum_bonus_at_hot - 0.001
+	_cycle_momentum_streaks.visible = owned and rushed_in_overdrive
 
 	# The diagnosis overlay: live values driving this row's carbonation (reading the
 	# bubbles' internals directly is fine here — this label exists only to expose them).

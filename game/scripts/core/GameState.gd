@@ -28,8 +28,9 @@ var economy: EconomyState
 var wage: WageState
 var frenzy: FrenzyState
 
-## Rush Momentum — the climbing property-income bonus that rewards SUSTAINED rushing with faster
-## progress (Tim 2026-07-12, the "pinch of active progression"). See RushMomentumState.
+## Rush Momentum / Overheat — the climbing heat meter whose property-income bonus rewards
+## ATTENTIVE rushing (ride the danger bands, vent before the shutdown — Tim 2026-07-15,
+## evolving the 07-12 "pinch of active progression"). See RushMomentumState.
 var rush_momentum: RushMomentumState
 
 ## Seconds of "rushing" credit remaining. Each rush verb refills it to tuning.rush_momentum_grace_
@@ -88,11 +89,12 @@ func _init(property_configs: Array, p_tuning: TuningConfig) -> void:
 ## single-generation run is unaffected.
 func tick(delta: float, extra_property_multiplier: float = 1.0) -> void:
 	frenzy.tick(delta)
-	# Rush Momentum climbs while the player is actively rushing (rushed within the grace window)
-	# and bleeds otherwise. The bonus MAGNITUDE is global, but it is applied ONLY to the properties
+	# Rush heat climbs while the player is actively rushing (rushed within the grace window)
+	# and bleeds otherwise; a frenzy BURN freezes the whole heat model (Tim 2026-07-15 — see
+	# RushMomentumState). The bonus MAGNITUDE is global, but it is applied ONLY to the properties
 	# being actively rushed (Tim 2026-07-13) — via each property's own rush_momentum_factor below,
 	# NOT the whole-economy tick multiplier.
-	rush_momentum.tick(delta, _rush_grace_remaining > 0.0)
+	rush_momentum.tick(delta, _rush_grace_remaining > 0.0, frenzy.is_burning())
 	_rush_grace_remaining = maxf(_rush_grace_remaining - delta, 0.0)
 	# Point each property's momentum factor at the current bonus while it is still inside its
 	# actively-rushed grace, else back to 1.0; then decay that grace so the boost fades a beat after
@@ -153,9 +155,14 @@ func hold_tap_wage() -> void:
 
 ## Layer 2: tap a property. Starts the cycle if idle, rushes it if running.
 func tap_property(prop_index: int) -> void:
-	frenzy.on_tap()
 	var prop := economy.properties[prop_index] as PropertyState
 	if prop.is_cycle_running:
+		# During an overheat lockout the rush verb is fully DEAD (Plans/Rush_Overheat.md): no
+		# frenzy fill, no grace, no rush income. Starting an idle cycle (the else branch) still
+		# works while locked out — only rushing is the overheating act.
+		if not rush_momentum.can_rush():
+			return
+		frenzy.on_tap()
 		# Keep the global momentum meter building, and mark THIS property as actively rushed so the
 		# bonus applies to it and only it. Its rush_momentum_factor is refreshed now, so this very
 		# payout already carries the bonus, and the tick keeps it lit while the grace holds.
@@ -167,6 +174,9 @@ func tap_property(prop_index: int) -> void:
 		# above), so the rushed cycle collects exactly the full rate the row shows (Tim 2026-07-12/13).
 		economy.credit_property_income(prop.rush_cycle(frenzy.get_multiplier() * prop.legacy_income_multiplier))
 	else:
+		# Starting an idle cycle is still a real tap (it feeds frenzy) and is allowed even
+		# during an overheat lockout — see the can_rush() gate above.
+		frenzy.on_tap()
 		prop.start_cycle()
 
 
@@ -176,6 +186,10 @@ func tap_property(prop_index: int) -> void:
 func hold_rush_property(prop_index: int) -> void:
 	var prop := economy.properties[prop_index] as PropertyState
 	if not prop.is_cycle_running:
+		return
+	# During an overheat lockout the held rush is fully DEAD too: no frenzy fill, no grace, no
+	# rush income (Plans/Rush_Overheat.md).
+	if not rush_momentum.can_rush():
 		return
 	frenzy.on_tap(tuning.frenzy_fill_hold_factor)
 	# Keep the global momentum meter building, and mark THIS property as actively rushed so the

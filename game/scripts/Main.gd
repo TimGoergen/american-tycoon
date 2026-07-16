@@ -658,7 +658,10 @@ func _build_property_tab() -> Control:
 		return cost_a < cost_b)
 	for i in ladder_order:
 		var row := PropertyRow.new()
-		row.setup(i, game.economy.properties[i] as PropertyState, game.economy, game.frenzy, game.epoch)
+		# game.rush_momentum is passed so the row can present the rush control as disabled while
+		# rushing is locked out after an overheat (Rush Overheat, Tim 2026-07-15) — read-only.
+		row.setup(i, game.economy.properties[i] as PropertyState, game.economy, game.frenzy,
+				game.epoch, game.rush_momentum)
 		row.buy_requested.connect(_on_buy_requested)
 		row.tap_requested.connect(_on_tap_requested)
 		row.hold_rush_requested.connect(_on_hold_rush_requested)

@@ -5,9 +5,10 @@ extends HBoxContainer
 # of the frenzy meter. The button — carrying the growth-arrow art — is now the ONLY thing
 # that pops a frenzy; the meter beside it is a pure display (it used to be one big button
 # with the fill as its background). The meter charges as a dark-gold fill with bright-gold
-# carbonation, and carries the live reward readout ("2.4× for 54s") right-aligned — the
-# reward is always previewed, since every irreversible decision shows its reward first
-# (Spec §7). While burning the fill turns red and the readout counts the burn down.
+# carbonation, and carries the live reward readout ("2.4× for 54s") right-aligned — shown
+# once the charge clears the pop floor, since every irreversible decision shows its reward
+# first (Spec §7); below the floor no pop is possible, so no reward is previewed
+# (Tim, 2026-07-15). While burning the fill turns red and the readout counts the burn down.
 
 signal pop_requested
 
@@ -154,10 +155,15 @@ func _process(delta: float) -> void:
 		_pop_button.disabled = true
 	else:
 		_set_burn_style(false)
-		# Live preview of what a pop right now would lock in.
-		var preview_mult := 1.0 + (_tuning.frenzy_max_multiplier - 1.0) * _frenzy.meter
-		var preview_secs := _frenzy.meter * _tuning.frenzy_burn_duration
-		_label.text = "%s× for %ds" % [Money.trim(preview_mult, 1), int(preview_secs)]
+		if _frenzy.can_pop():
+			# Live preview of what a pop right now would lock in.
+			var preview_mult := 1.0 + (_tuning.frenzy_max_multiplier - 1.0) * _frenzy.meter
+			var preview_secs := _frenzy.meter * _tuning.frenzy_burn_duration
+			_label.text = "%s× for %ds" % [Money.trim(preview_mult, 1), int(preview_secs)]
+		else:
+			# Below the pop floor there is no reward to preview — a pop isn't possible yet,
+			# and a counting-up multiplier read as "already earned" (Tim, 2026-07-15).
+			_label.text = ""
 		_pop_button.disabled = not _frenzy.can_pop()
 
 

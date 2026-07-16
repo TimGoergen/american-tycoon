@@ -17,6 +17,11 @@ class_name WageState
 # GREATER (executive_wage_floor below, fed by GameState each tick). Early on it is an
 # honest hourly wage; once you own the economy, "clocking in" is the tycoon awarding
 # himself executive compensation — the number grows with the empire, and so does the joke.
+#
+# The clock-in LEVEL scales that compensation too (Tim, 2026-07-15): the floor pays
+# (1 + bonus_per_level × level), so a level-up always visibly raises the per-tap payout.
+# Before this, once the floor overtook the ladder, leveling up changed a number that had
+# already lost the max() — the badge blinked and the payout stayed identical.
 
 
 ## Clicks the FIRST level-up costs; each later level costs this much more — 10, 20, 30, …
@@ -64,6 +69,11 @@ var auto_tap_power_multiplier: float = 1.0
 ## here — not looked up — so WageState keeps zero dependencies on the economy.
 var executive_wage_floor: float = 0.0
 
+## Executive-pay bonus per clock-in level, as a fraction of the floor (0.05 = +5% per level).
+## Fed by GameState from tuning.wage_floor_bonus_per_level alongside the floor itself, so
+## WageState keeps zero dependencies and the knob stays live-tunable.
+var executive_floor_bonus_per_level: float = 0.0
+
 
 ## Tap the wage button. Earns the current level's wage (floored at award, Spec §1), banks the
 ## click toward the next level-up, and levels up — carrying any surplus clicks — once the
@@ -83,11 +93,14 @@ func tap_wage(income_multiplier: float = 1.0) -> float:
 
 
 ## The base wage one tap earns right now, before frenzy / Legacy multipliers: the
-## CURRENT level's ladder wage, or the executive-compensation floor once the empire's
-## passive income outgrows the ladder — whichever is greater. Payment (tap_wage) and
+## CURRENT level's ladder wage, or the level-boosted executive-compensation floor once the
+## empire's passive income outgrows the ladder — whichever is greater. Payment (tap_wage) and
 ## the clock-in button's "+$x / tap" display both read this, so they can never disagree.
 func current_wage_per_tap() -> float:
-	return maxf(wage_per_tap_at_level(level), executive_wage_floor)
+	# The level boosts the floor so a level-up always moves the payout, even deep into the
+	# executive-compensation regime where the ladder wage lost the max() long ago.
+	var boosted_floor := executive_wage_floor * (1.0 + executive_floor_bonus_per_level * float(level))
+	return maxf(wage_per_tap_at_level(level), boosted_floor)
 
 
 ## The base wage one tap earns at `at_level`: base × growth^level (the per-level ramp).

@@ -40,6 +40,14 @@ signal defaults_requested
 ## reset). Destructive — the panel two-taps to confirm before emitting this.
 signal reset_dynasty_requested
 
+## Playtest "jump ahead" tools (Tim 2026-07-13) — Main applies each to the live game, saves, and
+## reloads, so the mid/late game and a prestiged heir can be sampled in seconds. jump_epoch teleports
+## to a tier; grant_legacy adds Legacy to spend; grant_cash adds spending money as a multiple of the
+## current epoch's clear target.
+signal jump_epoch_requested(tier: int)
+signal grant_legacy_requested(amount: int)
+signal grant_cash_requested(epoch_target_multiplier: float)
+
 
 # Large, legible type for phone reading (UI notes §1) — sized up 25% from the first
 # pass for on-device readability (Tim). Still denser than the ceremony screens, since
@@ -74,6 +82,7 @@ const DESCRIPTIONS := {
 	"hold_rush_per_second": "Auto-rush pulses per second while holding a property.",
 	"wage_hold_taps_per_second": "Auto wage-taps per second while holding Clock In.",
 	"wage_passive_fraction": "Seconds of passive income one Clock In tap pays (the executive-pay floor).",
+	"wage_floor_bonus_per_level": "Executive-pay bonus per clock-in level (0.15 = +15% of the floor per level).",
 	"frenzy_fill_hold_factor": "Frenzy charge from a held-rush pulse vs a real tap.",
 	"buy_hold_initial_delay": "Pause before a held Buy button starts repeating (seconds).",
 	"buy_hold_repeat_interval": "Gap between Buy auto-repeats while held (seconds).",
@@ -104,6 +113,7 @@ const DESCRIPTIONS := {
 	"legacy_bonus_max_gems": "Most legacy moments one round can bank (1 = flat windfall).",
 	"legacy_bonus_great_multiplier": "Bonus to the legacy grant on a great round (1.10 = +10%).",
 	"legacy_bonus_great_threshold": "How far into the bonus band counts as a great round (0-1).",
+	"legacy_bonus_first_contact_multiplier": "Extra multiplier on the epoch-transition (First Contact) legacy gem grant.",
 	"legacy_gem_chance_catch": "Chance a legacy gem-coin appears in Catch Money.",
 	"legacy_gem_chance_timing": "Chance a legacy gem appears in the Timing zone.",
 	"legacy_gem_chance_balance": "Chance a legacy gem appears in the Balance zone.",
@@ -115,6 +125,18 @@ const DESCRIPTIONS := {
 	"basketball_max_throw_speed": "Max basketball throw speed (px/sec) — raw power.",
 	"offline_efficiency": "Offline income rate vs live play (0–1).",
 	"offline_cap_seconds": "Longest offline accrual window (seconds; 14400 = 4h).",
+	"rush_momentum_heat_build_per_second": "How fast heat climbs while rushing (heat/sec; 1.0 heat = the Hot edge).",
+	"rush_momentum_heat_build_hot_per_second": "Slower climb rate above the Hot edge (heat/sec; sets time-in-danger).",
+	"rush_momentum_heat_bleed_per_second": "How fast heat cools when NOT rushing (heat/sec).",
+	"rush_momentum_critical_start": "Heat where the Critical band begins (Hot spans 1.0 to here, always safe).",
+	"rush_momentum_ceiling_min": "Lowest possible overheat point (rolled each climb; min Critical depth).",
+	"rush_momentum_ceiling_max": "Highest possible overheat point, and where the bonus peaks.",
+	"rush_momentum_bonus_at_hot": "Income bonus at the Hot edge, heat 1.0 (0.30 = +30%).",
+	"rush_momentum_bonus_at_critical": "Income bonus at the Critical edge (0.40 = +40%).",
+	"rush_momentum_bonus_peak": "Income bonus at max possible heat (0.55 = +55%).",
+	"rush_momentum_locked_drain_per_second": "Heat drained per second while overheated (sets the lockout length).",
+	"rush_momentum_rearm_seconds": "Extra delay after a full cool-down before rushing re-enables.",
+	"rush_momentum_grace_seconds": "How long you still count as rushing after your last rush (bridges the pulse gaps).",
 	"frenzy_max_multiplier": "Peak income multiplier during a frenzy burn.",
 	"frenzy_burn_duration": "How long a full frenzy burn lasts (seconds).",
 	"frenzy_fill_per_tap": "Meter fill added per tap (fraction of the full bar).",
@@ -125,7 +147,8 @@ const DESCRIPTIONS := {
 	"estate_tax_rate_base": "Estate tax rate before loopholes (0–1).",
 	"loophole_rate_floor": "Lowest the estate tax can fall via loopholes.",
 	"k_legacy": "Legacy payout scale on the power curve (K × (net/floor) ^ alpha).",
-	"alpha_legacy": "Legacy curve exponent; ~0.30 doubles gems per 10x estate.",
+	"alpha_legacy": "Legacy curve exponent; lower = flatter yield, tames the prestige runaway.",
+	"legacy_upgrade_cost_multiplier": "Global x on every Legacy upgrade cost — the prestige-power brake (higher = a prestige buys fewer levels).",
 	"crash_multiplier": "Income multiplier during a Market Crash event.",
 	"crash_duration_minutes": "Market Crash length (active minutes).",
 	"audit_settle_rate": "Audit settlement cost as a fraction of net worth.",
@@ -142,8 +165,21 @@ const DESCRIPTIONS := {
 const DISPLAY_NAMES := {
 	"m1_starting_cash": "Starting Cash",
 	"rush_pct": "Rush Percent",
+	"rush_momentum_heat_build_per_second": "Heat Build /s",
+	"rush_momentum_heat_build_hot_per_second": "Hot Heat Build /s",
+	"rush_momentum_heat_bleed_per_second": "Heat Bleed /s",
+	"rush_momentum_critical_start": "Critical Band Start",
+	"rush_momentum_ceiling_min": "Overheat Ceiling Min",
+	"rush_momentum_ceiling_max": "Overheat Ceiling Max",
+	"rush_momentum_bonus_at_hot": "Bonus At Hot",
+	"rush_momentum_bonus_at_critical": "Bonus At Critical",
+	"rush_momentum_bonus_peak": "Bonus Peak",
+	"rush_momentum_locked_drain_per_second": "Overheat Drain /s",
+	"rush_momentum_rearm_seconds": "Re-arm Seconds",
+	"rush_momentum_grace_seconds": "Momentum Grace Sec",
 	"k_legacy": "Legacy Payout Scale",
 	"alpha_legacy": "Legacy Payout Curve",
+	"legacy_upgrade_cost_multiplier": "Legacy Upgrade Cost x",
 	"minigame_duration_seconds": "Minigame Timer Seconds",
 	"minigame_keep_floor": "Minigame Downside Floor",
 	"minigame_full_performance": "Minigame Neutral Point",
@@ -154,6 +190,7 @@ const DISPLAY_NAMES := {
 	"legacy_bonus_max_gems": "Legacy Bonus Max Gems",
 	"legacy_bonus_great_multiplier": "Legacy Bonus Great Multiplier",
 	"legacy_bonus_great_threshold": "Legacy Bonus Great Threshold",
+	"legacy_bonus_first_contact_multiplier": "Legacy Bonus First Contact Mult",
 	"legacy_gem_chance_catch": "Legacy Gem Chance Catch",
 	"legacy_gem_chance_timing": "Legacy Gem Chance Timing",
 	"legacy_gem_chance_balance": "Legacy Gem Chance Balance",
@@ -181,6 +218,7 @@ const SECTIONS := [
 	]},
 	{"title": "Wage", "prefixes": ["wage_"]},
 	{"title": "Frenzy", "prefixes": ["frenzy_"]},
+	{"title": "Rush Momentum", "prefixes": ["rush_momentum_"]},
 	{"title": "Buy & Hire Holds", "prefixes": ["buy_hold_", "hire_hold_"]},
 	{"title": "Staff", "prefixes": ["staff_"]},
 	{"title": "Retention", "prefixes": ["retention_"]},
@@ -188,7 +226,7 @@ const SECTIONS := [
 	{"title": "Minigames", "prefixes": ["minigame_", "match3_", "basketball_"]},
 	{"title": "Legacy Bonus", "prefixes": ["legacy_bonus_", "legacy_gem_chance_"]},
 	{"title": "Offline", "prefixes": ["offline_"]},
-	{"title": "Estate & Legacy", "prefixes": ["estate_", "loophole_", "k_legacy", "alpha_legacy"]},
+	{"title": "Estate & Legacy", "prefixes": ["estate_", "loophole_", "k_legacy", "alpha_legacy", "legacy_upgrade_cost_multiplier"]},
 	{"title": "Events", "prefixes": ["crash_", "audit_"]},
 ]
 
@@ -367,6 +405,68 @@ func _add_collapsible_section(title: String) -> VBoxContainer:
 	return body
 
 
+## The Playtest "jump ahead" section: teleport to any epoch, grant Legacy, or grant spending cash —
+## so the mid/late game and a prestiged heir can be sampled in seconds instead of the hours a real
+## run takes (Tim 2026-07-13). Each button just emits a signal; Main applies it to the live game,
+## saves, and reloads. Starts EXPANDED, since it is the reason a tester opens this panel.
+func _add_playtest_section() -> void:
+	var title := "Playtest — jump ahead"
+	var body := _add_collapsible_section(title)
+
+	body.add_child(_playtest_label("Jump to epoch (teleport + entry cash):"))
+	var epoch_row := HBoxContainer.new()
+	epoch_row.add_theme_constant_override("separation", 8)
+	for tier in range(1, EpochCatalog.tier_count() + 1):
+		var t := tier
+		var eb := _playtest_button("E%d" % t)
+		eb.pressed.connect(func() -> void: jump_epoch_requested.emit(t))
+		epoch_row.add_child(eb)
+	body.add_child(epoch_row)
+
+	body.add_child(_playtest_label("Grant Legacy (to spend in the Estate Office):"))
+	var legacy_row := HBoxContainer.new()
+	legacy_row.add_theme_constant_override("separation", 8)
+	for pair in [["+1K", 1000], ["+100K", 100_000], ["+10M", 10_000_000]]:
+		var amount := int(pair[1])
+		var lb := _playtest_button(String(pair[0]))
+		lb.pressed.connect(func() -> void: grant_legacy_requested.emit(amount))
+		legacy_row.add_child(lb)
+	body.add_child(legacy_row)
+
+	body.add_child(_playtest_label("Grant spending cash (× this epoch's clear target):"))
+	var cash_row := HBoxContainer.new()
+	cash_row.add_theme_constant_override("separation", 8)
+	for mult in [1.0, 10.0, 100.0]:
+		var m: float = mult
+		var cb := _playtest_button("x%d" % int(m))
+		cb.pressed.connect(func() -> void: grant_cash_requested.emit(m))
+		cash_row.add_child(cb)
+	body.add_child(cash_row)
+
+	_toggle_section(title)  # open it by default
+
+
+## A wide button for the Playtest section, sharing its row evenly with its siblings.
+func _playtest_button(text: String) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.custom_minimum_size = Vector2(0, 84)
+	button.add_theme_font_size_override("font_size", BUTTON_SIZE)
+	UiPalette.style_button(button, false)
+	return button
+
+
+## A caption line above a Playtest button row.
+func _playtest_label(text: String) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
+	label.add_theme_color_override("font_color", UiPalette.INK_NAVY)
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	return label
+
+
 ## A blue plate (dev-tool CYCLE_BLUE fill, navy border) for a section header button — the same
 ## plate shape as the Estate tab's section headers, but one shared color for the whole panel.
 func _make_section_plate(color: Color) -> StyleBoxFlat:
@@ -434,6 +534,9 @@ func open(effective_tuning: TuningConfig, baked_tuning: TuningConfig) -> void:
 	_sections.clear()
 	for child in _list.get_children():
 		child.queue_free()
+
+	# Playtest jump tools first, above the tuning-knob sections (Tim 2026-07-13).
+	_add_playtest_section()
 
 	# Reflection: every exported int/float on TuningConfig, in declaration order (so related
 	# constants stay grouped exactly as they read in the source file). We first sort each knob

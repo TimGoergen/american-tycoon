@@ -167,6 +167,23 @@ func rush_power_multiplier() -> float:
 	return pow(1.0 + per_level, float(level))
 
 
+## Multiplier on the frenzy (TURBO) BONUS — the amount the popped multiplier climbs above 1×
+## (Killer Instinct). Compounding, same rationale as property_income_multiplier. FrenzyState.pop()
+## scales the bonus by this. 1.0 with nothing bought.
+func frenzy_intensity_multiplier() -> float:
+	var per_level := _per_level(LegacyUpgradeCatalog.FRENZY_INTENSITY)
+	var level := get_level(LegacyUpgradeCatalog.FRENZY_INTENSITY)
+	return pow(1.0 + per_level, float(level))
+
+
+## Multiplier on the frenzy (TURBO) burn DURATION (Second Wind). Compounding. FrenzyState.tick()
+## divides the burn-drain rate by this so a pop lasts longer. 1.0 with nothing bought.
+func frenzy_duration_multiplier() -> float:
+	var per_level := _per_level(LegacyUpgradeCatalog.FRENZY_DURATION)
+	var level := get_level(LegacyUpgradeCatalog.FRENZY_DURATION)
+	return pow(1.0 + per_level, float(level))
+
+
 ## The maximum EXTRA-HIGH bonus the prestige minigame can pay, as a fraction above full
 ## (GDD §5.5). 0.25 base (a perfect round keeps +25%), raised +5%/level by Family
 ## Reputation. Additive — a steady, ownable climb. MinigameScreen reads this to size its

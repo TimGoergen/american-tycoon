@@ -34,6 +34,7 @@ var _background: TextureRect
 ## with (the reached epoch). Updates the moment a first contact advances the epoch.
 var _first_contact_overlay: FirstContactOverlay
 var _frenzy_bar: FrenzyBar
+var _momentum_bar: MomentumBar
 var _wage_panel: WagePanel
 var _welcome_overlay: WelcomeBackOverlay
 var _about_screen: AboutScreen
@@ -70,6 +71,11 @@ var _ladder_area: Control           # the property-list region; swipes over eith
 var _swipe_tracking := false        # a touch is down on the ladder, tracking for a horizontal swipe
 var _swipe_start := Vector2.ZERO
 var _swipe_delta := Vector2.ZERO
+var _swipe_hold_seen := false       # a held action (rush/buy/hire) was engaged at some point this
+									# gesture — if so, this gesture can NEVER become a tab swipe
+var _swipe_start_scroll := 0        # the ladder scroll when this gesture began — restored before a
+									# swipe switches tabs, so the swipe's own drag doesn't corrupt
+									# the leaving tab's remembered scroll position
 const EPOCH_SWIPE_THRESHOLD := 60.0  # px of horizontal travel to count as a tab swipe
 
 # "New ventures" nudge: pop a modal the first time a tab the player hasn't opened has a property
@@ -78,6 +84,7 @@ var _venture_overlay: NewVenturesOverlay
 var _tab_unlocked: Array = []         # tabs the player can open yet (persisted once true)
 var _tab_seen: Array = []             # tabs the player has viewed — a seen tab is never nudged
 var _tab_nudged: Array = []           # tabs already nudged — fire at most once each
+var _tab_scroll: Array = []           # each tab's last scroll offset (0 = first visit / top)
 var _pending_venture_tab := -1        # the tab the live nudge points at (for its "SHOW ME")
 var _venture_check_timer := 0.0
 const VENTURE_CHECK_INTERVAL := 0.5   # how often to scan for a newly-affordable unopened tab
@@ -234,11 +241,12 @@ func _process(delta: float) -> void:
 		_update_tab_unlocks()
 		_check_new_ventures()
 
-	# The current epoch name rides on the hero stat (replaced the heir name, Tim 2026-06-27);
-	# the prestige-exit button and the Estate Office button (with its Legacy balance) reflect
-	# the live state.
-	_hero_stat.set_epoch_name(EpochCatalog.civilization(game.epoch.current_tier))
-	_hero_stat.set_planet_tier(game.epoch.current_tier)
+	# The hero stat's planet watermark follows the epoch pager's ACTIVE TAB, not the reached
+	# epoch (Tim 2026-07-15) — page back to Earth and the header shows Earth. Both Earth tabs
+	# (Blue/White Collar, 0 and 1) are tier 1; every alien tab's index IS its tier. (The
+	# civilization NAME moved to the pager itself — it was duplicative here.) The prestige-exit
+	# button and the Estate Office button (with its Legacy balance) reflect the live state.
+	_hero_stat.set_planet_tier(1 if _epoch_tab <= 1 else _epoch_tab)
 	_refresh_contact_progress()
 	_update_plan_button()
 	_update_estate_badge()
@@ -560,6 +568,13 @@ func _build_property_tab() -> Control:
 	# (Tim, 2026-07-01: uniform margin around the button groups, but not between the two buttons).
 	v.add_theme_constant_override("separation", 24)
 
+	# Rush Momentum meter: fills as sustained rushing builds the income bonus, drains when the player
+	# stops. Sits directly above the frenzy/TURBO row so the two reward meters read as a pair. It
+	# updates itself (its own _process reads game.rush_momentum), so nothing drives it from here.
+	_momentum_bar = MomentumBar.new()
+	_momentum_bar.setup(game.rush_momentum, tuning)
+	v.add_child(_momentum_bar)
+
 	# Action row: the TURBO button (its background is the frenzy meter) takes the larger
 	# share; the buy-mode toggle takes the rest.
 	var action_row := HBoxContainer.new()
@@ -643,10 +658,14 @@ func _build_property_tab() -> Control:
 		return cost_a < cost_b)
 	for i in ladder_order:
 		var row := PropertyRow.new()
-		row.setup(i, game.economy.properties[i] as PropertyState, game.economy, game.frenzy, game.epoch)
+		# game.rush_momentum is passed so the row can present the rush control as disabled while
+		# rushing is locked out after an overheat (Rush Overheat, Tim 2026-07-15) — read-only.
+		row.setup(i, game.economy.properties[i] as PropertyState, game.economy, game.frenzy,
+				game.epoch, game.rush_momentum)
 		row.buy_requested.connect(_on_buy_requested)
 		row.tap_requested.connect(_on_tap_requested)
 		row.hold_rush_requested.connect(_on_hold_rush_requested)
+		row.rush_hold_released.connect(_on_rush_hold_released)
 		row.hire_requested.connect(_on_hire_requested)
 		row.set_buy_mode(_buy_mode)
 		ladder.add_child(row)
@@ -661,6 +680,9 @@ func _build_property_tab() -> Control:
 	_tab_seen.fill(false)
 	_tab_nudged.resize(_epoch_tab_count())
 	_tab_nudged.fill(false)
+	# Each tab remembers its own scroll offset; 0 means never-visited (opens at the top).
+	_tab_scroll.resize(_epoch_tab_count())
+	_tab_scroll.fill(0)
 	_update_tab_unlocks()
 	# Open on the deepest UNLOCKED tab (where the player is actively buying) and paint the pager.
 	_set_epoch_tab(_epoch_default_tab())
@@ -787,6 +809,14 @@ func _build_epoch_pager() -> Control:
 	_epoch_pager_label.add_theme_font_override("font", UiPalette.make_bold_font())
 	_epoch_pager_label.add_theme_font_size_override("font_size", UiPalette.FONT_DISPLAY)
 	_epoch_pager_label.add_theme_color_override("font_color", UiPalette.NAVY)
+	# Fill the space between the arrows and WRAP a long civilization name onto a second line rather
+	# than forcing the whole tab column wider than the screen (Tim, 2026-07-13: "QUARTZITE
+	# CONGLOMERATE" pushed everything off the right edge). Autowrap alone does the job — do NOT add
+	# text_overrun_behavior trimming on top of it: trimming tells the layout the text is disposable,
+	# which collapses the label's minimum height to ~0 and it renders as nothing (Tim hit this on
+	# device 2026-07-15: the pager showed no names at all).
+	_epoch_pager_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_epoch_pager_label.autowrap_mode = TextServer.AUTOWRAP_WORD
 	center.add_child(_epoch_pager_label)
 
 	_epoch_pager_sub = Label.new()
@@ -794,6 +824,8 @@ func _build_epoch_pager() -> Control:
 	_epoch_pager_sub.add_theme_font_override("font", UiPalette.make_bold_font())
 	_epoch_pager_sub.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
 	_epoch_pager_sub.add_theme_color_override("font_color", UiPalette.DARK_GOLD)
+	_epoch_pager_sub.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_epoch_pager_sub.autowrap_mode = TextServer.AUTOWRAP_WORD
 	center.add_child(_epoch_pager_sub)
 
 	_epoch_next_button = _make_pager_arrow("›")
@@ -825,6 +857,9 @@ func _step_epoch_tab(delta: int) -> void:
 ## Switch to a tab: gate every row's liveness to it (only this tab refreshes + draws), then
 ## repaint the pager. Safe to call before the rows exist (used from _on_contact_made too).
 func _set_epoch_tab(tab: int) -> void:
+	# Remember where the player left the tab we're leaving, so returning to it restores that spot.
+	if _ladder_scroll != null and _epoch_tab >= 0 and _epoch_tab < _tab_scroll.size():
+		_tab_scroll[_epoch_tab] = _ladder_scroll.scroll_vertical
 	_epoch_tab = clampi(tab, 0, _epoch_tab_max())
 	# Viewing a tab marks it seen, so it never triggers the "new ventures" nudge afterward.
 	if _epoch_tab < _tab_seen.size():
@@ -832,6 +867,13 @@ func _set_epoch_tab(tab: int) -> void:
 	for row_variant in _rows:
 		var row := row_variant as PropertyRow
 		row.set_tab_active(_epoch_tab_of(row.prop_index) == _epoch_tab)
+	# Restore THIS tab's own last scroll offset (0 the first time it is opened, so a never-visited
+	# tab starts at the top — Tim, 2026-07-13). Deferred as well, so it also wins after the row-
+	# visibility change re-lays-out the list (an immediate set can be clamped by the stale height).
+	if _ladder_scroll != null:
+		var target: int = int(_tab_scroll[_epoch_tab]) if _epoch_tab < _tab_scroll.size() else 0
+		_ladder_scroll.scroll_vertical = target
+		_ladder_scroll.set_deferred("scroll_vertical", target)
 	_update_epoch_pager()
 
 
@@ -868,17 +910,30 @@ func _input(event: InputEvent) -> void:
 			_swipe_tracking = region.has_point(event.position)
 			_swipe_start = event.position
 			_swipe_delta = Vector2.ZERO
+			_swipe_hold_seen = false
+			_swipe_start_scroll = _ladder_scroll.scroll_vertical if _ladder_scroll != null else 0
 		elif _swipe_tracking:
 			_swipe_tracking = false
 			# A press held long enough to trigger a hold (auto-rush / hold-to-buy / hold-to-hire)
-			# owns the finger — don't also flip the tab if it drifted sideways (Tim 2026-07-11).
-			if _any_row_holding():
+			# owns the finger — don't also flip the tab if it drifted sideways (Tim 2026-07-11). We
+			# LATCH this across the whole gesture (_swipe_hold_seen), so once a continuous state has
+			# started the swipe is dead until the player lifts and swipes again — even if the hold
+			# lapses before release, e.g. the finger drifts off the portrait (Tim 2026-07-13).
+			if _swipe_hold_seen or _any_row_holding():
 				return
 			# Swipe LEFT (negative x) advances to the next epoch, like turning a page forward.
 			if absf(_swipe_delta.x) >= EPOCH_SWIPE_THRESHOLD and absf(_swipe_delta.x) > absf(_swipe_delta.y):
+				# The swipe's drag nudged this tab's vertical scroll; undo that first, so the tab we
+				# leave saves where the player actually left it — not where the swipe dragged it to
+				# (Tim 2026-07-13: swipes lost the per-tab scroll that the pager buttons preserved).
+				if _ladder_scroll != null:
+					_ladder_scroll.scroll_vertical = _swipe_start_scroll
 				_step_epoch_tab(1 if _swipe_delta.x < 0.0 else -1)
 	elif event is InputEventScreenDrag and _swipe_tracking:
 		_swipe_delta = event.position - _swipe_start
+		# Latch the moment a held action is engaged, so the rest of this gesture can't become a swipe.
+		if _any_row_holding():
+			_swipe_hold_seen = true
 
 
 ## True if any property row currently has a held action engaged (so a sideways drift during a
@@ -1109,6 +1164,9 @@ func _build_settings_tab() -> Control:
 	_dev_panel.apply_requested.connect(_on_dev_apply_requested)
 	_dev_panel.defaults_requested.connect(_on_dev_defaults_requested)
 	_dev_panel.reset_dynasty_requested.connect(_on_dev_reset_dynasty_requested)
+	_dev_panel.jump_epoch_requested.connect(_on_dev_jump_epoch)
+	_dev_panel.grant_legacy_requested.connect(_on_dev_grant_legacy)
+	_dev_panel.grant_cash_requested.connect(_on_dev_grant_cash)
 	_dev_panel.closed.connect(_on_dev_closed)
 	stack.add_child(_dev_panel)
 
@@ -1268,6 +1326,12 @@ func _on_hold_rush_requested(prop_index: int) -> void:
 	game.hold_rush_property(prop_index)
 
 
+## A rush hold ended: stop Rush Momentum building right away rather than letting the
+## pulse-bridging grace ride for another half second after the finger lifts (Tim 2026-07-15).
+func _on_rush_hold_released(prop_index: int) -> void:
+	game.release_rush(prop_index)
+
+
 ## Player pressed a row's staff button: buy the next rung of that property's sequential
 ## staff ladder (hiring IS level 1 of each block — GDD §6.1, epoch-depth redesign). The
 ## row re-reads game state every frame, so a purchase shows on the next _process refresh.
@@ -1330,6 +1394,38 @@ func _on_dev_reset_dynasty_requested() -> void:
 	get_tree().reload_current_scene()
 
 
+## Playtest: teleport this generation to `tier`. Set lifetime-earned to that epoch's ENTRY threshold
+## (so the epoch state is coherent and won't immediately re-advance) and hand over the same amount as
+## spending cash to build the new cohort. restore() sets the tier directly, skipping the First Contact
+## beats — a clean teleport. Save + reload so the pager, unlocked rows, and staff caps rebuild.
+func _on_dev_jump_epoch(tier: int) -> void:
+	var entry_earned := 0.0
+	if tier > 1:
+		entry_earned = EpochCatalog.consume_threshold(tier - 1, tuning.earth_economy_target)
+	game.economy.cash_earned_this_gen = entry_earned
+	game.economy.cash = entry_earned
+	game.epoch.restore(tier)
+	SaveManager.save_dict_to_file(dynasty.to_save_dict())
+	get_tree().reload_current_scene()
+
+
+## Playtest: grant Legacy to spend in the Estate Office (to feel a prestiged heir). Save + reload.
+func _on_dev_grant_legacy(amount: int) -> void:
+	dynasty.upgrades.award(amount)
+	SaveManager.save_dict_to_file(dynasty.to_save_dict())
+	get_tree().reload_current_scene()
+
+
+## Playtest: grant spending cash as a multiple of the current epoch's clear target — always a
+## meaningful amount whatever the scale. award_cash never touches lifetime-earned, so it can't
+## advance the epoch or inflate the estate; it is pure buying power. Save + reload.
+func _on_dev_grant_cash(epoch_target_multiplier: float) -> void:
+	var target := EpochCatalog.consume_threshold(game.epoch.current_tier, tuning.earth_economy_target)
+	game.economy.award_cash(target * epoch_target_multiplier)
+	SaveManager.save_dict_to_file(dynasty.to_save_dict())
+	get_tree().reload_current_scene()
+
+
 ## Balance Tuning closed without applying: restore the Settings tab's normal page.
 ## (Apply/Defaults/Wipe reload the whole scene, which rebuilds everything anyway.)
 func _on_dev_closed() -> void:
@@ -1358,7 +1454,7 @@ func _update_plan_button() -> void:
 	if can_succeed:
 		# Two centered rows (Tim, 2026-07-05): the verb on top, the banked gems beneath —
 		# "(+x [gem])", the legacy-gem image standing in for the word "Legacy".
-		_plan_label.text = "[center]PASS THE TORCH\n+%d [img width=70 height=70]res://art/icons/legacy_gem.svg[/img][/center]" % dynasty.projected_legacy_gain()
+		_plan_label.text = "[center]PASS THE TORCH\n+%s [img width=70 height=70]res://art/icons/legacy_gem.svg[/img][/center]" % Money.abbrev(dynasty.projected_legacy_gain())
 	else:
 		_plan_label.text = "[center]PASS THE TORCH[/center]"
 
@@ -1367,7 +1463,7 @@ func _update_plan_button() -> void:
 	if dynasty.upgrades.earned_lifetime != _shown_lifetime_earned:
 		_shown_lifetime_earned = dynasty.upgrades.earned_lifetime
 		# Gem image scaled with the 66px text so the pair keeps its proportions.
-		_lifetime_earned_label.text = "[center][img width=67 height=67]res://art/icons/legacy_gem.svg[/img] Lifetime Earned: %d[/center]" % _shown_lifetime_earned
+		_lifetime_earned_label.text = "[center][img width=67 height=67]res://art/icons/legacy_gem.svg[/img] Lifetime Earned: %s[/center]" % Money.abbrev(_shown_lifetime_earned)
 
 
 ## First contact: a new epoch was reached this tick. Show the beat (Main's _process
@@ -1408,8 +1504,10 @@ func _on_contact_dismissed() -> void:
 	_minigame_site = MinigameSite.FIRST_CONTACT
 	_first_contact_bonus_tier = tier
 	# Set the dynasty's lifetime Legacy so a Legacy gem collected during this negotiation can be
-	# sized/granted (the Legacy Bonus system now reaches the First Contact site too).
+	# sized/granted (the Legacy Bonus system now reaches the First Contact site too), then boost it:
+	# an epoch transition is a milestone, so its gem pays much more than a routine gem (Tim 2026-07-12).
 	_minigame_screen.set_legacy_lifetime(dynasty.upgrades.earned_lifetime)
+	_minigame_screen.set_legacy_bonus_multiplier(tuning.legacy_bonus_first_contact_multiplier)
 	# Frame the negotiation around the FLAGSHIP's per-unit base income (the concrete
 	# number being talked up), but pitched at the civilization: the terms struck here
 	# apply to the epoch's whole cohort (Phase 2).
@@ -1466,6 +1564,11 @@ func _build_retention_entries() -> Array:
 		if next_level <= best_levels:
 			cost = dynasty.staff_retention.cost_for_level(i, next_level)
 			can_afford = dynasty.upgrades.available >= cost
+		# Gems already spent retaining this staffer — the sum of every retained level's cost.
+		# Lets the Estate Office show the Household Staff category's total invested (Tim 2026-07-13).
+		var gems_spent := 0
+		for level in range(1, retained_levels + 1):
+			gems_spent += dynasty.staff_retention.cost_for_level(i, level)
 		# Show the roster's face: the staffer of the deepest block the bloodline has
 		# reached, named by that block's absolute epoch on this property's ladder.
 		var shown_blocks := prop.staff_block_of_level(maxi(maxi(best_levels, retained_levels), 1))
@@ -1477,6 +1580,7 @@ func _build_retention_entries() -> Array:
 			"retained_levels": retained_levels,
 			"cost": cost,
 			"can_afford": can_afford,
+			"gems_spent": gems_spent,
 		})
 	return entries
 

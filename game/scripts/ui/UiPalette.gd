@@ -51,6 +51,19 @@ const CYCLE_BLUE := Color("#5E86B8")
 ## era palette so the bubbles glow against the CYCLE_BLUE fill (Tim, 2026-07-06).
 const NEON_BLUE := Color("#4DE8FF")
 
+## The Rush Momentum meter's purples: DARK_PURPLE is the fill with BRIGHT_PURPLE carbonation on
+## top (dark-fill / bright-bubble since Tim 2026-07-15; it launched light-fill / dark-bubble).
+## PURPLE is the original lighter fill hue, kept in the palette for future use.
+const PURPLE := Color("#9B5DE5")
+const DARK_PURPLE := Color("#5E3499")
+## Bright purple carbonation added to every property bar while Rush Momentum is MAXED — a vivid
+## glow against the green/blue cycle fills, distinct from the always-present gold (Tim, 2026-07-13).
+const BRIGHT_PURPLE := Color("#C77DFF")
+## Neon salmon for the MAX-Rush-Momentum streaks — tiny dots that fly fast in a straight line
+## (MomentumStreaks), a deliberate contrast to the swaying gold carbonation (Tim, 2026-07-14).
+## Dimmed ~15% from the original #FF7A6B (Tim 2026-07-15: "a little dimmer").
+const NEON_SALMON := Color("#D9685B")
+
 # ---------------------------------------------------------------------------
 # Type scale — the single source of truth for UI font sizes (Tim's "chunkier UI"
 # pass, 2026-06-21). Named semantic tiers replace the ~24 scattered magic numbers.
@@ -162,15 +175,16 @@ static func make_panel_style() -> StyleBoxFlat:
 const TAB_PANEL_EDGE_MARGIN := 40
 
 
-## The standard per-tab content panel: a translucent cream plate with the gray outline the
-## settings tab established (3px border, 8px corners) and an inner content margin so nothing
-## crowds the outline. 65% alpha so the epoch backdrop reads faintly through it (Tim, 2026-06-28).
+## The standard per-tab content panel: a translucent cream plate with the same navy frame as
+## the income header and the tab buttons (12px border, 4px corners — Tim 2026-07-15; was the
+## settings tab's thin gray outline) and an inner content margin so nothing crowds the frame.
+## 65% alpha so the epoch backdrop reads faintly through it (Tim, 2026-06-28).
 static func make_tab_panel_style() -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(CREAM, 0.65)
-	style.border_color = MID_GRAY
-	style.set_border_width_all(3)
-	style.set_corner_radius_all(8)
+	style.border_color = NAVY
+	style.set_border_width_all(12)
+	style.set_corner_radius_all(4)
 	style.set_content_margin_all(24)
 	return style
 

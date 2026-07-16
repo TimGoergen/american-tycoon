@@ -48,6 +48,14 @@ extends Resource
 ## on top of passive income.
 @export var wage_passive_fraction: float = 0.25  # feel-tune
 
+## Executive-pay bonus per clock-in level, as a fraction of the floor (0.15 = +15%/level).
+## Scales the executive floor by (1 + this × level) so a level-up ALWAYS visibly raises the
+## per-tap payout — without it, once the floor overtook the ladder wage, leveling up changed
+## nothing and the ladder felt dead (Tim, 2026-07-15). A steady multiplier of the floor, so
+## it tracks the economy rather than compounding past it. Tripled from the first-cut 0.05
+## (Tim, 2026-07-15: clock-in should be more powerful).
+@export var wage_floor_bonus_per_level: float = 0.15  # feel-tune
+
 ## Frenzy fill per held-rush pulse, as a fraction of a manual tap's fill.
 ## Holding is convenient, so it charges the meter slower than real tapping.
 @export var frenzy_fill_hold_factor: float = 0.6  # feel-tune M1
@@ -188,6 +196,63 @@ extends Resource
 ## Minimum meter charge at which the player can trigger a frenzy pop.
 @export var frenzy_pop_floor: float = 0.15  # feel-tune M1
 
+# --- Rush Momentum / Overheat (Tim 2026-07-15; design: Plans/Rush_Overheat.md) ---
+# Rushing heats the property up — heat IS the momentum meter, in HEAT UNITS where 1.0 = the old
+# momentum cap = the Hot band's lower edge. Deeper heat pays a bigger property-income bonus but
+# risks an overheat shutdown at a secretly rolled ceiling. See RushMomentumState for the model.
+# NOTE: the old bonus-fraction knobs (rush_momentum_max_bonus / _build_per_second /
+# _bleed_per_second) were deliberately RENAMED rather than reused, so a stale user override
+# saved in the old bonus-fraction units can never silently poison the new heat-unit semantics.
+
+## How fast heat climbs while actively rushing, in heat units per second
+## (0.167 ≈ 6 s from cold to the Hot edge — matching the old build feel).
+@export var rush_momentum_heat_build_per_second: float = 0.167  # feel-tune
+
+## How fast heat climbs while rushing ABOVE the Hot edge (heat 1.0), in heat units per second.
+## Slower than the base build so the ride through the danger bands is a real decision window:
+## 0.075 stretches the climb from the Hot edge to the rolled ceiling (0.40–0.60 units) to
+## ~5.3–8 s (Tim 2026-07-15: "at least 5 to 8 seconds in the high heat zone").
+@export var rush_momentum_heat_build_hot_per_second: float = 0.075  # feel-tune
+
+## How fast heat bleeds away when NOT rushing, in heat units per second
+## (0.333 ≈ 3 s to fully cool from the Hot edge — matching the old bleed feel).
+@export var rush_momentum_heat_bleed_per_second: float = 0.333  # feel-tune
+
+## Heat at which the Critical band (warning 2) begins. The Hot band spans 1.0 to here, and its
+## width is GUARANTEED safe — the random ceiling can never land inside it.
+@export var rush_momentum_critical_start: float = 1.25  # feel-tune
+
+## Lowest possible overheat ceiling (rolled per excursion). Being above critical_start guarantees
+## a minimum stretch of Critical before the earliest possible shutdown — the anti-frustration floor.
+@export var rush_momentum_ceiling_min: float = 1.40  # feel-tune
+
+## Highest possible overheat ceiling, and the heat at which the bonus reaches its peak.
+@export var rush_momentum_ceiling_max: float = 1.60  # feel-tune
+
+## Bonus at the Hot edge (heat 1.0), as a fraction of property income. 0.30 keeps the old cap's
+## value — the Building band is exactly the pre-overheat meter.
+@export var rush_momentum_bonus_at_hot: float = 0.30  # feel-tune
+
+## Bonus at the Critical edge (heat = critical_start).
+@export var rush_momentum_bonus_at_critical: float = 0.40  # feel-tune
+
+## Bonus at the maximum possible heat (ceiling_max). Only ever held for seconds at a time —
+## the realistic average is the ride/vent duty cycle, well below this peak.
+@export var rush_momentum_bonus_peak: float = 0.55  # feel-tune
+
+## Heat drained per second while OVERHEATED (the locked cooldown). 0.16 ≈ a 10 s lockout from a
+## full 1.6 ceiling; the visibly draining bar is the cooldown display.
+@export var rush_momentum_locked_drain_per_second: float = 0.16  # feel-tune
+
+## Extra delay (seconds) after an overheated property fully cools before rushing re-enables —
+## the extra sting Tim asked for beyond the drain itself.
+@export var rush_momentum_rearm_seconds: float = 1.5  # feel-tune
+
+## Grace window (seconds): you still count as "rushing" for momentum this long after your last
+## rush. Must exceed the rush pulse interval (1 / hold_rush_per_second = 0.2 s at 5/s) so momentum
+## keeps building smoothly BETWEEN the discrete auto-rush pulses instead of bleeding in the gaps.
+@export var rush_momentum_grace_seconds: float = 0.5  # feel-tune
+
 # --- Estate & tax (Spec §9) ---
 
 ## Base estate-tax exemption in dollars.
@@ -203,14 +268,21 @@ extends Resource
 
 ## Coefficient on the Legacy gain curve (see EstateWaterfall.legacy_gain): legacy =
 ## floor(K_LEGACY × (estate_net / floor) ^ ALPHA), where the floor is EstateWaterfall.LEGACY_BASE.
-## Solved from a $10T → ~45 gems anchor for the gentle power curve (Tim, 2026-07-02).
-@export var k_legacy: float = 0.045  # feel-tune
+## Raised 0.045 → 0.50 (Tim 2026-07-14) to keep the FIRST prestige near its old ~350 gems after
+## alpha_legacy was lowered to 0.22 — the two move together (a lower exponent needs a higher
+## coefficient to hold the same yield at the founder's estate scale).
+@export var k_legacy: float = 0.50  # feel-tune
 
 ## Exponent on the estate-magnitude term of the Legacy curve — how fast gems grow with earnings.
-## ~0.30 means gems roughly DOUBLE per 10× of estate, so a better run is clearly rewarded (the old
-## log² curve was ~flat: doubling a run added only ~3 gems). Higher = punchier AND faster late
-## growth; the Legacy shop's geometric costs are the real brake on any windfall (Tim, 2026-07-02).
-@export var alpha_legacy: float = 0.30  # feel-tune
+## Lowered 0.30 → 0.22 (Tim 2026-07-14) to flatten the prestige runaway (at 0.30 the yield compounded
+## ~18× per epoch, driving income to ×237 over a dynasty); paired with the upgrade-cost nerf below so
+## the correction is split. Still rewards a better run (~+16% gems per 2× estate), just less punchy.
+@export var alpha_legacy: float = 0.22  # feel-tune
+
+## Global multiplier on EVERY Legacy upgrade's cost (LegacyUpgradeCatalog.cost_multiplier). 1.0 = the
+## authored prices; >1 makes a prestige's gems buy fewer upgrade levels, the second brake (with the
+## lower alpha_legacy) on the multiplier runaway that made late epochs trivial (Tim 2026-07-14).
+@export var legacy_upgrade_cost_multiplier: float = 2.0  # feel-tune
 
 # Note: the old k_sprint / beta_sprint / k_residual constants were removed when
 # Legacy became a spendable upgrade currency. Per-level upgrade magnitudes and
@@ -285,6 +357,12 @@ extends Resource
 ## How far into the host's bonus band (0..1) a round must reach to count as GREAT for the legacy
 ## bonus. Below the "full" line = bad (keep nothing); at/above full but under this = normal.
 @export var legacy_bonus_great_threshold: float = 0.75  # feel-tune
+
+## Extra multiplier on the Legacy-gem grant at a FIRST CONTACT (epoch-transition) minigame only —
+## reaching a new civilization is a milestone, so its gem is worth much more than a routine
+## welcome-back / succession gem (Tim 2026-07-12: the epoch-transition gem paid too few gems).
+## 1.0 = same as any other site; higher = a bigger epoch-transition windfall.
+@export var legacy_bonus_first_contact_multiplier: float = 10.0  # feel-tune
 
 ## Per-game chance a Legacy gem becomes available in a round (small), a per-round appearance chance.
 ## (Match-3 has NO random chance — its Legacy gems come only from 5+ matches — so it has no knob.)

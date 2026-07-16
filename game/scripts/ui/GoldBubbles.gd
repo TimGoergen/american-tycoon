@@ -124,6 +124,12 @@ var bubble_color := DEFAULT_GOLD:
 			bubble_color = value
 			queue_redraw()
 
+## Shifts the per-bubble hash so a SECOND bubble layer on the same bar gets its own distinct crowd
+## (different sizes/lanes/phases/positions) instead of overlapping the first identically. Left 0 for
+## the normal single gold layer; the maxed-momentum purple layer sets a non-zero value. Must be set
+## BEFORE add_child() (the trait cache is built in _ready). (Tim, 2026-07-13.)
+var variant_salt := 0.0
+
 ## Explicitly-fed fill fraction for hand-drawn bars; < 0 means "read the parent Range instead".
 var _explicit_fraction := -1.0
 
@@ -195,7 +201,7 @@ func _ready() -> void:
 ## so a bubble's phase/speed/size are independent of its start position (else the crowd rolls as
 ## one coherent wave — Tim, 2026-07-06).
 func _variant(index: int, salt: float) -> float:
-	return fposmod(sin(float(index) * 127.1 + salt * 311.7) * 43758.5453, 1.0)
+	return fposmod(sin((float(index) + variant_salt) * 127.1 + salt * 311.7) * 43758.5453, 1.0)
 
 
 ## Feed the fill fraction (0–1) for a bar this node can't read on its own (a hand-drawn bar).

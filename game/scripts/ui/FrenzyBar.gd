@@ -1,41 +1,51 @@
 class_name FrenzyBar
-extends ProgressBar
+extends HBoxContainer
 
-# The frenzy meter IS the TURBO button (Tim, 2026-06-21): the meter fill doubles as
-# the button background — mustard while charging, red while burning — with a
-# transparent Button overlaid on top that catches the tap (the same "meter as button
-# background" pattern the wage button uses).
-#
-# On top of the button sit two pieces that ignore the mouse so the tap still reaches
-# it (Tim, 2026-06-29): the green growth-arrow icon, left-aligned, standing in for the
-# word "TURBO", and the live reward readout ("2.4× for 54s") right-aligned. The reward
-# is always previewed — every irreversible decision shows its reward first (Spec §7).
+# The TURBO control (reworked Tim, 2026-07-15): a square ICON BUTTON pinned to the left edge
+# of the frenzy meter. The button — carrying the growth-arrow art — is now the ONLY thing
+# that pops a frenzy; the meter beside it is a pure display (it used to be one big button
+# with the fill as its background). The meter charges as a dark-gold fill with bright-gold
+# carbonation, and carries the live reward readout ("2.4× for 54s") right-aligned — shown
+# once the charge clears the pop floor, since every irreversible decision shows its reward
+# first (Spec §7); below the floor no pop is possible, so no reward is previewed
+# (Tim, 2026-07-15). While burning the fill turns red and the readout counts the burn down.
 
 signal pop_requested
 
-## The growth-arrow symbol that replaces the word "TURBO" on the button.
+## The growth-arrow symbol on the pop button.
 const TURBO_TEX := preload("res://art/icons/turbo.svg")
-## Side length of the icon's (square) layout box. The arrow art is taller than it is wide
-## and fits inside this box keeping its aspect, so this is effectively its drawn height —
-## sized to nearly fill the button so the symbol reads large (Tim, 2026-06-29).
+## Cap on the icon's drawn size inside the (square) pop button, so the symbol reads large
+## without touching the button's frame (Tim, 2026-06-29 sizing, kept through the 07-15 rework).
 const TURBO_ICON_SIZE := 90
 
-## Bubble crowd size while CHARGING (the gold fill), as a fraction of the full crowd —
+## Bubble crowd size while CHARGING, as a fraction of the full crowd —
 ## the full crowd read as too busy there (Tim, 2026-07-06). Burning uses the full crowd.
 const CHARGING_BUBBLE_DENSITY := 0.5
 
 var _frenzy: FrenzyState
 var _tuning: TuningConfig
 
-var _button: Button
-## The reward readout drawn on the right of the button (the icon stands in for the
-## word "TURBO" on the left). Set live in _process.
+## The square icon button that pops the frenzy — the control's only tappable piece.
+var _pop_button: Button
+## The display-only charge meter to the button's right.
+var _meter: ProgressBar
+## The reward readout drawn on the right of the meter. Set live in _process.
 var _label: Label
-## The carbonation overlay — kept so _set_burn_style can retint the bubbles with the fill.
+## The carbonation overlay — kept so _set_burn_style can restyle it with the fill.
 var _bubbles: GoldBubbles
+## The pop-floor marker: a vertical line on the meter at the charge needed before TURBO can
+## fire early, so the player can see how far away "poppable" is (Tim 2026-07-15). Hidden
+## while burning — the bar is a countdown timer then, and the floor means nothing.
+var _floor_marker: Control
 var _showing_burn_style := false
 
-## Eased fill shown on the bar. The true meter is driven by the 10 Hz logic tick,
+## Width of the pop-floor marker line, in px.
+const FLOOR_MARKER_WIDTH := 4.0
+## Inset matching the framed meter's border (style_framed_progress), so the marker spans
+## exactly the track the fill moves through.
+const METER_FRAME_INSET := 3.0
+
+## Eased fill shown on the meter. The true meter is driven by the 10 Hz logic tick,
 ## so we glide the displayed fill toward it each frame instead of copying it raw —
 ## otherwise the bar steps visibly ~10 times a second (see BarSmoothing).
 var _displayed_fill := 0.0
@@ -48,101 +58,113 @@ func setup(frenzy: FrenzyState, tuning: TuningConfig) -> void:
 
 
 func _ready() -> void:
-	min_value = 0.0
-	max_value = 1.0
-	show_percentage = false
-	# The shared standard button height, matching the buy-mode button sharing its row.
-	custom_minimum_size = Vector2(0, UiPalette.STANDARD_BUTTON_HEIGHT)
-	size_flags_vertical = Control.SIZE_FILL
-	UiPalette.style_framed_progress(self, UiPalette.MUSTARD_GOLD, UiPalette.PROGRESS_TRACK_GRAY)
+	add_theme_constant_override("separation", 8)
 
-	# Carbonation in the meter (Tim, 2026-07-05 — re-added after a brief removal): the
-	# bubbles tint against the fill so they always read — DARK gold on the charging GOLD
-	# fill, bright gold on the burning RED fill (_set_burn_style swaps them with the fill).
-	# Added BEFORE the button/label overlay so the readout draws over them.
-	_bubbles = GoldBubbles.new()
-	_bubbles.edge_inset = 3.0  # match the framed fill's 3px inset (style_framed_progress)
-	_bubbles.bubble_color = UiPalette.DARK_GOLD
-	_bubbles.density_scale = CHARGING_BUBBLE_DENSITY  # the meter starts in the charging state
-	add_child(_bubbles)
-
-	# Transparent button overlaying the meter: the gold/red fill shows through, and only
-	# the tap belongs to the button. Empty styleboxes in every state keep the meter visible
-	# (a Button's default plate is opaque and would hide the fill).
-	_button = Button.new()
-	_button.set_anchors_preset(Control.PRESET_FULL_RECT)
-	for state in ["normal", "hover", "pressed", "focus", "disabled"]:
-		_button.add_theme_stylebox_override(state, StyleBoxEmpty.new())
-	_button.pressed.connect(func() -> void: pop_requested.emit())
+	# The pop button: a square gold plate with the turbo arrow, matching the standard button
+	# height so it lines up with the buy-mode button sharing this row.
+	_pop_button = Button.new()
+	_pop_button.custom_minimum_size = Vector2(UiPalette.STANDARD_BUTTON_HEIGHT, UiPalette.STANDARD_BUTTON_HEIGHT)
+	_pop_button.icon = TURBO_TEX
+	_pop_button.expand_icon = true
+	_pop_button.add_theme_constant_override("icon_max_width", TURBO_ICON_SIZE)
+	_pop_button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# The project's default 2D filter is plain linear (no mipmaps), which aliases badly when a
+	# large SVG texture is minified to this size. Switch to the mipmapped filter so the icon
+	# actually uses the mipmaps we generate at import — same fix the Legacy gem icons use.
+	_pop_button.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	UiPalette.style_button(_pop_button, false)
+	# When a pop isn't available (mid-burn, or the meter is below the pop floor) the button
+	# grays its OUTLINE too, so "can't trigger" reads at a glance (Tim 2026-07-15). The
+	# standard disabled plate keeps the navy frame; this swaps just this button's for gray.
+	var disabled_plate := StyleBoxFlat.new()
+	disabled_plate.bg_color = UiPalette.CREAM
+	disabled_plate.border_color = UiPalette.MID_GRAY
+	disabled_plate.set_border_width_all(3)
+	disabled_plate.set_corner_radius_all(4)
+	disabled_plate.set_content_margin_all(12)
+	_pop_button.add_theme_stylebox_override("disabled", disabled_plate)
+	_pop_button.pressed.connect(func() -> void: pop_requested.emit())
 	# A second finger can pop TURBO while the first holds a rush (Tim, 2026-07-07); the
 	# disabled state (mid-burn / below the pop floor) blocks it the same as a primary tap.
-	_button.add_child(SecondaryTapButton.new())
-	add_child(_button)
+	_pop_button.add_child(SecondaryTapButton.new())
+	add_child(_pop_button)
 
-	# Overlay sitting on top of the button: the icon on the left, the reward text on the
-	# right. It ignores the mouse so taps pass straight through to the button beneath. The
-	# side margins keep both pieces clear of the navy frame.
+	# The charge meter: display only — dark-gold fill with bright-gold carbonation
+	# (Tim, 2026-07-15; it launched as a gold fill with dark bubbles).
+	_meter = ProgressBar.new()
+	_meter.min_value = 0.0
+	_meter.max_value = 1.0
+	_meter.show_percentage = false
+	_meter.custom_minimum_size = Vector2(0, UiPalette.STANDARD_BUTTON_HEIGHT)
+	_meter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_meter.size_flags_vertical = Control.SIZE_FILL
+	_meter.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UiPalette.style_framed_progress(_meter, UiPalette.DARK_GOLD, UiPalette.PROGRESS_TRACK_GRAY)
+	add_child(_meter)
+
+	# Carbonation in the meter (Tim, 2026-07-05 — re-added after a brief removal): bright gold,
+	# glowing against the dark-gold charging fill and the red burning fill alike. Added BEFORE
+	# the label overlay so the readout draws over the bubbles.
+	_bubbles = GoldBubbles.new()
+	_bubbles.edge_inset = 3.0  # match the framed fill's 3px inset (style_framed_progress)
+	_bubbles.bubble_color = GoldBubbles.DEFAULT_GOLD
+	_bubbles.density_scale = CHARGING_BUBBLE_DENSITY  # the meter starts in the charging state
+	_meter.add_child(_bubbles)
+
+	# The pop-floor marker, over the bubbles but under the readout.
+	_floor_marker = Control.new()
+	_floor_marker.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_floor_marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_floor_marker.draw.connect(_draw_floor_marker)
+	_meter.add_child(_floor_marker)
+
+	# Overlay on the meter carrying the reward readout, right-aligned. Mouse-ignoring — the
+	# meter is not a button, so nothing here should catch a tap. The side margins keep the
+	# text clear of the navy frame.
 	var overlay := MarginContainer.new()
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	overlay.add_theme_constant_override("margin_left", 16)
 	overlay.add_theme_constant_override("margin_right", 16)
 	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_button.add_child(overlay)
+	_meter.add_child(overlay)
 
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
-	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	overlay.add_child(row)
-
-	# Left: the growth-arrow icon standing in for the word "TURBO".
-	var icon := TextureRect.new()
-	icon.texture = TURBO_TEX
-	icon.custom_minimum_size = Vector2(TURBO_ICON_SIZE, TURBO_ICON_SIZE)
-	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	# The project's default 2D filter is plain linear (no mipmaps), which aliases badly when a
-	# large SVG texture is minified to this small size. Switch this icon to the mipmapped filter
-	# so it actually uses the mipmaps we generate at import — same fix the Legacy gem icons use.
-	icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
-	row.add_child(icon)
-
-	# Right: the live reward readout. It takes the remaining width and right-aligns, so the
-	# text hugs the frame's right edge while the icon stays pinned left.
 	_label = Label.new()
 	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	# Larger + bold readout (Tim, 2026-06-25), white in all states so a tap never recolors
-	# it. FONT_SUBHEAD, deliberately matching the buy-mode button sharing its row — the
-	# two were resized together (Tim, 2026-07-07; both had been FONT_BUTTON and read small).
+	# Larger + bold readout (Tim, 2026-06-25), white in all states. FONT_SUBHEAD, deliberately
+	# matching the buy-mode button sharing its row (Tim, 2026-07-07).
 	_label.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
 	_label.add_theme_font_override("font", UiPalette.make_bold_font())
 	_label.add_theme_color_override("font_color", Color.WHITE)
-	row.add_child(_label)
+	overlay.add_child(_label)
 
 
 func _process(delta: float) -> void:
 	_displayed_fill = BarSmoothing.approach(_displayed_fill, _frenzy.meter, delta)
-	value = _displayed_fill
+	_meter.value = _displayed_fill
 
 	if _frenzy.mode == FrenzyState.Mode.BURNING:
 		_set_burn_style(true)
 		var seconds_left := _frenzy.meter * _tuning.frenzy_burn_duration
 		# Multiplier reads "2.4×" (the × trails the number) per Tim's call — via Money.trim
-		# so a whole multiplier reads "2×", never "2.0×" (Tim, 2026-07-03). The icon on the
-		# left already conveys "TURBO", so the readout is just the reward.
+		# so a whole multiplier reads "2×", never "2.0×" (Tim, 2026-07-03). The button's icon
+		# already conveys "TURBO", so the readout is just the reward.
 		_label.text = "%s× — %ds left" % [Money.trim(_frenzy.locked_multiplier, 1), int(seconds_left)]
-		_button.disabled = true
+		_pop_button.disabled = true
 	else:
 		_set_burn_style(false)
-		# Live preview of what a pop right now would lock in.
-		var preview_mult := 1.0 + (_tuning.frenzy_max_multiplier - 1.0) * _frenzy.meter
-		var preview_secs := _frenzy.meter * _tuning.frenzy_burn_duration
-		_label.text = "%s× for %ds" % [Money.trim(preview_mult, 1), int(preview_secs)]
-		_button.disabled = not _frenzy.can_pop()
+		if _frenzy.can_pop():
+			# Live preview of what a pop right now would lock in.
+			var preview_mult := 1.0 + (_tuning.frenzy_max_multiplier - 1.0) * _frenzy.meter
+			var preview_secs := _frenzy.meter * _tuning.frenzy_burn_duration
+			_label.text = "%s× for %ds" % [Money.trim(preview_mult, 1), int(preview_secs)]
+		else:
+			# Below the pop floor there is no reward to preview — a pop isn't possible yet,
+			# and a counting-up multiplier read as "already earned" (Tim, 2026-07-15).
+			_label.text = ""
+		_pop_button.disabled = not _frenzy.can_pop()
 
 
 ## Swap the fill color when entering/leaving a burn. Only on change — the
@@ -151,15 +173,33 @@ func _set_burn_style(burning: bool) -> void:
 	if burning == _showing_burn_style:
 		return
 	_showing_burn_style = burning
-	var fill := UiPalette.KETCHUP_RED if burning else UiPalette.MUSTARD_GOLD
-	UiPalette.style_framed_progress(self, fill, UiPalette.PROGRESS_TRACK_GRAY)
-	# Retint the carbonation with the fill so the bubbles always contrast: bright gold
-	# reads on the burning red, dark gold on the charging gold (Tim, 2026-07-05).
-	_bubbles.bubble_color = GoldBubbles.DEFAULT_GOLD if burning else UiPalette.DARK_GOLD
+	var fill := UiPalette.KETCHUP_RED if burning else UiPalette.DARK_GOLD
+	UiPalette.style_framed_progress(_meter, fill, UiPalette.PROGRESS_TRACK_GRAY)
+	# The pop-floor marker only means something while charging.
+	_floor_marker.visible = not burning
 	# Burning drains the meter right-to-left, so the liquid flows that way too, with the
 	# full crowd; charging fills left-to-right with the reduced crowd (Tim, 2026-07-06).
+	# The bright-gold bubble color reads on both fills, so it no longer swaps here.
 	_bubbles.flow_reversed = burning
 	_bubbles.density_scale = 1.0 if burning else CHARGING_BUBBLE_DENSITY
 	# Carbonation TIER (Tim, 2026-07-10): burning discharges the multiplier — a livelier RUSHED
 	# flow; charging is the steady FLOWING accrual. Speeds are per-tier static values.
 	_bubbles.tier = GoldBubbles.Tier.RUSHED if burning else GoldBubbles.Tier.FLOWING
+
+
+## Draw the vertical pop-floor line at tuning.frenzy_pop_floor across the meter's track:
+## charge past this line and TURBO can be triggered early. Navy, like the meter's frame, so
+## it reads on both the dark-gold fill behind it and the pale empty track ahead of it.
+func _draw_floor_marker() -> void:
+	if _floor_marker.size.x <= METER_FRAME_INSET * 2.0:
+		return
+	# Match the FILL's coordinate system, not the visual track's: ProgressBar computes its fill
+	# rect across the bar's FULL width (leading edge = fraction × width) and the fill stylebox's
+	# −3px expand margin then pulls the drawn edge back by the inset. Mapping the fraction onto
+	# the inset track instead left the marker ~1px right of the fill edge at the floor
+	# (Tim 2026-07-15).
+	var x := clampf(_tuning.frenzy_pop_floor, 0.0, 1.0) * _floor_marker.size.x - METER_FRAME_INSET
+	_floor_marker.draw_rect(
+		Rect2(x - FLOOR_MARKER_WIDTH / 2.0, METER_FRAME_INSET,
+			FLOOR_MARKER_WIDTH, _floor_marker.size.y - METER_FRAME_INSET * 2.0),
+		UiPalette.INK_NAVY)

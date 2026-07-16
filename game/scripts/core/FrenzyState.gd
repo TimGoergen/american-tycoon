@@ -18,6 +18,12 @@ var meter: float = 0.0
 ## Multiplier locked in at pop; 1.0 whenever not burning.
 var locked_multiplier: float = 1.0
 
+## Legacy upgrades scale the burn (set per-generation by DynastyState from the purchased upgrades;
+## 1.0 = nothing bought). intensity_multiplier boosts the popped multiplier's BONUS (Killer Instinct);
+## duration_multiplier lengthens the burn (Second Wind).
+var intensity_multiplier: float = 1.0
+var duration_multiplier: float = 1.0
+
 var _seconds_since_tap: float = 0.0
 
 
@@ -44,12 +50,19 @@ func tick(delta: float) -> void:
 		Mode.BURNING:
 			# A full bar drains in frenzy_burn_duration seconds, so a 60% pop
 			# burns for 60% of that — duration scales with charge by construction.
-			meter -= delta / tuning.frenzy_burn_duration
+			# The Second Wind Legacy upgrade lengthens the burn (duration_multiplier).
+			meter -= delta / (tuning.frenzy_burn_duration * duration_multiplier)
 			if meter <= 0.0:
 				meter = 0.0
 				locked_multiplier = 1.0
 				mode = Mode.FILLING
 				_seconds_since_tap = 0.0
+
+
+## True while a popped frenzy is burning down. Rush Overheat reads this each tick: a burn
+## FREEZES the heat model completely (see RushMomentumState — Tim 2026-07-15).
+func is_burning() -> bool:
+	return mode == Mode.BURNING
 
 
 func can_pop() -> bool:
@@ -61,7 +74,9 @@ func can_pop() -> bool:
 func pop() -> void:
 	if not can_pop():
 		return
-	locked_multiplier = 1.0 + (tuning.frenzy_max_multiplier - 1.0) * meter
+	# The Killer Instinct Legacy upgrade scales the BONUS (the amount above 1×), so a full pop
+	# pays 1 + (max-1)×intensity×charge — a bigger frenzy the more you've invested.
+	locked_multiplier = 1.0 + (tuning.frenzy_max_multiplier - 1.0) * intensity_multiplier * meter
 	mode = Mode.BURNING
 
 

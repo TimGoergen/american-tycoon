@@ -325,8 +325,9 @@ func show_will(will: Dictionary, dying_dynasty_name: String) -> void:
 	_tax_value.text      = "−%s" % Money.of(will.tax).display()
 	_net_value.text      = Money.of(will.estate_net).display()
 
-	# Legacy is a points integer, not a dollar figure — shown plainly with a + sign.
-	_legacy_value.text   = "+%d" % int(will.legacy_gain)
+	# Legacy is a points integer, not a dollar figure — formatted like money (45, 1.5K, 10M) with a
+	# + sign, minus the "$" (Tim, 2026-07-13).
+	_legacy_value.text   = "+" + Money.abbrev(will.legacy_gain)
 
 	_phase0_container.visible = false
 	_phase1_container.visible = true

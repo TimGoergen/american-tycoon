@@ -121,6 +121,13 @@ func display_cash() -> String:
 		return prefix + ("%.2f" % v)
 
 
+## The same magnitude abbreviation as display() but WITHOUT the "$" — for NON-dollar quantities
+## (Legacy gems, etc.) that should still read like money (45, 1.5K, 10M) instead of raw integers
+## like "10000000" (Tim 2026-07-13). Non-negative inputs (these are counts).
+static func abbrev(v: float, max_decimals: int = 1) -> String:
+	return Money.of(v).display(max_decimals).trim_prefix("$")
+
+
 ## Insert comma thousands separators into a non-negative integer dollar amount.
 ## E.g. 1250 → "1,250", 999999 → "999,999". (GDScript has no built-in for this.)
 static func _group_thousands(whole: int) -> String:

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 40
+display_name = "Planetary Mainframe"
+unlock_tier = 3
+base_cost = 181600000000000000000.0
+r0 = 1.09
+base_income_per_unit = 3313000000000000000.0
+base_cycle_length = 60.0
+staffer_name = "Planetary Mainframe Core"
+accent_color = Color(0.2, 0.7, 0.75, 1)

@@ -74,6 +74,16 @@ var _sections: Dictionary = {}
 # set_retention_entries carry the same themed border as the cards built up-front.
 var _staff_accent: Color = UiPalette.MONEY_GREEN
 
+## The category key for the dynamic staff-retention section. It owns no catalog upgrade ids, so its
+## affordable badge and invested total are computed from the retention entry snapshots instead of
+## the catalog (Tim 2026-07-13).
+const HOUSEHOLD_STAFF_CATEGORY := "Household Staff"
+
+## The latest retention entry snapshot Main passed to set_retention_entries — kept so the Household
+## Staff header can report its "+x affordable" count and total gems invested, like every other
+## category. Each entry carries "cost", "can_afford", and "gems_spent".
+var _retention_entries: Array = []
+
 # Hold-to-buy state: which upgrade's buy button is currently held (""=none), and the
 # timer toward the next auto-repeat purchase. See _process and _on_buy_down/up.
 var _held_buy_id := ""
@@ -253,6 +263,8 @@ func _category_color(category: String) -> Color:
 			return UiPalette.BRICK
 		"Household Staff":
 			return UiPalette.MONEY_GREEN
+		"Frenzy":
+			return UiPalette.DARK_GOLD
 	return UiPalette.NAVY
 
 
@@ -378,11 +390,44 @@ func set_all_collapsed(collapsed: bool) -> void:
 
 
 ## Refresh a section header's caret + name to match its expanded state. "+" invites a tap to
-## open a collapsed section; "-" shows it is already open.
+## open a collapsed section; "-" shows it is already open. The name is followed by the total gems
+## the player has invested in this category so far, formatted like money (Tim, 2026-07-13) — shown
+## only for catalog categories (Household Staff's retention isn't a catalog upgrade, so it has no id
+## list and no total).
 func _update_section_header(category: String) -> void:
 	var section: Dictionary = _sections[category]
 	var marker := "-" if bool(section["expanded"]) else "+"
-	(section["button"] as Button).text = "%s  %s" % [marker, category.to_upper()]
+	# The name is followed by the total gems invested in this category, formatted like money (Tim
+	# 2026-07-13) — every category, including Household Staff.
+	(section["button"] as Button).text = "%s  %s  (%s)" % [
+		marker, category.to_upper(), Money.abbrev(_category_gems_invested(category))]
+
+
+## Total Legacy gems the player has spent in this category. Catalog categories sum each upgrade's
+## per-level costs (level 1 up to its current level); Household Staff sums the gems already spent
+## retaining each staffer (carried on the retention entry snapshots).
+func _category_gems_invested(category: String) -> int:
+	if _upgrades == null:
+		return 0  # may run during _build_ui before setup() supplies the live state
+	if category == HOUSEHOLD_STAFF_CATEGORY:
+		var staff_total := 0
+		for entry_variant in _retention_entries:
+			staff_total += int((entry_variant as Dictionary).get("gems_spent", 0))
+		return staff_total
+	var total := 0
+	for id_variant in _sections[category]["upgrade_ids"]:
+		var id := String(id_variant)
+		for level in range(1, _upgrades.get_level(id) + 1):
+			total += LegacyUpgradeCatalog.cost_for_level(id, level)
+	return total
+
+
+## Refresh the Household Staff header's invested total and its affordable badge from the latest
+## retention snapshot. Safe before the section exists (during _build_ui) — it no-ops then.
+func _refresh_staff_section_header() -> void:
+	if _sections.has(HOUSEHOLD_STAFF_CATEGORY):
+		_update_section_header(HOUSEHOLD_STAFF_CATEGORY)
+		_update_section_count(HOUSEHOLD_STAFF_CATEGORY)
 
 
 ## Refresh a collapsed section header's right-aligned "+x affordable" badge (Tim, 2026-06-24).
@@ -403,16 +448,26 @@ func _update_section_count(category: String) -> void:
 		label.text = ""
 		return
 
-	var upgrade_ids: Array = section["upgrade_ids"]
 	var non_maxed_count := 0
 	var affordable_count := 0
-	for id in upgrade_ids:
-		var upgrade_id := String(id)
-		if _upgrades.is_maxed(upgrade_id):
-			continue
-		non_maxed_count += 1
-		if _upgrades.can_buy(upgrade_id):
-			affordable_count += 1
+	if category == HOUSEHOLD_STAFF_CATEGORY:
+		# Household Staff has no catalog upgrades — count the retention entries with a level still
+		# left to buy (cost >= 0) and how many of those the player can afford right now.
+		for entry_variant in _retention_entries:
+			var entry := entry_variant as Dictionary
+			if int(entry["cost"]) < 0:
+				continue  # this staffer is already retained to the bloodline's best level
+			non_maxed_count += 1
+			if bool(entry["can_afford"]):
+				affordable_count += 1
+	else:
+		for id in section["upgrade_ids"]:
+			var upgrade_id := String(id)
+			if _upgrades.is_maxed(upgrade_id):
+				continue
+			non_maxed_count += 1
+			if _upgrades.can_buy(upgrade_id):
+				affordable_count += 1
 
 	if non_maxed_count == 0 or bool(section["expanded"]):
 		label.text = ""
@@ -511,6 +566,8 @@ func _add_upgrade_card(parent: VBoxContainer, definition: Dictionary, accent: Co
 ## cost < 0 means there is nothing to buy (never staffed, or already retained to the
 ## bloodline's best level).
 func set_retention_entries(entries: Array) -> void:
+	_retention_entries = entries
+	_refresh_staff_section_header()  # its invested total + affordable badge track this snapshot
 	for child in _staff_list.get_children():
 		child.queue_free()
 	_retention_rows = {}
@@ -536,6 +593,7 @@ func set_retention_entries(entries: Array) -> void:
 ## RETAIN button keeps existing (and repeating). Falls back to a full rebuild if the
 ## row set itself changed (a property staffed for the first time adds a row).
 func update_retention_entries(entries: Array) -> void:
+	_retention_entries = entries
 	if entries.size() != _retention_rows.size():
 		set_retention_entries(entries)
 		return
@@ -546,6 +604,7 @@ func update_retention_entries(entries: Array) -> void:
 			return
 	for entry_variant in entries:
 		_apply_retention_entry(entry_variant as Dictionary)
+	_refresh_staff_section_header()  # in-place path: keep the header total + badge current too
 
 
 ## One Household Staff card: property + current staffer on top, the now/retained tiers
@@ -616,7 +675,7 @@ func _apply_retention_entry(entry: Dictionary) -> void:
 		button.text = "RETAINED"
 		button.disabled = true
 	else:
-		button.text = "RETAIN LVL %d\n%d Gems" % [int(entry["retained_levels"]) + 1, cost]
+		button.text = "RETAIN LVL %d\n%s Gems" % [int(entry["retained_levels"]) + 1, Money.abbrev(cost)]
 		button.disabled = not bool(entry["can_afford"])
 
 
@@ -627,7 +686,8 @@ func _apply_retention_entry(entry: Dictionary) -> void:
 ## Re-read the live state and update the wallet readout and every card.
 func refresh() -> void:
 	# Just the number — the gem icon beside it stands in for the word "Legacy" (Tim, 2026-06-28).
-	_wallet_label.text = "%d" % _upgrades.available
+	# Formatted like money (45, 1.5K, 10M) rather than a raw integer (Tim, 2026-07-13).
+	_wallet_label.text = Money.abbrev(_upgrades.available)
 
 	for definition in LegacyUpgradeCatalog.all():
 		var id := String(definition["id"])
@@ -647,12 +707,14 @@ func refresh() -> void:
 			var cost := _upgrades.get_next_cost(id)
 			# The legacy-gem icon replaces the word "BUY"; the cost follows it (Tim, 2026-06-28).
 			buy_button.icon = GEM_TEX
-			buy_button.text = "  %d" % cost
+			buy_button.text = "  %s" % Money.abbrev(cost)
 			# Greyed out (but still readable) when the player can't afford it.
 			buy_button.disabled = not _upgrades.can_buy(id)
 
-	# Update every collapsed section's "+x affordable" badge to match the new wallet/levels.
+	# Update every section's header (its invested-gems total may have changed after a buy) and its
+	# collapsed "+x affordable" badge, to match the new wallet/levels.
 	for category in _sections:
+		_update_section_header(String(category))
 		_update_section_count(String(category))
 
 

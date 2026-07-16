@@ -16,6 +16,10 @@ enum BuyMode { ONE, TEN, NEXT_TIER, MAX }
 signal buy_requested(prop_index: int, mode: BuyMode)
 signal tap_requested(prop_index: int)
 signal hold_rush_requested(prop_index: int)
+## Fired the moment a rush HOLD that actually auto-rushed ends, so Rush Momentum can stop
+## building immediately instead of riding out the pulse-bridging grace window (Tim 2026-07-15:
+## the momentum bar kept growing ~a second after release). Quick taps never fire this.
+signal rush_hold_released(prop_index: int)
 ## The staff button was pressed. There is only ONE staff action now — buy the next rung of
 ## the property's sequential staff ladder (hiring a staffer IS level 1 of each 20-level
 ## block, GDD §6.1 epoch-depth redesign) — so the button needs no state dispatch.
@@ -26,6 +30,11 @@ var prop_index: int = -1
 var _prop: PropertyState
 var _economy: EconomyState
 var _frenzy: FrenzyState
+## The shared Rush Momentum / heat state (Rush Overheat, Tim 2026-07-15). Read-only here: the row
+## checks is_locked_out() so the portrait LOOKS disabled while rushing is shut down — the core
+## already ignores rush requests during lockout, but an unresponsive live-looking button reads as
+## a bug, not a cooldown.
+var _rush_momentum: RushMomentumState
 ## The generation's reached epoch — the highest staffer tier any property may be hired
 ## or upgraded to right now. Read live so the hire button unlocks the moment a new
 ## civilization is contacted (EpochState.current_tier).
@@ -173,6 +182,9 @@ var _was_pinned := false
 ## Seconds the rush has been continuously held (0 when not held) — gates the whole
 ## rush presentation past RUSH_ENGAGE_SEC so taps don't flash it.
 var _rush_hold_seconds := 0.0
+## True once the current rush hold has fired at least one auto-rush pulse; drives the
+## rush_hold_released signal on release (see _pump_held_rush).
+var _rush_hold_pulsed := false
 
 ## The displayed bar's eased sweep rate (bars/sec) — see SWEEP_EASE_TAU.
 var _sweep_rate := 0.0
@@ -261,6 +273,9 @@ var _income_label: Label
 var _income_icon: TextureRect
 var _cycle_bar: ProgressBar
 var _cycle_bubbles: GoldBubbles
+## Fast neon-salmon streaks shown ONLY while THIS property is being rushed at max Rush Momentum —
+## tiny dots flying in a straight line, contrasting the swaying gold carbonation (Tim, 2026-07-14).
+var _cycle_momentum_streaks: MomentumStreaks
 ## Diagnosis readout over the bar, shown when tuning.carb_debug_overlay = 1.
 var _carb_debug_label: Label
 var _buy_button: Button
@@ -289,12 +304,14 @@ var _ownership_style_applied := -1
 
 
 ## Call before adding to the tree.
-func setup(p_index: int, prop: PropertyState, economy: EconomyState, frenzy: FrenzyState, epoch: EpochState) -> void:
+func setup(p_index: int, prop: PropertyState, economy: EconomyState, frenzy: FrenzyState,
+		epoch: EpochState, rush_momentum: RushMomentumState) -> void:
 	prop_index = p_index
 	_prop = prop
 	_economy = economy
 	_frenzy = frenzy
 	_epoch = epoch
+	_rush_momentum = rush_momentum
 
 
 func _ready() -> void:
@@ -393,6 +410,13 @@ func _ready() -> void:
 	# Kept as a member: the refresh commands their flow speed while the bar is pinned solid.
 	_cycle_bubbles = GoldBubbles.new()
 	_cycle_bar.add_child(_cycle_bubbles)
+
+	# Fast neon-salmon streaks over the gold, hidden until this property is rushed at max Rush
+	# Momentum (see _process). They fly straight and fast to contrast the swaying gold carbonation.
+	_cycle_momentum_streaks = MomentumStreaks.new()
+	_cycle_momentum_streaks.color = UiPalette.NEON_SALMON
+	_cycle_momentum_streaks.visible = false
+	_cycle_bar.add_child(_cycle_momentum_streaks)
 
 	# Tiny diagnosis readout over the bar (tuning.carb_debug_overlay = 1 in Balance
 	# Tuning): the live numbers driving the carbonation, so an on-device eye report can
@@ -638,12 +662,21 @@ func _pump_held_rush(delta: float) -> void:
 	# A secondary finger on the portrait (multi-touch) counts as held too.
 	if (not _manager_circle.is_held() and not _secondary_held("rush")) or _prop.units_owned == 0:
 		_hold_accumulator = 0.0
+		# The hold just ended (or lapsed): if it actually auto-rushed, say so NOW, so momentum
+		# stops building at the release instead of riding out the grace window. Gated on a real
+		# pulse having fired — a quick tap fires no pulse, and its momentum credit (granted via
+		# the button's own pressed -> tap_requested on release) must survive this pump seeing
+		# "not held" on the very same frame.
+		if _rush_hold_pulsed:
+			_rush_hold_pulsed = false
+			rush_hold_released.emit(prop_index)
 		return
 	_hold_accumulator += delta
 	var pulse_interval := 1.0 / _prop.tuning.hold_rush_per_second
 	while _hold_accumulator >= pulse_interval:
 		_hold_accumulator -= pulse_interval
 		if _prop.is_cycle_running:
+			_rush_hold_pulsed = true
 			hold_rush_requested.emit(prop_index)
 		else:
 			# Idle: the held pulse starts the cycle. Signals are synchronous, so
@@ -756,8 +789,17 @@ func _refresh(delta: float) -> void:
 	var portrait_mode := ManagerCircle.PortraitMode.LOCKED
 	if owned:
 		portrait_mode = ManagerCircle.PortraitMode.STAFFED if staffed else ManagerCircle.PortraitMode.UNSTAFFED
-	# The infinity "rushing" icon shows whether the primary Button or a secondary finger holds it.
-	var show_rush_icon := interactive and (_manager_circle.is_held() or _secondary_held("rush"))
+	# Rush Overheat lockout (Tim 2026-07-15): while rushing is shut down the portrait must LOOK
+	# disabled — the core ignores the rush verb during lockout, so a live-looking button that does
+	# nothing would read as a bug. PRESENTATION ONLY: the portrait stays interactive (a tap can
+	# still start an idle cycle, which is not a rush), and buy/hire are untouched. A gray, dimmed
+	# modulate mutes the whole disc; the rush-held look below is suppressed for the duration.
+	var rush_locked := _rush_momentum != null and _rush_momentum.is_locked_out()
+	_manager_circle.modulate = Color(0.55, 0.55, 0.55) if rush_locked else Color.WHITE
+	# The infinity "rushing" icon shows whether the primary Button or a secondary finger holds it
+	# — hidden during lockout, when holding produces no rushes.
+	var show_rush_icon := interactive and not rush_locked \
+			and (_manager_circle.is_held() or _secondary_held("rush"))
 	_manager_circle.set_state(
 		portrait_mode, config.accent_color, config.manager_portrait, show_rush_icon,
 		interactive, _prop.staff_level
@@ -775,8 +817,9 @@ func _refresh(delta: float) -> void:
 	var bar_is_solid := owned and _prop.is_cycle_running \
 		and effective_length > 0.0 and effective_length < SOLID_BAR_THRESHOLD_SEC
 	# The amount paid per completed cycle. For an OWNED rung get_income_per_cycle() already folds in
-	# the staffer and Family Fortune (Legacy) multipliers, with frenzy applied live on top so it
-	# matches what the player receives; for an UNOWNED rung it's the per-cycle value of a single
+	# the staffer and Family Fortune (Legacy) multipliers AND this property's own Rush Momentum factor
+	# (>1 only while it is being actively rushed — Tim 2026-07-13), with frenzy applied live on top so
+	# it matches what the player receives; for an UNOWNED rung it's the per-cycle value of a single
 	# unit (a buy-in preview).
 	var per_cycle := _prop.get_income_per_cycle() * _frenzy.get_multiplier() if owned \
 		else _prop.get_single_unit_income_per_cycle()
@@ -799,8 +842,10 @@ func _refresh(delta: float) -> void:
 	# finger via the raw-touch handler (Tim, 2026-07-07 — rushing two properties at once
 	# left the secondary one with the calm color/rate: it pumped, but this flag only
 	# looked at the Button, so a rushed row didn't always present as rushing).
+	# Also forced OFF while rush is locked out (Rush Overheat): the finger may still be down, but
+	# no rushes are landing, so the boosted readout / vivid green / frenzy fizz would all be lies.
 	var rush_held := (_manager_circle.is_held() or _secondary_held("rush")) \
-			and _prop.units_owned > 0
+			and _prop.units_owned > 0 and not rush_locked
 	# The ENGAGED flag: held long enough to count as a real hold (see RUSH_ENGAGE_SEC).
 	# Every rush-presentation element below keys off THIS, never the raw press, so a
 	# single tap changes nothing on screen (Tim, 2026-07-08).
@@ -818,7 +863,16 @@ func _refresh(delta: float) -> void:
 	# The leading "$" is now shown as the dollar-bill icon just left of the label (see
 	# _income_icon), so strip it off every amount before it goes into the text (Tim, 2026-07-09).
 	if rushed_fractions_per_second > 0.0:
-		_income_label.text = Money.of(per_cycle * rushed_fractions_per_second).display().trim_prefix("$") + " / s"
+		# While rushing, the cycle completes every 1/rushed_fractions_per_second seconds. Apply the
+		# SAME rule as an un-rushed cycle: a sub-second effective cycle reads as a per-second RATE,
+		# but a cycle longer than a second reads as the per-cycle payout WITH its (rush-shortened)
+		# duration — the money lands in lumps that far apart, so "16 T / 2s" is honest where "8.1 T/s"
+		# implies a smooth per-second trickle it never delivers (Tim, 2026-07-13).
+		var rushed_cycle_time := 1.0 / rushed_fractions_per_second
+		if rushed_cycle_time <= PER_SECOND_READOUT_THRESHOLD_SEC:
+			_income_label.text = Money.of(per_cycle * rushed_fractions_per_second).display().trim_prefix("$") + " / s"
+		else:
+			_income_label.text = "%s / %s" % [Money.of(per_cycle).display().trim_prefix("$"), _format_cycle_duration(rushed_cycle_time)]
 	elif effective_length > 0.0 and effective_length <= PER_SECOND_READOUT_THRESHOLD_SEC:
 		_income_label.text = Money.of(per_cycle / effective_length).display().trim_prefix("$") + " / s"
 	else:
@@ -830,9 +884,17 @@ func _refresh(delta: float) -> void:
 	if not owned or effective_length <= 0.0:
 		_displayed_income_per_sec = 0.0
 	elif rushed_fractions_per_second > 0.0:
+		# Being rushed: it really earns at this rate right now (even an unstaffed rung, while held).
 		_displayed_income_per_sec = per_cycle * rushed_fractions_per_second
-	else:
+	elif _prop.is_staffed:
+		# Staffed: it auto-runs, so it earns this passive rate hands-off.
 		_displayed_income_per_sec = per_cycle / effective_length
+	else:
+		# Owned but UNSTAFFED and not being rushed: it stops after each payout and needs a manual
+		# tap to run again, so it earns nothing passively — it must NOT inflate the income headline
+		# (Tim 2026-07-13: two staffed properties made ~70 B/s, but the headline read ~80 B/s, the
+		# extra coming from owned-but-unstaffed rungs' theoretical rates being summed in).
+		_displayed_income_per_sec = 0.0
 
 	# Smooth, constant-velocity cycle bar (see _displayed_cycle_fraction above). Measured
 	# against the EFFECTIVE (sped-up) cycle length so the bar still fills all the way to the
@@ -946,6 +1008,16 @@ func _refresh(delta: float) -> void:
 	else:
 		_cycle_bubbles.tier = GoldBubbles.Tier.IDLE
 	_cycle_bubbles.tier_ease_tau = _prop.tuning.carb_tier_ease
+
+	# Fast neon-salmon streaks over the gold ONLY on a property that is ITSELF being rushed in
+	# OVERDRIVE — its own momentum factor at/past the Hot-band bonus, i.e. heat past the old cap
+	# (Rush Overheat, Tim 2026-07-15; was "at max bonus" when the meter still had a hard cap).
+	# Momentum applies only to the rushed property, so no other row may show any change
+	# (Tim 2026-07-13) — so this keys off THIS property's own momentum factor, not the global meter.
+	# (rush_momentum_factor is 1 + bonus while the property is within its rush grace.)
+	var rushed_in_overdrive := _prop.rush_momentum_factor \
+			>= 1.0 + _prop.tuning.rush_momentum_bonus_at_hot - 0.001
+	_cycle_momentum_streaks.visible = owned and rushed_in_overdrive
 
 	# The diagnosis overlay: live values driving this row's carbonation (reading the
 	# bubbles' internals directly is fine here — this label exists only to expose them).

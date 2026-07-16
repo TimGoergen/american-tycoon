@@ -81,9 +81,10 @@ const SWEEP_PEAK_ALPHA := 0.9
 const SWEEP_FRAME_INSET := 8.0
 
 ## Floating "+income" indicators that rise off the button on each earning tap.
-## They originate at the button's vertical center, INCOME_FLOAT_RIGHT_FRACTION of
-## the width in from the right edge (± INCOME_FLOAT_ORIGIN_JITTER px of random
-## spread), then float up while swaying gently side to side and fading out.
+## They originate just ABOVE the static "+$x" per-tap amount text (Tim 2026-07-15: the
+## float must clear the readout, not overlap it), INCOME_FLOAT_RIGHT_FRACTION of the
+## width in from the right edge (± INCOME_FLOAT_ORIGIN_JITTER px of random spread),
+## then float up while swaying gently side to side and fading out.
 const INCOME_FLOAT_FONT_SIZE := UiPalette.FONT_SUBHEAD
 const INCOME_FLOAT_DURATION := 0.9
 const INCOME_FLOAT_RISE_FRACTION := 0.7    # how far up it travels (× button height)
@@ -91,6 +92,7 @@ const INCOME_FLOAT_RIGHT_FRACTION := 0.15  # origin distance in from the right e
 const INCOME_FLOAT_ORIGIN_JITTER := 5.0    # px of random spread on the origin x
 const INCOME_FLOAT_SWAY := 8.0             # px amplitude of the side-to-side wave
 const INCOME_FLOAT_WAVES := 1.5            # full side-to-side waves over the rise
+const INCOME_FLOAT_GAP := 6.0              # px between the amount text's top and the float's bottom
 
 ## Seconds left in the current manual-tap blink. >0 means the blink is showing.
 var _flash_remaining := 0.0
@@ -152,9 +154,11 @@ func _ready() -> void:
 	# The meter is the button background; its bright-gold fill shows promotion
 	# progress. It ignores the mouse so the Button on top handles every tap.
 	_wage_meter = ProgressBar.new()
-	# Shortened 230 -> 196 to make room for the taller tab bar while staying the big primary
-	# tap target (Tim, 2026-06-22).
-	_wage_meter.custom_minimum_size = Vector2(0, 196)
+	# Shortened 230 -> 196 for the taller tab bar (Tim, 2026-06-22), then 196 -> 118 (40%
+	# shorter, Tim 2026-07-15: the wage button hasn't earned its footprint yet). This height
+	# drives the whole clock-in row — the level plate fills the row's height — and the freed
+	# space flows back to the property list, whose scroll area expands above this panel.
+	_wage_meter.custom_minimum_size = Vector2(0, 118)
 	_wage_meter.min_value = 0.0
 	_wage_meter.max_value = 1.0
 	_wage_meter.show_percentage = false
@@ -502,15 +506,24 @@ func _spawn_income_float(amount: float) -> void:
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_wage_meter.add_child(label)
 
-	# Origin: the button's vertical center, INCOME_FLOAT_RIGHT_FRACTION of the width
-	# in from the right edge, with a few px of random spread on x. The label is
-	# centered on that point (its `position` is the top-left corner).
+	# Origin: just above the static "+$x" amount text (Tim 2026-07-15 — the float must clear
+	# the readout, not rise through it), INCOME_FLOAT_RIGHT_FRACTION of the width in from the
+	# right edge, with a few px of random spread on x. `position` is the label's top-left
+	# corner, so the y also subtracts the float's own height to place its BOTTOM at the gap.
 	var text_size := ThemeDB.fallback_font.get_string_size(
 		label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, INCOME_FLOAT_FONT_SIZE
 	)
+	# The amount text is drawn vertically centered in the meter, so its top edge sits half
+	# its font height above the meter's center line. Read the label's own font settings so
+	# this stays correct if that readout is ever restyled.
+	var amount_font := _wage_amount_label.get_theme_font("font")
+	var amount_font_size := _wage_amount_label.get_theme_font_size("font_size")
+	var amount_text_top := meter_size.y * 0.5 - amount_font.get_height(amount_font_size) * 0.5
 	var origin_x := meter_size.x * (1.0 - INCOME_FLOAT_RIGHT_FRACTION) \
 		+ randf_range(-INCOME_FLOAT_ORIGIN_JITTER, INCOME_FLOAT_ORIGIN_JITTER)
-	var origin := Vector2(origin_x - text_size.x * 0.5, meter_size.y * 0.5 - text_size.y * 0.5)
+	var origin := Vector2(
+		origin_x - text_size.x * 0.5,
+		amount_text_top - INCOME_FLOAT_GAP - text_size.y)
 	label.position = origin
 
 	# Drive rise + gentle side-to-side sway + fade per frame from a 0→1 tween, then

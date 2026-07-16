@@ -1,10 +1,10 @@
 class_name EconomyState
 
 # The complete economy simulation state for one game run.
-# Owns all 12 PropertyState instances and the player's cash balance.
+# Owns every PropertyState on the ladder and the player's cash balance.
 # No scene-tree dependencies — safe to drive from the headless simulator.
 
-## All 12 property states, indexed 0–11 matching GDD §4 order.
+## All property states, in ConfigLoader.PROPERTY_PATHS order (the save-stable property index).
 var properties: Array  # Array[PropertyState]
 
 ## Player cash in dollars (stored as float; use Money.of(cash).display() to format).
@@ -43,10 +43,69 @@ var spent_on_staff_this_gen: float = 0.0
 var starting_cash: float = 0.0
 
 
+## Each property's STAFF PRICE RANK, indexed by property index — the exponent all
+## staff pricing grows by (see compute_staff_price_ranks). Computed once here at
+## construction because the ladder never changes mid-run.
+var _staff_price_ranks: Array[int] = []
+
+
 func _init(configs: Array, tuning: TuningConfig) -> void:
 	properties = []
 	for cfg in configs:
 		properties.append(PropertyState.new(cfg as PropertyConfig, tuning))
+	_staff_price_ranks = compute_staff_price_ranks(configs)
+
+
+## Compute each property's STAFF PRICE RANK from the configs (escalating ladder
+## rework, Tim 2026-07-15). Staff pricing used to exponentiate the GLOBAL array
+## index, which stopped meaning "how far up the ladder" once alien cohort siblings
+## were APPENDED to the array for save compatibility instead of slotted by cost:
+## epoch 2's second-cheapest property (appended around index 17) priced its staff
+## above epoch 6's flagship (index 16), and the escalating ladder's 15 further
+## appends would have detached the exponent completely. The rank restores a
+## coherent price order without touching the save-stable array index:
+##   • Earth properties (unlock_tier 1) keep their ladder index (0–11) — their
+##     staff prices do not change at all.
+##   • An alien property ranks earth_count + its COST RANK within its own epoch's
+##     cohort (cheapest = 0). Every epoch's flagship therefore ranks 12 — exactly
+##     the global index flagships had before, so flagship staff prices are also
+##     unchanged — and its cohort's dearer rungs climb 13, 14, … within their own
+##     epoch instead of across the whole array.
+## Static so DynastyState can price Legacy staff retention off the identical rule
+## without duplicating it (retention has the same disease for the same reason).
+static func compute_staff_price_ranks(configs: Array) -> Array[int]:
+	var ranks: Array[int] = []
+	ranks.resize(configs.size())
+	# Earth rungs: rank = position among Earth properties, which is their array
+	# index today (Earth fills indices 0–11) and stays correct if that ever grows.
+	var earth_count := 0
+	for i in range(configs.size()):
+		if (configs[i] as PropertyConfig).unlock_tier <= 1:
+			ranks[i] = earth_count
+			earth_count += 1
+	# Alien rungs: gather each epoch's cohort, order it by base_cost, and rank each
+	# member by that cost order — the cohort's ladder position, not its array slot.
+	var cohort_indices_by_tier: Dictionary = {}  # unlock_tier -> Array of property indices
+	for i in range(configs.size()):
+		var tier := (configs[i] as PropertyConfig).unlock_tier
+		if tier <= 1:
+			continue
+		if not cohort_indices_by_tier.has(tier):
+			cohort_indices_by_tier[tier] = []
+		(cohort_indices_by_tier[tier] as Array).append(i)
+	for tier in cohort_indices_by_tier:
+		var members: Array = cohort_indices_by_tier[tier]
+		members.sort_custom(func(a: int, b: int) -> bool:
+			return (configs[a] as PropertyConfig).base_cost < (configs[b] as PropertyConfig).base_cost)
+		for cost_rank in range(members.size()):
+			ranks[members[cost_rank]] = earth_count + cost_rank
+	return ranks
+
+
+## The staff price rank for one property — the exponent both the dollar staff-block
+## anchors (below) and Legacy retention (StaffRetention) grow by.
+func get_staff_price_rank(prop_index: int) -> int:
+	return _staff_price_ranks[prop_index]
 
 
 # ---------------------------------------------------------------------------
@@ -98,8 +157,8 @@ func try_buy(prop_index: int, count: int, current_tier: int) -> bool:
 
 ## Index of the FLAGSHIP property that unlocks at `tier` — the first (cheapest) member
 ## of that epoch's cohort, which anchors the First Contact trade-deal minigame — or -1
-## if no property is gated to that tier. Since Phase 2 each alien epoch has FOUR
-## properties; PROPERTY_PATHS lists every flagship before any sibling, so "first match"
+## if no property is gated to that tier. Each alien epoch ships a multi-property
+## cohort; PROPERTY_PATHS lists every flagship before any sibling, so "first match"
 ## is the flagship.
 func get_property_index_for_unlock_tier(tier: int) -> int:
 	var indices := get_property_indices_for_unlock_tier(tier)
@@ -133,8 +192,8 @@ func get_property_indices_for_unlock_tier(tier: int) -> Array[int]:
 ## Block 1 (the property's home epoch): the modest property-scaled hire cost, exactly
 ## like today's first hire for Earth AND alien properties. Blocks 2+: anchored to the
 ## BLOCK's epoch economy — earth_economy_target × that epoch's economy_scale ×
-## staff_cost_fraction, grown per property rung — so each epoch's staffer roster costs
-## ~economy_scale more than the last, priced once and forever by its home epoch.
+## staff_cost_fraction, grown per STAFF PRICE RANK — so each epoch's staffer roster
+## costs ~economy_scale more than the last, priced once and forever by its home epoch.
 func get_staff_block_anchor(prop_index: int, block: int) -> float:
 	var prop := properties[prop_index] as PropertyState
 	if block <= 1:
@@ -142,8 +201,10 @@ func get_staff_block_anchor(prop_index: int, block: int) -> float:
 	var tuning := prop.tuning
 	var block_epoch := prop.staff_block_epoch(block)
 	var epoch_economy := tuning.earth_economy_target * EpochCatalog.economy_scale(block_epoch)
+	# Grown by the staff price rank, NOT the raw array index — appended alien
+	# siblings sit out of cost order in the array (see compute_staff_price_ranks).
 	var fraction := tuning.staff_cost_fraction \
-			* pow(tuning.staff_cost_property_growth, float(prop_index))
+			* pow(tuning.staff_cost_property_growth, float(get_staff_price_rank(prop_index)))
 	return CostCurve.round_nice(epoch_economy * fraction * prop.staff_cost_multiplier)
 
 
@@ -210,6 +271,10 @@ func rush_cycle(prop_index: int, income_multiplier: float = 1.0) -> void:
 	credit_property_income((properties[prop_index] as PropertyState).rush_cycle(income_multiplier))
 
 
+## Cumulative income that arrived via an off-tick RUSH payout (diagnostic only — the sim reads it
+## to see what fraction of income comes from rushing vs the passive tick).
+var rush_income_total: float = 0.0
+
 ## Credit income from an OFF-tick property payout (a rushed cycle that completed immediately),
 ## exactly the way tick() credits it — cash, total_income, and the lifetime-earned accumulator —
 ## so an instant rush payout is indistinguishable from one collected on a tick.
@@ -219,6 +284,7 @@ func credit_property_income(amount: float) -> void:
 	cash += amount
 	total_income += amount
 	cash_earned_this_gen += amount
+	rush_income_total += amount
 
 
 # ---------------------------------------------------------------------------

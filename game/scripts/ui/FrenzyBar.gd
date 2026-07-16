@@ -62,6 +62,16 @@ func _ready() -> void:
 	# actually uses the mipmaps we generate at import — same fix the Legacy gem icons use.
 	_pop_button.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	UiPalette.style_button(_pop_button, false)
+	# When a pop isn't available (mid-burn, or the meter is below the pop floor) the button
+	# grays its OUTLINE too, so "can't trigger" reads at a glance (Tim 2026-07-15). The
+	# standard disabled plate keeps the navy frame; this swaps just this button's for gray.
+	var disabled_plate := StyleBoxFlat.new()
+	disabled_plate.bg_color = UiPalette.CREAM
+	disabled_plate.border_color = UiPalette.MID_GRAY
+	disabled_plate.set_border_width_all(3)
+	disabled_plate.set_corner_radius_all(4)
+	disabled_plate.set_content_margin_all(12)
+	_pop_button.add_theme_stylebox_override("disabled", disabled_plate)
 	_pop_button.pressed.connect(func() -> void: pop_requested.emit())
 	# A second finger can pop TURBO while the first holds a rush (Tim, 2026-07-07); the
 	# disabled state (mid-burn / below the pop floor) blocks it the same as a primary tap.

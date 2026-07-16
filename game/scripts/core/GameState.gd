@@ -191,6 +191,22 @@ func hold_rush_property(prop_index: int) -> void:
 	economy.credit_property_income(prop.rush_cycle(frenzy.get_multiplier() * prop.legacy_income_multiplier))
 
 
+## The player let go of a rush hold on this property. The grace windows exist only to bridge
+## the gaps BETWEEN pulses while the button is held (they fire at 5/s, slower than the 10/s
+## tick) — on an actual release they would otherwise keep momentum BUILDING for another grace
+## period, which read on-device as the bar growing a beat after the finger lifted (Tim
+## 2026-07-15). So end this property's rushed state now, and stop the global build unless
+## some OTHER property is still inside its own rushed grace (a second finger).
+func release_rush(prop_index: int) -> void:
+	var prop := economy.properties[prop_index] as PropertyState
+	prop.rush_active_grace = 0.0
+	prop.rush_momentum_factor = 1.0
+	for prop_variant in economy.properties:
+		if (prop_variant as PropertyState).rush_active_grace > 0.0:
+			return
+	_rush_grace_remaining = 0.0
+
+
 ## Pop the frenzy meter if allowed. Returns true if a burn started.
 func pop_frenzy() -> bool:
 	if not frenzy.can_pop():

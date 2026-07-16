@@ -16,6 +16,10 @@ enum BuyMode { ONE, TEN, NEXT_TIER, MAX }
 signal buy_requested(prop_index: int, mode: BuyMode)
 signal tap_requested(prop_index: int)
 signal hold_rush_requested(prop_index: int)
+## Fired the moment a rush HOLD that actually auto-rushed ends, so Rush Momentum can stop
+## building immediately instead of riding out the pulse-bridging grace window (Tim 2026-07-15:
+## the momentum bar kept growing ~a second after release). Quick taps never fire this.
+signal rush_hold_released(prop_index: int)
 ## The staff button was pressed. There is only ONE staff action now — buy the next rung of
 ## the property's sequential staff ladder (hiring a staffer IS level 1 of each 20-level
 ## block, GDD §6.1 epoch-depth redesign) — so the button needs no state dispatch.
@@ -173,6 +177,9 @@ var _was_pinned := false
 ## Seconds the rush has been continuously held (0 when not held) — gates the whole
 ## rush presentation past RUSH_ENGAGE_SEC so taps don't flash it.
 var _rush_hold_seconds := 0.0
+## True once the current rush hold has fired at least one auto-rush pulse; drives the
+## rush_hold_released signal on release (see _pump_held_rush).
+var _rush_hold_pulsed := false
 
 ## The displayed bar's eased sweep rate (bars/sec) — see SWEEP_EASE_TAU.
 var _sweep_rate := 0.0
@@ -649,12 +656,21 @@ func _pump_held_rush(delta: float) -> void:
 	# A secondary finger on the portrait (multi-touch) counts as held too.
 	if (not _manager_circle.is_held() and not _secondary_held("rush")) or _prop.units_owned == 0:
 		_hold_accumulator = 0.0
+		# The hold just ended (or lapsed): if it actually auto-rushed, say so NOW, so momentum
+		# stops building at the release instead of riding out the grace window. Gated on a real
+		# pulse having fired — a quick tap fires no pulse, and its momentum credit (granted via
+		# the button's own pressed -> tap_requested on release) must survive this pump seeing
+		# "not held" on the very same frame.
+		if _rush_hold_pulsed:
+			_rush_hold_pulsed = false
+			rush_hold_released.emit(prop_index)
 		return
 	_hold_accumulator += delta
 	var pulse_interval := 1.0 / _prop.tuning.hold_rush_per_second
 	while _hold_accumulator >= pulse_interval:
 		_hold_accumulator -= pulse_interval
 		if _prop.is_cycle_running:
+			_rush_hold_pulsed = true
 			hold_rush_requested.emit(prop_index)
 		else:
 			# Idle: the held pulse starts the cycle. Signals are synchronous, so

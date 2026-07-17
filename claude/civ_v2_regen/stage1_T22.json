@@ -1,0 +1,42 @@
+{
+    "tier": 22,
+    "civilization": "Spectacle Prime",
+    "new_properties": [
+        {
+            "property": "Clickbait Foundries",
+            "staffer": "Thumbnail Provocateur"
+        },
+        {
+            "property": "Sponsored Content Mills",
+            "staffer": "Native Ad Alchemist"
+        },
+        {
+            "property": "Follower Hatcheries",
+            "staffer": "Bot Flock Shepherd"
+        },
+        {
+            "property": "Drama Exchanges",
+            "staffer": "Manufactured Beef Wrangler"
+        },
+        {
+            "property": "Cancellation Insurance",
+            "staffer": "Apology Video Underwriter"
+        },
+        {
+            "property": "Persona Cloning Vats",
+            "staffer": "Deepfake Identity Sculptor"
+        },
+        {
+            "property": "The Algorithm Cathedral",
+            "staffer": "For You Page High Priest"
+        },
+        {
+            "property": "Planetwide Livestream Grid",
+            "staffer": "Orbital Camera Auteur"
+        },
+        {
+            "property": "Attention Singularity",
+            "staffer": "Event Horizon Hypecaster"
+        }
+    ]
+}

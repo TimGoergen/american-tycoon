@@ -1,0 +1,128 @@
+﻿{
+    "tier":  7,
+    "civilization":  "Vashti Deep-Court",
+    "home_planet":  "Bathyros",
+    "currency":  "Lures",
+    "accent_color":  "0f4c5c",
+    "hail":  "Weeelcome... dooown... little surface-thing... your weeealth siiinks so beautifully. The Deep-Court has appraiiised your empire... by the glow of a thousand luuures... and found it... edible. At these depths... everything... eventually... settles with us.",
+    "contact_line":  "Seven miles down, where the sun has never held an account, the aristocracy hangs glowing storefronts from their own foreheads. Foot traffic swims right in and is never itemized again.",
+    "existing_properties":  [
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  2.534E+32,
+                                    "property":  "Anglerlight Storefronts",
+                                    "staffer_name":  "Anglerlight Shopkeep",
+                                    "unit_cost":  1.389E+34
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  1.774E+33,
+                                    "property":  "Pressure Vaults",
+                                    "staffer_name":  "Pressure Vault Warden",
+                                    "unit_cost":  9.725E+34
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  1.242E+34,
+                                    "property":  "Trench Tollway",
+                                    "staffer_name":  "Trench Toll Collector",
+                                    "unit_cost":  6.808E+35
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  8.691E+34,
+                                    "property":  "Leviathan Charter Fleet",
+                                    "staffer_name":  "Leviathan Fleet Admiral",
+                                    "unit_cost":  4.765E+36
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  6.085E+35,
+                                    "property":  "Abyssal Sovereignty",
+                                    "staffer_name":  "Sovereign of the Crushing Dark",
+                                    "unit_cost":  3.336E+37
+                                }
+                            ],
+    "sample_roster_entries":  [
+                                  {
+                                      "property":  "ATM",
+                                      "staffer":  "Lure-Lit Teller"
+                                  },
+                                  {
+                                      "property":  "Money Tree",
+                                      "staffer":  "Kelp-Forest Cultivator"
+                                  },
+                                  {
+                                      "property":  "NFTs",
+                                      "staffer":  "Bioluminant Curator"
+                                  },
+                                  {
+                                      "property":  "Tax Increment Financing",
+                                      "staffer":  "Pressure-Gradient Auditor"
+                                  },
+                                  {
+                                      "property":  "Cross Border Distribution",
+                                      "staffer":  "Abyssal Current Courier"
+                                  },
+                                  {
+                                      "property":  "Money Laundering",
+                                      "staffer":  "Silt-Bed Cleaner"
+                                  },
+                                  {
+                                      "property":  "Day Trading",
+                                      "staffer":  "Darkwater Day-Trader"
+                                  },
+                                  {
+                                      "property":  "Flipping Houses",
+                                      "staffer":  "Shipwreck Flipper"
+                                  },
+                                  {
+                                      "property":  "Multi Level Marketing",
+                                      "staffer":  "Anglerlight Recruiter"
+                                  },
+                                  {
+                                      "property":  "Hedge Fund",
+                                      "staffer":  "Leviathan Fund Manager"
+                                  },
+                                  {
+                                      "property":  "Legislative Assets",
+                                      "staffer":  "Deep-Court Lobbyist"
+                                  },
+                                  {
+                                      "property":  "Executive Assets",
+                                      "staffer":  "Trench Chief of Staff"
+                                  },
+                                  {
+                                      "property":  "Photon Exchange",
+                                      "staffer":  "Lure-Light Exchange Broker"
+                                  },
+                                  {
+                                      "property":  "Beam Utilities",
+                                      "staffer":  "Sonar Beam Operator"
+                                  },
+                                  {
+                                      "property":  "Solar Futures Desk",
+                                      "staffer":  "Sunless Futures Broker"
+                                  },
+                                  {
+                                      "property":  "Dyson Holdings",
+                                      "staffer":  "Dyson Reef Foreman"
+                                  },
+                                  {
+                                      "property":  "Starcore Syndicate",
+                                      "staffer":  "Drowned Star Magnate"
+                                  },
+                                  {
+                                      "property":  "Data Foundry",
+                                      "staffer":  "Pressure-Forged Foundry"
+                                  },
+                                  {
+                                      "property":  "Server Metropolis",
+                                      "staffer":  "Sunken Server Warden"
+                                  },
+                                  {
+                                      "property":  "Algorithm Mines",
+                                      "staffer":  "Trench Mining Overseer"
+                                  }
+                              ]
+}

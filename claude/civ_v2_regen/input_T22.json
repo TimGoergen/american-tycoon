@@ -1,0 +1,128 @@
+﻿{
+    "tier":  22,
+    "civilization":  "Spectacle Prime",
+    "home_planet":  "Limelight",
+    "currency":  "Views",
+    "accent_color":  "b03060",
+    "hail":  "OMG you guys, a whole NEW EMPIRE just dropped — link your assets in bio!! Smash that treaty button, ring the little bell, and surrender your attention before this offer stops trending. #FirstContact #Blessed",
+    "contact_line":  "An entire species of influencers, monetizing the act of being watched. They filmed your arrival from six angles and tagged you in all of them.",
+    "existing_properties":  [
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  6.112E+95,
+                                    "property":  "Engagement Farms",
+                                    "staffer_name":  "Engagement Farmhand",
+                                    "unit_cost":  3.351E+97
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  4.279E+96,
+                                    "property":  "Attention Refineries",
+                                    "staffer_name":  "Attention Span Refiner",
+                                    "unit_cost":  2.346E+98
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  2.995E+97,
+                                    "property":  "Parasocial Bonds",
+                                    "staffer_name":  "Parasocial Relationship Broker",
+                                    "unit_cost":  1.642E+99
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  2.096E+98,
+                                    "property":  "Virality Futures",
+                                    "staffer_name":  "Virality Futures Forecaster",
+                                    "unit_cost":  1.149E+100
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  1.468E+99,
+                                    "property":  "The Eternal Feed",
+                                    "staffer_name":  "Feed Curator Eternal",
+                                    "unit_cost":  8.046E+100
+                                }
+                            ],
+    "sample_roster_entries":  [
+                                  {
+                                      "property":  "ATM",
+                                      "staffer":  "Cash Drop Streamer"
+                                  },
+                                  {
+                                      "property":  "Money Tree",
+                                      "staffer":  "Growth Hack Gardener"
+                                  },
+                                  {
+                                      "property":  "NFTs",
+                                      "staffer":  "Clout Drop Curator"
+                                  },
+                                  {
+                                      "property":  "Tax Increment Financing",
+                                      "staffer":  "Sponsored District Promoter"
+                                  },
+                                  {
+                                      "property":  "Cross Border Distribution",
+                                      "staffer":  "Global Reach Coordinator"
+                                  },
+                                  {
+                                      "property":  "Money Laundering",
+                                      "staffer":  "Brand Reputation Scrubber"
+                                  },
+                                  {
+                                      "property":  "Day Trading",
+                                      "staffer":  "Live-Ticker Reactor"
+                                  },
+                                  {
+                                      "property":  "Flipping Houses",
+                                      "staffer":  "House Tour Vlogger"
+                                  },
+                                  {
+                                      "property":  "Multi Level Marketing",
+                                      "staffer":  "Affiliate Funnel Guru"
+                                  },
+                                  {
+                                      "property":  "Hedge Fund",
+                                      "staffer":  "Finfluencer-in-Residence"
+                                  },
+                                  {
+                                      "property":  "Legislative Assets",
+                                      "staffer":  "Verified Policy Shill"
+                                  },
+                                  {
+                                      "property":  "Executive Assets",
+                                      "staffer":  "Chief Vibes Officer"
+                                  },
+                                  {
+                                      "property":  "Photon Exchange",
+                                      "staffer":  "Ring Light Broker"
+                                  },
+                                  {
+                                      "property":  "Beam Utilities",
+                                      "staffer":  "Glow-Up Technician"
+                                  },
+                                  {
+                                      "property":  "Solar Futures Desk",
+                                      "staffer":  "Golden Hour Forecaster"
+                                  },
+                                  {
+                                      "property":  "Dyson Holdings",
+                                      "staffer":  "Spotlight Megastructure Host"
+                                  },
+                                  {
+                                      "property":  "Starcore Syndicate",
+                                      "staffer":  "Main Character Energist"
+                                  },
+                                  {
+                                      "property":  "Data Foundry",
+                                      "staffer":  "Analytics Dashboard Obsessive"
+                                  },
+                                  {
+                                      "property":  "Server Metropolis",
+                                      "staffer":  "Content Farm Sysadmin"
+                                  },
+                                  {
+                                      "property":  "Algorithm Mines",
+                                      "staffer":  "Algorithm Whisperer"
+                                  }
+                              ]
+}

@@ -1,0 +1,42 @@
+{
+    "tier": 18,
+    "civilization": "The Vantablack Salon",
+    "new_properties": [
+        {
+            "property": "Vernissage Circuits",
+            "staffer": "Opening Night Impresaria"
+        },
+        {
+            "property": "Gala Blacklist Registries",
+            "staffer": "Guest List Executioner"
+        },
+        {
+            "property": "Restoration Ateliers",
+            "staffer": "Overzealous Restoration Maestro"
+        },
+        {
+            "property": "Provenance Vaults",
+            "staffer": "Impeccable Pedigree Archivist"
+        },
+        {
+            "property": "Biennale Monopolies",
+            "staffer": "Perpetual Biennale Chairwoman"
+        },
+        {
+            "property": "Movement Manufactories",
+            "staffer": "Bespoke Ism Fabricator"
+        },
+        {
+            "property": "The Zeitgeist Refinery",
+            "staffer": "Zeitgeist Distiller"
+        },
+        {
+            "property": "Obsolescence Bureaus",
+            "staffer": "Planned Irrelevance Commissioner"
+        },
+        {
+            "property": "Negative Space Exchange",
+            "staffer": "Curator of Absence"
+        }
+    ]
+}

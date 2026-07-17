@@ -1,0 +1,30 @@
+{
+    "tier": 7,
+    "civilization": "Vashti Deep-Court",
+    "new_properties": [
+        {
+            "property": "Whalefall Estates",
+            "staffer": "Whalefall Estate Broker"
+        },
+        {
+            "property": "Ventworks Utility",
+            "staffer": "Hydrothermal Vent Baron"
+        },
+        {
+            "property": "Siren Bond Market",
+            "staffer": "Siren Bond Underwriter"
+        },
+        {
+            "property": "Hadal Mint",
+            "staffer": "Hadal Mintmaster"
+        },
+        {
+            "property": "Drowned Cathedral Exchange",
+            "staffer": "Bishop of Sunken Ledgers"
+        },
+        {
+            "property": "Midnight Zone Trust",
+            "staffer": "Regent of the Midnight Zone"
+        }
+    ]
+}

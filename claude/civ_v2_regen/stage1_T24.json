@@ -1,0 +1,42 @@
+{
+    "tier": 24,
+    "civilization": "Atlas Concordat",
+    "new_properties": [
+        {
+            "property": "Compass Rose Franchises",
+            "staffer": "Cardinal Directions Licenser"
+        },
+        {
+            "property": "Legend Licensing",
+            "staffer": "Map Key Notary"
+        },
+        {
+            "property": "Projection Patents",
+            "staffer": "Distortion Rights Draftsman"
+        },
+        {
+            "property": "Antipode Holdings",
+            "staffer": "Far-Side Claims Broker"
+        },
+        {
+            "property": "Equator Toll Ring",
+            "staffer": "Zero-Latitude Gatekeeper"
+        },
+        {
+            "property": "Magnetic Pole Trust",
+            "staffer": "True North Custodian"
+        },
+        {
+            "property": "Continental Drift Futures",
+            "staffer": "Tectonic Boundary Speculator"
+        },
+        {
+            "property": "Terra Incognita Escrow",
+            "staffer": "Unknown Lands Executor"
+        },
+        {
+            "property": "The Master Graticule",
+            "staffer": "Universal Grid Archon"
+        }
+    ]
+}

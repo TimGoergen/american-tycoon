@@ -1,0 +1,42 @@
+{
+    "tier": 23,
+    "civilization": "Vek-Tor Kollektiv",
+    "new_properties": [
+        {
+            "property": "Triplicate Archives",
+            "staffer": "Chief Carbon Copy Archivist"
+        },
+        {
+            "property": "Waiting Room Estates",
+            "staffer": "Deputy Minister of Delay"
+        },
+        {
+            "property": "Bureau of Grievances",
+            "staffer": "Grievance Intake Commissar"
+        },
+        {
+            "property": "Signature Refinery",
+            "staffer": "Countersignature Comptroller"
+        },
+        {
+            "property": "Inspectorate of Inspections",
+            "staffer": "Inspector General of Inspectors"
+        },
+        {
+            "property": "Lost Records Vault",
+            "staffer": "Curator of Misplaced Files"
+        },
+        {
+            "property": "Stamp Reserve Bank",
+            "staffer": "Governor of the Stamp Reserve"
+        },
+        {
+            "property": "The Eternal Queue",
+            "staffer": "Warden of Queue 7,441-B"
+        },
+        {
+            "property": "Ministry of Pending",
+            "staffer": "Undersecretary of Forever"
+        }
+    ]
+}

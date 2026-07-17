@@ -1,0 +1,128 @@
+﻿{
+    "tier":  18,
+    "civilization":  "The Vantablack Salon",
+    "home_planet":  "Monochrome",
+    "currency":  "Critiques",
+    "accent_color":  "141414",
+    "hail":  "Ah. The portfolio arrives — bold, busy, très nouveau riche, darling. We shall hang it in the west wing under \u0027Outsider Art\u0027 until your taste appreciates... or until you do, whichever is never.",
+    "contact_line":  "They own nothing but opinions, and their opinions are worth more than your entire empire. They have already pronounced it \u0027derivative.\u0027",
+    "existing_properties":  [
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  7.661E+78,
+                                    "property":  "Velvet Rope Concessions",
+                                    "staffer_name":  "Velvet Rope Arbiter",
+                                    "unit_cost":  4.2E+80
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  5.363E+79,
+                                    "property":  "Taste Tribunals",
+                                    "staffer_name":  "Presiding Taste Magistrate",
+                                    "unit_cost":  2.94E+81
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  3.754E+80,
+                                    "property":  "Couture Foundries",
+                                    "staffer_name":  "Couture Forge Directrice",
+                                    "unit_cost":  2.058E+82
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  2.627E+81,
+                                    "property":  "Auction Seances",
+                                    "staffer_name":  "Dead Masters Auctioneer",
+                                    "unit_cost":  1.44E+83
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  1.839E+82,
+                                    "property":  "The Canon Estate",
+                                    "staffer_name":  "Keeper of the Canon",
+                                    "unit_cost":  1.008E+84
+                                }
+                            ],
+    "sample_roster_entries":  [
+                                  {
+                                      "property":  "ATM",
+                                      "staffer":  "Vulgar Currency Docent"
+                                  },
+                                  {
+                                      "property":  "Money Tree",
+                                      "staffer":  "Money Topiary Artiste"
+                                  },
+                                  {
+                                      "property":  "NFTs",
+                                      "staffer":  "Derivative Work Appraiser"
+                                  },
+                                  {
+                                      "property":  "Tax Increment Financing",
+                                      "staffer":  "Fiscal Composition Critic"
+                                  },
+                                  {
+                                      "property":  "Cross Border Distribution",
+                                      "staffer":  "Touring Exhibition Courier"
+                                  },
+                                  {
+                                      "property":  "Money Laundering",
+                                      "staffer":  "Provenance Restorer"
+                                  },
+                                  {
+                                      "property":  "Day Trading",
+                                      "staffer":  "Volatility Connoisseur"
+                                  },
+                                  {
+                                      "property":  "Flipping Houses",
+                                      "staffer":  "Renovation Auteur"
+                                  },
+                                  {
+                                      "property":  "Multi Level Marketing",
+                                      "staffer":  "Cult Following Curator"
+                                  },
+                                  {
+                                      "property":  "Hedge Fund",
+                                      "staffer":  "Portfolio Salonnière"
+                                  },
+                                  {
+                                      "property":  "Legislative Assets",
+                                      "staffer":  "Legislation Tastemaker"
+                                  },
+                                  {
+                                      "property":  "Executive Assets",
+                                      "staffer":  "Éminence Grise"
+                                  },
+                                  {
+                                      "property":  "Photon Exchange",
+                                      "staffer":  "Gallery Lighting Broker"
+                                  },
+                                  {
+                                      "property":  "Beam Utilities",
+                                      "staffer":  "Track Lighting Baron"
+                                  },
+                                  {
+                                      "property":  "Solar Futures Desk",
+                                      "staffer":  "Golden Hour Forecaster"
+                                  },
+                                  {
+                                      "property":  "Dyson Holdings",
+                                      "staffer":  "Stellar Installation Patron"
+                                  },
+                                  {
+                                      "property":  "Starcore Syndicate",
+                                      "staffer":  "Starlight Vernissage Host"
+                                  },
+                                  {
+                                      "property":  "Data Foundry",
+                                      "staffer":  "Machine Art Denouncer"
+                                  },
+                                  {
+                                      "property":  "Server Metropolis",
+                                      "staffer":  "Brutalist Campus Docent"
+                                  },
+                                  {
+                                      "property":  "Algorithm Mines",
+                                      "staffer":  "Algorithmic Kitsch Assayer"
+                                  }
+                              ]
+}

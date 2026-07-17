@@ -1,0 +1,38 @@
+{
+    "tier": 9,
+    "civilization": "Melissar Hive-Court",
+    "new_properties": [
+        {
+            "property": "Propolis Patent Office",
+            "staffer": "Propolis Sealing Notary"
+        },
+        {
+            "property": "Royal Mead Distillery",
+            "staffer": "Mead Cellars Sommelier"
+        },
+        {
+            "property": "The Waggle Bourse",
+            "staffer": "Waggle Floor Auctioneer"
+        },
+        {
+            "property": "Swarm Assurance Society",
+            "staffer": "Swarm Risk Actuary"
+        },
+        {
+            "property": "Pheromone Broadcasting Guild",
+            "staffer": "Scent Decree Herald"
+        },
+        {
+            "property": "Meadow Annexation Bureau",
+            "staffer": "Wildflower Annexation Envoy"
+        },
+        {
+            "property": "Ministry of Lesser Hives",
+            "staffer": "Viceroy of Lesser Hives"
+        },
+        {
+            "property": "The Queen's Mint",
+            "staffer": "Stamper of the Royal Profile"
+        }
+    ]
+}

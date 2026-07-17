@@ -1,0 +1,42 @@
+{
+    "tier": 17,
+    "civilization": "Ferrovore Guilds",
+    "new_properties": [
+        {
+            "property": "Corrosion Escrow",
+            "staffer": "Corrosion Escrow Agent"
+        },
+        {
+            "property": "Ore-Debt Registries",
+            "staffer": "Ore-Debt Notary"
+        },
+        {
+            "property": "Tarnish Futures",
+            "staffer": "Tarnish Futures Underwriter"
+        },
+        {
+            "property": "Slag Baronies",
+            "staffer": "Slag Baron"
+        },
+        {
+            "property": "Foundry Cartels",
+            "staffer": "Foundry Cartel Boss"
+        },
+        {
+            "property": "Rust-Tithe Cathedrals",
+            "staffer": "Rust-Tithe Archdeacon"
+        },
+        {
+            "property": "Magnetosphere Monopolies",
+            "staffer": "Magnetosphere Monopolist"
+        },
+        {
+            "property": "Mantle Mining Concordats",
+            "staffer": "Mantle Concordat Magnate"
+        },
+        {
+            "property": "The Molten Mint",
+            "staffer": "Molten Mint Magistrate"
+        }
+    ]
+}

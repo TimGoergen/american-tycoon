@@ -1,0 +1,128 @@
+﻿{
+    "tier":  10,
+    "civilization":  "Norrvane Frostholm",
+    "home_planet":  "Norrvane",
+    "currency":  "Glacier Shares",
+    "accent_color":  "6d8ea0",
+    "hail":  "Hail, hasty little ember. Your wealth-hoard has been weighed and carved upon the ᚠᛖᚺᚢ-stone, where it shall sit unspent for a thousand winters, as is proper. Sit — the thaw-debt comes due for all who rush.",
+    "contact_line":  "Ice giants who compound interest once per ice age and regard a fiscal quarter as an act of violence. Try not to fidget; they can hear it.",
+    "existing_properties":  [
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  1.203E+45,
+                                    "property":  "Permafrost Ledgers",
+                                    "staffer_name":  "Permafrost Ledger-Carver",
+                                    "unit_cost":  6.596E+46
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  8.421E+45,
+                                    "property":  "Cold Storage Monopoly",
+                                    "staffer_name":  "Cold-Hoard Monopolist",
+                                    "unit_cost":  4.617E+47
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  5.895E+46,
+                                    "property":  "Glacier Calving Yards",
+                                    "staffer_name":  "Berg-Calving Yardmaster",
+                                    "unit_cost":  3.232E+48
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  4.126E+47,
+                                    "property":  "Avalanche Derivatives",
+                                    "staffer_name":  "Avalanche Rune-Reckoner",
+                                    "unit_cost":  2.262E+49
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  2.889E+48,
+                                    "property":  "The Deep-Ice Endowment",
+                                    "staffer_name":  "Deep-Ice Endowment Elder",
+                                    "unit_cost":  1.584E+50
+                                }
+                            ],
+    "sample_roster_entries":  [
+                                  {
+                                      "property":  "ATM",
+                                      "staffer":  "Coin-Slot Rimewarden"
+                                  },
+                                  {
+                                      "property":  "Money Tree",
+                                      "staffer":  "Frost-Orchard Tender"
+                                  },
+                                  {
+                                      "property":  "NFTs",
+                                      "staffer":  "Unique-Snowflake Skald"
+                                  },
+                                  {
+                                      "property":  "Tax Increment Financing",
+                                      "staffer":  "District Frost-Levy Seer"
+                                  },
+                                  {
+                                      "property":  "Cross Border Distribution",
+                                      "staffer":  "Floe-Crossing Cargo Master"
+                                  },
+                                  {
+                                      "property":  "Money Laundering",
+                                      "staffer":  "Glacial Meltwater Purifier"
+                                  },
+                                  {
+                                      "property":  "Day Trading",
+                                      "staffer":  "Vulgar Haste Speculator"
+                                  },
+                                  {
+                                      "property":  "Flipping Houses",
+                                      "staffer":  "Longhouse Turnover Jarl"
+                                  },
+                                  {
+                                      "property":  "Multi Level Marketing",
+                                      "staffer":  "Snowball-Scheme Recruiter"
+                                  },
+                                  {
+                                      "property":  "Hedge Fund",
+                                      "staffer":  "Wealth-Hoard Hedgemaster"
+                                  },
+                                  {
+                                      "property":  "Legislative Assets",
+                                      "staffer":  "Althing Vote-Hoarder"
+                                  },
+                                  {
+                                      "property":  "Executive Assets",
+                                      "staffer":  "High-Jarl Purse Keeper"
+                                  },
+                                  {
+                                      "property":  "Photon Exchange",
+                                      "staffer":  "Aurora-Light Barterer"
+                                  },
+                                  {
+                                      "property":  "Beam Utilities",
+                                      "staffer":  "Sunbeam Ration Warden"
+                                  },
+                                  {
+                                      "property":  "Solar Futures Desk",
+                                      "staffer":  "Midnight-Sun Futures Seer"
+                                  },
+                                  {
+                                      "property":  "Dyson Holdings",
+                                      "staffer":  "Sun-Cage Holdings Thane"
+                                  },
+                                  {
+                                      "property":  "Starcore Syndicate",
+                                      "staffer":  "Starheart Forge Elder"
+                                  },
+                                  {
+                                      "property":  "Data Foundry",
+                                      "staffer":  "Rune-Data Carver"
+                                  },
+                                  {
+                                      "property":  "Server Metropolis",
+                                      "staffer":  "Cold-Server Hall Warden"
+                                  },
+                                  {
+                                      "property":  "Algorithm Mines",
+                                      "staffer":  "Logic-Seam Delver"
+                                  }
+                              ]
+}

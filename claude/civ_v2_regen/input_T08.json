@@ -1,0 +1,128 @@
+﻿{
+    "tier":  8,
+    "civilization":  "Ssethraki Coil-Banks",
+    "home_planet":  "Ssethra",
+    "currency":  "Premiums",
+    "accent_color":  "4f7942",
+    "hail":  "Sssalutationsss, sssoft-ssskinned asssset. Our sssensorsss indicate you are — how tragic — entirely uninsssured. Sssign here, and here, and initial here; the sssqueeze you feel is ssimply the coverage taking hold.",
+    "contact_line":  "Serpents who founded a religion on insurance, then built a civilization on the paperwork. Their embrace is total coverage — in the constrictor sense.",
+    "existing_properties":  [
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  4.259E+36,
+                                    "property":  "Venom Underwriting",
+                                    "staffer_name":  "Chief Venom Underwriter",
+                                    "unit_cost":  2.335E+38
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  2.982E+37,
+                                    "property":  "Molt Reinsurance",
+                                    "staffer_name":  "Second-Skin Reinsurer",
+                                    "unit_cost":  1.635E+39
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  2.087E+38,
+                                    "property":  "Coilfold Annuities",
+                                    "staffer_name":  "Coilfold Annuity Actuary",
+                                    "unit_cost":  1.144E+40
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  1.461E+39,
+                                    "property":  "Actuarial Temple",
+                                    "staffer_name":  "High Priest of Premiums",
+                                    "unit_cost":  8.009E+40
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  1.023E+40,
+                                    "property":  "The Ouroboros Perpetuity",
+                                    "staffer_name":  "Ouroboros Perpetuity Trustee",
+                                    "unit_cost":  5.607E+41
+                                }
+                            ],
+    "sample_roster_entries":  [
+                                  {
+                                      "property":  "ATM",
+                                      "staffer":  "Cold-Blooded Teller"
+                                  },
+                                  {
+                                      "property":  "Money Tree",
+                                      "staffer":  "Tree-Coiled Cultivator"
+                                  },
+                                  {
+                                      "property":  "NFTs",
+                                      "staffer":  "Shed-Skin Token Appraiser"
+                                  },
+                                  {
+                                      "property":  "Tax Increment Financing",
+                                      "staffer":  "Municipal Squeeze Actuary"
+                                  },
+                                  {
+                                      "property":  "Cross Border Distribution",
+                                      "staffer":  "Slither-Route Logistician"
+                                  },
+                                  {
+                                      "property":  "Money Laundering",
+                                      "staffer":  "Clean Molt Specialist"
+                                  },
+                                  {
+                                      "property":  "Day Trading",
+                                      "staffer":  "Strike-Window Trader"
+                                  },
+                                  {
+                                      "property":  "Flipping Houses",
+                                      "staffer":  "Nest Turnover Adjuster"
+                                  },
+                                  {
+                                      "property":  "Multi Level Marketing",
+                                      "staffer":  "Coil-Upon-Coil Recruiter"
+                                  },
+                                  {
+                                      "property":  "Hedge Fund",
+                                      "staffer":  "Hedgerow Ambush Manager"
+                                  },
+                                  {
+                                      "property":  "Legislative Assets",
+                                      "staffer":  "Capitol Pit Lobbyist"
+                                  },
+                                  {
+                                      "property":  "Executive Assets",
+                                      "staffer":  "Chief Constrictor of Staff"
+                                  },
+                                  {
+                                      "property":  "Photon Exchange",
+                                      "staffer":  "Basking Exchange Broker"
+                                  },
+                                  {
+                                      "property":  "Beam Utilities",
+                                      "staffer":  "Heat-Lamp Utilities Warden"
+                                  },
+                                  {
+                                      "property":  "Solar Futures Desk",
+                                      "staffer":  "Solar Bask Actuary"
+                                  },
+                                  {
+                                      "property":  "Dyson Holdings",
+                                      "staffer":  "Star-Encoiling Foreman"
+                                  },
+                                  {
+                                      "property":  "Starcore Syndicate",
+                                      "staffer":  "Starcore Clutch Magnate"
+                                  },
+                                  {
+                                      "property":  "Data Foundry",
+                                      "staffer":  "Cold Logic Underwriter"
+                                  },
+                                  {
+                                      "property":  "Server Metropolis",
+                                      "staffer":  "Server Den Warden"
+                                  },
+                                  {
+                                      "property":  "Algorithm Mines",
+                                      "staffer":  "Recursive Coil Miner"
+                                  }
+                              ]
+}

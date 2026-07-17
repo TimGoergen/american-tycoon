@@ -1,0 +1,128 @@
+﻿{
+    "tier":  20,
+    "civilization":  "Mirror Meridian",
+    "home_planet":  "Speculum",
+    "currency":  "Reflections",
+    "accent_color":  "8e99a4",
+    "hail":  "ɘmoɔlɘW. Welcome — you say it, we say it back, and the saying-back is billable. You built an empire; an empire built you; both of you now appear in our catalogue, and appearances are never free.",
+    "contact_line":  "Beings of pure reflection who sold you a copy of yourself before you finished waving. The royalties on your own face are already past due.",
+    "existing_properties":  [
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  2.163E+87,
+                                    "property":  "Mirror Mints",
+                                    "staffer_name":  "Mirror Mint Engraver",
+                                    "unit_cost":  1.186E+89
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  1.515E+88,
+                                    "property":  "Doppelganger Staffing",
+                                    "staffer_name":  "Chief Doppelganger Recruiter",
+                                    "unit_cost":  8.304E+89
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  1.06E+89,
+                                    "property":  "Vanity Exchanges",
+                                    "staffer_name":  "Vanity Floor Flatterer",
+                                    "unit_cost":  5.813E+90
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  7.422E+89,
+                                    "property":  "Reflection Royalties",
+                                    "staffer_name":  "Likeness Royalty Collector",
+                                    "unit_cost":  4.069E+91
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  5.195E+90,
+                                    "property":  "The Infinite Regress",
+                                    "staffer_name":  "Regent of the Regress",
+                                    "unit_cost":  2.848E+92
+                                }
+                            ],
+    "sample_roster_entries":  [
+                                  {
+                                      "property":  "ATM",
+                                      "staffer":  "Reflected Teller"
+                                  },
+                                  {
+                                      "property":  "Money Tree",
+                                      "staffer":  "Twin Grove Cultivator"
+                                  },
+                                  {
+                                      "property":  "NFTs",
+                                      "staffer":  "Facsimile Curator"
+                                  },
+                                  {
+                                      "property":  "Tax Increment Financing",
+                                      "staffer":  "Symmetry Auditor"
+                                  },
+                                  {
+                                      "property":  "Cross Border Distribution",
+                                      "staffer":  "Looking-Glass Courier"
+                                  },
+                                  {
+                                      "property":  "Money Laundering",
+                                      "staffer":  "Image Rehabilitation Specialist"
+                                  },
+                                  {
+                                      "property":  "Day Trading",
+                                      "staffer":  "Mirrored Day-Trader"
+                                  },
+                                  {
+                                      "property":  "Flipping Houses",
+                                      "staffer":  "Reflection Flipper"
+                                  },
+                                  {
+                                      "property":  "Multi Level Marketing",
+                                      "staffer":  "Self-Replicating Recruiter"
+                                  },
+                                  {
+                                      "property":  "Hedge Fund",
+                                      "staffer":  "Two-Faced Fund Manager"
+                                  },
+                                  {
+                                      "property":  "Legislative Assets",
+                                      "staffer":  "Smoke-and-Mirrors Lobbyist"
+                                  },
+                                  {
+                                      "property":  "Executive Assets",
+                                      "staffer":  "Mirror-Image Chief of Staff"
+                                  },
+                                  {
+                                      "property":  "Photon Exchange",
+                                      "staffer":  "Glint Exchange Broker"
+                                  },
+                                  {
+                                      "property":  "Beam Utilities",
+                                      "staffer":  "Beam Bounce Operator"
+                                  },
+                                  {
+                                      "property":  "Solar Futures Desk",
+                                      "staffer":  "Sunglint Futures Broker"
+                                  },
+                                  {
+                                      "property":  "Dyson Holdings",
+                                      "staffer":  "Dyson Mirror-Array Foreman"
+                                  },
+                                  {
+                                      "property":  "Starcore Syndicate",
+                                      "staffer":  "Starlight Reflector Magnate"
+                                  },
+                                  {
+                                      "property":  "Data Foundry",
+                                      "staffer":  "Mirror Foundry"
+                                  },
+                                  {
+                                      "property":  "Server Metropolis",
+                                      "staffer":  "Mirror-Server Warden"
+                                  },
+                                  {
+                                      "property":  "Algorithm Mines",
+                                      "staffer":  "Recursive Mine Foreman"
+                                  }
+                              ]
+}

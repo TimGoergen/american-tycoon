@@ -1,0 +1,42 @@
+{
+    "tier": 21,
+    "civilization": "Ossuary Compact",
+    "new_properties": [
+        {
+            "property": "Columbarium Exchange",
+            "staffer": "Urn Placement Broker"
+        },
+        {
+            "property": "Cenotaph Securities",
+            "staffer": "Cenotaph Underwriter"
+        },
+        {
+            "property": "Charnel Clearinghouse",
+            "staffer": "Charnel House Clearing Clerk"
+        },
+        {
+            "property": "Eulogy Underwriting",
+            "staffer": "Eulogy Actuary"
+        },
+        {
+            "property": "Seance Brokerage",
+            "staffer": "Licensed Medium of Exchange"
+        },
+        {
+            "property": "Barrow Bond Market",
+            "staffer": "Barrow Bondsman"
+        },
+        {
+            "property": "Necropolis Bourse",
+            "staffer": "Graveshift Floor Trader"
+        },
+        {
+            "property": "Purgatory Escrow",
+            "staffer": "Purgatorial Escrow Agent"
+        },
+        {
+            "property": "Afterlife Sovereign Fund",
+            "staffer": "Sovereign Wealth Wraith"
+        }
+    ]
+}

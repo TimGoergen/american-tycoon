@@ -1,0 +1,42 @@
+{
+    "tier": 25,
+    "civilization": "The Null Ledger",
+    "new_properties": [
+        {
+            "property": "Half-Life Holdings",
+            "staffer": "Half-Life Portfolio Manager"
+        },
+        {
+            "property": "Redshift Receivership",
+            "staffer": "Receiver of Fading Light"
+        },
+        {
+            "property": "Vacuum Decay Futures",
+            "staffer": "False Vacuum Underwriter"
+        },
+        {
+            "property": "Proton Decay Trusts",
+            "staffer": "Proton Decay Trustee"
+        },
+        {
+            "property": "Stellar Foreclosure Courts",
+            "staffer": "Stellar Foreclosure Magistrate"
+        },
+        {
+            "property": "Galactic Liquidation Fleets",
+            "staffer": "Liquidator of Galaxies"
+        },
+        {
+            "property": "Black Hole Escrow",
+            "staffer": "Event Horizon Escrow Officer"
+        },
+        {
+            "property": "Universal Write-Down Office",
+            "staffer": "Comptroller of Cosmic Write-Downs"
+        },
+        {
+            "property": "The Penultimate Kelvin",
+            "staffer": "Custodian of the Penultimate Kelvin"
+        }
+    ]
+}

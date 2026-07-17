@@ -1,0 +1,128 @@
+﻿{
+    "tier":  11,
+    "civilization":  "The Resonant Octave",
+    "home_planet":  "Cadenza",
+    "currency":  "Notes",
+    "accent_color":  "544e9e",
+    "hail":  "♪ hush… we heard your fortune humming from across the void, and darling, it was flat ♪ every coin that clinks is a note, and every note is licensed to US ♪ so begin quietly, invest steadily, and TOGETHER WE SHALL CRESCENDO ♪",
+    "contact_line":  "Beings made entirely of sound, and every note they\u0027ve ever sung is under copyright. Try not to hum anything — it\u0027s licensed.",
+    "existing_properties":  [
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  2.023E+49,
+                                    "property":  "Jingle Licensing",
+                                    "staffer_name":  "Earworm Licensing Agent",
+                                    "unit_cost":  1.109E+51
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  1.415E+50,
+                                    "property":  "Chord Cartel",
+                                    "staffer_name":  "Power Chord Enforcer",
+                                    "unit_cost":  7.76E+51
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  9.908E+50,
+                                    "property":  "Anthem Rights Bureau",
+                                    "staffer_name":  "Anthem Rights Registrar",
+                                    "unit_cost":  5.432E+52
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  6.935E+51,
+                                    "property":  "Symphony Futures",
+                                    "staffer_name":  "Unfinished Symphony Broker",
+                                    "unit_cost":  3.802E+53
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  4.855E+52,
+                                    "property":  "The Final Movement",
+                                    "staffer_name":  "Conductor of the Final Movement",
+                                    "unit_cost":  2.662E+54
+                                }
+                            ],
+    "sample_roster_entries":  [
+                                  {
+                                      "property":  "ATM",
+                                      "staffer":  "Coin-Chime Teller"
+                                  },
+                                  {
+                                      "property":  "Money Tree",
+                                      "staffer":  "Windchime Arborist"
+                                  },
+                                  {
+                                      "property":  "NFTs",
+                                      "staffer":  "One-Hit Wonder Curator"
+                                  },
+                                  {
+                                      "property":  "Tax Increment Financing",
+                                      "staffer":  "Tempo Increment Auditor"
+                                  },
+                                  {
+                                      "property":  "Cross Border Distribution",
+                                      "staffer":  "World Tour Roadie Captain"
+                                  },
+                                  {
+                                      "property":  "Money Laundering",
+                                      "staffer":  "Uncredited Remix Engineer"
+                                  },
+                                  {
+                                      "property":  "Day Trading",
+                                      "staffer":  "Sight-Reading Day-Trader"
+                                  },
+                                  {
+                                      "property":  "Flipping Houses",
+                                      "staffer":  "B-Side Flipper"
+                                  },
+                                  {
+                                      "property":  "Multi Level Marketing",
+                                      "staffer":  "Fan Club Recruiter"
+                                  },
+                                  {
+                                      "property":  "Hedge Fund",
+                                      "staffer":  "Perfect-Pitch Fund Manager"
+                                  },
+                                  {
+                                      "property":  "Legislative Assets",
+                                      "staffer":  "Payola Lobbyist"
+                                  },
+                                  {
+                                      "property":  "Executive Assets",
+                                      "staffer":  "Maestro Chief of Staff"
+                                  },
+                                  {
+                                      "property":  "Photon Exchange",
+                                      "staffer":  "Light-Motif Broker"
+                                  },
+                                  {
+                                      "property":  "Beam Utilities",
+                                      "staffer":  "Beam Resonance Tuner"
+                                  },
+                                  {
+                                      "property":  "Solar Futures Desk",
+                                      "staffer":  "Sunrise Overture Trader"
+                                  },
+                                  {
+                                      "property":  "Dyson Holdings",
+                                      "staffer":  "Sphere-Harmonic Foreman"
+                                  },
+                                  {
+                                      "property":  "Starcore Syndicate",
+                                      "staffer":  "Stellar Chorus Magnate"
+                                  },
+                                  {
+                                      "property":  "Data Foundry",
+                                      "staffer":  "Waveform Foundry Chief"
+                                  },
+                                  {
+                                      "property":  "Server Metropolis",
+                                      "staffer":  "Synth Rack Warden"
+                                  },
+                                  {
+                                      "property":  "Algorithm Mines",
+                                      "staffer":  "Algo-Rhythm Miner"
+                                  }
+                              ]
+}

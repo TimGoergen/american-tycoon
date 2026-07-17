@@ -1,0 +1,128 @@
+﻿{
+    "tier":  23,
+    "civilization":  "Vek-Tor Kollektiv",
+    "home_planet":  "Kartoteka",
+    "currency":  "Stamps",
+    "accent_color":  "9e2b25",
+    "hail":  "Greetings, applicant. Your First Contact request (ФОРМА 88-Б, submitted in triplicate) has been received, stamped ОДОБРЕНО, and filed under PENDING — ВЕЧНО. Please join Queue 7,441-В; your commerce will be processed in the order in which it was inherited.",
+    "contact_line":  "A bureaucracy so old the forms have outlived three civilizations, including the one that printed them. Take a number; eternity is running slightly behind.",
+    "existing_properties":  [
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  1.027E+100,
+                                    "property":  "Queue Concessions",
+                                    "staffer_name":  "Queue Marshal, First Class",
+                                    "unit_cost":  5.632E+101
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  7.19E+100,
+                                    "property":  "Rubber Stamp Foundries",
+                                    "staffer_name":  "Stamp Foundry Commissar",
+                                    "unit_cost":  3.942E+102
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  5.034E+101,
+                                    "property":  "Permit Pyramids",
+                                    "staffer_name":  "Permit Pyramid Overseer",
+                                    "unit_cost":  2.76E+103
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  3.524E+102,
+                                    "property":  "Committee of Committees",
+                                    "staffer_name":  "Chairman of All Chairmen",
+                                    "unit_cost":  1.932E+104
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  2.466E+103,
+                                    "property":  "The Central Plan",
+                                    "staffer_name":  "First Secretary of the Plan",
+                                    "unit_cost":  1.352E+105
+                                }
+                            ],
+    "sample_roster_entries":  [
+                                  {
+                                      "property":  "ATM",
+                                      "staffer":  "Window No. 7 Teller"
+                                  },
+                                  {
+                                      "property":  "Money Tree",
+                                      "staffer":  "Botanical Permit Clerk"
+                                  },
+                                  {
+                                      "property":  "NFTs",
+                                      "staffer":  "Novelty Asset Registrar"
+                                  },
+                                  {
+                                      "property":  "Tax Increment Financing",
+                                      "staffer":  "Increment Filing Commissar"
+                                  },
+                                  {
+                                      "property":  "Cross Border Distribution",
+                                      "staffer":  "Customs Stamp Attache"
+                                  },
+                                  {
+                                      "property":  "Money Laundering",
+                                      "staffer":  "Records Correction Officer"
+                                  },
+                                  {
+                                      "property":  "Day Trading",
+                                      "staffer":  "Same-Day Approval Expediter"
+                                  },
+                                  {
+                                      "property":  "Flipping Houses",
+                                      "staffer":  "Dwelling Reassignment Clerk"
+                                  },
+                                  {
+                                      "property":  "Multi Level Marketing",
+                                      "staffer":  "Downline Directorate Recruiter"
+                                  },
+                                  {
+                                      "property":  "Hedge Fund",
+                                      "staffer":  "Contingency Fund Comptroller"
+                                  },
+                                  {
+                                      "property":  "Legislative Assets",
+                                      "staffer":  "Statute Drafting Apparatchik"
+                                  },
+                                  {
+                                      "property":  "Executive Assets",
+                                      "staffer":  "Politburo Chief of Staff"
+                                  },
+                                  {
+                                      "property":  "Photon Exchange",
+                                      "staffer":  "Photon Requisition Clerk"
+                                  },
+                                  {
+                                      "property":  "Beam Utilities",
+                                      "staffer":  "Beam Utility Inspector"
+                                  },
+                                  {
+                                      "property":  "Solar Futures Desk",
+                                      "staffer":  "Solar Forecast Undersecretary"
+                                  },
+                                  {
+                                      "property":  "Dyson Holdings",
+                                      "staffer":  "Dyson Zoning Commissar"
+                                  },
+                                  {
+                                      "property":  "Starcore Syndicate",
+                                      "staffer":  "Starcore Licensing Chief"
+                                  },
+                                  {
+                                      "property":  "Data Foundry",
+                                      "staffer":  "Data Intake Processor"
+                                  },
+                                  {
+                                      "property":  "Server Metropolis",
+                                      "staffer":  "Municipal Server Registrar"
+                                  },
+                                  {
+                                      "property":  "Algorithm Mines",
+                                      "staffer":  "Algorithm Extraction Auditor"
+                                  }
+                              ]
+}

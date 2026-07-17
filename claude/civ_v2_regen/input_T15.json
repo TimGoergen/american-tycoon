@@ -1,0 +1,128 @@
+﻿{
+    "tier":  15,
+    "civilization":  "Oneiroi Drift",
+    "home_planet":  "Somnia",
+    "currency":  "REMs",
+    "accent_color":  "8f7bb5",
+    "hail":  "you were somewhere warm... a staircase, an empire, your teeth were falling out and every tooth was a coin... lovely, that one. that will be forty thousand REMs... payable before you wake.",
+    "contact_line":  "They have been selling you dreams your whole life, strictly on credit. Last night\u0027s invoice is already overdue.",
+    "existing_properties":  [
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  1.614E+66,
+                                    "property":  "Sleep Debt Collections",
+                                    "staffer_name":  "Sleep Debt Repo Agent",
+                                    "unit_cost":  8.846E+67
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  1.129E+67,
+                                    "property":  "Lucid Licensing",
+                                    "staffer_name":  "Lucidity Licensing Clerk",
+                                    "unit_cost":  6.192E+68
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  7.905E+67,
+                                    "property":  "Nightmare Insurance",
+                                    "staffer_name":  "Nightmare Claims Adjuster",
+                                    "unit_cost":  4.334E+69
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  5.534E+68,
+                                    "property":  "Subconscious Real Estate",
+                                    "staffer_name":  "Subconscious Estate Agent",
+                                    "unit_cost":  3.034E+70
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  3.874E+69,
+                                    "property":  "The Waking Monopoly",
+                                    "staffer_name":  "Monopolist of the Waking Hour",
+                                    "unit_cost":  2.124E+71
+                                }
+                            ],
+    "sample_roster_entries":  [
+                                  {
+                                      "property":  "ATM",
+                                      "staffer":  "Sleepwalking Teller"
+                                  },
+                                  {
+                                      "property":  "Money Tree",
+                                      "staffer":  "Dream Orchard Tender"
+                                  },
+                                  {
+                                      "property":  "NFTs",
+                                      "staffer":  "Hypnagogic Image Curator"
+                                  },
+                                  {
+                                      "property":  "Tax Increment Financing",
+                                      "staffer":  "Drowsy District Assessor"
+                                  },
+                                  {
+                                      "property":  "Cross Border Distribution",
+                                      "staffer":  "Threshold-of-Sleep Smuggler"
+                                  },
+                                  {
+                                      "property":  "Money Laundering",
+                                      "staffer":  "Bad Memory Launderer"
+                                  },
+                                  {
+                                      "property":  "Day Trading",
+                                      "staffer":  "Daydream Trader"
+                                  },
+                                  {
+                                      "property":  "Flipping Houses",
+                                      "staffer":  "Recurring Dream-House Flipper"
+                                  },
+                                  {
+                                      "property":  "Multi Level Marketing",
+                                      "staffer":  "Shared Dream Recruiter"
+                                  },
+                                  {
+                                      "property":  "Hedge Fund",
+                                      "staffer":  "Subconscious Hedge Manager"
+                                  },
+                                  {
+                                      "property":  "Legislative Assets",
+                                      "staffer":  "Dream Logic Lobbyist"
+                                  },
+                                  {
+                                      "property":  "Executive Assets",
+                                      "staffer":  "Chief of Slumber"
+                                  },
+                                  {
+                                      "property":  "Photon Exchange",
+                                      "staffer":  "Moonbeam Exchange Broker"
+                                  },
+                                  {
+                                      "property":  "Beam Utilities",
+                                      "staffer":  "Nightlight Utilities Warden"
+                                  },
+                                  {
+                                      "property":  "Solar Futures Desk",
+                                      "staffer":  "Tomorrow-Morning Futures Broker"
+                                  },
+                                  {
+                                      "property":  "Dyson Holdings",
+                                      "staffer":  "Dreamcatcher Sphere Engineer"
+                                  },
+                                  {
+                                      "property":  "Starcore Syndicate",
+                                      "staffer":  "Wish-Upon-a-Star Syndic"
+                                  },
+                                  {
+                                      "property":  "Data Foundry",
+                                      "staffer":  "Dream Journal Foundryman"
+                                  },
+                                  {
+                                      "property":  "Server Metropolis",
+                                      "staffer":  "Sleeping City Sysop"
+                                  },
+                                  {
+                                      "property":  "Algorithm Mines",
+                                      "staffer":  "Deep-Sleep Pattern Miner"
+                                  }
+                              ]
+}

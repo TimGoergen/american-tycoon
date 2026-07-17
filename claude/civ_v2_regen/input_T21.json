@@ -1,0 +1,128 @@
+﻿{
+    "tier":  21,
+    "civilization":  "Ossuary Compact",
+    "home_planet":  "Ossuar",
+    "currency":  "Heirlooms",
+    "accent_color":  "7d7259",
+    "hail":  "Our deepest condolences on your continued liquidity; the arrangement fee appears as line item one. The departed partners reviewed your portfolio at last evening\u0027s interment and have voted, unanimously, to acquire you. Please, take all the time you need — it accrues at the standard rate.",
+    "contact_line":  "Inheritance bankers whose board of directors has been dead for centuries — attendance remains perfect. Here, dying is simply a lateral move into senior management.",
+    "existing_properties":  [
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  3.637E+91,
+                                    "property":  "Probate Catacombs",
+                                    "staffer_name":  "Catacomb Probate Clerk",
+                                    "unit_cost":  1.994E+93
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  2.546E+92,
+                                    "property":  "Ancestor Annuities",
+                                    "staffer_name":  "Ancestral Disbursement Officer",
+                                    "unit_cost":  1.396E+94
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  1.782E+93,
+                                    "property":  "Mausoleum Realty",
+                                    "staffer_name":  "Mausoleum Leasing Agent",
+                                    "unit_cost":  9.769E+94
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  1.247E+94,
+                                    "property":  "Reliquary Trusts",
+                                    "staffer_name":  "Reliquary Trustee",
+                                    "unit_cost":  6.839E+95
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  8.731E+94,
+                                    "property":  "The Estate Eternal",
+                                    "staffer_name":  "Executor Everlasting",
+                                    "unit_cost":  4.787E+96
+                                }
+                            ],
+    "sample_roster_entries":  [
+                                  {
+                                      "property":  "ATM",
+                                      "staffer":  "Ferryman\u0027s Toll Teller"
+                                  },
+                                  {
+                                      "property":  "Money Tree",
+                                      "staffer":  "Family Tree Arborist"
+                                  },
+                                  {
+                                      "property":  "NFTs",
+                                      "staffer":  "Digital Remains Curator"
+                                  },
+                                  {
+                                      "property":  "Tax Increment Financing",
+                                      "staffer":  "Estate Tax Embalmer"
+                                  },
+                                  {
+                                      "property":  "Cross Border Distribution",
+                                      "staffer":  "Beyond-the-Veil Courier"
+                                  },
+                                  {
+                                      "property":  "Money Laundering",
+                                      "staffer":  "Posthumous Asset Cleanser"
+                                  },
+                                  {
+                                      "property":  "Day Trading",
+                                      "staffer":  "Mourning Session Trader"
+                                  },
+                                  {
+                                      "property":  "Flipping Houses",
+                                      "staffer":  "Burial Plot Resale Agent"
+                                  },
+                                  {
+                                      "property":  "Multi Level Marketing",
+                                      "staffer":  "Descendant Downline Recruiter"
+                                  },
+                                  {
+                                      "property":  "Hedge Fund",
+                                      "staffer":  "Perpetual Care Fund Manager"
+                                  },
+                                  {
+                                      "property":  "Legislative Assets",
+                                      "staffer":  "Dead Hand Lobbyist"
+                                  },
+                                  {
+                                      "property":  "Executive Assets",
+                                      "staffer":  "Chief Executor Officer"
+                                  },
+                                  {
+                                      "property":  "Photon Exchange",
+                                      "staffer":  "Eternal Flame Broker"
+                                  },
+                                  {
+                                      "property":  "Beam Utilities",
+                                      "staffer":  "Votive Beam Warden"
+                                  },
+                                  {
+                                      "property":  "Solar Futures Desk",
+                                      "staffer":  "Sunset Futures Officiant"
+                                  },
+                                  {
+                                      "property":  "Dyson Holdings",
+                                      "staffer":  "Star-Shroud Custodian"
+                                  },
+                                  {
+                                      "property":  "Starcore Syndicate",
+                                      "staffer":  "Dying Star Executor"
+                                  },
+                                  {
+                                      "property":  "Data Foundry",
+                                      "staffer":  "Death Records Archivist"
+                                  },
+                                  {
+                                      "property":  "Server Metropolis",
+                                      "staffer":  "Necropolis Server Sexton"
+                                  },
+                                  {
+                                      "property":  "Algorithm Mines",
+                                      "staffer":  "Mortality Table Miner"
+                                  }
+                              ]
+}

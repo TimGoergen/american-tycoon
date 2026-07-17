@@ -1,0 +1,34 @@
+{
+    "tier": 8,
+    "civilization": "Ssethraki Coil-Banks",
+    "new_properties": [
+        {
+            "property": "Fang Liability Consortium",
+            "staffer": "Bite-Wound Claims Adjuster"
+        },
+        {
+            "property": "Hatchling Whole-Life",
+            "staffer": "Clutch Policy Broker"
+        },
+        {
+            "property": "Brumation Escrow Vaults",
+            "staffer": "Deep-Sleep Escrow Custodian"
+        },
+        {
+            "property": "Constriction Claims Tribunal",
+            "staffer": "Grand Squeeze Arbiter"
+        },
+        {
+            "property": "Planetary Coverage Coils",
+            "staffer": "World-Wrap Policy Magnate"
+        },
+        {
+            "property": "Extinction Rider Exchange",
+            "staffer": "Doomsday Rider Broker"
+        },
+        {
+            "property": "Stellar Collapse Indemnity",
+            "staffer": "Supernova Exclusions Actuary"
+        }
+    ]
+}

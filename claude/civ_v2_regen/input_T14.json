@@ -1,0 +1,128 @@
+﻿{
+    "tier":  14,
+    "civilization":  "The Politesse Ascendancy",
+    "home_planet":  "Decorum",
+    "currency":  "Regards",
+    "accent_color":  "9e6b8a",
+    "hail":  "How dreadfully kind of you to answer — we do hope the intrusion is not too great a bother. We have taken the small liberty of opening an account in your name; terribly sorry to mention the interest, which began, regrettably, some time ago. Do give our warmest regards to your assets, while they remain yours.",
+    "contact_line":  "They will apologize for the invoice, the interest, and the repossession — in that order, on monogrammed stationery.",
+    "existing_properties":  [
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  9.6E+61,
+                                    "property":  "Courtesy Tolls",
+                                    "staffer_name":  "Courtesy Toll Collector",
+                                    "unit_cost":  5.263E+63
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  6.72E+62,
+                                    "property":  "Apology Notary",
+                                    "staffer_name":  "Sincerest Apology Notary",
+                                    "unit_cost":  3.684E+64
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  4.704E+63,
+                                    "property":  "Invitation Futures",
+                                    "staffer_name":  "Invitation Futures Broker",
+                                    "unit_cost":  2.579E+65
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  3.292E+64,
+                                    "property":  "Grudge Endowment",
+                                    "staffer_name":  "Grudge Portfolio Steward",
+                                    "unit_cost":  1.805E+66
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  2.306E+65,
+                                    "property":  "The Last Word Estate",
+                                    "staffer_name":  "Last Word Executor",
+                                    "unit_cost":  1.264E+67
+                                }
+                            ],
+    "sample_roster_entries":  [
+                                  {
+                                      "property":  "ATM",
+                                      "staffer":  "Gratuity Dispensation Butler"
+                                  },
+                                  {
+                                      "property":  "Money Tree",
+                                      "staffer":  "Hostess Gift Arborist"
+                                  },
+                                  {
+                                      "property":  "NFTs",
+                                      "staffer":  "Calling Card Curator"
+                                  },
+                                  {
+                                      "property":  "Tax Increment Financing",
+                                      "staffer":  "Tactful Levy Secretary"
+                                  },
+                                  {
+                                      "property":  "Cross Border Distribution",
+                                      "staffer":  "Traveling Regards Courier"
+                                  },
+                                  {
+                                      "property":  "Money Laundering",
+                                      "staffer":  "Discreet Reputation Launderer"
+                                  },
+                                  {
+                                      "property":  "Day Trading",
+                                      "staffer":  "Polite Interruption Broker"
+                                  },
+                                  {
+                                      "property":  "Flipping Houses",
+                                      "staffer":  "Housewarming Turnover Host"
+                                  },
+                                  {
+                                      "property":  "Multi Level Marketing",
+                                      "staffer":  "Introduction Chain Chaperone"
+                                  },
+                                  {
+                                      "property":  "Hedge Fund",
+                                      "staffer":  "Genteel Hedging Steward"
+                                  },
+                                  {
+                                      "property":  "Legislative Assets",
+                                      "staffer":  "Parliamentary Manners Whip"
+                                  },
+                                  {
+                                      "property":  "Executive Assets",
+                                      "staffer":  "First Gentleman-in-Waiting"
+                                  },
+                                  {
+                                      "property":  "Photon Exchange",
+                                      "staffer":  "Radiant Pleasantries Teller"
+                                  },
+                                  {
+                                      "property":  "Beam Utilities",
+                                      "staffer":  "Well-Lit Welcome Warden"
+                                  },
+                                  {
+                                      "property":  "Solar Futures Desk",
+                                      "staffer":  "Sunny Disposition Forecaster"
+                                  },
+                                  {
+                                      "property":  "Dyson Holdings",
+                                      "staffer":  "Grand Chandelier Steward"
+                                  },
+                                  {
+                                      "property":  "Starcore Syndicate",
+                                      "staffer":  "Luminous Honors Registrar"
+                                  },
+                                  {
+                                      "property":  "Data Foundry",
+                                      "staffer":  "Punctilious Records Amanuensis"
+                                  },
+                                  {
+                                      "property":  "Server Metropolis",
+                                      "staffer":  "Head Butler of Servers"
+                                  },
+                                  {
+                                      "property":  "Algorithm Mines",
+                                      "staffer":  "Procedural Etiquette Drillmaster"
+                                  }
+                              ]
+}

@@ -1,0 +1,42 @@
+{
+    "tier": 26,
+    "civilization": "The Proprietors Absolute",
+    "new_properties": [
+        {
+            "property": "Soul Escrow Services",
+            "staffer": "Posthumous Asset Custodian"
+        },
+        {
+            "property": "Gravity Easement Office",
+            "staffer": "Fundamental Force Easement Agent"
+        },
+        {
+            "property": "Mathematics Licensing Bureau",
+            "staffer": "Arithmetic Royalty Auditor"
+        },
+        {
+            "property": "Timeshares in Time",
+            "staffer": "Fourth-Dimensional Leasing Agent"
+        },
+        {
+            "property": "Probability Trust Holdings",
+            "staffer": "Trustee of the Merely Possible"
+        },
+        {
+            "property": "Mortgages on Causality",
+            "staffer": "Cause-and-Effect Underwriter"
+        },
+        {
+            "property": "Eminent Domain of Reality",
+            "staffer": "Condemnor of Realities"
+        },
+        {
+            "property": "Divine Foreclosure Division",
+            "staffer": "Repossessor of Deities"
+        },
+        {
+            "property": "Escheat of the Multiverse",
+            "staffer": "Receiver of Unclaimed Universes"
+        }
+    ]
+}

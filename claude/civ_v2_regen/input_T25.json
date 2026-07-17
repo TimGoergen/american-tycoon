@@ -1,0 +1,128 @@
+﻿{
+    "tier":  25,
+    "civilization":  "The Null Ledger",
+    "home_planet":  "Asymptote",
+    "currency":  "Entropy Credits",
+    "accent_color":  "4e5860",
+    "hail":  "Audit commenced. ∑(your holdings) = a positive number, which is a temporary condition; ΔS \u003e 0, every margin → 0, and all accounts close at ∅. We have held a short position against your empire since before it existed — settlement is not a question of if, merely of when, and we are patient to the last kelvin.",
+    "contact_line":  "Auditors of the universe\u0027s slow bankruptcy, they have shorted everything that exists and are always, eventually, right. Your empire has just been marked down as a rounding error on the way to zero.",
+    "existing_properties":  [
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  2.902E+108,
+                                    "property":  "Zero-Sum Clearinghouses",
+                                    "staffer_name":  "Zero-Sum Clearing Officer",
+                                    "unit_cost":  1.591E+110
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  2.032E+109,
+                                    "property":  "Decay Arbitrage",
+                                    "staffer_name":  "Decay Arbitrageur",
+                                    "unit_cost":  1.114E+111
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  1.422E+110,
+                                    "property":  "Entropy Audit Bureaus",
+                                    "staffer_name":  "Chief Entropy Auditor",
+                                    "unit_cost":  7.795E+111
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  9.954E+110,
+                                    "property":  "Heat-Death Reserves",
+                                    "staffer_name":  "Heat-Death Reserve Governor",
+                                    "unit_cost":  5.457E+112
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  6.968E+111,
+                                    "property":  "The Final Balance",
+                                    "staffer_name":  "Auditor of the Final Balance",
+                                    "unit_cost":  3.82E+113
+                                }
+                            ],
+    "sample_roster_entries":  [
+                                  {
+                                      "property":  "ATM",
+                                      "staffer":  "Terminal Withdrawal Actuary"
+                                  },
+                                  {
+                                      "property":  "Money Tree",
+                                      "staffer":  "Depreciating Orchard Auditor"
+                                  },
+                                  {
+                                      "property":  "NFTs",
+                                      "staffer":  "Worthlessness Certifier"
+                                  },
+                                  {
+                                      "property":  "Tax Increment Financing",
+                                      "staffer":  "Diminishing Returns Assessor"
+                                  },
+                                  {
+                                      "property":  "Cross Border Distribution",
+                                      "staffer":  "Dissipation Logistics Clerk"
+                                  },
+                                  {
+                                      "property":  "Money Laundering",
+                                      "staffer":  "Cold-Cycle Launderer"
+                                  },
+                                  {
+                                      "property":  "Day Trading",
+                                      "staffer":  "Decay-Rate Day-Trader"
+                                  },
+                                  {
+                                      "property":  "Flipping Houses",
+                                      "staffer":  "Condemned Asset Flipper"
+                                  },
+                                  {
+                                      "property":  "Multi Level Marketing",
+                                      "staffer":  "Pyramid Collapse Forecaster"
+                                  },
+                                  {
+                                      "property":  "Hedge Fund",
+                                      "staffer":  "Universal Short Seller"
+                                  },
+                                  {
+                                      "property":  "Legislative Assets",
+                                      "staffer":  "Sunset Clause Lobbyist"
+                                  },
+                                  {
+                                      "property":  "Executive Assets",
+                                      "staffer":  "Chief of Diminishing Staff"
+                                  },
+                                  {
+                                      "property":  "Photon Exchange",
+                                      "staffer":  "Redshift Exchange Auditor"
+                                  },
+                                  {
+                                      "property":  "Beam Utilities",
+                                      "staffer":  "Dimming Grid Overseer"
+                                  },
+                                  {
+                                      "property":  "Solar Futures Desk",
+                                      "staffer":  "Stellar Decline Forecaster"
+                                  },
+                                  {
+                                      "property":  "Dyson Holdings",
+                                      "staffer":  "Dyson Depreciation Assessor"
+                                  },
+                                  {
+                                      "property":  "Starcore Syndicate",
+                                      "staffer":  "Star-Death Actuary"
+                                  },
+                                  {
+                                      "property":  "Data Foundry",
+                                      "staffer":  "Bit-Rot Foundry Examiner"
+                                  },
+                                  {
+                                      "property":  "Server Metropolis",
+                                      "staffer":  "Downtime Actuary"
+                                  },
+                                  {
+                                      "property":  "Algorithm Mines",
+                                      "staffer":  "Diminishing Yield Surveyor"
+                                  }
+                              ]
+}

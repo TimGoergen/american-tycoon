@@ -1,0 +1,42 @@
+{
+    "tier": 11,
+    "civilization": "The Resonant Octave",
+    "new_properties": [
+        {
+            "property": "Reverb Royalties",
+            "staffer": "Echo Residuals Collector"
+        },
+        {
+            "property": "Encore Futures",
+            "staffer": "Standing Ovation Wrangler"
+        },
+        {
+            "property": "Key Change Patents",
+            "staffer": "Modulation Patent Clerk"
+        },
+        {
+            "property": "Silence Easements",
+            "staffer": "Moment-of-Silence Assessor"
+        },
+        {
+            "property": "Octave Monopoly",
+            "staffer": "Twelve-Tone Scale Baron"
+        },
+        {
+            "property": "Planetary Reverb Chamber",
+            "staffer": "Atmospheric Acoustician"
+        },
+        {
+            "property": "Orbital Amphitheater",
+            "staffer": "Void Venue Impresario"
+        },
+        {
+            "property": "Spheres Music Exchange",
+            "staffer": "Celestial Harmonics Broker"
+        },
+        {
+            "property": "Cosmic Hum Licensing",
+            "staffer": "Primordial Drone Licensor"
+        }
+    ]
+}

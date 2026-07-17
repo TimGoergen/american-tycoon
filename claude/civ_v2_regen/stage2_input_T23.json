@@ -1,0 +1,1315 @@
+{
+  "tier": 23,
+  "civilization": "Vek-Tor Kollektiv",
+  "hail": "Greetings, applicant. Your First Contact request (ФОРМА 88-Б, submitted in triplicate) has been received, stamped ОДОБРЕНО, and filed under PENDING — ВЕЧНО. Please join Queue 7,441-В; your commerce will be processed in the order in which it was inherited.",
+  "currency": "Stamps",
+  "home_planet": "Kartoteka",
+  "voice_reference_existing_roster": [
+    {
+      "property": "ATM",
+      "staffer": "Window No. 7 Teller"
+    },
+    {
+      "property": "Money Tree",
+      "staffer": "Botanical Permit Clerk"
+    },
+    {
+      "property": "NFTs",
+      "staffer": "Novelty Asset Registrar"
+    },
+    {
+      "property": "Tax Increment Financing",
+      "staffer": "Increment Filing Commissar"
+    },
+    {
+      "property": "Cross Border Distribution",
+      "staffer": "Customs Stamp Attache"
+    },
+    {
+      "property": "Money Laundering",
+      "staffer": "Records Correction Officer"
+    },
+    {
+      "property": "Day Trading",
+      "staffer": "Same-Day Approval Expediter"
+    },
+    {
+      "property": "Flipping Houses",
+      "staffer": "Dwelling Reassignment Clerk"
+    },
+    {
+      "property": "Multi Level Marketing",
+      "staffer": "Downline Directorate Recruiter"
+    },
+    {
+      "property": "Hedge Fund",
+      "staffer": "Contingency Fund Comptroller"
+    },
+    {
+      "property": "Legislative Assets",
+      "staffer": "Statute Drafting Apparatchik"
+    },
+    {
+      "property": "Executive Assets",
+      "staffer": "Politburo Chief of Staff"
+    },
+    {
+      "property": "Photon Exchange",
+      "staffer": "Photon Requisition Clerk"
+    },
+    {
+      "property": "Beam Utilities",
+      "staffer": "Beam Utility Inspector"
+    },
+    {
+      "property": "Solar Futures Desk",
+      "staffer": "Solar Forecast Undersecretary"
+    },
+    {
+      "property": "Dyson Holdings",
+      "staffer": "Dyson Zoning Commissar"
+    },
+    {
+      "property": "Starcore Syndicate",
+      "staffer": "Starcore Licensing Chief"
+    },
+    {
+      "property": "Data Foundry",
+      "staffer": "Data Intake Processor"
+    },
+    {
+      "property": "Server Metropolis",
+      "staffer": "Municipal Server Registrar"
+    },
+    {
+      "property": "Algorithm Mines",
+      "staffer": "Algorithm Extraction Auditor"
+    },
+    {
+      "property": "Robo-Labor Agency",
+      "staffer": "Automated Labor Assignor"
+    },
+    {
+      "property": "Singularity Holdings",
+      "staffer": "Singularity Case Officer"
+    },
+    {
+      "property": "Spore Bank",
+      "staffer": "Spore Deposit Clerk"
+    },
+    {
+      "property": "Hyphae Networks",
+      "staffer": "Hyphae Routing Functionary"
+    },
+    {
+      "property": "Biomass Refinery",
+      "staffer": "Biomass Quota Inspector"
+    },
+    {
+      "property": "Terraforming Co-op",
+      "staffer": "Terraform Collective Secretary"
+    },
+    {
+      "property": "Biosphere Trust",
+      "staffer": "Biosphere Custodial Trustee"
+    },
+    {
+      "property": "Prism Vault",
+      "staffer": "Prism Inventory Warden"
+    },
+    {
+      "property": "Gem Exchange",
+      "staffer": "Gem Appraisal Notary"
+    },
+    {
+      "property": "Laser Lens Works",
+      "staffer": "Lens Standards Examiner"
+    },
+    {
+      "property": "Monolith Realty",
+      "staffer": "Monolith Deed Recorder"
+    },
+    {
+      "property": "Geode Dominion",
+      "staffer": "Geode Cadastral Surveyor"
+    },
+    {
+      "property": "Time Bank",
+      "staffer": "Hours Ledger Custodian"
+    },
+    {
+      "property": "Deadline Futures",
+      "staffer": "Deadline Extension Denier"
+    },
+    {
+      "property": "Moment Market",
+      "staffer": "Momentary Permit Vendor"
+    },
+    {
+      "property": "Eternity Escrow",
+      "staffer": "Eternity Escrow Archivist"
+    },
+    {
+      "property": "Causality Capital",
+      "staffer": "Cause-and-Effect Adjudicator"
+    },
+    {
+      "property": "Anglerlight Storefronts",
+      "staffer": "Storefront Signage Licensor"
+    },
+    {
+      "property": "Pressure Vaults",
+      "staffer": "Pressure Vault Inspector"
+    },
+    {
+      "property": "Trench Tollway",
+      "staffer": "Trench Toll Collector"
+    },
+    {
+      "property": "Leviathan Charter Fleet",
+      "staffer": "Fleet Charter Registrar"
+    },
+    {
+      "property": "Abyssal Sovereignty",
+      "staffer": "Abyssal Jurisdiction Clerk"
+    },
+    {
+      "property": "Venom Underwriting",
+      "staffer": "Venom Claims Adjuster"
+    },
+    {
+      "property": "Molt Reinsurance",
+      "staffer": "Molt Renewal Processor"
+    },
+    {
+      "property": "Coilfold Annuities",
+      "staffer": "Annuity Disbursement Officer"
+    },
+    {
+      "property": "Actuarial Temple",
+      "staffer": "Actuarial Rites Examiner"
+    },
+    {
+      "property": "The Ouroboros Perpetuity",
+      "staffer": "Perpetual Renewal Commissar"
+    },
+    {
+      "property": "Wax Works Combine",
+      "staffer": "Wax Seal Custodian"
+    },
+    {
+      "property": "Nectar Commodities",
+      "staffer": "Nectar Quota Assessor"
+    },
+    {
+      "property": "Drone Placement Agency",
+      "staffer": "Drone Assignment Clerk"
+    },
+    {
+      "property": "Honeycomb Estates",
+      "staffer": "Hexagonal Housing Registrar"
+    },
+    {
+      "property": "The Royal Jelly Reserve",
+      "staffer": "Jelly Reserve Comptroller"
+    },
+    {
+      "property": "Permafrost Ledgers",
+      "staffer": "Frozen Ledger Archivist"
+    },
+    {
+      "property": "Cold Storage Monopoly",
+      "staffer": "Cold Storage Licensor"
+    },
+    {
+      "property": "Glacier Calving Yards",
+      "staffer": "Calving Schedule Coordinator"
+    },
+    {
+      "property": "Avalanche Derivatives",
+      "staffer": "Avalanche Risk Assessor"
+    },
+    {
+      "property": "The Deep-Ice Endowment",
+      "staffer": "Deep-Ice Endowment Trustee"
+    },
+    {
+      "property": "Jingle Licensing",
+      "staffer": "Jingle License Examiner"
+    },
+    {
+      "property": "Chord Cartel",
+      "staffer": "Chord Registration Clerk"
+    },
+    {
+      "property": "Anthem Rights Bureau",
+      "staffer": "State Anthem Custodian"
+    },
+    {
+      "property": "Symphony Futures",
+      "staffer": "Symphony Scheduling Deputy"
+    },
+    {
+      "property": "The Final Movement",
+      "staffer": "Final Movement Rapporteur"
+    },
+    {
+      "property": "Redacted Ledgers",
+      "staffer": "Chief Redaction Officer"
+    },
+    {
+      "property": "Umbral Shell Foundry",
+      "staffer": "Shell Entity Incorporator"
+    },
+    {
+      "property": "Blackout Brokerage",
+      "staffer": "Blackout Clearance Broker"
+    },
+    {
+      "property": "Deniability Trust",
+      "staffer": "Plausible Deniability Notary"
+    },
+    {
+      "property": "The Unlit Exchange",
+      "staffer": "Unlisted Exchange Registrar"
+    },
+    {
+      "property": "Ransom Escrow",
+      "staffer": "Ransom Receipt Issuer"
+    },
+    {
+      "property": "Siege Logistics",
+      "staffer": "Siege Requisitions Quartermaster"
+    },
+    {
+      "property": "Mercenary Exchange",
+      "staffer": "Mercenary Contract Vetter"
+    },
+    {
+      "property": "War Bond Colosseum",
+      "staffer": "War Bond Ticket Clerk"
+    },
+    {
+      "property": "The Warhoard Citadel",
+      "staffer": "Warhoard Inventory Commissar"
+    },
+    {
+      "property": "Courtesy Tolls",
+      "staffer": "Courtesy Toll Collector"
+    },
+    {
+      "property": "Apology Notary",
+      "staffer": "Apology Certification Officer"
+    },
+    {
+      "property": "Invitation Futures",
+      "staffer": "Invitation Waitlist Manager"
+    },
+    {
+      "property": "Grudge Endowment",
+      "staffer": "Grudge Filing Registrar"
+    },
+    {
+      "property": "The Last Word Estate",
+      "staffer": "Final Correspondence Clerk"
+    },
+    {
+      "property": "Sleep Debt Collections",
+      "staffer": "Sleep Debt Collections Agent"
+    },
+    {
+      "property": "Lucid Licensing",
+      "staffer": "Lucidity Permit Issuer"
+    },
+    {
+      "property": "Nightmare Insurance",
+      "staffer": "Nightmare Claims Examiner"
+    },
+    {
+      "property": "Subconscious Real Estate",
+      "staffer": "Subconscious Zoning Officer"
+    },
+    {
+      "property": "The Waking Monopoly",
+      "staffer": "Waking Hours Comptroller"
+    },
+    {
+      "property": "Syllable Mint",
+      "staffer": "Syllable Mint Overseer"
+    },
+    {
+      "property": "Etymology Mines",
+      "staffer": "Etymology Excavation Recorder"
+    },
+    {
+      "property": "Thesaurus Vaults",
+      "staffer": "Synonym Vault Cataloguer"
+    },
+    {
+      "property": "Dead Language Estates",
+      "staffer": "Dead Language Executor"
+    },
+    {
+      "property": "The Unspeakable Lexicon",
+      "staffer": "Classified Lexicon Custodian"
+    },
+    {
+      "property": "Scrap Tithes",
+      "staffer": "Scrap Tithe Collector"
+    },
+    {
+      "property": "Rust Refineries",
+      "staffer": "Rust Refinery Inspector"
+    },
+    {
+      "property": "Alloy Dynasties",
+      "staffer": "Alloy Succession Registrar"
+    },
+    {
+      "property": "Smelter Sovereignty",
+      "staffer": "Smelter Permit Commissar"
+    },
+    {
+      "property": "The Core-Iron Throne",
+      "staffer": "Core-Iron Throne Steward"
+    },
+    {
+      "property": "Velvet Rope Concessions",
+      "staffer": "Velvet Rope Concessionaire"
+    },
+    {
+      "property": "Taste Tribunals",
+      "staffer": "Taste Tribunal Stenographer"
+    },
+    {
+      "property": "Couture Foundries",
+      "staffer": "Couture Standards Inspector"
+    },
+    {
+      "property": "Auction Seances",
+      "staffer": "Seance Minutes Recorder"
+    },
+    {
+      "property": "The Canon Estate",
+      "staffer": "Canon Accession Registrar"
+    },
+    {
+      "property": "Scratch Shrine Franchises",
+      "staffer": "Scratch Shrine Franchisor"
+    },
+    {
+      "property": "House-Edge Utilities",
+      "staffer": "House-Edge Meter Reader"
+    },
+    {
+      "property": "Jackpot Reservoirs",
+      "staffer": "Jackpot Reservoir Gauger"
+    },
+    {
+      "property": "Destiny Bookmakers",
+      "staffer": "Destiny Odds Certifier"
+    },
+    {
+      "property": "The Rigged Table",
+      "staffer": "Rigged Table Auditor"
+    },
+    {
+      "property": "Mirror Mints",
+      "staffer": "Mirror Mint Assayer"
+    },
+    {
+      "property": "Doppelganger Staffing",
+      "staffer": "Duplicate Personnel Officer"
+    },
+    {
+      "property": "Vanity Exchanges",
+      "staffer": "Vanity License Vendor"
+    },
+    {
+      "property": "Reflection Royalties",
+      "staffer": "Reflection Royalty Remitter"
+    },
+    {
+      "property": "The Infinite Regress",
+      "staffer": "Infinite Regress Caseworker"
+    },
+    {
+      "property": "Probate Catacombs",
+      "staffer": "Probate Backlog Clerk"
+    },
+    {
+      "property": "Ancestor Annuities",
+      "staffer": "Ancestral Pension Officer"
+    },
+    {
+      "property": "Mausoleum Realty",
+      "staffer": "Mausoleum Deeds Recorder"
+    },
+    {
+      "property": "Reliquary Trusts",
+      "staffer": "Reliquary Trust Custodian"
+    },
+    {
+      "property": "The Estate Eternal",
+      "staffer": "Eternal Estate Administrator"
+    },
+    {
+      "property": "Engagement Farms",
+      "staffer": "Engagement Quota Enforcer"
+    },
+    {
+      "property": "Attention Refineries",
+      "staffer": "Attention Intake Clerk"
+    },
+    {
+      "property": "Parasocial Bonds",
+      "staffer": "Parasocial Bond Notary"
+    },
+    {
+      "property": "Virality Futures",
+      "staffer": "Virality Forecast Deputy"
+    },
+    {
+      "property": "The Eternal Feed",
+      "staffer": "Eternal Feed Censor"
+    },
+    {
+      "property": "Queue Concessions",
+      "staffer": "Queue Marshal, First Class"
+    },
+    {
+      "property": "Rubber Stamp Foundries",
+      "staffer": "Stamp Foundry Commissar"
+    },
+    {
+      "property": "Permit Pyramids",
+      "staffer": "Permit Pyramid Overseer"
+    },
+    {
+      "property": "Committee of Committees",
+      "staffer": "Chairman of All Chairmen"
+    },
+    {
+      "property": "The Central Plan",
+      "staffer": "First Secretary of the Plan"
+    },
+    {
+      "property": "Border Tollbooths",
+      "staffer": "Border Checkpoint Stamper"
+    },
+    {
+      "property": "Meridian Leases",
+      "staffer": "Meridian Lease Recorder"
+    },
+    {
+      "property": "Cartography Copyrights",
+      "staffer": "Map Copyright Examiner"
+    },
+    {
+      "property": "Territorial Nebulae",
+      "staffer": "Nebula Annexation Clerk"
+    },
+    {
+      "property": "The Edge of the Map",
+      "staffer": "Map-Edge Boundary Surveyor"
+    },
+    {
+      "property": "Zero-Sum Clearinghouses",
+      "staffer": "Zero-Sum Clearing Officer"
+    },
+    {
+      "property": "Decay Arbitrage",
+      "staffer": "Decay Rate Assessor"
+    },
+    {
+      "property": "Entropy Audit Bureaus",
+      "staffer": "Entropy Audit Commissar"
+    },
+    {
+      "property": "Heat-Death Reserves",
+      "staffer": "Heat-Death Reserve Custodian"
+    },
+    {
+      "property": "The Final Balance",
+      "staffer": "Final Balance Reconciler"
+    },
+    {
+      "property": "Fine Print Mills",
+      "staffer": "Fine Print Typesetter"
+    },
+    {
+      "property": "Concept Copyrights",
+      "staffer": "Concept Filing Registrar"
+    },
+    {
+      "property": "Liens on Existence",
+      "staffer": "Existential Lien Recorder"
+    },
+    {
+      "property": "Title Registry of Everything",
+      "staffer": "Registrar of Everything"
+    },
+    {
+      "property": "The Deed to the Universe",
+      "staffer": "Universal Deed Custodian"
+    },
+    {
+      "property": "Triplicate Archives",
+      "staffer": "Chief Carbon Copy Archivist"
+    },
+    {
+      "property": "Waiting Room Estates",
+      "staffer": "Deputy Minister of Delay"
+    },
+    {
+      "property": "Bureau of Grievances",
+      "staffer": "Grievance Intake Commissar"
+    },
+    {
+      "property": "Signature Refinery",
+      "staffer": "Countersignature Comptroller"
+    },
+    {
+      "property": "Inspectorate of Inspections",
+      "staffer": "Inspector General of Inspectors"
+    },
+    {
+      "property": "Lost Records Vault",
+      "staffer": "Curator of Misplaced Files"
+    },
+    {
+      "property": "Stamp Reserve Bank",
+      "staffer": "Governor of the Stamp Reserve"
+    },
+    {
+      "property": "The Eternal Queue",
+      "staffer": "Warden of Queue 7,441-B"
+    },
+    {
+      "property": "Ministry of Pending",
+      "staffer": "Undersecretary of Forever"
+    }
+  ],
+  "properties_needing_titles": [
+    {
+      "tier": 2,
+      "property": "Supernova Underwriters"
+    },
+    {
+      "tier": 3,
+      "property": "Sentience Leasing Corp"
+    },
+    {
+      "tier": 3,
+      "property": "Planetary Mainframe"
+    },
+    {
+      "tier": 4,
+      "property": "Rotworld Orchards"
+    },
+    {
+      "tier": 4,
+      "property": "Panspermia Logistics"
+    },
+    {
+      "tier": 4,
+      "property": "Moonrot Colonies"
+    },
+    {
+      "tier": 5,
+      "property": "Bedrock Annuities"
+    },
+    {
+      "tier": 5,
+      "property": "Tectonic Arbitrage"
+    },
+    {
+      "tier": 5,
+      "property": "Mantle Extraction Concern"
+    },
+    {
+      "tier": 5,
+      "property": "Planetcore Assay"
+    },
+    {
+      "tier": 6,
+      "property": "Hindsight Hedge Fund"
+    },
+    {
+      "tier": 6,
+      "property": "Nostalgia Refinery"
+    },
+    {
+      "tier": 6,
+      "property": "Timeline Repossessions"
+    },
+    {
+      "tier": 6,
+      "property": "Millennium Mortgage"
+    },
+    {
+      "tier": 6,
+      "property": "Big Bang Buyback"
+    },
+    {
+      "tier": 7,
+      "property": "Whalefall Estates"
+    },
+    {
+      "tier": 7,
+      "property": "Ventworks Utility"
+    },
+    {
+      "tier": 7,
+      "property": "Siren Bond Market"
+    },
+    {
+      "tier": 7,
+      "property": "Hadal Mint"
+    },
+    {
+      "tier": 7,
+      "property": "Drowned Cathedral Exchange"
+    },
+    {
+      "tier": 7,
+      "property": "Midnight Zone Trust"
+    },
+    {
+      "tier": 8,
+      "property": "Fang Liability Consortium"
+    },
+    {
+      "tier": 8,
+      "property": "Hatchling Whole-Life"
+    },
+    {
+      "tier": 8,
+      "property": "Brumation Escrow Vaults"
+    },
+    {
+      "tier": 8,
+      "property": "Constriction Claims Tribunal"
+    },
+    {
+      "tier": 8,
+      "property": "Planetary Coverage Coils"
+    },
+    {
+      "tier": 8,
+      "property": "Extinction Rider Exchange"
+    },
+    {
+      "tier": 8,
+      "property": "Stellar Collapse Indemnity"
+    },
+    {
+      "tier": 9,
+      "property": "Propolis Patent Office"
+    },
+    {
+      "tier": 9,
+      "property": "Royal Mead Distillery"
+    },
+    {
+      "tier": 9,
+      "property": "The Waggle Bourse"
+    },
+    {
+      "tier": 9,
+      "property": "Swarm Assurance Society"
+    },
+    {
+      "tier": 9,
+      "property": "Pheromone Broadcasting Guild"
+    },
+    {
+      "tier": 9,
+      "property": "Meadow Annexation Bureau"
+    },
+    {
+      "tier": 9,
+      "property": "Ministry of Lesser Hives"
+    },
+    {
+      "tier": 9,
+      "property": "The Queen's Mint"
+    },
+    {
+      "tier": 10,
+      "property": "Thaw-Debt Collections"
+    },
+    {
+      "tier": 10,
+      "property": "Frostbite Annuities"
+    },
+    {
+      "tier": 10,
+      "property": "Blizzard Claims Hall"
+    },
+    {
+      "tier": 10,
+      "property": "Fjord Toll Dominion"
+    },
+    {
+      "tier": 10,
+      "property": "Winterlong Bond Vaults"
+    },
+    {
+      "tier": 10,
+      "property": "Frozen Sea Exchange"
+    },
+    {
+      "tier": 10,
+      "property": "Moraine Mineral Rights"
+    },
+    {
+      "tier": 10,
+      "property": "Polar Crown Holdings"
+    },
+    {
+      "tier": 10,
+      "property": "Ice Age Futures"
+    },
+    {
+      "tier": 11,
+      "property": "Reverb Royalties"
+    },
+    {
+      "tier": 11,
+      "property": "Encore Futures"
+    },
+    {
+      "tier": 11,
+      "property": "Key Change Patents"
+    },
+    {
+      "tier": 11,
+      "property": "Silence Easements"
+    },
+    {
+      "tier": 11,
+      "property": "Octave Monopoly"
+    },
+    {
+      "tier": 11,
+      "property": "Planetary Reverb Chamber"
+    },
+    {
+      "tier": 11,
+      "property": "Orbital Amphitheater"
+    },
+    {
+      "tier": 11,
+      "property": "Spheres Music Exchange"
+    },
+    {
+      "tier": 11,
+      "property": "Cosmic Hum Licensing"
+    },
+    {
+      "tier": 12,
+      "property": "Whisper Clearinghouse"
+    },
+    {
+      "tier": 12,
+      "property": "Favor Futures Desk"
+    },
+    {
+      "tier": 12,
+      "property": "Ghost Payroll Bureau"
+    },
+    {
+      "tier": 12,
+      "property": "The Silent Auction"
+    },
+    {
+      "tier": 12,
+      "property": "Bank of Nowhere"
+    },
+    {
+      "tier": 12,
+      "property": "Leverage Reserve Vault"
+    },
+    {
+      "tier": 12,
+      "property": "Retroactive Erasure Group"
+    },
+    {
+      "tier": 12,
+      "property": "Shadow Central Bank"
+    },
+    {
+      "tier": 12,
+      "property": "Ministry of Nonexistence"
+    },
+    {
+      "tier": 13,
+      "property": "Protection Racket Annex"
+    },
+    {
+      "tier": 13,
+      "property": "Plunder Clearinghouse"
+    },
+    {
+      "tier": 13,
+      "property": "Tribute Futures Pit"
+    },
+    {
+      "tier": 13,
+      "property": "Warpath Toll Authority"
+    },
+    {
+      "tier": 13,
+      "property": "Hostile Takeover Legion"
+    },
+    {
+      "tier": 13,
+      "property": "Scorched Earth Realty"
+    },
+    {
+      "tier": 13,
+      "property": "Conquest Dividend Bureau"
+    },
+    {
+      "tier": 13,
+      "property": "Orbital Blockade Consortium"
+    },
+    {
+      "tier": 13,
+      "property": "Grand Pillage Portfolio"
+    },
+    {
+      "tier": 14,
+      "property": "Thank-You Note Mint"
+    },
+    {
+      "tier": 14,
+      "property": "Small Talk Reserve"
+    },
+    {
+      "tier": 14,
+      "property": "RSVP Clearinghouse"
+    },
+    {
+      "tier": 14,
+      "property": "Seating Chart Exchange"
+    },
+    {
+      "tier": 14,
+      "property": "Condolence Consortium"
+    },
+    {
+      "tier": 14,
+      "property": "Debutante Bond Exchange"
+    },
+    {
+      "tier": 14,
+      "property": "Faux Pas Tribunal"
+    },
+    {
+      "tier": 14,
+      "property": "Orbital Finishing School"
+    },
+    {
+      "tier": 14,
+      "property": "Forgiveness Reserve Bank"
+    },
+    {
+      "tier": 15,
+      "property": "Snooze Button Tolls"
+    },
+    {
+      "tier": 15,
+      "property": "Counting Sheep Leasing"
+    },
+    {
+      "tier": 15,
+      "property": "Deja Vu Royalties"
+    },
+    {
+      "tier": 15,
+      "property": "Melatonin Futures"
+    },
+    {
+      "tier": 15,
+      "property": "Somnambulist Staffing"
+    },
+    {
+      "tier": 15,
+      "property": "Insomnia Subscriptions"
+    },
+    {
+      "tier": 15,
+      "property": "REM Cycle Refineries"
+    },
+    {
+      "tier": 15,
+      "property": "Circadian Grid Utilities"
+    },
+    {
+      "tier": 15,
+      "property": "Collective Unconscious Trust"
+    },
+    {
+      "tier": 16,
+      "property": "Idiom Refinery"
+    },
+    {
+      "tier": 16,
+      "property": "Grammar Debtors' Prison"
+    },
+    {
+      "tier": 16,
+      "property": "Pronunciation Tollway"
+    },
+    {
+      "tier": 16,
+      "property": "Rhetoric Futures Exchange"
+    },
+    {
+      "tier": 16,
+      "property": "Untranslatable Word Reserve"
+    },
+    {
+      "tier": 16,
+      "property": "Proto-Tongue Derricks"
+    },
+    {
+      "tier": 16,
+      "property": "Babel Reconstruction Trust"
+    },
+    {
+      "tier": 16,
+      "property": "Mother Tongue Monopoly"
+    },
+    {
+      "tier": 16,
+      "property": "The Silence Concession"
+    },
+    {
+      "tier": 17,
+      "property": "Corrosion Escrow"
+    },
+    {
+      "tier": 17,
+      "property": "Ore-Debt Registries"
+    },
+    {
+      "tier": 17,
+      "property": "Tarnish Futures"
+    },
+    {
+      "tier": 17,
+      "property": "Slag Baronies"
+    },
+    {
+      "tier": 17,
+      "property": "Foundry Cartels"
+    },
+    {
+      "tier": 17,
+      "property": "Rust-Tithe Cathedrals"
+    },
+    {
+      "tier": 17,
+      "property": "Magnetosphere Monopolies"
+    },
+    {
+      "tier": 17,
+      "property": "Mantle Mining Concordats"
+    },
+    {
+      "tier": 17,
+      "property": "The Molten Mint"
+    },
+    {
+      "tier": 18,
+      "property": "Vernissage Circuits"
+    },
+    {
+      "tier": 18,
+      "property": "Gala Blacklist Registries"
+    },
+    {
+      "tier": 18,
+      "property": "Restoration Ateliers"
+    },
+    {
+      "tier": 18,
+      "property": "Provenance Vaults"
+    },
+    {
+      "tier": 18,
+      "property": "Biennale Monopolies"
+    },
+    {
+      "tier": 18,
+      "property": "Movement Manufactories"
+    },
+    {
+      "tier": 18,
+      "property": "The Zeitgeist Refinery"
+    },
+    {
+      "tier": 18,
+      "property": "Obsolescence Bureaus"
+    },
+    {
+      "tier": 18,
+      "property": "Negative Space Exchange"
+    },
+    {
+      "tier": 19,
+      "property": "Loaded Dice Foundries"
+    },
+    {
+      "tier": 19,
+      "property": "Comp Suite Arcologies"
+    },
+    {
+      "tier": 19,
+      "property": "Roulette Ring Worlds"
+    },
+    {
+      "tier": 19,
+      "property": "Whale Harvest Fleets"
+    },
+    {
+      "tier": 19,
+      "property": "Probability Refineries"
+    },
+    {
+      "tier": 19,
+      "property": "Luck Futures Exchange"
+    },
+    {
+      "tier": 19,
+      "property": "Vigorish Gravity Wells"
+    },
+    {
+      "tier": 19,
+      "property": "Casino Moon Consortium"
+    },
+    {
+      "tier": 19,
+      "property": "The Infinite Parlay"
+    },
+    {
+      "tier": 20,
+      "property": "Echo Escrow"
+    },
+    {
+      "tier": 20,
+      "property": "Selfsame Insurance"
+    },
+    {
+      "tier": 20,
+      "property": "Likeness Licensing Bureau"
+    },
+    {
+      "tier": 20,
+      "property": "The Gallery of You"
+    },
+    {
+      "tier": 20,
+      "property": "Kaleidoscope Trust"
+    },
+    {
+      "tier": 20,
+      "property": "Quicksilver Sea Refinery"
+    },
+    {
+      "tier": 20,
+      "property": "Mirror Moon Works"
+    },
+    {
+      "tier": 20,
+      "property": "Orbital Vanity Ring"
+    },
+    {
+      "tier": 20,
+      "property": "The Second Speculum"
+    },
+    {
+      "tier": 21,
+      "property": "Columbarium Exchange"
+    },
+    {
+      "tier": 21,
+      "property": "Cenotaph Securities"
+    },
+    {
+      "tier": 21,
+      "property": "Charnel Clearinghouse"
+    },
+    {
+      "tier": 21,
+      "property": "Eulogy Underwriting"
+    },
+    {
+      "tier": 21,
+      "property": "Seance Brokerage"
+    },
+    {
+      "tier": 21,
+      "property": "Barrow Bond Market"
+    },
+    {
+      "tier": 21,
+      "property": "Necropolis Bourse"
+    },
+    {
+      "tier": 21,
+      "property": "Purgatory Escrow"
+    },
+    {
+      "tier": 21,
+      "property": "Afterlife Sovereign Fund"
+    },
+    {
+      "tier": 22,
+      "property": "Clickbait Foundries"
+    },
+    {
+      "tier": 22,
+      "property": "Sponsored Content Mills"
+    },
+    {
+      "tier": 22,
+      "property": "Follower Hatcheries"
+    },
+    {
+      "tier": 22,
+      "property": "Drama Exchanges"
+    },
+    {
+      "tier": 22,
+      "property": "Cancellation Insurance"
+    },
+    {
+      "tier": 22,
+      "property": "Persona Cloning Vats"
+    },
+    {
+      "tier": 22,
+      "property": "The Algorithm Cathedral"
+    },
+    {
+      "tier": 22,
+      "property": "Planetwide Livestream Grid"
+    },
+    {
+      "tier": 22,
+      "property": "Attention Singularity"
+    },
+    {
+      "tier": 24,
+      "property": "Compass Rose Franchises"
+    },
+    {
+      "tier": 24,
+      "property": "Legend Licensing"
+    },
+    {
+      "tier": 24,
+      "property": "Projection Patents"
+    },
+    {
+      "tier": 24,
+      "property": "Antipode Holdings"
+    },
+    {
+      "tier": 24,
+      "property": "Equator Toll Ring"
+    },
+    {
+      "tier": 24,
+      "property": "Magnetic Pole Trust"
+    },
+    {
+      "tier": 24,
+      "property": "Continental Drift Futures"
+    },
+    {
+      "tier": 24,
+      "property": "Terra Incognita Escrow"
+    },
+    {
+      "tier": 24,
+      "property": "The Master Graticule"
+    },
+    {
+      "tier": 25,
+      "property": "Half-Life Holdings"
+    },
+    {
+      "tier": 25,
+      "property": "Redshift Receivership"
+    },
+    {
+      "tier": 25,
+      "property": "Vacuum Decay Futures"
+    },
+    {
+      "tier": 25,
+      "property": "Proton Decay Trusts"
+    },
+    {
+      "tier": 25,
+      "property": "Stellar Foreclosure Courts"
+    },
+    {
+      "tier": 25,
+      "property": "Galactic Liquidation Fleets"
+    },
+    {
+      "tier": 25,
+      "property": "Black Hole Escrow"
+    },
+    {
+      "tier": 25,
+      "property": "Universal Write-Down Office"
+    },
+    {
+      "tier": 25,
+      "property": "The Penultimate Kelvin"
+    },
+    {
+      "tier": 26,
+      "property": "Soul Escrow Services"
+    },
+    {
+      "tier": 26,
+      "property": "Gravity Easement Office"
+    },
+    {
+      "tier": 26,
+      "property": "Mathematics Licensing Bureau"
+    },
+    {
+      "tier": 26,
+      "property": "Timeshares in Time"
+    },
+    {
+      "tier": 26,
+      "property": "Probability Trust Holdings"
+    },
+    {
+      "tier": 26,
+      "property": "Mortgages on Causality"
+    },
+    {
+      "tier": 26,
+      "property": "Eminent Domain of Reality"
+    },
+    {
+      "tier": 26,
+      "property": "Divine Foreclosure Division"
+    },
+    {
+      "tier": 26,
+      "property": "Escheat of the Multiverse"
+    }
+  ]
+}

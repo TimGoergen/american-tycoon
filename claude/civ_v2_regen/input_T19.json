@@ -1,0 +1,128 @@
+﻿{
+    "tier":  19,
+    "civilization":  "Fortuna Cartel",
+    "home_planet":  "Fortuna Prime",
+    "currency":  "Odds",
+    "accent_color":  "1f6e43",
+    "hail":  "Well, well — look what the wormhole dragged in. We had you nine-to-two to show up broke, friend, and the house never loses, so go ahead and check your pockets. Pull up a chair; the drinks are free, the table is honest-ish, and the odds of you leaving richer are — let\u0027s call them ours.",
+    "contact_line":  "They ran the numbers on your arrival and priced it at even money. The house, as always, had already collected.",
+    "existing_properties":  [
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  1.287E+83,
+                                    "property":  "Scratch Shrine Franchises",
+                                    "staffer_name":  "Scratch Shrine Oracle",
+                                    "unit_cost":  7.058E+84
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  9.012E+83,
+                                    "property":  "House-Edge Utilities",
+                                    "staffer_name":  "House-Edge Gridkeeper",
+                                    "unit_cost":  4.941E+85
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  6.309E+84,
+                                    "property":  "Jackpot Reservoirs",
+                                    "staffer_name":  "Jackpot Floodgate Warden",
+                                    "unit_cost":  3.459E+86
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  4.416E+85,
+                                    "property":  "Destiny Bookmakers",
+                                    "staffer_name":  "Destiny Oddsmaker",
+                                    "unit_cost":  2.421E+87
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  3.092E+86,
+                                    "property":  "The Rigged Table",
+                                    "staffer_name":  "Keeper of the Rigged Table",
+                                    "unit_cost":  1.695E+88
+                                }
+                            ],
+    "sample_roster_entries":  [
+                                  {
+                                      "property":  "ATM",
+                                      "staffer":  "Chip Cage Cashier"
+                                  },
+                                  {
+                                      "property":  "Money Tree",
+                                      "staffer":  "Lucky Grove Groundskeeper"
+                                  },
+                                  {
+                                      "property":  "NFTs",
+                                      "staffer":  "Novelty Chip Shill"
+                                  },
+                                  {
+                                      "property":  "Tax Increment Financing",
+                                      "staffer":  "Vigorish Assessor"
+                                  },
+                                  {
+                                      "property":  "Cross Border Distribution",
+                                      "staffer":  "Offshore Handle Runner"
+                                  },
+                                  {
+                                      "property":  "Money Laundering",
+                                      "staffer":  "Chip Wash Attendant"
+                                  },
+                                  {
+                                      "property":  "Day Trading",
+                                      "staffer":  "Ticker-Tape Handicapper"
+                                  },
+                                  {
+                                      "property":  "Flipping Houses",
+                                      "staffer":  "Full House Flipper"
+                                  },
+                                  {
+                                      "property":  "Multi Level Marketing",
+                                      "staffer":  "Pyramid Parlay Recruiter"
+                                  },
+                                  {
+                                      "property":  "Hedge Fund",
+                                      "staffer":  "Hedge-Bet Bookrunner"
+                                  },
+                                  {
+                                      "property":  "Legislative Assets",
+                                      "staffer":  "Statehouse Odds Fixer"
+                                  },
+                                  {
+                                      "property":  "Executive Assets",
+                                      "staffer":  "Boardroom Pit Boss"
+                                  },
+                                  {
+                                      "property":  "Photon Exchange",
+                                      "staffer":  "Neon Marquee Broker"
+                                  },
+                                  {
+                                      "property":  "Beam Utilities",
+                                      "staffer":  "Spotlight Rig Operator"
+                                  },
+                                  {
+                                      "property":  "Solar Futures Desk",
+                                      "staffer":  "Sunrise Futures Tout"
+                                  },
+                                  {
+                                      "property":  "Dyson Holdings",
+                                      "staffer":  "Megawatt Marquee Magnate"
+                                  },
+                                  {
+                                      "property":  "Starcore Syndicate",
+                                      "staffer":  "Star-Stakes Syndicate Boss"
+                                  },
+                                  {
+                                      "property":  "Data Foundry",
+                                      "staffer":  "Card-Counting Mainframe"
+                                  },
+                                  {
+                                      "property":  "Server Metropolis",
+                                      "staffer":  "Slot Bank Superintendent"
+                                  },
+                                  {
+                                      "property":  "Algorithm Mines",
+                                      "staffer":  "Random-Number Mine Foreman"
+                                  }
+                              ]
+}

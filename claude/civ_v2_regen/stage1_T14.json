@@ -1,0 +1,42 @@
+{
+    "tier": 14,
+    "civilization": "The Politesse Ascendancy",
+    "new_properties": [
+        {
+            "property": "Thank-You Note Mint",
+            "staffer": "Perpetual Gratitude Engraver"
+        },
+        {
+            "property": "Small Talk Reserve",
+            "staffer": "Weather Remarks Custodian"
+        },
+        {
+            "property": "RSVP Clearinghouse",
+            "staffer": "Regrets-Only Adjudicator"
+        },
+        {
+            "property": "Seating Chart Exchange",
+            "staffer": "Precedence Placement Cartographer"
+        },
+        {
+            "property": "Condolence Consortium",
+            "staffer": "Deepest Sympathies Actuary"
+        },
+        {
+            "property": "Debutante Bond Exchange",
+            "staffer": "Season Debut Chaperone-General"
+        },
+        {
+            "property": "Faux Pas Tribunal",
+            "staffer": "Presiding Manners Magistrate"
+        },
+        {
+            "property": "Orbital Finishing School",
+            "staffer": "Void Deportment Headmistress"
+        },
+        {
+            "property": "Forgiveness Reserve Bank",
+            "staffer": "Absolution Loan Officer"
+        }
+    ]
+}

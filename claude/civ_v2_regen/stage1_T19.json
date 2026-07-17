@@ -1,0 +1,42 @@
+{
+    "tier": 19,
+    "civilization": "Fortuna Cartel",
+    "new_properties": [
+        {
+            "property": "Loaded Dice Foundries",
+            "staffer": "Loaded Dice Smith"
+        },
+        {
+            "property": "Comp Suite Arcologies",
+            "staffer": "Comp Suite Concierge"
+        },
+        {
+            "property": "Roulette Ring Worlds",
+            "staffer": "Roulette World Croupier"
+        },
+        {
+            "property": "Whale Harvest Fleets",
+            "staffer": "High-Roller Harpooner"
+        },
+        {
+            "property": "Probability Refineries",
+            "staffer": "Chief Odds Distiller"
+        },
+        {
+            "property": "Luck Futures Exchange",
+            "staffer": "Luck Futures Floor Boss"
+        },
+        {
+            "property": "Vigorish Gravity Wells",
+            "staffer": "Vigorish Siphon Baron"
+        },
+        {
+            "property": "Casino Moon Consortium",
+            "staffer": "Casino Moon Impresario"
+        },
+        {
+            "property": "The Infinite Parlay",
+            "staffer": "Infinite Parlay Prophet"
+        }
+    ]
+}

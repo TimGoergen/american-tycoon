@@ -1,0 +1,128 @@
+﻿{
+    "tier":  17,
+    "civilization":  "Ferrovore Guilds",
+    "home_planet":  "Oxidane",
+    "currency":  "Ingots",
+    "accent_color":  "8a4a1c",
+    "hail":  "Ore-scent confirmed. Your coin-hoard is already rusting, soft-thing — that is not rot, that is interest, and we hold the note. Pay the rust-tithe, sign the ore-debt, and the Guilds will chew you into something profitable.",
+    "contact_line":  "They eat metal for a living and file the corrosion as earnings. Here, nothing ever depreciates — it just rusts, at a very competitive rate.",
+    "existing_properties":  [
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  4.558E+74,
+                                    "property":  "Scrap Tithes",
+                                    "staffer_name":  "Scrap-Tithe Collector",
+                                    "unit_cost":  2.499E+76
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  3.19E+75,
+                                    "property":  "Rust Refineries",
+                                    "staffer_name":  "Rust-Refinery Foreman",
+                                    "unit_cost":  1.749E+77
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  2.233E+76,
+                                    "property":  "Alloy Dynasties",
+                                    "staffer_name":  "Alloy Dynast",
+                                    "unit_cost":  1.224E+78
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  1.563E+77,
+                                    "property":  "Smelter Sovereignty",
+                                    "staffer_name":  "Smelter Sovereign",
+                                    "unit_cost":  8.571E+78
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  1.094E+78,
+                                    "property":  "The Core-Iron Throne",
+                                    "staffer_name":  "Core-Iron Throne Warden",
+                                    "unit_cost":  5.999E+79
+                                }
+                            ],
+    "sample_roster_entries":  [
+                                  {
+                                      "property":  "ATM",
+                                      "staffer":  "Ingot Dispenser Tender"
+                                  },
+                                  {
+                                      "property":  "Money Tree",
+                                      "staffer":  "Ore-Vein Cultivator"
+                                  },
+                                  {
+                                      "property":  "NFTs",
+                                      "staffer":  "Commemorative Slag Curator"
+                                  },
+                                  {
+                                      "property":  "Tax Increment Financing",
+                                      "staffer":  "Rust-Tithe Assessor"
+                                  },
+                                  {
+                                      "property":  "Cross Border Distribution",
+                                      "staffer":  "Ingot Caravan Master"
+                                  },
+                                  {
+                                      "property":  "Money Laundering",
+                                      "staffer":  "Tarnish Removal Specialist"
+                                  },
+                                  {
+                                      "property":  "Day Trading",
+                                      "staffer":  "Spot-Metal Speculator"
+                                  },
+                                  {
+                                      "property":  "Flipping Houses",
+                                      "staffer":  "Scrap-and-Reforge Dealer"
+                                  },
+                                  {
+                                      "property":  "Multi Level Marketing",
+                                      "staffer":  "Pyrite Pyramid Recruiter"
+                                  },
+                                  {
+                                      "property":  "Hedge Fund",
+                                      "staffer":  "Diversified Alloy Manager"
+                                  },
+                                  {
+                                      "property":  "Legislative Assets",
+                                      "staffer":  "Iron-Fisted Lobbyist"
+                                  },
+                                  {
+                                      "property":  "Executive Assets",
+                                      "staffer":  "Foundry Chief of Staff"
+                                  },
+                                  {
+                                      "property":  "Photon Exchange",
+                                      "staffer":  "Forge-Glow Broker"
+                                  },
+                                  {
+                                      "property":  "Beam Utilities",
+                                      "staffer":  "Furnace-Light Fitter"
+                                  },
+                                  {
+                                      "property":  "Solar Futures Desk",
+                                      "staffer":  "Solar Smelt Forecaster"
+                                  },
+                                  {
+                                      "property":  "Dyson Holdings",
+                                      "staffer":  "Star-Forge Scaffolder"
+                                  },
+                                  {
+                                      "property":  "Starcore Syndicate",
+                                      "staffer":  "Starcore Crucible Baron"
+                                  },
+                                  {
+                                      "property":  "Data Foundry",
+                                      "staffer":  "Data Ingot Caster"
+                                  },
+                                  {
+                                      "property":  "Server Metropolis",
+                                      "staffer":  "Server Rack Welder"
+                                  },
+                                  {
+                                      "property":  "Algorithm Mines",
+                                      "staffer":  "Algorithm Pit Foreman"
+                                  }
+                              ]
+}

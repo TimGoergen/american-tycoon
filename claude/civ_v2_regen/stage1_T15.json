@@ -1,0 +1,42 @@
+{
+    "tier": 15,
+    "civilization": "Oneiroi Drift",
+    "new_properties": [
+        {
+            "property": "Snooze Button Tolls",
+            "staffer": "Snooze Toll Collector"
+        },
+        {
+            "property": "Counting Sheep Leasing",
+            "staffer": "Licensed Sheep Wrangler"
+        },
+        {
+            "property": "Deja Vu Royalties",
+            "staffer": "Deja Vu Rights Enforcer"
+        },
+        {
+            "property": "Melatonin Futures",
+            "staffer": "Melatonin Pit Broker"
+        },
+        {
+            "property": "Somnambulist Staffing",
+            "staffer": "Sleepwalker Labor Broker"
+        },
+        {
+            "property": "Insomnia Subscriptions",
+            "staffer": "Insomnia Retention Specialist"
+        },
+        {
+            "property": "REM Cycle Refineries",
+            "staffer": "REM Refinery Foreman"
+        },
+        {
+            "property": "Circadian Grid Utilities",
+            "staffer": "Circadian Grid Operator"
+        },
+        {
+            "property": "Collective Unconscious Trust",
+            "staffer": "Trustee of the Collective Unconscious"
+        }
+    ]
+}

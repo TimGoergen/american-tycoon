@@ -1,0 +1,42 @@
+{
+    "tier": 20,
+    "civilization": "Mirror Meridian",
+    "new_properties": [
+        {
+            "property": "Echo Escrow",
+            "staffer": "Second-Saying Notary"
+        },
+        {
+            "property": "Selfsame Insurance",
+            "staffer": "Identical Claims Adjuster"
+        },
+        {
+            "property": "Likeness Licensing Bureau",
+            "staffer": "Deputy of Derivative Faces"
+        },
+        {
+            "property": "The Gallery of You",
+            "staffer": "Curator of Every You"
+        },
+        {
+            "property": "Kaleidoscope Trust",
+            "staffer": "Trustee of a Thousand Facets"
+        },
+        {
+            "property": "Quicksilver Sea Refinery",
+            "staffer": "Silvering Refinery Foreman"
+        },
+        {
+            "property": "Mirror Moon Works",
+            "staffer": "Lunar Resurfacing Superintendent"
+        },
+        {
+            "property": "Orbital Vanity Ring",
+            "staffer": "Ring of Regard Overseer"
+        },
+        {
+            "property": "The Second Speculum",
+            "staffer": "Planetary Understudy"
+        }
+    ]
+}

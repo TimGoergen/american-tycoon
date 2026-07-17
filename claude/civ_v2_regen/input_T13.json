@@ -1,0 +1,128 @@
+﻿{
+    "tier":  13,
+    "civilization":  "Karr\u0027ghan Warhoard",
+    "home_planet":  "Karr\u0027Vok",
+    "currency":  "Plunder",
+    "accent_color":  "8b3a1f",
+    "hail":  "KARR\u0027GH! Your treasury has been scouted, vok\u0027tar — the walls are thin and the margins THINNER. Surrender your holdings to the Warhoard and we will call it a MERGER; resist, and we will call it Q4.",
+    "contact_line":  "A mercenary horde that discovered spreadsheets and never looked back. Their invoices arrive by catapult, and they are always paid.",
+    "existing_properties":  [
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  5.711E+57,
+                                    "property":  "Ransom Escrow",
+                                    "staffer_name":  "Hostage Account Manager",
+                                    "unit_cost":  3.131E+59
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  3.998E+58,
+                                    "property":  "Siege Logistics",
+                                    "staffer_name":  "Supply Line Warmaster",
+                                    "unit_cost":  2.192E+60
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  2.798E+59,
+                                    "property":  "Mercenary Exchange",
+                                    "staffer_name":  "Sellsword Floor Broker",
+                                    "unit_cost":  1.534E+61
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  1.959E+60,
+                                    "property":  "War Bond Colosseum",
+                                    "staffer_name":  "Bloodsport Bond Promoter",
+                                    "unit_cost":  1.074E+62
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  1.371E+61,
+                                    "property":  "The Warhoard Citadel",
+                                    "staffer_name":  "High Custodian of Plunder",
+                                    "unit_cost":  7.519E+62
+                                }
+                            ],
+    "sample_roster_entries":  [
+                                  {
+                                      "property":  "ATM",
+                                      "staffer":  "Coin Raid Quartermaster"
+                                  },
+                                  {
+                                      "property":  "Money Tree",
+                                      "staffer":  "Pillage Orchard Warden"
+                                  },
+                                  {
+                                      "property":  "NFTs",
+                                      "staffer":  "Trophy Banner Hawker"
+                                  },
+                                  {
+                                      "property":  "Tax Increment Financing",
+                                      "staffer":  "Tribute Levy Enforcer"
+                                  },
+                                  {
+                                      "property":  "Cross Border Distribution",
+                                      "staffer":  "Warpath Caravan Master"
+                                  },
+                                  {
+                                      "property":  "Money Laundering",
+                                      "staffer":  "Loot Rebranding Officer"
+                                  },
+                                  {
+                                      "property":  "Day Trading",
+                                      "staffer":  "Skirmish Trade Raider"
+                                  },
+                                  {
+                                      "property":  "Flipping Houses",
+                                      "staffer":  "Conquered Keep Flipper"
+                                  },
+                                  {
+                                      "property":  "Multi Level Marketing",
+                                      "staffer":  "Recruitment Chain Sergeant"
+                                  },
+                                  {
+                                      "property":  "Hedge Fund",
+                                      "staffer":  "War Chest Steward"
+                                  },
+                                  {
+                                      "property":  "Legislative Assets",
+                                      "staffer":  "Treaty Extortion Envoy"
+                                  },
+                                  {
+                                      "property":  "Executive Assets",
+                                      "staffer":  "Warlord\u0027s Chief Adjutant"
+                                  },
+                                  {
+                                      "property":  "Photon Exchange",
+                                      "staffer":  "Signal-Fire Trade Captain"
+                                  },
+                                  {
+                                      "property":  "Beam Utilities",
+                                      "staffer":  "Siege Laser Foreman"
+                                  },
+                                  {
+                                      "property":  "Solar Futures Desk",
+                                      "staffer":  "Scorched-Sun Futures Broker"
+                                  },
+                                  {
+                                      "property":  "Dyson Holdings",
+                                      "staffer":  "Star Siege Engineer"
+                                  },
+                                  {
+                                      "property":  "Starcore Syndicate",
+                                      "staffer":  "Starcore Plunder Chieftain"
+                                  },
+                                  {
+                                      "property":  "Data Foundry",
+                                      "staffer":  "Intel Forge Master"
+                                  },
+                                  {
+                                      "property":  "Server Metropolis",
+                                      "staffer":  "Garrison Server Warden"
+                                  },
+                                  {
+                                      "property":  "Algorithm Mines",
+                                      "staffer":  "Code Sapper Foreman"
+                                  }
+                              ]
+}

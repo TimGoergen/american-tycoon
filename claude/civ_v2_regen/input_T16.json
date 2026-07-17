@@ -1,0 +1,128 @@
+﻿{
+    "tier":  16,
+    "civilization":  "The Glossolalia Lyceum",
+    "home_planet":  "Lexica",
+    "currency":  "Syllables",
+    "accent_color":  "2d5f8a",
+    "hail":  "Ah — you say \u0027we come in peace,\u0027 but you mean \u0027we come to trade\u0027; do be precise, for precision is λόγος, and λόγος is money. Every syllable you have just spent accrues to our accounts — a modest δραχμή per phoneme, plus a surcharge for that dangling modifier. Speak on, speak on; you grow more indebted with every word.",
+    "contact_line":  "Philologists who devour languages whole and hold clear title to several dead ones. They will correct your grammar, then bill you for the lesson.",
+    "existing_properties":  [
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  2.712E+70,
+                                    "property":  "Syllable Mint",
+                                    "staffer_name":  "Syllable Mintmaster",
+                                    "unit_cost":  1.487E+72
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  1.899E+71,
+                                    "property":  "Etymology Mines",
+                                    "staffer_name":  "Root-Word Excavator",
+                                    "unit_cost":  1.041E+73
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  1.329E+72,
+                                    "property":  "Thesaurus Vaults",
+                                    "staffer_name":  "Synonym Vault Custodian",
+                                    "unit_cost":  7.285E+73
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  9.301E+72,
+                                    "property":  "Dead Language Estates",
+                                    "staffer_name":  "Dead Tongue Executor",
+                                    "unit_cost":  5.099E+74
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  6.512E+73,
+                                    "property":  "The Unspeakable Lexicon",
+                                    "staffer_name":  "Lexarch of the Ineffable",
+                                    "unit_cost":  3.57E+75
+                                }
+                            ],
+    "sample_roster_entries":  [
+                                  {
+                                      "property":  "ATM",
+                                      "staffer":  "Automated Lexeme Teller"
+                                  },
+                                  {
+                                      "property":  "Money Tree",
+                                      "staffer":  "Cognate Arborist"
+                                  },
+                                  {
+                                      "property":  "NFTs",
+                                      "staffer":  "Hapax Legomenon Broker"
+                                  },
+                                  {
+                                      "property":  "Tax Increment Financing",
+                                      "staffer":  "Genitive Case Assessor"
+                                  },
+                                  {
+                                      "property":  "Cross Border Distribution",
+                                      "staffer":  "Loanword Smuggler"
+                                  },
+                                  {
+                                      "property":  "Money Laundering",
+                                      "staffer":  "Euphemism Consultant"
+                                  },
+                                  {
+                                      "property":  "Day Trading",
+                                      "staffer":  "Slang Volatility Trader"
+                                  },
+                                  {
+                                      "property":  "Flipping Houses",
+                                      "staffer":  "Palindrome Flipper"
+                                  },
+                                  {
+                                      "property":  "Multi Level Marketing",
+                                      "staffer":  "Recursive Clause Recruiter"
+                                  },
+                                  {
+                                      "property":  "Hedge Fund",
+                                      "staffer":  "Hedge-Word Fund Manager"
+                                  },
+                                  {
+                                      "property":  "Legislative Assets",
+                                      "staffer":  "Prescriptivist Lobbyist"
+                                  },
+                                  {
+                                      "property":  "Executive Assets",
+                                      "staffer":  "Imperative Mood Chief of Staff"
+                                  },
+                                  {
+                                      "property":  "Photon Exchange",
+                                      "staffer":  "Illuminated Manuscript Trader"
+                                  },
+                                  {
+                                      "property":  "Beam Utilities",
+                                      "staffer":  "Acute Accent Beam-Setter"
+                                  },
+                                  {
+                                      "property":  "Solar Futures Desk",
+                                      "staffer":  "Helios Futures Grammarian"
+                                  },
+                                  {
+                                      "property":  "Dyson Holdings",
+                                      "staffer":  "Circumlocution Sphere Engineer"
+                                  },
+                                  {
+                                      "property":  "Starcore Syndicate",
+                                      "staffer":  "Asterisk Core Magnate"
+                                  },
+                                  {
+                                      "property":  "Data Foundry",
+                                      "staffer":  "Corpus Foundry Lexicographer"
+                                  },
+                                  {
+                                      "property":  "Server Metropolis",
+                                      "staffer":  "Syntax Server Warden"
+                                  },
+                                  {
+                                      "property":  "Algorithm Mines",
+                                      "staffer":  "Morpheme Mining Overseer"
+                                  }
+                              ]
+}

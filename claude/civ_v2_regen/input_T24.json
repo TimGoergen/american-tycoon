@@ -1,0 +1,128 @@
+﻿{
+    "tier":  24,
+    "civilization":  "Atlas Concordat",
+    "home_planet":  "Meridian Zero",
+    "currency":  "Coordinates",
+    "accent_color":  "46688c",
+    "hail":  "Hail, entity at declination -12° 40\u0027, right ascension 4h 33m, grid square OURS. We have completed the survey — bearing 090° true, north of your ambitions — and drawn a border around your fortune; you now lease the coordinates you are standing on. Payment is due wherever you are, which, per the master atlas, is everywhere we own.",
+    "contact_line":  "Cartographer-priests who copyrighted the concept of \u0027where.\u0027 Your empire has a location, and the location just received an invoice.",
+    "existing_properties":  [
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  1.727E+104,
+                                    "property":  "Border Tollbooths",
+                                    "staffer_name":  "Border Toll Cartographer",
+                                    "unit_cost":  9.466E+105
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  1.209E+105,
+                                    "property":  "Meridian Leases",
+                                    "staffer_name":  "Meridian Leaseholder-Priest",
+                                    "unit_cost":  6.626E+106
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  8.46E+105,
+                                    "property":  "Cartography Copyrights",
+                                    "staffer_name":  "Copyrighted Contour Scribe",
+                                    "unit_cost":  4.638E+107
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  5.923E+106,
+                                    "property":  "Territorial Nebulae",
+                                    "staffer_name":  "Nebula Claims Surveyor",
+                                    "unit_cost":  3.247E+108
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  4.146E+107,
+                                    "property":  "The Edge of the Map",
+                                    "staffer_name":  "Here-Be-Dragons Registrar",
+                                    "unit_cost":  2.273E+109
+                                }
+                            ],
+    "sample_roster_entries":  [
+                                  {
+                                      "property":  "ATM",
+                                      "staffer":  "Waypoint Cash Surveyor"
+                                  },
+                                  {
+                                      "property":  "Money Tree",
+                                      "staffer":  "Orchard Grid Plotter"
+                                  },
+                                  {
+                                      "property":  "NFTs",
+                                      "staffer":  "Uncharted Token Cartographer"
+                                  },
+                                  {
+                                      "property":  "Tax Increment Financing",
+                                      "staffer":  "District Boundary Assessor"
+                                  },
+                                  {
+                                      "property":  "Cross Border Distribution",
+                                      "staffer":  "Border Crossing Chartsman"
+                                  },
+                                  {
+                                      "property":  "Money Laundering",
+                                      "staffer":  "Coordinate Scrubbing Clerk"
+                                  },
+                                  {
+                                      "property":  "Day Trading",
+                                      "staffer":  "Intraday Bearing Taker"
+                                  },
+                                  {
+                                      "property":  "Flipping Houses",
+                                      "staffer":  "Parcel Re-Plotter"
+                                  },
+                                  {
+                                      "property":  "Multi Level Marketing",
+                                      "staffer":  "Downline Triangulator"
+                                  },
+                                  {
+                                      "property":  "Hedge Fund",
+                                      "staffer":  "Portfolio Projection Mapper"
+                                  },
+                                  {
+                                      "property":  "Legislative Assets",
+                                      "staffer":  "Gerrymander Draftsman"
+                                  },
+                                  {
+                                      "property":  "Executive Assets",
+                                      "staffer":  "Chief Meridian Officer"
+                                  },
+                                  {
+                                      "property":  "Photon Exchange",
+                                      "staffer":  "Sunray Bearing Broker"
+                                  },
+                                  {
+                                      "property":  "Beam Utilities",
+                                      "staffer":  "Sightline Utilities Surveyor"
+                                  },
+                                  {
+                                      "property":  "Solar Futures Desk",
+                                      "staffer":  "Solar Transit Plotter"
+                                  },
+                                  {
+                                      "property":  "Dyson Holdings",
+                                      "staffer":  "Sphere Circumference Surveyor"
+                                  },
+                                  {
+                                      "property":  "Starcore Syndicate",
+                                      "staffer":  "Stellar Datum Keeper"
+                                  },
+                                  {
+                                      "property":  "Data Foundry",
+                                      "staffer":  "Geodata Foundry Master"
+                                  },
+                                  {
+                                      "property":  "Server Metropolis",
+                                      "staffer":  "Server Grid Zoner"
+                                  },
+                                  {
+                                      "property":  "Algorithm Mines",
+                                      "staffer":  "Pathfinding Mine Foreman"
+                                  }
+                              ]
+}

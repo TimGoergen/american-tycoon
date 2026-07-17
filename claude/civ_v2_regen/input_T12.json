@@ -1,0 +1,128 @@
+﻿{
+    "tier":  12,
+    "civilization":  "Umbrafex Syndicate",
+    "home_planet":  "Nocturne-9",
+    "currency":  "Favors",
+    "accent_color":  "26222e",
+    "hail":  "you did not receive this hail... there is no Syndicate, and it is very pleased with your ledgers... one favor has been extended to you — terms ██████, repayable upon ██████... tell no one. we certainly didn\u0027t...",
+    "contact_line":  "The Umbrafex Syndicate does not officially exist, which is also how they file their taxes. Somehow you already owe them a favor.",
+    "existing_properties":  [
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  3.398E+53,
+                                    "property":  "Redacted Ledgers",
+                                    "staffer_name":  "Chief Redaction Clerk",
+                                    "unit_cost":  1.863E+55
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  2.378E+54,
+                                    "property":  "Umbral Shell Foundry",
+                                    "staffer_name":  "Shell Company Smith",
+                                    "unit_cost":  1.304E+56
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  1.665E+55,
+                                    "property":  "Blackout Brokerage",
+                                    "staffer_name":  "Blackout Floor Whisperer",
+                                    "unit_cost":  9.13E+56
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  1.166E+56,
+                                    "property":  "Deniability Trust",
+                                    "staffer_name":  "Plausible Deniability Trustee",
+                                    "unit_cost":  6.391E+57
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  8.161E+56,
+                                    "property":  "The Unlit Exchange",
+                                    "staffer_name":  "The Unnamed Chairman",
+                                    "unit_cost":  4.474E+58
+                                }
+                            ],
+    "sample_roster_entries":  [
+                                  {
+                                      "property":  "ATM",
+                                      "staffer":  "Off-Book Teller"
+                                  },
+                                  {
+                                      "property":  "Money Tree",
+                                      "staffer":  "Shade Orchard Tender"
+                                  },
+                                  {
+                                      "property":  "NFTs",
+                                      "staffer":  "Provenance Obscurer"
+                                  },
+                                  {
+                                      "property":  "Tax Increment Financing",
+                                      "staffer":  "Off-Ledger Tax Strategist"
+                                  },
+                                  {
+                                      "property":  "Cross Border Distribution",
+                                      "staffer":  "Border Ghost Courier"
+                                  },
+                                  {
+                                      "property":  "Money Laundering",
+                                      "staffer":  "Alleged Freshness Consultant"
+                                  },
+                                  {
+                                      "property":  "Day Trading",
+                                      "staffer":  "After-Hours Trader"
+                                  },
+                                  {
+                                      "property":  "Flipping Houses",
+                                      "staffer":  "Safehouse Flipper"
+                                  },
+                                  {
+                                      "property":  "Multi Level Marketing",
+                                      "staffer":  "Shadow Downline Handler"
+                                  },
+                                  {
+                                      "property":  "Hedge Fund",
+                                      "staffer":  "Dark Pool Administrator"
+                                  },
+                                  {
+                                      "property":  "Legislative Assets",
+                                      "staffer":  "Unregistered Lobbyist"
+                                  },
+                                  {
+                                      "property":  "Executive Assets",
+                                      "staffer":  "Chief of ██████"
+                                  },
+                                  {
+                                      "property":  "Photon Exchange",
+                                      "staffer":  "Photon Occlusion Broker"
+                                  },
+                                  {
+                                      "property":  "Beam Utilities",
+                                      "staffer":  "Beam Dimming Foreman"
+                                  },
+                                  {
+                                      "property":  "Solar Futures Desk",
+                                      "staffer":  "Eclipse Futures Insider"
+                                  },
+                                  {
+                                      "property":  "Dyson Holdings",
+                                      "staffer":  "Dyson Blackout Engineer"
+                                  },
+                                  {
+                                      "property":  "Starcore Syndicate",
+                                      "staffer":  "Snuffed Star Magnate"
+                                  },
+                                  {
+                                      "property":  "Data Foundry",
+                                      "staffer":  "Data Scrubbing Foreman"
+                                  },
+                                  {
+                                      "property":  "Server Metropolis",
+                                      "staffer":  "Dark Server Superintendent"
+                                  },
+                                  {
+                                      "property":  "Algorithm Mines",
+                                      "staffer":  "Untraceable Algorithm Miner"
+                                  }
+                              ]
+}

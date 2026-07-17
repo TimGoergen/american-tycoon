@@ -1,0 +1,128 @@
+﻿{
+    "tier":  26,
+    "civilization":  "The Proprietors Absolute",
+    "home_planet":  "Provisio",
+    "currency":  "Titles",
+    "accent_color":  "3a2e59",
+    "hail":  "Welcome, hereinafter \u0027the Tenant\u0027, to Existence™ (see §1: \u0027All of It, Ours\u0027). Your so-called Empire has been duly recorded as a Fixture (§4,088,209,317) and is hereby graciously sublet back to You at prevailing rates, plus Gratitude™. By continuing to exist, You accept these Terms.",
+    "contact_line":  "They own the concept of ownership itself, which makes your entire empire, retroactively, a rental. Congratulations: you are now the universe\u0027s most successful tenant.",
+    "existing_properties":  [
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  4.877E+112,
+                                    "property":  "Fine Print Mills",
+                                    "staffer_name":  "Subclause Mill Foreman",
+                                    "unit_cost":  2.674E+114
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  3.415E+113,
+                                    "property":  "Concept Copyrights",
+                                    "staffer_name":  "Registrar of Notions™",
+                                    "unit_cost":  1.872E+115
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  2.389E+114,
+                                    "property":  "Liens on Existence",
+                                    "staffer_name":  "Ontological Lienholder",
+                                    "unit_cost":  1.31E+116
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  1.673E+115,
+                                    "property":  "Title Registry of Everything",
+                                    "staffer_name":  "Recorder-General of Everything",
+                                    "unit_cost":  9.171E+116
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  1.171E+116,
+                                    "property":  "The Deed to the Universe",
+                                    "staffer_name":  "The Proprietor Absolute",
+                                    "unit_cost":  6.42E+117
+                                }
+                            ],
+    "sample_roster_entries":  [
+                                  {
+                                      "property":  "ATM",
+                                      "staffer":  "Dispensation Clause Clerk"
+                                  },
+                                  {
+                                      "property":  "Money Tree",
+                                      "staffer":  "Usufruct Cultivator"
+                                  },
+                                  {
+                                      "property":  "NFTs",
+                                      "staffer":  "Intangible Asset Conveyancer"
+                                  },
+                                  {
+                                      "property":  "Tax Increment Financing",
+                                      "staffer":  "Incremental Levy Draftsman"
+                                  },
+                                  {
+                                      "property":  "Cross Border Distribution",
+                                      "staffer":  "Jurisdiction Shopping Counsel"
+                                  },
+                                  {
+                                      "property":  "Money Laundering",
+                                      "staffer":  "Provenance Restatement Counsel"
+                                  },
+                                  {
+                                      "property":  "Day Trading",
+                                      "staffer":  "Intraday Assignment Clerk"
+                                  },
+                                  {
+                                      "property":  "Flipping Houses",
+                                      "staffer":  "Serial Deed Transferor"
+                                  },
+                                  {
+                                      "property":  "Multi Level Marketing",
+                                      "staffer":  "Sublicense Pyramid Grantor"
+                                  },
+                                  {
+                                      "property":  "Hedge Fund",
+                                      "staffer":  "Indemnified Speculation Trustee"
+                                  },
+                                  {
+                                      "property":  "Legislative Assets",
+                                      "staffer":  "Statute Drafting Licensor"
+                                  },
+                                  {
+                                      "property":  "Executive Assets",
+                                      "staffer":  "Signing Authority Holder"
+                                  },
+                                  {
+                                      "property":  "Photon Exchange",
+                                      "staffer":  "Light Rights Broker"
+                                  },
+                                  {
+                                      "property":  "Beam Utilities",
+                                      "staffer":  "Light Easement Warden"
+                                  },
+                                  {
+                                      "property":  "Solar Futures Desk",
+                                      "staffer":  "Sunrise Options Notary"
+                                  },
+                                  {
+                                      "property":  "Dyson Holdings",
+                                      "staffer":  "Stellar Enclosure Titleholder"
+                                  },
+                                  {
+                                      "property":  "Starcore Syndicate",
+                                      "staffer":  "Fusion Royalty Collector"
+                                  },
+                                  {
+                                      "property":  "Data Foundry",
+                                      "staffer":  "Data Ownership Assignee"
+                                  },
+                                  {
+                                      "property":  "Server Metropolis",
+                                      "staffer":  "Hosting Terms Enforcer"
+                                  },
+                                  {
+                                      "property":  "Algorithm Mines",
+                                      "staffer":  "Algorithm Patent Prospector"
+                                  }
+                              ]
+}

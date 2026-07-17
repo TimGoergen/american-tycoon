@@ -1,0 +1,738 @@
+{
+  "tier": 7,
+  "civilization": "Vashti Deep-Court",
+  "new_roster_entries": [
+    {
+      "property": "Supernova Underwriters",
+      "staffer": "Nova-Glow Underwriter"
+    },
+    {
+      "property": "Sentience Leasing Corp",
+      "staffer": "Awakened Kraken Leaser"
+    },
+    {
+      "property": "Planetary Mainframe",
+      "staffer": "Seabed Mainframe Keeper"
+    },
+    {
+      "property": "Rotworld Orchards",
+      "staffer": "Whalefall Orchardist"
+    },
+    {
+      "property": "Panspermia Logistics",
+      "staffer": "Drift-Spore Shipper"
+    },
+    {
+      "property": "Moonrot Colonies",
+      "staffer": "Tide-Rot Colonist"
+    },
+    {
+      "property": "Bedrock Annuities",
+      "staffer": "Seafloor Bedrock Annuitant"
+    },
+    {
+      "property": "Tectonic Arbitrage",
+      "staffer": "Rift-Vent Arbitrageur"
+    },
+    {
+      "property": "Mantle Extraction Concern",
+      "staffer": "Vent-Mantle Extractor"
+    },
+    {
+      "property": "Planetcore Assay",
+      "staffer": "Trench-Core Assayer"
+    },
+    {
+      "property": "Hindsight Hedge Fund",
+      "staffer": "Receding Tide Hedger"
+    },
+    {
+      "property": "Nostalgia Refinery",
+      "staffer": "Sunken Memory Refiner"
+    },
+    {
+      "property": "Timeline Repossessions",
+      "staffer": "Undertow Repossessor"
+    },
+    {
+      "property": "Millennium Mortgage",
+      "staffer": "Thousand-Fathom Mortgagor"
+    },
+    {
+      "property": "Big Bang Buyback",
+      "staffer": "First Tide Buyback Agent"
+    },
+    {
+      "property": "Fang Liability Consortium",
+      "staffer": "Anglerfang Liability Assessor"
+    },
+    {
+      "property": "Hatchling Whole-Life",
+      "staffer": "Fry Whole-Life Underwriter"
+    },
+    {
+      "property": "Brumation Escrow Vaults",
+      "staffer": "Cold-Torpor Escrow Warden"
+    },
+    {
+      "property": "Constriction Claims Tribunal",
+      "staffer": "Kraken-Grip Claims Justice"
+    },
+    {
+      "property": "Planetary Coverage Coils",
+      "staffer": "Sea-Serpent Coverage Coiler"
+    },
+    {
+      "property": "Extinction Rider Exchange",
+      "staffer": "Last Species Rider Broker"
+    },
+    {
+      "property": "Stellar Collapse Indemnity",
+      "staffer": "Star-Sink Indemnifier"
+    },
+    {
+      "property": "Propolis Patent Office",
+      "staffer": "Coral-Resin Patent Clerk"
+    },
+    {
+      "property": "Royal Mead Distillery",
+      "staffer": "Brine Mead Distiller"
+    },
+    {
+      "property": "The Waggle Bourse",
+      "staffer": "Lure-Dance Floor Trader"
+    },
+    {
+      "property": "Swarm Assurance Society",
+      "staffer": "Shoal Assurance Actuary"
+    },
+    {
+      "property": "Pheromone Broadcasting Guild",
+      "staffer": "Scent-Plume Broadcaster"
+    },
+    {
+      "property": "Meadow Annexation Bureau",
+      "staffer": "Kelp Meadow Annexer"
+    },
+    {
+      "property": "Ministry of Lesser Hives",
+      "staffer": "Minister of Lesser Reefs"
+    },
+    {
+      "property": "The Queen's Mint",
+      "staffer": "Drowned Queen's Mintmaster"
+    },
+    {
+      "property": "Thaw-Debt Collections",
+      "staffer": "Meltwater Debt Collector"
+    },
+    {
+      "property": "Frostbite Annuities",
+      "staffer": "Icewater Annuitant"
+    },
+    {
+      "property": "Blizzard Claims Hall",
+      "staffer": "Ice-Storm Claims Adjuster"
+    },
+    {
+      "property": "Fjord Toll Dominion",
+      "staffer": "Fjord-Mouth Tollkeeper"
+    },
+    {
+      "property": "Winterlong Bond Vaults",
+      "staffer": "Long-Winter Bond Warden"
+    },
+    {
+      "property": "Frozen Sea Exchange",
+      "staffer": "Under-Ice Exchange Broker"
+    },
+    {
+      "property": "Moraine Mineral Rights",
+      "staffer": "Glacial Seabed Claimant"
+    },
+    {
+      "property": "Polar Crown Holdings",
+      "staffer": "Polar Deep Crownkeeper"
+    },
+    {
+      "property": "Ice Age Futures",
+      "staffer": "Frozen Epoch Broker"
+    },
+    {
+      "property": "Reverb Royalties",
+      "staffer": "Deep Echo Royalty Agent"
+    },
+    {
+      "property": "Encore Futures",
+      "staffer": "Second Song Broker"
+    },
+    {
+      "property": "Key Change Patents",
+      "staffer": "Current-Shift Key Patenter"
+    },
+    {
+      "property": "Silence Easements",
+      "staffer": "Soundless Depths Easer"
+    },
+    {
+      "property": "Octave Monopoly",
+      "staffer": "Sonar Octave Monopolist"
+    },
+    {
+      "property": "Planetary Reverb Chamber",
+      "staffer": "Ocean-Basin Reverb Keeper"
+    },
+    {
+      "property": "Orbital Amphitheater",
+      "staffer": "Sunken Amphitheater Usher"
+    },
+    {
+      "property": "Spheres Music Exchange",
+      "staffer": "Tide-Sphere Music Broker"
+    },
+    {
+      "property": "Cosmic Hum Licensing",
+      "staffer": "Abyssal Hum Licensor"
+    },
+    {
+      "property": "Whisper Clearinghouse",
+      "staffer": "Bubble-Whisper Clearer"
+    },
+    {
+      "property": "Favor Futures Desk",
+      "staffer": "Deep-Favor Futures Clerk"
+    },
+    {
+      "property": "Ghost Payroll Bureau",
+      "staffer": "Ghost-Ship Paymaster"
+    },
+    {
+      "property": "The Silent Auction",
+      "staffer": "Lightless Auction Caller"
+    },
+    {
+      "property": "Bank of Nowhere",
+      "staffer": "Bottomless Bank Teller"
+    },
+    {
+      "property": "Leverage Reserve Vault",
+      "staffer": "Crush-Depth Leverage Warden"
+    },
+    {
+      "property": "Retroactive Erasure Group",
+      "staffer": "Silt-Settle Eraser"
+    },
+    {
+      "property": "Shadow Central Bank",
+      "staffer": "Midnight Zone Central Banker"
+    },
+    {
+      "property": "Ministry of Nonexistence",
+      "staffer": "Minister of the Unfathomed"
+    },
+    {
+      "property": "Protection Racket Annex",
+      "staffer": "Reef Protection Racketeer"
+    },
+    {
+      "property": "Plunder Clearinghouse",
+      "staffer": "Wreck-Plunder Clearing Agent"
+    },
+    {
+      "property": "Tribute Futures Pit",
+      "staffer": "Tribute Trench Pit Trader"
+    },
+    {
+      "property": "Warpath Toll Authority",
+      "staffer": "War-Current Toll Warden"
+    },
+    {
+      "property": "Hostile Takeover Legion",
+      "staffer": "Frenzy Takeover Legionnaire"
+    },
+    {
+      "property": "Scorched Earth Realty",
+      "staffer": "Boiled Sea Realtor"
+    },
+    {
+      "property": "Conquest Dividend Bureau",
+      "staffer": "Conquered Waters Dividend Clerk"
+    },
+    {
+      "property": "Orbital Blockade Consortium",
+      "staffer": "Strait Blockade Admiral"
+    },
+    {
+      "property": "Grand Pillage Portfolio",
+      "staffer": "Grand Wreck-Pillager"
+    },
+    {
+      "property": "Thank-You Note Mint",
+      "staffer": "Gratitude Bubble Minter"
+    },
+    {
+      "property": "Small Talk Reserve",
+      "staffer": "Shallow Talk Reservist"
+    },
+    {
+      "property": "RSVP Clearinghouse",
+      "staffer": "Summons Reply Clerk"
+    },
+    {
+      "property": "Seating Chart Exchange",
+      "staffer": "Court Perch Arranger"
+    },
+    {
+      "property": "Condolence Consortium",
+      "staffer": "Drowned Condolence Bearer"
+    },
+    {
+      "property": "Debutante Bond Exchange",
+      "staffer": "Debut Descent Bondsman"
+    },
+    {
+      "property": "Faux Pas Tribunal",
+      "staffer": "Deep-Court Misstep Justice"
+    },
+    {
+      "property": "Orbital Finishing School",
+      "staffer": "Trench Finishing Tutor"
+    },
+    {
+      "property": "Forgiveness Reserve Bank",
+      "staffer": "Absolution Depths Banker"
+    },
+    {
+      "property": "Snooze Button Tolls",
+      "staffer": "Slack-Tide Snooze Tollman"
+    },
+    {
+      "property": "Counting Sheep Leasing",
+      "staffer": "Counting Krill Leaser"
+    },
+    {
+      "property": "Deja Vu Royalties",
+      "staffer": "Twice-Seen Tide Agent"
+    },
+    {
+      "property": "Melatonin Futures",
+      "staffer": "Midnight Brine Broker"
+    },
+    {
+      "property": "Somnambulist Staffing",
+      "staffer": "Sleep-Drift Dispatcher"
+    },
+    {
+      "property": "Insomnia Subscriptions",
+      "staffer": "Lidless Eye Enroller"
+    },
+    {
+      "property": "REM Cycle Refineries",
+      "staffer": "Dream-Current Refiner"
+    },
+    {
+      "property": "Circadian Grid Utilities",
+      "staffer": "Tidal Clock Gridkeeper"
+    },
+    {
+      "property": "Collective Unconscious Trust",
+      "staffer": "Shoal-Dream Trustee"
+    },
+    {
+      "property": "Idiom Refinery",
+      "staffer": "Deep-Saying Refiner"
+    },
+    {
+      "property": "Grammar Debtors' Prison",
+      "staffer": "Grammar Brig Jailer"
+    },
+    {
+      "property": "Pronunciation Tollway",
+      "staffer": "Garbled Bubble Tollkeeper"
+    },
+    {
+      "property": "Rhetoric Futures Exchange",
+      "staffer": "Siren Rhetoric Broker"
+    },
+    {
+      "property": "Untranslatable Word Reserve",
+      "staffer": "Unsounded Word Keeper"
+    },
+    {
+      "property": "Proto-Tongue Derricks",
+      "staffer": "First-Song Derrick Driller"
+    },
+    {
+      "property": "Babel Reconstruction Trust",
+      "staffer": "Sunken Babel Rebuilder"
+    },
+    {
+      "property": "Mother Tongue Monopoly",
+      "staffer": "Mother Current Monopolist"
+    },
+    {
+      "property": "The Silence Concession",
+      "staffer": "Hush-of-the-Deep Vendor"
+    },
+    {
+      "property": "Corrosion Escrow",
+      "staffer": "Saltbite Escrow Agent"
+    },
+    {
+      "property": "Ore-Debt Registries",
+      "staffer": "Seam-Debt Registrar"
+    },
+    {
+      "property": "Tarnish Futures",
+      "staffer": "Brine-Tarnish Broker"
+    },
+    {
+      "property": "Slag Baronies",
+      "staffer": "Vent-Slag Baron"
+    },
+    {
+      "property": "Foundry Cartels",
+      "staffer": "Blackwater Foundry Cartelist"
+    },
+    {
+      "property": "Rust-Tithe Cathedrals",
+      "staffer": "Rusted Cathedral Tither"
+    },
+    {
+      "property": "Magnetosphere Monopolies",
+      "staffer": "Lodestone Deep Monopolist"
+    },
+    {
+      "property": "Mantle Mining Concordats",
+      "staffer": "Vent-Mine Concordat Signer"
+    },
+    {
+      "property": "The Molten Mint",
+      "staffer": "Magma Vent Minter"
+    },
+    {
+      "property": "Vernissage Circuits",
+      "staffer": "Glow-Gallery Circuit Host"
+    },
+    {
+      "property": "Gala Blacklist Registries",
+      "staffer": "Court Blacklist Scrivener"
+    },
+    {
+      "property": "Restoration Ateliers",
+      "staffer": "Wreck Restoration Artisan"
+    },
+    {
+      "property": "Provenance Vaults",
+      "staffer": "Salvage Provenance Warden"
+    },
+    {
+      "property": "Biennale Monopolies",
+      "staffer": "Tide-Festival Monopolist"
+    },
+    {
+      "property": "Movement Manufactories",
+      "staffer": "Current-Movement Fabricator"
+    },
+    {
+      "property": "The Zeitgeist Refinery",
+      "staffer": "Spirit-of-the-Tide Refiner"
+    },
+    {
+      "property": "Obsolescence Bureaus",
+      "staffer": "Obsolete Wreck Clerk"
+    },
+    {
+      "property": "Negative Space Exchange",
+      "staffer": "Empty Fathom Broker"
+    },
+    {
+      "property": "Loaded Dice Foundries",
+      "staffer": "Sinker-Dice Smith"
+    },
+    {
+      "property": "Comp Suite Arcologies",
+      "staffer": "Comped Grotto Concierge"
+    },
+    {
+      "property": "Roulette Ring Worlds",
+      "staffer": "Whirlpool Roulette Croupier"
+    },
+    {
+      "property": "Whale Harvest Fleets",
+      "staffer": "Whale-Purse Harvester"
+    },
+    {
+      "property": "Probability Refineries",
+      "staffer": "Chance-Current Refiner"
+    },
+    {
+      "property": "Luck Futures Exchange",
+      "staffer": "Lucky Lure Broker"
+    },
+    {
+      "property": "Vigorish Gravity Wells",
+      "staffer": "Undertow Vigorish Keeper"
+    },
+    {
+      "property": "Casino Moon Consortium",
+      "staffer": "Casino Grotto Consort"
+    },
+    {
+      "property": "The Infinite Parlay",
+      "staffer": "Bottomless Parlay Bookie"
+    },
+    {
+      "property": "Echo Escrow",
+      "staffer": "Sonar Echo Escrower"
+    },
+    {
+      "property": "Selfsame Insurance",
+      "staffer": "Mirror-Twin Underwriter"
+    },
+    {
+      "property": "Likeness Licensing Bureau",
+      "staffer": "Mimic Likeness Licensor"
+    },
+    {
+      "property": "The Gallery of You",
+      "staffer": "Gallery of Reflections Docent"
+    },
+    {
+      "property": "Kaleidoscope Trust",
+      "staffer": "Shattered Light Trustee"
+    },
+    {
+      "property": "Quicksilver Sea Refinery",
+      "staffer": "Quicksilver Trench Refiner"
+    },
+    {
+      "property": "Mirror Moon Works",
+      "staffer": "Moon-Glass Seaworks Smith"
+    },
+    {
+      "property": "Orbital Vanity Ring",
+      "staffer": "Vanity Ring Reef-Keeper"
+    },
+    {
+      "property": "The Second Speculum",
+      "staffer": "Second Surface Warden"
+    },
+    {
+      "property": "Columbarium Exchange",
+      "staffer": "Urn-Reef Exchange Clerk"
+    },
+    {
+      "property": "Cenotaph Securities",
+      "staffer": "Empty-Grave Securities Agent"
+    },
+    {
+      "property": "Charnel Clearinghouse",
+      "staffer": "Bonefield Clearing Agent"
+    },
+    {
+      "property": "Eulogy Underwriting",
+      "staffer": "Last Rites Underwriter"
+    },
+    {
+      "property": "Seance Brokerage",
+      "staffer": "Drowned Voices Medium"
+    },
+    {
+      "property": "Barrow Bond Market",
+      "staffer": "Burial Mound Bondsman"
+    },
+    {
+      "property": "Necropolis Bourse",
+      "staffer": "Sunken Necropolis Trader"
+    },
+    {
+      "property": "Purgatory Escrow",
+      "staffer": "Between-Tides Escrow Agent"
+    },
+    {
+      "property": "Afterlife Sovereign Fund",
+      "staffer": "Afterdeep Sovereign Steward"
+    },
+    {
+      "property": "Clickbait Foundries",
+      "staffer": "Baited Hook Foundryman"
+    },
+    {
+      "property": "Sponsored Content Mills",
+      "staffer": "Sponsored Chum Miller"
+    },
+    {
+      "property": "Follower Hatcheries",
+      "staffer": "Fry-School Hatchery Keeper"
+    },
+    {
+      "property": "Drama Exchanges",
+      "staffer": "Feeding-Frenzy Drama Broker"
+    },
+    {
+      "property": "Cancellation Insurance",
+      "staffer": "Cast-Out Coverage Agent"
+    },
+    {
+      "property": "Persona Cloning Vats",
+      "staffer": "Mimic Vat Tender"
+    },
+    {
+      "property": "The Algorithm Cathedral",
+      "staffer": "Cathedral Current Algorithmist"
+    },
+    {
+      "property": "Planetwide Livestream Grid",
+      "staffer": "All-Ocean Livestream Warden"
+    },
+    {
+      "property": "Attention Singularity",
+      "staffer": "All-Devouring Gaze Keeper"
+    },
+    {
+      "property": "Triplicate Archives",
+      "staffer": "Triplicate Silt Archivist"
+    },
+    {
+      "property": "Waiting Room Estates",
+      "staffer": "Holding-Depth Estate Agent"
+    },
+    {
+      "property": "Bureau of Grievances",
+      "staffer": "Grievance Trench Clerk"
+    },
+    {
+      "property": "Signature Refinery",
+      "staffer": "Ink-Signature Refiner"
+    },
+    {
+      "property": "Inspectorate of Inspections",
+      "staffer": "Sounding-of-Soundings Inspector"
+    },
+    {
+      "property": "Lost Records Vault",
+      "staffer": "Lost-to-the-Deep Archivist"
+    },
+    {
+      "property": "Stamp Reserve Bank",
+      "staffer": "Pressure-Stamp Reservist"
+    },
+    {
+      "property": "The Eternal Queue",
+      "staffer": "Endless Migration Marshal"
+    },
+    {
+      "property": "Ministry of Pending",
+      "staffer": "Minister of Slow Sinking"
+    },
+    {
+      "property": "Compass Rose Franchises",
+      "staffer": "Coral Compass Franchiser"
+    },
+    {
+      "property": "Legend Licensing",
+      "staffer": "Sea-Legend Licensor"
+    },
+    {
+      "property": "Projection Patents",
+      "staffer": "Chart Projection Patentee"
+    },
+    {
+      "property": "Antipode Holdings",
+      "staffer": "Opposite Ocean Holder"
+    },
+    {
+      "property": "Equator Toll Ring",
+      "staffer": "Warm Current Tollmaster"
+    },
+    {
+      "property": "Magnetic Pole Trust",
+      "staffer": "Lodestone Pole Trustee"
+    },
+    {
+      "property": "Continental Drift Futures",
+      "staffer": "Drifting Plate Broker"
+    },
+    {
+      "property": "Terra Incognita Escrow",
+      "staffer": "Unsounded Waters Escrower"
+    },
+    {
+      "property": "The Master Graticule",
+      "staffer": "Master Depth-Grid Keeper"
+    },
+    {
+      "property": "Half-Life Holdings",
+      "staffer": "Glow-Decay Holder"
+    },
+    {
+      "property": "Redshift Receivership",
+      "staffer": "Fading Glow Receiver"
+    },
+    {
+      "property": "Vacuum Decay Futures",
+      "staffer": "False Vacuum Tide Broker"
+    },
+    {
+      "property": "Proton Decay Trusts",
+      "staffer": "Smallest Mote Trustee"
+    },
+    {
+      "property": "Stellar Foreclosure Courts",
+      "staffer": "Star-Drowning Court Bailiff"
+    },
+    {
+      "property": "Galactic Liquidation Fleets",
+      "staffer": "Great Liquidation Admiral"
+    },
+    {
+      "property": "Black Hole Escrow",
+      "staffer": "Deepest Maw Escrower"
+    },
+    {
+      "property": "Universal Write-Down Office",
+      "staffer": "All-Depths Write-Down Clerk"
+    },
+    {
+      "property": "The Penultimate Kelvin",
+      "staffer": "Second-Coldest Current Keeper"
+    },
+    {
+      "property": "Soul Escrow Services",
+      "staffer": "Soul-Sink Escrow Agent"
+    },
+    {
+      "property": "Gravity Easement Office",
+      "staffer": "Downward Pull Easement Clerk"
+    },
+    {
+      "property": "Mathematics Licensing Bureau",
+      "staffer": "Deep Arithmetic Licensor"
+    },
+    {
+      "property": "Timeshares in Time",
+      "staffer": "Tide-Share Timekeeper"
+    },
+    {
+      "property": "Probability Trust Holdings",
+      "staffer": "Current-of-Chance Trustee"
+    },
+    {
+      "property": "Mortgages on Causality",
+      "staffer": "Cause-and-Current Mortgagor"
+    },
+    {
+      "property": "Eminent Domain of Reality",
+      "staffer": "All-Waters Domain Sovereign"
+    },
+    {
+      "property": "Divine Foreclosure Division",
+      "staffer": "God-Drowning Foreclosure Agent"
+    },
+    {
+      "property": "Escheat of the Multiverse",
+      "staffer": "Escheator of Every Ocean"
+    }
+  ]
+}

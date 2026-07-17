@@ -1,0 +1,42 @@
+{
+    "tier": 12,
+    "civilization": "Umbrafex Syndicate",
+    "new_properties": [
+        {
+            "property": "Whisper Clearinghouse",
+            "staffer": "Rumor Settlement Clerk"
+        },
+        {
+            "property": "Favor Futures Desk",
+            "staffer": "Unspoken Terms Underwriter"
+        },
+        {
+            "property": "Ghost Payroll Bureau",
+            "staffer": "Director of Nonexistent Staff"
+        },
+        {
+            "property": "The Silent Auction",
+            "staffer": "Absentee Auctioneer"
+        },
+        {
+            "property": "Bank of Nowhere",
+            "staffer": "Vice President of Nowhere"
+        },
+        {
+            "property": "Leverage Reserve Vault",
+            "staffer": "Compromat Archivist"
+        },
+        {
+            "property": "Retroactive Erasure Group",
+            "staffer": "Never-Happened Adjuster"
+        },
+        {
+            "property": "Shadow Central Bank",
+            "staffer": "Unminted Currency Governor"
+        },
+        {
+            "property": "Ministry of Nonexistence",
+            "staffer": "Undersecretary of ██████"
+        }
+    ]
+}

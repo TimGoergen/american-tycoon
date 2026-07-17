@@ -1,0 +1,128 @@
+﻿{
+    "tier":  9,
+    "civilization":  "Melissar Hive-Court",
+    "home_planet":  "Melissar VI",
+    "currency":  "Royal Jelly",
+    "accent_color":  "c19a26",
+    "hail":  "By royal decree, We have tazzted your fortune upon the wind and pronounce it zzweet enough for Court. Your buzzness is hereby annexed to the Hive; your pozzition is Provisional Drone, compensated in exposure to Our radiance. Kneel, and bring nectar.",
+    "contact_line":  "A gilded-age bee aristocracy that turned the hive into a stock exchange and the drones into unpaid interns. The queen annexed your portfolio before you finished bowing.",
+    "existing_properties":  [
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  7.159E+40,
+                                    "property":  "Wax Works Combine",
+                                    "staffer_name":  "Master Wax Sculptress",
+                                    "unit_cost":  3.925E+42
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  5.011E+41,
+                                    "property":  "Nectar Commodities",
+                                    "staffer_name":  "Nectar Futures Grandee",
+                                    "unit_cost":  2.747E+43
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  3.508E+42,
+                                    "property":  "Drone Placement Agency",
+                                    "staffer_name":  "Unpaid Drone Recruiter",
+                                    "unit_cost":  1.923E+44
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  2.455E+43,
+                                    "property":  "Honeycomb Estates",
+                                    "staffer_name":  "Hexagonal Estates Duchess",
+                                    "unit_cost":  1.346E+45
+                                },
+                                {
+                                    "cycle_seconds":  60.0,
+                                    "income_per_unit":  1.719E+44,
+                                    "property":  "The Royal Jelly Reserve",
+                                    "staffer_name":  "Keeper of the Royal Jelly",
+                                    "unit_cost":  9.423E+45
+                                }
+                            ],
+    "sample_roster_entries":  [
+                                  {
+                                      "property":  "ATM",
+                                      "staffer":  "Comb Cell Teller"
+                                  },
+                                  {
+                                      "property":  "Money Tree",
+                                      "staffer":  "Royal Orchard Pollinator"
+                                  },
+                                  {
+                                      "property":  "NFTs",
+                                      "staffer":  "Waggle-Dance Curator"
+                                  },
+                                  {
+                                      "property":  "Tax Increment Financing",
+                                      "staffer":  "Hive Tithe Assessor"
+                                  },
+                                  {
+                                      "property":  "Cross Border Distribution",
+                                      "staffer":  "Foraging Route Marshal"
+                                  },
+                                  {
+                                      "property":  "Money Laundering",
+                                      "staffer":  "Pollen Provenance Scrubber"
+                                  },
+                                  {
+                                      "property":  "Day Trading",
+                                      "staffer":  "Swarm Floor Trader"
+                                  },
+                                  {
+                                      "property":  "Flipping Houses",
+                                      "staffer":  "Comb Renovation Baroness"
+                                  },
+                                  {
+                                      "property":  "Multi Level Marketing",
+                                      "staffer":  "Brood Downline Matron"
+                                  },
+                                  {
+                                      "property":  "Hedge Fund",
+                                      "staffer":  "Hedgerow Fund Keeper"
+                                  },
+                                  {
+                                      "property":  "Legislative Assets",
+                                      "staffer":  "Court Decree Whisperer"
+                                  },
+                                  {
+                                      "property":  "Executive Assets",
+                                      "staffer":  "Queen\u0027s Chief Attendant"
+                                  },
+                                  {
+                                      "property":  "Photon Exchange",
+                                      "staffer":  "Sunbeam Nectar Broker"
+                                  },
+                                  {
+                                      "property":  "Beam Utilities",
+                                      "staffer":  "Sunpatch Utilities Warden"
+                                  },
+                                  {
+                                      "property":  "Solar Futures Desk",
+                                      "staffer":  "Bloom Season Forecaster"
+                                  },
+                                  {
+                                      "property":  "Dyson Holdings",
+                                      "staffer":  "Sun-Jar Estate Keeper"
+                                  },
+                                  {
+                                      "property":  "Starcore Syndicate",
+                                      "staffer":  "Starcore Swarm Mistress"
+                                  },
+                                  {
+                                      "property":  "Data Foundry",
+                                      "staffer":  "Waggle Data Archivist"
+                                  },
+                                  {
+                                      "property":  "Server Metropolis",
+                                      "staffer":  "Hive Mind Superintendent"
+                                  },
+                                  {
+                                      "property":  "Algorithm Mines",
+                                      "staffer":  "Pattern Dance Miner"
+                                  }
+                              ]
+}

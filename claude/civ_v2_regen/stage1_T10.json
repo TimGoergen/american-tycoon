@@ -1,0 +1,42 @@
+{
+    "tier": 10,
+    "civilization": "Norrvane Frostholm",
+    "new_properties": [
+        {
+            "property": "Thaw-Debt Collections",
+            "staffer": "Thaw-Debt Doomsayer"
+        },
+        {
+            "property": "Frostbite Annuities",
+            "staffer": "Slow-Drip Annuity Skald"
+        },
+        {
+            "property": "Blizzard Claims Hall",
+            "staffer": "Whiteout Claim-Denier"
+        },
+        {
+            "property": "Fjord Toll Dominion",
+            "staffer": "Fjord-Gate Toll Jarl"
+        },
+        {
+            "property": "Winterlong Bond Vaults",
+            "staffer": "Thousand-Winter Bondsman"
+        },
+        {
+            "property": "Frozen Sea Exchange",
+            "staffer": "Pack-Ice Floor Thane"
+        },
+        {
+            "property": "Moraine Mineral Rights",
+            "staffer": "Moraine Claims Reeve"
+        },
+        {
+            "property": "Polar Crown Holdings",
+            "staffer": "Polar Crown Hoard-Keeper"
+        },
+        {
+            "property": "Ice Age Futures",
+            "staffer": "Glaciation Futures Völva"
+        }
+    ]
+}

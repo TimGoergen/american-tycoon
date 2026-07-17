@@ -1,0 +1,42 @@
+{
+    "tier": 13,
+    "civilization": "Karr'ghan Warhoard",
+    "new_properties": [
+        {
+            "property": "Protection Racket Annex",
+            "staffer": "Extortion Renewals Clerk"
+        },
+        {
+            "property": "Plunder Clearinghouse",
+            "staffer": "Spoils Settlement Reaver"
+        },
+        {
+            "property": "Tribute Futures Pit",
+            "staffer": "Vassal Yield Broker"
+        },
+        {
+            "property": "Warpath Toll Authority",
+            "staffer": "Conquest Toll Reeve"
+        },
+        {
+            "property": "Hostile Takeover Legion",
+            "staffer": "Acquisitions Warband Captain"
+        },
+        {
+            "property": "Scorched Earth Realty",
+            "staffer": "Razed Lands Appraiser"
+        },
+        {
+            "property": "Conquest Dividend Bureau",
+            "staffer": "Spoils Payout Marshal"
+        },
+        {
+            "property": "Orbital Blockade Consortium",
+            "staffer": "Siege Fleet Executive"
+        },
+        {
+            "property": "Grand Pillage Portfolio",
+            "staffer": "Warmaster of Diversified Raiding"
+        }
+    ]
+}

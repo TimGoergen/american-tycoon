@@ -1,0 +1,3262 @@
+[
+  {
+    "tier": 1,
+    "rung": 0,
+    "property": "ATM",
+    "staffer_home": "ATM Technician",
+    "unit_cost": 50,
+    "income_per_unit": 5,
+    "cycle_seconds": 0.54,
+    "source": "live"
+  },
+  {
+    "tier": 1,
+    "rung": 1,
+    "property": "Money Tree",
+    "staffer_home": "Botanical Manager",
+    "unit_cost": 350,
+    "income_per_unit": 78.45,
+    "cycle_seconds": 1.765,
+    "source": "live"
+  },
+  {
+    "tier": 1,
+    "rung": 2,
+    "property": "NFTs",
+    "staffer_home": "NFT Community Manager",
+    "unit_cost": 2500,
+    "income_per_unit": 683.74,
+    "cycle_seconds": 3.077,
+    "source": "live"
+  },
+  {
+    "tier": 1,
+    "rung": 3,
+    "property": "Tax Increment Financing",
+    "staffer_home": "Tax Strategist",
+    "unit_cost": 17500,
+    "income_per_unit": 4966,
+    "cycle_seconds": 4.47,
+    "source": "live"
+  },
+  {
+    "tier": 1,
+    "rung": 4,
+    "property": "Cross Border Distribution",
+    "staffer_home": "Logistics Director",
+    "unit_cost": 120000,
+    "income_per_unit": 34630,
+    "cycle_seconds": 6.233,
+    "source": "live"
+  },
+  {
+    "tier": 1,
+    "rung": 5,
+    "property": "Money Laundering",
+    "staffer_home": "Freshness Consultant",
+    "unit_cost": 850000,
+    "income_per_unit": 226381,
+    "cycle_seconds": 8.15,
+    "source": "live"
+  },
+  {
+    "tier": 1,
+    "rung": 6,
+    "property": "Day Trading",
+    "staffer_home": "Portfolio Analyst",
+    "unit_cost": 6000000,
+    "income_per_unit": 1583415,
+    "cycle_seconds": 11.401,
+    "source": "live"
+  },
+  {
+    "tier": 1,
+    "rung": 7,
+    "property": "Flipping Houses",
+    "staffer_home": "Property Manager",
+    "unit_cost": 42000000,
+    "income_per_unit": 10552056,
+    "cycle_seconds": 15.67,
+    "source": "live"
+  },
+  {
+    "tier": 1,
+    "rung": 8,
+    "property": "Multi Level Marketing",
+    "staffer_home": "Downline Coordinator",
+    "unit_cost": 290000000,
+    "income_per_unit": 81430202,
+    "cycle_seconds": 21.986,
+    "source": "live"
+  },
+  {
+    "tier": 1,
+    "rung": 9,
+    "property": "Hedge Fund",
+    "staffer_home": "Fund Administrator",
+    "unit_cost": 2000000000,
+    "income_per_unit": 569958344,
+    "cycle_seconds": 30.778,
+    "source": "live"
+  },
+  {
+    "tier": 1,
+    "rung": 10,
+    "property": "Legislative Assets",
+    "staffer_home": "Lobbyist",
+    "unit_cost": 14000000000,
+    "income_per_unit": 3824309933,
+    "cycle_seconds": 43.023,
+    "source": "live"
+  },
+  {
+    "tier": 1,
+    "rung": 11,
+    "property": "Executive Assets",
+    "staffer_home": "Chief of Staff",
+    "unit_cost": 100000000000,
+    "income_per_unit": 29629629630,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 2,
+    "rung": 0,
+    "property": "Photon Exchange",
+    "staffer_home": "Photon Exchange Director",
+    "unit_cost": 10360000000000,
+    "income_per_unit": 189000000000,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 2,
+    "rung": 1,
+    "property": "Beam Utilities",
+    "staffer_home": "Beam Grid Operator",
+    "unit_cost": 52430000000000,
+    "income_per_unit": 956600000000,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 2,
+    "rung": 2,
+    "property": "Solar Futures Desk",
+    "staffer_home": "Flare Futures Broker",
+    "unit_cost": 265400000000000,
+    "income_per_unit": 4841000000000,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 2,
+    "rung": 3,
+    "property": "Dyson Holdings",
+    "staffer_home": "Dyson Site Foreman",
+    "unit_cost": 1343000000000000.0,
+    "income_per_unit": 24500000000000,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 2,
+    "rung": 4,
+    "property": "Supernova Underwriters",
+    "staffer_home": "Supernova Underwriter",
+    "unit_cost": 6798000000000000.0,
+    "income_per_unit": 124000000000000,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 2,
+    "rung": 5,
+    "property": "Starcore Syndicate",
+    "staffer_home": "Stellar Core Magnate",
+    "unit_cost": 3.44e+16,
+    "income_per_unit": 627600000000000,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 3,
+    "rung": 0,
+    "property": "Data Foundry",
+    "staffer_home": "Foundry Core",
+    "unit_cost": 1.741e+17,
+    "income_per_unit": 3177000000000000.0,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 3,
+    "rung": 1,
+    "property": "Server Metropolis",
+    "staffer_home": "Rack City Warden",
+    "unit_cost": 6.989e+17,
+    "income_per_unit": 1.275e+16,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 3,
+    "rung": 2,
+    "property": "Algorithm Mines",
+    "staffer_home": "Mining Subroutine",
+    "unit_cost": 2.806e+18,
+    "income_per_unit": 5.12e+16,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 3,
+    "rung": 3,
+    "property": "Robo-Labor Agency",
+    "staffer_home": "Labor Dispatch Core",
+    "unit_cost": 1.126e+19,
+    "income_per_unit": 2.056e+17,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 3,
+    "rung": 4,
+    "property": "Sentience Leasing Corp",
+    "staffer_home": "Sentience Lease Daemon",
+    "unit_cost": 4.522e+19,
+    "income_per_unit": 8.252e+17,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 3,
+    "rung": 5,
+    "property": "Planetary Mainframe",
+    "staffer_home": "Planetary Mainframe Core",
+    "unit_cost": 1.816e+20,
+    "income_per_unit": 3.313e+18,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 3,
+    "rung": 6,
+    "property": "Singularity Holdings",
+    "staffer_home": "Singularity Overmind",
+    "unit_cost": 7.289e+20,
+    "income_per_unit": 1.33e+19,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 4,
+    "rung": 0,
+    "property": "Spore Bank",
+    "staffer_home": "Spore Banker",
+    "unit_cost": 2.926e+21,
+    "income_per_unit": 5.339e+19,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 4,
+    "rung": 1,
+    "property": "Hyphae Networks",
+    "staffer_home": "Hyphae Line-Tender",
+    "unit_cost": 9.873e+21,
+    "income_per_unit": 1.802e+20,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 4,
+    "rung": 2,
+    "property": "Biomass Refinery",
+    "staffer_home": "Decay Refiner",
+    "unit_cost": 3.332e+22,
+    "income_per_unit": 6.079e+20,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 4,
+    "rung": 3,
+    "property": "Terraforming Co-op",
+    "staffer_home": "Sporefall Steward",
+    "unit_cost": 1.124e+23,
+    "income_per_unit": 2.051e+21,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 4,
+    "rung": 4,
+    "property": "Rotworld Orchards",
+    "staffer_home": "Rotworld Orchard-Tender",
+    "unit_cost": 3.793e+23,
+    "income_per_unit": 6.922e+21,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 4,
+    "rung": 5,
+    "property": "Panspermia Logistics",
+    "staffer_home": "Panspermia Drift-Shepherd",
+    "unit_cost": 1.28e+24,
+    "income_per_unit": 2.336e+22,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 4,
+    "rung": 6,
+    "property": "Moonrot Colonies",
+    "staffer_home": "Moonrot Colony-Mother",
+    "unit_cost": 4.319e+24,
+    "income_per_unit": 7.881e+22,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 4,
+    "rung": 7,
+    "property": "Biosphere Trust",
+    "staffer_home": "All-Biosphere Overlord",
+    "unit_cost": 1.457e+25,
+    "income_per_unit": 2.659e+23,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 5,
+    "rung": 0,
+    "property": "Prism Vault",
+    "staffer_home": "Prism Vault Keeper",
+    "unit_cost": 4.918e+25,
+    "income_per_unit": 8.973e+23,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 5,
+    "rung": 1,
+    "property": "Gem Exchange",
+    "staffer_home": "Facet Floor Trader",
+    "unit_cost": 1.45e+26,
+    "income_per_unit": 2.645e+24,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 5,
+    "rung": 2,
+    "property": "Laser Lens Works",
+    "staffer_home": "Lens Grinder Prime",
+    "unit_cost": 4.274e+26,
+    "income_per_unit": 7.797e+24,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 5,
+    "rung": 3,
+    "property": "Monolith Realty",
+    "staffer_home": "Monolith Concierge",
+    "unit_cost": 1.26e+27,
+    "income_per_unit": 2.298e+25,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 5,
+    "rung": 4,
+    "property": "Bedrock Annuities",
+    "staffer_home": "Bedrock Annuity Setter",
+    "unit_cost": 3.714e+27,
+    "income_per_unit": 6.775e+25,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 5,
+    "rung": 5,
+    "property": "Tectonic Arbitrage",
+    "staffer_home": "Tectonic Plate Broker",
+    "unit_cost": 1.095e+28,
+    "income_per_unit": 1.997e+26,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 5,
+    "rung": 6,
+    "property": "Mantle Extraction Concern",
+    "staffer_home": "Mantle Vein Magnate",
+    "unit_cost": 3.227e+28,
+    "income_per_unit": 5.888e+26,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 5,
+    "rung": 7,
+    "property": "Planetcore Assay",
+    "staffer_home": "Planetcore Assay-Lord",
+    "unit_cost": 9.512e+28,
+    "income_per_unit": 1.736e+27,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 5,
+    "rung": 8,
+    "property": "Geode Dominion",
+    "staffer_home": "Geode Sovereign",
+    "unit_cost": 2.804e+29,
+    "income_per_unit": 5.116e+27,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 6,
+    "rung": 0,
+    "property": "Time Bank",
+    "staffer_home": "Time Banker",
+    "unit_cost": 8.266000000000001e+29,
+    "income_per_unit": 1.508e+28,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 6,
+    "rung": 1,
+    "property": "Deadline Futures",
+    "staffer_home": "Deadline Enforcer",
+    "unit_cost": 2.187e+30,
+    "income_per_unit": 3.99e+28,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 6,
+    "rung": 2,
+    "property": "Moment Market",
+    "staffer_home": "Moment Appraiser",
+    "unit_cost": 5.786e+30,
+    "income_per_unit": 1.056e+29,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 6,
+    "rung": 3,
+    "property": "Eternity Escrow",
+    "staffer_home": "Eternity Notary",
+    "unit_cost": 1.531e+31,
+    "income_per_unit": 2.793e+29,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 6,
+    "rung": 4,
+    "property": "Hindsight Hedge Fund",
+    "staffer_home": "Hindsight Fund Oracle",
+    "unit_cost": 4.05e+31,
+    "income_per_unit": 7.389e+29,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 6,
+    "rung": 5,
+    "property": "Nostalgia Refinery",
+    "staffer_home": "Nostalgia Distiller",
+    "unit_cost": 1.072e+32,
+    "income_per_unit": 1.955e+30,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 6,
+    "rung": 6,
+    "property": "Timeline Repossessions",
+    "staffer_home": "Timeline Repo Agent",
+    "unit_cost": 2.835e+32,
+    "income_per_unit": 5.172e+30,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 6,
+    "rung": 7,
+    "property": "Millennium Mortgage",
+    "staffer_home": "Thousand-Year Lienholder",
+    "unit_cost": 7.501e+32,
+    "income_per_unit": 1.368e+31,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 6,
+    "rung": 8,
+    "property": "Big Bang Buyback",
+    "staffer_home": "Repossessor of the First Second",
+    "unit_cost": 1.985e+33,
+    "income_per_unit": 3.621e+31,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 6,
+    "rung": 9,
+    "property": "Causality Capital",
+    "staffer_home": "Sovereign of Cause & Effect",
+    "unit_cost": 5.251e+33,
+    "income_per_unit": 9.579e+31,
+    "cycle_seconds": 60,
+    "source": "live"
+  },
+  {
+    "tier": 7,
+    "rung": 0,
+    "property": "Anglerlight Storefronts",
+    "staffer_home": "Anglerlight Shopkeep",
+    "unit_cost": 1.389e+34,
+    "income_per_unit": 2.534e+32,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 7,
+    "rung": 1,
+    "property": "Pressure Vaults",
+    "staffer_home": "Pressure Vault Warden",
+    "unit_cost": 3.364e+34,
+    "income_per_unit": 6.136e+32,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 7,
+    "rung": 2,
+    "property": "Trench Tollway",
+    "staffer_home": "Trench Toll Collector",
+    "unit_cost": 8.147e+34,
+    "income_per_unit": 1.486e+33,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 7,
+    "rung": 3,
+    "property": "Leviathan Charter Fleet",
+    "staffer_home": "Leviathan Fleet Admiral",
+    "unit_cost": 1.973e+35,
+    "income_per_unit": 3.599e+33,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 7,
+    "rung": 4,
+    "property": "Whalefall Estates",
+    "staffer_home": "Whalefall Estate Broker",
+    "unit_cost": 4.778e+35,
+    "income_per_unit": 8.715e+33,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 7,
+    "rung": 5,
+    "property": "Ventworks Utility",
+    "staffer_home": "Hydrothermal Vent Baron",
+    "unit_cost": 1.157e+36,
+    "income_per_unit": 2.11e+34,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 7,
+    "rung": 6,
+    "property": "Siren Bond Market",
+    "staffer_home": "Siren Bond Underwriter",
+    "unit_cost": 2.802e+36,
+    "income_per_unit": 5.111e+34,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 7,
+    "rung": 7,
+    "property": "Hadal Mint",
+    "staffer_home": "Hadal Mintmaster",
+    "unit_cost": 6.787e+36,
+    "income_per_unit": 1.238e+35,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 7,
+    "rung": 8,
+    "property": "Drowned Cathedral Exchange",
+    "staffer_home": "Bishop of Sunken Ledgers",
+    "unit_cost": 1.644e+37,
+    "income_per_unit": 2.999e+35,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 7,
+    "rung": 9,
+    "property": "Midnight Zone Trust",
+    "staffer_home": "Regent of the Midnight Zone",
+    "unit_cost": 3.98e+37,
+    "income_per_unit": 7.26e+35,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 7,
+    "rung": 10,
+    "property": "Abyssal Sovereignty",
+    "staffer_home": "Sovereign of the Crushing Dark",
+    "unit_cost": 9.64e+37,
+    "income_per_unit": 1.758e+36,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 8,
+    "rung": 0,
+    "property": "Venom Underwriting",
+    "staffer_home": "Chief Venom Underwriter",
+    "unit_cost": 2.335e+38,
+    "income_per_unit": 4.259e+36,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 8,
+    "rung": 1,
+    "property": "Molt Reinsurance",
+    "staffer_home": "Second-Skin Reinsurer",
+    "unit_cost": 5.253e+38,
+    "income_per_unit": 9.581e+36,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 8,
+    "rung": 2,
+    "property": "Coilfold Annuities",
+    "staffer_home": "Coilfold Annuity Actuary",
+    "unit_cost": 1.182e+39,
+    "income_per_unit": 2.156e+37,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 8,
+    "rung": 3,
+    "property": "Actuarial Temple",
+    "staffer_home": "High Priest of Premiums",
+    "unit_cost": 2.659e+39,
+    "income_per_unit": 4.85e+37,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 8,
+    "rung": 4,
+    "property": "Fang Liability Consortium",
+    "staffer_home": "Bite-Wound Claims Adjuster",
+    "unit_cost": 5.981e+39,
+    "income_per_unit": 1.091e+38,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 8,
+    "rung": 5,
+    "property": "Hatchling Whole-Life",
+    "staffer_home": "Clutch Policy Broker",
+    "unit_cost": 1.346e+40,
+    "income_per_unit": 2.455e+38,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 8,
+    "rung": 6,
+    "property": "Brumation Escrow Vaults",
+    "staffer_home": "Deep-Sleep Escrow Custodian",
+    "unit_cost": 3.027e+40,
+    "income_per_unit": 5.521e+38,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 8,
+    "rung": 7,
+    "property": "Constriction Claims Tribunal",
+    "staffer_home": "Grand Squeeze Arbiter",
+    "unit_cost": 6.81e+40,
+    "income_per_unit": 1.242e+39,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 8,
+    "rung": 8,
+    "property": "Planetary Coverage Coils",
+    "staffer_home": "World-Wrap Policy Magnate",
+    "unit_cost": 1.532e+41,
+    "income_per_unit": 2.794e+39,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 8,
+    "rung": 9,
+    "property": "Extinction Rider Exchange",
+    "staffer_home": "Doomsday Rider Broker",
+    "unit_cost": 3.447e+41,
+    "income_per_unit": 6.287e+39,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 8,
+    "rung": 10,
+    "property": "Stellar Collapse Indemnity",
+    "staffer_home": "Supernova Exclusions Actuary",
+    "unit_cost": 7.754e+41,
+    "income_per_unit": 1.414e+40,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 8,
+    "rung": 11,
+    "property": "The Ouroboros Perpetuity",
+    "staffer_home": "Ouroboros Perpetuity Trustee",
+    "unit_cost": 1.744e+42,
+    "income_per_unit": 3.181e+40,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 9,
+    "rung": 0,
+    "property": "Wax Works Combine",
+    "staffer_home": "Master Wax Sculptress",
+    "unit_cost": 3.925e+42,
+    "income_per_unit": 7.159e+40,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 9,
+    "rung": 1,
+    "property": "Nectar Commodities",
+    "staffer_home": "Nectar Futures Grandee",
+    "unit_cost": 8.296e+42,
+    "income_per_unit": 1.513e+41,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 9,
+    "rung": 2,
+    "property": "Drone Placement Agency",
+    "staffer_home": "Unpaid Drone Recruiter",
+    "unit_cost": 1.754e+43,
+    "income_per_unit": 3.199e+41,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 9,
+    "rung": 3,
+    "property": "Honeycomb Estates",
+    "staffer_home": "Hexagonal Estates Duchess",
+    "unit_cost": 3.706e+43,
+    "income_per_unit": 6.76e+41,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 9,
+    "rung": 4,
+    "property": "Propolis Patent Office",
+    "staffer_home": "Propolis Sealing Notary",
+    "unit_cost": 7.834e+43,
+    "income_per_unit": 1.429e+42,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 9,
+    "rung": 5,
+    "property": "Royal Mead Distillery",
+    "staffer_home": "Mead Cellars Sommelier",
+    "unit_cost": 1.656e+44,
+    "income_per_unit": 3.021e+42,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 9,
+    "rung": 6,
+    "property": "The Waggle Bourse",
+    "staffer_home": "Waggle Floor Auctioneer",
+    "unit_cost": 3.5e+44,
+    "income_per_unit": 6.384e+42,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 9,
+    "rung": 7,
+    "property": "Swarm Assurance Society",
+    "staffer_home": "Swarm Risk Actuary",
+    "unit_cost": 7.398e+44,
+    "income_per_unit": 1.349e+43,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 9,
+    "rung": 8,
+    "property": "Pheromone Broadcasting Guild",
+    "staffer_home": "Scent Decree Herald",
+    "unit_cost": 1.564e+45,
+    "income_per_unit": 2.853e+43,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 9,
+    "rung": 9,
+    "property": "Meadow Annexation Bureau",
+    "staffer_home": "Wildflower Annexation Envoy",
+    "unit_cost": 3.305e+45,
+    "income_per_unit": 6.028e+43,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 9,
+    "rung": 10,
+    "property": "Ministry of Lesser Hives",
+    "staffer_home": "Viceroy of Lesser Hives",
+    "unit_cost": 6.986e+45,
+    "income_per_unit": 1.274e+44,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 9,
+    "rung": 11,
+    "property": "The Queen's Mint",
+    "staffer_home": "Stamper of the Royal Profile",
+    "unit_cost": 1.477e+46,
+    "income_per_unit": 2.694e+44,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 9,
+    "rung": 12,
+    "property": "The Royal Jelly Reserve",
+    "staffer_home": "Keeper of the Royal Jelly",
+    "unit_cost": 3.121e+46,
+    "income_per_unit": 5.693e+44,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 10,
+    "rung": 0,
+    "property": "Permafrost Ledgers",
+    "staffer_home": "Permafrost Ledger-Carver",
+    "unit_cost": 6.596e+46,
+    "income_per_unit": 1.203e+45,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 10,
+    "rung": 1,
+    "property": "Cold Storage Monopoly",
+    "staffer_home": "Cold-Hoard Monopolist",
+    "unit_cost": 1.322e+47,
+    "income_per_unit": 2.411e+45,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 10,
+    "rung": 2,
+    "property": "Glacier Calving Yards",
+    "staffer_home": "Berg-Calving Yardmaster",
+    "unit_cost": 2.648e+47,
+    "income_per_unit": 4.83e+45,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 10,
+    "rung": 3,
+    "property": "Avalanche Derivatives",
+    "staffer_home": "Avalanche Rune-Reckoner",
+    "unit_cost": 5.306e+47,
+    "income_per_unit": 9.678e+45,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 10,
+    "rung": 4,
+    "property": "Thaw-Debt Collections",
+    "staffer_home": "Thaw-Debt Doomsayer",
+    "unit_cost": 1.063e+48,
+    "income_per_unit": 1.939e+46,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 10,
+    "rung": 5,
+    "property": "Frostbite Annuities",
+    "staffer_home": "Slow-Drip Annuity Skald",
+    "unit_cost": 2.13e+48,
+    "income_per_unit": 3.885e+46,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 10,
+    "rung": 6,
+    "property": "Blizzard Claims Hall",
+    "staffer_home": "Whiteout Claim-Denier",
+    "unit_cost": 4.268e+48,
+    "income_per_unit": 7.785e+46,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 10,
+    "rung": 7,
+    "property": "Fjord Toll Dominion",
+    "staffer_home": "Fjord-Gate Toll Jarl",
+    "unit_cost": 8.551e+48,
+    "income_per_unit": 1.56e+47,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 10,
+    "rung": 8,
+    "property": "Winterlong Bond Vaults",
+    "staffer_home": "Thousand-Winter Bondsman",
+    "unit_cost": 1.713e+49,
+    "income_per_unit": 3.125e+47,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 10,
+    "rung": 9,
+    "property": "Frozen Sea Exchange",
+    "staffer_home": "Pack-Ice Floor Thane",
+    "unit_cost": 3.433e+49,
+    "income_per_unit": 6.262e+47,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 10,
+    "rung": 10,
+    "property": "Moraine Mineral Rights",
+    "staffer_home": "Moraine Claims Reeve",
+    "unit_cost": 6.878e+49,
+    "income_per_unit": 1.255e+48,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 10,
+    "rung": 11,
+    "property": "Polar Crown Holdings",
+    "staffer_home": "Polar Crown Hoard-Keeper",
+    "unit_cost": 1.378e+50,
+    "income_per_unit": 2.513e+48,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 10,
+    "rung": 12,
+    "property": "Ice Age Futures",
+    "staffer_home": "Glaciation Futures Völva",
+    "unit_cost": 2.761e+50,
+    "income_per_unit": 5.036e+48,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 10,
+    "rung": 13,
+    "property": "The Deep-Ice Endowment",
+    "staffer_home": "Deep-Ice Endowment Elder",
+    "unit_cost": 5.533e+50,
+    "income_per_unit": 1.009e+49,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 11,
+    "rung": 0,
+    "property": "Jingle Licensing",
+    "staffer_home": "Earworm Licensing Agent",
+    "unit_cost": 1.109e+51,
+    "income_per_unit": 2.023e+49,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 11,
+    "rung": 1,
+    "property": "Chord Cartel",
+    "staffer_home": "Power Chord Enforcer",
+    "unit_cost": 2.222e+51,
+    "income_per_unit": 4.053e+49,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 11,
+    "rung": 2,
+    "property": "Anthem Rights Bureau",
+    "staffer_home": "Anthem Rights Registrar",
+    "unit_cost": 4.452e+51,
+    "income_per_unit": 8.12e+49,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 11,
+    "rung": 3,
+    "property": "Symphony Futures",
+    "staffer_home": "Unfinished Symphony Broker",
+    "unit_cost": 8.921e+51,
+    "income_per_unit": 1.627e+50,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 11,
+    "rung": 4,
+    "property": "Reverb Royalties",
+    "staffer_home": "Echo Residuals Collector",
+    "unit_cost": 1.787e+52,
+    "income_per_unit": 3.259e+50,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 11,
+    "rung": 5,
+    "property": "Encore Futures",
+    "staffer_home": "Standing Ovation Wrangler",
+    "unit_cost": 3.581e+52,
+    "income_per_unit": 6.532e+50,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 11,
+    "rung": 6,
+    "property": "Key Change Patents",
+    "staffer_home": "Modulation Patent Clerk",
+    "unit_cost": 7.176e+52,
+    "income_per_unit": 1.309e+51,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 11,
+    "rung": 7,
+    "property": "Silence Easements",
+    "staffer_home": "Moment-of-Silence Assessor",
+    "unit_cost": 1.438e+53,
+    "income_per_unit": 2.623e+51,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 11,
+    "rung": 8,
+    "property": "Octave Monopoly",
+    "staffer_home": "Twelve-Tone Scale Baron",
+    "unit_cost": 2.881e+53,
+    "income_per_unit": 5.255e+51,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 11,
+    "rung": 9,
+    "property": "Planetary Reverb Chamber",
+    "staffer_home": "Atmospheric Acoustician",
+    "unit_cost": 5.772e+53,
+    "income_per_unit": 1.053e+52,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 11,
+    "rung": 10,
+    "property": "Orbital Amphitheater",
+    "staffer_home": "Void Venue Impresario",
+    "unit_cost": 1.156e+54,
+    "income_per_unit": 2.109e+52,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 11,
+    "rung": 11,
+    "property": "Spheres Music Exchange",
+    "staffer_home": "Celestial Harmonics Broker",
+    "unit_cost": 2.317e+54,
+    "income_per_unit": 4.226e+52,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 11,
+    "rung": 12,
+    "property": "Cosmic Hum Licensing",
+    "staffer_home": "Primordial Drone Licensor",
+    "unit_cost": 4.643e+54,
+    "income_per_unit": 8.469e+52,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 11,
+    "rung": 13,
+    "property": "The Final Movement",
+    "staffer_home": "Conductor of the Final Movement",
+    "unit_cost": 9.303e+54,
+    "income_per_unit": 1.697e+53,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 12,
+    "rung": 0,
+    "property": "Redacted Ledgers",
+    "staffer_home": "Chief Redaction Clerk",
+    "unit_cost": 1.863e+55,
+    "income_per_unit": 3.398e+53,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 12,
+    "rung": 1,
+    "property": "Umbral Shell Foundry",
+    "staffer_home": "Shell Company Smith",
+    "unit_cost": 3.733e+55,
+    "income_per_unit": 6.809e+53,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 12,
+    "rung": 2,
+    "property": "Blackout Brokerage",
+    "staffer_home": "Blackout Floor Whisperer",
+    "unit_cost": 7.479e+55,
+    "income_per_unit": 1.364e+54,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 12,
+    "rung": 3,
+    "property": "Deniability Trust",
+    "staffer_home": "Plausible Deniability Trustee",
+    "unit_cost": 1.499e+56,
+    "income_per_unit": 2.734e+54,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 12,
+    "rung": 4,
+    "property": "Whisper Clearinghouse",
+    "staffer_home": "Rumor Settlement Clerk",
+    "unit_cost": 3.003e+56,
+    "income_per_unit": 5.477e+54,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 12,
+    "rung": 5,
+    "property": "Favor Futures Desk",
+    "staffer_home": "Unspoken Terms Underwriter",
+    "unit_cost": 6.016e+56,
+    "income_per_unit": 1.097e+55,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 12,
+    "rung": 6,
+    "property": "Ghost Payroll Bureau",
+    "staffer_home": "Director of Nonexistent Staff",
+    "unit_cost": 1.205e+57,
+    "income_per_unit": 2.198e+55,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 12,
+    "rung": 7,
+    "property": "The Silent Auction",
+    "staffer_home": "Absentee Auctioneer",
+    "unit_cost": 2.415e+57,
+    "income_per_unit": 4.405e+55,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 12,
+    "rung": 8,
+    "property": "Bank of Nowhere",
+    "staffer_home": "Vice President of Nowhere",
+    "unit_cost": 4.839e+57,
+    "income_per_unit": 8.826e+55,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 12,
+    "rung": 9,
+    "property": "Leverage Reserve Vault",
+    "staffer_home": "Compromat Archivist",
+    "unit_cost": 9.696e+57,
+    "income_per_unit": 1.769e+56,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 12,
+    "rung": 10,
+    "property": "Retroactive Erasure Group",
+    "staffer_home": "Never-Happened Adjuster",
+    "unit_cost": 1.943e+58,
+    "income_per_unit": 3.544e+56,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 12,
+    "rung": 11,
+    "property": "Shadow Central Bank",
+    "staffer_home": "Unminted Currency Governor",
+    "unit_cost": 3.893e+58,
+    "income_per_unit": 7.101e+56,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 12,
+    "rung": 12,
+    "property": "Ministry of Nonexistence",
+    "staffer_home": "Undersecretary of ██████",
+    "unit_cost": 7.799e+58,
+    "income_per_unit": 1.423e+57,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 12,
+    "rung": 13,
+    "property": "The Unlit Exchange",
+    "staffer_home": "The Unnamed Chairman",
+    "unit_cost": 1.563e+59,
+    "income_per_unit": 2.851e+57,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 13,
+    "rung": 0,
+    "property": "Ransom Escrow",
+    "staffer_home": "Hostage Account Manager",
+    "unit_cost": 3.131e+59,
+    "income_per_unit": 5.711e+57,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 13,
+    "rung": 1,
+    "property": "Siege Logistics",
+    "staffer_home": "Supply Line Warmaster",
+    "unit_cost": 6.273e+59,
+    "income_per_unit": 1.144e+58,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 13,
+    "rung": 2,
+    "property": "Mercenary Exchange",
+    "staffer_home": "Sellsword Floor Broker",
+    "unit_cost": 1.257e+60,
+    "income_per_unit": 2.293e+58,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 13,
+    "rung": 3,
+    "property": "War Bond Colosseum",
+    "staffer_home": "Bloodsport Bond Promoter",
+    "unit_cost": 2.519e+60,
+    "income_per_unit": 4.595e+58,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 13,
+    "rung": 4,
+    "property": "Protection Racket Annex",
+    "staffer_home": "Extortion Renewals Clerk",
+    "unit_cost": 5.046e+60,
+    "income_per_unit": 9.204e+58,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 13,
+    "rung": 5,
+    "property": "Plunder Clearinghouse",
+    "staffer_home": "Spoils Settlement Reaver",
+    "unit_cost": 1.011e+61,
+    "income_per_unit": 1.844e+59,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 13,
+    "rung": 6,
+    "property": "Tribute Futures Pit",
+    "staffer_home": "Vassal Yield Broker",
+    "unit_cost": 2.026e+61,
+    "income_per_unit": 3.695e+59,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 13,
+    "rung": 7,
+    "property": "Warpath Toll Authority",
+    "staffer_home": "Conquest Toll Reeve",
+    "unit_cost": 4.059e+61,
+    "income_per_unit": 7.404e+59,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 13,
+    "rung": 8,
+    "property": "Hostile Takeover Legion",
+    "staffer_home": "Acquisitions Warband Captain",
+    "unit_cost": 8.133e+61,
+    "income_per_unit": 1.483e+60,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 13,
+    "rung": 9,
+    "property": "Scorched Earth Realty",
+    "staffer_home": "Razed Lands Appraiser",
+    "unit_cost": 1.63e+62,
+    "income_per_unit": 2.973e+60,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 13,
+    "rung": 10,
+    "property": "Conquest Dividend Bureau",
+    "staffer_home": "Spoils Payout Marshal",
+    "unit_cost": 3.265e+62,
+    "income_per_unit": 5.955e+60,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 13,
+    "rung": 11,
+    "property": "Orbital Blockade Consortium",
+    "staffer_home": "Siege Fleet Executive",
+    "unit_cost": 6.542e+62,
+    "income_per_unit": 1.193e+61,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 13,
+    "rung": 12,
+    "property": "Grand Pillage Portfolio",
+    "staffer_home": "Warmaster of Diversified Raiding",
+    "unit_cost": 1.311e+63,
+    "income_per_unit": 2.391e+61,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 13,
+    "rung": 13,
+    "property": "The Warhoard Citadel",
+    "staffer_home": "High Custodian of Plunder",
+    "unit_cost": 2.626e+63,
+    "income_per_unit": 4.79e+61,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 14,
+    "rung": 0,
+    "property": "Courtesy Tolls",
+    "staffer_home": "Courtesy Toll Collector",
+    "unit_cost": 5.263e+63,
+    "income_per_unit": 9.6e+61,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 14,
+    "rung": 1,
+    "property": "Apology Notary",
+    "staffer_home": "Sincerest Apology Notary",
+    "unit_cost": 1.055e+64,
+    "income_per_unit": 1.924e+62,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 14,
+    "rung": 2,
+    "property": "Invitation Futures",
+    "staffer_home": "Invitation Futures Broker",
+    "unit_cost": 2.113e+64,
+    "income_per_unit": 3.854e+62,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 14,
+    "rung": 3,
+    "property": "Grudge Endowment",
+    "staffer_home": "Grudge Portfolio Steward",
+    "unit_cost": 4.233e+64,
+    "income_per_unit": 7.721e+62,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 14,
+    "rung": 4,
+    "property": "Thank-You Note Mint",
+    "staffer_home": "Perpetual Gratitude Engraver",
+    "unit_cost": 8.482e+64,
+    "income_per_unit": 1.547e+63,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 14,
+    "rung": 5,
+    "property": "Small Talk Reserve",
+    "staffer_home": "Weather Remarks Custodian",
+    "unit_cost": 1.7e+65,
+    "income_per_unit": 3.101e+63,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 14,
+    "rung": 6,
+    "property": "RSVP Clearinghouse",
+    "staffer_home": "Regrets-Only Adjudicator",
+    "unit_cost": 3.405e+65,
+    "income_per_unit": 6.211e+63,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 14,
+    "rung": 7,
+    "property": "Seating Chart Exchange",
+    "staffer_home": "Precedence Placement Cartographer",
+    "unit_cost": 6.823e+65,
+    "income_per_unit": 1.245e+64,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 14,
+    "rung": 8,
+    "property": "Condolence Consortium",
+    "staffer_home": "Deepest Sympathies Actuary",
+    "unit_cost": 1.367e+66,
+    "income_per_unit": 2.493e+64,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 14,
+    "rung": 9,
+    "property": "Debutante Bond Exchange",
+    "staffer_home": "Season Debut Chaperone-General",
+    "unit_cost": 2.739e+66,
+    "income_per_unit": 4.996e+64,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 14,
+    "rung": 10,
+    "property": "Faux Pas Tribunal",
+    "staffer_home": "Presiding Manners Magistrate",
+    "unit_cost": 5.488e+66,
+    "income_per_unit": 1.001e+65,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 14,
+    "rung": 11,
+    "property": "Orbital Finishing School",
+    "staffer_home": "Void Deportment Headmistress",
+    "unit_cost": 1.1e+67,
+    "income_per_unit": 2.006e+65,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 14,
+    "rung": 12,
+    "property": "Forgiveness Reserve Bank",
+    "staffer_home": "Absolution Loan Officer",
+    "unit_cost": 2.203e+67,
+    "income_per_unit": 4.018e+65,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 14,
+    "rung": 13,
+    "property": "The Last Word Estate",
+    "staffer_home": "Last Word Executor",
+    "unit_cost": 4.415e+67,
+    "income_per_unit": 8.053e+65,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 15,
+    "rung": 0,
+    "property": "Sleep Debt Collections",
+    "staffer_home": "Sleep Debt Repo Agent",
+    "unit_cost": 8.846e+67,
+    "income_per_unit": 1.614e+66,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 15,
+    "rung": 1,
+    "property": "Lucid Licensing",
+    "staffer_home": "Lucidity Licensing Clerk",
+    "unit_cost": 1.772e+68,
+    "income_per_unit": 3.232e+66,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 15,
+    "rung": 2,
+    "property": "Nightmare Insurance",
+    "staffer_home": "Nightmare Claims Adjuster",
+    "unit_cost": 3.551e+68,
+    "income_per_unit": 6.477e+66,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 15,
+    "rung": 3,
+    "property": "Subconscious Real Estate",
+    "staffer_home": "Subconscious Estate Agent",
+    "unit_cost": 7.116e+68,
+    "income_per_unit": 1.298e+67,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 15,
+    "rung": 4,
+    "property": "Snooze Button Tolls",
+    "staffer_home": "Snooze Toll Collector",
+    "unit_cost": 1.426e+69,
+    "income_per_unit": 2.601e+67,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 15,
+    "rung": 5,
+    "property": "Counting Sheep Leasing",
+    "staffer_home": "Licensed Sheep Wrangler",
+    "unit_cost": 2.857e+69,
+    "income_per_unit": 5.211e+67,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 15,
+    "rung": 6,
+    "property": "Deja Vu Royalties",
+    "staffer_home": "Deja Vu Rights Enforcer",
+    "unit_cost": 5.724e+69,
+    "income_per_unit": 1.044e+68,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 15,
+    "rung": 7,
+    "property": "Melatonin Futures",
+    "staffer_home": "Melatonin Pit Broker",
+    "unit_cost": 1.147e+70,
+    "income_per_unit": 2.092e+68,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 15,
+    "rung": 8,
+    "property": "Somnambulist Staffing",
+    "staffer_home": "Sleepwalker Labor Broker",
+    "unit_cost": 2.298e+70,
+    "income_per_unit": 4.192e+68,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 15,
+    "rung": 9,
+    "property": "Insomnia Subscriptions",
+    "staffer_home": "Insomnia Retention Specialist",
+    "unit_cost": 4.604e+70,
+    "income_per_unit": 8.398e+68,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 15,
+    "rung": 10,
+    "property": "REM Cycle Refineries",
+    "staffer_home": "REM Refinery Foreman",
+    "unit_cost": 9.225e+70,
+    "income_per_unit": 1.683e+69,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 15,
+    "rung": 11,
+    "property": "Circadian Grid Utilities",
+    "staffer_home": "Circadian Grid Operator",
+    "unit_cost": 1.848e+71,
+    "income_per_unit": 3.371e+69,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 15,
+    "rung": 12,
+    "property": "Collective Unconscious Trust",
+    "staffer_home": "Trustee of the Collective Unconscious",
+    "unit_cost": 3.703e+71,
+    "income_per_unit": 6.754e+69,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 15,
+    "rung": 13,
+    "property": "The Waking Monopoly",
+    "staffer_home": "Monopolist of the Waking Hour",
+    "unit_cost": 7.42e+71,
+    "income_per_unit": 1.353e+70,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 16,
+    "rung": 0,
+    "property": "Syllable Mint",
+    "staffer_home": "Syllable Mintmaster",
+    "unit_cost": 1.487e+72,
+    "income_per_unit": 2.712e+70,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 16,
+    "rung": 1,
+    "property": "Etymology Mines",
+    "staffer_home": "Root-Word Excavator",
+    "unit_cost": 2.979e+72,
+    "income_per_unit": 5.434e+70,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 16,
+    "rung": 2,
+    "property": "Thesaurus Vaults",
+    "staffer_home": "Synonym Vault Custodian",
+    "unit_cost": 5.97e+72,
+    "income_per_unit": 1.089e+71,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 16,
+    "rung": 3,
+    "property": "Dead Language Estates",
+    "staffer_home": "Dead Tongue Executor",
+    "unit_cost": 1.196e+73,
+    "income_per_unit": 2.182e+71,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 16,
+    "rung": 4,
+    "property": "Idiom Refinery",
+    "staffer_home": "Figurative Sense Distiller",
+    "unit_cost": 2.397e+73,
+    "income_per_unit": 4.372e+71,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 16,
+    "rung": 5,
+    "property": "Grammar Debtors' Prison",
+    "staffer_home": "Comma Splice Bailiff",
+    "unit_cost": 4.802e+73,
+    "income_per_unit": 8.759e+71,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 16,
+    "rung": 6,
+    "property": "Pronunciation Tollway",
+    "staffer_home": "Diphthong Toll Collector",
+    "unit_cost": 9.621e+73,
+    "income_per_unit": 1.755e+72,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 16,
+    "rung": 7,
+    "property": "Rhetoric Futures Exchange",
+    "staffer_home": "Chiasmus Arbitrageur",
+    "unit_cost": 1.928e+74,
+    "income_per_unit": 3.517e+72,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 16,
+    "rung": 8,
+    "property": "Untranslatable Word Reserve",
+    "staffer_home": "Lacuna Appraiser",
+    "unit_cost": 3.863e+74,
+    "income_per_unit": 7.046e+72,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 16,
+    "rung": 9,
+    "property": "Proto-Tongue Derricks",
+    "staffer_home": "Ur-Root Driller",
+    "unit_cost": 7.739e+74,
+    "income_per_unit": 1.412e+73,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 16,
+    "rung": 10,
+    "property": "Babel Reconstruction Trust",
+    "staffer_home": "Confusion of Tongues Foreman",
+    "unit_cost": 1.551e+75,
+    "income_per_unit": 2.829e+73,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 16,
+    "rung": 11,
+    "property": "Mother Tongue Monopoly",
+    "staffer_home": "Proto-Lingual Matriarch",
+    "unit_cost": 3.107e+75,
+    "income_per_unit": 5.667e+73,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 16,
+    "rung": 12,
+    "property": "The Silence Concession",
+    "staffer_home": "Pregnant Pause Rentier",
+    "unit_cost": 6.225e+75,
+    "income_per_unit": 1.135e+74,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 16,
+    "rung": 13,
+    "property": "The Unspeakable Lexicon",
+    "staffer_home": "Lexarch of the Ineffable",
+    "unit_cost": 1.247e+76,
+    "income_per_unit": 2.275e+74,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 17,
+    "rung": 0,
+    "property": "Scrap Tithes",
+    "staffer_home": "Scrap-Tithe Collector",
+    "unit_cost": 2.499e+76,
+    "income_per_unit": 4.558e+74,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 17,
+    "rung": 1,
+    "property": "Rust Refineries",
+    "staffer_home": "Rust-Refinery Foreman",
+    "unit_cost": 5.007e+76,
+    "income_per_unit": 9.133e+74,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 17,
+    "rung": 2,
+    "property": "Alloy Dynasties",
+    "staffer_home": "Alloy Dynast",
+    "unit_cost": 1.003e+77,
+    "income_per_unit": 1.829e+75,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 17,
+    "rung": 3,
+    "property": "Smelter Sovereignty",
+    "staffer_home": "Smelter Sovereign",
+    "unit_cost": 2.01e+77,
+    "income_per_unit": 3.666e+75,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 17,
+    "rung": 4,
+    "property": "Corrosion Escrow",
+    "staffer_home": "Corrosion Escrow Agent",
+    "unit_cost": 4.028e+77,
+    "income_per_unit": 7.347e+75,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 17,
+    "rung": 5,
+    "property": "Ore-Debt Registries",
+    "staffer_home": "Ore-Debt Notary",
+    "unit_cost": 8.07e+77,
+    "income_per_unit": 1.472e+76,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 17,
+    "rung": 6,
+    "property": "Tarnish Futures",
+    "staffer_home": "Tarnish Futures Underwriter",
+    "unit_cost": 1.617e+78,
+    "income_per_unit": 2.949e+76,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 17,
+    "rung": 7,
+    "property": "Slag Baronies",
+    "staffer_home": "Slag Baron",
+    "unit_cost": 3.24e+78,
+    "income_per_unit": 5.91e+76,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 17,
+    "rung": 8,
+    "property": "Foundry Cartels",
+    "staffer_home": "Foundry Cartel Boss",
+    "unit_cost": 6.491e+78,
+    "income_per_unit": 1.184e+77,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 17,
+    "rung": 9,
+    "property": "Rust-Tithe Cathedrals",
+    "staffer_home": "Rust-Tithe Archdeacon",
+    "unit_cost": 1.301e+79,
+    "income_per_unit": 2.373e+77,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 17,
+    "rung": 10,
+    "property": "Magnetosphere Monopolies",
+    "staffer_home": "Magnetosphere Monopolist",
+    "unit_cost": 2.606e+79,
+    "income_per_unit": 4.753e+77,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 17,
+    "rung": 11,
+    "property": "Mantle Mining Concordats",
+    "staffer_home": "Mantle Concordat Magnate",
+    "unit_cost": 5.221e+79,
+    "income_per_unit": 9.523e+77,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 17,
+    "rung": 12,
+    "property": "The Molten Mint",
+    "staffer_home": "Molten Mint Magistrate",
+    "unit_cost": 1.046e+80,
+    "income_per_unit": 1.908e+78,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 17,
+    "rung": 13,
+    "property": "The Core-Iron Throne",
+    "staffer_home": "Core-Iron Throne Warden",
+    "unit_cost": 2.096e+80,
+    "income_per_unit": 3.823e+78,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 18,
+    "rung": 0,
+    "property": "Velvet Rope Concessions",
+    "staffer_home": "Velvet Rope Arbiter",
+    "unit_cost": 4.2e+80,
+    "income_per_unit": 7.661e+78,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 18,
+    "rung": 1,
+    "property": "Taste Tribunals",
+    "staffer_home": "Presiding Taste Magistrate",
+    "unit_cost": 8.415e+80,
+    "income_per_unit": 1.535e+79,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 18,
+    "rung": 2,
+    "property": "Couture Foundries",
+    "staffer_home": "Couture Forge Directrice",
+    "unit_cost": 1.686e+81,
+    "income_per_unit": 3.075e+79,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 18,
+    "rung": 3,
+    "property": "Auction Seances",
+    "staffer_home": "Dead Masters Auctioneer",
+    "unit_cost": 3.378e+81,
+    "income_per_unit": 6.161e+79,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 18,
+    "rung": 4,
+    "property": "Vernissage Circuits",
+    "staffer_home": "Opening Night Impresaria",
+    "unit_cost": 6.769e+81,
+    "income_per_unit": 1.235e+80,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 18,
+    "rung": 5,
+    "property": "Gala Blacklist Registries",
+    "staffer_home": "Guest List Executioner",
+    "unit_cost": 1.356e+82,
+    "income_per_unit": 2.473e+80,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 18,
+    "rung": 6,
+    "property": "Restoration Ateliers",
+    "staffer_home": "Overzealous Restoration Maestro",
+    "unit_cost": 2.718e+82,
+    "income_per_unit": 4.958e+80,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 18,
+    "rung": 7,
+    "property": "Provenance Vaults",
+    "staffer_home": "Impeccable Pedigree Archivist",
+    "unit_cost": 5.445e+82,
+    "income_per_unit": 9.932e+80,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 18,
+    "rung": 8,
+    "property": "Biennale Monopolies",
+    "staffer_home": "Perpetual Biennale Chairwoman",
+    "unit_cost": 1.091e+83,
+    "income_per_unit": 1.99e+81,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 18,
+    "rung": 9,
+    "property": "Movement Manufactories",
+    "staffer_home": "Bespoke Ism Fabricator",
+    "unit_cost": 2.186e+83,
+    "income_per_unit": 3.987e+81,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 18,
+    "rung": 10,
+    "property": "The Zeitgeist Refinery",
+    "staffer_home": "Zeitgeist Distiller",
+    "unit_cost": 4.38e+83,
+    "income_per_unit": 7.989e+81,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 18,
+    "rung": 11,
+    "property": "Obsolescence Bureaus",
+    "staffer_home": "Planned Irrelevance Commissioner",
+    "unit_cost": 8.776e+83,
+    "income_per_unit": 1.601e+82,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 18,
+    "rung": 12,
+    "property": "Negative Space Exchange",
+    "staffer_home": "Curator of Absence",
+    "unit_cost": 1.758e+84,
+    "income_per_unit": 3.207e+82,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 18,
+    "rung": 13,
+    "property": "The Canon Estate",
+    "staffer_home": "Keeper of the Canon",
+    "unit_cost": 3.523e+84,
+    "income_per_unit": 6.426e+82,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 19,
+    "rung": 0,
+    "property": "Scratch Shrine Franchises",
+    "staffer_home": "Scratch Shrine Oracle",
+    "unit_cost": 7.058e+84,
+    "income_per_unit": 1.287e+83,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 19,
+    "rung": 1,
+    "property": "House-Edge Utilities",
+    "staffer_home": "House-Edge Gridkeeper",
+    "unit_cost": 1.414e+85,
+    "income_per_unit": 2.579e+83,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 19,
+    "rung": 2,
+    "property": "Jackpot Reservoirs",
+    "staffer_home": "Jackpot Floodgate Warden",
+    "unit_cost": 2.833e+85,
+    "income_per_unit": 5.167e+83,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 19,
+    "rung": 3,
+    "property": "Destiny Bookmakers",
+    "staffer_home": "Destiny Oddsmaker",
+    "unit_cost": 5.677e+85,
+    "income_per_unit": 1.035e+84,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 19,
+    "rung": 4,
+    "property": "Loaded Dice Foundries",
+    "staffer_home": "Loaded Dice Smith",
+    "unit_cost": 1.138e+86,
+    "income_per_unit": 2.076e+84,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 19,
+    "rung": 5,
+    "property": "Comp Suite Arcologies",
+    "staffer_home": "Comp Suite Concierge",
+    "unit_cost": 2.279e+86,
+    "income_per_unit": 4.157e+84,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 19,
+    "rung": 6,
+    "property": "Roulette Ring Worlds",
+    "staffer_home": "Roulette World Croupier",
+    "unit_cost": 4.567e+86,
+    "income_per_unit": 8.33e+84,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 19,
+    "rung": 7,
+    "property": "Whale Harvest Fleets",
+    "staffer_home": "High-Roller Harpooner",
+    "unit_cost": 9.15e+86,
+    "income_per_unit": 1.669e+85,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 19,
+    "rung": 8,
+    "property": "Probability Refineries",
+    "staffer_home": "Chief Odds Distiller",
+    "unit_cost": 1.833e+87,
+    "income_per_unit": 3.343e+85,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 19,
+    "rung": 9,
+    "property": "Luck Futures Exchange",
+    "staffer_home": "Luck Futures Floor Boss",
+    "unit_cost": 3.673e+87,
+    "income_per_unit": 6.7e+85,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 19,
+    "rung": 10,
+    "property": "Vigorish Gravity Wells",
+    "staffer_home": "Vigorish Siphon Baron",
+    "unit_cost": 7.36e+87,
+    "income_per_unit": 1.342e+86,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 19,
+    "rung": 11,
+    "property": "Casino Moon Consortium",
+    "staffer_home": "Casino Moon Impresario",
+    "unit_cost": 1.475e+88,
+    "income_per_unit": 2.69e+86,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 19,
+    "rung": 12,
+    "property": "The Infinite Parlay",
+    "staffer_home": "Infinite Parlay Prophet",
+    "unit_cost": 2.955e+88,
+    "income_per_unit": 5.39e+86,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 19,
+    "rung": 13,
+    "property": "The Rigged Table",
+    "staffer_home": "Keeper of the Rigged Table",
+    "unit_cost": 5.92e+88,
+    "income_per_unit": 1.08e+87,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 20,
+    "rung": 0,
+    "property": "Mirror Mints",
+    "staffer_home": "Mirror Mint Engraver",
+    "unit_cost": 1.186e+89,
+    "income_per_unit": 2.163e+87,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 20,
+    "rung": 1,
+    "property": "Doppelganger Staffing",
+    "staffer_home": "Chief Doppelganger Recruiter",
+    "unit_cost": 2.376e+89,
+    "income_per_unit": 4.334e+87,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 20,
+    "rung": 2,
+    "property": "Vanity Exchanges",
+    "staffer_home": "Vanity Floor Flatterer",
+    "unit_cost": 4.761e+89,
+    "income_per_unit": 8.684e+87,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 20,
+    "rung": 3,
+    "property": "Reflection Royalties",
+    "staffer_home": "Likeness Royalty Collector",
+    "unit_cost": 9.54e+89,
+    "income_per_unit": 1.74e+88,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 20,
+    "rung": 4,
+    "property": "Echo Escrow",
+    "staffer_home": "Second-Saying Notary",
+    "unit_cost": 1.911e+90,
+    "income_per_unit": 3.486e+88,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 20,
+    "rung": 5,
+    "property": "Selfsame Insurance",
+    "staffer_home": "Identical Claims Adjuster",
+    "unit_cost": 3.83e+90,
+    "income_per_unit": 6.986e+88,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 20,
+    "rung": 6,
+    "property": "Likeness Licensing Bureau",
+    "staffer_home": "Deputy of Derivative Faces",
+    "unit_cost": 7.674e+90,
+    "income_per_unit": 1.4e+89,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 20,
+    "rung": 7,
+    "property": "The Gallery of You",
+    "staffer_home": "Curator of Every You",
+    "unit_cost": 1.538e+91,
+    "income_per_unit": 2.805e+89,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 20,
+    "rung": 8,
+    "property": "Kaleidoscope Trust",
+    "staffer_home": "Trustee of a Thousand Facets",
+    "unit_cost": 3.081e+91,
+    "income_per_unit": 5.62e+89,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 20,
+    "rung": 9,
+    "property": "Quicksilver Sea Refinery",
+    "staffer_home": "Silvering Refinery Foreman",
+    "unit_cost": 6.173e+91,
+    "income_per_unit": 1.126e+90,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 20,
+    "rung": 10,
+    "property": "Mirror Moon Works",
+    "staffer_home": "Lunar Resurfacing Superintendent",
+    "unit_cost": 1.237e+92,
+    "income_per_unit": 2.256e+90,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 20,
+    "rung": 11,
+    "property": "Orbital Vanity Ring",
+    "staffer_home": "Ring of Regard Overseer",
+    "unit_cost": 2.478e+92,
+    "income_per_unit": 4.52e+90,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 20,
+    "rung": 12,
+    "property": "The Second Speculum",
+    "staffer_home": "Planetary Understudy",
+    "unit_cost": 4.965e+92,
+    "income_per_unit": 9.056e+90,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 20,
+    "rung": 13,
+    "property": "The Infinite Regress",
+    "staffer_home": "Regent of the Regress",
+    "unit_cost": 9.948e+92,
+    "income_per_unit": 1.815e+91,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 21,
+    "rung": 0,
+    "property": "Probate Catacombs",
+    "staffer_home": "Catacomb Probate Clerk",
+    "unit_cost": 1.994e+93,
+    "income_per_unit": 3.637e+91,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 21,
+    "rung": 1,
+    "property": "Ancestor Annuities",
+    "staffer_home": "Ancestral Disbursement Officer",
+    "unit_cost": 3.995e+93,
+    "income_per_unit": 7.287e+91,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 21,
+    "rung": 2,
+    "property": "Mausoleum Realty",
+    "staffer_home": "Mausoleum Leasing Agent",
+    "unit_cost": 8.005e+93,
+    "income_per_unit": 1.46e+92,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 21,
+    "rung": 3,
+    "property": "Reliquary Trusts",
+    "staffer_home": "Reliquary Trustee",
+    "unit_cost": 1.604e+94,
+    "income_per_unit": 2.926e+92,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 21,
+    "rung": 4,
+    "property": "Columbarium Exchange",
+    "staffer_home": "Urn Placement Broker",
+    "unit_cost": 3.214e+94,
+    "income_per_unit": 5.862e+92,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 21,
+    "rung": 5,
+    "property": "Cenotaph Securities",
+    "staffer_home": "Cenotaph Underwriter",
+    "unit_cost": 6.439e+94,
+    "income_per_unit": 1.174e+93,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 21,
+    "rung": 6,
+    "property": "Charnel Clearinghouse",
+    "staffer_home": "Charnel House Clearing Clerk",
+    "unit_cost": 1.29e+95,
+    "income_per_unit": 2.353e+93,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 21,
+    "rung": 7,
+    "property": "Eulogy Underwriting",
+    "staffer_home": "Eulogy Actuary",
+    "unit_cost": 2.585e+95,
+    "income_per_unit": 4.715e+93,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 21,
+    "rung": 8,
+    "property": "Seance Brokerage",
+    "staffer_home": "Licensed Medium of Exchange",
+    "unit_cost": 5.18e+95,
+    "income_per_unit": 9.448e+93,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 21,
+    "rung": 9,
+    "property": "Barrow Bond Market",
+    "staffer_home": "Barrow Bondsman",
+    "unit_cost": 1.038e+96,
+    "income_per_unit": 1.893e+94,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 21,
+    "rung": 10,
+    "property": "Necropolis Bourse",
+    "staffer_home": "Graveshift Floor Trader",
+    "unit_cost": 2.079e+96,
+    "income_per_unit": 3.792e+94,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 21,
+    "rung": 11,
+    "property": "Purgatory Escrow",
+    "staffer_home": "Purgatorial Escrow Agent",
+    "unit_cost": 4.166e+96,
+    "income_per_unit": 7.599e+94,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 21,
+    "rung": 12,
+    "property": "Afterlife Sovereign Fund",
+    "staffer_home": "Sovereign Wealth Wraith",
+    "unit_cost": 8.348e+96,
+    "income_per_unit": 1.523e+95,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 21,
+    "rung": 13,
+    "property": "The Estate Eternal",
+    "staffer_home": "Executor Everlasting",
+    "unit_cost": 1.673e+97,
+    "income_per_unit": 3.052e+95,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 22,
+    "rung": 0,
+    "property": "Engagement Farms",
+    "staffer_home": "Engagement Farmhand",
+    "unit_cost": 3.351e+97,
+    "income_per_unit": 6.112e+95,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 22,
+    "rung": 1,
+    "property": "Attention Refineries",
+    "staffer_home": "Attention Span Refiner",
+    "unit_cost": 6.714e+97,
+    "income_per_unit": 1.225e+96,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 22,
+    "rung": 2,
+    "property": "Parasocial Bonds",
+    "staffer_home": "Parasocial Relationship Broker",
+    "unit_cost": 1.345e+98,
+    "income_per_unit": 2.453e+96,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 22,
+    "rung": 3,
+    "property": "Virality Futures",
+    "staffer_home": "Virality Futures Forecaster",
+    "unit_cost": 2.695e+98,
+    "income_per_unit": 4.916e+96,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 22,
+    "rung": 4,
+    "property": "Clickbait Foundries",
+    "staffer_home": "Thumbnail Provocateur",
+    "unit_cost": 5.401e+98,
+    "income_per_unit": 9.851e+96,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 22,
+    "rung": 5,
+    "property": "Sponsored Content Mills",
+    "staffer_home": "Native Ad Alchemist",
+    "unit_cost": 1.082e+99,
+    "income_per_unit": 1.974e+97,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 22,
+    "rung": 6,
+    "property": "Follower Hatcheries",
+    "staffer_home": "Bot Flock Shepherd",
+    "unit_cost": 2.168e+99,
+    "income_per_unit": 3.954e+97,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 22,
+    "rung": 7,
+    "property": "Drama Exchanges",
+    "staffer_home": "Manufactured Beef Wrangler",
+    "unit_cost": 4.344e+99,
+    "income_per_unit": 7.923e+97,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 22,
+    "rung": 8,
+    "property": "Cancellation Insurance",
+    "staffer_home": "Apology Video Underwriter",
+    "unit_cost": 8.704e+99,
+    "income_per_unit": 1.588e+98,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 22,
+    "rung": 9,
+    "property": "Persona Cloning Vats",
+    "staffer_home": "Deepfake Identity Sculptor",
+    "unit_cost": 1.744e+100,
+    "income_per_unit": 3.181e+98,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 22,
+    "rung": 10,
+    "property": "The Algorithm Cathedral",
+    "staffer_home": "For You Page High Priest",
+    "unit_cost": 3.494e+100,
+    "income_per_unit": 6.373e+98,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 22,
+    "rung": 11,
+    "property": "Planetwide Livestream Grid",
+    "staffer_home": "Orbital Camera Auteur",
+    "unit_cost": 7.002e+100,
+    "income_per_unit": 1.277e+99,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 22,
+    "rung": 12,
+    "property": "Attention Singularity",
+    "staffer_home": "Event Horizon Hypecaster",
+    "unit_cost": 1.403e+101,
+    "income_per_unit": 2.559e+99,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 22,
+    "rung": 13,
+    "property": "The Eternal Feed",
+    "staffer_home": "Feed Curator Eternal",
+    "unit_cost": 2.811e+101,
+    "income_per_unit": 5.127e+99,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 23,
+    "rung": 0,
+    "property": "Queue Concessions",
+    "staffer_home": "Queue Marshal, First Class",
+    "unit_cost": 5.632e+101,
+    "income_per_unit": 1.027e+100,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 23,
+    "rung": 1,
+    "property": "Rubber Stamp Foundries",
+    "staffer_home": "Stamp Foundry Commissar",
+    "unit_cost": 1.128e+102,
+    "income_per_unit": 2.057e+100,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 23,
+    "rung": 2,
+    "property": "Permit Pyramids",
+    "staffer_home": "Permit Pyramid Overseer",
+    "unit_cost": 2.261e+102,
+    "income_per_unit": 4.124e+100,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 23,
+    "rung": 3,
+    "property": "Committee of Committees",
+    "staffer_home": "Chairman of All Chairmen",
+    "unit_cost": 4.53e+102,
+    "income_per_unit": 8.263e+100,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 23,
+    "rung": 4,
+    "property": "Triplicate Archives",
+    "staffer_home": "Chief Carbon Copy Archivist",
+    "unit_cost": 9.077e+102,
+    "income_per_unit": 1.656e+101,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 23,
+    "rung": 5,
+    "property": "Waiting Room Estates",
+    "staffer_home": "Deputy Minister of Delay",
+    "unit_cost": 1.819e+103,
+    "income_per_unit": 3.318e+101,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 23,
+    "rung": 6,
+    "property": "Bureau of Grievances",
+    "staffer_home": "Grievance Intake Commissar",
+    "unit_cost": 3.644e+103,
+    "income_per_unit": 6.647e+101,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 23,
+    "rung": 7,
+    "property": "Signature Refinery",
+    "staffer_home": "Countersignature Comptroller",
+    "unit_cost": 7.301e+103,
+    "income_per_unit": 1.332e+102,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 23,
+    "rung": 8,
+    "property": "Inspectorate of Inspections",
+    "staffer_home": "Inspector General of Inspectors",
+    "unit_cost": 1.463e+104,
+    "income_per_unit": 2.669e+102,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 23,
+    "rung": 9,
+    "property": "Lost Records Vault",
+    "staffer_home": "Curator of Misplaced Files",
+    "unit_cost": 2.931e+104,
+    "income_per_unit": 5.346e+102,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 23,
+    "rung": 10,
+    "property": "Stamp Reserve Bank",
+    "staffer_home": "Governor of the Stamp Reserve",
+    "unit_cost": 5.873e+104,
+    "income_per_unit": 1.071e+103,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 23,
+    "rung": 11,
+    "property": "The Eternal Queue",
+    "staffer_home": "Warden of Queue 7,441-B",
+    "unit_cost": 1.177e+105,
+    "income_per_unit": 2.147e+103,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 23,
+    "rung": 12,
+    "property": "Ministry of Pending",
+    "staffer_home": "Undersecretary of Forever",
+    "unit_cost": 2.358e+105,
+    "income_per_unit": 4.301e+103,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 23,
+    "rung": 13,
+    "property": "The Central Plan",
+    "staffer_home": "First Secretary of the Plan",
+    "unit_cost": 4.724e+105,
+    "income_per_unit": 8.617e+103,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 24,
+    "rung": 0,
+    "property": "Border Tollbooths",
+    "staffer_home": "Border Toll Cartographer",
+    "unit_cost": 9.466e+105,
+    "income_per_unit": 1.727e+104,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 24,
+    "rung": 1,
+    "property": "Meridian Leases",
+    "staffer_home": "Meridian Leaseholder-Priest",
+    "unit_cost": 1.897e+106,
+    "income_per_unit": 3.46e+104,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 24,
+    "rung": 2,
+    "property": "Cartography Copyrights",
+    "staffer_home": "Copyrighted Contour Scribe",
+    "unit_cost": 3.8e+106,
+    "income_per_unit": 6.931e+104,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 24,
+    "rung": 3,
+    "property": "Territorial Nebulae",
+    "staffer_home": "Nebula Claims Surveyor",
+    "unit_cost": 7.614e+106,
+    "income_per_unit": 1.389e+105,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 24,
+    "rung": 4,
+    "property": "Compass Rose Franchises",
+    "staffer_home": "Cardinal Directions Licenser",
+    "unit_cost": 1.526e+107,
+    "income_per_unit": 2.783e+105,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 24,
+    "rung": 5,
+    "property": "Legend Licensing",
+    "staffer_home": "Map Key Notary",
+    "unit_cost": 3.057e+107,
+    "income_per_unit": 5.576e+105,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 24,
+    "rung": 6,
+    "property": "Projection Patents",
+    "staffer_home": "Distortion Rights Draftsman",
+    "unit_cost": 6.125e+107,
+    "income_per_unit": 1.117e+106,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 24,
+    "rung": 7,
+    "property": "Antipode Holdings",
+    "staffer_home": "Far-Side Claims Broker",
+    "unit_cost": 1.227e+108,
+    "income_per_unit": 2.238e+106,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 24,
+    "rung": 8,
+    "property": "Equator Toll Ring",
+    "staffer_home": "Zero-Latitude Gatekeeper",
+    "unit_cost": 2.459e+108,
+    "income_per_unit": 4.485e+106,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 24,
+    "rung": 9,
+    "property": "Magnetic Pole Trust",
+    "staffer_home": "True North Custodian",
+    "unit_cost": 4.927e+108,
+    "income_per_unit": 8.987e+106,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 24,
+    "rung": 10,
+    "property": "Continental Drift Futures",
+    "staffer_home": "Tectonic Boundary Speculator",
+    "unit_cost": 9.871e+108,
+    "income_per_unit": 1.8e+107,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 24,
+    "rung": 11,
+    "property": "Terra Incognita Escrow",
+    "staffer_home": "Unknown Lands Executor",
+    "unit_cost": 1.978e+109,
+    "income_per_unit": 3.608e+107,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 24,
+    "rung": 12,
+    "property": "The Master Graticule",
+    "staffer_home": "Universal Grid Archon",
+    "unit_cost": 3.963e+109,
+    "income_per_unit": 7.229e+107,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 24,
+    "rung": 13,
+    "property": "The Edge of the Map",
+    "staffer_home": "Here-Be-Dragons Registrar",
+    "unit_cost": 7.94e+109,
+    "income_per_unit": 1.448e+108,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 25,
+    "rung": 0,
+    "property": "Zero-Sum Clearinghouses",
+    "staffer_home": "Zero-Sum Clearing Officer",
+    "unit_cost": 1.591e+110,
+    "income_per_unit": 2.902e+108,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 25,
+    "rung": 1,
+    "property": "Decay Arbitrage",
+    "staffer_home": "Decay Arbitrageur",
+    "unit_cost": 3.188e+110,
+    "income_per_unit": 5.815e+108,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 25,
+    "rung": 2,
+    "property": "Entropy Audit Bureaus",
+    "staffer_home": "Chief Entropy Auditor",
+    "unit_cost": 6.387e+110,
+    "income_per_unit": 1.165e+109,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 25,
+    "rung": 3,
+    "property": "Heat-Death Reserves",
+    "staffer_home": "Heat-Death Reserve Governor",
+    "unit_cost": 1.28e+111,
+    "income_per_unit": 2.335e+109,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 25,
+    "rung": 4,
+    "property": "Half-Life Holdings",
+    "staffer_home": "Half-Life Portfolio Manager",
+    "unit_cost": 2.564e+111,
+    "income_per_unit": 4.677e+109,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 25,
+    "rung": 5,
+    "property": "Redshift Receivership",
+    "staffer_home": "Receiver of Fading Light",
+    "unit_cost": 5.138e+111,
+    "income_per_unit": 9.372e+109,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 25,
+    "rung": 6,
+    "property": "Vacuum Decay Futures",
+    "staffer_home": "False Vacuum Underwriter",
+    "unit_cost": 1.029e+112,
+    "income_per_unit": 1.877e+110,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 25,
+    "rung": 7,
+    "property": "Proton Decay Trusts",
+    "staffer_home": "Proton Decay Trustee",
+    "unit_cost": 2.063e+112,
+    "income_per_unit": 3.763e+110,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 25,
+    "rung": 8,
+    "property": "Stellar Foreclosure Courts",
+    "staffer_home": "Stellar Foreclosure Magistrate",
+    "unit_cost": 4.133e+112,
+    "income_per_unit": 7.539e+110,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 25,
+    "rung": 9,
+    "property": "Galactic Liquidation Fleets",
+    "staffer_home": "Liquidator of Galaxies",
+    "unit_cost": 8.281e+112,
+    "income_per_unit": 1.51e+111,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 25,
+    "rung": 10,
+    "property": "Black Hole Escrow",
+    "staffer_home": "Event Horizon Escrow Officer",
+    "unit_cost": 1.659e+113,
+    "income_per_unit": 3.026e+111,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 25,
+    "rung": 11,
+    "property": "Universal Write-Down Office",
+    "staffer_home": "Comptroller of Cosmic Write-Downs",
+    "unit_cost": 3.324e+113,
+    "income_per_unit": 6.063e+111,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 25,
+    "rung": 12,
+    "property": "The Penultimate Kelvin",
+    "staffer_home": "Custodian of the Penultimate Kelvin",
+    "unit_cost": 6.661e+113,
+    "income_per_unit": 1.215e+112,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 25,
+    "rung": 13,
+    "property": "The Final Balance",
+    "staffer_home": "Auditor of the Final Balance",
+    "unit_cost": 1.335e+114,
+    "income_per_unit": 2.435e+112,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 26,
+    "rung": 0,
+    "property": "Fine Print Mills",
+    "staffer_home": "Subclause Mill Foreman",
+    "unit_cost": 2.674e+114,
+    "income_per_unit": 4.877e+112,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 26,
+    "rung": 1,
+    "property": "Concept Copyrights",
+    "staffer_home": "Registrar of Notions™",
+    "unit_cost": 5.358e+114,
+    "income_per_unit": 9.773e+112,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 26,
+    "rung": 2,
+    "property": "Liens on Existence",
+    "staffer_home": "Ontological Lienholder",
+    "unit_cost": 1.074e+115,
+    "income_per_unit": 1.959e+113,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 26,
+    "rung": 3,
+    "property": "Title Registry of Everything",
+    "staffer_home": "Recorder-General of Everything",
+    "unit_cost": 2.151e+115,
+    "income_per_unit": 3.923e+113,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  },
+  {
+    "tier": 26,
+    "rung": 4,
+    "property": "Soul Escrow Services",
+    "staffer_home": "Posthumous Asset Custodian",
+    "unit_cost": 4.31e+115,
+    "income_per_unit": 7.861e+113,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 26,
+    "rung": 5,
+    "property": "Gravity Easement Office",
+    "staffer_home": "Fundamental Force Easement Agent",
+    "unit_cost": 8.635e+115,
+    "income_per_unit": 1.575e+114,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 26,
+    "rung": 6,
+    "property": "Mathematics Licensing Bureau",
+    "staffer_home": "Arithmetic Royalty Auditor",
+    "unit_cost": 1.73e+116,
+    "income_per_unit": 3.156e+114,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 26,
+    "rung": 7,
+    "property": "Timeshares in Time",
+    "staffer_home": "Fourth-Dimensional Leasing Agent",
+    "unit_cost": 3.467e+116,
+    "income_per_unit": 6.324e+114,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 26,
+    "rung": 8,
+    "property": "Probability Trust Holdings",
+    "staffer_home": "Trustee of the Merely Possible",
+    "unit_cost": 6.946e+116,
+    "income_per_unit": 1.267e+115,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 26,
+    "rung": 9,
+    "property": "Mortgages on Causality",
+    "staffer_home": "Cause-and-Effect Underwriter",
+    "unit_cost": 1.392e+117,
+    "income_per_unit": 2.539e+115,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 26,
+    "rung": 10,
+    "property": "Eminent Domain of Reality",
+    "staffer_home": "Condemnor of Realities",
+    "unit_cost": 2.788e+117,
+    "income_per_unit": 5.085e+115,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 26,
+    "rung": 11,
+    "property": "Divine Foreclosure Division",
+    "staffer_home": "Repossessor of Deities",
+    "unit_cost": 5.587e+117,
+    "income_per_unit": 1.019e+116,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 26,
+    "rung": 12,
+    "property": "Escheat of the Multiverse",
+    "staffer_home": "Receiver of Unclaimed Universes",
+    "unit_cost": 1.119e+118,
+    "income_per_unit": 2.041e+116,
+    "cycle_seconds": 60.0,
+    "source": "stage1"
+  },
+  {
+    "tier": 26,
+    "rung": 13,
+    "property": "The Deed to the Universe",
+    "staffer_home": "The Proprietor Absolute",
+    "unit_cost": 2.243e+118,
+    "income_per_unit": 4.091e+116,
+    "cycle_seconds": 60.0,
+    "source": "draft"
+  }
+]

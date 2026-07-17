@@ -1,0 +1,42 @@
+{
+    "tier": 16,
+    "civilization": "The Glossolalia Lyceum",
+    "new_properties": [
+        {
+            "property": "Idiom Refinery",
+            "staffer": "Figurative Sense Distiller"
+        },
+        {
+            "property": "Grammar Debtors' Prison",
+            "staffer": "Comma Splice Bailiff"
+        },
+        {
+            "property": "Pronunciation Tollway",
+            "staffer": "Diphthong Toll Collector"
+        },
+        {
+            "property": "Rhetoric Futures Exchange",
+            "staffer": "Chiasmus Arbitrageur"
+        },
+        {
+            "property": "Untranslatable Word Reserve",
+            "staffer": "Lacuna Appraiser"
+        },
+        {
+            "property": "Proto-Tongue Derricks",
+            "staffer": "Ur-Root Driller"
+        },
+        {
+            "property": "Babel Reconstruction Trust",
+            "staffer": "Confusion of Tongues Foreman"
+        },
+        {
+            "property": "Mother Tongue Monopoly",
+            "staffer": "Proto-Lingual Matriarch"
+        },
+        {
+            "property": "The Silence Concession",
+            "staffer": "Pregnant Pause Rentier"
+        }
+    ]
+}

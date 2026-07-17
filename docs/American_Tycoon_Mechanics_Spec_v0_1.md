@@ -46,9 +46,10 @@ r_band(b)    = R0_i × BAND_STEP^b
   for the very first unit — e.g. the first ATM read $55 instead of $50.)
 - Prices are snapped to the nearest $5 (`round_nice`) so the player never sees odd
   numbers; the underlying geometric product is kept raw so the curve still climbs smoothly.
-- `R0_i` per property from config. **Live: 1.09 on all 17 rungs** (2026-07-03 core pace pass,
-  was 1.07 — the progression brake chosen by the pace study, see §3.3).
-- `BAND_STEP` global (provisional 1.15 `TBD-SIM`).
+- `R0_i` per property from config. **Live: 1.09 on all 52 rungs** (2026-07-03 core pace pass,
+  was 1.07 — the progression brake chosen by the pace study, see §3.3; alien cohort rungs
+  inherit their epoch flagship's r0, §3.6).
+- `BAND_STEP` global (**live 1.10** since the 2026-06-22 re-tune, §15 item 8; was 1.15).
 - Steepening applies only *after* each milestone is crossed — milestones stay reachable by construction.
 - **Simulator guard (hard requirement):** no reachable game state may exist where every property is band-walled and no action is affordable (GDD §0.1).
 - Bulk-buy costs = exact sum of per-unit costs (fixes the 2022 MAX double-count bug). Buttons: **+1 / +10 / +to-next-milestone / MAX** (GDD §3.1). **The to-next-milestone mode landed 2026-07-07** as `BuyMode.NEXT_TIER` (caption "BUY: NEXT"), replacing an interim ×100 in the same enum slot (saved mode prefs stay valid): `count = max(0, next_milestone_threshold − units_owned)`, **all-or-nothing** — the button disables until the full jump is affordable, and reads +0 past the last milestone (like MAX when broke).
@@ -88,7 +89,7 @@ lever, not more `r0`.
 income_per_cycle(i) = floor( units_i × income_per_unit_i )   [2022 formula, preserved]
 income_per_sec(i)   = income_per_cycle(i) / cycle_length_i   [for display & offline math]
 ```
-Global multipliers (frenzy §7, sprint/residual §9.4, event modifiers §10) multiply income at point of payment.
+Global multipliers (frenzy §7, the Family Fortune Legacy upgrade §9.4, event modifiers §10) multiply income at point of payment. The Rush Overheat factor (§4.1) also multiplies at point of payment but **per property** — only the property being actively rushed carries it (Tim 2026-07-13). A rushed collection therefore pays `frenzy × Family Fortune × rush_momentum_factor`; `rush_cycle` collects every full cycle the advance covers and carries the remainder (2026-07-12/13 fixes — rush previously dropped Family Fortune).
 
 ### 3.5 Per-property UI
 Milestone progress slider per property: min = last milestone, max = next (recovered 2022 design, kept — it feeds the return spike: "the pile can push me over 40").
@@ -99,16 +100,41 @@ Milestone progress slider per property: min = last milestone, max = next (recove
 - **Rushed income readout (2026-07-07).** While rush is held a row's income label quotes the effective rate — `per_cycle × the completion rate above` — as `$X / s` (not gated on `is_cycle_running`: an unstaffed cycle stops momentarily at each payout and would flicker the readout). The hero panel's headline is the **simple sum of the rates the rows currently display** (unowned rows' buy-previews contribute 0), so it rises live under rush/frenzy; the core's `displayed_income_per_sec` (theoretical staffed-passive rate) is unchanged and still drives the executive wage floor (§5).
 
 ### 3.6 Alien property types — epoch unlock + First Contact reward (built 2026-06-28, GDD §5.5 site 2)
-The ladder is **17** `PropertyConfig`s: the 12 Earth properties plus 5 alien property types, one per alien epoch — Photon Exchange (epoch 2), Data Foundry (3), Spore Bank (4), Prism Vault (5), Time Bank (6).
+The ladder is **52** `PropertyConfig`s: the 12 Earth properties plus **40 alien properties in an escalating cohort per epoch — 6, 7, 8, 9, 10 rungs for epochs 2–6** (escalating-ladder rework, Tim 2026-07-15, the unlock-cadence fix; was one property per epoch at build, then 4-property cohorts in the Epoch Depth pass). Each epoch's cohort is anchored by its **flagship** — Photon Exchange (epoch 2), Data Foundry (3), Spore Bank (4), Prism Vault (5), Time Bank (6) — and topped by the epoch's grandest venture (Starcore Syndicate etc.). New rungs were APPENDED at array indices 37–51 (append-only convention), so saves load unchanged.
+
+**Cohort grid (2026-07-15).** Per epoch T, cohort size `N = T + 4`; rung k (0-based, flagship = rung 0):
+```
+cost(k)   = flagship_cost × (16807^(1/N))^k     (the cohort spans exactly ×16807 = 7^5,
+                                                 matching the per-epoch threshold growth)
+income(k) = cost(k) × 0.01824                   (income/cost held constant across all rungs)
+```
+Cycle 60 s, r0, and accent color are inherited from the epoch's flagship. Because every cohort spans ×16807 regardless of size, epoch durations, thresholds, and the ~1-epoch-per-prestige cadence are untouched by construction — only the per-rung ratio shrinks (×5.06 at epoch 2 down to ×2.64 at epoch 6), which is what flattens the unlock cadence (sim-measured median gap ~3.2–4.0 min per epoch, vs. 4.4→7.1 min before).
 - **`unlock_tier`** (new `PropertyConfig` field, default 1): a property is buyable/visible only once `EpochState.current_tier ≥ unlock_tier`. Earth's 12 are tier 1; each alien property carries its epoch tier. Gate enforced in `EconomyState.try_buy` / `is_property_unlocked` / `get_cheapest_unaffordable_unowned_index` (all take the run's reached tier) and hidden entirely in `PropertyRow` until unlocked. A locked property is also skipped by the sim's greedy buy.
 - **Reward = a head start, not the unlock.** A property is unlocked-or-not, so the minigame can't multiply the unlock. At First Contact the trade-deal minigame's universal multiplier instead scales **starting units**: `grant_starting_units = floor(first_contact_starting_units × multiplier)`, granted free (run through `PropertyState.buy`, but **not** counted as estate spend — won, not bought). Full deal → the cap (`first_contact_starting_units` = 8, dev-tunable); skip / opt-out → the keep-floor share (≈half); minigames-off grants the keep-floor units directly with no screen. Flow lives in `Main` (`MinigameSite.FIRST_CONTACT`): contact overlay → its `dismissed` signal launches the minigame → `_finish_first_contact_minigame` grants the units + saves.
-- **Magnitude:** each alien property is a fixed flagship (~5× Executive Assets: `base_cost` $500B, `income/unit` $671.6B, ratio 1.34×); epoch scaling comes purely from staffing (§6), so its "clear @10 units" sits in a sane band (≈58→22 min across epochs 2–6) instead of running away. An early cut that scaled base magnitude by `economy_scale` double-counted the epoch. Readout: `sim/Sim.gd._print_alien_property_economics`. All first-pass — at-scale feel is an on-device tuning pass (the sim can't reach epoch 2 in its per-generation budget).
+- **Magnitude (REWORKED 2026-07-12, continuous ladder):** alien base magnitudes are no longer a fixed flagship — the 52 properties climb at ~×7/rung continuously (Earth already did: ATM $50 → Executive Assets $100B), and each epoch's flagship is **anchored to the player's epoch-entry wealth**: `flagship(T) ≈ 10%` of the previous epoch's threshold (≈ cash on hand at contact), with income anchored separately for a ~3× income step-up at each contact. So it is ×7 within and across alien epochs, with one "catch up to your wealth" jump at the Earth→alien boundary (Tim 2026-07-12: the flagship must not be pocket change on arrival). The rest of the cohort spaces off the flagship per the 2026-07-15 grid above. (The original 2026-06-28 cut was one fixed ~5×-Executive-Assets flagship per epoch, epoch scaling purely from staffing — superseded.)
 
 ## 4. Tapping (Active Layer 2)
 
 - **Start verb:** a tap on an idle, unstaffed property starts its cycle (2022 verb, preserved). Cycles pay on completion; unstaffed cycles stop after paying.
-- **Rush verb:** a tap on a *running* cycle advances it by `RUSH_PCT × cycle_length` (provisional 5% — ~20 taps completes any cycle at any altitude). Percentage, never fixed seconds: this is what makes tapping auto-scale with capital.
+- **Rush verb:** a tap on a *running* cycle advances it by `RUSH_PCT × cycle_length` (live 10% — ~10 taps completes any cycle at any altitude; scaled further by the Strong-Arm Tactics Legacy upgrade). Percentage, never fixed seconds: this is what makes tapping auto-scale with capital. Holding auto-rushes at `hold_rush_per_second` (5/s).
 - Both verbs feed the frenzy meter (§7) and the dynastic tap count (§5).
+
+### 4.1 Rush Overheat + Cruise Control (shipped 2026-07-16; Plans/Rush_Overheat.md, Plans/Rush_Cruise_Control.md)
+Rushing heats the property up — **heat IS the momentum meter** (one scalar, no timers; heat unit 1.0 = the old momentum cap). Bonus is a pure piecewise-linear function of heat; the factor `1 + bonus` multiplies **only the actively rushed property's** income (magnitude builds globally, application is per-property — §3.4).
+
+| Band | Heat | Bonus | |
+|---|---|---|---|
+| Building | 0 → 1.0 (inclusive) | 0% → +30% | build 0.167/s, bleed 0.333/s |
+| Hot | 1.0 → 1.25 | +30% → +40% | overdrive build 0.075/s; always safe for its width |
+| Critical | 1.25 → rolled ceiling | +40% → +55% (at 1.60) | ceiling rolled **per excursion**, uniform 1.40–1.60 |
+| OVERHEAT | heat hits ceiling | 0%, rush disabled | locked drain 0.16/s (~8–12 s), then 1.5 s re-arm |
+
+- **Cruise (default, 2026-07-16):** holding without overdrive is safe forever — heat clamps at the cruise point, `cruise_heat = effective_cruise_bonus / bonus_at_hot` (≈0.833 at the base **+25%** `rush_momentum_cruise_bonus`). No overheat possible while cruising.
+- **OVERDRIVE is an opt-in button** (visible/enabled while a rush hold is live, no lockout): releases the clamp and rides the danger bands as shipped. **Per-excursion** — disengages on release, overheat, and reset; the ceiling re-rolls each time heat crosses 1.0 upward. Building is inclusive of heat 1.0 (max-Legacy cruise parks there without starting an excursion).
+- **Frenzy burn = a true freeze** (no gain, bleed, lockout drain, or re-arm countdown).
+- Legacy upgrades ("Rush" category, §9.4): **Cooling Systems** +0.01 cruise bonus/level, max 5 (hard cap at +30% = the old always-on cap); **Rapid Restart** −10% total lockout/level, max 5 (drain rate ÷ scale, re-arm × scale — never zero).
+- Duty-cycle (sim-measured): cruise averages **+24.5%**; a skilled ride/vent overdrive loop averages **+34.8%**.
+- Knobs (`rush_momentum_*` heat/bonus/drain/re-arm family, Balance Tuning) supersede `rush_momentum_max_bonus`; grace 0.5 s bridges auto-rush pulses. Full reset at each First Contact.
 
 ## 5. Wage Ladder (Active Layer 1) — Hybrid Credentials
 
@@ -123,8 +149,8 @@ The ladder is **17** `PropertyConfig`s: the 12 Earth properties plus 5 alien pro
 ## 6. Staffing & Offline (merged system)
 
 - **Hire / upgrade (epoch-keyed, updated 2026-06-16):** staffing is a **per-property tier track**, not a one-time switch (GDD §6). `staff_tier` per property: `0` = unstaffed, `1` = Earth staffer (auto-start + auto-collect forever — the old "hired" behavior), `2+` = the alien staffer unlocked once the run reaches that epoch (§6.2). Each tier carries `staff_income_multiplier` (Earth = 1.0; alien tiers are large jumps), applied at point of payment alongside frenzy/Legacy.
-- **Within-epoch staff levels (the per-epoch upgrade track, added 2026-06-27, GDD §6.1):** after hiring a tier, a property's staffer is leveled up through the epoch. `staff_level` per property; the effective staffer multiplier is `staff_income_multiplier(tier) × (1 + staff_level_step)^staff_level`, routed through `PropertyState._effective_staff_multiplier()` so every income site (collect, per-sec, per-cycle, single-unit) uses it. Level cost is anchored to the current tier's entry hire: `round_nice(entry_hire × staff_level_cost_base × staff_level_cost_growth^staff_level)` (`EconomyState.get_staff_level_cost`). No hard cap — geometric cost is the brake. `staff_level` **resets to 0 on `set_staff_tier`** (a new epoch's staffer is a fresh hire) and is **per property**. Saved per property (GameState SAVE_VERSION → 7; pre-v7 defaults to 0). Constants `staff_level_step` (0.25), `staff_level_cost_base` (0.10), `staff_level_cost_growth` (1.6) — all first-pass feel-tune. **Cost (reworked 2026-06-17):** the Earth staffer (tier 1) keeps its small property-scaled cost (≈50× band-1 unit cost × Legacy discount); **alien tiers (2+) are anchored to the target epoch's whole economy** — `earth_economy_target × economy_scale(tier) × staff_cost_fraction × growth^property_index` — so they cost `economy_step`× more each epoch (≈30× under the 2026-06-27 ladder) and you must earn into the new economy before affording them (saved cash carries over). You can only reach a tier whose epoch the run has reached. Tap-rush remains additive at any tier ≥ 1. Data table: `EpochCatalog.gd`; state: `EpochState.gd`.
-- **Epoch pacing — the law (REWORKED Phase 3, 2026-07-11, GDD §6.2; plan `Epoch_Depth_Pass.md` §4):** time to clear an epoch ≈ (dollars to earn) ÷ (income/sec). Dollars-to-earn scales with `economy_scale = 60^(tier−1)` (economy_step **60**, up from 30). Income comes from the FIVE-property cohort magnitudes (threshold-anchored, growing at `economy_step/DRIFT` per epoch, DRIFT 0.95) *plus* the per-block staff ladder. The old "ratio = economy_step ÷ staff_step" law is RETIRED — it assumed a single linear per-tier staff factor that the Phase 1 per-block staff ladder + Phase 2/3 cohorts broke. Pacing is now MEASURED, not projected: `sim/Sim.gd` builds the real economy three ways — fixed-depth MEASUREMENT, cohort SWEEP, and a cost-curve-aware PLAYOUT (a heir plays all epochs). Result: no cliff; per-epoch ratio brackets ~1.0–1.05 (each epoch ≈ as long as, to slightly longer than, the last — Tim's 2026-07-11 target). **Caveat:** first-pass constants; the on-device pass (Phase 4) is owed. DRIFT is the knob that shifts the rise.
+- **Within-epoch staff levels (the per-epoch upgrade track, added 2026-06-27, GDD §6.1):** after hiring a tier, a property's staffer is leveled up through the epoch. `staff_level` per property; the effective staffer multiplier is `staff_income_multiplier(tier) × (1 + staff_level_step)^staff_level`, routed through `PropertyState._effective_staff_multiplier()` so every income site (collect, per-sec, per-cycle, single-unit) uses it. Level cost is anchored to the current tier's entry hire: `round_nice(entry_hire × staff_level_cost_base × staff_level_cost_growth^staff_level)` (`EconomyState.get_staff_level_cost`). No hard cap — geometric cost is the brake. `staff_level` **resets to 0 on `set_staff_tier`** (a new epoch's staffer is a fresh hire) and is **per property**. Saved per property (GameState SAVE_VERSION → 7; pre-v7 defaults to 0). Constants live: `staff_level_step` (0.33; each block's per-level step is this × the block's catalog multiplier), `staff_level_cost_base` (0.07, cut from 0.10 2026-07-02 so a level's ROI beats buying a unit), `staff_level_cost_growth` (1.5, softened from 1.6), `staff_levels_per_epoch` (20 — the ladder became per-epoch BLOCKS in the 2026-07-04 Epoch Depth redesign: level 1 of each block IS that epoch's staffer hire at the block's anchor, costs/effects frozen to the block's epoch). **Cost (reworked 2026-06-17):** the Earth staffer (tier 1) keeps its small property-scaled cost (≈50× band-1 unit cost × Legacy discount); **alien tiers (2+) are anchored to the target epoch's whole economy** — `earth_economy_target × economy_scale(tier) × staff_cost_fraction × growth^staff_price_rank` — so they cost ~`economy_scale`× more each epoch (×16807 under the 2026-07-12 ladder) and you must earn into the new economy before affording them (saved cash carries over). **Staff price rank (RE-ANCHORED 2026-07-15, escalating ladder):** the growth exponent was the property's GLOBAL array index, which broke once alien cohort siblings were appended out of cost order — now Earth properties rank 0–11 (their old indices, prices unchanged), and an alien property ranks `12 + its cost rank within its own cohort` (every flagship = 12, exactly its old index, so flagship staff prices are also unchanged). Computed once in `EconomyState.compute_staff_price_ranks`; `StaffRetention.cost_for_level` (Legacy retention, §9.3) grows by the **same rank** for the same reason. You can only reach a tier whose epoch the run has reached. Tap-rush remains additive at any tier ≥ 1. Data table: `EpochCatalog.gd`; state: `EpochState.gd`.
+- **Epoch pacing — the law (REWORKED AGAIN 2026-07-12, continuous ladder; then escalating cohorts 2026-07-15):** time to clear an epoch ≈ (dollars to earn) ÷ (income/sec). Dollars-to-earn scales with `economy_scale = (7^5)^(tier−1) = 16807^(tier−1)` — one 5-rung ×7 ladder block per epoch, matching how far the property magnitudes climb in that epoch (§3.6), so pacing stays ~flat and you can never trivially buy across epochs. *(The 2026-07-11 Phase-3 model — economy_step 60, threshold-anchored five-property cohorts drifting at `economy_step/DRIFT`, DRIFT 0.95 — was superseded the next day by Tim's "each new property is a ~7× jump, like Earth" continuous-ladder model.)* The old "ratio = economy_step ÷ staff_step" law stays RETIRED; pacing is MEASURED, not projected: `sim/Sim.gd` runs pacing measurement, a step-up check, and a cost-curve-aware PLAYOUT (an heir plays all epochs); epoch durations verified ~unchanged by the 2026-07-15 cohort rework. **Caveat:** on-device feel pass still owed.
 - **Offline accrual draws from staffed properties only:**
 ```
 offline_rate  = Σ(staffed i) income_per_sec(i) × OFFLINE_EFF
@@ -132,7 +158,7 @@ offline_pile  = floor( offline_rate × min(elapsed_seconds, OFFLINE_CAP) )
 ```
 - `OFFLINE_EFF` provisional 50% `TBD-SIM`; `OFFLINE_CAP` base 4h, extended by Family Office upgrades (ladder TBD content pass).
 - **The first hire is the offline unlock** — no separate Property Manager purchase. Family Office = the upgrade institution for cap/efficiency.
-- Frenzy, sprint, and event modifiers do **not** apply offline (offline is its own reduced-efficiency channel; keeps active play strictly superior).
+- Frenzy, rush bonuses, and event modifiers do **not** apply offline (offline is its own reduced-efficiency channel; keeps active play strictly superior).
 - Welcome-back: two-beat ritual per GDD §3.1; pile stat line *Hours worked: 0* sourced from wage-tap count during absence (always 0, by construction — the joke is load-bearing and free).
 
 ## 7. Frenzy (Active Layer 3) — One Bar, Two Modes
@@ -147,7 +173,7 @@ State machine: `FILLING ⇄ BURNING`.
 
 - Frenzy multiplier applies to **all income** (properties + wage).
 - Pop button always previews live value: "×2.4 for 38s" (house rule: every irreversible decision shows its reward first).
-- Provisional constants: FRENZY_MAX_MULT 4×, T_BURN 90s, FRENZY_FILL 0.4%/tap, FRENZY_DECAY 0.5%/s, IDLE_GRACE 5s — all `TBD-SIM`/feel-tuned in M1.
+- Live constants (`tuning.tres`): FRENZY_MAX_MULT 5.6×, T_BURN 30s (device-tuned from the provisional 4×/90s), FRENZY_FILL 0.4%/tap (held rush pulses fill at ×0.6), FRENZY_DECAY 0.5%/s, IDLE_GRACE 5s. The Killer Instinct / Second Wind Legacy upgrades compound the popped multiplier and burn duration further (§9.4). Presented in-game as **TURBO**.
 
 ## 8. Debt, Loans, Credit Offers
 
@@ -173,30 +199,40 @@ estate_net     = after_credit − tax
 - `EXEMPTION` base $1M; `TAX_RATE` base 60% — both provisional `TBD-SIM`, deliberately brutal so the loophole tree feels like a jailbreak.
 - **Loopholes** (purchased via Legislative/Executive Assets, persist across generations): two axes — exemption raisers (multiplicative on EXEMPTION) and rate cutters (subtractive on TAX_RATE, floored at LOOPHOLE_RATE_FLOOR ~5%). Catalog = content pass; each loophole = real mechanism, real name, itemized line on the will.
 
-### 9.3 Legacy conversion (root function, bracket display)
+### 9.3 Legacy conversion (gentle power curve, bracket display)
 ```
-legacy_gain = floor( K_LEGACY × log10(estate_net / LEGACY_BASE) ^ ALPHA )   K=0.5 ALPHA=2 LEGACY_BASE=$1k
+legacy_gain = floor( K_LEGACY × (estate_net / LEGACY_BASE) ^ ALPHA )   K=0.50 ALPHA=0.22 LEGACY_BASE=$1k
 ```
 (`estate_net` here is the post-tax net of the §9.2 waterfall, whose gross is lifetime cash earned
-this generation — not net worth at death. **Reworked 2026-06-17 from a plain power curve:** the old
-`K × estate_net ^ 0.5` minted absurd Legacy at real trillion-dollar scale — a single 20T run gave
-~16k, enough to buy out the whole shop. The log curve compresses the whole range to a sane handful
-— ≈ $1B→18, $8T→49, $1Q→72 — and nothing converts below the `LEGACY_BASE` floor.)
+this generation — not net worth at death; nothing converts at or below the `LEGACY_BASE` floor.
+**Curve history:** the 2026-06-17 log² curve — `floor(K × log10(net/base)²)` — fixed the original
+`K × net^0.5` runaway but was so flat that doubling a run's earnings added only ~3 Legacy, breaking
+the "better run → more prestige currency" loop; **2026-07-02** restored a deliberately GENTLE power
+curve (ALPHA 0.30, K 0.045 — gems roughly double per 10× of earnings, anchored $10T→45).
+**Prestige Option C, 2026-07-14:** ALPHA 0.30 → **0.22** and K 0.045 → **0.50** together (a lower
+exponent needs a higher coefficient to keep the first prestige near its old ~350 gems) — at 0.30 the
+yield compounded ~18× per epoch, driving income ×237 over a dynasty; 0.22 still rewards a better run
+(~+16% gems per 2× estate). Paired with the second brake: **`legacy_upgrade_cost_multiplier` = 2.0**,
+a NEW global × on every Legacy upgrade's cost (`LegacyUpgradeCatalog.cost_multiplier`, a static set
+from tuning by DynastyState), so a prestige's gems buy fewer levels. Target: ~1 epoch per prestige.)
 **Prestige minigame multiplier (GDD §5.5; built 2026-06-22 as match-3).** The prestige
 minigame scales how much of the converted award is **kept**:
 ```
 legacy_awarded = floor( legacy_gain × MINIGAME_MULT )
-MINIGAME_MULT = keep_floor          at score 0   (also what Skip / opt-out banks)
-              → 1.0 (full)          at score ≥ minigame_full_score
-              → 1.0 + bonus_max     at score ≥ minigame_extra_score
+MINIGAME_MULT = keep_floor          at performance 0   (a MODEST downside)
+              → 1.0 (neutral)       at performance minigame_full_performance  (= what Skip / opt-out banks)
+              → 1.0 + bonus_max     at performance 1.0
 bonus_max = LegacyUpgrades.minigame_bonus_max()  = 0.25 + 0.05 × Family Reputation level
 ```
-`legacy_gain` (the log curve above, × Estate Lawyers yield) is the **base**. Unlike the
-2026-06-21 first pass, this is **NOT upside-only** — a poor round (or a skip) keeps less than
-the base (floor 0.5 = half), which is what gives the minigame stakes; a great round overfills
-into the extra-high bonus. Tuning: `minigame_keep_floor` 0.5, `minigame_full_score` 100,
-`minigame_extra_score` 200, `minigame_duration_seconds` 20 (all `TBD-SIM`, dev-panel editable);
-the extra bonus cap is the Family Reputation upgrade (LegacyUpgradeCatalog). Governed by the
+`legacy_gain` (the power curve above, × Estate Lawyers yield) is the **base**. **Curve reshaped
+2026-07-10 (work item 4):** STANDARD play is now neutral — the multiplier is `minigame_keep_floor`
+(0.9, a modest downside, no longer half) at performance 0, exactly 1.0 at "standard" performance
+(`minigame_full_performance` 0.5), and up into the bonus at perfect play; **skip / minigames-off
+banks exactly 1.0**, not the floor (the 2026-06-21/22 stakes model, where a skip cost half the
+award, is retired). Tuning: `minigame_keep_floor` 0.9, `minigame_full_performance` 0.5,
+`minigame_full_score` 100, `minigame_extra_score` 200, `minigame_duration_seconds` 25 (device-tuned
+2026-07-09; dev-panel editable); the extra bonus cap is the Family Reputation upgrade
+(LegacyUpgradeCatalog). Governed by the
 persisted `GameState.ui_minigame_enabled` (default mandatory). Applied in
 `DynastyState.perform_succession(cause, minigame_multiplier)`, floored, clamped ≥ 0.
 
@@ -235,13 +271,13 @@ WHY this round is happening (the heir proving themselves at succession; one bold
 overnight pile banks; opening terms with a new civilization). Hidden in Challenge Mode and the
 review tuner.
 
-**PLANNED, not built (2026-07-07 debrief, work item 4):** reshape the outcome curve so STANDARD
-play is neutral — a flat middle band mapping to 1.0, a modest downside floor for genuinely bad
-play, a modest upside for great play, and skip/opt-out landing at exactly 1.0 (replacing the
-keep_floor-0.5 stakes model above, where a skipped round cost half the award). To land together
-with a match-3 difficulty raise (Tim maxes the 200-cleared perfect almost every round; a ceiling
-most rounds touch would make the new upside effectively flat). All band numbers to be TuningConfig
-exports.
+**SHIPPED 2026-07-10 (was work item 4, planned 2026-07-07):** the neutral-standard-play outcome
+curve above, landed together with the match-3 difficulty raise (bigger 7×6 board, cascade combos
+removed for static per-match scoring, `match3_full_score` 600 / `match3_max_score` 2200 — a single
+lucky chain can no longer max the round) and the cross-minigame **Legacy Bonus system**
+(`Plans/Legacy_Bonus_System.md`): each minigame has a small game-specific chance at a bonus Legacy
+gem worth `legacy_bonus_fraction` (0.1%) of lifetime-earned Legacy, gated by round result, min 1,
+capped per round, ×10 at a First Contact site. All band numbers are TuningConfig exports.
 
 Displayed as **brackets** (thresholds where legacy_gain crosses integers / named tiers); advisor announces bracket crossings. Total Legacy is dynastic and never spent down by conversion — Legacy *upgrades* cost Legacy per the upgrade table (content pass). The catalog includes **per-staffer retention** (GDD §6.3): spend Legacy to carry a property's staff ladder across the prestige reset **one LEVEL at a time** (2026-07-04 redesign), buyable up to the bloodline's ever-reached best on that property. *(Distinct from the "Loyal Staff" upgrade, which only discounts hire cost. Staff otherwise reset on prestige.)*
 
@@ -254,15 +290,23 @@ defaults: base 1.0 · property_step 1.5 · level_growth 1.25
 ```
 The per-property term is the point: protecting a top earner costs like a top earner (ATM level 1 = 1 Legacy; Executive Assets level 1 ≈ 87). The old model — flat `ceil(1.0 × 1.12^(level−1))`, no property term — priced the ATM's staff like Executive Assets' and made deep retention near-free at a ~350-gem prestige. All three knobs are `TuningConfig` exports (`retention_*`) editable live from the Balance Tuning screen; `StaffRetention` stays tuning-free (DynastyState copies them in on construction and load).
 
-### 9.4 Legacy application — catch-up sprint + residual
-```
-SPRINT_MULT   = 1 + K_SPRINT × Legacy ^ BETA          (provisional BETA 0.5, K_SPRINT TBD-SIM)
-active while:   heir net_worth < predecessor_peak_net_worth
-RESIDUAL_MULT = 1 + K_RES × brackets_attained          (permanent, after sprint ends)
-```
-- "Predecessor's peak position" = **peak net worth of the immediately preceding generation** (provisional definition `TBD-SIM`; simulator validates against multi-generation decay cases, e.g., post-bankruptcy heirs).
-- Estate Planning tab's headline projection — *"your heir reaches your current position in N minutes"* — is computed by the simulator core running headlessly in-game with SPRINT_MULT applied (§13).
-- Sprint/residual multiply all property income (not wage — the wage is honest).
+### 9.4 Legacy application — spendable upgrade currency (sprint/residual RETIRED)
+The automatic catch-up sprint + residual multipliers (`SPRINT_MULT = 1 + K_SPRINT × Legacy^BETA`,
+`RESIDUAL_MULT = 1 + K_RES × brackets`) were **retired when Legacy became a spendable currency**:
+the prestige reward is now gems the player spends on permanent upgrades in the Legacy shop
+(`LegacyUpgradeCatalog.gd`), and those upgrades provide the per-generation acceleration the old
+multipliers used to. `K_SPRINT` / `BETA` / `K_RES` no longer exist in TuningConfig.
+- Each upgrade: `cost(level) = floor(base_cost × cost_growth^(level−1) × cost_multiplier)`, where
+  `cost_multiplier` is the global 2.0 prestige-power brake (2026-07-14, §9.3).
+- The catalog spans Wealth (Trust Fund, Family Fortune — the property-income multiplier applied at
+  point of payment, §3.4), Operations (Efficiency Experts, Loyal Staff, Strong-Arm Tactics),
+  Career/Labor (Old-Money Connections, Restless Hands, Piecework Bonus), Legacy (Estate Lawyers,
+  Family Reputation), Frenzy (Killer Instinct, Second Wind), and — NEW 2026-07-16 — **Rush**:
+  **Cooling Systems** (+0.01 cruise bonus/level, max 5, base_cost 6, growth 2.0; hard-capped at the
+  old +30%) and **Rapid Restart** (−10% overheat lockout/level, max 5, base_cost 6, growth 2.0;
+  additive with hard caps — a compounding limitation-remover runs away). See §4.1.
+- Upgrade multipliers apply to property income (not wage — the wage is honest; the wage has its
+  own Career/Labor upgrades instead).
 
 ## 10. Events — Schema-Ready Weather, Audit Dilemma
 
@@ -284,23 +328,29 @@ Godot Resources (the 2022 ScriptableObject pattern, ported):
 | Constant | Provisional | Status |
 |---|---|---|
 | LOGIC_HZ | 10 | [ENG] |
-| RUSH_PCT | 5% of cycle | TBD-SIM |
+| RUSH_PCT | 10% of cycle | live (tuning.tres) |
 | CYCLE_FLOOR | 1.0 s | TBD-SIM |
-| BAND_STEP | 1.15 | TBD-SIM |
-| R0 (per property) | 1.05–1.10 | TBD-SIM |
-| STAFF_COST rule | 50× unit cost @ band 1 | TBD-SIM |
+| BAND_STEP | 1.10 | live (2026-06-22 re-tune) |
+| R0 (per property) | 1.09 all 52 rungs | live (2026-07-03) |
+| STAFF_COST rule (Earth tier 1) | 50× unit cost @ band 1 | TBD-SIM |
+| staff_cost_fraction / staff_cost_property_growth (alien anchors, exponent = staff price rank §6) | 0.01 / 1.4 | feel-tune (rank since 2026-07-15) |
 | OFFLINE_EFF | 50% | TBD-SIM |
 | OFFLINE_CAP base | 4 h | TBD-SIM |
-| FRENZY_MAX_MULT | 4× | feel-tune M1 |
-| T_BURN | 90 s | feel-tune M1 |
+| FRENZY_MAX_MULT | 5.6× | device-tuned (was 4×) |
+| T_BURN | 30 s | device-tuned (was 90 s) |
 | FRENZY_FILL / DECAY / IDLE_GRACE / POP_FLOOR | 0.4%/tap / 0.5%/s / 5 s / 15% | feel-tune M1 |
+| rush heat build / hot build / bleed | 0.167 / 0.075 / 0.333 per s | feel-tune (2026-07-16, §4.1) |
+| rush critical_start / ceiling_min–max | 1.25 / 1.40–1.60 heat | feel-tune (2026-07-16, §4.1) |
+| rush bonus at hot / critical / peak / cruise | +30% / +40% / +55% / +25% | feel-tune (2026-07-16, §4.1) |
+| rush locked drain / re-arm | 0.16 per s (~10 s lockout) / 1.5 s | feel-tune (2026-07-16, §4.1) |
 | EXEMPTION base / TAX_RATE base | $1M / 60% | TBD-SIM |
 | LOOPHOLE_RATE_FLOOR | 5% | TBD-SIM |
-| K_LEGACY / ALPHA / LEGACY_BASE (log curve) | 0.5 / 2 / $1k | feel-tune |
-| minigame keep_floor / full_score / extra_score / duration | 0.5 / 100 / 200 / 20s | TBD-SIM |
-| retention_base_cost / retention_property_step / retention_cost_growth | 1.0 / 1.5 / 1.25 | feel-tune (Balance Tuning) |
+| K_LEGACY / ALPHA / LEGACY_BASE (power curve) | 0.50 / 0.22 / $1k | feel-tune (Option C, 2026-07-14) |
+| legacy_upgrade_cost_multiplier | 2.0 | feel-tune (Option C, 2026-07-14) |
+| minigame keep_floor / full_performance / full_score / extra_score / duration | 0.9 / 0.5 / 100 / 200 / 25s | device-tuned 2026-07-09/10 |
+| retention_base_cost / retention_property_step / retention_cost_growth | 1.0 / 1.5 / 1.25 | feel-tune (Balance Tuning; property term = staff price rank since 2026-07-15) |
 | minigame extra bonus cap (Family Reputation) | 0.25 + 0.05/level | TBD-SIM |
-| K_SPRINT / BETA / K_RES | tune / 0.5 / tune | TBD-SIM |
+| ~~K_SPRINT / BETA / K_RES~~ | — | RETIRED (Legacy is spendable, §9.4) |
 | CRASH_MULT / CRASH_DUR | 0.5 / 10 active-min | TBD-SIM |
 | AUDIT_SETTLE / AUDIT_THRESHOLD | 8% net worth / N units | TBD-SIM |
 | Earth economy_target | $103.6T | confirm |

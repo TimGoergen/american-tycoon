@@ -759,12 +759,14 @@ class BandZoneOverlay extends Control:
 				draw_rect(Rect2(visible_left, top, slice_right - visible_left, bottom - top),
 						slice_color)
 
-		# Hazard stripes still mark gamble territory, but they FADE IN across the first stretch
-		# of the Critical span instead of starting at a hard edge — the stripes emerging from
-		# the deepening wash is what makes the two old sections read as one (Tim 2026-07-18).
-		var crit_left := maxf(critical_x, fill_x)
-		if right_x > crit_left:
-			_draw_hazard_stripes(crit_left, right_x, top, bottom, critical_x)
+		# Hazard stripes join the same fade: strength 0 at the cruise bar, full only at the bar's
+		# END, ramping across the WHOLE overheat span. Starting them at the Critical edge — even
+		# with a partial fade-in — still read as a boundary on device (Tim 2026-07-18 follow-up:
+		# a texture edge splits the section as surely as a color edge), so the stripes now share
+		# the wash's single left-to-right story and no x-position has a detectable seam.
+		var stripes_left := maxf(cruise_x, fill_x)
+		if right_x > stripes_left:
+			_draw_hazard_stripes(stripes_left, right_x, top, bottom, cruise_x, right_x)
 
 		# The cruise bar — where a plain hold clamps (Plans/Rush_Cruise_Control.md). ALWAYS
 		# drawn, over fill and track alike, so the safety landmark is spatially real whatever
@@ -773,20 +775,17 @@ class BandZoneOverlay extends Control:
 			draw_rect(Rect2(cruise_x - CRUISE_BAR_WIDTH * 0.5, top, CRUISE_BAR_WIDTH,
 					bottom - top), CRUISE_BAR_COLOR)
 
-	## Fraction of the Critical span over which the hazard stripes fade from invisible to full
-	## strength (Tim 2026-07-18: the sections must blend, so the stripes emerge gradually from
-	## the wash instead of switching on at the Critical edge).
-	const STRIPE_FADE_IN_FRAC := 0.4
-
 	## Diagonal 45° hazard stripes across [left_x, right_x]. Each stripe is a thick line from the
 	## bottom edge up-right to the top edge; its endpoints are clipped in 1D along the line so no
 	## stripe pokes past the segment's edges (inset by half the stripe width, since draw_line
-	## spreads its width to both sides). `fade_from_x` is where the Critical span BEGINS on the
-	## track (left_x can sit further right when the fill has covered part of the span): each
-	## stripe's alpha ramps 0 → full across the fade-in stretch from there, keyed on the stripe's
-	## visible midpoint so the fade is anchored to the track like the wash gradient is.
+	## spreads its width to both sides). Stripe alpha ramps 0 → full across [fade_from_x,
+	## fade_to_x] (the whole overheat span), keyed on each stripe's visible midpoint so the fade
+	## is anchored to the track like the wash gradient is. The ramp is SQUARED: perception-wise a
+	## linear alpha ramp makes faint stripes readable almost immediately, which re-creates the
+	## very boundary this fade exists to remove — squaring keeps the left stretch essentially
+	## clean and lets the stripes assert themselves only toward the hazard end.
 	func _draw_hazard_stripes(left_x: float, right_x: float, top: float, bottom: float,
-			fade_from_x: float) -> void:
+			fade_from_x: float, fade_to_x: float) -> void:
 		var height := bottom - top
 		if height <= 0.0:
 			return
@@ -794,7 +793,7 @@ class BandZoneOverlay extends Control:
 		var clip_right := right_x - STRIPE_WIDTH * 0.5
 		if clip_right <= clip_left:
 			return
-		var fade_span := maxf((right_x - fade_from_x) * STRIPE_FADE_IN_FRAC, 0.001)
+		var fade_span := maxf(fade_to_x - fade_from_x, 0.001)
 		# The first stripe starts far enough left that its top end can still land in the segment.
 		var x0 := clip_left - height
 		# Snap to the stripe grid so the pattern stays fixed to the bar (it does not crawl as the
@@ -810,6 +809,7 @@ class BandZoneOverlay extends Control:
 				var to := Vector2(x0 + t_max * height, bottom - t_max * height)
 				var mid_x := (from.x + to.x) * 0.5
 				var strength := clampf((mid_x - fade_from_x) / fade_span, 0.0, 1.0)
+				strength *= strength  # squared ramp — see the doc comment above
 				if strength > 0.0:
 					draw_line(from, to,
 							Color(CRITICAL_STRIPE, CRITICAL_STRIPE.a * strength), STRIPE_WIDTH)

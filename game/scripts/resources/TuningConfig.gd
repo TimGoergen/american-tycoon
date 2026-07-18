@@ -259,6 +259,14 @@ extends Resource
 ## keeps building smoothly BETWEEN the discrete auto-rush pulses instead of bleeding in the gaps.
 @export var rush_momentum_grace_seconds: float = 0.5  # feel-tune
 
+## Haptic pulse lengths (milliseconds) for the momentum bar's three feedback beats: the tap on
+## entering Critical, the long thump on overheating, and the tick when rushing re-arms. Live
+## knobs so the haptic device pass can be dialed on the phone without a code round-trip
+## (phones vary a lot in how a given pulse length feels). 0 disables that pulse.
+@export var rush_momentum_haptic_critical_ms: float = 60.0  # feel-tune
+@export var rush_momentum_haptic_overheat_ms: float = 200.0  # feel-tune
+@export var rush_momentum_haptic_ready_ms: float = 40.0  # feel-tune
+
 # --- Estate & tax (Spec §9) ---
 
 ## Base estate-tax exemption in dollars.

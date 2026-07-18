@@ -109,10 +109,8 @@ const TIER_CHIP_FADE_OUT_SEC := 0.4
 const READY_FLASH_ALPHA := 0.75
 const READY_FLASH_FADE_SEC := 0.5
 
-## Haptic pulse lengths (ms) per event — first-cut values, device pass pending (plan: open item).
-const HAPTIC_CRITICAL_MS := 60
-const HAPTIC_OVERHEAT_MS := 200
-const HAPTIC_READY_MS := 40
+# Haptic pulse lengths moved from constants to live Balance Tuning knobs (tuning
+# rush_momentum_haptic_*_ms) so the device pass can dial them on the phone — see _vibrate.
 
 
 ## Call before adding to the tree.
@@ -438,21 +436,21 @@ func _on_band_entered(band: RushMomentumState.Band) -> void:
 		_show_tier_chip(
 			"CRITICAL +%d%%!" % int(round(_tuning.rush_momentum_bonus_peak * 100.0)),
 			UiPalette.KETCHUP_RED, UiPalette.PALE_GOLD)
-		_vibrate(HAPTIC_CRITICAL_MS)
+		_vibrate(_tuning.rush_momentum_haptic_critical_ms)
 
 
 ## Heat hit the hidden ceiling: the shutdown moment. The label/fill/bubble changes are all
 ## per-frame state reads (see _process); here we only add the long haptic thump so the failure
 ## lands physically as well as visually.
 func _on_overheated() -> void:
-	_vibrate(HAPTIC_OVERHEAT_MS)
+	_vibrate(_tuning.rush_momentum_haptic_overheat_ms)
 
 
 ## The re-arm delay finished: rush is available again. Flash the whole meter bright once (plus a
 ## short haptic tick) so re-availability is unmissable — the label reverts to "+0%" on its own
 ## via _process now that is_locked_out() is false.
 func _on_rush_ready() -> void:
-	_vibrate(HAPTIC_READY_MS)
+	_vibrate(_tuning.rush_momentum_haptic_ready_ms)
 	_ready_flash.color = Color(1, 1, 1, READY_FLASH_ALPHA)
 	var tween := create_tween()
 	tween.tween_property(_ready_flash, "color:a", 0.0, READY_FLASH_FADE_SEC)
@@ -483,10 +481,11 @@ func _show_tier_chip(text: String, plate_color: Color, text_color: Color) -> voi
 
 
 ## Haptic tap, mobile only — desktop must stay silent (Input.vibrate_handheld is a no-op on most
-## desktops anyway, but the explicit guard documents the intent and costs nothing).
-func _vibrate(duration_ms: int) -> void:
-	if OS.has_feature("mobile"):
-		Input.vibrate_handheld(duration_ms)
+## desktops anyway, but the explicit guard documents the intent and costs nothing). Takes the
+## tuning knob's float directly; a knob dialed to 0 (or below) disables that pulse.
+func _vibrate(duration_ms: float) -> void:
+	if duration_ms >= 1.0 and OS.has_feature("mobile"):
+		Input.vibrate_handheld(int(duration_ms))
 
 
 # ---------------------------------------------------------------------------

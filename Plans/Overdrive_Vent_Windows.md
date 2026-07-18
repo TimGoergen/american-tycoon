@@ -169,6 +169,51 @@ knowing when to let go is itself a skill moment.
 or revert to plan-faithful knobs and accept a ~+45% skilled average. Both are two knob edits in
 Balance Tuning; the cadence is equally a device-feel question.
 
+## Endless escalation rework (Tim, 2026-07-18 — supersedes the tier cap)
+
+Tim's verdict on the built v1: likes the vent mechanic, but it is "still relatively limited" —
+he wants "more of an infinite scaling rather than a relatively short limit before you overheat,"
+with the failure state coming "from the mechanic becoming more difficult and complicated,
+including increasing the number of vent events and speed that must be accomplished in order to
+keep going."
+
+So: **the tier cap is gone; the difficulty curve replaces the ceiling as the ending.**
+
+- **Windows never stop.** `vent_max_tiers` retired. Every successful vent ratchets the bonus
+  AND the difficulty; the run ends when you finally miss (or bail by releasing). Deep runs are
+  self-limiting: even at 95% per-gesture skill, survival odds compound away — the designed
+  outcome is that every overdrive run eventually ends in flames, and the question is how high
+  you got. Best streak = an implicit high score (numbers-go-brrr, pillar 4).
+- **Three escalation axes, per tier (all knobs):**
+  1. *Cadence* — window arrival delay decays geometrically (`vent_delay_decay`, first-cut 0.88)
+     toward a floor (`vent_delay_floor`, 0.35 s): more vent events, faster.
+  2. *Speed* — window duration decays (`vent_duration_decay`, 0.92) toward a floor
+     (`vent_duration_floor`, 0.45 s): less time to perform each gesture.
+  3. *Complexity* — required lifts escalate 1 → 2 → 3 (`vent_lifts_step_tiers`, first-cut: +1
+     lift every 3 tiers, hard-capped at 3 — a quad-pump is thumb mush, so past ×3 the speed
+     axes carry the difficulty alone). The old `vent_double_from_tier` is superseded.
+- **Reward stays a flat unbounded step** (`vent_bonus_step`) per vent — the difficulty curve is
+  the brake, not the reward curve. No cap on the peak bonus.
+- **Punishment does NOT escalate without bound:** the per-tier fail sting keeps its rate but
+  gains a cap (`vent_fail_rearm_cap`, first-cut 9 s extra) — Tim's direction is that failure
+  pressure comes from difficulty, not from ever-longer timeouts. The hard heat ceiling remains
+  only as the ignored-everything backstop.
+- **Sim gates change shape:** report the skilled/sloppy *survival curves* (median and p90 tier
+  reached) and average bonus; targets — skilled median run reaches tier ~6–10 with average
+  bonus ≥ the v1 +61.9%, sloppy still at or below cruise, and the telegraph guarantee holds at
+  every escalated cadence (floors included).
+
+**Shipped tune (2026-07-18, sim-validated — 600 s × 5 seeds):** cruise +24.9% · skilled (95%)
+**+71.3% avg, median death at tier 8, p90 tier 12** · sloppy (70%) +23.0%, median tier 2. Every
+skilled run ends on a blown beat, never the backstop. Retunes vs first-cut, all sim-forced:
+`vent_bonus_step` 0.45→**0.60**; `vent_heat_drop` 0.15→**0.06** (deep runs must visibly ride
+just under the backstop or the average is unreachable — success also tops heat off so the next
+window always fits before the ceiling); `vent_delay_decay` **0.85**; `vent_duration_decay`
+0.92→**0.975** (at 0.92 a ×3 window became physically unfinishable right when triples begin —
+a cliff, not a curve). Autopilot models skill **per lift** (not per gesture), which is what
+makes triples genuinely harder and produces the compounding-odds survival curve above.
+Effective ladder: +55% base, +60% per vent, unbounded — a median skilled run peaks ~+535%.
+
 ## Decision log
 
 - Overdrive must be skill-based with larger risk and reward; cruise keeps the safe floor

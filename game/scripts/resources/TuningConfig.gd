@@ -246,44 +246,78 @@ extends Resource
 @export var rush_momentum_bonus_at_critical: float = 0.40  # feel-tune
 
 ## Bonus at the hard ceiling with NO vents achieved — the ladder's tier-0 peak. Each successful
-## vent adds rush_momentum_vent_bonus_step on top (+235% at the tier-4 cap with the defaults).
-## Only ever held for seconds at a time — the realistic average is the ride/vent duty cycle
-## (~+62% for a skilled venter; see the vent-window block comment below).
+## vent adds rush_momentum_vent_bonus_step on top, with NO cap (endless escalation). Only ever
+## held for seconds at a time — the realistic average is the ride/vent duty cycle
+## (~+71% for a skilled venter; see the vent-window block comment below).
 @export var rush_momentum_bonus_peak: float = 0.55  # feel-tune
 
-# --- Vent windows (Tim 2026-07-17; design: Plans/Overdrive_Vent_Windows.md) ---
+# --- Vent windows (Tim 2026-07-17, endless escalation 2026-07-18; design:
+# Plans/Overdrive_Vent_Windows.md) ---
 # While riding Critical with overdrive engaged, telegraphed vent windows periodically demand a
 # gesture on the rushed property's button: VENT = one lift (release → re-press), VENT ×2 = the
-# double release (lift → tap → re-hold). Success vents heat and ratchets the bonus ladder up a
-# rung; a miss (or reaching the hard ceiling) is a full overheat. Gesture tolerances are
-# deliberately sloppy-thumb generous — thumbs on glass are the real calibration, not the sim.
+# double release (lift → tap → re-hold), VENT ×3 adds a second tap. Success vents heat and
+# ratchets the bonus ladder up a rung; a miss (or reaching the hard ceiling) is a full
+# overheat. Gesture tolerances are deliberately sloppy-thumb generous — thumbs on glass are
+# the real calibration, not the sim.
 #
-# RETUNED FROM THE PLAN'S FIRST CUT (sim section 20's duty-cycle measurement, 2026-07-17):
-# the plan's targets — a skilled venter (95% gestures) averaging ~+60-80% while a sloppy one
-# (70%) lands at or below cruise — are NOT reachable with the first-cut knobs (skilled topped
-# out ~+45-50%, because climbs and lockouts dilute the average no matter the play). Hitting
-# both targets needed a faster window cadence, a taller ladder, and a harsher per-tier sting
-# (final: delay 0.8-1.6, step 0.45, 4 tiers, sting 3.0 → skilled +62%, sloppy +24%, cruise
-# +25%). The tall ladder (+235% at the tier-4 cap, vs the plan's +115% at tier 3) is the
-# price of the +60-80% average — FLAGGED for Tim's veto; every knob is live in Balance Tuning.
+# ENDLESS ESCALATION (Tim 2026-07-18, supersedes the old 4-tier cap): the windows never stop
+# arriving, and the DIFFICULTY CURVE replaces the tier cap as the run's ending. Each tier the
+# arrival delay and the window duration both decay geometrically toward floors, and the demanded
+# lifts step up 1 → 2 → 3 (hard-capped at 3 — a quad-pump is thumb mush; past ×3 the speed axes
+# carry the difficulty alone). The reward stays a flat unbounded step per vent: the brake is the
+# curve, not the reward. Every run therefore ends in flames eventually — the question is how
+# high you got (best streak = an implicit high score).
+#
+# RETUNED for the endless model (sim section 20's survival-curve measurement, 2026-07-18): with
+# every run now ending in a lockout (no more bail-at-the-cap harvest), hitting the plan's
+# targets — skilled (95% per lift) median run tier ~6-10 with average ≥ the v1 +62%, sloppy
+# (70%) at or below cruise — needed heat to RIDE HIGH between vents (heat_drop 0.15 → 0.06,
+# so the bar visibly creeps toward the ceiling as tiers deepen) and a gentler duration decay
+# (0.92 → 0.975, so deep runs die to blown beats on the escalating gestures, not to a
+# too-short-to-finish cliff right where triples begin). Measured finals: skilled +71% avg,
+# median tier 8, p90 12; sloppy +23%; cruise +25%. Every knob is live in Balance Tuning.
 
-## Earliest a vent window can arrive after entering Critical / after a vent (seconds).
-## Retuned 2.0 → 0.8 (see the block comment above): the brisk cadence is what lets a skilled
-## rider climb the ladder fast enough to matter, and makes a sloppy rider's fumbles frequent
-## enough that the risk stays real.
+## Earliest a vent window can arrive after entering Critical / after a vent (seconds) — the
+## TIER-0 base of the escalating cadence (each tier multiplies the rolled delay by delay_decay).
+## The brisk base cadence is what lets a skilled rider climb the ladder fast enough to matter,
+## and makes a sloppy rider's fumbles frequent enough that the risk stays real.
 @export var rush_momentum_vent_window_delay_min: float = 0.8  # feel-tune
 
-## Latest arrival (seconds) — the rolled unpredictability. The roll is clamped so the first
-## window always fully fits before heat could reach the hard ceiling (the telegraph guarantee).
-## Retuned 4.0 → 1.6, paired with delay_min above.
+## Latest arrival (seconds) — the rolled unpredictability, tier-0 base. The roll is clamped so
+## every window always fully fits before heat could reach the hard ceiling (the telegraph
+## guarantee).
 @export var rush_momentum_vent_window_delay_max: float = 1.6  # feel-tune
 
-## Seconds the player has to COMPLETE the gesture once a window telegraphs.
+## Per-tier multiplier on the rolled arrival delay (escalation axis 1, CADENCE): 0.85 = each
+## tier's windows arrive 15% sooner, geometrically, floored at vent_delay_floor. Tightened
+## from the plan's first-cut 0.88: the faster mid-tier cadence is what lets a skilled rider
+## bank deep tiers before the difficulty curve catches up.
+@export var rush_momentum_vent_delay_decay: float = 0.85  # feel-tune
+
+## The cadence floor (seconds): the escalating arrival delay never decays below this — past it,
+## the duration and lift axes carry the difficulty.
+@export var rush_momentum_vent_delay_floor: float = 0.35  # feel-tune
+
+## Seconds the player has to COMPLETE the gesture once a window telegraphs — the TIER-0 base
+## of the escalating duration (each tier multiplies it by duration_decay).
 @export var rush_momentum_vent_window_duration: float = 1.0  # feel-tune
 
-## Duration shaved off the window per achieved vent tier (seconds; floored at 0.5 s in code) —
-## the timing pressure that escalates alongside the reward ladder.
-@export var rush_momentum_vent_window_tighten: float = 0.10  # feel-tune
+## Per-tier multiplier on the window duration (escalation axis 2, SPEED). Retuned from the
+## plan's first-cut 0.92: at 0.92 a ×3 window becomes too short for even a brisk clean triple
+## right when triples begin (~tier 6 — a hard cliff, before the escalating gestures' odds
+## ever get to bite); 0.975 keeps deep windows tight but finishable into the teens, so runs
+## end the designed way — a blown beat on an ever-faster, ever-more-complex gesture.
+@export var rush_momentum_vent_duration_decay: float = 0.975  # feel-tune
+
+## The duration floor (seconds): the escalating window never shrinks below this — a shorter
+## window stops being a skill check and becomes a reflex lottery.
+@export var rush_momentum_vent_duration_floor: float = 0.45  # feel-tune
+
+## Tiers between lift escalations (escalation axis 3, COMPLEXITY): required lifts =
+## 1 + tier / this (integer division), so 3 = single at tiers 0-2, double from tier 3, triple
+## from tier 6. HARD-CAPPED at 3 lifts in code — a quad-pump is thumb mush (Tim 2026-07-18);
+## past ×3 the cadence and speed axes carry the difficulty alone.
+@export var rush_momentum_vent_lifts_step_tiers: int = 3  # feel-tune
 
 ## Max gap between gesture beats — finger-up time before the re-press must land (seconds).
 @export var rush_momentum_vent_gap_max: float = 0.40  # feel-tune
@@ -293,27 +327,30 @@ extends Resource
 @export var rush_momentum_vent_tap_max: float = 0.25  # feel-tune
 
 ## Heat vented on a successful gesture (clamped so venting keeps you IN Critical, never below).
-@export var rush_momentum_vent_heat_drop: float = 0.15  # feel-tune
+## Retuned 0.15 → 0.06 for the endless model: smaller than the heat built between checks, so
+## the bar CREEPS TOWARD THE CEILING as tiers deepen — deep runs visibly ride just under the
+## backstop (drama AND pay: the Critical bonus scales with how high the bar sits). A success
+## additionally clamps heat down just enough that the next window always fits (see
+## RushMomentumState._succeed_vent — the telegraph guarantee's other half).
+@export var rush_momentum_vent_heat_drop: float = 0.06  # feel-tune
 
-## Bonus added to the ladder's peak per successful vent (0.45 = +45 percentage points).
-## Retuned 0.20 → 0.45 (see the block comment above): the peak is only ever tasted for
-## seconds at the very top of a ride, so it must tower for the AVERAGE to reach the target.
-@export var rush_momentum_vent_bonus_step: float = 0.45  # feel-tune
-
-## Ratchet cap: successful vents per excursion. At the cap the windows stop arriving (nothing
-## left to earn) and the ride continues to the hard ceiling. Retuned 3 → 4: the deep rungs
-## are where the skill gap pays (a sloppy venter rarely survives four checks in a row).
-@export var rush_momentum_vent_max_tiers: int = 4  # feel-tune
-
-## First vent tier whose windows demand the ×2 double-release gesture (a window opening while
-## vent_tier() >= this asks for two lifts). 1 = the first vent is always the easy single.
-@export var rush_momentum_vent_double_from_tier: int = 1  # feel-tune
+## Bonus added to the ladder's peak per successful vent (0.60 = +60 percentage points), with
+## NO cap — the difficulty curve is the brake, not the reward curve (Tim 2026-07-18). The peak
+## is only ever tasted near the top of a deep ride, so it must tower for the AVERAGE to reach
+## the target (a median skilled run tops out around +55% + 8 × 60% = +535% peak, held for
+## seconds; the honest long-session average is the +71% the sim measures).
+@export var rush_momentum_vent_bonus_step: float = 0.60  # feel-tune
 
 ## Extra re-arm seconds per achieved vent tier when an excursion overheats — falling from
 ## higher hurts more. Applied BEFORE the Rapid Restart lockout scale (which divides the total).
-## Retuned 1.0 → 3.0 (see the block comment above): with the taller ladder paying so much,
-## the fall from it has to genuinely hurt or a sloppy rider still out-earns cruise.
+## With the taller ladder paying so much, the fall from it has to genuinely hurt or a sloppy
+## rider still out-earns cruise.
 @export var rush_momentum_vent_fail_rearm_per_tier: float = 3.0  # feel-tune
+
+## Cap on the per-tier re-arm sting (seconds). Deep runs must NOT earn ever-longer timeouts —
+## Tim's direction (2026-07-18) is that failure pressure comes from the difficulty curve, not
+## the punishment; past this the fall costs the same no matter how high it was from.
+@export var rush_momentum_vent_fail_rearm_cap: float = 9.0  # feel-tune
 
 ## Heat drained per second while OVERHEATED (the locked cooldown). 0.16 ≈ a 10 s lockout from a
 ## full 1.6 ceiling; the visibly draining bar is the cooldown display.

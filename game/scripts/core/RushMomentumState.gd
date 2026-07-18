@@ -40,21 +40,26 @@ class_name RushMomentumState
 # visible HARD CEILING remains purely as the "you ignored everything" backstop, and the first
 # window's roll is clamped so it always fully fits before heat could reach that ceiling.
 #
-# The reward ladder: the Critical segment's peak (reached at the hard ceiling) starts at
-# bonus_peak (+55%) and each successful vent adds vent_bonus_step, up to vent_max_tiers rungs
-# (+45% per rung to a +235% tier-4 cap with the defaults — retuned taller than the plan's
-# first cut to hit its own duty-cycle targets; see TuningConfig's vent-window block comment).
-# From vent_double_from_tier onward the windows demand the ×2 gesture AND tighten by
-# vent_window_tighten per tier — risk, reward, and skill all escalate together while the
-# first vent stays approachable.
+# The reward ladder is ENDLESS (Tim 2026-07-18, superseding the old 4-tier cap): the Critical
+# segment's peak (reached at the hard ceiling) starts at bonus_peak (+55%) and each successful
+# vent adds vent_bonus_step, with NO cap. The DIFFICULTY CURVE replaces the cap as the run's
+# ending — per tier, three axes escalate (all knobs): the arrival delay decays geometrically
+# (vent_delay_decay, floored at vent_delay_floor), the window duration decays
+# (vent_duration_decay, floored at vent_duration_floor), and the demanded lifts step up
+# 1 → 2 → 3 (one more every vent_lifts_step_tiers tiers, hard-capped at MAX_VENT_LIFTS).
+# Even perfect-looking play compounds away eventually — every overdrive run ends in flames,
+# and the question is how high you got. The first vent stays approachable regardless.
 #
 # Overheating is the severe outcome (Tim: "more severe than waiting for a full cooldown"):
 # the bonus drops to 0, rushing is disabled, heat drains to zero at a separate locked-drain
 # rate (the visibly draining bar IS the cooldown display), and then a short re-arm delay adds
 # the extra sting before rushing re-enables. Falling from higher hurts more: the re-arm gains
-# vent_fail_rearm_per_tier extra seconds per vent tier achieved this excursion. Releasing
+# vent_fail_rearm_per_tier extra seconds per vent tier achieved this excursion — but the sting
+# is capped at vent_fail_rearm_cap, because on the endless ladder the failure pressure must
+# come from the difficulty curve, not ever-longer timeouts (Tim 2026-07-18). Releasing
 # NORMALLY just bleeds heat back down through the bands — and ends the excursion, clearing the
-# vent ladder and any pending window (the gamble is always a fresh choice).
+# vent ladder and any pending window (the gamble is always a fresh choice, and bailing out
+# with the cash already banked is the endless ladder's legitimate cash-out move).
 #
 # CRUISE CONTROL amendment (Tim 2026-07-16; design of record: Plans/Rush_Cruise_Control.md):
 # holding rush is SAFE FOREVER by default. Without overdrive engaged, heat climbs normally but
@@ -76,16 +81,19 @@ enum Band { BUILDING, HOT, CRITICAL }
 
 ## Where the vent-gesture judge is within the current OPEN window. Never a timed state on its
 ## own — the phase only changes on press/release edges, and the tick merely polices how long
-## the current phase has lasted against the gap/tap tolerances.
+## the current phase has lasted against the gap/tap tolerances. The same three phases judge
+## every gesture length: an N-lift gesture is just N trips through GAP, with a TAP between
+## each pair (release → [tap →] ... → re-hold).
 enum VentPhase {
 	WAITING_FOR_LIFT,  # finger down; the gesture starts with its first release
 	GAP,               # finger up; must re-press within vent_gap_max
-	TAP,               # finger down on the ×2 gesture's middle tap; must release within vent_tap_max
+	TAP,               # finger down on an intermediate tap; must release within vent_tap_max
 }
 
-## The window duration can tighten per achieved tier, but never below this floor — a window
-## shorter than half a second stops being a skill check and becomes a reflex lottery.
-const VENT_WINDOW_DURATION_FLOOR := 0.5
+## The most lifts a window can ever demand, no matter how deep the tier: a quad-pump is thumb
+## mush (Tim 2026-07-18), so past ×3 the cadence and duration axes carry the difficulty alone.
+## The UI's pip display renders up to this many beats — raising it is a UI change too.
+const MAX_VENT_LIFTS := 3
 
 ## Fired on UPWARD band crossings only (BUILDING→HOT, HOT→CRITICAL) — the UI reacts per band
 ## (currently only CRITICAL pops a tier chip; HOT is announced by the fill alone).
@@ -165,8 +173,9 @@ var _was_rushing: bool = false
 
 # --- Vent-window state (all cleared on overheat, reset, and release-disengage) ---
 
-## Successful vents THIS excursion (0 .. vent_max_tiers). Each tier raises the Critical
-## segment's peak bonus by vent_bonus_step — see current_peak_bonus().
+## Successful vents THIS excursion — UNBOUNDED (the endless ladder). Each tier raises the
+## Critical segment's peak bonus by vent_bonus_step (see current_peak_bonus()) and escalates
+## the next window's cadence, duration, and demanded lifts.
 var _vent_tier: int = 0
 
 ## True while a vent window is OPEN (the gesture clock is running).
@@ -175,7 +184,7 @@ var _window_open: bool = false
 ## Seconds left in the open window. The gesture must COMPLETE before this hits zero.
 var _window_remaining: float = 0.0
 
-## Lifts the open window demands: 1 (single feather) or 2 (double release). Stale when closed.
+## Lifts the open window demands: 1 (single feather) .. MAX_VENT_LIFTS. Stale when closed.
 var _window_required_lifts: int = 1
 
 ## Completed lift beats so far in the open window's gesture.
@@ -313,24 +322,27 @@ func _tick_vent_windows(delta: float) -> void:
 			_open_window()
 		return
 
-	# Nothing open, nothing pending: schedule the next check — but only inside Critical, and
-	# only while the ladder has rungs left. At the tier cap the windows simply stop arriving
-	# (nothing left to earn); the ride continues to the hard ceiling, so a capped rider's only
-	# exit is releasing (forfeit the ladder) or the backstop overheat.
-	if current_band() == Band.CRITICAL and _vent_tier < tuning.rush_momentum_vent_max_tiers:
+	# Nothing open, nothing pending: schedule the next check — inside Critical the windows
+	# NEVER stop arriving (the endless ladder). The run ends when a check is finally missed,
+	# or when the player releases to cash out.
+	if current_band() == Band.CRITICAL:
 		_schedule_next_window()
 
 
 ## Roll the next window's arrival delay. The roll is the design's whole unpredictability — the
-## overheat OUTCOME is player-owned, only the check's TIMING is random.
+## overheat OUTCOME is player-owned, only the check's TIMING is random. Per tier the rolled
+## delay decays geometrically (escalation axis 1: more checks, faster), floored at delay_floor.
 func _schedule_next_window() -> void:
 	var delay := rng.randf_range(tuning.rush_momentum_vent_window_delay_min,
 			tuning.rush_momentum_vent_window_delay_max)
+	delay = maxf(delay * pow(tuning.rush_momentum_vent_delay_decay, _vent_tier),
+			tuning.rush_momentum_vent_delay_floor)
 	# TELEGRAPH GUARANTEE (Plans/Overdrive_Vent_Windows.md): a window must always OPEN — with
 	# its full duration still ahead — before heat could climb to the hard ceiling, or the
-	# backstop could kill a rider who was never given a check. Clamp the rolled delay so the
+	# backstop could kill a rider who was never given a check. Clamp the escalated delay so the
 	# whole window fits before the projected ceiling arrival at the overdrive build rate
-	# (floored at 0 = open next tick, which trumps even delay_min: fairness beats pacing).
+	# (floored at 0 = open next tick, which trumps even the cadence floor: fairness beats
+	# pacing). _succeed_vent guarantees the clamp always has room to work — see its heat clamp.
 	var build_rate := tuning.rush_momentum_heat_build_hot_per_second
 	if build_rate > 0.0:
 		var seconds_to_ceiling := (tuning.rush_momentum_hard_ceiling - heat) / build_rate
@@ -339,12 +351,21 @@ func _schedule_next_window() -> void:
 	_window_arrival_remaining = delay
 
 
-## How long the NEXT window will stay open: the base duration, tightened per achieved tier
-## (the deeper the ladder, the sharper the check), floored so it stays humanly possible.
+## How long the NEXT window will stay open: the base duration decayed per achieved tier
+## (escalation axis 2: less time per check, geometrically), floored at duration_floor.
 func _next_window_duration() -> float:
 	return maxf(tuning.rush_momentum_vent_window_duration
-			- _vent_tier * tuning.rush_momentum_vent_window_tighten,
-			VENT_WINDOW_DURATION_FLOOR)
+			* pow(tuning.rush_momentum_vent_duration_decay, _vent_tier),
+			tuning.rush_momentum_vent_duration_floor)
+
+
+## Lifts the NEXT window will demand (escalation axis 3: a more complex gesture): one more
+## every lifts_step_tiers tiers, hard-capped at MAX_VENT_LIFTS. The step knob is guarded to at
+## least 1 so a hand-poked 0 can never divide by zero (it would just demand the cap instantly).
+func _next_window_required_lifts() -> int:
+	var step := maxi(tuning.rush_momentum_vent_lifts_step_tiers, 1)
+	# GDScript's int / int truncates, which is exactly the "+1 every N tiers" stair-step.
+	return mini(1 + _vent_tier / step, MAX_VENT_LIFTS)
 
 
 ## A pending window's arrival delay just elapsed: open it and arm the gesture judge.
@@ -352,9 +373,9 @@ func _open_window() -> void:
 	_window_pending = false
 	_window_open = true
 	_window_remaining = _next_window_duration()
-	# The gesture escalates with the ladder: early tiers demand the approachable single
-	# feather; from vent_double_from_tier onward, Tim's double release.
-	_window_required_lifts = 1 if _vent_tier < tuning.rush_momentum_vent_double_from_tier else 2
+	# The gesture escalates with the ladder: the approachable single feather early, Tim's
+	# double release deeper, the triple pump deepest (capped there — see MAX_VENT_LIFTS).
+	_window_required_lifts = _next_window_required_lifts()
 	_window_lifts_done = 0
 	# Seed the judge from the live button state: mid-hold (the normal case) the gesture starts
 	# with its first release; if the finger happens to be up already, that release has in
@@ -380,7 +401,8 @@ func notify_rush_pressed() -> void:
 			if _window_lifts_done >= _window_required_lifts:
 				_succeed_vent()
 			else:
-				# The ×2 gesture's middle tap has begun: this press must stay short.
+				# More lifts still owed, so this press is an intermediate tap (the ×2 gesture
+				# has one, the ×3 gesture two): it must stay short or it reads as a re-hold.
 				_vent_phase = VentPhase.TAP
 				_phase_elapsed = 0.0
 		_:
@@ -399,8 +421,8 @@ func notify_rush_released() -> void:
 			_vent_phase = VentPhase.GAP
 			_phase_elapsed = 0.0
 		VentPhase.TAP:
-			# The middle tap ended in time (a long hold would have missed on a tick already);
-			# the second gap clock starts.
+			# The intermediate tap ended in time (a long hold would have missed on a tick
+			# already); the next gap clock starts.
 			_vent_phase = VentPhase.GAP
 			_phase_elapsed = 0.0
 		_:
@@ -414,7 +436,21 @@ func _succeed_vent() -> void:
 	# the reward for the check is the ratchet, not an exit from danger — clamping at
 	# critical_start keeps the ride hot and the next window meaningful.
 	heat = maxf(heat - tuning.rush_momentum_vent_heat_drop, tuning.rush_momentum_critical_start)
-	_vent_tier = mini(_vent_tier + 1, tuning.rush_momentum_vent_max_tiers)
+	_vent_tier += 1  # UNBOUNDED — the endless ladder's whole point (Tim 2026-07-18)
+	# TELEGRAPH GUARANTEE, success half: with a small heat_drop the bar rides ever closer to
+	# the ceiling, and the scheduler's delay clamp alone cannot save a rider whose heat is
+	# ALREADY too high for the next window to fit even at delay 0. So a success also vents
+	# whatever extra heat is needed for the next (escalated) window to fully fit at the
+	# overdrive build rate — an adaptive top-off that only bites near the ceiling, where it
+	# reads as "the vent bought you exactly one more check," which is precisely the design.
+	# The reserve includes the cadence floor's worth of build on top of the window itself:
+	# scheduling and opening are quantized to ticks, so without that cushion a fast build rate
+	# can strand the rider a tick or two above the fit bound (sim section 19's ×2-build combo).
+	var build_rate := tuning.rush_momentum_heat_build_hot_per_second
+	if build_rate > 0.0:
+		var next_window_fits_below := tuning.rush_momentum_hard_ceiling \
+				- (_next_window_duration() + tuning.rush_momentum_vent_delay_floor) * build_rate
+		heat = minf(heat, maxf(next_window_fits_below, tuning.rush_momentum_critical_start))
 	_window_open = false
 	_window_lifts_done = 0
 	bonus = _bonus_for_heat(heat)
@@ -481,8 +517,11 @@ func _begin_overheat() -> void:
 	_locked_out = true
 	_rearming = false
 	# Capture the ladder's re-arm sting BEFORE clearing it — the re-arm delay is not computed
-	# until the drain finishes (see _tick_lockout), by which time the tier is gone.
-	_rearm_tier_sting = tuning.rush_momentum_vent_fail_rearm_per_tier * _vent_tier
+	# until the drain finishes (see _tick_lockout), by which time the tier is gone. The sting
+	# is CAPPED: on the endless ladder, failure pressure comes from the difficulty curve, not
+	# from ever-longer timeouts (Tim 2026-07-18).
+	_rearm_tier_sting = minf(tuning.rush_momentum_vent_fail_rearm_per_tier * _vent_tier,
+			tuning.rush_momentum_vent_fail_rearm_cap)
 	_clear_vent_state()
 	# The gamble ended (badly) — the next rush hold after the lockout starts back in cruise mode.
 	_overdrive_engaged = false
@@ -518,8 +557,8 @@ func _bonus_for_heat(current_heat: float) -> float:
 
 
 ## The bonus at the hard ceiling with the CURRENT vent tier: the top of the reward ladder the
-## bar and chip quote (base peak +55%, each vent adds vent_bonus_step — +235% at the tier-4
-## cap with the defaults).
+## bar and chip quote (base peak +55%, each vent adds vent_bonus_step, UNBOUNDED — the
+## difficulty curve is the brake, not the reward curve).
 func current_peak_bonus() -> float:
 	return tuning.rush_momentum_bonus_peak + _vent_tier * tuning.rush_momentum_vent_bonus_step
 
@@ -577,12 +616,13 @@ func vent_window_remaining() -> float:
 	return _window_remaining if _window_open else 0.0
 
 
-## Lifts the OPEN window demands (1 or 2). Only meaningful while is_vent_window_open().
+## Lifts the OPEN window demands (1 .. MAX_VENT_LIFTS). Only meaningful while
+## is_vent_window_open().
 func vent_required_lifts() -> int:
 	return _window_required_lifts
 
 
-## Successful vents this excursion (0 .. vent_max_tiers) — the bonus ladder's current rung.
+## Successful vents this excursion (unbounded) — the bonus ladder's current rung.
 func vent_tier() -> int:
 	return _vent_tier
 

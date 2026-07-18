@@ -39,13 +39,16 @@ extends HBoxContainer
 #     bar on the track marks the cruise point itself.
 #   • Once overdrive engages, everything above presents exactly as shipped.
 #
-# Vent Windows (Plans/Overdrive_Vent_Windows.md, Tim 2026-07-17) add the telegraph + feedback
-# layer on top: when the core opens a vent window this bar pops a HELD-OPEN gold "VENT!" /
-# "VENT ×2!" chip with large gesture pips (one per demanded lift, filling as the lifts land)
-# and a thin draining countdown bar; success swaps it for a green "VENTED — PEAK +X%!" chip
-# plus the ready-style white flash; a miss flashes the UNFINISHED pips red so the player can
-# see exactly which beat was blown before the overheat presentation lands (the plan's rule:
-# miss-feedback is what makes a skill mechanic learnable).
+# Vent Windows (Plans/Overdrive_Vent_Windows.md, Tim 2026-07-17; endless escalation rework
+# Tim 2026-07-18) add the telegraph + feedback layer on top: when the core opens a vent window
+# this bar pops a HELD-OPEN gold "VENT!" / "VENT ×2!" / "VENT ×3!" chip with large gesture pips
+# (one per demanded lift, filling as the lifts land) and a thin draining countdown bar; success
+# swaps it for a green "VENTED — PEAK +X%!" chip plus the ready-style white flash; a miss
+# flashes the UNFINISHED pips red so the player can see exactly which beat was blown before the
+# overheat presentation lands (the plan's rule: miss-feedback is what makes a skill mechanic
+# learnable). The windows NEVER stop: there is no tier cap, every success ratchets the bonus
+# AND the difficulty (faster cadence, shorter windows, up to three lifts), and the run ends on
+# the miss — how high the peak climbed IS the score, so the chip's "+X%" can grow without bound.
 
 ## The player tapped OVERDRIVE: release the cruise clamp for this excursion. Main routes this
 ## to GameState.engage_rush_overdrive() — the same seam as FrenzyBar.pop_requested.
@@ -88,8 +91,9 @@ var _vent_pips: VentPipRow
 ## the window's resolution decides how it ends). _process drives the countdown while true.
 var _vent_chip_active := false
 ## The open window's telegraphed duration (s), for the countdown fraction. Taken from the
-## vent_window_opened signal rather than the tuning knob, because the core TIGHTENS windows
-## per achieved tier — the chip must drain over the window's REAL length.
+## vent_window_opened signal rather than the tuning knob, because the core SHRINKS windows
+## per achieved tier (the endless escalation's speed axis) — the chip must drain over the
+## window's REAL length.
 var _vent_window_duration := 1.0
 
 ## Full-rect white flash played when rush re-arms — re-availability must be unmissable
@@ -526,14 +530,16 @@ func _on_rush_ready() -> void:
 ## bright MUSTARD_GOLD with NAVY text: gold is the "act now" family here, deliberately apart
 ## from teal (cruise/calm) and red (critical/failure), and navy-on-gold is the standard
 ## action-button pairing, so the chip reads as "DO the thing" at a glance. The pips beneath
-## show the demanded lifts (1 or 2) with the countdown bar under them.
+## show the demanded lifts (1 to 3 — the escalation's complexity axis) with the countdown bar
+## under them.
 func _on_vent_window_opened(required_lifts: int, duration: float) -> void:
 	_vent_window_duration = maxf(duration, 0.001)
 	_vent_chip_active = true
 	_vent_pips.show_window(required_lifts)
-	_show_tier_chip_held(
-			"VENT ×2!" if required_lifts >= 2 else "VENT!",
-			UiPalette.MUSTARD_GOLD, UiPalette.NAVY)
+	# A single lift is plain "VENT!"; deeper tiers name their count ("VENT ×2!", "VENT ×3!") —
+	# the count in the text matches the pip count, so the demand reads two ways at once.
+	var chip_text := "VENT!" if required_lifts <= 1 else "VENT ×%d!" % required_lifts
+	_show_tier_chip_held(chip_text, UiPalette.MUSTARD_GOLD, UiPalette.NAVY)
 	_vibrate(_tuning.rush_momentum_haptic_vent_ms)
 
 
@@ -777,6 +783,10 @@ class BandZoneOverlay extends Control:
 class VentPipRow extends Control:
 	## Pip geometry — sized for at-a-glance legibility beside the FONT_HEADLINE chip text
 	## (Tim's vision, §1b: these are read mid-gesture with about a second on the clock).
+	## Checked for the endless rework's 3-lift maximum: three pips draw 192px wide
+	## (2 × spacing + one diameter), narrower than the "VENT ×3!" headline text above them,
+	## so the chip's plate is sized by the text either way and the pips never crowd or
+	## overflow it — no size change was needed for the third pip.
 	const PIP_RADIUS := 24.0
 	const PIP_SPACING := 72.0    # center-to-center
 	const PIP_OUTLINE := 5.0

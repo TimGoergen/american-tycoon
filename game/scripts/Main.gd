@@ -669,6 +669,8 @@ func _build_property_tab() -> Control:
 		row.tap_requested.connect(_on_tap_requested)
 		row.hold_rush_requested.connect(_on_hold_rush_requested)
 		row.rush_hold_released.connect(_on_rush_hold_released)
+		row.rush_pressed.connect(_on_rush_pressed)
+		row.rush_released.connect(_on_rush_released)
 		row.hire_requested.connect(_on_hire_requested)
 		row.set_buy_mode(_buy_mode)
 		ladder.add_child(row)
@@ -1333,6 +1335,18 @@ func _on_hold_rush_requested(prop_index: int) -> void:
 ## pulse-bridging grace ride for another half second after the finger lifts (Tim 2026-07-15).
 func _on_rush_hold_released(prop_index: int) -> void:
 	game.release_rush(prop_index)
+
+
+## Raw finger-down/finger-up edges on a row's rush control, forwarded verbatim for the
+## Overdrive Vent Window gesture reader (Plans/Overdrive_Vent_Windows.md). GameState routes
+## them to RushMomentumState, which only interprets them while a vent window is open on the
+## overdriven property — outside a window they are inert, so plain rush taps stay plain.
+func _on_rush_pressed(prop_index: int) -> void:
+	game.notify_rush_pressed(prop_index)
+
+
+func _on_rush_released(prop_index: int) -> void:
+	game.notify_rush_released(prop_index)
 
 
 ## Player pressed a row's staff button: buy the next rung of that property's sequential

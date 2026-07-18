@@ -145,6 +145,30 @@ the same pattern).
 - Whether VENT ×2 deserves a distinct haptic signature (double-pulse) — new knob if so.
 - Whether the +115% cap should scale with epoch depth — parked, revisit with Late Epoch Sinks.
 
+## Sim retune addendum (2026-07-17, build session — AWAITING TIM'S VETO)
+
+The autopilot found the plan's first-cut knobs **cannot hit the plan's own targets**: with a
++115% tier-3 top, a skilled venter averages only ~+45–50% — climb time and occasional lockouts
+dilute the average no matter how well you play. Hitting the +60–80% skilled target required a
+**taller, faster, harsher** ladder, shipped as the new defaults:
+
+| Knob | Plan first-cut | Shipped default |
+|---|---|---|
+| `vent_window_delay_min/max` | 2.0 / 4.0 | **0.8 / 1.6** (a check ~every 1.2 s in Critical) |
+| `vent_bonus_step` | 0.20 | **0.45** |
+| `vent_max_tiers` | 3 | **4** |
+| `vent_fail_rearm_per_tier` | 1.0 | **3.0** |
+
+Ladder peaks are now **+55% → +100% → +145% → +190% → +235%** (was +55…+115%). Measured duty
+cycle: cruise +24.9%, **skilled (95%) +61.9%**, **sloppy (70%) +24.2%** — both targets hit
+(old pre-vent skilled rhythm: +34.8%). Also: the sloppy model only lands below cruise because
+the *bail decision* at the tier cap is judged at the same reliability as the gestures —
+knowing when to let go is itself a skill moment.
+
+**Tim's choice:** accept the tall ladder (+235% top, checks every ~1.2 s — an intense minigame),
+or revert to plan-faithful knobs and accept a ~+45% skilled average. Both are two knob edits in
+Balance Tuning; the cadence is equally a device-feel question.
+
 ## Decision log
 
 - Overdrive must be skill-based with larger risk and reward; cruise keeps the safe floor

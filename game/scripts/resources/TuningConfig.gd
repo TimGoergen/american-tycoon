@@ -199,10 +199,14 @@ extends Resource
 # --- Rush Momentum / Overheat (Tim 2026-07-15; design: Plans/Rush_Overheat.md) ---
 # Rushing heats the property up — heat IS the momentum meter, in HEAT UNITS where 1.0 = the old
 # momentum cap = the Hot band's lower edge. Deeper heat pays a bigger property-income bonus but
-# risks an overheat shutdown at a secretly rolled ceiling. See RushMomentumState for the model.
+# risks an overheat shutdown. See RushMomentumState for the model. Since Vent Windows
+# (Plans/Overdrive_Vent_Windows.md) the overheat point is no longer a secret roll — a fixed
+# hard ceiling backstops a chain of telegraphed vent-gesture skill checks (knobs below).
 # NOTE: the old bonus-fraction knobs (rush_momentum_max_bonus / _build_per_second /
 # _bleed_per_second) were deliberately RENAMED rather than reused, so a stale user override
 # saved in the old bonus-fraction units can never silently poison the new heat-unit semantics.
+# The old rush_momentum_ceiling_min/_max knobs (the retired random ceiling) were REMOVED for
+# the same reason — nothing may quietly re-inject the slot-machine ceiling.
 
 ## How fast heat climbs while actively rushing, in heat units per second
 ## (0.167 ≈ 6 s from cold to the Hot edge — matching the old build feel).
@@ -210,8 +214,8 @@ extends Resource
 
 ## How fast heat climbs while rushing ABOVE the Hot edge (heat 1.0), in heat units per second.
 ## Slower than the base build so the ride through the danger bands is a real decision window:
-## 0.075 stretches the climb from the Hot edge to the rolled ceiling (0.40–0.60 units) to
-## ~5.3–8 s (Tim 2026-07-15: "at least 5 to 8 seconds in the high heat zone").
+## 0.075 stretches the climb from the Hot edge to the hard ceiling (0.60 units) to ~8 s
+## (Tim 2026-07-15: "at least 5 to 8 seconds in the high heat zone").
 @export var rush_momentum_heat_build_hot_per_second: float = 0.075  # feel-tune
 
 ## How fast heat bleeds away when NOT rushing, in heat units per second
@@ -219,15 +223,14 @@ extends Resource
 @export var rush_momentum_heat_bleed_per_second: float = 0.333  # feel-tune
 
 ## Heat at which the Critical band (warning 2) begins. The Hot band spans 1.0 to here, and its
-## width is GUARANTEED safe — the random ceiling can never land inside it.
+## width is GUARANTEED safe — no vent window or overheat can ever land inside it.
 @export var rush_momentum_critical_start: float = 1.25  # feel-tune
 
-## Lowest possible overheat ceiling (rolled per excursion). Being above critical_start guarantees
-## a minimum stretch of Critical before the earliest possible shutdown — the anti-frustration floor.
-@export var rush_momentum_ceiling_min: float = 1.40  # feel-tune
-
-## Highest possible overheat ceiling, and the heat at which the bonus reaches its peak.
-@export var rush_momentum_ceiling_max: float = 1.60  # feel-tune
+## The FIXED overheat ceiling — the visible end of the bar and the "you ignored everything"
+## backstop (Plans/Overdrive_Vent_Windows.md). Also the heat at which the bonus reaches the
+## vent ladder's current peak. Replaces the retired random ceiling roll: unpredictability now
+## lives in the vent windows' arrival times, never in the shutdown point itself.
+@export var rush_momentum_hard_ceiling: float = 1.60  # feel-tune
 
 ## The sustainable "cruise" bonus while holding rush WITHOUT overdrive engaged (0.25 = +25%).
 ## Heat clamps at the matching point on the Building band and can never overheat there — the
@@ -242,9 +245,75 @@ extends Resource
 ## Bonus at the Critical edge (heat = critical_start).
 @export var rush_momentum_bonus_at_critical: float = 0.40  # feel-tune
 
-## Bonus at the maximum possible heat (ceiling_max). Only ever held for seconds at a time —
-## the realistic average is the ride/vent duty cycle, well below this peak.
+## Bonus at the hard ceiling with NO vents achieved — the ladder's tier-0 peak. Each successful
+## vent adds rush_momentum_vent_bonus_step on top (+235% at the tier-4 cap with the defaults).
+## Only ever held for seconds at a time — the realistic average is the ride/vent duty cycle
+## (~+62% for a skilled venter; see the vent-window block comment below).
 @export var rush_momentum_bonus_peak: float = 0.55  # feel-tune
+
+# --- Vent windows (Tim 2026-07-17; design: Plans/Overdrive_Vent_Windows.md) ---
+# While riding Critical with overdrive engaged, telegraphed vent windows periodically demand a
+# gesture on the rushed property's button: VENT = one lift (release → re-press), VENT ×2 = the
+# double release (lift → tap → re-hold). Success vents heat and ratchets the bonus ladder up a
+# rung; a miss (or reaching the hard ceiling) is a full overheat. Gesture tolerances are
+# deliberately sloppy-thumb generous — thumbs on glass are the real calibration, not the sim.
+#
+# RETUNED FROM THE PLAN'S FIRST CUT (sim section 20's duty-cycle measurement, 2026-07-17):
+# the plan's targets — a skilled venter (95% gestures) averaging ~+60-80% while a sloppy one
+# (70%) lands at or below cruise — are NOT reachable with the first-cut knobs (skilled topped
+# out ~+45-50%, because climbs and lockouts dilute the average no matter the play). Hitting
+# both targets needed a faster window cadence, a taller ladder, and a harsher per-tier sting
+# (final: delay 0.8-1.6, step 0.45, 4 tiers, sting 3.0 → skilled +62%, sloppy +24%, cruise
+# +25%). The tall ladder (+235% at the tier-4 cap, vs the plan's +115% at tier 3) is the
+# price of the +60-80% average — FLAGGED for Tim's veto; every knob is live in Balance Tuning.
+
+## Earliest a vent window can arrive after entering Critical / after a vent (seconds).
+## Retuned 2.0 → 0.8 (see the block comment above): the brisk cadence is what lets a skilled
+## rider climb the ladder fast enough to matter, and makes a sloppy rider's fumbles frequent
+## enough that the risk stays real.
+@export var rush_momentum_vent_window_delay_min: float = 0.8  # feel-tune
+
+## Latest arrival (seconds) — the rolled unpredictability. The roll is clamped so the first
+## window always fully fits before heat could reach the hard ceiling (the telegraph guarantee).
+## Retuned 4.0 → 1.6, paired with delay_min above.
+@export var rush_momentum_vent_window_delay_max: float = 1.6  # feel-tune
+
+## Seconds the player has to COMPLETE the gesture once a window telegraphs.
+@export var rush_momentum_vent_window_duration: float = 1.0  # feel-tune
+
+## Duration shaved off the window per achieved vent tier (seconds; floored at 0.5 s in code) —
+## the timing pressure that escalates alongside the reward ladder.
+@export var rush_momentum_vent_window_tighten: float = 0.10  # feel-tune
+
+## Max gap between gesture beats — finger-up time before the re-press must land (seconds).
+@export var rush_momentum_vent_gap_max: float = 0.40  # feel-tune
+
+## Max press length that still counts as the ×2 gesture's middle tap (seconds); a longer hold
+## is a fumbled re-hold, which misses the window.
+@export var rush_momentum_vent_tap_max: float = 0.25  # feel-tune
+
+## Heat vented on a successful gesture (clamped so venting keeps you IN Critical, never below).
+@export var rush_momentum_vent_heat_drop: float = 0.15  # feel-tune
+
+## Bonus added to the ladder's peak per successful vent (0.45 = +45 percentage points).
+## Retuned 0.20 → 0.45 (see the block comment above): the peak is only ever tasted for
+## seconds at the very top of a ride, so it must tower for the AVERAGE to reach the target.
+@export var rush_momentum_vent_bonus_step: float = 0.45  # feel-tune
+
+## Ratchet cap: successful vents per excursion. At the cap the windows stop arriving (nothing
+## left to earn) and the ride continues to the hard ceiling. Retuned 3 → 4: the deep rungs
+## are where the skill gap pays (a sloppy venter rarely survives four checks in a row).
+@export var rush_momentum_vent_max_tiers: int = 4  # feel-tune
+
+## First vent tier whose windows demand the ×2 double-release gesture (a window opening while
+## vent_tier() >= this asks for two lifts). 1 = the first vent is always the easy single.
+@export var rush_momentum_vent_double_from_tier: int = 1  # feel-tune
+
+## Extra re-arm seconds per achieved vent tier when an excursion overheats — falling from
+## higher hurts more. Applied BEFORE the Rapid Restart lockout scale (which divides the total).
+## Retuned 1.0 → 3.0 (see the block comment above): with the taller ladder paying so much,
+## the fall from it has to genuinely hurt or a sloppy rider still out-earns cruise.
+@export var rush_momentum_vent_fail_rearm_per_tier: float = 3.0  # feel-tune
 
 ## Heat drained per second while OVERHEATED (the locked cooldown). 0.16 ≈ a 10 s lockout from a
 ## full 1.6 ceiling; the visibly draining bar is the cooldown display.
@@ -266,6 +335,10 @@ extends Resource
 @export var rush_momentum_haptic_critical_ms: float = 60.0  # feel-tune
 @export var rush_momentum_haptic_overheat_ms: float = 200.0  # feel-tune
 @export var rush_momentum_haptic_ready_ms: float = 40.0  # feel-tune
+
+## The vent-window telegraph's own pulse — a beat longer than the Critical tap so "act NOW"
+## is distinguishable by feel alone with the eyes on the property row (plan follow-up item).
+@export var rush_momentum_haptic_vent_ms: float = 80.0  # feel-tune
 
 # --- Estate & tax (Spec §9) ---
 

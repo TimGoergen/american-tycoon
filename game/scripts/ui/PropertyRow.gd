@@ -20,6 +20,16 @@ signal hold_rush_requested(prop_index: int)
 ## building immediately instead of riding out the pulse-bridging grace window (Tim 2026-07-15:
 ## the momentum bar kept growing ~a second after release). Quick taps never fire this.
 signal rush_hold_released(prop_index: int)
+## RAW physical press/release edges on the rush control — the finger itself touching down and
+## lifting off, with no engage threshold, no pulse pacing, no tap-vs-hold interpretation.
+## These exist for the Overdrive Vent Window gesture reader (Plans/Overdrive_Vent_Windows.md):
+## the vent gesture is a precisely timed sequence of lifts and re-presses, so the core needs
+## the bare edges. They are ADDITIONAL, lower-level events — hold_rush_requested /
+## rush_hold_released above keep their exact shipped behaviour. Main routes these to
+## GameState.notify_rush_pressed/notify_rush_released; outside a vent window the core
+## ignores them, so they are inert in ordinary play. See _pump_rush_edges.
+signal rush_pressed(prop_index: int)
+signal rush_released(prop_index: int)
 ## The staff button was pressed. There is only ONE staff action now — buy the next rung of
 ## the property's sequential staff ladder (hiring a staffer IS level 1 of each 20-level
 ## block, GDD §6.1 epoch-depth redesign) — so the button needs no state dispatch.
@@ -33,7 +43,8 @@ var _frenzy: FrenzyState
 ## The shared Rush Momentum / heat state (Rush Overheat, Tim 2026-07-15). Read-only here: the row
 ## checks is_locked_out() so the portrait LOOKS disabled while rushing is shut down — the core
 ## already ignores rush requests during lockout, but an unresponsive live-looking button reads as
-## a bug, not a cooldown.
+## a bug, not a cooldown. Also read for is_vent_window_open(), which holds the rush presentation
+## up through the vent gesture's finger lifts (see _vent_presentation_hold).
 var _rush_momentum: RushMomentumState
 ## The generation's reached epoch — the highest staffer tier any property may be hired
 ## or upgraded to right now. Read live so the hire button unlocks the moment a new
@@ -180,8 +191,12 @@ const SOLID_FLOW_RUSH_MULT := 1.6
 var _was_pinned := false
 
 ## Seconds the rush has been continuously held (0 when not held) — gates the whole
-## rush presentation past RUSH_ENGAGE_SEC so taps don't flash it.
+## rush presentation past RUSH_ENGAGE_SEC so taps don't flash it. FROZEN (not reset) while a
+## vent window holds the presentation through the gesture's finger lifts — see _refresh.
 var _rush_hold_seconds := 0.0
+## The rush control's raw held state last frame (primary Button OR secondary finger), so
+## _pump_rush_edges can emit rush_pressed/rush_released exactly on the transitions.
+var _rush_button_was_down := false
 ## True once the current rush hold has fired at least one auto-rush pulse; drives the
 ## rush_hold_released signal on release (see _pump_held_rush).
 var _rush_hold_pulsed := false
@@ -564,6 +579,7 @@ func _process(delta: float) -> void:
 	if not _tab_active:
 		return  # a hidden tab: no refresh, no bar/bubble draw — the whole point of the pager
 	_refresh(delta)
+	_pump_rush_edges()
 	_pump_held_rush(delta)
 	_pump_held_buy(delta)
 	_pump_held_hire(delta)
@@ -651,6 +667,28 @@ func _secondary_held(control_id: String) -> bool:
 	return _secondary_targets.values().has(control_id)
 
 
+## Emit the raw rush_pressed/rush_released edge signals (the vent gesture's input — see the
+## signal comments). "Down" is the SAME truth the hold pump reads — the primary finger's
+## Button OR any secondary finger on the portrait — so the edges can never disagree with the
+## hold behaviour; polling it per frame costs at most one frame of latency (~16 ms), far
+## inside the gesture's 0.25–0.40 s tolerances. Deliberately NOT gated on is_cycle_running:
+## an unstaffed property's cycle stops for a few frames at every payout (the same flicker
+## documented in _refresh), and a vent re-press landing in that gap must still count as a
+## press. Owning zero units means the control can't rush at all, so those rows stay silent;
+## edges are otherwise always forwarded (even during lockout) — the core, not the view,
+## decides what a press means.
+func _pump_rush_edges() -> void:
+	var down: bool = _prop.units_owned > 0 \
+			and (_manager_circle.is_held() or _secondary_held("rush"))
+	if down == _rush_button_was_down:
+		return
+	_rush_button_was_down = down
+	if down:
+		rush_pressed.emit(prop_index)
+	else:
+		rush_released.emit(prop_index)
+
+
 ## Holding the start/rush button continually drives the property at the tuning
 ## hold rate (UI notes §2): an idle cycle is STARTED on the first held pulse,
 ## then a running cycle is RUSHED on every pulse after. Both are gated behind the
@@ -734,6 +772,23 @@ func is_hold_active() -> bool:
 	return _buy_hold_repeating or _hire_hold_repeating or _rush_hold_seconds >= RUSH_ENGAGE_SEC
 
 
+## True while the game's open vent window should hold THIS row's rush presentation up through
+## the gesture's finger lifts (Plans/Overdrive_Vent_Windows.md). Two conditions:
+##   • a vent window is open — read from the SHARED RushMomentumState the row already holds
+##     for the overheat-lockout look (the cleanest existing seam to the global rush state;
+##     no new setup parameter needed), and
+##   • this row was already presenting an ENGAGED rush (_rush_hold_seconds past
+##     RUSH_ENGAGE_SEC — the frozen counter, see _refresh).
+## The second condition is how the row knows the vent is ABOUT it without being told which
+## property overdrive rode in on: only the row whose hold built the heat can have an engaged
+## counter when a window opens; every other row's counter sits at 0. (Rushing two rows at once
+## can leave both engaged — both fingers are then mid-gesture, so holding both presentations
+## through the window is the honest read.)
+func _vent_presentation_hold() -> bool:
+	return _rush_momentum != null and _rush_momentum.is_vent_window_open() \
+			and _rush_hold_seconds >= RUSH_ENGAGE_SEC
+
+
 func _refresh(delta: float) -> void:
 	# Ladder visibility (Phase 3 tabs, Tim 2026-07-11): the pager (Main) groups properties into
 	# epoch tabs and shows one tab at a time, so within the ACTIVE tab every unlocked property is
@@ -797,9 +852,13 @@ func _refresh(delta: float) -> void:
 	var rush_locked := _rush_momentum != null and _rush_momentum.is_locked_out()
 	_manager_circle.modulate = Color(0.55, 0.55, 0.55) if rush_locked else Color.WHITE
 	# The infinity "rushing" icon shows whether the primary Button or a secondary finger holds it
-	# — hidden during lockout, when holding produces no rushes.
+	# — hidden during lockout, when holding produces no rushes. The vent presentation hold (see
+	# _vent_presentation_hold below) keeps it up through the vent gesture's finger lifts too:
+	# this reads LAST frame's _rush_hold_seconds (the current-frame update happens further down),
+	# which is exactly the frozen value the hold maintains, so the icon never flickers mid-vent.
 	var show_rush_icon := interactive and not rush_locked \
-			and (_manager_circle.is_held() or _secondary_held("rush"))
+			and (_manager_circle.is_held() or _secondary_held("rush")
+					or _vent_presentation_hold())
 	_manager_circle.set_state(
 		portrait_mode, config.accent_color, config.manager_portrait, show_rush_icon,
 		interactive, _prop.staff_level
@@ -849,7 +908,18 @@ func _refresh(delta: float) -> void:
 	# The ENGAGED flag: held long enough to count as a real hold (see RUSH_ENGAGE_SEC).
 	# Every rush-presentation element below keys off THIS, never the raw press, so a
 	# single tap changes nothing on screen (Tim, 2026-07-08).
-	_rush_hold_seconds = (_rush_hold_seconds + delta) if rush_held else 0.0
+	#
+	# Vent-window presentation hold (Plans/Overdrive_Vent_Windows.md — "the hold must not
+	# flicker"): the vent gesture demands lifting the finger mid-rush, and the game must never
+	# LOOK like it dropped the hold during those lifts. So while _vent_presentation_hold() is
+	# true the counter FREEZES at its held value instead of resetting — rush_engaged stays true,
+	# and with it every downstream rush visual (vivid fill color, boosted income readout, frenzy
+	# bubbles, the rushed sweep rate). Normal release behaviour resumes the instant the window
+	# resolves (success, miss, or overheat all close it).
+	if rush_held:
+		_rush_hold_seconds += delta
+	elif not _vent_presentation_hold():
+		_rush_hold_seconds = 0.0
 	var rush_engaged := _rush_hold_seconds >= RUSH_ENGAGE_SEC
 	# Deliberately NOT gated on is_cycle_running: an UNSTAFFED property's cycle stops the
 	# instant it pays out and only restarts on the next held-rush pulse, so gating on it

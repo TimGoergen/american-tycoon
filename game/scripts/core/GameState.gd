@@ -94,15 +94,24 @@ func tick(delta: float, extra_property_multiplier: float = 1.0) -> void:
 	# RushMomentumState). The bonus MAGNITUDE is global, but it is applied ONLY to the properties
 	# being actively rushed (Tim 2026-07-13) — via each property's own rush_momentum_factor below,
 	# NOT the whole-economy tick multiplier.
-	rush_momentum.tick(delta, _rush_grace_remaining > 0.0, frenzy.is_burning())
-	_rush_grace_remaining = maxf(_rush_grace_remaining - delta, 0.0)
+	# While a vent window is open, the gesture's lifts (finger deliberately OFF the button —
+	# Plans/Overdrive_Vent_Windows.md) must not read as "stopped rushing": the player still
+	# counts as rushing even with the grace expired, and the grace timers below are frozen so
+	# neither the global build nor the rushed property's factor can bleed mid-gesture. The
+	# window is at most ~1 s, so freezing the decay for its span is imperceptible elsewhere.
+	var vent_gesture_holding := rush_momentum.is_vent_window_open()
+	rush_momentum.tick(delta, _rush_grace_remaining > 0.0 or vent_gesture_holding,
+			frenzy.is_burning())
+	if not vent_gesture_holding:
+		_rush_grace_remaining = maxf(_rush_grace_remaining - delta, 0.0)
 	# Point each property's momentum factor at the current bonus while it is still inside its
 	# actively-rushed grace, else back to 1.0; then decay that grace so the boost fades a beat after
 	# the player stops rushing it. This is what confines momentum to the rushed property.
 	for prop_variant in economy.properties:
 		var p := prop_variant as PropertyState
 		p.rush_momentum_factor = rush_momentum.factor() if p.rush_active_grace > 0.0 else 1.0
-		p.rush_active_grace = maxf(p.rush_active_grace - delta, 0.0)
+		if not vent_gesture_holding:
+			p.rush_active_grace = maxf(p.rush_active_grace - delta, 0.0)
 	var tier_before := epoch.current_tier
 	economy.tick(delta, frenzy.get_multiplier() * extra_property_multiplier)
 	peak_net_worth = maxf(peak_net_worth, economy.get_net_worth())
@@ -213,6 +222,12 @@ func hold_rush_property(prop_index: int) -> void:
 ## 2026-07-15). So end this property's rushed state now, and stop the global build unless
 ## some OTHER property is still inside its own rushed grace (a second finger).
 func release_rush(prop_index: int) -> void:
+	# During an open vent window a lift is a GESTURE BEAT, not a quit (Plans/
+	# Overdrive_Vent_Windows.md): zeroing the graces here would drop the rushed property's
+	# factor and end the excursion mid-gesture. The judge in RushMomentumState decides how the
+	# window resolves; a real walk-away simply misses the window and overheats there.
+	if rush_momentum.is_vent_window_open():
+		return
 	var prop := economy.properties[prop_index] as PropertyState
 	prop.rush_active_grace = 0.0
 	prop.rush_momentum_factor = 1.0
@@ -230,6 +245,20 @@ func engage_rush_overdrive() -> void:
 	if not rush_momentum.can_rush():
 		return
 	rush_momentum.engage_overdrive()
+
+
+## Press edge on a property's rush button — the raw finger-down moment, forwarded to the vent
+## gesture judge (Plans/Overdrive_Vent_Windows.md). Only meaningful during an overdrive ride:
+## the core ignores edges when no vent window is open or pending, so ordinary rush taps are
+## unaffected. `prop_index` is accepted for symmetry with the other property verbs; the heat
+## model is global, so the judge does not need it (only one property rides overdrive at a time).
+func notify_rush_pressed(_prop_index: int) -> void:
+	rush_momentum.notify_rush_pressed()
+
+
+## Release edge on a property's rush button — the raw finger-up moment. See notify_rush_pressed.
+func notify_rush_released(_prop_index: int) -> void:
+	rush_momentum.notify_rush_released()
 
 
 ## Pop the frenzy meter if allowed. Returns true if a burn started.

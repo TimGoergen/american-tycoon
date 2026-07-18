@@ -8,16 +8,17 @@ extends HBoxContainer
 # the OVR button is the ONE tappable piece, enabled only mid-hold (see below).
 #
 # Overheat (Plans/Rush_Overheat.md) turned the old 0..cap meter into a push-your-luck heat
-# gauge, so the meter shows the FULL heat range 0..ceiling_max:
+# gauge, so the meter shows the FULL heat range 0..hard_ceiling:
 #   • a wide teal CRUISE bar marks the cruise point — everything left of it is safe;
 #   • from the cruise bar to the hazard zone the track is ONE continuous amber ramp in a single
 #     hue, deepening across its whole width, with NO internal tick lines (Tim 2026-07-16: one
 #     continuous section, a single base color, the effect changing throughout — this replaced
 #     the original thin white heat==1.0 tick + flat amber Hot wash);
-#   • the Critical band [critical_start .. ceiling_max] is hazard-striped dark red — the real
-#     overheat point is rolled secretly inside it every excursion, so the WHOLE zone reads as
-#     "gamble territory" rather than promising a precise edge (Tim 2026-07-15: the exact point
-#     of overheating should not be predictable);
+#   • the Critical band [critical_start .. hard_ceiling] is hazard-striped dark red — gamble
+#     territory. Vent Windows (Plans/Overdrive_Vent_Windows.md, Tim 2026-07-17) retired the
+#     old hidden random ceiling: the bar now ends at the FIXED hard ceiling (the "you ignored
+#     everything" backstop), and the unpredictability lives in WHEN a vent window telegraphs
+#     instead — the skill check replaced the slot machine;
 #   • the fill and its bubbles shift purple → amber continuously from the cruise point to the
 #     hazard zone, then blinking red inside Critical, the blink growing faster and harder the
 #     deeper the player pushes;
@@ -37,6 +38,14 @@ extends HBoxContainer
 #     CONTENT state, clearly apart from the amber/red danger escalation. The wide teal cruise
 #     bar on the track marks the cruise point itself.
 #   • Once overdrive engages, everything above presents exactly as shipped.
+#
+# Vent Windows (Plans/Overdrive_Vent_Windows.md, Tim 2026-07-17) add the telegraph + feedback
+# layer on top: when the core opens a vent window this bar pops a HELD-OPEN gold "VENT!" /
+# "VENT ×2!" chip with large gesture pips (one per demanded lift, filling as the lifts land)
+# and a thin draining countdown bar; success swaps it for a green "VENTED — PEAK +X%!" chip
+# plus the ready-style white flash; a miss flashes the UNFINISHED pips red so the player can
+# see exactly which beat was blown before the overheat presentation lands (the plan's rule:
+# miss-feedback is what makes a skill mechanic learnable).
 
 ## The player tapped OVERDRIVE: release the cruise clamp for this excursion. Main routes this
 ## to GameState.engage_rush_overdrive() — the same seam as FrenzyBar.pop_requested.
@@ -66,10 +75,22 @@ var _streaks: MomentumStreaks
 ## to the hazard zone, and the hazard-striped Critical segment.
 var _zones: BandZoneOverlay
 
-## The short-lived "CRITICAL +55%!" chip shown on entering the Critical band.
+## The large chip shown over the meter: the short-lived "CRITICAL +X%!" band crossing, and —
+## Vent Windows — the held-open "VENT!" telegraph plus its success/miss resolution chips.
 var _tier_chip: PanelContainer
 var _tier_chip_label: Label
 var _tier_chip_tween: Tween
+
+## The vent gesture pips + countdown bar, drawn inside the chip beneath its text line (see
+## VentPipRow at the bottom of this file). Visible only while a vent chip is up.
+var _vent_pips: VentPipRow
+## True while the chip is being HELD OPEN as the live vent-window telegraph (no timed fade —
+## the window's resolution decides how it ends). _process drives the countdown while true.
+var _vent_chip_active := false
+## The open window's telegraphed duration (s), for the countdown fraction. Taken from the
+## vent_window_opened signal rather than the tuning knob, because the core TIGHTENS windows
+## per achieved tier — the chip must drain over the window's REAL length.
+var _vent_window_duration := 1.0
 
 ## Full-rect white flash played when rush re-arms — re-availability must be unmissable
 ## (Tim 2026-07-15), so the whole meter blinks bright once alongside the label reverting.
@@ -262,6 +283,14 @@ func _ready() -> void:
 	_tier_chip.visible = false
 	_meter.add_child(_tier_chip)
 
+	# The chip's content column: the big text line, with the vent pips + countdown beneath it.
+	# The pip row only shows while the chip is vent-related; a plain tier chip keeps it hidden,
+	# so the chip collapses to exactly its old text-only shape then.
+	var chip_column := VBoxContainer.new()
+	chip_column.add_theme_constant_override("separation", 10)
+	chip_column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tier_chip.add_child(chip_column)
+
 	_tier_chip_label = Label.new()
 	_tier_chip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_tier_chip_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -270,30 +299,47 @@ func _ready() -> void:
 	_tier_chip_label.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
 	_tier_chip_label.add_theme_font_override("font", UiPalette.make_bold_font())
 	_tier_chip_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_tier_chip.add_child(_tier_chip_label)
+	chip_column.add_child(_tier_chip_label)
+
+	_vent_pips = VentPipRow.new()
+	_vent_pips.visible = false
+	chip_column.add_child(_vent_pips)
 
 	# Band-edge signals: the chip + haptics fire on the crossings; overheat/re-arm swap the
 	# whole meter's presentation.
 	_rush_momentum.band_entered.connect(_on_band_entered)
 	_rush_momentum.overheated.connect(_on_overheated)
 	_rush_momentum.rush_ready.connect(_on_rush_ready)
+	# Vent Windows: the telegraph and its three resolutions (Plans/Overdrive_Vent_Windows.md).
+	_rush_momentum.vent_window_opened.connect(_on_vent_window_opened)
+	_rush_momentum.vent_lift_registered.connect(_on_vent_lift_registered)
+	_rush_momentum.vent_succeeded.connect(_on_vent_succeeded)
+	_rush_momentum.vent_missed.connect(_on_vent_missed)
 
 
 func _process(delta: float) -> void:
-	# The meter spans the FULL heat range: fill fraction = heat / ceiling_max, so the Hot tick and
-	# the Critical hazard zone sit at fixed positions on the track and the fill physically enters
-	# them as heat climbs. Guard the knob so a 0 can't divide by zero.
-	var ceiling_max: float = maxf(_tuning.rush_momentum_ceiling_max, 0.0001)
-	var target_fill: float = clampf(_rush_momentum.heat / ceiling_max, 0.0, 1.0)
+	# The meter spans the FULL heat range: fill fraction = heat / hard_ceiling — the FIXED
+	# backstop that replaced the old random ceiling roll (Vent Windows) — so the hazard zone
+	# sits at a fixed position on the track and the fill physically enters it as heat climbs.
+	# Guard the knob so a 0 can't divide by zero.
+	var hard_ceiling: float = maxf(_tuning.rush_momentum_hard_ceiling, 0.0001)
+	var target_fill: float = clampf(_rush_momentum.heat / hard_ceiling, 0.0, 1.0)
 	_displayed_fill = BarSmoothing.approach(_displayed_fill, target_fill, delta)
 	_meter.value = _displayed_fill
 
 	# Feed the zone overlay the cruise point and the hazard edge (as fill fractions) plus the
 	# current fill edge, so it can paint the ramp/hazard segments only over the still-unfilled
 	# track and keep the cruise bar where the clamp actually sits (Legacy can move it).
-	var critical_start_frac: float = clampf(_tuning.rush_momentum_critical_start / ceiling_max, 0.0, 1.0)
-	var cruise_frac: float = clampf(_rush_momentum.cruise_heat() / ceiling_max, 0.0, 1.0)
+	var critical_start_frac: float = clampf(_tuning.rush_momentum_critical_start / hard_ceiling, 0.0, 1.0)
+	var cruise_frac: float = clampf(_rush_momentum.cruise_heat() / hard_ceiling, 0.0, 1.0)
 	_zones.update_zones(cruise_frac, critical_start_frac, _displayed_fill)
+
+	# While the vent telegraph is up, drain its countdown from the LIVE remaining time —
+	# remaining / telegraphed duration, so a tier-tightened window still drains exactly
+	# full-to-empty (and a frenzy freeze visibly pauses it, matching the core's pause).
+	if _vent_chip_active:
+		_vent_pips.set_countdown(clampf(
+				_rush_momentum.vent_window_remaining() / _vent_window_duration, 0.0, 1.0))
 
 	var locked_out := _rush_momentum.is_locked_out()
 	var cruising := _rush_momentum.is_cruising()
@@ -353,7 +399,7 @@ func _update_fill_color(delta: float, locked_out: bool, cruising: bool) -> void:
 	var heat: float = _rush_momentum.heat
 	var cruise_heat: float = _rush_momentum.cruise_heat()
 	var critical_start: float = _tuning.rush_momentum_critical_start
-	var ceiling_max: float = maxf(_tuning.rush_momentum_ceiling_max, 0.0001)
+	var hard_ceiling: float = maxf(_tuning.rush_momentum_hard_ceiling, 0.0001)
 
 	if locked_out:
 		# Draining after an overheat: a flat dark red — the punishment color, no blink (the
@@ -381,9 +427,10 @@ func _update_fill_color(delta: float, locked_out: bool, cruising: bool) -> void:
 		_blink_phase = 0.0
 		return
 
-	# Critical: blinking red, ramping with depth. Phase accumulates at the CURRENT frequency so
-	# the ramp never makes the sine jump; strength widens the red↔pale-gold pulse.
-	var crit_span: float = maxf(ceiling_max - critical_start, 0.0001)
+	# Critical: blinking red, ramping with depth toward the hard ceiling. Phase accumulates at
+	# the CURRENT frequency so the ramp never makes the sine jump; strength widens the
+	# red↔pale-gold pulse.
+	var crit_span: float = maxf(hard_ceiling - critical_start, 0.0001)
 	var crit_depth: float = clampf((heat - critical_start) / crit_span, 0.0, 1.0)
 	var blink_hz: float = lerpf(BLINK_HZ_MIN, BLINK_HZ_MAX, crit_depth)
 	var strength: float = lerpf(BLINK_STRENGTH_MIN, BLINK_STRENGTH_MAX, crit_depth)
@@ -433,16 +480,29 @@ func _apply_label_state(state: int) -> void:
 ## old cap read as noise). The chip sells the last rung of the gamble, not every rung.
 func _on_band_entered(band: RushMomentumState.Band) -> void:
 	if band == RushMomentumState.Band.CRITICAL:
+		# current_peak_bonus(), not the static bonus_peak knob: the peak is a LADDER now (Vent
+		# Windows) — base +55%, climbing per successful vent — and the chip must quote the top
+		# of THIS excursion's ladder, or a re-entry after a vent would understate the prize.
 		_show_tier_chip(
-			"CRITICAL +%d%%!" % int(round(_tuning.rush_momentum_bonus_peak * 100.0)),
+			"CRITICAL +%d%%!" % int(round(_rush_momentum.current_peak_bonus() * 100.0)),
 			UiPalette.KETCHUP_RED, UiPalette.PALE_GOLD)
 		_vibrate(_tuning.rush_momentum_haptic_critical_ms)
 
 
-## Heat hit the hidden ceiling: the shutdown moment. The label/fill/bubble changes are all
-## per-frame state reads (see _process); here we only add the long haptic thump so the failure
-## lands physically as well as visually.
+## Heat hit the hard ceiling, or a vent window was missed: the shutdown moment. The
+## label/fill/bubble changes are all per-frame state reads (see _process); here we add the
+## long haptic thump so the failure lands physically as well as visually, and make sure no
+## held-open vent telegraph outlives the excursion it belonged to.
 func _on_overheated() -> void:
+	# The hard-ceiling backstop can fire while a vent telegraph is still up (the missed-window
+	# path clears it in _on_vent_missed; this covers heat simply reaching the top). Drop the
+	# held chip so the OVERHEATED presentation isn't fighting a stale "VENT!" plate.
+	if _vent_chip_active:
+		_vent_chip_active = false
+		_vent_pips.visible = false
+		if _tier_chip_tween != null and _tier_chip_tween.is_valid():
+			_tier_chip_tween.kill()
+		_tier_chip.visible = false
 	_vibrate(_tuning.rush_momentum_haptic_overheat_ms)
 
 
@@ -456,9 +516,96 @@ func _on_rush_ready() -> void:
 	tween.tween_property(_ready_flash, "color:a", 0.0, READY_FLASH_FADE_SEC)
 
 
+# ---------------------------------------------------------------------------
+# Vent Windows: the telegraph and its resolutions (Plans/Overdrive_Vent_Windows.md)
+# ---------------------------------------------------------------------------
+
+## The core opened a vent window: the act-NOW telegraph. The tier chip is reused, but HELD
+## OPEN for the window's whole life — its resolution (success / miss / overheat) decides how
+## it ends, so a knob-lengthened window can never outlive its own telegraph. The plate is
+## bright MUSTARD_GOLD with NAVY text: gold is the "act now" family here, deliberately apart
+## from teal (cruise/calm) and red (critical/failure), and navy-on-gold is the standard
+## action-button pairing, so the chip reads as "DO the thing" at a glance. The pips beneath
+## show the demanded lifts (1 or 2) with the countdown bar under them.
+func _on_vent_window_opened(required_lifts: int, duration: float) -> void:
+	_vent_window_duration = maxf(duration, 0.001)
+	_vent_chip_active = true
+	_vent_pips.show_window(required_lifts)
+	_show_tier_chip_held(
+			"VENT ×2!" if required_lifts >= 2 else "VENT!",
+			UiPalette.MUSTARD_GOLD, UiPalette.NAVY)
+	_vibrate(_tuning.rush_momentum_haptic_vent_ms)
+
+
+## A gesture lift landed: fill its pip, so progress through the demanded beats is visible
+## mid-gesture (the ×2 vent needs the player to KNOW the first lift registered).
+func _on_vent_lift_registered(lifts_done: int, _required_lifts: int) -> void:
+	_vent_pips.set_filled(lifts_done)
+
+
+## Vent completed in time: heat drops and the bonus ladder ratchets up a rung. Swap the held
+## telegraph for a normal TIMED chip quoting the NEW excursion peak (the signal's value, so
+## the number can never drift from the core's ladder), in celebratory money-green, plus the
+## same full-meter white flash the READY moment uses — success should feel like a payoff, not
+## mere survival.
+func _on_vent_succeeded(_new_tier: int, new_peak_bonus: float) -> void:
+	_vent_chip_active = false
+	_vent_pips.visible = false
+	_show_tier_chip(
+			"VENTED — PEAK +%d%%!" % int(round(new_peak_bonus * 100.0)),
+			UiPalette.MONEY_GREEN, UiPalette.NAVY)
+	_ready_flash.color = Color(1, 1, 1, READY_FLASH_ALPHA)
+	var tween := create_tween()
+	tween.tween_property(_ready_flash, "color:a", 0.0, READY_FLASH_FADE_SEC)
+
+
+## The window expired (or the gesture fumbled) — fired just before the overheat lands. The
+## blown beat must be VISIBLE (the plan's rule: miss-feedback is what makes the skill check
+## learnable), so the chip flips to a red MISSED plate while the pips stay up with the
+## UNFINISHED ones strobing red: the player sees exactly how many lifts landed versus what was
+## demanded. The timed chip's fade then clears everything while the standard OVERHEATED
+## presentation (label swap + draining red fill) plays underneath.
+func _on_vent_missed(lifts_done: int, _required_lifts: int) -> void:
+	_vent_chip_active = false
+	_vent_pips.set_filled(lifts_done)
+	_vent_pips.start_miss_flash()
+	_show_tier_chip("VENT MISSED!", UiPalette.KETCHUP_RED, UiPalette.PALE_GOLD)
+
+
 ## Show the tier chip: set its text/colors, ease it in, hold, fade out. A new crossing while the
-## old chip is still up simply restarts the sequence with the new text.
+## old chip is still up simply restarts the sequence with the new text. The end-of-fade cleanup
+## also retires the vent pips + miss strobe, so a miss chip tidies itself up and the next plain
+## tier chip can never inherit stale pips.
 func _show_tier_chip(text: String, plate_color: Color, text_color: Color) -> void:
+	_style_tier_chip(text, plate_color, text_color)
+	if _tier_chip_tween != null and _tier_chip_tween.is_valid():
+		_tier_chip_tween.kill()
+	_tier_chip.visible = true
+	_tier_chip.modulate = Color(1, 1, 1, 0)
+	_tier_chip_tween = create_tween()
+	_tier_chip_tween.tween_property(_tier_chip, "modulate:a", 1.0, TIER_CHIP_FADE_IN_SEC)
+	_tier_chip_tween.tween_interval(TIER_CHIP_HOLD_SEC)
+	_tier_chip_tween.tween_property(_tier_chip, "modulate:a", 0.0, TIER_CHIP_FADE_OUT_SEC)
+	_tier_chip_tween.tween_callback(func() -> void:
+		_tier_chip.visible = false
+		_vent_pips.visible = false
+		_vent_pips.stop_miss_flash())
+
+
+## The HELD-OPEN variant for the live vent telegraph: eases in exactly like the timed chip but
+## then STAYS — no hold interval, no fade — until a resolution handler replaces or clears it.
+func _show_tier_chip_held(text: String, plate_color: Color, text_color: Color) -> void:
+	_style_tier_chip(text, plate_color, text_color)
+	if _tier_chip_tween != null and _tier_chip_tween.is_valid():
+		_tier_chip_tween.kill()
+	_tier_chip.visible = true
+	_tier_chip.modulate = Color(1, 1, 1, 0)
+	_tier_chip_tween = create_tween()
+	_tier_chip_tween.tween_property(_tier_chip, "modulate:a", 1.0, TIER_CHIP_FADE_IN_SEC)
+
+
+## Apply text + plate/text colors to the chip (shared by the timed and held-open variants).
+func _style_tier_chip(text: String, plate_color: Color, text_color: Color) -> void:
 	_tier_chip_label.text = text
 	_tier_chip_label.add_theme_color_override("font_color", text_color)
 	var plate := StyleBoxFlat.new()
@@ -468,16 +615,6 @@ func _show_tier_chip(text: String, plate_color: Color, text_color: Color) -> voi
 	plate.set_corner_radius_all(8)
 	plate.set_content_margin_all(14)
 	_tier_chip.add_theme_stylebox_override("panel", plate)
-
-	if _tier_chip_tween != null and _tier_chip_tween.is_valid():
-		_tier_chip_tween.kill()
-	_tier_chip.visible = true
-	_tier_chip.modulate = Color(1, 1, 1, 0)
-	_tier_chip_tween = create_tween()
-	_tier_chip_tween.tween_property(_tier_chip, "modulate:a", 1.0, TIER_CHIP_FADE_IN_SEC)
-	_tier_chip_tween.tween_interval(TIER_CHIP_HOLD_SEC)
-	_tier_chip_tween.tween_property(_tier_chip, "modulate:a", 0.0, TIER_CHIP_FADE_OUT_SEC)
-	_tier_chip_tween.tween_callback(func() -> void: _tier_chip.visible = false)
 
 
 ## Haptic tap, mobile only — desktop must stay silent (Input.vibrate_handheld is a no-op on most
@@ -622,3 +759,110 @@ class BandZoneOverlay extends Control:
 				var to := Vector2(x0 + t_max * height, bottom - t_max * height)
 				draw_line(from, to, CRITICAL_STRIPE, STRIPE_WIDTH)
 			x0 += STRIPE_SPACING
+
+
+# ---------------------------------------------------------------------------
+# The vent gesture pips
+# ---------------------------------------------------------------------------
+
+## The vent window's gesture readout, drawn inside the tier chip beneath its text line: one
+## LARGE pip per demanded lift (outline ring = still owed, solid disc = landed), with a thin
+## countdown bar beneath them draining as the window runs out. The countdown is a separate
+## thin bar rather than the chip's plate draining, for two reasons: mutating the plate
+## stylebox every frame is heavier than one draw_rect, and a shrinking bar is the same
+## time-language every other meter on this screen already speaks. On a miss the UNFINISHED
+## pips strobe red (self-animated — the host only calls start_miss_flash) so the blown beat is
+## unmistakable. Custom-drawn like BandZoneOverlay/MomentumStreaks: two circles and a rect are
+## cheaper and crisper than textures at this size.
+class VentPipRow extends Control:
+	## Pip geometry — sized for at-a-glance legibility beside the FONT_HEADLINE chip text
+	## (Tim's vision, §1b: these are read mid-gesture with about a second on the clock).
+	const PIP_RADIUS := 24.0
+	const PIP_SPACING := 72.0    # center-to-center
+	const PIP_OUTLINE := 5.0
+	const COUNTDOWN_HEIGHT := 10.0
+	const COUNTDOWN_GAP := 12.0  # vertical gap between the pips and the countdown bar
+	## Unfinished-pip blink rate after a miss — a hard, urgent strobe, clearly a failure.
+	const MISS_FLASH_HZ := 6.0
+
+	## Pips draw in the chip's NAVY (matching its border and the telegraph's text); the
+	## countdown in a translucent navy; missed pips strobe KETCHUP_RED (the failure color).
+	## Hex literals with palette-name comments, matching BandZoneOverlay's convention.
+	const PIP_COLOR := Color("#1D2D50")             # NAVY
+	const COUNTDOWN_COLOR := Color("#1D2D50", 0.55)  # translucent NAVY
+	const MISS_FLASH_COLOR := Color("#B5402A")      # KETCHUP_RED
+
+	var _required := 1
+	var _filled := 0
+	var _countdown_fraction := 1.0
+	var _miss_flashing := false
+	## Miss-strobe clock in blink cycles (advanced by MISS_FLASH_HZ per second); the integer
+	## part's parity picks red vs navy — a square wave, not a sine: an alarm, not a glow.
+	var _miss_phase := 0.0
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	## A window opened: show `required` empty pips and a full countdown bar.
+	func show_window(required: int) -> void:
+		_required = maxi(required, 1)
+		_filled = 0
+		_countdown_fraction = 1.0
+		_miss_flashing = false
+		visible = true
+		# Reserve the drawn footprint so the chip's containers size the plate around it.
+		custom_minimum_size = Vector2(
+				PIP_SPACING * float(_required - 1) + PIP_RADIUS * 2.0,
+				PIP_RADIUS * 2.0 + COUNTDOWN_GAP + COUNTDOWN_HEIGHT)
+		queue_redraw()
+
+	## How many lifts have landed (fills that many pips, left to right).
+	func set_filled(filled: int) -> void:
+		_filled = clampi(filled, 0, _required)
+		queue_redraw()
+
+	## Remaining window time as a 0..1 fraction; fed every frame by the host's _process.
+	func set_countdown(fraction: float) -> void:
+		if is_equal_approx(fraction, _countdown_fraction):
+			return
+		_countdown_fraction = fraction
+		queue_redraw()
+
+	## Begin strobing the unfinished pips red (the miss feedback). Runs until stop_miss_flash —
+	## the host's chip-fade cleanup calls that, so the strobe lives exactly as long as the chip.
+	func start_miss_flash() -> void:
+		_miss_flashing = true
+		_miss_phase = 0.0
+
+	func stop_miss_flash() -> void:
+		_miss_flashing = false
+
+	func _process(delta: float) -> void:
+		# Only the miss strobe animates continuously; everything else redraws on state change.
+		if _miss_flashing and visible:
+			_miss_phase += delta * MISS_FLASH_HZ
+			queue_redraw()
+
+	func _draw() -> void:
+		# Pips, centered horizontally in whatever width the chip's column gave us.
+		var row_width := PIP_SPACING * float(_required - 1)
+		var first_x := size.x * 0.5 - row_width * 0.5
+		for i in range(_required):
+			var center := Vector2(first_x + PIP_SPACING * float(i), PIP_RADIUS)
+			if i < _filled:
+				draw_circle(center, PIP_RADIUS, PIP_COLOR)
+			else:
+				var ring := PIP_COLOR
+				if _miss_flashing and fmod(_miss_phase, 1.0) < 0.5:
+					ring = MISS_FLASH_COLOR
+				# Radius inset by half the stroke so the ring's OUTER edge matches a filled
+				# pip's silhouette — filling a pip must read as "same pip, now solid".
+				draw_arc(center, PIP_RADIUS - PIP_OUTLINE * 0.5, 0.0, TAU, 48, ring,
+						PIP_OUTLINE, true)
+		# The countdown bar under the pips: left-anchored, its width the REMAINING fraction of
+		# the window — the same left-anchored fill language as every meter on this screen, just
+		# running down instead of up.
+		var bar_y := PIP_RADIUS * 2.0 + COUNTDOWN_GAP
+		var bar_width := size.x * clampf(_countdown_fraction, 0.0, 1.0)
+		if bar_width > 0.0:
+			draw_rect(Rect2(0.0, bar_y, bar_width, COUNTDOWN_HEIGHT), COUNTDOWN_COLOR)

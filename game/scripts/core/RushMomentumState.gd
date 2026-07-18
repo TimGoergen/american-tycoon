@@ -1,57 +1,114 @@
 class_name RushMomentumState
 
 # Rush Overheat — the push-your-luck evolution of Rush Momentum (Tim 2026-07-15;
-# design of record: Plans/Rush_Overheat.md).
+# design of record: Plans/Rush_Overheat.md), now with VENT WINDOWS (Tim 2026-07-17;
+# design of record: Plans/Overdrive_Vent_Windows.md).
 #
 # The original momentum meter (Tim 2026-07-12) rewarded SUSTAINED rushing: hold long enough and
 # the bonus caps and sits there. The optimal play became "never release" — a grip test, not a
 # decision. Overheat converts it into a rhythm that rewards ATTENTION: the property literally
 # heats up as you rush (that's WHY its productivity rises), and pushing it too hot shuts it down.
 #
-# ONE scalar, NO timers. Heat IS the momentum meter, and it keeps climbing past the old cap
-# (heat 1.0) while rush is held. Every tier is a heat RANGE, never a timed state:
+# ONE scalar, NO wall-clock timers. Heat IS the momentum meter, and it keeps climbing past the
+# old cap (heat 1.0) while rush is held. Every tier is a heat RANGE, never a timed state:
 #
 #   Building   heat 0    → 1.0        bonus  0%  → +30%   (the old meter, unchanged feel)
 #   Hot        heat 1.0  → critical    bonus +30% → +40%   (warning 1 — safe for its width)
-#   Critical   heat crit → ceiling     bonus +40% → +55%   (warning 2 — you are now gambling)
-#   OVERHEAT   heat hits the ceiling   bonus 0, rush disabled until fully cooled + re-armed
+#   Critical   heat crit → ceiling     bonus +40% → the LADDER PEAK (see vent tiers below)
+#   OVERHEAT   heat hits the ceiling,  bonus 0, rush disabled until fully cooled + re-armed
+#              OR a vent window is missed
 #
-# The overheat ceiling is rolled SECRETLY PER EXCURSION (Tim: "the exact point of overheating
-# should not be entirely predictable"): each time heat crosses 1.0 upward we roll a fresh ceiling
-# uniformly in [ceiling_min, ceiling_max], so probing-and-memorizing one run's fuse teaches you
-# nothing about the next. Guardrail: the roll range lives entirely INSIDE Critical, so the Hot
-# band's promised width is always honored — the warning tiers stay trustworthy.
+# VENT WINDOWS (Plans/Overdrive_Vent_Windows.md) replaced the old secretly rolled per-excursion
+# ceiling. The Critical band is no longer a slot machine — it is a chain of telegraphed skill
+# checks. While riding Critical with overdrive engaged, the property periodically threatens to
+# blow: a vent window OPENS (bar flash + haptic + a chip in the UI) and the player must perform
+# the vent gesture on the rushed property's button before it closes:
+#
+#   VENT    (1 lift):  release → re-press, gap ≤ vent_gap_max. One clean feather.
+#   VENT ×2 (2 lifts): release → tap (press ≤ vent_tap_max, then release) → re-press,
+#                      every gap ≤ vent_gap_max. Tim's "two separate lifts" pump gesture.
+#
+#   Success: a chunk of heat vents (back WITHIN Critical, never out of it), the climb resumes,
+#            and the bonus tier ratchets up one rung — the reward for surviving the check.
+#   Miss (window expires, gap too long, tap held too long): OVERHEAT, exactly as if the ceiling
+#            had been hit — every overheat is now one the player caused by missing a read.
+#
+# Tim's 2026-07-15 "the exact overheat point should not be entirely predictable" is still
+# honored, but the unpredictability moved from the OUTCOME to the SCHEDULE: each window's
+# arrival time is rolled by `rng` within [delay_min, delay_max], so you never know exactly when
+# the check comes — but once it telegraphs, the outcome is entirely in your hands. A fixed,
+# visible HARD CEILING remains purely as the "you ignored everything" backstop, and the first
+# window's roll is clamped so it always fully fits before heat could reach that ceiling.
+#
+# The reward ladder: the Critical segment's peak (reached at the hard ceiling) starts at
+# bonus_peak (+55%) and each successful vent adds vent_bonus_step, up to vent_max_tiers rungs
+# (+45% per rung to a +235% tier-4 cap with the defaults — retuned taller than the plan's
+# first cut to hit its own duty-cycle targets; see TuningConfig's vent-window block comment).
+# From vent_double_from_tier onward the windows demand the ×2 gesture AND tighten by
+# vent_window_tighten per tier — risk, reward, and skill all escalate together while the
+# first vent stays approachable.
 #
 # Overheating is the severe outcome (Tim: "more severe than waiting for a full cooldown"):
 # the bonus drops to 0, rushing is disabled, heat drains to zero at a separate locked-drain
 # rate (the visibly draining bar IS the cooldown display), and then a short re-arm delay adds
-# the extra sting before rushing re-enables. Releasing NORMALLY just bleeds heat back down
-# through the bands — hysteresis for free, no timer to game with a micro-flick.
+# the extra sting before rushing re-enables. Falling from higher hurts more: the re-arm gains
+# vent_fail_rearm_per_tier extra seconds per vent tier achieved this excursion. Releasing
+# NORMALLY just bleeds heat back down through the bands — and ends the excursion, clearing the
+# vent ladder and any pending window (the gamble is always a fresh choice).
 #
 # CRUISE CONTROL amendment (Tim 2026-07-16; design of record: Plans/Rush_Cruise_Control.md):
 # holding rush is SAFE FOREVER by default. Without overdrive engaged, heat climbs normally but
 # clamps at the CRUISE POINT — the heat where the bonus equals the cruise-bonus knob (+25%
 # first-cut) — and no overheat is possible. The danger bands above are an OPT-IN gamble behind
-# engage_overdrive() (the OVERDRIVE button): once engaged, everything behaves exactly as shipped.
-# Overdrive is PER-EXCURSION — it disengages when the hold ends (and on overheat and reset), so
-# the gamble is always a fresh choice, never a sticky mode you forgot you left on.
+# engage_overdrive() (the OVERDRIVE button): once engaged, everything behaves as described.
+# Overdrive is PER-EXCURSION — it disengages when the hold ends (and on overheat and reset).
 #
 # During a frenzy BURN everything freezes — no heat gain, no bleed, no lockout drain, no re-arm
-# countdown; the bonus holds at its entry depth. Players will ride Critical into a frenzy on
-# purpose, and an overheat mid-frenzy would gut the press-to-release payoff (Item 5).
+# countdown, no window-arrival countdown, and no open-window countdown. Everything here advances
+# on tick delta ONLY (never OS time), so the freeze is total and a window can never unfairly
+# expire mid-frenzy.
 #
-# bonus stays a pure function of heat, is applied to PROPERTY income only (never the wage), and
-# is threaded into both the payout AND the displayed rate so the cash always matches the readout.
-# A full reset at every First Contact keeps it a per-epoch pinch, not a run-long snowball.
+# bonus stays a pure function of (heat, vent tier), is applied to PROPERTY income only (never
+# the wage), and is threaded into both the payout AND the displayed rate so the cash always
+# matches the readout. A full reset at every First Contact keeps it a per-epoch pinch.
 
 enum Band { BUILDING, HOT, CRITICAL }
+
+## Where the vent-gesture judge is within the current OPEN window. Never a timed state on its
+## own — the phase only changes on press/release edges, and the tick merely polices how long
+## the current phase has lasted against the gap/tap tolerances.
+enum VentPhase {
+	WAITING_FOR_LIFT,  # finger down; the gesture starts with its first release
+	GAP,               # finger up; must re-press within vent_gap_max
+	TAP,               # finger down on the ×2 gesture's middle tap; must release within vent_tap_max
+}
+
+## The window duration can tighten per achieved tier, but never below this floor — a window
+## shorter than half a second stops being a skill check and becomes a reflex lottery.
+const VENT_WINDOW_DURATION_FLOOR := 0.5
 
 ## Fired on UPWARD band crossings only (BUILDING→HOT, HOT→CRITICAL) — the UI reacts per band
 ## (currently only CRITICAL pops a tier chip; HOT is announced by the fill alone).
 ## Sliding back down through a band edge is silent (de-escalation needs no fanfare).
 signal band_entered(band: Band)
 
-## Heat hit this excursion's secretly rolled ceiling. The lockout begins now.
+## A vent window just OPENED: the player has `duration` seconds to perform the gesture
+## (`required_lifts` is 1 for the single feather, 2 for the double release).
+signal vent_window_opened(required_lifts: int, duration: float)
+
+## One lift beat of the gesture just landed (the re-press completed it) — the UI's pip display.
+signal vent_lift_registered(lifts_done: int, required_lifts: int)
+
+## The gesture completed in time: heat vented, and the bonus ladder ratcheted to `new_tier`
+## (its peak — the bonus at the hard ceiling — is now `new_peak_bonus`).
+signal vent_succeeded(new_tier: int, new_peak_bonus: float)
+
+## The window was blown (expired, gap too long, or tap held too long). Fired just BEFORE
+## `overheated`, carrying how far through the gesture the player got — miss-feedback must show
+## WHICH beat was blown, or the skill is unlearnable (Plans/Overdrive_Vent_Windows.md).
+signal vent_missed(lifts_done: int, required_lifts: int)
+
+## Heat hit the hard ceiling, or a vent window was missed. The lockout begins now.
 signal overheated
 
 ## The post-overheat re-arm delay just finished; rushing is available again.
@@ -60,11 +117,11 @@ signal rush_ready
 var tuning: TuningConfig
 
 ## Current heat, in heat units where 1.0 = the old momentum cap = the Hot band's lower edge.
-## Ranges 0 .. the rolled ceiling (at most tuning.rush_momentum_ceiling_max).
+## Ranges 0 .. tuning.rush_momentum_hard_ceiling.
 var heat: float = 0.0
 
-## Current bonus as a FRACTION of property income (0.3 = +30%). Recomputed from heat every tick
-## via the piecewise band mapping; forced to 0 for the whole overheat lockout.
+## Current bonus as a FRACTION of property income (0.3 = +30%). Recomputed from (heat, vent
+## tier) every tick via the piecewise band mapping; forced to 0 for the whole overheat lockout.
 var bonus: float = 0.0
 
 ## Extra cruise-bonus points from the "Cooling Systems" Legacy upgrade, as an additive fraction
@@ -78,14 +135,10 @@ var legacy_cruise_bonus: float = 0.0
 ## by DynastyState._apply_upgrade_effects, like legacy_cruise_bonus above.
 var lockout_time_scale: float = 1.0
 
-## Rolls the per-excursion overheat ceiling. Public so the headless sim can seed it and get
-## deterministic runs; the live game just uses its default random seed.
+## Rolls each vent window's ARRIVAL time (the schedule is the unpredictable part now — the old
+## random ceiling is retired). Public so the headless sim can seed it and get deterministic
+## runs; the live game just uses its default random seed.
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
-
-## This excursion's secret overheat ceiling. Rolled fresh each time heat crosses 1.0 upward;
-## between excursions it rests at ceiling_max (unreachable without crossing 1.0 first, which
-## re-rolls it — so the resting value can never actually decide an overheat).
-var _ceiling: float = 0.0
 
 ## True from the overheat moment until rush_ready fires (covers both the drain and the re-arm).
 var _locked_out: bool = false
@@ -97,6 +150,11 @@ var _rearm_remaining: float = 0.0
 ## True only during the post-drain re-arm delay (the tail end of the lockout).
 var _rearming: bool = false
 
+## The per-tier re-arm sting earned by the excursion that just overheated. Captured at the
+## overheat moment (before the vent ladder is cleared) because the re-arm delay is not computed
+## until the drain finishes, by which time the tier is gone.
+var _rearm_tier_sting: float = 0.0
+
 ## True while the player has OPTED IN to the danger bands (the OVERDRIVE button). Per-excursion
 ## by design: cleared on a non-rushing tick, on overheat, and on reset (Plans/Rush_Cruise_Control.md).
 var _overdrive_engaged: bool = false
@@ -105,10 +163,46 @@ var _overdrive_engaged: bool = false
 ## cruise hold apart from an idle bar without re-deriving the grace window itself.
 var _was_rushing: bool = false
 
+# --- Vent-window state (all cleared on overheat, reset, and release-disengage) ---
+
+## Successful vents THIS excursion (0 .. vent_max_tiers). Each tier raises the Critical
+## segment's peak bonus by vent_bonus_step — see current_peak_bonus().
+var _vent_tier: int = 0
+
+## True while a vent window is OPEN (the gesture clock is running).
+var _window_open: bool = false
+
+## Seconds left in the open window. The gesture must COMPLETE before this hits zero.
+var _window_remaining: float = 0.0
+
+## Lifts the open window demands: 1 (single feather) or 2 (double release). Stale when closed.
+var _window_required_lifts: int = 1
+
+## Completed lift beats so far in the open window's gesture.
+var _window_lifts_done: int = 0
+
+## True while the NEXT window's arrival delay is counting down (rolled but not yet open).
+var _window_pending: bool = false
+
+## Seconds until the pending window opens. Advances on tick delta only (frenzy-freezable).
+var _window_arrival_remaining: float = 0.0
+
+## The gesture judge's phase within the open window (see VentPhase).
+var _vent_phase: VentPhase = VentPhase.WAITING_FOR_LIFT
+
+## Seconds spent in the current gesture phase. Reset on every press/release edge; the tick
+## checks it against vent_gap_max / vent_tap_max so tolerances share the game's tick clock
+## (never OS time — the frenzy freeze must stop gesture clocks too).
+var _phase_elapsed: float = 0.0
+
+## Whether the rushed property's button is currently held, tracked from the press/release
+## edges GameState forwards. Needed so a window that opens mid-hold starts the judge in
+## WAITING_FOR_LIFT, while one that opens with the finger already up starts in GAP.
+var _button_pressed: bool = false
+
 
 func _init(p_tuning: TuningConfig) -> void:
 	tuning = p_tuning
-	_ceiling = p_tuning.rush_momentum_ceiling_max
 
 
 ## Advance the heat model by one tick. `rushing` is true if the player rushed within the grace
@@ -116,7 +210,8 @@ func _init(p_tuning: TuningConfig) -> void:
 ## per-second (see the TuningConfig knobs), so the behaviour is frame-rate independent.
 func tick(delta: float, rushing: bool, frenzy_burning: bool) -> void:
 	# Frenzy burn = a TRUE freeze (Tim 2026-07-15): no gain, no bleed, no lockout drain, no
-	# re-arm countdown. Heat and bonus both hold exactly where they were until the burn ends.
+	# re-arm countdown — and no vent scheduling or window countdown either (a window expiring
+	# mid-frenzy would be an unfair miss). Everything holds until the burn ends.
 	if frenzy_burning:
 		return
 
@@ -127,12 +222,16 @@ func tick(delta: float, rushing: bool, frenzy_burning: bool) -> void:
 	_was_rushing = rushing
 	# Overdrive is PER-EXCURSION (Plans/Rush_Cruise_Control.md): letting go of the rush hold
 	# disengages it, so the next press always starts back in safe cruise mode — the gamble is a
-	# fresh choice every time, never a sticky mode left on by accident.
+	# fresh choice every time, never a sticky mode left on by accident. Ending the excursion
+	# also forfeits the vent ladder and any scheduled window: the ratchet is the reward for a
+	# CONTINUOUS ride, not a bankable buff. (GameState keeps `rushing` true through a vent
+	# gesture's lifts, so a mid-gesture lift can never land here by accident.)
 	if not rushing:
 		_overdrive_engaged = false
+		_clear_vent_state()
 
 	# Rushing WITHOUT overdrive = cruising: heat clamps at the cruise point and no overheat is
-	# possible. Everything below — the excursion roll, the band signals, the ceiling check —
+	# possible. Everything below — the band signals, the vent scheduler, the ceiling check —
 	# belongs to the opt-in overdrive ride, so the cruise path skips it entirely.
 	if rushing and not _overdrive_engaged:
 		_tick_cruise(delta)
@@ -149,16 +248,22 @@ func tick(delta: float, rushing: bool, frenzy_burning: bool) -> void:
 	else:
 		heat = maxf(heat - tuning.rush_momentum_heat_bleed_per_second * delta, 0.0)
 
-	# Entering Hot from below starts a new EXCURSION: roll this run's secret ceiling now, before
-	# the overheat check, so a single large tick that jumps straight past 1.0 still gets a roll.
 	var band_after := current_band()
 	if band_before == Band.BUILDING and band_after >= Band.HOT:
-		_ceiling = rng.randf_range(tuning.rush_momentum_ceiling_min, tuning.rush_momentum_ceiling_max)
 		band_entered.emit(Band.HOT)
 	if band_before <= Band.HOT and band_after == Band.CRITICAL:
 		band_entered.emit(Band.CRITICAL)
 
-	if heat >= _ceiling:
+	# The vent scheduler and gesture judge only run on a live overdrive ride. A missed window
+	# overheats inside this call, in which case this tick is finished.
+	if _overdrive_engaged:
+		_tick_vent_windows(delta)
+		if _locked_out:
+			return
+
+	# The fixed hard ceiling is the "you ignored everything" backstop (the schedule guarantees
+	# a window telegraphs first — see _schedule_next_window — so reaching it is always on you).
+	if heat >= tuning.rush_momentum_hard_ceiling:
 		_begin_overheat()
 		return
 
@@ -166,7 +271,7 @@ func tick(delta: float, rushing: bool, frenzy_burning: bool) -> void:
 
 
 ## The safe half of a rush hold (Plans/Rush_Cruise_Control.md): heat climbs normally but CLAMPS
-## at the cruise point, and the bonus holds there indefinitely — no excursion roll, no overheat.
+## at the cruise point, and the bonus holds there indefinitely — no vent windows, no overheat.
 func _tick_cruise(delta: float) -> void:
 	var clamp_heat := cruise_heat()
 	if heat < clamp_heat:
@@ -181,6 +286,164 @@ func _tick_cruise(delta: float) -> void:
 	bonus = _bonus_for_heat(heat)
 
 
+## The vent side of an overdrive tick: run the open window's gesture clock, or count down a
+## pending window's arrival, or — deep in Critical with rungs still left on the ladder —
+## schedule the next window. Written as one self-healing condition chain (instead of hooks on
+## specific band crossings) so EVERY path into Critical gets a window: the normal climb, a
+## re-engage while heat is still high from a bailed ride, and the resume after a vent.
+func _tick_vent_windows(delta: float) -> void:
+	if _window_open:
+		_window_remaining -= delta
+		_phase_elapsed += delta
+		# Police the gesture tolerances on the tick clock. A blown beat is a MISS the moment it
+		# becomes unrecoverable — waiting for the window to expire would just delay bad news.
+		if _vent_phase == VentPhase.GAP and _phase_elapsed > tuning.rush_momentum_vent_gap_max:
+			_miss_vent()
+			return
+		if _vent_phase == VentPhase.TAP and _phase_elapsed > tuning.rush_momentum_vent_tap_max:
+			_miss_vent()
+			return
+		if _window_remaining <= 0.0:
+			_miss_vent()
+		return
+
+	if _window_pending:
+		_window_arrival_remaining -= delta
+		if _window_arrival_remaining <= 0.0 and current_band() == Band.CRITICAL:
+			_open_window()
+		return
+
+	# Nothing open, nothing pending: schedule the next check — but only inside Critical, and
+	# only while the ladder has rungs left. At the tier cap the windows simply stop arriving
+	# (nothing left to earn); the ride continues to the hard ceiling, so a capped rider's only
+	# exit is releasing (forfeit the ladder) or the backstop overheat.
+	if current_band() == Band.CRITICAL and _vent_tier < tuning.rush_momentum_vent_max_tiers:
+		_schedule_next_window()
+
+
+## Roll the next window's arrival delay. The roll is the design's whole unpredictability — the
+## overheat OUTCOME is player-owned, only the check's TIMING is random.
+func _schedule_next_window() -> void:
+	var delay := rng.randf_range(tuning.rush_momentum_vent_window_delay_min,
+			tuning.rush_momentum_vent_window_delay_max)
+	# TELEGRAPH GUARANTEE (Plans/Overdrive_Vent_Windows.md): a window must always OPEN — with
+	# its full duration still ahead — before heat could climb to the hard ceiling, or the
+	# backstop could kill a rider who was never given a check. Clamp the rolled delay so the
+	# whole window fits before the projected ceiling arrival at the overdrive build rate
+	# (floored at 0 = open next tick, which trumps even delay_min: fairness beats pacing).
+	var build_rate := tuning.rush_momentum_heat_build_hot_per_second
+	if build_rate > 0.0:
+		var seconds_to_ceiling := (tuning.rush_momentum_hard_ceiling - heat) / build_rate
+		delay = minf(delay, maxf(seconds_to_ceiling - _next_window_duration(), 0.0))
+	_window_pending = true
+	_window_arrival_remaining = delay
+
+
+## How long the NEXT window will stay open: the base duration, tightened per achieved tier
+## (the deeper the ladder, the sharper the check), floored so it stays humanly possible.
+func _next_window_duration() -> float:
+	return maxf(tuning.rush_momentum_vent_window_duration
+			- _vent_tier * tuning.rush_momentum_vent_window_tighten,
+			VENT_WINDOW_DURATION_FLOOR)
+
+
+## A pending window's arrival delay just elapsed: open it and arm the gesture judge.
+func _open_window() -> void:
+	_window_pending = false
+	_window_open = true
+	_window_remaining = _next_window_duration()
+	# The gesture escalates with the ladder: early tiers demand the approachable single
+	# feather; from vent_double_from_tier onward, Tim's double release.
+	_window_required_lifts = 1 if _vent_tier < tuning.rush_momentum_vent_double_from_tier else 2
+	_window_lifts_done = 0
+	# Seed the judge from the live button state: mid-hold (the normal case) the gesture starts
+	# with its first release; if the finger happens to be up already, that release has in
+	# effect just happened, so the gap clock starts now.
+	_vent_phase = VentPhase.WAITING_FOR_LIFT if _button_pressed else VentPhase.GAP
+	_phase_elapsed = 0.0
+	vent_window_opened.emit(_window_required_lifts, _window_remaining)
+
+
+## Press edge on the rushed property's button (forwarded by GameState). Outside an open window
+## this only updates the tracked button state — ordinary rush taps stay ordinary (context
+## gating: no gesture ambiguity exists when no window is open).
+func notify_rush_pressed() -> void:
+	_button_pressed = true
+	if not _window_open:
+		return
+	match _vent_phase:
+		VentPhase.GAP:
+			# A re-press inside the gap completes one lift beat. (The gap length itself is
+			# policed every tick, so reaching here means it was in time.)
+			_window_lifts_done += 1
+			vent_lift_registered.emit(_window_lifts_done, _window_required_lifts)
+			if _window_lifts_done >= _window_required_lifts:
+				_succeed_vent()
+			else:
+				# The ×2 gesture's middle tap has begun: this press must stay short.
+				_vent_phase = VentPhase.TAP
+				_phase_elapsed = 0.0
+		_:
+			# A press while already judged as down (duplicate edge) carries no meaning.
+			pass
+
+
+## Release edge on the rushed property's button (forwarded by GameState). See notify_rush_pressed.
+func notify_rush_released() -> void:
+	_button_pressed = false
+	if not _window_open:
+		return
+	match _vent_phase:
+		VentPhase.WAITING_FOR_LIFT:
+			# The gesture's opening lift: the finger is up, the re-press gap clock starts.
+			_vent_phase = VentPhase.GAP
+			_phase_elapsed = 0.0
+		VentPhase.TAP:
+			# The middle tap ended in time (a long hold would have missed on a tick already);
+			# the second gap clock starts.
+			_vent_phase = VentPhase.GAP
+			_phase_elapsed = 0.0
+		_:
+			# A release while already judged as up (duplicate edge) carries no meaning.
+			pass
+
+
+## The gesture completed inside the window: vent heat, ratchet the ladder, roll the next check.
+func _succeed_vent() -> void:
+	# Venting drops you back WITHIN Critical, never out of it (Plans/Overdrive_Vent_Windows.md):
+	# the reward for the check is the ratchet, not an exit from danger — clamping at
+	# critical_start keeps the ride hot and the next window meaningful.
+	heat = maxf(heat - tuning.rush_momentum_vent_heat_drop, tuning.rush_momentum_critical_start)
+	_vent_tier = mini(_vent_tier + 1, tuning.rush_momentum_vent_max_tiers)
+	_window_open = false
+	_window_lifts_done = 0
+	bonus = _bonus_for_heat(heat)
+	vent_succeeded.emit(_vent_tier, current_peak_bonus())
+	# The next window (if the ladder has rungs left) is scheduled by the tick's self-healing
+	# condition chain — no need to roll here, and one code path keeps the rng draw order simple.
+
+
+## The open window was blown. Report HOW FAR the player got (the learnable feedback), then
+## overheat exactly as if the ceiling had been hit.
+func _miss_vent() -> void:
+	vent_missed.emit(_window_lifts_done, _window_required_lifts)
+	_begin_overheat()
+
+
+## Forget the whole vent excursion: the ladder, the open window, and any pending schedule.
+## Called on overheat, on reset, and when a release ends the excursion. (_button_pressed is
+## deliberately NOT touched — it mirrors the physical finger, not the excursion.)
+func _clear_vent_state() -> void:
+	_vent_tier = 0
+	_window_open = false
+	_window_remaining = 0.0
+	_window_lifts_done = 0
+	_window_pending = false
+	_window_arrival_remaining = 0.0
+	_vent_phase = VentPhase.WAITING_FOR_LIFT
+	_phase_elapsed = 0.0
+
+
 ## The lockout half of the tick: drain heat to zero at the locked rate, then run the re-arm
 ## delay, then re-enable rushing. The `rushing` flag is deliberately ignored here — rush taps
 ## during a lockout are dead (GameState refuses the verbs too; this is the belt to that brace).
@@ -192,10 +455,13 @@ func _tick_lockout(delta: float) -> void:
 		# = half the drain time), the mirror of MULTIPLYING the re-arm delay below.
 		heat = maxf(heat - tuning.rush_momentum_locked_drain_per_second / _safe_lockout_scale() * delta, 0.0)
 		if heat <= 0.0:
-			# Fully cooled — the extra-sting re-arm delay starts only now, so its length is
-			# a constant feel knob rather than varying with how deep the overheat was.
+			# Fully cooled — the re-arm delay starts only now. Falling from higher hurts more
+			# (Plans/Overdrive_Vent_Windows.md): the per-tier sting captured at the overheat is
+			# added to the base BEFORE the Rapid Restart scale, so the Legacy discount divides
+			# the whole punishment, sting included.
 			_rearming = true
-			_rearm_remaining = tuning.rush_momentum_rearm_seconds * _safe_lockout_scale()
+			_rearm_remaining = (tuning.rush_momentum_rearm_seconds + _rearm_tier_sting) \
+					* _safe_lockout_scale()
 	else:
 		_rearm_remaining -= delta
 		if _rearm_remaining <= 0.0:
@@ -205,14 +471,19 @@ func _tick_lockout(delta: float) -> void:
 			rush_ready.emit()
 
 
-## Heat reached the ceiling: kill the bonus, disable rushing, and start the locked drain.
+## Heat reached the hard ceiling, or a vent window was missed: kill the bonus, disable rushing,
+## and start the locked drain.
 func _begin_overheat() -> void:
-	# Pin heat at the rolled ceiling so the bar starts its drain from the exact shutdown point
-	# (a fast tick could otherwise overshoot past it).
-	heat = _ceiling
+	# A fast tick can overshoot past the ceiling; pin heat back so the bar starts its drain
+	# from at most the ceiling. (A missed-window overheat simply drains from wherever heat was.)
+	heat = minf(heat, tuning.rush_momentum_hard_ceiling)
 	bonus = 0.0
 	_locked_out = true
 	_rearming = false
+	# Capture the ladder's re-arm sting BEFORE clearing it — the re-arm delay is not computed
+	# until the drain finishes (see _tick_lockout), by which time the tier is gone.
+	_rearm_tier_sting = tuning.rush_momentum_vent_fail_rearm_per_tier * _vent_tier
+	_clear_vent_state()
 	# The gamble ended (badly) — the next rush hold after the lockout starts back in cruise mode.
 	_overdrive_engaged = false
 	overheated.emit()
@@ -225,14 +496,14 @@ func _safe_lockout_scale() -> float:
 	return clampf(lockout_time_scale, 0.05, 1.0)
 
 
-## The band → bonus mapping: a pure, piecewise-LINEAR function of heat, so one variable drives
-## payout, display, and danger state (the "cash always matches the readout" invariant).
-## The Critical segment always spans up to ceiling_MAX — the mapping never depends on the secret
-## rolled ceiling, so the displayed bonus can't leak where this excursion's fuse ends.
+## The band → bonus mapping: a pure, piecewise-LINEAR function of (heat, vent tier), so one
+## function drives payout, display, and danger state (the "cash always matches the readout"
+## invariant). The Critical segment's top end is the LADDER peak — it rises with each
+## successful vent — so a vent visibly re-steepens the reward for the heat still ahead.
 func _bonus_for_heat(current_heat: float) -> float:
 	var hot_start := 1.0  # by definition of the heat unit (1.0 = the old cap)
 	var critical_start := tuning.rush_momentum_critical_start
-	var ceiling_max := tuning.rush_momentum_ceiling_max
+	var hard_ceiling := tuning.rush_momentum_hard_ceiling
 	if current_heat <= hot_start:
 		# Building: 0 → bonus_at_hot across [0, 1.0].
 		return tuning.rush_momentum_bonus_at_hot * (current_heat / hot_start)
@@ -240,10 +511,17 @@ func _bonus_for_heat(current_heat: float) -> float:
 		# Hot: bonus_at_hot → bonus_at_critical across [1.0, critical_start].
 		var hot_progress := (current_heat - hot_start) / (critical_start - hot_start)
 		return lerpf(tuning.rush_momentum_bonus_at_hot, tuning.rush_momentum_bonus_at_critical, hot_progress)
-	# Critical: bonus_at_critical → bonus_peak across [critical_start, ceiling_max].
+	# Critical: bonus_at_critical → the current ladder peak across [critical_start, hard_ceiling].
 	var critical_progress := clampf(
-		(current_heat - critical_start) / (ceiling_max - critical_start), 0.0, 1.0)
-	return lerpf(tuning.rush_momentum_bonus_at_critical, tuning.rush_momentum_bonus_peak, critical_progress)
+		(current_heat - critical_start) / (hard_ceiling - critical_start), 0.0, 1.0)
+	return lerpf(tuning.rush_momentum_bonus_at_critical, current_peak_bonus(), critical_progress)
+
+
+## The bonus at the hard ceiling with the CURRENT vent tier: the top of the reward ladder the
+## bar and chip quote (base peak +55%, each vent adds vent_bonus_step — +235% at the tier-4
+## cap with the defaults).
+func current_peak_bonus() -> float:
+	return tuning.rush_momentum_bonus_peak + _vent_tier * tuning.rush_momentum_vent_bonus_step
 
 
 ## The live property-income multiplier (1 + bonus). Multiplied into every property payout AND its
@@ -253,8 +531,8 @@ func factor() -> float:
 
 
 ## Opt in to the danger bands for THIS rush hold (the OVERDRIVE button). Releases the cruise
-## clamp so heat resumes climbing through Hot and Critical exactly as shipped — secret rolled
-## ceiling, overheat, lockout and all. A no-op during an overheat lockout (the button is dead).
+## clamp so heat resumes climbing through Hot and Critical — vent windows, hard ceiling,
+## lockout and all. A no-op during an overheat lockout (the button is dead).
 func engage_overdrive() -> void:
 	if _locked_out:
 		return
@@ -288,6 +566,27 @@ func cruise_heat() -> float:
 	return effective_cruise_bonus() / tuning.rush_momentum_bonus_at_hot
 
 
+## True while a vent window is OPEN (the gesture clock is running). GameState uses this to keep
+## the player counted as rushing — and the rushed property's grace alive — through the lifts.
+func is_vent_window_open() -> bool:
+	return _window_open
+
+
+## Seconds left to complete the gesture; 0 when no window is open.
+func vent_window_remaining() -> float:
+	return _window_remaining if _window_open else 0.0
+
+
+## Lifts the OPEN window demands (1 or 2). Only meaningful while is_vent_window_open().
+func vent_required_lifts() -> int:
+	return _window_required_lifts
+
+
+## Successful vents this excursion (0 .. vent_max_tiers) — the bonus ladder's current rung.
+func vent_tier() -> int:
+	return _vent_tier
+
+
 ## False from the overheat moment until rush_ready fires. GameState gates every rush verb on this.
 func can_rush() -> bool:
 	return not _locked_out
@@ -309,7 +608,7 @@ func current_band() -> Band:
 	# Building is INCLUSIVE of heat 1.0 (Plans/Rush_Cruise_Control.md boundary rule): with max
 	# Cooling Systems the cruise clamp sits at exactly 1.0, and parking there must not read as
 	# Hot or start an excursion — an excursion begins only when overdrive pushes heat PAST the
-	# tick. tick()'s excursion roll keys off this band crossing, so the rule lives here once.
+	# tick.
 	if heat <= 1.0:
 		return Band.BUILDING
 	if heat < tuning.rush_momentum_critical_start:
@@ -317,15 +616,16 @@ func current_band() -> Band:
 	return Band.CRITICAL
 
 
-## Wipe everything — heat, bonus, AND any in-progress lockout/re-arm. Called on each First
-## Contact so every epoch builds its own momentum fresh, which is what keeps the mechanic a
-## per-epoch pinch instead of a run-long snowball.
+## Wipe everything — heat, bonus, the vent ladder, AND any in-progress lockout/re-arm. Called
+## on each First Contact so every epoch builds its own momentum fresh, which is what keeps the
+## mechanic a per-epoch pinch instead of a run-long snowball.
 func reset() -> void:
 	heat = 0.0
 	bonus = 0.0
 	_locked_out = false
 	_rearming = false
 	_rearm_remaining = 0.0
+	_rearm_tier_sting = 0.0
 	_overdrive_engaged = false
 	_was_rushing = false
-	_ceiling = tuning.rush_momentum_ceiling_max
+	_clear_vent_state()

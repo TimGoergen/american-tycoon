@@ -1,17 +1,20 @@
 extends SceneTree
 
 # Headless verification for Rush Overheat — the push-your-luck heat model that replaced the
-# hold-forever momentum ratchet (Tim 2026-07-15; design of record: Plans/Rush_Overheat.md).
+# hold-forever momentum ratchet (Tim 2026-07-15; design of record: Plans/Rush_Overheat.md),
+# extended for VENT WINDOWS (Tim 2026-07-17; design of record: Plans/Overdrive_Vent_Windows.md).
 #
 # Usage: godot --headless --path . --script res://sim/RushOverheatTest.gd
 #
 # Proves, without any rendering:
 #   1. Building 0 → Hot takes ~6 s of sustained rushing (the old build feel is preserved).
 #   2. band_entered fires on the upward crossings, HOT then CRITICAL, in order.
-#   3. Overheat triggers at a per-excursion ceiling inside [ceiling_min, ceiling_max].
+#   3. Ignoring the vent telegraph is a MISS: the excursion overheats below the hard ceiling,
+#      with vent_missed announcing the blown window first.
 #   4. The lockout: rush disabled, bonus 0, heat drains at the locked rate, and rush_ready
 #      fires only rearm_seconds AFTER the bar empties — then rushing re-enables.
-#   5. A frenzy burn FREEZES everything: build, bleed, lockout drain, and re-arm countdown.
+#   5. A frenzy burn FREEZES everything: build, bleed, lockout drain, re-arm countdown, the
+#      vent-window scheduler, and an open window's gesture clock.
 #   6. reset() from mid-lockout restores a clean, rushable state (the First Contact wipe).
 #   7. The piecewise bonus mapping hits the knob values exactly at each band edge.
 #
@@ -23,12 +26,23 @@ extends SceneTree
 #  11. Legacy cruise points (Cooling Systems) raise the clamp, hard-capped at bonus_at_hot;
 #      parked at heat 1.0 exactly, cruising never starts an excursion (the boundary rule).
 #  12. The lockout time scale (Rapid Restart) halves the whole lockout at level 5.
-#  13. DUTY CYCLE: the cruise baseline (+25% forever, zero risk) vs a skilled ride/vent
-#      overdrive player's average bonus over 120 s — the printed pair is what the gamble
-#      is actually worth (measure, don't guess — durable lesson).
+#  13. DUTY CYCLE (legacy strategy): the cruise baseline vs the pre-vent-window "ride and
+#      release" rhythm — kept as the historical comparison point for the new numbers.
 #
-# NOTE: since Cruise Control, plain rushing CLAMPS at the cruise point — the danger-band
-# sections below call engage_overdrive() first, matching what the OVERDRIVE button does.
+# Vent Windows (Plans/Overdrive_Vent_Windows.md) add:
+#  14. The scheduler is deterministic under a seeded rng (reproducible window times).
+#  15. The gesture judge: clean single, clean double, gap-too-long, tap-too-long, expiry,
+#      and lifts on a closed window being ignored.
+#  16. The ladder math: tier 0..3 peak bonuses follow bonus_peak + tier × vent_bonus_step
+#      (0.55 / 0.75 / 0.95 / 1.15 with the default knobs).
+#  17. Venting clamps at critical_start (never OUT of Critical); the tier caps and windows
+#      stop arriving at the cap (the ride then ends at the hard ceiling).
+#  18. The miss penalty: the re-arm gains vent_fail_rearm_per_tier seconds per achieved tier,
+#      and Rapid Restart still scales the WHOLE lockout, sting included.
+#  19. The telegraph guarantee: across panel-plausible knob combos, the first window always
+#      opens with its full duration still ahead of the projected ceiling arrival.
+#  20. AUTOPILOT DUTY CYCLE (measure, don't guess): a modeled SKILLED venter (95% gesture
+#      success) vs a SLOPPY one (70%) vs the cruise baseline, over a long ride.
 #
 # Exits with code 0 only if every check passes (1 otherwise), so CI/headless runs fail loudly.
 
@@ -39,7 +53,7 @@ var _failures := 0
 
 
 func _initialize() -> void:
-	print("=== Rush Overheat — headless verification ===\n")
+	print("=== Rush Overheat + Vent Windows — headless verification ===\n")
 
 	var tuning := ConfigLoader.load_tuning(false)
 	if tuning == null:
@@ -48,7 +62,7 @@ func _initialize() -> void:
 		return
 
 	_test_build_time_to_hot(tuning)
-	_test_band_signals_and_ceiling(tuning)
+	_test_band_signals_and_missed_window(tuning)
 	_test_overheat_lockout(tuning)
 	_test_frenzy_freeze(tuning)
 	_test_reset_mid_lockout(tuning)
@@ -59,6 +73,13 @@ func _initialize() -> void:
 	_test_legacy_cruise_and_boundary(tuning)
 	_test_legacy_lockout_scale(tuning)
 	_measure_duty_cycle(tuning)
+	_test_scheduler_determinism(tuning)
+	_test_gesture_judge(tuning)
+	_test_ladder_math(tuning)
+	_test_vent_clamp_and_tier_cap(tuning)
+	_test_miss_penalty(tuning)
+	_test_telegraph_guarantee(tuning)
+	_measure_vent_autopilot_duty_cycle(tuning)
 
 	print("")
 	if _failures == 0:
@@ -76,18 +97,74 @@ func _check(label: String, condition: bool) -> void:
 		_failures += 1
 
 
-## A fresh heat state with a deterministic ceiling roll, so every run reproduces exactly.
+## A fresh heat state with a deterministic rng seed, so every run reproduces exactly.
+## (The rng now rolls vent-window ARRIVAL times — the old random ceiling is retired.)
 func _fresh_state(tuning: TuningConfig, seed_value: int) -> RushMomentumState:
 	var state := RushMomentumState.new(tuning)
 	state.rng.seed = seed_value
 	return state
 
 
+## Start a realistic overdrive ride: the finger goes down (so the gesture judge sees a held
+## button when a window opens) and overdrive is engaged.
+func _press_and_engage(state: RushMomentumState) -> void:
+	state.notify_rush_pressed()
+	state.engage_overdrive()
+
+
+## Rush a pressed, engaged state until a vent window OPENS. Returns the seconds it took,
+## or -1.0 if the state overheated (or the cap tripped) before a window arrived.
+func _ride_to_window_open(state: RushMomentumState, cap_seconds := 30.0) -> float:
+	var elapsed := 0.0
+	while not state.is_vent_window_open() and not state.is_locked_out() and elapsed < cap_seconds:
+		state.tick(TICK_SECONDS, true, false)
+		elapsed += TICK_SECONDS
+	return elapsed if state.is_vent_window_open() else -1.0
+
+
+## Perform a clean SINGLE-lift vent gesture: release, a 0.1 s gap, re-press.
+## Ticks keep rushing=true through the lift, exactly as GameState does while a window is open.
+func _perform_single_lift(state: RushMomentumState) -> void:
+	state.notify_rush_released()
+	state.tick(TICK_SECONDS, true, false)
+	state.notify_rush_pressed()
+
+
+## Perform a clean DOUBLE-lift vent gesture (Tim's double release):
+## release → 0.1 s gap → tap down → 0.1 s tap → tap up → 0.1 s gap → re-press.
+func _perform_double_lift(state: RushMomentumState) -> void:
+	state.notify_rush_released()
+	state.tick(TICK_SECONDS, true, false)
+	state.notify_rush_pressed()
+	state.tick(TICK_SECONDS, true, false)
+	state.notify_rush_released()
+	state.tick(TICK_SECONDS, true, false)
+	state.notify_rush_pressed()
+
+
+## Ride to the next `count` windows and vent each one cleanly (single or double as demanded).
+## Returns true only if every vent succeeded.
+func _vent_cleanly(state: RushMomentumState, count: int) -> bool:
+	for _i in range(count):
+		var tier_before := state.vent_tier()
+		if _ride_to_window_open(state) < 0.0:
+			return false
+		if state.vent_required_lifts() == 1:
+			_perform_single_lift(state)
+		else:
+			_perform_double_lift(state)
+		if state.vent_tier() != tier_before + 1:
+			return false
+	return true
+
+
 ## Rush a state upward until it overheats (or the safety cap trips). Returns the seconds spent.
 ## Engages overdrive first — since Cruise Control, a plain hold clamps safely at the cruise
 ## point, so reaching an overheat requires the opt-in (exactly like the OVERDRIVE button).
+## The hold never performs the vent gesture, so the FIRST vent window expires and misses —
+## since Vent Windows, that is what an ignored overdrive ride's overheat IS.
 func _rush_until_overheat(state: RushMomentumState) -> float:
-	state.engage_overdrive()
+	_press_and_engage(state)
 	var elapsed := 0.0
 	while not state.is_locked_out() and elapsed < 60.0:
 		state.tick(TICK_SECONDS, true, false)
@@ -99,7 +176,7 @@ func _test_build_time_to_hot(tuning: TuningConfig) -> void:
 	print("1. Building 0 -> Hot takes ~6 s of sustained rushing")
 	var state := _fresh_state(tuning, 1)
 	# Overdrive so the climb runs past the cruise clamp — this section times the raw build rate.
-	state.engage_overdrive()
+	_press_and_engage(state)
 	var elapsed := 0.0
 	while state.heat < 1.0 and elapsed < 30.0:
 		state.tick(TICK_SECONDS, true, false)
@@ -110,13 +187,17 @@ func _test_build_time_to_hot(tuning: TuningConfig) -> void:
 		absf(state.bonus - tuning.rush_momentum_bonus_at_hot) < 0.02)
 
 
-func _test_band_signals_and_ceiling(tuning: TuningConfig) -> void:
-	print("\n2 & 3. Band signals fire upward in order; overheat lands inside the ceiling window")
+func _test_band_signals_and_missed_window(tuning: TuningConfig) -> void:
+	print("\n2 & 3. Band signals fire upward in order; an ignored vent window misses and overheats")
 	var state := _fresh_state(tuning, 12345)
 	var bands_entered: Array = []
 	var overheat_count := [0]  # single-element array so the lambda can mutate it
+	var windows_opened := [0]
+	var misses: Array = []
 	state.band_entered.connect(func(band: RushMomentumState.Band) -> void: bands_entered.append(band))
 	state.overheated.connect(func() -> void: overheat_count[0] += 1)
+	state.vent_window_opened.connect(func(_lifts: int, _duration: float) -> void: windows_opened[0] += 1)
+	state.vent_missed.connect(func(done: int, required: int) -> void: misses.append([done, required]))
 
 	_rush_until_overheat(state)
 	_check("band_entered fired exactly twice on the way up", bands_entered.size() == 2)
@@ -124,24 +205,25 @@ func _test_band_signals_and_ceiling(tuning: TuningConfig) -> void:
 		bands_entered.size() >= 1 and bands_entered[0] == RushMomentumState.Band.HOT)
 	_check("second crossing was CRITICAL",
 		bands_entered.size() >= 2 and bands_entered[1] == RushMomentumState.Band.CRITICAL)
+	_check("exactly one vent window telegraphed before the shutdown", windows_opened[0] == 1)
+	_check("the ignored window was judged a MISS with zero lifts done",
+		misses.size() == 1 and misses[0][0] == 0)
 	_check("overheated fired exactly once", overheat_count[0] == 1)
-	print("     (overheated at heat %.3f)" % state.heat)
-	_check("overheat heat is inside [ceiling_min, ceiling_max]",
-		state.heat >= tuning.rush_momentum_ceiling_min
-			and state.heat <= tuning.rush_momentum_ceiling_max)
+	print("     (missed the window and overheated at heat %.3f)" % state.heat)
+	_check("the missed-window overheat lands inside Critical, below the hard ceiling",
+		state.heat > tuning.rush_momentum_critical_start
+			and state.heat < tuning.rush_momentum_hard_ceiling)
 
-	# A second excursion re-rolls the ceiling: cool below Hot, climb again, and confirm a
-	# (deterministically) different shutdown point — the anti-memorization roll.
-	var first_ceiling := state.heat
+	# A second excursion rolls a fresh window ARRIVAL: the shutdown height differs because the
+	# schedule (not the outcome) is the random part now — the anti-memorization property.
+	var first_overheat_heat := state.heat
 	state.reset()
-	var bands_second: Array = []
-	state.band_entered.connect(func(band: RushMomentumState.Band) -> void: bands_second.append(band))
 	_rush_until_overheat(state)
-	_check("second excursion also overheats inside the window",
-		state.heat >= tuning.rush_momentum_ceiling_min
-			and state.heat <= tuning.rush_momentum_ceiling_max)
-	_check("second excursion rolled a different ceiling (re-roll per excursion)",
-		not is_equal_approx(state.heat, first_ceiling))
+	_check("second excursion also misses inside Critical",
+		state.heat > tuning.rush_momentum_critical_start
+			and state.heat < tuning.rush_momentum_hard_ceiling)
+	_check("second excursion's window arrived at a different time (fresh schedule roll)",
+		not is_equal_approx(state.heat, first_overheat_heat))
 
 
 func _test_overheat_lockout(tuning: TuningConfig) -> void:
@@ -167,6 +249,7 @@ func _test_overheat_lockout(tuning: TuningConfig) -> void:
 		absf(drained - tuning.rush_momentum_locked_drain_per_second) < 0.005)
 
 	# Run the drain out, then time the re-arm: rush_ready fires only rearm_seconds AFTER empty.
+	# (This excursion achieved no vent tiers, so there is no per-tier sting — section 18 covers it.)
 	var elapsed := 0.0
 	while state.heat > 0.0 and elapsed < 60.0:
 		state.tick(TICK_SECONDS, false, false)
@@ -179,7 +262,7 @@ func _test_overheat_lockout(tuning: TuningConfig) -> void:
 		state.tick(TICK_SECONDS, false, false)
 		rearm_elapsed += TICK_SECONDS
 	print("     (rush_ready fired %.1f s after empty; knob says %.1f)" % [rearm_elapsed, tuning.rush_momentum_rearm_seconds])
-	_check("rush_ready fired ~rearm_seconds after the bar emptied",
+	_check("rush_ready fired ~rearm_seconds after the bar emptied (tier-0 excursion: no sting)",
 		absf(rearm_elapsed - tuning.rush_momentum_rearm_seconds) <= TICK_SECONDS + 0.001)
 	_check("can_rush() is true again after rush_ready", state.can_rush())
 	_check("no longer locked out or re-arming", not state.is_locked_out() and not state.is_rearming())
@@ -187,7 +270,7 @@ func _test_overheat_lockout(tuning: TuningConfig) -> void:
 
 
 func _test_frenzy_freeze(tuning: TuningConfig) -> void:
-	print("\n5. A frenzy burn freezes heat exactly (build, bleed, and lockout all halt)")
+	print("\n5. A frenzy burn freezes heat exactly (build, bleed, lockout, and vent clocks all halt)")
 
 	# Mid-build freeze: rushing during a burn adds no heat, and the bonus holds.
 	var state := _fresh_state(tuning, 42)
@@ -226,6 +309,33 @@ func _test_frenzy_freeze(tuning: TuningConfig) -> void:
 	_check("re-arm COUNTDOWN halts during a burn (rush_ready never fired)",
 		not ready_fired[0] and rearming.is_rearming())
 
+	# Vent SCHEDULER freeze: with a window rolled but not yet open, a long burn never opens it
+	# (the arrival countdown advances on tick delta only — no wall-clock leaks).
+	var pending := _fresh_state(tuning, 45)
+	var windows_opened := [0]
+	pending.vent_window_opened.connect(func(_lifts: int, _duration: float) -> void: windows_opened[0] += 1)
+	_press_and_engage(pending)
+	while pending.current_band() != RushMomentumState.Band.CRITICAL:
+		pending.tick(TICK_SECONDS, true, false)
+	pending.tick(TICK_SECONDS, true, false)  # one Critical tick so the schedule is rolled
+	for _i in range(200):  # 20 s of frenzy — far beyond delay_max
+		pending.tick(TICK_SECONDS, true, true)
+	_check("a PENDING window never opens during a burn (scheduler frozen)",
+		windows_opened[0] == 0 and not pending.is_locked_out())
+
+	# Open-window freeze: an OPEN window's countdown halts, so a burn can never expire it.
+	var open_state := _fresh_state(tuning, 46)
+	var open_missed := [0]
+	open_state.vent_missed.connect(func(_done: int, _required: int) -> void: open_missed[0] += 1)
+	_press_and_engage(open_state)
+	_check("(setup) a window opened for the freeze probe", _ride_to_window_open(open_state) >= 0.0)
+	var remaining_before := open_state.vent_window_remaining()
+	for _i in range(50):  # 5 s of frenzy — far beyond the ~1 s window
+		open_state.tick(TICK_SECONDS, true, true)
+	_check("an OPEN window's countdown halts during a burn (no miss, time held)",
+		open_state.is_vent_window_open() and open_missed[0] == 0
+			and is_equal_approx(open_state.vent_window_remaining(), remaining_before))
+
 
 func _test_reset_mid_lockout(tuning: TuningConfig) -> void:
 	print("\n6. reset() from mid-lockout restores a clean rushable state (First Contact wipe)")
@@ -239,6 +349,8 @@ func _test_reset_mid_lockout(tuning: TuningConfig) -> void:
 	_check("not locked out or re-arming after reset",
 		not state.is_locked_out() and not state.is_rearming())
 	_check("band is BUILDING after reset", state.current_band() == RushMomentumState.Band.BUILDING)
+	_check("vent ladder and window are wiped after reset",
+		state.vent_tier() == 0 and not state.is_vent_window_open())
 	# And the wiped state actually climbs again.
 	state.tick(1.0, true, false)
 	_check("a reset state builds heat again", state.heat > 0.0)
@@ -251,9 +363,9 @@ func _test_bonus_mapping(tuning: TuningConfig) -> void:
 	#   heat 0.5  -> halfway up Building         = bonus_at_hot / 2
 	#   heat 1.0  -> the Hot edge                = bonus_at_hot
 	#   heat 1.25 -> the Critical edge           = bonus_at_critical
-	#   heat 1.5  -> partway through Critical    = lerp toward bonus_peak at ceiling_max
+	#   heat 1.5  -> partway through Critical    = lerp toward the tier-0 peak at hard_ceiling
 	var critical_fraction := (1.5 - tuning.rush_momentum_critical_start) \
-			/ (tuning.rush_momentum_ceiling_max - tuning.rush_momentum_critical_start)
+			/ (tuning.rush_momentum_hard_ceiling - tuning.rush_momentum_critical_start)
 	var probes := [
 		[0.5, tuning.rush_momentum_bonus_at_hot * 0.5],
 		[1.0, tuning.rush_momentum_bonus_at_hot],
@@ -298,9 +410,12 @@ func _test_overdrive_engage(tuning: TuningConfig) -> void:
 	print("\n9. engage_overdrive() releases the clamp: the climb resumes to a real overheat")
 	var state := _fresh_state(tuning, 100)
 	var bands_entered: Array = []
+	var missed := [0]
 	state.band_entered.connect(func(band: RushMomentumState.Band) -> void: bands_entered.append(band))
+	state.vent_missed.connect(func(_done: int, _required: int) -> void: missed[0] += 1)
 
 	# Settle into the cruise clamp first, then opt in.
+	state.notify_rush_pressed()
 	for _i in range(100):  # 10 s — well past the ~5 s climb to the clamp
 		state.tick(TICK_SECONDS, true, false)
 	_check("(setup) parked at the cruise clamp", is_equal_approx(state.heat, state.cruise_heat()))
@@ -314,9 +429,8 @@ func _test_overdrive_engage(tuning: TuningConfig) -> void:
 		elapsed += TICK_SECONDS
 	print("     (overheated %.1f s after engaging, at heat %.3f)" % [elapsed, state.heat])
 	_check("the resumed climb reaches a real overheat", state.is_locked_out())
-	_check("overheat landed inside [ceiling_min, ceiling_max]",
-		state.heat >= tuning.rush_momentum_ceiling_min
-			and state.heat <= tuning.rush_momentum_ceiling_max)
+	_check("the overheat was the ignored window's MISS, below the hard ceiling",
+		missed[0] == 1 and state.heat < tuning.rush_momentum_hard_ceiling)
 	_check("HOT and CRITICAL both announced on the way up",
 		bands_entered == [RushMomentumState.Band.HOT, RushMomentumState.Band.CRITICAL])
 	_check("overdrive disengaged by the overheat", not state.is_overdrive_engaged())
@@ -325,8 +439,9 @@ func _test_overdrive_engage(tuning: TuningConfig) -> void:
 func _test_overdrive_disengages_on_release(tuning: TuningConfig) -> void:
 	print("\n10. Overdrive is per-excursion: releasing the hold disengages it")
 	var state := _fresh_state(tuning, 101)
-	state.engage_overdrive()
-	# Ride ~2 s past the cruise point — above the clamp but still safely below ceiling_min.
+	_press_and_engage(state)
+	# Ride ~2 s past the cruise point — above the clamp but still safely inside Hot, below
+	# Critical, so no vent window can be scheduled during the ride.
 	for _i in range(70):  # 7 s: ~6 s to the Hot edge plus ~1 s into Hot
 		state.tick(TICK_SECONDS, true, false)
 	_check("(setup) rode above the cruise point without overheating",
@@ -334,6 +449,7 @@ func _test_overdrive_disengages_on_release(tuning: TuningConfig) -> void:
 	_check("(setup) overdrive engaged mid-ride", state.is_overdrive_engaged())
 
 	# One released tick = the hold ended. That alone must disengage overdrive.
+	state.notify_rush_released()
 	state.tick(TICK_SECONDS, false, false)
 	_check("one non-rushing tick disengages overdrive", not state.is_overdrive_engaged())
 
@@ -341,6 +457,7 @@ func _test_overdrive_disengages_on_release(tuning: TuningConfig) -> void:
 	# the ride bleeds DOWN to the cruise point (never sustained for free) and pins there.
 	var overheat_count := [0]
 	state.overheated.connect(func() -> void: overheat_count[0] += 1)
+	state.notify_rush_pressed()
 	for _i in range(300):  # 30 s of plain holding
 		state.tick(TICK_SECONDS, true, false)
 	_check("the re-hold is cruising again", state.is_cruising())
@@ -383,6 +500,7 @@ func _test_legacy_cruise_and_boundary(tuning: TuningConfig) -> void:
 	var bands_entered: Array = []
 	state.overheated.connect(func() -> void: overheat_count[0] += 1)
 	state.band_entered.connect(func(band: RushMomentumState.Band) -> void: bands_entered.append(band))
+	state.notify_rush_pressed()
 	for _i in range(600):  # 60 s parked at the tick
 		state.tick(TICK_SECONDS, true, false)
 	_check("heat parks at 1.0 exactly", is_equal_approx(state.heat, 1.0))
@@ -399,13 +517,13 @@ func _test_legacy_cruise_and_boundary(tuning: TuningConfig) -> void:
 	while not state.is_locked_out() and elapsed < 60.0:
 		state.tick(TICK_SECONDS, true, false)
 		elapsed += TICK_SECONDS
-	_check("overdrive from the 1.0 boundary rolls an excursion and overheats normally",
+	_check("overdrive from the 1.0 boundary rides to a normal overheat",
 		state.is_locked_out() and bands_entered.size() == 2)
 
 
 func _test_legacy_lockout_scale(tuning: TuningConfig) -> void:
 	print("\n12. Rapid Restart at level 5 halves the whole lockout (drain AND re-arm together)")
-	# Same seed = the same rolled ceiling, so the two lockouts start from identical heat and
+	# Same seed = the same window schedule, so the two lockouts start from identical heat and
 	# the only difference is the scale.
 	var baseline := _fresh_state(tuning, 104)
 	var halved := _fresh_state(tuning, 104)
@@ -430,14 +548,14 @@ func _measure_lockout_seconds(state: RushMomentumState) -> float:
 	return elapsed
 
 
-## The balance measurement (not a pass/fail test): a SKILLED player rides heat up to 1.30 and
-## vents back to 1.00, over and over, never overheating (1.30 is safely below ceiling_min 1.40).
-## The average bonus over 120 s is the realistic value of the mechanic — and since Cruise
-## Control it is measured AGAINST the zero-effort cruise baseline (+25% forever), so the
-## printed pair is exactly what the overdrive gamble is worth (the number Tim needs).
+## The LEGACY balance measurement (kept as the historical comparison point): the pre-vent-window
+## "skilled" strategy rode heat up to 1.30 and released back to 1.00, never venting a window
+## (the ride's ~0.7 s of Critical per lap is far shorter than the earliest window arrival, so
+## no window ever opens). Its average vs cruise is the +10.3% edge Tim judged too small — the
+## number the vent-window autopilot (section 20) exists to beat.
 func _measure_duty_cycle(tuning: TuningConfig) -> void:
-	print("\n13. DUTY-CYCLE MEASUREMENT — cruise baseline vs skilled ride/vent, 120 simulated seconds")
-	const RIDE_TOP := 1.30   # release point, below the earliest possible ceiling (1.40)
+	print("\n13. LEGACY DUTY CYCLE — cruise baseline vs the old ride/release rhythm, 120 s")
+	const RIDE_TOP := 1.30   # release point: barely into Critical, gone before a window arrives
 	const VENT_BOTTOM := 1.0  # re-engage point, the Hot edge
 	var total_seconds := 120.0
 
@@ -454,7 +572,7 @@ func _measure_duty_cycle(tuning: TuningConfig) -> void:
 	var cruise_average := cruise_bonus_seconds / total_seconds
 	_check("the cruise hold never overheats", not cruise_overheated[0])
 
-	# The gamble: the skilled overdrive player rides to the top and vents, over and over.
+	# The old gamble: ride to the top of the safe zone and release, over and over.
 	var state := _fresh_state(tuning, 2026)
 	state.engage_overdrive()
 	var overheated_during_run := [false]
@@ -467,7 +585,7 @@ func _measure_duty_cycle(tuning: TuningConfig) -> void:
 		state.tick(TICK_SECONDS, rushing, false)
 		elapsed += TICK_SECONDS
 		total_bonus_seconds += state.bonus * TICK_SECONDS
-		# The skilled player's rhythm: vent at the ride top, re-engage at the Hot edge.
+		# The old rhythm: release at the ride top, re-engage at the Hot edge.
 		# Each re-engage taps OVERDRIVE again — the release tick disengaged it (per-excursion).
 		if rushing and state.heat >= RIDE_TOP:
 			rushing = false
@@ -476,13 +594,516 @@ func _measure_duty_cycle(tuning: TuningConfig) -> void:
 			state.engage_overdrive()
 
 	var average_bonus := total_bonus_seconds / total_seconds
-	_check("the skilled rhythm never overheats", not overheated_during_run[0])
-	print("")
+	_check("the old ride/release rhythm never overheats (windows never get time to open)",
+		not overheated_during_run[0])
 	print("  >>> CRUISE BASELINE AVERAGE BONUS: +%.1f%% (holds at +%.0f%% forever, zero risk) <<<"
 			% [cruise_average * 100.0, cruise_state.effective_cruise_bonus() * 100.0])
-	print("  >>> SKILLED OVERDRIVE AVERAGE BONUS: +%.1f%% (peak is +%.0f%%) <<<"
-			% [average_bonus * 100.0, tuning.rush_momentum_bonus_peak * 100.0])
-	print("  >>> THE GAMBLE IS WORTH: +%.1f%% over cruising (before any overheat losses) <<<"
-			% [(average_bonus - cruise_average) * 100.0])
-	print("      (ride to heat %.2f, vent to %.2f, 120 s including the initial cold climb)"
-			% [RIDE_TOP, VENT_BOTTOM])
+	print("  >>> OLD RIDE/RELEASE AVERAGE BONUS: +%.1f%% — the pre-vent-window comparison <<<"
+			% [average_bonus * 100.0])
+
+
+func _test_scheduler_determinism(tuning: TuningConfig) -> void:
+	print("\n14. The window scheduler is deterministic under a seeded rng")
+	# Two identically seeded states must produce identical window times AND identical
+	# missed-window overheat heights; a different seed must diverge.
+	var first := _fresh_state(tuning, 555)
+	var second := _fresh_state(tuning, 555)
+	_press_and_engage(first)
+	_press_and_engage(second)
+	var first_open := _ride_to_window_open(first)
+	var second_open := _ride_to_window_open(second)
+	print("     (seed 555 opened its first window at %.1f s in both runs)" % first_open)
+	_check("same seed opens the first window at the same time",
+		first_open >= 0.0 and is_equal_approx(first_open, second_open))
+
+	# Ride the same-seed pair to their (missed) overheat: identical shutdown heights.
+	var first_elapsed := 0.0
+	while not first.is_locked_out() and first_elapsed < 30.0:
+		first.tick(TICK_SECONDS, true, false)
+		first_elapsed += TICK_SECONDS
+	var second_elapsed := 0.0
+	while not second.is_locked_out() and second_elapsed < 30.0:
+		second.tick(TICK_SECONDS, true, false)
+		second_elapsed += TICK_SECONDS
+	_check("same seed reproduces the same missed-window overheat height",
+		first.is_locked_out() and is_equal_approx(first.heat, second.heat))
+
+	# Different seeds must actually vary. One pair of seeds CAN legitimately collide — open
+	# times are quantized to the 0.1 s tick across a ~1 s delay range — so probe a handful of
+	# seeds and require the first-window time to vary somewhere in the batch.
+	var open_times_varied := false
+	for probe_seed in range(556, 562):
+		var probe := _fresh_state(tuning, probe_seed)
+		_press_and_engage(probe)
+		if not is_equal_approx(_ride_to_window_open(probe), first_open):
+			open_times_varied = true
+			break
+	_check("different seeds roll different window arrivals (across a seed batch)",
+		open_times_varied)
+
+
+func _test_gesture_judge(tuning: TuningConfig) -> void:
+	print("\n15. The gesture judge: clean gestures succeed, blown beats miss, closed windows ignore")
+
+	# --- Clean single, then clean double, on one continuous ride ---
+	var state := _fresh_state(tuning, 700)
+	var lifts: Array = []
+	var successes: Array = []
+	var misses: Array = []
+	state.vent_lift_registered.connect(func(done: int, required: int) -> void: lifts.append([done, required]))
+	state.vent_succeeded.connect(func(tier: int, peak: float) -> void: successes.append([tier, peak]))
+	state.vent_missed.connect(func(done: int, required: int) -> void: misses.append([done, required]))
+	_press_and_engage(state)
+	_check("(setup) first window opened", _ride_to_window_open(state) >= 0.0)
+	_check("the first window (tier 0) demands the SINGLE feather", state.vent_required_lifts() == 1)
+	var heat_before_vent := state.heat
+	_perform_single_lift(state)
+	_check("clean single lift succeeds the vent", successes.size() == 1 and state.vent_tier() == 1)
+	_check("the single's lift beat was registered as 1 of 1",
+		lifts.size() == 1 and lifts[0][0] == 1 and lifts[0][1] == 1)
+	_check("success vented heat downward", state.heat < heat_before_vent)
+	_check("the window closed on success",
+		not state.is_vent_window_open() and is_zero_approx(state.vent_window_remaining()))
+
+	_check("(setup) second window opened", _ride_to_window_open(state) >= 0.0)
+	_check("the tier-1 window demands the DOUBLE release (vent_double_from_tier)",
+		state.vent_required_lifts() == 2)
+	lifts.clear()
+	_perform_double_lift(state)
+	_check("clean double release succeeds the vent", successes.size() == 2 and state.vent_tier() == 2)
+	_check("both lift beats were registered in order (1 of 2, then 2 of 2)",
+		lifts.size() == 2 and lifts[0][0] == 1 and lifts[1][0] == 2)
+	_check("no miss fired during the clean gestures", misses.is_empty())
+
+	# --- Gap too long: lift, then hover past vent_gap_max without re-pressing ---
+	var gap_state := _fresh_state(tuning, 701)
+	var gap_misses: Array = []
+	var gap_overheated := [0]
+	gap_state.vent_missed.connect(func(done: int, required: int) -> void: gap_misses.append([done, required]))
+	gap_state.overheated.connect(func() -> void: gap_overheated[0] += 1)
+	_press_and_engage(gap_state)
+	_check("(setup) window opened for the gap-too-long case", _ride_to_window_open(gap_state) >= 0.0)
+	gap_state.notify_rush_released()
+	var gap_ticks := int(ceil((tuning.rush_momentum_vent_gap_max + 0.2) / TICK_SECONDS))
+	for _i in range(gap_ticks):
+		gap_state.tick(TICK_SECONDS, true, false)
+	_check("a gap past vent_gap_max is a MISS (0 lifts done) and overheats",
+		gap_misses.size() == 1 and gap_misses[0][0] == 0 and gap_overheated[0] == 1)
+
+	# --- Tap too long: on a double window, hold the middle tap past vent_tap_max ---
+	var tap_state := _fresh_state(tuning, 702)
+	var tap_misses: Array = []
+	tap_state.vent_missed.connect(func(done: int, required: int) -> void: tap_misses.append([done, required]))
+	_press_and_engage(tap_state)
+	_check("(setup) vented once to reach a double window", _vent_cleanly(tap_state, 1))
+	_check("(setup) double window opened", _ride_to_window_open(tap_state) >= 0.0
+			and tap_state.vent_required_lifts() == 2)
+	tap_state.notify_rush_released()
+	tap_state.tick(TICK_SECONDS, true, false)
+	tap_state.notify_rush_pressed()  # the middle tap goes down (lift 1 registers)...
+	var tap_ticks := int(ceil((tuning.rush_momentum_vent_tap_max + 0.2) / TICK_SECONDS))
+	for _i in range(tap_ticks):  # ...and never comes back up in time
+		tap_state.tick(TICK_SECONDS, true, false)
+	_check("a middle tap held past vent_tap_max is a MISS showing 1 of 2 lifts done",
+		tap_misses.size() == 1 and tap_misses[0][0] == 1 and tap_misses[0][1] == 2
+			and tap_state.is_locked_out())
+
+	# --- Expiry: hold straight through the window without ever lifting ---
+	var expiry_state := _fresh_state(tuning, 703)
+	var expiry_misses: Array = []
+	expiry_state.vent_missed.connect(func(done: int, required: int) -> void: expiry_misses.append([done, required]))
+	_press_and_engage(expiry_state)
+	_check("(setup) window opened for the expiry case", _ride_to_window_open(expiry_state) >= 0.0)
+	var expiry_ticks := int(ceil((tuning.rush_momentum_vent_window_duration + 0.2) / TICK_SECONDS))
+	for _i in range(expiry_ticks):
+		expiry_state.tick(TICK_SECONDS, true, false)
+	_check("holding through the whole window is a MISS (0 lifts done) and overheats",
+		expiry_misses.size() == 1 and expiry_misses[0][0] == 0 and expiry_state.is_locked_out())
+
+	# --- Lifts on a CLOSED window are ordinary taps: no signals, no state damage ---
+	var closed_state := _fresh_state(tuning, 704)
+	var closed_signals := [0]
+	closed_state.vent_lift_registered.connect(func(_done: int, _required: int) -> void: closed_signals[0] += 1)
+	closed_state.vent_succeeded.connect(func(_tier: int, _peak: float) -> void: closed_signals[0] += 1)
+	closed_state.vent_missed.connect(func(_done: int, _required: int) -> void: closed_signals[0] += 1)
+	_press_and_engage(closed_state)
+	for _i in range(30):  # 3 s: still climbing Building — far from any window
+		closed_state.tick(TICK_SECONDS, true, false)
+	for _i in range(3):  # rapid lift/re-press flurry with no window open
+		closed_state.notify_rush_released()
+		closed_state.tick(TICK_SECONDS, true, false)
+		closed_state.notify_rush_pressed()
+		closed_state.tick(TICK_SECONDS, true, false)
+	_check("lifts with no window open emit no vent signals and change no vent state",
+		closed_signals[0] == 0 and closed_state.vent_tier() == 0
+			and not closed_state.is_locked_out())
+
+
+func _test_ladder_math(tuning: TuningConfig) -> void:
+	print("\n16. The reward ladder: peak bonus climbs by vent_bonus_step per tier")
+	var state := _fresh_state(tuning, 800)
+	_press_and_engage(state)
+	var expected_peaks: Array = []
+	for tier in range(tuning.rush_momentum_vent_max_tiers + 1):
+		expected_peaks.append(tuning.rush_momentum_bonus_peak
+				+ tier * tuning.rush_momentum_vent_bonus_step)
+	print("     (expected peaks by tier: %s)" % [expected_peaks])
+
+	_check("tier 0 peak is %.2f" % expected_peaks[0],
+		absf(state.current_peak_bonus() - expected_peaks[0]) < 0.0001)
+	_check("tier 0 bonus AT the hard ceiling equals the tier-0 peak",
+		absf(state._bonus_for_heat(tuning.rush_momentum_hard_ceiling) - expected_peaks[0]) < 0.0001)
+	for tier in range(1, tuning.rush_momentum_vent_max_tiers + 1):
+		if not _vent_cleanly(state, 1):
+			_check("(setup) vent to tier %d succeeded" % tier, false)
+			return
+		_check("tier %d peak is %.2f" % [tier, expected_peaks[tier]],
+			absf(state.current_peak_bonus() - expected_peaks[tier]) < 0.0001)
+		_check("tier %d bonus AT the hard ceiling equals its peak" % tier,
+			absf(state._bonus_for_heat(tuning.rush_momentum_hard_ceiling) - expected_peaks[tier]) < 0.0001)
+
+
+func _test_vent_clamp_and_tier_cap(tuning: TuningConfig) -> void:
+	print("\n17. Venting clamps INSIDE Critical; the tier cap stops the windows")
+
+	# Clamp: with an absurdly large vent drop, a success still lands exactly at critical_start —
+	# venting keeps you IN Critical, never back to safety (the ratchet is the reward, not an exit).
+	var deep_drop: TuningConfig = tuning.duplicate()
+	deep_drop.rush_momentum_vent_heat_drop = 5.0
+	var clamp_state := _fresh_state(deep_drop, 900)
+	_press_and_engage(clamp_state)
+	_check("(setup) clamp-case vent succeeded", _vent_cleanly(clamp_state, 1))
+	_check("an oversized vent clamps heat at critical_start exactly",
+		is_equal_approx(clamp_state.heat, deep_drop.rush_momentum_critical_start))
+	_check("the vented state still reads as CRITICAL",
+		clamp_state.current_band() == RushMomentumState.Band.CRITICAL)
+
+	# Cap: after vent_max_tiers successes the windows stop arriving — nothing left to earn —
+	# and the continued ride ends at the hard ceiling backstop.
+	var cap_state := _fresh_state(tuning, 901)
+	var windows_after_cap := [0]
+	var at_cap := [false]
+	cap_state.vent_window_opened.connect(func(_lifts: int, _duration: float) -> void:
+		if at_cap[0]:
+			windows_after_cap[0] += 1)
+	_press_and_engage(cap_state)
+	_check("(setup) vented to the tier cap", _vent_cleanly(cap_state, tuning.rush_momentum_vent_max_tiers))
+	_check("vent_tier() sits at the cap", cap_state.vent_tier() == tuning.rush_momentum_vent_max_tiers)
+	at_cap[0] = true
+	var elapsed := 0.0
+	while not cap_state.is_locked_out() and elapsed < 30.0:
+		cap_state.tick(TICK_SECONDS, true, false)
+		elapsed += TICK_SECONDS
+	_check("no further window opened after the cap", windows_after_cap[0] == 0)
+	_check("the capped ride overheats AT the hard ceiling (pinned)",
+		cap_state.is_locked_out()
+			and is_equal_approx(cap_state.heat, tuning.rush_momentum_hard_ceiling))
+
+
+func _test_miss_penalty(tuning: TuningConfig) -> void:
+	print("\n18. The miss penalty: per-tier re-arm sting, still scaled whole by Rapid Restart")
+	# Same seed and same script twice, so both runs overheat from identical heat at tier 2;
+	# the only difference in the second run is the Rapid Restart scale.
+	var baseline := _fresh_state(tuning, 950)
+	var discounted := _fresh_state(tuning, 950)
+	discounted.lockout_time_scale = 0.5
+
+	var baseline_result := _overheat_at_tier_two(baseline, tuning)
+	var discounted_result := _overheat_at_tier_two(discounted, tuning)
+
+	var expected_drain: float = baseline_result["overheat_heat"] / tuning.rush_momentum_locked_drain_per_second
+	var expected_rearm: float = tuning.rush_momentum_rearm_seconds \
+			+ 2.0 * tuning.rush_momentum_vent_fail_rearm_per_tier
+	var expected_total := expected_drain + expected_rearm
+	print("     (tier-2 lockout: measured %.1f s, expected %.1f s = %.1f drain + %.1f re-arm)"
+			% [baseline_result["lockout_seconds"], expected_total, expected_drain, expected_rearm])
+	_check("both runs overheated after exactly two clean vents, from the same heat",
+		baseline_result["clean_vents"] == 2 and discounted_result["clean_vents"] == 2
+			and is_equal_approx(baseline_result["overheat_heat"], discounted_result["overheat_heat"]))
+	_check("the lockout includes the per-tier re-arm sting",
+		absf(baseline_result["lockout_seconds"] - expected_total) <= 4.0 * TICK_SECONDS + 0.001)
+	print("     (Rapid Restart 0.5: measured %.1f s vs %.1f s baseline)"
+			% [discounted_result["lockout_seconds"], baseline_result["lockout_seconds"]])
+	_check("Rapid Restart halves the WHOLE lockout, sting included",
+		absf(discounted_result["lockout_seconds"] - baseline_result["lockout_seconds"] / 2.0)
+			<= 3.0 * TICK_SECONDS + 0.001)
+
+
+## Vent twice cleanly, then keep holding without venting so the excursion overheats at tier 2
+## (via the ignored third window or the hard ceiling — whichever the schedule reaches first;
+## the per-tier sting applies to both overheat causes identically). Returns the clean vents
+## performed, the heat the overheat fell from, and the full lockout length.
+func _overheat_at_tier_two(state: RushMomentumState, tuning: TuningConfig) -> Dictionary:
+	var ready_fired := [false]
+	var clean_vents := [0]
+	state.rush_ready.connect(func() -> void: ready_fired[0] = true)
+	state.vent_succeeded.connect(func(_tier: int, _peak: float) -> void: clean_vents[0] += 1)
+	_press_and_engage(state)
+	_vent_cleanly(state, 2)
+	var elapsed := 0.0
+	while not state.is_locked_out() and elapsed < 30.0:  # ride on, ignoring any third window
+		state.tick(TICK_SECONDS, true, false)
+		elapsed += TICK_SECONDS
+	var overheat_heat := state.heat
+	var lockout_seconds := 0.0
+	while not ready_fired[0] and lockout_seconds < 120.0:
+		state.tick(TICK_SECONDS, false, false)
+		lockout_seconds += TICK_SECONDS
+	return {
+		"clean_vents": clean_vents[0],
+		"overheat_heat": overheat_heat,
+		"lockout_seconds": lockout_seconds,
+	}
+
+
+func _test_telegraph_guarantee(tuning: TuningConfig) -> void:
+	print("\n19. The telegraph guarantee holds across panel-plausible knob combos")
+	# For each combo, the FIRST window must open with its full duration still ahead of the
+	# projected hard-ceiling arrival — heat_at_open + duration × build_hot <= hard_ceiling
+	# (plus one tick of slack, since the open is quantized to the tick that notices the delay
+	# elapsed). Each combo runs several seeds so the roll can't get lucky.
+	var combos := [
+		{"label": "defaults", "delay_max": tuning.rush_momentum_vent_window_delay_max,
+			"build_hot": tuning.rush_momentum_heat_build_hot_per_second,
+			"duration": tuning.rush_momentum_vent_window_duration},
+		{"label": "delay_max 8", "delay_max": 8.0,
+			"build_hot": tuning.rush_momentum_heat_build_hot_per_second,
+			"duration": tuning.rush_momentum_vent_window_duration},
+		{"label": "build_hot x2", "delay_max": tuning.rush_momentum_vent_window_delay_max,
+			"build_hot": tuning.rush_momentum_heat_build_hot_per_second * 2.0,
+			"duration": tuning.rush_momentum_vent_window_duration},
+		{"label": "delay_max 8 + build_hot x2", "delay_max": 8.0,
+			"build_hot": tuning.rush_momentum_heat_build_hot_per_second * 2.0,
+			"duration": tuning.rush_momentum_vent_window_duration},
+		{"label": "delay_max 8 + duration 1.5", "delay_max": 8.0,
+			"build_hot": tuning.rush_momentum_heat_build_hot_per_second,
+			"duration": 1.5},
+	]
+	for combo_variant in combos:
+		var combo: Dictionary = combo_variant
+		var combo_tuning: TuningConfig = tuning.duplicate()
+		combo_tuning.rush_momentum_vent_window_delay_max = combo["delay_max"]
+		combo_tuning.rush_momentum_heat_build_hot_per_second = combo["build_hot"]
+		combo_tuning.rush_momentum_vent_window_duration = combo["duration"]
+		var all_seeds_ok := true
+		for seed_value in range(1, 6):
+			var state := _fresh_state(combo_tuning, 3000 + seed_value)
+			var open_info: Array = []  # [heat_at_open, duration] captured at the open moment
+			state.vent_window_opened.connect(func(_lifts: int, duration: float) -> void:
+				open_info.append([state.heat, duration]))
+			_press_and_engage(state)
+			var opened := _ride_to_window_open(state, 60.0) >= 0.0
+			if not opened or open_info.is_empty():
+				all_seeds_ok = false
+				continue
+			var heat_at_open: float = open_info[0][0]
+			var open_duration: float = open_info[0][1]
+			# One tick of build-rate slack: the open is noticed on a tick boundary.
+			var slack: float = combo["build_hot"] * TICK_SECONDS + 0.0001
+			if heat_at_open + open_duration * combo["build_hot"] \
+					> combo_tuning.rush_momentum_hard_ceiling + slack:
+				all_seeds_ok = false
+		_check("[%s] the first window always fully fits before the ceiling" % combo["label"],
+			all_seeds_ok)
+
+
+func _measure_vent_autopilot_duty_cycle(tuning: TuningConfig) -> void:
+	print("\n20. AUTOPILOT DUTY CYCLE — skilled and sloppy venters vs cruise, %d simulated seconds"
+			% int(AUTOPILOT_SECONDS))
+
+	# Cruise baseline: the zone-out player holds forever, zero risk.
+	var cruise_state := _fresh_state(tuning, 4000)
+	var cruise_bonus_seconds := 0.0
+	var cruise_ticks := int(round(AUTOPILOT_SECONDS / TICK_SECONDS))
+	for _i in range(cruise_ticks):
+		cruise_state.tick(TICK_SECONDS, true, false)
+		cruise_bonus_seconds += cruise_state.bonus * TICK_SECONDS
+	var cruise_average := cruise_bonus_seconds / AUTOPILOT_SECONDS
+
+	# The modeled venters: identical policy (hold, gesture on every window after a 0.3 s
+	# reaction, a skill-rolled bail read just under the ceiling at the tier cap); only the
+	# reliability differs. Averaged over several seeds — one 600 s ride is noisy enough
+	# (one extra fumble swings the average by a couple of points) to mislead a retune.
+	var skilled := _run_vent_autopilot_seeds(tuning, 4001, 0.95)
+	var sloppy := _run_vent_autopilot_seeds(tuning, 4002, 0.70)
+
+	print("")
+	print("  >>> CRUISE BASELINE AVERAGE BONUS:  +%.1f%% (zero risk, zero skill) <<<"
+			% [cruise_average * 100.0])
+	print("  >>> SKILLED VENTER (95%% gestures):  +%.1f%% avg (%d vents, %d overheats over %d seeds) <<<"
+			% [skilled["average_bonus"] * 100.0, skilled["vents"], skilled["overheats"],
+			AUTOPILOT_SEED_RUNS])
+	print("  >>> SLOPPY VENTER  (70%% gestures):  +%.1f%% avg (%d vents, %d overheats over %d seeds) <<<"
+			% [sloppy["average_bonus"] * 100.0, sloppy["vents"], sloppy["overheats"],
+			AUTOPILOT_SEED_RUNS])
+	print("      (per-seed time split, skilled: %.0f s Critical / %.0f s climbing / %.0f s locked out;"
+			% [skilled["critical_seconds"], skilled["climbing_seconds"], skilled["locked_seconds"]])
+	print("       per-seed time split, sloppy:  %.0f s Critical / %.0f s climbing / %.0f s locked out)"
+			% [sloppy["critical_seconds"], sloppy["climbing_seconds"], sloppy["locked_seconds"]])
+	print("      (targets: skilled ~+60-80%, a gap worth interrupting cruise for;")
+	print("       sloppy at or below cruise, so the risk stays real)")
+	_check("the skilled venter averages ~+60-80% (worth the risk)",
+		skilled["average_bonus"] >= 0.55 and skilled["average_bonus"] <= 0.85)
+	_check("the sloppy venter lands at or below cruise (the risk is real)",
+		sloppy["average_bonus"] <= cruise_average + 0.005)
+	_check("the skilled venter actually overheats sometimes (5% misses bite)",
+		skilled["overheats"] >= 1)
+	_check("no CLEAN gesture was ever judged a miss (autopilot and judge agree on the rules)",
+		skilled["clean_missed"] == 0 and sloppy["clean_missed"] == 0)
+
+
+## Average _run_vent_autopilot over AUTOPILOT_SEED_RUNS seeds. average_bonus and the time
+## splits come back as per-seed means; vents/overheats/misses as totals across all seeds.
+func _run_vent_autopilot_seeds(tuning: TuningConfig, base_seed: int, gesture_success: float) -> Dictionary:
+	var totals := {
+		"average_bonus": 0.0, "vents": 0, "overheats": 0, "missed_windows": 0,
+		"clean_missed": 0, "locked_seconds": 0.0, "critical_seconds": 0.0, "climbing_seconds": 0.0,
+	}
+	for s in range(AUTOPILOT_SEED_RUNS):
+		var run := _run_vent_autopilot(tuning, base_seed + s * 100, gesture_success)
+		totals["average_bonus"] += run["average_bonus"] / AUTOPILOT_SEED_RUNS
+		totals["vents"] += run["vents"]
+		totals["overheats"] += run["overheats"]
+		totals["missed_windows"] += run["missed_windows"]
+		totals["clean_missed"] += run["clean_missed"]
+		totals["locked_seconds"] += run["locked_seconds"] / AUTOPILOT_SEED_RUNS
+		totals["critical_seconds"] += run["critical_seconds"] / AUTOPILOT_SEED_RUNS
+		totals["climbing_seconds"] += run["climbing_seconds"] / AUTOPILOT_SEED_RUNS
+	return totals
+
+
+## How long the autopilot rides for. Long enough that the skilled venter's ~5% miss rate is
+## actually sampled (a miss only comes up once every ~15-20 windows).
+const AUTOPILOT_SECONDS := 600.0
+
+## Independent 600 s rides averaged per profile — a single seed's fumble luck swings the
+## average by a couple of points, enough to mislead a retune.
+const AUTOPILOT_SEED_RUNS := 5
+
+## Ticks the autopilot waits after a window telegraphs before starting the gesture — a human
+## reaction beat (0.3 s), per the plan's modeled-venter spec.
+const AUTOPILOT_REACTION_TICKS := 3
+
+
+## The modeled venter (the CarbAutopilot lesson: measure the economy, don't guess it).
+## Policy: hold with overdrive engaged; on every window, react after 0.3 s and perform the
+## demanded gesture (a skill roll decides whether it lands cleanly or fumbles); at the tier cap
+## — where windows stop — bail just under the ceiling (release, forfeiting the ladder) and
+## restart rather than eat the backstop overheat; after any overheat, remount when re-armed.
+## Returns {"average_bonus", "vents", "overheats"} over AUTOPILOT_SECONDS.
+func _run_vent_autopilot(tuning: TuningConfig, seed_value: int, gesture_success: float) -> Dictionary:
+	var state := _fresh_state(tuning, seed_value)
+	# The skill dice are a SEPARATE seeded rng, so the venter's fumbles can't perturb the
+	# window-schedule rolls (both stay reproducible run to run).
+	var skill_rng := RandomNumberGenerator.new()
+	skill_rng.seed = seed_value * 7919 + 13
+
+	var tick_index := [0]        # arrays so the signal lambdas can read/mutate them
+	var pressed := [true]
+	var vents := [0]
+	var overheats := [0]
+	var missed_windows := [0]
+	var clean_missed := [0]   # misses despite a CLEAN plan — should stay 0 (judge/plan bug canary)
+	var planned_clean := [false]
+	var bail_decided := [false]  # one bail read per cap ride; reset on overheat / after remounting
+	# Scheduled gesture edges, keyed by absolute tick index -> "press" or "release". Edges are
+	# executed just before that tick, like real input events arriving between logic ticks.
+	var planned: Dictionary = {}
+
+	state.vent_succeeded.connect(func(_tier: int, _peak: float) -> void: vents[0] += 1)
+	state.vent_missed.connect(func(_done: int, _required: int) -> void:
+		missed_windows[0] += 1
+		if planned_clean[0]:
+			clean_missed[0] += 1)
+	state.overheated.connect(func() -> void:
+		overheats[0] += 1
+		bail_decided[0] = false
+		planned.clear())
+	state.vent_window_opened.connect(func(required_lifts: int, _duration: float) -> void:
+		var base: int = tick_index[0] + AUTOPILOT_REACTION_TICKS
+		planned_clean[0] = skill_rng.randf() < gesture_success
+		if planned_clean[0]:
+			# A clean, brisk gesture on 0.1 s beats — comfortably inside every tolerance, and
+			# quick enough that a window opened deep in Critical still completes before the
+			# climb can reach the hard ceiling: single = release, re-press 0.1 s later;
+			# double adds a 0.1 s tap and a second 0.1 s gap.
+			planned[base] = "release"
+			planned[base + 1] = "press"
+			if required_lifts == 2:
+				planned[base + 2] = "release"
+				planned[base + 3] = "press"
+		else:
+			# The fumble: lift and freeze — the re-press never comes, the gap times out, MISS.
+			planned[base] = "release")
+
+	state.notify_rush_pressed()
+	state.engage_overdrive()
+
+	var bail_ticks_left := 0
+	var total_bonus_seconds := 0.0
+	# Where the run's time actually went — the breakdown that tells a retune WHICH phase to
+	# attack (riding pay vs recovery drag), instead of guessing from the average alone.
+	var locked_seconds := 0.0
+	var critical_seconds := 0.0
+	var climbing_seconds := 0.0
+	var total_ticks := int(round(AUTOPILOT_SECONDS / TICK_SECONDS))
+	for _t in range(total_ticks):
+		if state.is_locked_out():
+			state.tick(TICK_SECONDS, false, false)
+			tick_index[0] += 1
+			locked_seconds += TICK_SECONDS
+			if not state.is_locked_out():
+				# Re-armed: straight back on the ride (the modeled venter never sulks).
+				pressed[0] = true
+				state.notify_rush_pressed()
+				state.engage_overdrive()
+			continue
+		if planned.has(tick_index[0]):
+			if planned[tick_index[0]] == "press":
+				pressed[0] = true
+				state.notify_rush_pressed()
+			else:
+				pressed[0] = false
+				state.notify_rush_released()
+			planned.erase(tick_index[0])
+		# The bail: at the tier cap no more windows are coming, so riding on can only end at
+		# the backstop. Reading the bar and letting go in time is a skill moment exactly like
+		# a gesture, so it rolls the SAME reliability: on a pass, release just under the
+		# ceiling, coast one tick (the release tick clears the ladder and disengages
+		# overdrive), then remount from the still-hot bar; on a fail, the venter misreads the
+		# bar and rides into the backstop overheat — with the full tier-cap re-arm sting.
+		if bail_ticks_left == 0 and pressed[0] and not bail_decided[0] \
+				and not state.is_vent_window_open() \
+				and state.vent_tier() >= tuning.rush_momentum_vent_max_tiers \
+				and state.heat >= tuning.rush_momentum_hard_ceiling - 0.05:
+			bail_decided[0] = true
+			if skill_rng.randf() < gesture_success:
+				pressed[0] = false
+				state.notify_rush_released()
+				bail_ticks_left = 1
+		# Mirror GameState's hold rule: an open window counts as rushing through the lifts.
+		var rushing: bool = pressed[0] or state.is_vent_window_open()
+		state.tick(TICK_SECONDS, rushing, false)
+		tick_index[0] += 1
+		total_bonus_seconds += state.bonus * TICK_SECONDS
+		if state.current_band() == RushMomentumState.Band.CRITICAL:
+			critical_seconds += TICK_SECONDS
+		else:
+			climbing_seconds += TICK_SECONDS
+		if bail_ticks_left > 0:
+			bail_ticks_left -= 1
+			if bail_ticks_left == 0:
+				pressed[0] = true
+				state.notify_rush_pressed()
+				state.engage_overdrive()
+				bail_decided[0] = false  # the ladder reset; the next cap is a fresh read
+	return {
+		"average_bonus": total_bonus_seconds / AUTOPILOT_SECONDS,
+		"vents": vents[0],
+		"overheats": overheats[0],
+		"missed_windows": missed_windows[0],
+		"clean_missed": clean_missed[0],
+		"locked_seconds": locked_seconds,
+		"critical_seconds": critical_seconds,
+		"climbing_seconds": climbing_seconds,
+	}

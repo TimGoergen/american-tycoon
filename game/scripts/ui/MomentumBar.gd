@@ -127,6 +127,9 @@ const BLINK_STRENGTH_MAX := 0.85
 
 ## How long the tier chip holds fully visible before fading (seconds).
 const TIER_CHIP_HOLD_SEC := 1.0
+## Pixels between the meter's top edge and the chip's bottom edge (Tim 2026-07-18: the chip
+## must not cover the bar).
+const TIER_CHIP_GAP_ABOVE_BAR := 8.0
 const TIER_CHIP_FADE_IN_SEC := 0.12
 const TIER_CHIP_FADE_OUT_SEC := 0.4
 
@@ -275,13 +278,20 @@ func _ready() -> void:
 	row.add_child(_label)
 	_apply_label_state(_LabelState.NORMAL)
 
-	# The tier chip: a large bold plate that eases in over the meter on an upward band crossing,
-	# holds ~1 s, then fades (see _show_tier_chip). Centered over the meter; z_index lifts it
-	# above the siblings drawn after this bar (the TURBO row sits right below).
+	# The tier chip: a large bold plate that eases in on an upward band crossing, holds ~1 s,
+	# then fades (see _show_tier_chip). It sits ABOVE the meter, not over it (Tim 2026-07-18:
+	# a chip covering the bar hid the fill/zones exactly when the player most needs to read
+	# them mid-vent) — anchored to the meter's top-center and growing upward, so however tall
+	# the chip gets (text only, or text + pips + countdown) its bottom edge stays a fixed gap
+	# above the bar. z_index lifts it above the siblings drawn after this bar.
 	_tier_chip = PanelContainer.new()
-	_tier_chip.set_anchors_preset(Control.PRESET_CENTER)
+	_tier_chip.anchor_left = 0.5
+	_tier_chip.anchor_right = 0.5
+	_tier_chip.anchor_top = 0.0
+	_tier_chip.anchor_bottom = 0.0
+	_tier_chip.offset_bottom = -TIER_CHIP_GAP_ABOVE_BAR
 	_tier_chip.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_tier_chip.grow_vertical = Control.GROW_DIRECTION_BOTH
+	_tier_chip.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	_tier_chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_tier_chip.z_index = 10
 	_tier_chip.visible = false
@@ -342,8 +352,16 @@ func _process(delta: float) -> void:
 	# remaining / telegraphed duration, so a tier-tightened window still drains exactly
 	# full-to-empty (and a frenzy freeze visibly pauses it, matching the core's pause).
 	if _vent_chip_active:
-		_vent_pips.set_countdown(clampf(
-				_rush_momentum.vent_window_remaining() / _vent_window_duration, 0.0, 1.0))
+		# Watchdog: a held telegraph with NO open window underneath is an orphan. The normal
+		# resolutions (success/miss/overheat) clear the chip via their signals, but a silent
+		# teardown — RushMomentumState.reset() at First Contact, mid-window — emits nothing,
+		# which left a stale "VENT!" plate on screen after the contact ceremony (Tim's device
+		# report, 2026-07-18). One state read per frame; fires only on that orphan case.
+		if not _rush_momentum.is_vent_window_open():
+			_dismiss_vent_telegraph()
+		else:
+			_vent_pips.set_countdown(clampf(
+					_rush_momentum.vent_window_remaining() / _vent_window_duration, 0.0, 1.0))
 
 	var locked_out := _rush_momentum.is_locked_out()
 	var cruising := _rush_momentum.is_cruising()
@@ -501,13 +519,22 @@ func _on_overheated() -> void:
 	# The hard-ceiling backstop can fire while a vent telegraph is still up (the missed-window
 	# path clears it in _on_vent_missed; this covers heat simply reaching the top). Drop the
 	# held chip so the OVERHEATED presentation isn't fighting a stale "VENT!" plate.
-	if _vent_chip_active:
-		_vent_chip_active = false
-		_vent_pips.visible = false
-		if _tier_chip_tween != null and _tier_chip_tween.is_valid():
-			_tier_chip_tween.kill()
-		_tier_chip.visible = false
+	_dismiss_vent_telegraph()
 	_vibrate(_tuning.rush_momentum_haptic_overheat_ms)
+
+
+## Drop a held-open vent telegraph immediately — chip, pips, and any in-flight tween. Safe to
+## call when no telegraph is up. Used by the overheat handler above and by the _process
+## watchdog for silent teardowns (see there).
+func _dismiss_vent_telegraph() -> void:
+	if not _vent_chip_active:
+		return
+	_vent_chip_active = false
+	_vent_pips.visible = false
+	_vent_pips.stop_miss_flash()
+	if _tier_chip_tween != null and _tier_chip_tween.is_valid():
+		_tier_chip_tween.kill()
+	_tier_chip.visible = false
 
 
 ## The re-arm delay finished: rush is available again. Flash the whole meter bright once (plus a
@@ -637,9 +664,11 @@ func _vibrate(duration_ms: float) -> void:
 
 ## Custom-drawn track decoration for the heat ranges (the same _draw approach MomentumStreaks
 ## uses): the wide teal CRUISE bar (where a plain hold clamps), then ONE continuous amber wash
-## deepening from the cruise bar all the way to the hazard edge — a single section in a single
-## hue with no internal tick lines (Tim 2026-07-16; this replaced the thin white heat==1.0 tick
-## and the flat Hot segment) — then the hazard-striped dark-red Critical segment.
+## deepening from the cruise bar all the way to the bar's END — one continuous amber-into-red
+## gradient with no internal tick lines and no seam at the Critical edge (Tim 2026-07-16 removed
+## the heat==1.0 tick and flat Hot segment; Tim 2026-07-18 merged the amber ramp and the red
+## Critical base into a single blended section). The hazard stripes remain the Critical marker,
+## fading in gradually across the start of the span so they emerge from the wash.
 ##
 ## The bar's fill is painted by the ProgressBar itself, UNDER all child overlays — so to make the
 ## zones read as if they were on the track BEHIND the fill, each segment is clipped to start at
@@ -707,29 +736,35 @@ class BandZoneOverlay extends Control:
 		var right_x := size.x - EDGE_INSET
 		var fill_x := maxf(_fill_frac * size.x - EDGE_INSET, EDGE_INSET)
 
-		# The ramp wash [cruise bar .. hazard edge]: sliced left-to-right, each slice's alpha
-		# interpolated across the FULL section width, then clipped to the unfilled track (see the
-		# class comment). Slicing the full span and skipping covered slices keeps the gradient
-		# anchored to the track — it never re-stretches as the fill advances.
-		if critical_x > cruise_x:
-			var span := critical_x - cruise_x
+		# The overheat wash [cruise bar .. bar end]: ONE continuous gradient across the whole
+		# danger span — amber at the cruise bar sliding into the dark hazard red at the far end,
+		# with no seam at the Critical edge (Tim 2026-07-18: the two sections should simply fade
+		# into each other). Sliced left-to-right (draw_rect has no gradient fill), each slice's
+		# color AND alpha interpolated across the FULL span, then clipped to the unfilled track
+		# (see the class comment). Slicing the full span and skipping covered slices keeps the
+		# gradient anchored to the track — it never re-stretches as the fill advances.
+		if right_x > cruise_x:
+			var span := right_x - cruise_x
 			var slice_width := span / float(RAMP_SLICES)
+			var start_color := Color(RAMP_COLOR, RAMP_ALPHA_START)
+			var end_color := CRITICAL_BASE
 			for i in range(RAMP_SLICES):
 				var slice_left := cruise_x + slice_width * float(i)
 				var slice_right := slice_left + slice_width
 				if slice_right <= fill_x:
 					continue
-				var alpha := lerpf(RAMP_ALPHA_START, RAMP_ALPHA_END,
+				var slice_color := start_color.lerp(end_color,
 						(float(i) + 0.5) / float(RAMP_SLICES))
 				var visible_left := maxf(slice_left, fill_x)
 				draw_rect(Rect2(visible_left, top, slice_right - visible_left, bottom - top),
-						Color(RAMP_COLOR, alpha))
+						slice_color)
 
-		# Critical segment (dark red + hazard stripes), clipped to the unfilled track.
+		# Hazard stripes still mark gamble territory, but they FADE IN across the first stretch
+		# of the Critical span instead of starting at a hard edge — the stripes emerging from
+		# the deepening wash is what makes the two old sections read as one (Tim 2026-07-18).
 		var crit_left := maxf(critical_x, fill_x)
 		if right_x > crit_left:
-			draw_rect(Rect2(crit_left, top, right_x - crit_left, bottom - top), CRITICAL_BASE)
-			_draw_hazard_stripes(crit_left, right_x, top, bottom)
+			_draw_hazard_stripes(crit_left, right_x, top, bottom, critical_x)
 
 		# The cruise bar — where a plain hold clamps (Plans/Rush_Cruise_Control.md). ALWAYS
 		# drawn, over fill and track alike, so the safety landmark is spatially real whatever
@@ -738,11 +773,20 @@ class BandZoneOverlay extends Control:
 			draw_rect(Rect2(cruise_x - CRUISE_BAR_WIDTH * 0.5, top, CRUISE_BAR_WIDTH,
 					bottom - top), CRUISE_BAR_COLOR)
 
+	## Fraction of the Critical span over which the hazard stripes fade from invisible to full
+	## strength (Tim 2026-07-18: the sections must blend, so the stripes emerge gradually from
+	## the wash instead of switching on at the Critical edge).
+	const STRIPE_FADE_IN_FRAC := 0.4
+
 	## Diagonal 45° hazard stripes across [left_x, right_x]. Each stripe is a thick line from the
 	## bottom edge up-right to the top edge; its endpoints are clipped in 1D along the line so no
 	## stripe pokes past the segment's edges (inset by half the stripe width, since draw_line
-	## spreads its width to both sides).
-	func _draw_hazard_stripes(left_x: float, right_x: float, top: float, bottom: float) -> void:
+	## spreads its width to both sides). `fade_from_x` is where the Critical span BEGINS on the
+	## track (left_x can sit further right when the fill has covered part of the span): each
+	## stripe's alpha ramps 0 → full across the fade-in stretch from there, keyed on the stripe's
+	## visible midpoint so the fade is anchored to the track like the wash gradient is.
+	func _draw_hazard_stripes(left_x: float, right_x: float, top: float, bottom: float,
+			fade_from_x: float) -> void:
 		var height := bottom - top
 		if height <= 0.0:
 			return
@@ -750,6 +794,7 @@ class BandZoneOverlay extends Control:
 		var clip_right := right_x - STRIPE_WIDTH * 0.5
 		if clip_right <= clip_left:
 			return
+		var fade_span := maxf((right_x - fade_from_x) * STRIPE_FADE_IN_FRAC, 0.001)
 		# The first stripe starts far enough left that its top end can still land in the segment.
 		var x0 := clip_left - height
 		# Snap to the stripe grid so the pattern stays fixed to the bar (it does not crawl as the
@@ -763,7 +808,11 @@ class BandZoneOverlay extends Control:
 			if t_max > t_min:
 				var from := Vector2(x0 + t_min * height, bottom - t_min * height)
 				var to := Vector2(x0 + t_max * height, bottom - t_max * height)
-				draw_line(from, to, CRITICAL_STRIPE, STRIPE_WIDTH)
+				var mid_x := (from.x + to.x) * 0.5
+				var strength := clampf((mid_x - fade_from_x) / fade_span, 0.0, 1.0)
+				if strength > 0.0:
+					draw_line(from, to,
+							Color(CRITICAL_STRIPE, CRITICAL_STRIPE.a * strength), STRIPE_WIDTH)
 			x0 += STRIPE_SPACING
 
 

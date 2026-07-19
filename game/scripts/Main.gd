@@ -1625,6 +1625,12 @@ func _on_retain_requested(property_index: int) -> void:
 ## mid-life) and persist, so a purchase is never lost to a crash before autosave.
 func _on_upgrade_purchased(_upgrade_id: String) -> void:
 	dynasty.refresh_current_generation_effects()
+	# The purchase just drained the shared Legacy wallet, and the Household Staff rows carry
+	# can_afford SNAPSHOTS — without a rebuild they keep advertising affordability the wallet
+	# no longer has (enabled RETAIN buttons + a wrong "+x affordable" badge; Tim's device
+	# report 2026-07-18). In-place update, same as _on_retain_requested, so a held button
+	# under the player's finger survives.
+	_legacy_screen.update_retention_entries(_build_retention_entries())
 	SaveManager.save_dict_to_file(dynasty.to_save_dict())
 
 

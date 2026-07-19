@@ -65,6 +65,18 @@ extends SceneTree
 #      lockout, and no phantom window later (an open only ever follows a fresh spawn's full
 #      approach).
 #
+# The vent REFRACTORY (Tim 2026-07-18 night — a rolled quiet spell after every resolved vent
+# and every fresh engage, so post-vent arrivals stop feeling metronomic) adds:
+#  24. Post-vent gaps vary run to run, never undercut refractory_min, and once the deep
+#      top-off clamp engages they are bounded by refractory_max plus tick slack (the
+#      force-spawn tail); the engage-time roll is clamped so the telegraph guarantee still
+#      holds even re-engaging hot near the force-spawn bound; the freeze checks in section 5
+#      cover the refractory clock too.
+#
+# The lockout's visual re-arm timer (Tim 2026-07-18 night) adds, inside section 4:
+#  25. rearm_remaining_fraction() is 0 while riding and while the drain runs, exactly 1.0 the
+#      moment the re-arm delay starts, monotonically decreasing, and 0.0 at rush_ready.
+#
 # Exits with code 0 only if every check passes (1 otherwise), so CI/headless runs fail loudly.
 
 ## One logic tick, matching the game's 10 Hz timestep.
@@ -104,6 +116,7 @@ func _initialize() -> void:
 	_measure_vent_autopilot_survival(tuning)
 	_test_approach_phase(tuning)
 	_test_approach_cancellation(tuning)
+	_test_vent_refractory_spacing(tuning)
 
 	print("")
 	if _failures == 0:
@@ -260,6 +273,11 @@ func _test_overheat_lockout(tuning: TuningConfig) -> void:
 	var state := _fresh_state(tuning, 777)
 	var ready_fired := [false]
 	state.rush_ready.connect(func() -> void: ready_fired[0] = true)
+	# The visual re-arm timer's getter reads 0 during ordinary riding (nothing is re-arming).
+	for _i in range(20):
+		state.tick(TICK_SECONDS, true, false)
+	_check("rearm_remaining_fraction() is 0 during normal riding",
+		is_zero_approx(state.rearm_remaining_fraction()))
 	_rush_until_overheat(state)
 
 	_check("can_rush() is false immediately on overheat", not state.can_rush())
@@ -276,6 +294,10 @@ func _test_overheat_lockout(tuning: TuningConfig) -> void:
 	print("     (drained %.3f heat in 1 s; knob says %.3f)" % [drained, tuning.rush_momentum_locked_drain_per_second])
 	_check("lockout drains at the locked rate (rush taps ignored)",
 		absf(drained - tuning.rush_momentum_locked_drain_per_second) < 0.005)
+	# The visual re-arm timer's getter must stay flat 0 through the DRAIN phase — the UI's
+	# receding gray may only start moving when the re-arm countdown actually exists.
+	_check("rearm_remaining_fraction() is 0 while the drain still runs",
+		is_zero_approx(state.rearm_remaining_fraction()))
 
 	# Run the drain out, then time the re-arm: rush_ready fires only rearm_seconds AFTER empty.
 	# (This excursion achieved no vent tiers, so there is no per-tier sting — section 18 covers it.)
@@ -286,10 +308,22 @@ func _test_overheat_lockout(tuning: TuningConfig) -> void:
 	_check("rush_ready has NOT fired when the bar first empties", not ready_fired[0])
 	_check("is_rearming() is true once the bar is empty", state.is_rearming())
 	_check("still locked out during the re-arm", state.is_locked_out() and not state.can_rush())
+	# The tick that emptied the bar also STARTED the re-arm delay, so the fraction reads its
+	# full 1.0 right now — the UI's gray covers the whole bar at this exact moment.
+	_check("rearm_remaining_fraction() is exactly 1.0 the moment the re-arm delay starts",
+		is_equal_approx(state.rearm_remaining_fraction(), 1.0))
+	var fraction_monotone := true
+	var last_fraction := state.rearm_remaining_fraction()
 	var rearm_elapsed := 0.0
 	while not ready_fired[0] and rearm_elapsed < 10.0:
 		state.tick(TICK_SECONDS, false, false)
 		rearm_elapsed += TICK_SECONDS
+		var fraction := state.rearm_remaining_fraction()
+		if fraction > last_fraction + 0.0001:
+			fraction_monotone = false
+		last_fraction = fraction
+	_check("rearm_remaining_fraction() fell monotonically and reads 0.0 at rush_ready",
+		fraction_monotone and is_zero_approx(state.rearm_remaining_fraction()))
 	print("     (rush_ready fired %.1f s after empty; knob says %.1f)" % [rearm_elapsed, tuning.rush_momentum_rearm_seconds])
 	_check("rush_ready fired ~rearm_seconds after the bar emptied (tier-0 excursion: no sting)",
 		absf(rearm_elapsed - tuning.rush_momentum_rearm_seconds) <= TICK_SECONDS + 0.001)
@@ -352,6 +386,18 @@ func _test_frenzy_freeze(tuning: TuningConfig) -> void:
 	_check("the hazard never opens a window during a burn (dice frozen)",
 		windows_opened[0] == 0 and not deep_burn.is_locked_out())
 	_check("deep heat holds exactly through the burn", is_equal_approx(deep_burn.heat, 1.4))
+
+	# REFRACTORY freeze: the rolled post-engage quiet spell halts on frozen ticks too — it is
+	# a vent clock like any other, and a burn draining it would silently eat the randomized
+	# spacing the refractory exists to provide.
+	var refractory_state := _fresh_state(tuning, 48)
+	_press_and_engage(refractory_state)  # engaging rolls the refractory
+	var refractory_before := refractory_state.vent_refractory_remaining()
+	_check("(setup) engaging rolled a live refractory", refractory_before > 0.0)
+	for _i in range(50):  # 5 s of frenzy — several times the longest possible roll
+		refractory_state.tick(TICK_SECONDS, true, true)
+	_check("the refractory clock halts during a burn",
+		is_equal_approx(refractory_state.vent_refractory_remaining(), refractory_before))
 
 	# APPROACH freeze: an in-flight event's approach clock halts too, so a burn can neither
 	# advance the flight nor open its window (an open mid-frenzy would shortchange the lead
@@ -1129,8 +1175,15 @@ func _test_depth_hazard_statistics(tuning: TuningConfig) -> void:
 	var expected_deep := lerpf(tuning.rush_momentum_vent_rate_at_cruise,
 			tuning.rush_momentum_vent_rate_at_ceiling, DEEP_DEPTH)
 
-	var measured_shallow := 1.0 / _measure_mean_arrival_seconds(tuning, 5000, SHALLOW_DEPTH)
-	var measured_deep := 1.0 / _measure_mean_arrival_seconds(tuning, 5001, DEEP_DEPTH)
+	# The refractory is ZEROED for this measurement: every trial re-engages (rolling a fresh
+	# quiet spell), and a constant ~0.8 s mean head start added to every geometric wait would
+	# bias the measured rates low. This section proves the HAZARD CURVE; the refractory's own
+	# spacing behaviour has its own section (24).
+	var stat_tuning: TuningConfig = tuning.duplicate()
+	stat_tuning.rush_momentum_vent_refractory_min = 0.0
+	stat_tuning.rush_momentum_vent_refractory_max = 0.0
+	var measured_shallow := 1.0 / _measure_mean_arrival_seconds(stat_tuning, 5000, SHALLOW_DEPTH)
+	var measured_deep := 1.0 / _measure_mean_arrival_seconds(stat_tuning, 5001, DEEP_DEPTH)
 	var measured_ratio := measured_deep / measured_shallow
 	var expected_ratio := expected_deep / expected_shallow
 	print("     (shallow %.2f: measured %.3f/s vs knob-lerped %.3f/s | deep %.2f: measured %.3f/s vs %.3f/s)"
@@ -1566,3 +1619,119 @@ func _test_approach_cancellation(tuning: TuningConfig) -> void:
 	_press_and_engage(reset_state)
 	_check("a fresh ride after the reset spawns and opens windows normally",
 		_ride_to_window_open(reset_state) >= tuning.rush_momentum_vent_approach_seconds - 0.0001)
+
+
+func _test_vent_refractory_spacing(tuning: TuningConfig) -> void:
+	print("\n24. The vent refractory: gaps vary, never undercut the min, bounded once deep")
+	var refractory_min := tuning.rush_momentum_vent_refractory_min
+	var refractory_max := tuning.rush_momentum_vent_refractory_max
+	var build_hot := tuning.rush_momentum_heat_build_hot_per_second
+
+	# --- Engaging rolls a refractory, and it suppresses the DICE: with the hazard cranked to
+	# a certainty (an expected spawn on virtually every eligible tick), the first spawn after
+	# a hot re-engage still waits out the rolled quiet — and not a tick longer than it plus
+	# tick-boundary slack, proving the quiet (not some other clock) was the delay.
+	var certain_tuning: TuningConfig = tuning.duplicate()
+	certain_tuning.rush_momentum_vent_rate_at_cruise = 1000.0
+	certain_tuning.rush_momentum_vent_rate_at_ceiling = 1000.0
+	var hot := _fresh_state(certain_tuning, 7000)
+	# Heat poked to a mid-depth BEFORE the engage (as after bailing a deep ride and
+	# re-pressing): far enough below the force-spawn bound that the roll is never clamped.
+	hot.heat = 1.2
+	_press_and_engage(hot)
+	var rolled := hot.vent_refractory_remaining()
+	_check("engaging rolls a refractory inside [min, max]",
+		rolled >= refractory_min - 0.0001 and rolled <= refractory_max + 0.0001)
+	var waited := 0.0
+	while not hot.is_vent_approaching() and waited < 10.0:
+		hot.tick(TICK_SECONDS, true, false)
+		waited += TICK_SECONDS
+	print("     (hot engage rolled %.2f s of quiet; certain hazard spawned after %.2f s)"
+			% [rolled, waited])
+	_check("a certain-spawn hazard still waits out the rolled quiet (and no longer)",
+		waited >= rolled - 0.0001 and waited <= rolled + 2.0 * TICK_SECONDS + 0.0001)
+
+	# --- The engage-time CLAMP: re-engaging with heat just under the force-spawn bound must
+	# shrink the roll to the climb room left (the refractory suppresses the force-spawn, so an
+	# unclamped roll here would let heat overshoot the reservation) — and the window that then
+	# arrives must still fully fit before the ceiling: the guarantee outranks the breather.
+	var near := _fresh_state(certain_tuning, 7001)
+	near.heat = near._window_fit_heat_bound() - 0.01
+	_press_and_engage(near)
+	_check("a hot re-engage near the bound clamps the rolled quiet to the room left",
+		near.vent_refractory_remaining() <= 0.01 / build_hot + 0.0001)
+	_check("(setup) the near-bound ride still opened a window",
+		_ride_to_window_open(near) >= 0.0)
+	_check("that window still fully fits before the ceiling (guarantee intact)",
+		near.heat + near.vent_window_remaining() * build_hot
+			<= certain_tuning.rush_momentum_hard_ceiling + build_hot * TICK_SECONDS + 0.0001)
+
+	# --- Post-vent spacing, on one long clean ride at the DEFAULT knobs: measure the gap from
+	# every vent success to the next event's spawn, with every tick counted (section 22's
+	# counted-step pattern). Per success, also record whether the top-off clamp bit — post-vent
+	# heat landing exactly on fit_bound − refractory_max × build_hot — because only THOSE gaps
+	# have a hard upper bound: the clamp leaves exactly refractory_max of climb to the
+	# force-spawn bound, so the forced spawn caps the gap at refractory_max (+ tick slack).
+	# Shallower gaps keep the open-ended hazard tail — that tail IS the randomness Tim wants.
+	var state := _fresh_state(tuning, 7002)
+	var tick_index := [0]
+	var last_success_tick := [-1]
+	var last_success_clamped := [false]
+	var gaps: Array = []        # seconds, success → next spawn
+	var gap_clamped: Array = [] # parallel: did the top-off clamp bite at that success?
+	state.vent_succeeded.connect(func(_tier: int, _peak: float) -> void:
+		last_success_tick[0] = tick_index[0]
+		var post_vent_bound: float = state._window_fit_heat_bound() \
+				- refractory_max * build_hot
+		last_success_clamped[0] = absf(state.heat - post_vent_bound) < 0.0001)
+	state.vent_incoming.connect(func(_approach: float, _lifts: int) -> void:
+		if last_success_tick[0] >= 0:
+			gaps.append(float(tick_index[0] - last_success_tick[0]) * TICK_SECONDS)
+			gap_clamped.append(last_success_clamped[0])
+			last_success_tick[0] = -1)
+	_press_and_engage(state)
+	var step := func() -> void:
+		state.tick(TICK_SECONDS, true, false)
+		tick_index[0] += 1
+	const SPACING_PROBE_VENTS := 12
+	var vents_done := 0
+	var safety := 0
+	while vents_done < SPACING_PROBE_VENTS and not state.is_locked_out() and safety < 5000:
+		safety += 1
+		if state.is_vent_window_open():
+			var lifts := state.vent_required_lifts()
+			state.notify_rush_released()
+			step.call()
+			state.notify_rush_pressed()
+			for _extra_lift in range(lifts - 1):
+				step.call()
+				state.notify_rush_released()
+				step.call()
+				state.notify_rush_pressed()
+			vents_done += 1
+		else:
+			step.call()
+	print("     (post-vent gaps, s: %s)" % [gaps])
+	print("     (top-off clamp bit on: %s)" % [gap_clamped])
+	_check("(setup) %d clean vents ridden with %d gaps measured" % [SPACING_PROBE_VENTS,
+			SPACING_PROBE_VENTS - 1],
+		vents_done == SPACING_PROBE_VENTS and gaps.size() >= SPACING_PROBE_VENTS - 1)
+	var all_at_least_min := true
+	var clamped_bounded := true
+	var clamped_count := 0
+	var distinct_gaps := {}  # tick-quantized gap value -> seen (the variety proof)
+	for i in range(gaps.size()):
+		var gap: float = gaps[i]
+		if gap < refractory_min - 0.0001:
+			all_at_least_min = false
+		distinct_gaps[snappedf(gap, TICK_SECONDS)] = true
+		if gap_clamped[i]:
+			clamped_count += 1
+			if gap > refractory_max + 2.0 * TICK_SECONDS + 0.0001:
+				clamped_bounded = false
+	_check("every post-vent gap waits at least refractory_min", all_at_least_min)
+	_check("consecutive gaps VARY (3+ distinct spacings — not a metronome)",
+		distinct_gaps.size() >= 3)
+	_check("(setup) the deep top-off clamp engaged for several vents", clamped_count >= 4)
+	_check("clamped-deep gaps are bounded by refractory_max plus tick slack (the forced tail)",
+		clamped_bounded)

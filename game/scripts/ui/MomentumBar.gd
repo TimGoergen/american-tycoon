@@ -26,12 +26,16 @@ extends HBoxContainer
 #     color carries the depth urgency: purple → amber with overdrive depth, the red warning
 #     blink ramping on top — so between events the bar still FEELS hotter the deeper you
 #     ride, even though it no longer plots heat's position. (Pinned-full was chosen over
-#     repurposing the fill as the countdown: the overlay's draining region already tells the
+#     repurposing the fill as the countdown: the overlay's timer strip already tells the
 #     countdown story, and a second moving edge underneath it would just be noise — the fill's
 #     job in this mode is to be the urgency-colored stage the minigame plays on.)
 #
-#   • OVERHEAT lockout: unchanged — the fill shows heat / hard_ceiling visibly draining (the
-#     drain IS the cooldown display), label swaps OVERHEATED → COOLING…, then the READY flash.
+#   • OVERHEAT lockout: the fill shows heat / hard_ceiling visibly draining (the drain IS the
+#     cooldown display), label swaps OVERHEATED → COOLING…, then the READY flash. The
+#     instrument overlay paints the DEAD-BAR GRAY behind it (Tim 2026-07-18 night): the track
+#     the draining fill reveals is dark gray, and once the drain finishes the gray itself
+#     drains from the right in proportion to the re-arm countdown — the gray's movement IS the
+#     re-arm timer, and the READY flash lands on a fully normal-looking bar.
 #
 # Vent resolutions still land as timed chips ABOVE the bar: green "VENTED — PEAK +X%!" plus
 # the white flash on success; red "VENT MISSED!" with the unfinished pips strobing on a miss.
@@ -69,10 +73,11 @@ var _bubbles: GoldBubbles
 ## that the bar has switched instruments.
 var _streaks: MomentumStreaks
 
-## The custom-drawn overdrive instrument: target bar, traveling event bar, in-bar pips and
-## window countdown. Draws NOTHING outside overdrive mode (the cruise bar is a clean, plain
-## meter now). Formerly BandZoneOverlay — the hazard wash/stripes it painted moved into the
-## fill's own depth coloring when the bar stopped plotting heat position.
+## The custom-drawn overdrive instrument: target bar, traveling event bar with its trailing
+## event backdrop, in-bar pips and the window's timer strip — plus the lockout's dead-bar gray
+## (its one non-overdrive job). Draws NOTHING in cruise/build mode (the cruise bar is a clean,
+## plain meter now). Formerly BandZoneOverlay — the hazard wash/stripes it painted moved into
+## the fill's own depth coloring when the bar stopped plotting heat position.
 var _instrument: OverdriveInstrumentOverlay
 
 ## The chip shown above the meter: the short-lived vent success/miss resolution plates.
@@ -403,6 +408,11 @@ func _process(delta: float) -> void:
 					_rush_momentum.vent_window_remaining() / _vent_window_duration, 0.0, 1.0)
 		_instrument.update_overdrive(TARGET_FRAC, event_frac, window_open, countdown_frac,
 				_rush_momentum.vent_required_lifts(), _window_lifts_done)
+	elif locked_out:
+		# The dead-bar gray: during the drain it back-fills behind the shown (eased) fill edge —
+		# the same _displayed_fill the meter draws, so the gray meets the red with no seam —
+		# and during the re-arm it recedes on the core's real countdown fraction.
+		_instrument.update_lockout(_displayed_fill, _rush_momentum.rearm_remaining_fraction())
 	else:
 		_instrument.update_idle()
 
@@ -648,26 +658,47 @@ func _vibrate(duration_ms: float) -> void:
 # ---------------------------------------------------------------------------
 
 ## Custom-drawn overlay for the bar's OVERDRIVE minigame instrument (the same _draw approach
-## MomentumStreaks uses). Draws NOTHING in cruise/build mode or during a lockout — the calm
-## bar is deliberately unadorned now that its right edge IS the cruise point.
+## MomentumStreaks uses), plus the OVERHEAT lockout's dead-bar gray — its one job outside
+## overdrive. Draws NOTHING in cruise/build mode: the calm bar is deliberately unadorned now
+## that its right edge IS the cruise point.
 ##
 ## In overdrive mode it draws, back to front:
-##   • while a window is OPEN: the countdown plate — a translucent gold region anchored at the
-##     target bar, its RIGHT edge sweeping left toward the target as time runs out. This
-##     continues the event's own motion language (the event bar arrived traveling right-to-
-##     left; now its "energy" keeps collapsing leftward into the target), so "the gold reaches
-##     the target = time's up" needs no explanation. Chosen over a right-anchored drain, which
-##     would introduce a second, opposite motion direction mid-moment.
+##   • the APPROACH TRAIL: while the red event bar travels left, the region from the bar back
+##     to the RIGHT edge fills with a dim gold wash — the event "fills in behind" its leading
+##     edge (Tim 2026-07-18 night), so the approach reads as a REGION sweeping in, not a lone
+##     thin bar. Dim MUSTARD_GOLD — the same act-now gold family as the target bar and the
+##     open-window dressing — so the approach and the open event share one visual identity:
+##     the trail IS the event backdrop, arriving.
+##   • while a window is OPEN: the EVENT BACKDROP — the same gold wash, a step brighter, held
+##     STEADY across the whole region right of the target. The trail grows to cover exactly
+##     this region at the instant the event arrives, so opening reads as "the sweep completed
+##     and lit up", never a cut to something new.
+##   • while a window is OPEN: the TIMER STRIP — a thin, bright-gold horizontal bar hugging
+##     the region's bottom edge, its right end draining left toward the target as time runs
+##     out. It replaces the old full-region draining plate (which would now fight the steady
+##     backdrop for the same pixels). Bottom placement keeps it clear of the centered pips;
+##     spanning the full region means full strip = full window at a glance; and the leftward
+##     drain continues the established motion language — everything about an event collapses
+##     leftward into the target, so "the strip reaches the target = time's up" needs no
+##     explanation.
 ##   • while a window is OPEN: the gesture pips, centered in the whole region right of the
 ##     target (VentPipRow's ring/disc drawing adapted to bar scale — ring = lift still owed,
-##     solid disc = landed). Cream, because the pips sit partly on the gold plate and partly
-##     on the dark urgency fill as the plate drains, and cream reads on both.
+##     solid disc = landed), brightened to be the most luminous marks on the bar (see the pip
+##     color constants).
 ##   • the traveling EVENT BAR: bright red, entering at the right edge and moving left; its
 ##     reaching the target IS the window opening.
 ##   • the fixed TARGET BAR at TARGET_FRAC: the trigger point. Same wide-bar silhouette as the
 ##     retired teal cruise marker (a shape the player already reads as "a line that matters"),
 ##     but in MUSTARD_GOLD — the act-now family the old "VENT!" chip established — because
 ##     this line is where acting happens, not where safety ends. Drawn LAST so nothing tints it.
+##
+## In LOCKOUT (Tim 2026-07-18 night) it draws the dead-bar gray:
+##   • drain phase: dark gray back-fills the track the shrinking red fill reveals, so the bar
+##     visibly dies from the right as it cools;
+##   • re-arm phase: the gray covers the whole bar, then its right edge recedes leftward in
+##     proportion to the re-arm countdown, revealing the normal track gray behind it — the
+##     gray's retreat IS the visual re-arm timer, and the READY flash lands on a bar that
+##     already looks normal again.
 ##
 ## All x math uses the FILL's coordinate system (frac × size.x − inset): ProgressBar computes
 ## its fill rect across the bar's FULL width and the fill stylebox's −3px expand margin pulls
@@ -683,10 +714,29 @@ class OverdriveInstrumentOverlay extends Control:
 	## The traveling vent event: bright red, unmistakably "incoming trouble".
 	const EVENT_BAR_WIDTH := 10.0
 	const EVENT_BAR_COLOR := Color("#E8503A")         # KETCHUP_RED, brightened to read as LIVE
-	## The open window's countdown plate (see the class comment for the drain direction).
-	const COUNTDOWN_COLOR := Color("#E3B23C", 0.45)   # translucent MUSTARD_GOLD
-	## In-bar gesture pips: cream reads over both the gold plate and the dark urgency fill.
-	const PIP_COLOR := Color("#F4E9D8")               # CREAM
+	## The approach trail and the open window's backdrop: ONE gold at two strengths. The
+	## countdown plate's MUSTARD_GOLD family was kept on purpose (Tim 2026-07-18 night) so the
+	## whole event lifecycle — trail, backdrop, timer strip, target bar — wears one identity;
+	## the trail is the DIMMER of the two so the region lighting up a step at the arrival
+	## instant reads as an escalation, not a repaint. Same hue, only alpha apart, so the trail
+	## growing to full width IS the backdrop appearing — a seamless open.
+	const APPROACH_TRAIL_COLOR := Color("#E3B23C", 0.25)   # dim translucent MUSTARD_GOLD
+	const WINDOW_BACKDROP_COLOR := Color("#E3B23C", 0.40)  # the same gold, lit up
+	## The open window's TIMER STRIP (replaces the full-region draining plate): thin, opaque,
+	## and a notch brighter than MUSTARD_GOLD so it stays readable ON the translucent gold
+	## backdrop it drains across. Geometry: hugs the region's bottom edge, below the centered
+	## pips, with a small gap so it never welds visually onto the frame.
+	const TIMER_STRIP_COLOR := Color("#F5C542")            # bright gold
+	const TIMER_STRIP_HEIGHT := 5.0
+	const TIMER_STRIP_BOTTOM_GAP := 3.0
+	## In-bar gesture pips, BRIGHTENED (Tim 2026-07-18 night — the old cream washed out against
+	## the gold backdrop). A landed lift is a near-white disc — deliberately the most luminous
+	## mark on the whole bar, because a registered beat is the confirmation the gesture lives
+	## or dies on — and an owed lift is a bright-gold ring: luminous enough to pop off the
+	## backdrop for contrast, while the solid-vs-outline SHAPE difference (not brightness
+	## alone) is what keeps filled-vs-owed instantly distinguishable at a glance.
+	const PIP_FILLED_COLOR := Color("#FFF7E6")             # near-white warm
+	const PIP_RING_COLOR := Color("#F5C542")               # bright gold, matches the strip
 	const PIP_OUTLINE := 4.0
 	## Pip radius as a fraction of the bar's inner height, with a hard cap so a desktop-resized
 	## bar can't grow comedy pips. Three pips at this size fit the two-thirds-width region on
@@ -696,8 +746,16 @@ class OverdriveInstrumentOverlay extends Control:
 	## Center-to-center pip spacing, in pip radii.
 	const PIP_SPACING_RADII := 3.0
 
+	## The lockout's dead-bar gray. Far darker than the normal PROGRESS_TRACK_GRAY (#B6BAC0)
+	## so a locked bar is unmistakably DEAD at a glance, but a neutral slate rather than
+	## near-black: the draining BRICK-red fill must still read against it, and red on a
+	## neutral dark gray keeps its hue contrast where red on near-black would just be two
+	## dark shapes.
+	const LOCKOUT_GRAY := Color("#45464C")
+
 	## Display state, fed every frame by the host's _process (derived fresh from the core each
-	## frame — see the watchdog note there). _event_frac < 0 means no event bar.
+	## frame — see the watchdog note there). _event_frac < 0 means no event bar. _active and
+	## _lockout are mutually exclusive modes; both false = the invisible cruise/build idle.
 	var _active := false
 	var _target_frac := 0.33
 	var _event_frac := -1.0
@@ -705,6 +763,9 @@ class OverdriveInstrumentOverlay extends Control:
 	var _countdown_frac := 0.0
 	var _required_lifts := 1
 	var _lifts_done := 0
+	var _lockout := false
+	var _lockout_fill_frac := 0.0
+	var _rearm_frac := 0.0
 
 	func _ready() -> void:
 		set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -713,13 +774,14 @@ class OverdriveInstrumentOverlay extends Control:
 	## Overdrive mode: update the instrument's geometry; redraws only on actual change.
 	func update_overdrive(target_frac: float, event_frac: float, window_open: bool,
 			countdown_frac: float, required_lifts: int, lifts_done: int) -> void:
-		if _active and is_equal_approx(target_frac, _target_frac) \
+		if _active and not _lockout and is_equal_approx(target_frac, _target_frac) \
 				and is_equal_approx(event_frac, _event_frac) \
 				and window_open == _window_open \
 				and is_equal_approx(countdown_frac, _countdown_frac) \
 				and required_lifts == _required_lifts and lifts_done == _lifts_done:
 			return
 		_active = true
+		_lockout = false
 		_target_frac = target_frac
 		_event_frac = event_frac
 		_window_open = window_open
@@ -728,19 +790,36 @@ class OverdriveInstrumentOverlay extends Control:
 		_lifts_done = lifts_done
 		queue_redraw()
 
-	## Cruise/build mode and lockout: the instrument draws nothing.
+	## Overheat lockout mode: the dead-bar gray. `fill_frac` is the meter's SHOWN (eased) fill,
+	## so the gray's left edge meets the draining red fill with no seam; `rearm_frac` is the
+	## core's re-arm countdown remaining (0 while the drain phase still runs).
+	func update_lockout(fill_frac: float, rearm_frac: float) -> void:
+		if _lockout and is_equal_approx(fill_frac, _lockout_fill_frac) \
+				and is_equal_approx(rearm_frac, _rearm_frac):
+			return
+		_lockout = true
+		_active = false
+		_lockout_fill_frac = fill_frac
+		_rearm_frac = rearm_frac
+		queue_redraw()
+
+	## Cruise/build mode: the instrument draws nothing.
 	func update_idle() -> void:
-		if not _active:
+		if not _active and not _lockout:
 			return
 		_active = false
+		_lockout = false
 		queue_redraw()
 
 	func _draw() -> void:
-		if not _active:
-			return
 		var top := EDGE_INSET
 		var bottom := size.y - EDGE_INSET
 		if size.x <= EDGE_INSET * 2.0 or bottom <= top:
+			return
+		if _lockout:
+			_draw_lockout(top, bottom)
+			return
+		if not _active:
 			return
 		# Fraction → x pixel in the fill's coordinate system (see the class comment).
 		var target_x := maxf(_target_frac * size.x - EDGE_INSET, EDGE_INSET)
@@ -750,11 +829,16 @@ class OverdriveInstrumentOverlay extends Control:
 			return
 
 		if _window_open:
-			# The countdown plate: anchored at the target, right edge sweeping left as the
-			# window runs out (drain direction rationale in the class comment).
-			var plate_width := runway * clampf(_countdown_frac, 0.0, 1.0)
-			if plate_width > 0.0:
-				draw_rect(Rect2(target_x, top, plate_width, bottom - top), COUNTDOWN_COLOR)
+			# The steady event backdrop across the whole region right of the target — the lit
+			# stage the pips and the timer strip play on (the countdown no longer moves it).
+			draw_rect(Rect2(target_x, top, runway, bottom - top), WINDOW_BACKDROP_COLOR)
+			# The timer strip: anchored at the target, right end draining left as the window
+			# runs out (placement + drain-direction rationale in the class comment).
+			var strip_width := runway * clampf(_countdown_frac, 0.0, 1.0)
+			if strip_width > 0.0:
+				draw_rect(Rect2(target_x,
+						bottom - TIMER_STRIP_BOTTOM_GAP - TIMER_STRIP_HEIGHT,
+						strip_width, TIMER_STRIP_HEIGHT), TIMER_STRIP_COLOR)
 			_draw_pips(target_x, right_x, top, bottom)
 
 		if _event_frac >= 0.0:
@@ -764,17 +848,45 @@ class OverdriveInstrumentOverlay extends Control:
 			var event_x := target_x + runway * clampf(_event_frac, 0.0, 1.0)
 			var half := EVENT_BAR_WIDTH * 0.5
 			event_x = clampf(event_x, target_x, right_x - half)
+			# The approach trail FIRST, from the event bar's center back to the right edge —
+			# the region filling in behind the leading edge (the event bar draws over the
+			# seam). Center, not the bar's left edge, so the trail can never peek out ahead
+			# of the red bar and muddy which edge is leading.
+			if right_x - event_x > 0.0:
+				draw_rect(Rect2(event_x, top, right_x - event_x, bottom - top),
+						APPROACH_TRAIL_COLOR)
 			draw_rect(Rect2(event_x - half, top, EVENT_BAR_WIDTH, bottom - top),
 					EVENT_BAR_COLOR)
 
-		# The target bar, drawn LAST so neither the plate nor an arriving event tints it.
+		# The target bar, drawn LAST so neither the backdrop nor an arriving event tints it.
 		draw_rect(Rect2(target_x - TARGET_BAR_WIDTH * 0.5, top, TARGET_BAR_WIDTH,
 				bottom - top), TARGET_BAR_COLOR)
 
+	## The lockout's dead-bar gray (see the class comment's LOCKOUT section). The re-arm
+	## branch is checked FIRST: the eased fill can lag a hair above zero when the re-arm
+	## begins, and the full-width gray must win that frame rather than leave a red sliver.
+	func _draw_lockout(top: float, bottom: float) -> void:
+		var left_x := EDGE_INSET
+		var right_x := size.x - EDGE_INSET
+		if _rearm_frac > 0.0:
+			# Re-arm phase: the gray anchors at the LEFT and its right edge recedes leftward
+			# with the countdown — the same rightward-reveal direction the READY moment then
+			# confirms. Width rides the core's real fraction, so Rapid Restart and the
+			# per-tier sting are automatically honest.
+			var gray_width := (right_x - left_x) * clampf(_rearm_frac, 0.0, 1.0)
+			if gray_width > 0.0:
+				draw_rect(Rect2(left_x, top, gray_width, bottom - top), LOCKOUT_GRAY)
+			return
+		# Drain phase: gray back-fills the track behind the shown fill edge — the same
+		# frac × width − inset mapping the fill itself uses, so the two meet seamlessly.
+		var fill_x := clampf(_lockout_fill_frac * size.x - EDGE_INSET, left_x, right_x)
+		if right_x - fill_x > 0.0:
+			draw_rect(Rect2(fill_x, top, right_x - fill_x, bottom - top), LOCKOUT_GRAY)
+
 	## The gesture pips at bar scale, centered in the region right of the target: one per
 	## demanded lift, ring = still owed, solid disc = landed (VentPipRow's language, adapted).
-	## They sit ON TOP of the draining plate but keep a fixed position — progress is the pips
-	## filling, time is the plate draining; two separate reads, neither moving the other.
+	## They sit ON TOP of the steady backdrop and keep a fixed position — progress is the pips
+	## filling, time is the strip draining; two separate reads, neither moving the other.
 	func _draw_pips(region_left: float, region_right: float, top: float, bottom: float) -> void:
 		var pip_radius := minf((bottom - top) * PIP_HEIGHT_FRAC, PIP_RADIUS_MAX)
 		var spacing := pip_radius * PIP_SPACING_RADII
@@ -784,11 +896,11 @@ class OverdriveInstrumentOverlay extends Control:
 		for i in range(_required_lifts):
 			var center := Vector2(first_x + spacing * float(i), center_y)
 			if i < _lifts_done:
-				draw_circle(center, pip_radius, PIP_COLOR)
+				draw_circle(center, pip_radius, PIP_FILLED_COLOR)
 			else:
 				# Radius inset by half the stroke so the ring's OUTER edge matches a filled
 				# pip's silhouette — filling a pip must read as "same pip, now solid".
-				draw_arc(center, pip_radius - PIP_OUTLINE * 0.5, 0.0, TAU, 48, PIP_COLOR,
+				draw_arc(center, pip_radius - PIP_OUTLINE * 0.5, 0.0, TAU, 48, PIP_RING_COLOR,
 						PIP_OUTLINE, true)
 
 

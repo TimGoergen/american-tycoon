@@ -31,7 +31,11 @@ class_name RushMomentumState
 # tick time later, when the event reaches the target — the player SEES IT COMING. The demanded
 # lifts are decided AT SPAWN and announced with the approach, so the player commits based on
 # what they saw coming; one event is in flight at a time (hazard rolls are suppressed while one
-# is approaching or open), and releasing the hold / disengaging / overheating / resetting
+# is approaching or open). Each resolved vent — and each fresh overdrive engage — also starts a
+# rolled REFRACTORY (Tim 2026-07-18 night: post-vent arrivals felt near-metronomic): a quiet
+# spell of vent_refractory_min..max seconds during which neither the dice nor the force-spawn
+# may fire, so the gap to the next event varies run to run. Releasing the hold / disengaging /
+# overheating / resetting
 # cancels an in-flight approach silently — the event never arrived, so there is no miss. Once
 # the window opens the player must perform the vent gesture on the rushed property's button
 # before it closes:
@@ -184,6 +188,11 @@ var _locked_out: bool = false
 ## drain has finished (heat == 0); counts down to the rush_ready moment.
 var _rearm_remaining: float = 0.0
 
+## The re-arm delay's FULL length, captured the moment it starts. The total varies per lockout
+## (the per-tier sting and the Rapid Restart scale both move it), so the UI's re-arm timer
+## cannot re-derive it from knobs — rearm_remaining_fraction() needs the real divisor.
+var _rearm_total: float = 0.0
+
 ## True only during the post-drain re-arm delay (the tail end of the lockout).
 var _rearming: bool = false
 
@@ -207,6 +216,13 @@ var _was_rushing: bool = false
 ## the next window's duration and demanded lifts. (Cadence escalates via DEPTH, not tier —
 ## see _tick_vent_windows.)
 var _vent_tier: int = 0
+
+## Tick-time seconds of post-vent (or post-engage) QUIET left before the next event may spawn —
+## the rolled REFRACTORY (Tim 2026-07-18 night). While positive, hazard dice AND the force-spawn
+## hold their fire, so back-to-back events can never land metronomically. Rolled on the seeded
+## schedule rng in _start_refractory; ticks down on tick delta only (frenzy-frozen like every
+## other vent clock); cleared with the rest of the vent state.
+var _refractory_remaining: float = 0.0
 
 ## True while a spawned vent event is IN FLIGHT: `vent_incoming` has fired but the window has
 ## not opened yet (the UI's red event bar is still traveling toward the target). Hazard rolls
@@ -364,6 +380,16 @@ func _tick_vent_windows(delta: float) -> void:
 			_open_window()
 		return
 
+	# The REFRACTORY: a rolled quiet spell after each resolved vent (and after engaging), so
+	# consecutive events never arrive metronomically. It suppresses the hazard dice AND the
+	# force-spawn below — which is only safe because every path that starts a refractory also
+	# guarantees the climb through it still fits: the post-vent top-off reserves refractory_max
+	# of extra climb room (_succeed_vent), and the engage-time roll is clamped so it expires
+	# before heat could pass the fit bound (_start_refractory).
+	if _refractory_remaining > 0.0:
+		_refractory_remaining -= delta
+		return
+
 	# The hazard only runs past the cruise point: below it there is nothing at risk (that heat
 	# is free to hold in cruise mode), so no check may ever demand a gesture there.
 	var floor_heat := cruise_heat()
@@ -511,22 +537,56 @@ func _succeed_vent() -> void:
 	heat = maxf(heat - tuning.rush_momentum_vent_heat_drop, cruise_heat())
 	_vent_tier += 1  # UNBOUNDED — the endless ladder's whole point (Tim 2026-07-18)
 	# TELEGRAPH GUARANTEE, success half — STILL REQUIRED under the hazard model (re-derived
-	# 2026-07-18; approach leg added 2026-07-19): the guarantee's force-spawn can only fire at
-	# whatever heat the bar has ALREADY reached, so if a small heat_drop leaves post-vent heat
-	# above the next event's fit bound, the forced event would spawn too late for its approach
-	# AND window to fully fit and the backstop could kill a clean rider mid-gesture. So a
-	# success also vents whatever extra heat is needed for the next (escalated) event — flight
-	# and window both — to fully fit at the overdrive build rate — an adaptive top-off that
-	# only bites near the ceiling, where it reads as "the vent bought you exactly one more
-	# check," which is precisely the design.
+	# 2026-07-18; approach leg added 2026-07-19; refractory leg added 2026-07-18 night): the
+	# guarantee's force-spawn can only fire at whatever heat the bar has ALREADY reached, so if
+	# a small heat_drop leaves post-vent heat above the next event's fit bound, the forced event
+	# would spawn too late for its approach AND window to fully fit and the backstop could kill
+	# a clean rider mid-gesture. So a success also vents whatever extra heat is needed for the
+	# next (escalated) event to fully fit — and now the reservation includes the WORST-CASE
+	# refractory too, because the force-spawn holds its fire until the rolled quiet ends and
+	# heat keeps climbing the whole time:
+	#
+	#   heat_post_vent + (refractory_max + approach + duration + cushion) × build_hot ≤ ceiling
+	#   ⇔ heat_post_vent ≤ _window_fit_heat_bound() − refractory_max × build_hot
+	#
+	# An adaptive top-off that only bites near the ceiling, where it reads as "the vent bought
+	# you exactly one more check," which is precisely the design.
 	if tuning.rush_momentum_heat_build_hot_per_second > 0.0:
-		heat = minf(heat, maxf(_window_fit_heat_bound(), cruise_heat()))
+		var post_vent_bound := _window_fit_heat_bound() \
+				- maxf(tuning.rush_momentum_vent_refractory_max, 0.0) \
+				* tuning.rush_momentum_heat_build_hot_per_second
+		heat = minf(heat, maxf(post_vent_bound, cruise_heat()))
 	_window_open = false
 	_window_lifts_done = 0
 	bonus = _bonus_for_heat(heat)
+	# The rolled breather before the next event may spawn — success is one of the two moments
+	# that start a refractory (engaging overdrive is the other).
+	_start_refractory()
 	vent_succeeded.emit(_vent_tier, current_peak_bonus())
-	# The next window (if the ladder has rungs left) is scheduled by the tick's self-healing
-	# condition chain — no need to roll here, and one code path keeps the rng draw order simple.
+	# The next window is scheduled by the tick's self-healing condition chain once the
+	# refractory expires — no need to roll an arrival here, and one code path keeps the rng
+	# draw order simple.
+
+
+## Roll and start a vent REFRACTORY: a quiet spell of uniformly random length (the two knobs)
+## during which no event may spawn — the "slightly random spacing" Tim asked for (2026-07-18
+## night). Rolled on the schedule rng so seeded sim runs stay reproducible. The roll is then
+## CLAMPED to the tick-time left before heat would reach the force-spawn bound: the refractory
+## suppresses the force-spawn too, so an uncapped roll started with heat already near the bound
+## (re-engaging overdrive while still hot from a bailed deep ride) could let heat overshoot the
+## reservation and reach the backstop without a check — the guarantee outranks the breather.
+## (Post-vent rolls are never clamped in practice: the success top-off already reserved
+## refractory_max of climb room below the bound. The clamp uses the OVERDRIVE build rate
+## because the bound sits well above heat 1.0 — the only region where it can bite.)
+func _start_refractory() -> void:
+	var rolled := rng.randf_range(
+			maxf(tuning.rush_momentum_vent_refractory_min, 0.0),
+			maxf(tuning.rush_momentum_vent_refractory_max, 0.0))
+	var build_hot := tuning.rush_momentum_heat_build_hot_per_second
+	if build_hot > 0.0:
+		var seconds_until_bound := maxf((_window_fit_heat_bound() - heat) / build_hot, 0.0)
+		rolled = minf(rolled, seconds_until_bound)
+	_refractory_remaining = rolled
 
 
 ## The open window was blown. Report HOW FAR the player got (the learnable feedback), then
@@ -543,6 +603,7 @@ func _miss_vent() -> void:
 ## finger, not the excursion.)
 func _clear_vent_state() -> void:
 	_vent_tier = 0
+	_refractory_remaining = 0.0
 	_approaching = false
 	_approach_remaining = 0.0
 	_approach_required_lifts = 1
@@ -571,6 +632,8 @@ func _tick_lockout(delta: float) -> void:
 			_rearming = true
 			_rearm_remaining = (tuning.rush_momentum_rearm_seconds + _rearm_tier_sting) \
 					* _safe_lockout_scale()
+			# Remember the full length so the UI's visual re-arm timer can show remaining/total.
+			_rearm_total = _rearm_remaining
 	else:
 		_rearm_remaining -= delta
 		if _rearm_remaining <= 0.0:
@@ -644,6 +707,13 @@ func factor() -> float:
 func engage_overdrive() -> void:
 	if _locked_out:
 		return
+	if not _overdrive_engaged:
+		# Fresh opt-in: start a rolled refractory so the FIRST event of the ride is not
+		# metronomic either (engaging at the cruise clamp used to make the first spawn's timing
+		# depend only on the dice, but a hot re-engage near the force-spawn bound would fire it
+		# on an exact schedule). Guarded on the flag so a duplicate engage tap mid-ride cannot
+		# re-roll a quiet spell the player did not earn.
+		_start_refractory()
 	_overdrive_engaged = true
 
 
@@ -686,6 +756,13 @@ func vent_approach_remaining() -> float:
 	return _approach_remaining if _approaching else 0.0
 
 
+## Seconds of rolled post-vent/post-engage QUIET left before the next event may spawn; 0.0 once
+## expired. Exposed for the headless sim's spacing checks (the live UI ignores it — the quiet
+## is deliberately invisible, so spacing FEELS random rather than reading as a mechanic).
+func vent_refractory_remaining() -> float:
+	return maxf(_refractory_remaining, 0.0)
+
+
 ## True while a vent window is OPEN (the gesture clock is running). GameState uses this to keep
 ## the player counted as rushing — and the rushed property's grace alive — through the lifts.
 func is_vent_window_open() -> bool:
@@ -723,6 +800,16 @@ func is_rearming() -> bool:
 	return _rearming
 
 
+## How much of the re-arm delay is LEFT, as a fraction: 1.0 the moment the delay starts, 0.0
+## at rush_ready — and 0.0 any time no re-arm is running (normal riding, the drain phase).
+## The UI's dark-gray lockout timer drains on this. Divides by the captured _rearm_total, not
+## the knobs, because the per-tier sting and the Rapid Restart scale vary the total per lockout.
+func rearm_remaining_fraction() -> float:
+	if not _rearming or _rearm_total <= 0.0:
+		return 0.0
+	return clampf(_rearm_remaining / _rearm_total, 0.0, 1.0)
+
+
 ## Which region the current heat sits in. Purely a heat-range lookup — regions are never
 ## timed states (the design's core rule).
 func current_band() -> Band:
@@ -744,6 +831,7 @@ func reset() -> void:
 	_locked_out = false
 	_rearming = false
 	_rearm_remaining = 0.0
+	_rearm_total = 0.0
 	_rearm_tier_sting = 0.0
 	_overdrive_engaged = false
 	_was_rushing = false

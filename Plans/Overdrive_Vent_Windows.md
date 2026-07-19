@@ -267,6 +267,40 @@ bar is redesigned into two display modes:
 - Overheat lockout keeps the full-bar drain display; the success/miss chips stay above the bar;
   heat still climbs underneath and still drives the hazard rate (urgency wash keyed on depth).
 
+### Instrument refinements (Tim, 2026-07-18 night — five polish passes on the built v1)
+
+1. **Trailing fill.** The approaching red bar is no longer alone: the region from the bar back
+   to the RIGHT edge fills with a dim variant of the event gold as it travels — the event
+   "fills in behind" its leading edge, reading as a region sweeping in. Same MUSTARD_GOLD
+   family as the open-window dressing (dim 0.25 alpha vs the backdrop's 0.40), so the trail
+   growing to full width IS the backdrop appearing — approach and open event share one
+   identity, and the open lands as a brightness step, not a repaint.
+2. **Brighter pips.** Landed lifts are now near-white discs (#FFF7E6 — the most luminous mark
+   on the bar) and owed lifts bright-gold rings (#F5C542); the solid-vs-outline shape keeps
+   filled-vs-owed unmistakable while both pop off the gold backdrop the old cream sank into.
+3. **Thin timer strip.** The full-region draining countdown plate is replaced by a steady
+   event backdrop plus a thin (5 px) bright-gold timer bar hugging the region's bottom edge,
+   spanning target → right edge and draining right-to-left toward the target — the classic
+   timer strip, continuing the everything-collapses-into-the-target motion language and
+   staying clear of the centered pips.
+4. **Rolled refractory (core).** Post-resolution arrivals felt near-metronomic (deep rides sit
+   on the force-spawn bound). Every vent success — and every fresh overdrive engage — now
+   rolls a quiet spell in [`vent_refractory_min` 0.4, `vent_refractory_max` 1.2] s (seeded
+   rng, tick-time, frenzy-frozen) during which hazard dice AND the force-spawn hold fire.
+   Guarantee reconciliation: the post-vent top-off now reserves refractory_max + approach +
+   duration + cushion of climb room, and an engage-time roll is clamped to the climb room
+   left, so a worst-case quiet can never push an event past the backstop. Miss/overheat paths
+   need no refractory (they end in lockout). Sim retune (rates saturate — the free ride is
+   approach + refractory, not hazard wait): rates 0.5/3.0 → **0.7/3.4**, fail sting
+   6.0 → **12.0 s/tier**, cap 9.0 → **14.0 s**. Gates: cruise +24.9%, skilled +78.1%
+   (median death tier 8, p90 13), sloppy +24.6% — at or below cruise.
+5. **Lockout dead-bar gray.** During the overheat drain the track revealed behind the
+   shrinking red fill is a dark slate gray (#45464C — clearly "dead" vs the normal #B6BAC0
+   track, still hue-contrasting the BRICK fill); once drained, the gray covers the bar and
+   its right edge recedes leftward on the real re-arm countdown (new core getter
+   `rearm_remaining_fraction()`: 1.0 at re-arm start → 0.0 at rush_ready, 0.0 otherwise) —
+   the gray's retreat IS the re-arm timer, and the READY flash lands on a normal bar.
+
 ## Decision log
 
 - Overdrive must be skill-based with larger risk and reward; cruise keeps the safe floor

@@ -244,7 +244,7 @@ the chance of a vent event goes up as they go further into the overheat zone as 
   ≤ cruise, telegraph guarantee at every depth, plus a new statistical check that measured
   arrival rate actually rises with depth. Retune the two rate knobs to hit them.
 
-## Approach-bar presentation rework (Tim, 2026-07-19 — the bar becomes two instruments)
+## Approach-bar presentation rework (Tim, 2026-07-18 night — the bar becomes two instruments)
 
 Tim: vent events are good but need to be "as fun, but as intuitive as possible." The momentum
 bar is redesigned into two display modes:

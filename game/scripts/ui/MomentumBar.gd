@@ -2,52 +2,47 @@ class_name MomentumBar
 extends HBoxContainer
 
 # The Rush Momentum / Heat control (Tim 2026-07-12; Rush Overheat rework Tim 2026-07-15;
-# Cruise Control amendment Tim 2026-07-16): the OVERDRIVE button beside a display-only heat
-# meter — the same square-button-plus-meter shape as the frenzy TURBO control (FrenzyBar).
-# Momentum is earned by rushing the PROPERTIES, so the meter itself is still not a button;
-# the OVR button is the ONE tappable piece, enabled only mid-hold (see below).
+# Cruise Control amendment Tim 2026-07-16): the OVERDRIVE button beside a display-only meter —
+# the same square-button-plus-meter shape as the frenzy TURBO control (FrenzyBar). Momentum is
+# earned by rushing the PROPERTIES, so the meter itself is still not a button; the OVR button
+# is the ONE tappable piece, enabled only mid-hold (see _process).
 #
-# Overheat (Plans/Rush_Overheat.md) turned the old 0..cap meter into a push-your-luck heat
-# gauge, so the meter shows the FULL heat range 0..hard_ceiling. The depth-hazard rework
-# (Plans/Overdrive_Vent_Windows.md, Tim 2026-07-18 evening) then retired the Critical band:
-# heat has just TWO regions — Building (0 → 1.0) and OVERDRIVE (1.0 → the hard ceiling) — and
-# vent checks arrive more often the DEEPER the player rides, so every danger cue on this bar
-# ramps continuously with overdrive depth instead of announcing a band edge:
-#   • a wide teal CRUISE bar marks the cruise point — everything left of it is safe;
-#   • from the cruise bar to the bar's END the track is ONE continuous amber-into-red wash,
-#     hazard stripes fading in across it, with NO internal tick lines and NO seams anywhere
-#     (Tim 2026-07-16 and 2026-07-18: one continuous section, the effect changing throughout);
-#   • the bar ends at the FIXED hard ceiling — the "you ignored everything" backstop that Vent
-#     Windows (Tim 2026-07-17) put where the old hidden random ceiling used to be: the real
-#     test is WHEN a vent window telegraphs, not where a secret line sits;
-#   • the fill and its bubbles shift purple → amber continuously with depth, a red blink fading
-#     in past the cruise point and growing faster and harder toward the ceiling. There is NO
-#     band-crossing chip any more (the old "CRITICAL +X%!" chip and its haptic left with the
-#     band): the vent telegraphs are the escalation drama now (Tim 2026-07-18);
-#   • on overheat the label swaps to "OVERHEATED" while the fill visibly drains (the drain IS
-#     the cooldown display), then "COOLING…" through the re-arm delay, then a bright READY flash.
+# APPROACH-BAR REWORK (Plans/Overdrive_Vent_Windows.md, Tim 2026-07-19): the meter is now TWO
+# different instruments sharing one frame, keyed on whether overdrive is engaged:
 #
-# Cruise Control (Plans/Rush_Cruise_Control.md) made the danger bands OPT-IN: holding rush is
-# safe forever, with heat clamped at the cruise point, until the player taps OVERDRIVE.
-#   • The OVR button is ALWAYS visible (Tim 2026-07-16: moving UI elements are annoying) but
-#     ENABLED only once the hold has REACHED the cruise clamp — is_cruising() AND heat at the
-#     cruise point; the climb toward the clamp stays gray (Tim 2026-07-16). Any other time it
-#     wears the gray-outlined "can't trigger" plate, like TURBO.
-#   • While the clamp is holding, the readout reads "CRUISE +25%" in a calm teal — a steady,
-#     CONTENT state, clearly apart from the amber/red danger escalation. The wide teal cruise
-#     bar on the track marks the cruise point itself.
-#   • Once overdrive engages, everything above presents exactly as shipped.
+#   • CRUISE/BUILD mode (overdrive NOT engaged, not locked out): the whole bar spans
+#     0 → the cruise clamp — FILLING THE BAR IS REACHING CRUISE (Tim: clean and safe-reading).
+#     Purple fill, gold-family bubbles, no hazard wash, no stripes, no blink. The old teal
+#     cruise-bar marker is gone in this mode: the bar's own right edge IS the cruise point now,
+#     so a marker for it would be redundant. The "CRUISE +25%" readout stays.
 #
-# Vent Windows (Plans/Overdrive_Vent_Windows.md, Tim 2026-07-17; endless escalation rework
-# Tim 2026-07-18) add the telegraph + feedback layer on top: when the core opens a vent window
-# this bar pops a HELD-OPEN gold "VENT!" / "VENT ×2!" / "VENT ×3!" chip with large gesture pips
-# (one per demanded lift, filling as the lifts land) and a thin draining countdown bar; success
-# swaps it for a green "VENTED — PEAK +X%!" chip plus the ready-style white flash; a miss
-# flashes the UNFINISHED pips red so the player can see exactly which beat was blown before the
-# overheat presentation lands (the plan's rule: miss-feedback is what makes a skill mechanic
-# learnable). The windows NEVER stop: there is no tier cap, every success ratchets the bonus
-# AND the difficulty (faster cadence, shorter windows, up to three lifts), and the run ends on
-# the miss — how high the peak climbed IS the score, so the chip's "+X%" can grow without bound.
+#   • OVERDRIVE mode (engage_overdrive → until disengage/overheat): the bar repurposes into
+#     the vent-minigame instrument. A fixed gold TARGET BAR sits ~1/3 from the left; each
+#     scheduled vent event enters as a bright red EVENT BAR at the right edge and travels left
+#     (the player SEES IT COMING — this replaces the old held-open gold "VENT!" chip); the
+#     event reaching the target IS the window opening. While a window is open, the whole
+#     region right of the target renders the gesture pips and the countdown at full bar
+#     scale (see OverdriveInstrumentOverlay). The ProgressBar fill is PINNED FULL and its
+#     color carries the depth urgency: purple → amber with overdrive depth, the red warning
+#     blink ramping on top — so between events the bar still FEELS hotter the deeper you
+#     ride, even though it no longer plots heat's position. (Pinned-full was chosen over
+#     repurposing the fill as the countdown: the overlay's draining region already tells the
+#     countdown story, and a second moving edge underneath it would just be noise — the fill's
+#     job in this mode is to be the urgency-colored stage the minigame plays on.)
+#
+#   • OVERHEAT lockout: unchanged — the fill shows heat / hard_ceiling visibly draining (the
+#     drain IS the cooldown display), label swaps OVERHEATED → COOLING…, then the READY flash.
+#
+# Vent resolutions still land as timed chips ABOVE the bar: green "VENTED — PEAK +X%!" plus
+# the white flash on success; red "VENT MISSED!" with the unfinished pips strobing on a miss.
+# The miss chip KEEPS its own pip row (VentPipRow) even though the bar now draws pips too:
+# a miss immediately flips the bar into the OVERHEAT display, which wipes the in-bar pips —
+# the chip is the only place the blown beat can stay visible long enough to learn from
+# (the plan's rule: miss-feedback is what makes a skill mechanic learnable).
+#
+# Cruise Control (Plans/Rush_Cruise_Control.md) rules still apply: the OVR button is ALWAYS
+# visible (Tim 2026-07-16: moving UI elements are annoying) but ENABLED only once the hold has
+# REACHED the cruise clamp; any other time it wears the gray-outlined "can't trigger" plate.
 
 ## The player tapped OVERDRIVE: release the cruise clamp for this excursion. Main routes this
 ## to GameState.engage_rush_overdrive() — the same seam as FrenzyBar.pop_requested.
@@ -60,7 +55,7 @@ var _tuning: TuningConfig
 ## only while cruising — see _process.
 var _overdrive_button: Button
 
-## The display-only heat meter. All the overlays below live inside it.
+## The display-only meter. All the overlays below live inside it.
 var _meter: ProgressBar
 
 ## The big bonus readout ("+42%"), right-aligned; the caption on the left names the meter.
@@ -69,31 +64,43 @@ var _label: Label
 ## Carbonation in the fill; hidden while overheated (a locked meter is not accruing anything).
 var _bubbles: GoldBubbles
 
-## Fast neon-salmon streaks shown while heat is past the old cap (the Hot tick) and rushing is
-## not locked out — "you are in overdrive" (was: only at max bonus; Tim 2026-07-15).
+## Fast neon-salmon streaks shown while overdrive is engaged — "you are riding the danger
+## zone". With the fill pinned full in overdrive mode, the streaks are also the motion cue
+## that the bar has switched instruments.
 var _streaks: MomentumStreaks
 
-## The custom-drawn zone overlay: the wide teal cruise bar, and the continuous amber-into-red
-## hazard wash (stripes and all) running from it to the bar's end.
-var _zones: BandZoneOverlay
+## The custom-drawn overdrive instrument: target bar, traveling event bar, in-bar pips and
+## window countdown. Draws NOTHING outside overdrive mode (the cruise bar is a clean, plain
+## meter now). Formerly BandZoneOverlay — the hazard wash/stripes it painted moved into the
+## fill's own depth coloring when the bar stopped plotting heat position.
+var _instrument: OverdriveInstrumentOverlay
 
-## The large chip shown above the meter (Vent Windows): the held-open "VENT!" telegraph plus
-## its short-lived success/miss resolution chips.
+## The chip shown above the meter: the short-lived vent success/miss resolution plates.
+## (The old HELD-OPEN gold "VENT!" telegraph chip is retired — the approaching red event bar
+## is the telegraph now, with ~2 s of warning instead of a plate popping in.)
 var _tier_chip: PanelContainer
 var _tier_chip_label: Label
 var _tier_chip_tween: Tween
 
-## The vent gesture pips + countdown bar, drawn inside the chip beneath its text line (see
-## VentPipRow at the bottom of this file). Visible only while a vent chip is up.
+## The miss-feedback pips inside the chip (see VentPipRow at the bottom of this file).
+## Visible only on the "VENT MISSED!" chip — see the class comment for why the chip keeps
+## its own pips alongside the in-bar ones.
 var _vent_pips: VentPipRow
-## True while the chip is being HELD OPEN as the live vent-window telegraph (no timed fade —
-## the window's resolution decides how it ends). _process drives the countdown while true.
-var _vent_chip_active := false
-## The open window's telegraphed duration (s), for the countdown fraction. Taken from the
-## vent_window_opened signal rather than the tuning knob, because the core SHRINKS windows
-## per achieved tier (the endless escalation's speed axis) — the chip must drain over the
+
+## The open window's telegraphed duration (s), for the in-bar countdown fraction. Taken from
+## the vent_window_opened signal rather than the tuning knob, because the core SHRINKS windows
+## per achieved tier (the escalation's speed axis) — the countdown must drain over the
 ## window's REAL length.
 var _vent_window_duration := 1.0
+
+## The in-flight event's total approach time (s), from the vent_incoming signal — the divisor
+## that turns vent_approach_remaining() into the event bar's 0..1 travel fraction.
+var _vent_approach_seconds := 1.0
+
+## Lifts landed in the OPEN window, from vent_lift_registered (the core exposes the demanded
+## count via vent_required_lifts() but not the landed count, so the UI keeps this one tally).
+## Reset when a window opens; meaningless while none is open.
+var _window_lifts_done := 0
 
 ## Full-rect white flash played when rush re-arms — re-availability must be unmissable
 ## (Tim 2026-07-15), so the whole meter blinks bright once alongside the label reverting.
@@ -104,7 +111,7 @@ var _ready_flash: ColorRect
 ## smoothing the frenzy meter uses; see BarSmoothing).
 var _displayed_fill := 0.0
 
-## The fill StyleBoxFlat, kept so _process can recolor the fill per heat depth (and drive the
+## The fill StyleBoxFlat, kept so _process can recolor the fill per mode/depth (and drive the
 ## warning blink) by mutating bg_color — far cheaper than rebuilding the stylebox every frame.
 var _fill_style: StyleBoxFlat
 
@@ -117,11 +124,16 @@ var _blink_phase := 0.0
 enum _LabelState { NORMAL, CRUISING, OVERHEATED, COOLING }
 var _label_state_applied: int = -1
 
-## Blink ramp: the red warning blink keys CONTINUOUSLY on overdrive depth — heat's position
-## within [cruise point .. hard ceiling]. Frequency runs BLINK_HZ_MIN → BLINK_HZ_MAX across
-## that span; strength runs 0 → BLINK_STRENGTH_MAX. There is deliberately no strength floor:
-## a floor would snap the blink on at some depth, re-creating the very band edge the
-## depth-hazard rework removed (see _update_fill_color).
+## Where the fixed vent target bar sits, as a fraction of the bar's width (~1/3 from the left,
+## Tim 2026-07-19). The region right of it is the event runway: events enter at the right edge
+## and travel left across two-thirds of the bar, so the approach is long enough to read.
+const TARGET_FRAC := 0.33
+
+## Blink ramp (overdrive mode): the red warning blink keys CONTINUOUSLY on overdrive depth —
+## heat's position within [cruise point .. hard ceiling]. Frequency runs BLINK_HZ_MIN →
+## BLINK_HZ_MAX across that span; strength runs 0 → BLINK_STRENGTH_MAX. There is deliberately
+## no strength floor: a floor would snap the blink on at some depth, re-creating the very band
+## edge the depth-hazard rework removed (see _update_fill_color).
 const BLINK_HZ_MIN := 2.5
 const BLINK_HZ_MAX := 7.0
 const BLINK_STRENGTH_MAX := 0.85
@@ -186,7 +198,7 @@ func _ready() -> void:
 	_overdrive_button.disabled = true  # _process enables it only while cruising
 	add_child(_overdrive_button)
 
-	# The heat meter itself — display only, so it ignores the mouse entirely (FrenzyBar's meter
+	# The meter itself — display only, so it ignores the mouse entirely (FrenzyBar's meter
 	# does the same); the button above is this control's one tappable piece.
 	_meter = ProgressBar.new()
 	_meter.min_value = 0.0
@@ -203,17 +215,15 @@ func _ready() -> void:
 	# (Tim 2026-07-15) so the bright bubbles and white text pop against it.
 	UiPalette.style_framed_progress(_meter, UiPalette.DARK_PURPLE, UiPalette.PROGRESS_TRACK_GRAY)
 	add_child(_meter)
-	# Keep a handle on the fill stylebox so the depth coloring / warning blink can mutate its
-	# bg_color per frame instead of rebuilding styleboxes (see _process).
+	# Keep a handle on the fill stylebox so the mode/depth coloring can mutate its bg_color
+	# per frame instead of rebuilding styleboxes (see _process).
 	_fill_style = _meter.get_theme_stylebox("fill") as StyleBoxFlat
 
-	# Band zones + the 1.0 and cruise ticks, custom-drawn (the same approach as MomentumStreaks).
-	# Added FIRST among the meter's overlays: it paints the hazard wash only over the UNFILLED
-	# track (the fill covers it as it advances, so it reads as track decoration behind the
-	# fill), plus the always-drawn cruise bar. Everything after it (bubbles, streaks, label)
-	# draws over it.
-	_zones = BandZoneOverlay.new()
-	_meter.add_child(_zones)
+	# The overdrive instrument overlay, custom-drawn (the same approach as MomentumStreaks).
+	# Added FIRST among the meter's overlays so the bubbles, streaks, and text labels all draw
+	# over its plates and bars.
+	_instrument = OverdriveInstrumentOverlay.new()
+	_meter.add_child(_instrument)
 
 	# Carbonation in the fill, the same "value accruing automatically" cue the frenzy meter and the
 	# property/economy bars carry: heat builds on its own while you rush. BRIGHT_PURPLE bubbles
@@ -226,7 +236,7 @@ func _ready() -> void:
 	_bubbles.tier = GoldBubbles.Tier.FLOWING  # steady automatic accrual, like TURBO charging
 	_meter.add_child(_bubbles)
 
-	# Neon-salmon streaks over the fill, shown while heat rides past the old cap (see _process).
+	# Neon-salmon streaks over the fill, shown while overdrive is engaged (see _process).
 	# Added over the gold bubbles but under the label overlay, so the "+XX%" still draws on top.
 	_streaks = MomentumStreaks.new()
 	_streaks.color = UiPalette.NEON_SALMON
@@ -243,17 +253,17 @@ func _ready() -> void:
 
 	# Overlay: a left caption and the big "+XX%" readout on the right. It ignores the mouse so it
 	# never eats a tap meant for the rows or buttons around it.
-	var overlay := MarginContainer.new()
-	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	overlay.add_theme_constant_override("margin_left", 16)
-	overlay.add_theme_constant_override("margin_right", 16)
-	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_meter.add_child(overlay)
+	var text_overlay := MarginContainer.new()
+	text_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	text_overlay.add_theme_constant_override("margin_left", 16)
+	text_overlay.add_theme_constant_override("margin_right", 16)
+	text_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_meter.add_child(text_overlay)
 
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	overlay.add_child(row)
+	text_overlay.add_child(row)
 
 	# Left: the meter's name. White (Tim 2026-07-15) so it reads over the dark purple fill (the
 	# caption sits at the left edge, filled first as heat climbs).
@@ -279,11 +289,11 @@ func _ready() -> void:
 	row.add_child(_label)
 	_apply_label_state(_LabelState.NORMAL)
 
-	# The tier chip: a large bold plate for the vent telegraph and its resolutions — timed chips
-	# ease in, hold ~1 s, then fade (see _show_tier_chip). It sits ABOVE the meter, not over it (Tim 2026-07-18:
-	# a chip covering the bar hid the fill/zones exactly when the player most needs to read
-	# them mid-vent) — anchored to the meter's top-center and growing upward, so however tall
-	# the chip gets (text only, or text + pips + countdown) its bottom edge stays a fixed gap
+	# The tier chip: a large bold plate for the vent resolutions — chips ease in, hold ~1 s,
+	# then fade (see _show_tier_chip). It sits ABOVE the meter, not over it (Tim 2026-07-18:
+	# a chip covering the bar hid the fill exactly when the player most needs to read it
+	# mid-vent) — anchored to the meter's top-center and growing upward, so however tall
+	# the chip gets (text only, or text + miss pips) its bottom edge stays a fixed gap
 	# above the bar. z_index lifts it above the siblings drawn after this bar.
 	_tier_chip = PanelContainer.new()
 	_tier_chip.anchor_left = 0.5
@@ -298,9 +308,9 @@ func _ready() -> void:
 	_tier_chip.visible = false
 	_meter.add_child(_tier_chip)
 
-	# The chip's content column: the big text line, with the vent pips + countdown beneath it.
-	# The pip row only shows while the chip is vent-related; a plain tier chip keeps it hidden,
-	# so the chip collapses to exactly its old text-only shape then.
+	# The chip's content column: the big text line, with the miss-feedback pips beneath it.
+	# The pip row only shows on the miss chip; every other chip keeps it hidden, so those
+	# chips collapse to exactly the text-only shape.
 	var chip_column := VBoxContainer.new()
 	chip_column.add_theme_constant_override("separation", 10)
 	chip_column.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -309,7 +319,7 @@ func _ready() -> void:
 	_tier_chip_label = Label.new()
 	_tier_chip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_tier_chip_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	# FONT_HEADLINE bold — the chip is the act-NOW / payoff moment and must land at a glance
+	# FONT_HEADLINE bold — the chip is the payoff/failure moment and must land at a glance
 	# (Tim's vision, §1b: large text, unmissable signals).
 	_tier_chip_label.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
 	_tier_chip_label.add_theme_font_override("font", UiPalette.make_bold_font())
@@ -322,10 +332,12 @@ func _ready() -> void:
 
 	# Overheat/re-arm swap the whole meter's presentation. (Deliberately NO band_entered
 	# connection: the depth-hazard rework retired the Critical band and its crossing chip —
-	# the vent telegraphs are the escalation drama now; Tim 2026-07-18.)
+	# the vent events are the escalation drama now; Tim 2026-07-18.)
 	_rush_momentum.overheated.connect(_on_overheated)
 	_rush_momentum.rush_ready.connect(_on_rush_ready)
-	# Vent Windows: the telegraph and its three resolutions (Plans/Overdrive_Vent_Windows.md).
+	# Vent Windows: the approach telegraph, the in-window progress, and the two resolutions
+	# (Plans/Overdrive_Vent_Windows.md, approach-bar rework).
+	_rush_momentum.vent_incoming.connect(_on_vent_incoming)
 	_rush_momentum.vent_window_opened.connect(_on_vent_window_opened)
 	_rush_momentum.vent_lift_registered.connect(_on_vent_lift_registered)
 	_rush_momentum.vent_succeeded.connect(_on_vent_succeeded)
@@ -333,38 +345,66 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	# The meter spans the FULL heat range: fill fraction = heat / hard_ceiling — the FIXED
-	# backstop that replaced the old random ceiling roll (Vent Windows) — so the hazard zone
-	# sits at a fixed position on the track and the fill physically enters it as heat climbs.
-	# Guard the knob so a 0 can't divide by zero.
-	var hard_ceiling: float = maxf(_tuning.rush_momentum_hard_ceiling, 0.0001)
-	var target_fill: float = clampf(_rush_momentum.heat / hard_ceiling, 0.0, 1.0)
+	var locked_out := _rush_momentum.is_locked_out()
+	var cruising := _rush_momentum.is_cruising()
+	# Overdrive DISPLAY mode: the engaged flag, not heat position — the instant the player opts
+	# in the bar becomes the minigame instrument, and the instant the ride ends (release,
+	# overheat) it stops being one. Lockout is checked too so the overheat drain always wins.
+	var overdrive := _rush_momentum.is_overdrive_engaged() and not locked_out
+
+	# The fill target per display mode. Every mode boundary is CONTINUOUS by construction, so
+	# the eased fill never visibly jumps on a transition:
+	#   • cruise → overdrive: engaging requires heat AT the cruise clamp, i.e. a full bar,
+	#     which is exactly overdrive's pinned 1.0;
+	#   • overdrive → cruise (bail): heat is above the clamp, so heat/cruise clamps to 1.0
+	#     and the bar stays full until the bleed brings heat back under the clamp;
+	#   • overdrive → lockout (overheat): heat is at/near the hard ceiling, so heat/ceiling
+	#     starts ≈ 1.0 and the drain animates down from there;
+	#   • lockout → cruise (re-arm): heat drained to 0, and 0/cruise is 0.
+	# A First Contact reset mid-anything is the one hard cut (heat snaps to 0) — the eased
+	# fill glides down, which reads as the meter powering off, and is fine.
+	var target_fill: float
+	if locked_out:
+		# OVERHEAT: the full-heat drain display, unchanged — fill = heat / hard_ceiling so the
+		# visible drain IS the cooldown. Guard the knob so a 0 can't divide by zero.
+		var hard_ceiling: float = maxf(_tuning.rush_momentum_hard_ceiling, 0.0001)
+		target_fill = clampf(_rush_momentum.heat / hard_ceiling, 0.0, 1.0)
+	elif overdrive:
+		# OVERDRIVE: pinned full — the bar is the minigame stage, not a heat plot (see the
+		# class comment for why pinned-full beat fill-as-countdown).
+		target_fill = 1.0
+	else:
+		# CRUISE/BUILD: the whole bar spans 0 → the cruise clamp, so filling the bar IS
+		# reaching cruise (Tim 2026-07-19). Legacy Cooling Systems moves the clamp; the
+		# guard covers a hand-poked zero cruise bonus.
+		var cruise: float = maxf(_rush_momentum.cruise_heat(), 0.0001)
+		target_fill = clampf(_rush_momentum.heat / cruise, 0.0, 1.0)
 	_displayed_fill = BarSmoothing.approach(_displayed_fill, target_fill, delta)
 	_meter.value = _displayed_fill
 
-	# Feed the zone overlay the cruise point (as a fill fraction) plus the current fill edge,
-	# so it can paint the hazard wash only over the still-unfilled track and keep the cruise
-	# bar where the clamp actually sits (Legacy can move it).
-	var cruise_frac: float = clampf(_rush_momentum.cruise_heat() / hard_ceiling, 0.0, 1.0)
-	_zones.update_zones(cruise_frac, _displayed_fill)
-
-	# While the vent telegraph is up, drain its countdown from the LIVE remaining time —
-	# remaining / telegraphed duration, so a tier-tightened window still drains exactly
-	# full-to-empty (and a frenzy freeze visibly pauses it, matching the core's pause).
-	if _vent_chip_active:
-		# Watchdog: a held telegraph with NO open window underneath is an orphan. The normal
-		# resolutions (success/miss/overheat) clear the chip via their signals, but a silent
-		# teardown — RushMomentumState.reset() at First Contact, mid-window — emits nothing,
-		# which left a stale "VENT!" plate on screen after the contact ceremony (Tim's device
-		# report, 2026-07-18). One state read per frame; fires only on that orphan case.
-		if not _rush_momentum.is_vent_window_open():
-			_dismiss_vent_telegraph()
-		else:
-			_vent_pips.set_countdown(clampf(
-					_rush_momentum.vent_window_remaining() / _vent_window_duration, 0.0, 1.0))
-
-	var locked_out := _rush_momentum.is_locked_out()
-	var cruising := _rush_momentum.is_cruising()
+	# Feed the overdrive instrument. Everything it shows is DERIVED FRESH each frame from the
+	# core's live getters — that per-frame derivation IS the orphan watchdog: an approach or
+	# window the core silently tore down (release-disengage, overheat, First Contact reset)
+	# simply stops appearing on the very next frame, so a stale red bar or stale pips cannot
+	# exist. (The old held-open "VENT!" chip needed an explicit watchdog for exactly this;
+	# deriving instead of retaining removes the failure mode outright.)
+	if overdrive:
+		# The event bar's travel fraction: 1.0 at the right edge when the event spawns, 0.0 at
+		# the target bar when the window opens — remaining / total, so a frenzy freeze (which
+		# pauses the core's approach clock) visibly halts the bar mid-flight.
+		var event_frac := -1.0  # negative = no event bar drawn
+		if _rush_momentum.is_vent_approaching() and _vent_approach_seconds > 0.0:
+			event_frac = clampf(
+					_rush_momentum.vent_approach_remaining() / _vent_approach_seconds, 0.0, 1.0)
+		var window_open := _rush_momentum.is_vent_window_open()
+		var countdown_frac := 0.0
+		if window_open:
+			countdown_frac = clampf(
+					_rush_momentum.vent_window_remaining() / _vent_window_duration, 0.0, 1.0)
+		_instrument.update_overdrive(TARGET_FRAC, event_frac, window_open, countdown_frac,
+				_rush_momentum.vent_required_lifts(), _window_lifts_done)
+	else:
+		_instrument.update_idle()
 
 	# The OVR button is a permanent fixture (Tim 2026-07-16: moving UI elements are annoying);
 	# it ENABLES only once the hold has actually REACHED the cruise clamp (Tim 2026-07-16) —
@@ -400,31 +440,24 @@ func _process(delta: float) -> void:
 	# shutdown reads as dead air, not business as usual.
 	_bubbles.visible = not locked_out
 
-	# The salmon streaks mark riding past the cruise point — the whole overdrive ramp is danger
-	# territory now that the old-cap tick is gone (Tim 2026-07-16: one continuous section past
-	# cruise). NOT while cruising: with max Cooling Systems the cruise clamp sits exactly at
-	# heat 1.0, and cruising there must stay a calm state (the boundary rule,
-	# Plans/Rush_Cruise_Control.md).
-	_streaks.visible = _rush_momentum.heat > _rush_momentum.cruise_heat() \
-			and not locked_out and not cruising
+	# The salmon streaks mark the overdrive ride itself now: with the fill pinned full, they are
+	# the motion cue that the bar has switched into its minigame instrument. Never while merely
+	# cruising or locked out.
+	_streaks.visible = overdrive
 
-	_update_fill_color(delta, locked_out, cruising)
+	_update_fill_color(delta, locked_out, overdrive)
 
 
-## Recolor the fill AND its bubbles for the current heat: DARK_PURPLE at or below the cruise
-## point (and always while cruising), then ONE continuous story across the whole overdrive
-## span [cruise point .. hard ceiling]: the base color slides purple → amber with depth while
-## a red warning blink rides on top of it, both its strength and its frequency ramping with
-## the SAME depth. The blink's strength ramp starts at ZERO, so it fades in naturally just
-## past cruise — blink strength IS the depth ramp; there is no separate "blink region" that
-## switches on (the depth-hazard rework removed the Critical band, so no color behavior may
-## begin at an internal edge). Mutates the cached fill stylebox's bg_color, so no styleboxes
-## are rebuilt.
-func _update_fill_color(delta: float, locked_out: bool, cruising: bool) -> void:
-	var heat: float = _rush_momentum.heat
-	var cruise_heat: float = _rush_momentum.cruise_heat()
-	var hard_ceiling: float = maxf(_tuning.rush_momentum_hard_ceiling, 0.0001)
-
+## Recolor the fill AND its bubbles for the current display mode. Cruise/build mode is the calm
+## instrument: always DARK_PURPLE, no wash, no blink (Tim 2026-07-19: clean and safe-reading).
+## In OVERDRIVE mode the fill is pinned full and its COLOR carries the depth urgency instead:
+## purple → amber sliding with overdrive depth — heat's position within [cruise point .. hard
+## ceiling], the same fraction the core's hazard rate interpolates on, so the bar's urgency and
+## the actual vent-check danger climb together — with the red warning blink ramping in strength
+## and frequency on that same depth. The blink's strength ramp starts at ZERO, so shallow riding
+## barely shimmers and there is no depth at which it snaps on (no re-created band edge).
+## Mutates the cached fill stylebox's bg_color, so no styleboxes are rebuilt.
+func _update_fill_color(delta: float, locked_out: bool, overdrive: bool) -> void:
 	if locked_out:
 		# Draining after an overheat: a flat dark red — the punishment color, no blink (the
 		# urgency is over; the player is just watching the cooldown empty out).
@@ -432,30 +465,30 @@ func _update_fill_color(delta: float, locked_out: bool, cruising: bool) -> void:
 		_bubbles.bubble_color = UiPalette.BRIGHT_PURPLE
 		return
 
-	if cruising or heat <= cruise_heat:
-		# Cruising (or simply below the cruise point): the steady, CONTENT look — including the
-		# max-Legacy edge where the clamp sits exactly at 1.0, which must never wear the danger
-		# ramp's amber (the boundary rule, Plans/Rush_Cruise_Control.md).
+	if not overdrive:
+		# Cruise/build: the steady, CONTENT look, whatever heat is doing (including bleeding
+		# back down after a bailed ride — the bar left the danger business when overdrive
+		# disengaged, so no danger color may linger).
 		_fill_style.bg_color = UiPalette.DARK_PURPLE
 		_bubbles.bubble_color = UiPalette.BRIGHT_PURPLE
 		_blink_phase = 0.0
 		return
 
-	# Overdrive depth: how far into [cruise point .. hard ceiling] heat is riding — the same
-	# depth fraction the core's vent-check hazard rate interpolates on, so the bar's urgency
-	# and the actual danger climb together.
+	# Overdrive depth: how far into [cruise point .. hard ceiling] heat is riding.
+	var heat: float = _rush_momentum.heat
+	var cruise_heat: float = _rush_momentum.cruise_heat()
+	var hard_ceiling: float = maxf(_tuning.rush_momentum_hard_ceiling, 0.0001)
 	var depth_span: float = maxf(hard_ceiling - cruise_heat, 0.0001)
 	var depth_frac: float = clampf((heat - cruise_heat) / depth_span, 0.0, 1.0)
 
-	# Base color: fill and bubbles slide purple → amber across the ENTIRE overdrive span,
-	# matching the track wash beneath (unchanged from the banded era, just re-spanned).
+	# Base color: fill and bubbles slide purple → amber across the whole overdrive span.
 	var base_fill: Color = UiPalette.DARK_PURPLE.lerp(UiPalette.MUSTARD_GOLD, depth_frac)
 	_bubbles.bubble_color = UiPalette.BRIGHT_PURPLE.lerp(UiPalette.PALE_GOLD, depth_frac)
 
 	# The red warning blink, pulsing the base color toward KETCHUP_RED. Phase accumulates at
 	# the CURRENT frequency so the ramping frequency never makes the sine jump. Strength
 	# scales straight off depth_frac (zero at the cruise point): shallow overdrive barely
-	# shimmers, the top of the bar flashes hard and fast.
+	# shimmers, riding just under the backstop flashes hard and fast.
 	var blink_hz: float = lerpf(BLINK_HZ_MIN, BLINK_HZ_MAX, depth_frac)
 	var strength: float = BLINK_STRENGTH_MAX * depth_frac
 	_blink_phase += delta * blink_hz * TAU
@@ -495,29 +528,12 @@ func _apply_label_state(state: int) -> void:
 
 
 ## Heat hit the hard ceiling, or a vent window was missed: the shutdown moment. The
-## label/fill/bubble changes are all per-frame state reads (see _process); here we add the
-## long haptic thump so the failure lands physically as well as visually, and make sure no
-## held-open vent telegraph outlives the excursion it belonged to.
+## label/fill/instrument changes are all per-frame state reads (see _process — the instrument
+## clears itself the moment the mode flips, so there is no telegraph to dismiss here any more);
+## this handler only adds the long haptic thump so the failure lands physically as well as
+## visually.
 func _on_overheated() -> void:
-	# The hard-ceiling backstop can fire while a vent telegraph is still up (the missed-window
-	# path clears it in _on_vent_missed; this covers heat simply reaching the top). Drop the
-	# held chip so the OVERHEATED presentation isn't fighting a stale "VENT!" plate.
-	_dismiss_vent_telegraph()
 	_vibrate(_tuning.rush_momentum_haptic_overheat_ms)
-
-
-## Drop a held-open vent telegraph immediately — chip, pips, and any in-flight tween. Safe to
-## call when no telegraph is up. Used by the overheat handler above and by the _process
-## watchdog for silent teardowns (see there).
-func _dismiss_vent_telegraph() -> void:
-	if not _vent_chip_active:
-		return
-	_vent_chip_active = false
-	_vent_pips.visible = false
-	_vent_pips.stop_miss_flash()
-	if _tier_chip_tween != null and _tier_chip_tween.is_valid():
-		_tier_chip_tween.kill()
-	_tier_chip.visible = false
 
 
 ## The re-arm delay finished: rush is available again. Flash the whole meter bright once (plus a
@@ -531,42 +547,42 @@ func _on_rush_ready() -> void:
 
 
 # ---------------------------------------------------------------------------
-# Vent Windows: the telegraph and its resolutions (Plans/Overdrive_Vent_Windows.md)
+# Vent Windows: the approach telegraph and its resolutions
+# (Plans/Overdrive_Vent_Windows.md, approach-bar rework Tim 2026-07-19)
 # ---------------------------------------------------------------------------
 
-## The core opened a vent window: the act-NOW telegraph. The tier chip is reused, but HELD
-## OPEN for the window's whole life — its resolution (success / miss / overheat) decides how
-## it ends, so a knob-lengthened window can never outlive its own telegraph. The plate is
-## bright MUSTARD_GOLD with NAVY text: gold is the "act now" family here, deliberately apart
-## from teal (cruise/calm) and red (failure), and navy-on-gold is the standard
-## action-button pairing, so the chip reads as "DO the thing" at a glance. The pips beneath
-## show the demanded lifts (1 to 3 — the escalation's complexity axis) with the countdown bar
-## under them.
-func _on_vent_window_opened(required_lifts: int, duration: float) -> void:
-	_vent_window_duration = maxf(duration, 0.001)
-	_vent_chip_active = true
-	_vent_pips.show_window(required_lifts)
-	# A single lift is plain "VENT!"; deeper tiers name their count ("VENT ×2!", "VENT ×3!") —
-	# the count in the text matches the pip count, so the demand reads two ways at once.
-	var chip_text := "VENT!" if required_lifts <= 1 else "VENT ×%d!" % required_lifts
-	_show_tier_chip_held(chip_text, UiPalette.MUSTARD_GOLD, UiPalette.NAVY)
+## A vent event just SPAWNED at the bar's right edge (~approach_seconds from triggering). Record
+## the divisor for the event bar's travel math, and fire the vent haptic HERE, at the spawn —
+## not at window-open — because a warning pulse with the whole approach still ahead is what a
+## telegraph haptic is FOR (it preserves the shipped meaning: "a check is coming, get ready",
+## with time to act on it). At window-open a buzz would land at the exact instant the player
+## should already be lifting — too late to help, and it would smear the physical beat players
+## calibrate their gesture timing against. The visual "NOW" is the red bar reaching the target.
+func _on_vent_incoming(approach_seconds: float, _required_lifts: int) -> void:
+	_vent_approach_seconds = maxf(approach_seconds, 0.001)
 	_vibrate(_tuning.rush_momentum_haptic_vent_ms)
 
 
-## A gesture lift landed: fill its pip, so progress through the demanded beats is visible
-## mid-gesture (the ×2 vent needs the player to KNOW the first lift registered).
+## The event reached the target: the window is open, the gesture clock is running. All the
+## presentation is in-bar now (pips + countdown via the instrument overlay, driven per frame by
+## _process) — no chip: the old held-open gold "VENT!" plate is retired, replaced by the
+## approaching red bar the player has been watching for the whole approach.
+func _on_vent_window_opened(_required_lifts: int, duration: float) -> void:
+	_vent_window_duration = maxf(duration, 0.001)
+	_window_lifts_done = 0
+
+
+## A gesture lift landed: the in-bar pip display fills one more (the ×2/×3 vents need the
+## player to KNOW each lift registered). _process feeds the tally to the instrument.
 func _on_vent_lift_registered(lifts_done: int, _required_lifts: int) -> void:
-	_vent_pips.set_filled(lifts_done)
+	_window_lifts_done = lifts_done
 
 
-## Vent completed in time: heat drops and the bonus ladder ratchets up a rung. Swap the held
-## telegraph for a normal TIMED chip quoting the NEW excursion peak (the signal's value, so
-## the number can never drift from the core's ladder), in celebratory money-green, plus the
-## same full-meter white flash the READY moment uses — success should feel like a payoff, not
-## mere survival.
+## Vent completed in time: heat drops and the bonus ladder ratchets up a rung. A timed chip
+## quotes the NEW excursion peak (the signal's value, so the number can never drift from the
+## core's ladder), in celebratory money-green, plus the same full-meter white flash the READY
+## moment uses — success should feel like a payoff, not mere survival.
 func _on_vent_succeeded(_new_tier: int, new_peak_bonus: float) -> void:
-	_vent_chip_active = false
-	_vent_pips.visible = false
 	_show_tier_chip(
 			"VENTED — PEAK +%d%%!" % int(round(new_peak_bonus * 100.0)),
 			UiPalette.MONEY_GREEN, UiPalette.NAVY)
@@ -575,23 +591,21 @@ func _on_vent_succeeded(_new_tier: int, new_peak_bonus: float) -> void:
 	tween.tween_property(_ready_flash, "color:a", 0.0, READY_FLASH_FADE_SEC)
 
 
-## The window expired (or the gesture fumbled) — fired just before the overheat lands. The
-## blown beat must be VISIBLE (the plan's rule: miss-feedback is what makes the skill check
-## learnable), so the chip flips to a red MISSED plate while the pips stay up with the
-## UNFINISHED ones strobing red: the player sees exactly how many lifts landed versus what was
-## demanded. The timed chip's fade then clears everything while the standard OVERHEATED
-## presentation (label swap + draining red fill) plays underneath.
-func _on_vent_missed(lifts_done: int, _required_lifts: int) -> void:
-	_vent_chip_active = false
-	_vent_pips.set_filled(lifts_done)
-	_vent_pips.start_miss_flash()
+## The window was blown (expired, or the gesture fumbled) — fired just before the overheat
+## lands. The blown beat must stay VISIBLE (the plan's rule: miss-feedback is what makes the
+## skill check learnable), and the bar itself can't show it — the overheat flips the bar into
+## its drain display, wiping the in-bar pips — so the miss CHIP carries the pips: the demanded
+## count with the landed ones solid and the unfinished ones strobing red, held for the chip's
+## timed life while the OVERHEATED presentation plays underneath.
+func _on_vent_missed(lifts_done: int, required_lifts: int) -> void:
+	_vent_pips.show_miss(required_lifts, lifts_done)
 	_show_tier_chip("VENT MISSED!", UiPalette.KETCHUP_RED, UiPalette.PALE_GOLD)
 
 
 ## Show the tier chip: set its text/colors, ease it in, hold, fade out. A new chip request while
-## the old chip is still up simply restarts the sequence with the new text. The end-of-fade cleanup
-## also retires the vent pips + miss strobe, so a miss chip tidies itself up and the next plain
-## tier chip can never inherit stale pips.
+## the old chip is still up simply restarts the sequence with the new text. The end-of-fade
+## cleanup also retires the miss pips + strobe, so a miss chip tidies itself up and the next
+## chip can never inherit stale pips.
 func _show_tier_chip(text: String, plate_color: Color, text_color: Color) -> void:
 	_style_tier_chip(text, plate_color, text_color)
 	if _tier_chip_tween != null and _tier_chip_tween.is_valid():
@@ -608,19 +622,7 @@ func _show_tier_chip(text: String, plate_color: Color, text_color: Color) -> voi
 		_vent_pips.stop_miss_flash())
 
 
-## The HELD-OPEN variant for the live vent telegraph: eases in exactly like the timed chip but
-## then STAYS — no hold interval, no fade — until a resolution handler replaces or clears it.
-func _show_tier_chip_held(text: String, plate_color: Color, text_color: Color) -> void:
-	_style_tier_chip(text, plate_color, text_color)
-	if _tier_chip_tween != null and _tier_chip_tween.is_valid():
-		_tier_chip_tween.kill()
-	_tier_chip.visible = true
-	_tier_chip.modulate = Color(1, 1, 1, 0)
-	_tier_chip_tween = create_tween()
-	_tier_chip_tween.tween_property(_tier_chip, "modulate:a", 1.0, TIER_CHIP_FADE_IN_SEC)
-
-
-## Apply text + plate/text colors to the chip (shared by the timed and held-open variants).
+## Apply text + plate/text colors to the chip.
 func _style_tier_chip(text: String, plate_color: Color, text_color: Color) -> void:
 	_tier_chip_label.text = text
 	_tier_chip_label.add_theme_color_override("font_color", text_color)
@@ -642,198 +644,184 @@ func _vibrate(duration_ms: float) -> void:
 
 
 # ---------------------------------------------------------------------------
-# The band-zone overlay
+# The overdrive instrument overlay
 # ---------------------------------------------------------------------------
 
-## Custom-drawn track decoration for the heat ranges (the same _draw approach MomentumStreaks
-## uses): the wide teal CRUISE bar (where a plain hold clamps), then ONE continuous amber wash
-## deepening from the cruise bar all the way to the bar's END — one continuous amber-into-red
-## gradient with no internal tick lines and no seams anywhere (Tim 2026-07-16 removed the
-## heat==1.0 tick and flat Hot segment; Tim 2026-07-18 merged the ramp and the red hazard base
-## into one blended section, and the depth-hazard rework then retired the Critical band, so the
-## whole overdrive span is a single gradient with the hazard stripes fading in across it).
+## Custom-drawn overlay for the bar's OVERDRIVE minigame instrument (the same _draw approach
+## MomentumStreaks uses). Draws NOTHING in cruise/build mode or during a lockout — the calm
+## bar is deliberately unadorned now that its right edge IS the cruise point.
 ##
-## The bar's fill is painted by the ProgressBar itself, UNDER all child overlays — so to make the
-## zones read as if they were on the track BEHIND the fill, each segment is clipped to start at
-## the CURRENT fill edge: the advancing fill "covers" the zone exactly as a background segment
-## would be covered. The cruise bar, by contrast, is always drawn — over fill and track alike —
-## so the "safe range ends here" marker never disappears.
-class BandZoneOverlay extends Control:
-	## Match the framed fill's 3px inset (UiPalette.style_framed_progress) so the segments sit
-	## inside the navy frame exactly like the fill does.
+## In overdrive mode it draws, back to front:
+##   • while a window is OPEN: the countdown plate — a translucent gold region anchored at the
+##     target bar, its RIGHT edge sweeping left toward the target as time runs out. This
+##     continues the event's own motion language (the event bar arrived traveling right-to-
+##     left; now its "energy" keeps collapsing leftward into the target), so "the gold reaches
+##     the target = time's up" needs no explanation. Chosen over a right-anchored drain, which
+##     would introduce a second, opposite motion direction mid-moment.
+##   • while a window is OPEN: the gesture pips, centered in the whole region right of the
+##     target (VentPipRow's ring/disc drawing adapted to bar scale — ring = lift still owed,
+##     solid disc = landed). Cream, because the pips sit partly on the gold plate and partly
+##     on the dark urgency fill as the plate drains, and cream reads on both.
+##   • the traveling EVENT BAR: bright red, entering at the right edge and moving left; its
+##     reaching the target IS the window opening.
+##   • the fixed TARGET BAR at TARGET_FRAC: the trigger point. Same wide-bar silhouette as the
+##     retired teal cruise marker (a shape the player already reads as "a line that matters"),
+##     but in MUSTARD_GOLD — the act-now family the old "VENT!" chip established — because
+##     this line is where acting happens, not where safety ends. Drawn LAST so nothing tints it.
+##
+## All x math uses the FILL's coordinate system (frac × size.x − inset): ProgressBar computes
+## its fill rect across the bar's FULL width and the fill stylebox's −3px expand margin pulls
+## the drawn edge back by the inset. Mapping fractions onto the inset track instead put markers
+## ~1-2px off the true fill edge — the documented off-by-inset gotcha (Tim 2026-07-15).
+class OverdriveInstrumentOverlay extends Control:
+	## Match the framed fill's 3px inset (UiPalette.style_framed_progress).
 	const EDGE_INSET := 3.0
-	## The ramp wash: one hue (amber), alpha deepening across the section's whole width — a
-	## continuous "warmer and warmer" read instead of discrete bands.
-	const RAMP_COLOR := Color("#E3B23C")  # MUSTARD_GOLD
-	const RAMP_ALPHA_START := 0.08
-	const RAMP_ALPHA_END := 0.45
-	## How many vertical slices approximate the wash's left-to-right alpha gradient (draw_rect
-	## has no gradient fill; ~24 slices are indistinguishable from smooth at bar height).
-	const RAMP_SLICES := 24
-	## The hazard end of the wash: the dark red the gradient lands on at the bar's end, plus
-	## the brighter red diagonal stripes that fade in over it.
-	const HAZARD_BASE := Color("#8E2F1E", 0.55)   # BRICK, translucent over the gray track
-	const HAZARD_STRIPE := Color("#B5402A", 0.60)  # KETCHUP_RED stripes
-	const STRIPE_WIDTH := 8.0
-	## Horizontal distance between stripe left edges. Stripes run at 45°.
-	const STRIPE_SPACING := 26.0
-	## The cruise-point bar: WIDE (Tim 2026-07-16 — it is the one safety landmark on the track,
-	## so it must land at a glance), in the same calm teal as the CRUISE readout so the marker
-	## and the label read as one idea ("the hold settles here").
-	const CRUISE_BAR_WIDTH := 10.0
-	const CRUISE_BAR_COLOR := Color("#9FD8D4", 0.9)  # ATOMIC_TEAL
+	## The fixed target bar (the trigger point). Wide like the old cruise marker was — the one
+	## landmark on the track must land at a glance (Tim 2026-07-16).
+	const TARGET_BAR_WIDTH := 10.0
+	const TARGET_BAR_COLOR := Color("#E3B23C")        # MUSTARD_GOLD — the act-now family
+	## The traveling vent event: bright red, unmistakably "incoming trouble".
+	const EVENT_BAR_WIDTH := 10.0
+	const EVENT_BAR_COLOR := Color("#E8503A")         # KETCHUP_RED, brightened to read as LIVE
+	## The open window's countdown plate (see the class comment for the drain direction).
+	const COUNTDOWN_COLOR := Color("#E3B23C", 0.45)   # translucent MUSTARD_GOLD
+	## In-bar gesture pips: cream reads over both the gold plate and the dark urgency fill.
+	const PIP_COLOR := Color("#F4E9D8")               # CREAM
+	const PIP_OUTLINE := 4.0
+	## Pip radius as a fraction of the bar's inner height, with a hard cap so a desktop-resized
+	## bar can't grow comedy pips. Three pips at this size fit the two-thirds-width region on
+	## the narrowest supported phone with room to spare.
+	const PIP_HEIGHT_FRAC := 0.28
+	const PIP_RADIUS_MAX := 15.0
+	## Center-to-center pip spacing, in pip radii.
+	const PIP_SPACING_RADII := 3.0
 
-	## The cruise point and the current fill edge, as fractions of the full bar (0..1). Fed
-	## every frame by the host's _process via update_zones.
-	var _cruise_frac := 0.0
-	var _fill_frac := 0.0
+	## Display state, fed every frame by the host's _process (derived fresh from the core each
+	## frame — see the watchdog note there). _event_frac < 0 means no event bar.
+	var _active := false
+	var _target_frac := 0.33
+	var _event_frac := -1.0
+	var _window_open := false
+	var _countdown_frac := 0.0
+	var _required_lifts := 1
+	var _lifts_done := 0
 
 	func _ready() -> void:
 		set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	## Update the geometry; redraws only when something actually moved.
-	func update_zones(cruise_frac: float, fill_frac: float) -> void:
-		if is_equal_approx(cruise_frac, _cruise_frac) \
-				and is_equal_approx(fill_frac, _fill_frac):
+	## Overdrive mode: update the instrument's geometry; redraws only on actual change.
+	func update_overdrive(target_frac: float, event_frac: float, window_open: bool,
+			countdown_frac: float, required_lifts: int, lifts_done: int) -> void:
+		if _active and is_equal_approx(target_frac, _target_frac) \
+				and is_equal_approx(event_frac, _event_frac) \
+				and window_open == _window_open \
+				and is_equal_approx(countdown_frac, _countdown_frac) \
+				and required_lifts == _required_lifts and lifts_done == _lifts_done:
 			return
-		_cruise_frac = cruise_frac
-		_fill_frac = fill_frac
+		_active = true
+		_target_frac = target_frac
+		_event_frac = event_frac
+		_window_open = window_open
+		_countdown_frac = countdown_frac
+		_required_lifts = required_lifts
+		_lifts_done = lifts_done
+		queue_redraw()
+
+	## Cruise/build mode and lockout: the instrument draws nothing.
+	func update_idle() -> void:
+		if not _active:
+			return
+		_active = false
 		queue_redraw()
 
 	func _draw() -> void:
+		if not _active:
+			return
 		var top := EDGE_INSET
 		var bottom := size.y - EDGE_INSET
 		if size.x <= EDGE_INSET * 2.0 or bottom <= top:
 			return
-		# Fraction → x pixel, in the FILL's coordinate system: ProgressBar computes its fill rect
-		# across the bar's FULL width (leading edge = fraction × width) and the fill stylebox's
-		# −3px expand margin then pulls the drawn edge back by the inset. Mapping fractions onto
-		# the inset track instead put the tick/zones ~1-2px right of the true fill edge — the same
-		# off-by-inset the frenzy pop-floor marker had (Tim 2026-07-15). At fraction 1.0 this
-		# lands on size.x − inset, flush with the frame's inner right edge.
-		var cruise_x := maxf(_cruise_frac * size.x - EDGE_INSET, EDGE_INSET)
+		# Fraction → x pixel in the fill's coordinate system (see the class comment).
+		var target_x := maxf(_target_frac * size.x - EDGE_INSET, EDGE_INSET)
 		var right_x := size.x - EDGE_INSET
-		var fill_x := maxf(_fill_frac * size.x - EDGE_INSET, EDGE_INSET)
-
-		# The overheat wash [cruise bar .. bar end]: ONE continuous gradient across the whole
-		# danger span — amber at the cruise bar sliding into the dark hazard red at the far end,
-		# with no internal seam (Tim 2026-07-18: the sections should simply fade into each
-		# other). Sliced left-to-right (draw_rect has no gradient fill), each slice's
-		# color AND alpha interpolated across the FULL span, then clipped to the unfilled track
-		# (see the class comment). Slicing the full span and skipping covered slices keeps the
-		# gradient anchored to the track — it never re-stretches as the fill advances.
-		if right_x > cruise_x:
-			var span := right_x - cruise_x
-			var slice_width := span / float(RAMP_SLICES)
-			var start_color := Color(RAMP_COLOR, RAMP_ALPHA_START)
-			var end_color := HAZARD_BASE
-			for i in range(RAMP_SLICES):
-				var slice_left := cruise_x + slice_width * float(i)
-				var slice_right := slice_left + slice_width
-				if slice_right <= fill_x:
-					continue
-				var slice_color := start_color.lerp(end_color,
-						(float(i) + 0.5) / float(RAMP_SLICES))
-				var visible_left := maxf(slice_left, fill_x)
-				draw_rect(Rect2(visible_left, top, slice_right - visible_left, bottom - top),
-						slice_color)
-
-		# Hazard stripes join the same fade: strength 0 at the cruise bar, full only at the bar's
-		# END, ramping across the WHOLE overheat span. Starting them anywhere mid-span — even
-		# with a partial fade-in — read as a boundary on device (Tim 2026-07-18 follow-up: a
-		# texture edge splits the section as surely as a color edge), so the stripes share the
-		# wash's single left-to-right story and no x-position has a detectable seam.
-		var stripes_left := maxf(cruise_x, fill_x)
-		if right_x > stripes_left:
-			_draw_hazard_stripes(stripes_left, right_x, top, bottom, cruise_x, right_x)
-
-		# The cruise bar — where a plain hold clamps (Plans/Rush_Cruise_Control.md). ALWAYS
-		# drawn, over fill and track alike, so the safety landmark is spatially real whatever
-		# the meter is doing. Drawn LAST so the ramp wash never tints it.
-		if _cruise_frac > 0.0:
-			draw_rect(Rect2(cruise_x - CRUISE_BAR_WIDTH * 0.5, top, CRUISE_BAR_WIDTH,
-					bottom - top), CRUISE_BAR_COLOR)
-
-	## Diagonal 45° hazard stripes across [left_x, right_x]. Each stripe is a thick line from the
-	## bottom edge up-right to the top edge; its endpoints are clipped in 1D along the line so no
-	## stripe pokes past the segment's edges (inset by half the stripe width, since draw_line
-	## spreads its width to both sides). Stripe alpha ramps 0 → full across [fade_from_x,
-	## fade_to_x] (the whole overheat span), keyed on each stripe's visible midpoint so the fade
-	## is anchored to the track like the wash gradient is. The ramp is SQUARED: perception-wise a
-	## linear alpha ramp makes faint stripes readable almost immediately, which re-creates the
-	## very boundary this fade exists to remove — squaring keeps the left stretch essentially
-	## clean and lets the stripes assert themselves only toward the hazard end.
-	func _draw_hazard_stripes(left_x: float, right_x: float, top: float, bottom: float,
-			fade_from_x: float, fade_to_x: float) -> void:
-		var height := bottom - top
-		if height <= 0.0:
+		var runway := right_x - target_x
+		if runway <= 0.0:
 			return
-		var clip_left := left_x + STRIPE_WIDTH * 0.5
-		var clip_right := right_x - STRIPE_WIDTH * 0.5
-		if clip_right <= clip_left:
-			return
-		var fade_span := maxf(fade_to_x - fade_from_x, 0.001)
-		# The first stripe starts far enough left that its top end can still land in the segment.
-		var x0 := clip_left - height
-		# Snap to the stripe grid so the pattern stays fixed to the bar (it does not crawl as the
-		# segment's left edge moves with the fill).
-		x0 = floorf(x0 / STRIPE_SPACING) * STRIPE_SPACING
-		while x0 < clip_right:
-			# The stripe runs from (x0, bottom) to (x0 + height, top). Clip its x-span to the
-			# segment: parametrize t: x = x0 + t * height, t in [0, 1].
-			var t_min := clampf((clip_left - x0) / height, 0.0, 1.0)
-			var t_max := clampf((clip_right - x0) / height, 0.0, 1.0)
-			if t_max > t_min:
-				var from := Vector2(x0 + t_min * height, bottom - t_min * height)
-				var to := Vector2(x0 + t_max * height, bottom - t_max * height)
-				var mid_x := (from.x + to.x) * 0.5
-				var strength := clampf((mid_x - fade_from_x) / fade_span, 0.0, 1.0)
-				strength *= strength  # squared ramp — see the doc comment above
-				if strength > 0.0:
-					draw_line(from, to,
-							Color(HAZARD_STRIPE, HAZARD_STRIPE.a * strength), STRIPE_WIDTH)
-			x0 += STRIPE_SPACING
+
+		if _window_open:
+			# The countdown plate: anchored at the target, right edge sweeping left as the
+			# window runs out (drain direction rationale in the class comment).
+			var plate_width := runway * clampf(_countdown_frac, 0.0, 1.0)
+			if plate_width > 0.0:
+				draw_rect(Rect2(target_x, top, plate_width, bottom - top), COUNTDOWN_COLOR)
+			_draw_pips(target_x, right_x, top, bottom)
+
+		if _event_frac >= 0.0:
+			# The traveling event: position interpolates target → right edge on the approach
+			# fraction (1.0 just spawned, 0.0 = arrived = window opening). Clamped so the bar
+			# never pokes past the frame at either end of its run.
+			var event_x := target_x + runway * clampf(_event_frac, 0.0, 1.0)
+			var half := EVENT_BAR_WIDTH * 0.5
+			event_x = clampf(event_x, target_x, right_x - half)
+			draw_rect(Rect2(event_x - half, top, EVENT_BAR_WIDTH, bottom - top),
+					EVENT_BAR_COLOR)
+
+		# The target bar, drawn LAST so neither the plate nor an arriving event tints it.
+		draw_rect(Rect2(target_x - TARGET_BAR_WIDTH * 0.5, top, TARGET_BAR_WIDTH,
+				bottom - top), TARGET_BAR_COLOR)
+
+	## The gesture pips at bar scale, centered in the region right of the target: one per
+	## demanded lift, ring = still owed, solid disc = landed (VentPipRow's language, adapted).
+	## They sit ON TOP of the draining plate but keep a fixed position — progress is the pips
+	## filling, time is the plate draining; two separate reads, neither moving the other.
+	func _draw_pips(region_left: float, region_right: float, top: float, bottom: float) -> void:
+		var pip_radius := minf((bottom - top) * PIP_HEIGHT_FRAC, PIP_RADIUS_MAX)
+		var spacing := pip_radius * PIP_SPACING_RADII
+		var row_width := spacing * float(_required_lifts - 1)
+		var first_x := (region_left + region_right) * 0.5 - row_width * 0.5
+		var center_y := (top + bottom) * 0.5
+		for i in range(_required_lifts):
+			var center := Vector2(first_x + spacing * float(i), center_y)
+			if i < _lifts_done:
+				draw_circle(center, pip_radius, PIP_COLOR)
+			else:
+				# Radius inset by half the stroke so the ring's OUTER edge matches a filled
+				# pip's silhouette — filling a pip must read as "same pip, now solid".
+				draw_arc(center, pip_radius - PIP_OUTLINE * 0.5, 0.0, TAU, 48, PIP_COLOR,
+						PIP_OUTLINE, true)
 
 
 # ---------------------------------------------------------------------------
-# The vent gesture pips
+# The miss-feedback pips (chip)
 # ---------------------------------------------------------------------------
 
-## The vent window's gesture readout, drawn inside the tier chip beneath its text line: one
-## LARGE pip per demanded lift (outline ring = still owed, solid disc = landed), with a thin
-## countdown bar beneath them draining as the window runs out. The countdown is a separate
-## thin bar rather than the chip's plate draining, for two reasons: mutating the plate
-## stylebox every frame is heavier than one draw_rect, and a shrinking bar is the same
-## time-language every other meter on this screen already speaks. On a miss the UNFINISHED
-## pips strobe red (self-animated — the host only calls start_miss_flash) so the blown beat is
-## unmistakable. Custom-drawn like BandZoneOverlay/MomentumStreaks: two circles and a rect are
-## cheaper and crisper than textures at this size.
+## The miss chip's gesture post-mortem, drawn inside the tier chip beneath its text line: one
+## LARGE pip per demanded lift, the landed ones solid, the unfinished ones strobing red — the
+## player sees exactly which beat was blown (the plan's learnability rule). This row exists
+## ALONGSIDE the in-bar pips because the overheat that follows a miss instantly flips the bar
+## into its drain display, wiping the in-bar pips — the chip is where the evidence survives.
+## Live-window duties (the countdown, progressive filling) moved into the bar; this row only
+## ever shows the frozen final state. Custom-drawn like OverdriveInstrumentOverlay: two circle
+## primitives are cheaper and crisper than textures at this size.
 class VentPipRow extends Control:
 	## Pip geometry — sized for at-a-glance legibility beside the FONT_HEADLINE chip text
-	## (Tim's vision, §1b: these are read mid-gesture with about a second on the clock).
-	## Checked for the endless rework's 3-lift maximum: three pips draw 192px wide
-	## (2 × spacing + one diameter), narrower than the "VENT ×3!" headline text above them,
-	## so the chip's plate is sized by the text either way and the pips never crowd or
-	## overflow it — no size change was needed for the third pip.
+	## (Tim's vision, §1b). Three pips draw 192px wide (2 × spacing + one diameter), narrower
+	## than the "VENT MISSED!" headline above them, so the chip's plate is sized by the text
+	## and the pips never crowd or overflow it.
 	const PIP_RADIUS := 24.0
 	const PIP_SPACING := 72.0    # center-to-center
 	const PIP_OUTLINE := 5.0
-	const COUNTDOWN_HEIGHT := 10.0
-	const COUNTDOWN_GAP := 12.0  # vertical gap between the pips and the countdown bar
-	## Unfinished-pip blink rate after a miss — a hard, urgent strobe, clearly a failure.
+	## Unfinished-pip blink rate — a hard, urgent strobe, clearly a failure.
 	const MISS_FLASH_HZ := 6.0
 
-	## Pips draw in the chip's NAVY (matching its border and the telegraph's text); the
-	## countdown in a translucent navy; missed pips strobe KETCHUP_RED (the failure color).
-	## Hex literals with palette-name comments, matching BandZoneOverlay's convention.
-	const PIP_COLOR := Color("#1D2D50")             # NAVY
-	const COUNTDOWN_COLOR := Color("#1D2D50", 0.55)  # translucent NAVY
-	const MISS_FLASH_COLOR := Color("#B5402A")      # KETCHUP_RED
+	## Pips draw in the chip's NAVY (matching its border); missed pips strobe KETCHUP_RED (the
+	## failure color). Hex literals with palette-name comments, matching the overlay's convention.
+	const PIP_COLOR := Color("#1D2D50")         # NAVY
+	const MISS_FLASH_COLOR := Color("#B5402A")  # KETCHUP_RED
 
 	var _required := 1
 	var _filled := 0
-	var _countdown_fraction := 1.0
 	var _miss_flashing := false
 	## Miss-strobe clock in blink cycles (advanced by MISS_FLASH_HZ per second); the integer
 	## part's parity picks red vs navy — a square wave, not a sine: an alarm, not a glow.
@@ -842,42 +830,25 @@ class VentPipRow extends Control:
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	## A window opened: show `required` empty pips and a full countdown bar.
-	func show_window(required: int) -> void:
+	## A window was missed: show the post-mortem — `required` pips, `filled` of them solid,
+	## the rest strobing. The host's chip fade calls stop_miss_flash when the chip retires.
+	func show_miss(required: int, filled: int) -> void:
 		_required = maxi(required, 1)
-		_filled = 0
-		_countdown_fraction = 1.0
-		_miss_flashing = false
+		_filled = clampi(filled, 0, _required)
+		_miss_flashing = true
+		_miss_phase = 0.0
 		visible = true
 		# Reserve the drawn footprint so the chip's containers size the plate around it.
 		custom_minimum_size = Vector2(
 				PIP_SPACING * float(_required - 1) + PIP_RADIUS * 2.0,
-				PIP_RADIUS * 2.0 + COUNTDOWN_GAP + COUNTDOWN_HEIGHT)
+				PIP_RADIUS * 2.0)
 		queue_redraw()
-
-	## How many lifts have landed (fills that many pips, left to right).
-	func set_filled(filled: int) -> void:
-		_filled = clampi(filled, 0, _required)
-		queue_redraw()
-
-	## Remaining window time as a 0..1 fraction; fed every frame by the host's _process.
-	func set_countdown(fraction: float) -> void:
-		if is_equal_approx(fraction, _countdown_fraction):
-			return
-		_countdown_fraction = fraction
-		queue_redraw()
-
-	## Begin strobing the unfinished pips red (the miss feedback). Runs until stop_miss_flash —
-	## the host's chip-fade cleanup calls that, so the strobe lives exactly as long as the chip.
-	func start_miss_flash() -> void:
-		_miss_flashing = true
-		_miss_phase = 0.0
 
 	func stop_miss_flash() -> void:
 		_miss_flashing = false
 
 	func _process(delta: float) -> void:
-		# Only the miss strobe animates continuously; everything else redraws on state change.
+		# Only the strobe animates; the row is otherwise static once shown.
 		if _miss_flashing and visible:
 			_miss_phase += delta * MISS_FLASH_HZ
 			queue_redraw()
@@ -898,10 +869,3 @@ class VentPipRow extends Control:
 				# pip's silhouette — filling a pip must read as "same pip, now solid".
 				draw_arc(center, PIP_RADIUS - PIP_OUTLINE * 0.5, 0.0, TAU, 48, ring,
 						PIP_OUTLINE, true)
-		# The countdown bar under the pips: left-anchored, its width the REMAINING fraction of
-		# the window — the same left-anchored fill language as every meter on this screen, just
-		# running down instead of up.
-		var bar_y := PIP_RADIUS * 2.0 + COUNTDOWN_GAP
-		var bar_width := size.x * clampf(_countdown_fraction, 0.0, 1.0)
-		if bar_width > 0.0:
-			draw_rect(Rect2(0.0, bar_y, bar_width, COUNTDOWN_HEIGHT), COUNTDOWN_COLOR)

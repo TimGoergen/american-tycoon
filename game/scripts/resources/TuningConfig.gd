@@ -244,7 +244,7 @@ extends Resource
 ## Bonus at the hard ceiling with NO vents achieved — the ladder's tier-0 peak. Each successful
 ## vent adds rush_momentum_vent_bonus_step on top, with NO cap (endless escalation). Only ever
 ## held for seconds at a time — the realistic average is the ride/vent duty cycle
-## (~+71% for a skilled venter; see the vent-window block comment below).
+## (~+83% for a skilled venter; see the vent-window block comment below).
 @export var rush_momentum_bonus_peak: float = 0.55  # feel-tune
 
 # --- Vent windows (Tim 2026-07-17, endless escalation 2026-07-18, depth hazard 2026-07-18
@@ -273,19 +273,33 @@ extends Resource
 #
 # TUNE HISTORY: the endless-model retunes (heat_drop 0.15 → 0.06 so the bar creeps toward the
 # ceiling; duration_decay 0.92 → 0.975 so deep runs die to blown beats, not a too-short-to-
-# finish cliff at the triples) carried over to the hazard model unchanged, and the sim gates
-# still hold — skilled (95% per lift) median run tier ~6-10 with average ≥ the v1 +62%, sloppy
-# (70%) at or below cruise. Every knob is live in Balance Tuning.
+# finish cliff at the triples) carried over to the hazard model unchanged. The APPROACH PHASE
+# retune (2026-07-19) rebalanced around the new 2 s telegraph flight — every check now carries
+# approach_seconds of paid, riskless riding, which roughly doubled the pay per unit of risk —
+# by densifying the check cadence (rates 0.05/1.0 → 0.5/3.0), trimming the per-vent reward
+# step (0.60 → 0.30), and stiffening the low-tier fail sting (3.0 → 6.0 s/tier, cap
+# unchanged). Sim gates hold — skilled (95% per lift) +83% average with median run tier 8,
+# sloppy (70%) at or below cruise. Every knob is live in Balance Tuning.
 
-## Expected vent-window arrivals per second when heat sits just past the cruise point — the
-## SHALLOW end of the depth hazard (0.05 ≈ a check every ~20 s hovering there). Each tick rolls
+## Expected vent-event spawns per second when heat sits just past the cruise point — the
+## SHALLOW end of the depth hazard (0.5 ≈ a check every ~2 s hovering there). Each tick rolls
 ## lerp(rate_at_cruise, rate_at_ceiling, depth) × delta against the schedule rng, so arrival
-## stays the unpredictable part while the outcome stays player-owned.
-@export var rush_momentum_vent_rate_at_cruise: float = 0.05  # feel-tune
+## stays the unpredictable part while the outcome stays player-owned. Raised 0.05 → 0.5 with
+## the approach phase (2026-07-19): every event now includes approach_seconds of check-free
+## riding, and at the old sparse cadence even a sloppy venter out-earned cruise on free ride
+## time alone — denser checks put the risk back.
+@export var rush_momentum_vent_rate_at_cruise: float = 0.5  # feel-tune
 
-## Expected arrivals per second at the hard ceiling — the DEEP end of the hazard (relentless).
-## Depth is the cadence axis now: riding higher is the player choosing more checks for more pay.
-@export var rush_momentum_vent_rate_at_ceiling: float = 1.0  # feel-tune
+## Expected spawns per second at the hard ceiling — the DEEP end of the hazard (relentless).
+## Depth is the cadence axis now: riding higher is the player choosing more checks for more
+## pay. Raised 1.0 → 3.0 with the approach phase, same reasoning as rate_at_cruise above.
+@export var rush_momentum_vent_rate_at_ceiling: float = 3.0  # feel-tune
+
+## The APPROACH PHASE (Tim 2026-07-19): the hazard roll SPAWNS a vent event instead of opening
+## its window instantly, and this is the travel time (seconds of tick time) of the incoming
+## event bar from the bar's right edge to the target — the telegraph lead the player watches
+## before the window opens and the gesture clock starts. Frenzy freeze pauses the flight.
+@export var rush_momentum_vent_approach_seconds: float = 2.0  # feel-tune
 
 ## Seconds the player has to COMPLETE the gesture once a window telegraphs — the TIER-0 base
 ## of the escalating duration (each tier multiplies it by duration_decay).
@@ -324,18 +338,21 @@ extends Resource
 ## the telegraph guarantee's other half).
 @export var rush_momentum_vent_heat_drop: float = 0.06  # feel-tune
 
-## Bonus added to the ladder's peak per successful vent (0.60 = +60 percentage points), with
+## Bonus added to the ladder's peak per successful vent (0.30 = +30 percentage points), with
 ## NO cap — the difficulty curve is the brake, not the reward curve (Tim 2026-07-18). The peak
-## is only ever tasted near the top of a deep ride, so it must tower for the AVERAGE to reach
-## the target (a median skilled run tops out around +55% + 8 × 60% = +535% peak, held for
-## seconds; the honest long-session average is the +71% the sim measures).
-@export var rush_momentum_vent_bonus_step: float = 0.60  # feel-tune
+## is only ever tasted near the top of a deep ride (a median skilled run tops out around
+## +55% + 8 × 30% = +295% peak, held for seconds; the honest long-session average is the +83%
+## the sim measures). Trimmed 0.60 → 0.30 for the approach phase (2026-07-19): every check now
+## carries approach_seconds of paid telegraph riding, so the same tier pays for roughly twice
+## as long — at the old step even a 70%-reliability rider out-earned cruise, killing the risk.
+@export var rush_momentum_vent_bonus_step: float = 0.30  # feel-tune
 
 ## Extra re-arm seconds per achieved vent tier when an excursion overheats — falling from
 ## higher hurts more. Applied BEFORE the Rapid Restart lockout scale (which divides the total).
-## With the taller ladder paying so much, the fall from it has to genuinely hurt or a sloppy
-## rider still out-earns cruise.
-@export var rush_momentum_vent_fail_rearm_per_tier: float = 3.0  # feel-tune
+## Raised 3.0 → 6.0 for the approach phase (2026-07-19): with the cap unchanged this bites
+## almost exclusively at LOW-tier deaths (skilled deep-run stings were already capped), which
+## is exactly where a sloppy rider was still out-earning cruise on the richer approach rides.
+@export var rush_momentum_vent_fail_rearm_per_tier: float = 6.0  # feel-tune
 
 ## Cap on the per-tier re-arm sting (seconds). Deep runs must NOT earn ever-longer timeouts —
 ## Tim's direction (2026-07-18) is that failure pressure comes from the difficulty curve, not

@@ -24,9 +24,17 @@ class_name RushMomentumState
 # and heat sits past the cruise point, every tick rolls a window-open chance whose rate
 # interpolates with DEPTH into the overdrive span — rare checks hovering shallow, relentless
 # checks riding just under the backstop. Where you sit on that curve is partly your call
-# (venting drops heat), so the intensity is player-authored. When a check comes, a vent window
-# OPENS (bar flash + haptic + a chip in the UI) and the player must perform the vent gesture on
-# the rushed property's button before it closes:
+# (venting drops heat), so the intensity is player-authored. When a check comes it does NOT
+# open instantly — the APPROACH PHASE (Tim 2026-07-19) puts the event IN FLIGHT first:
+# `vent_incoming` fires the tick the hazard roll lands (the UI shows the event as a bright red
+# bar traveling in from the right edge), and the window itself OPENS vent_approach_seconds of
+# tick time later, when the event reaches the target — the player SEES IT COMING. The demanded
+# lifts are decided AT SPAWN and announced with the approach, so the player commits based on
+# what they saw coming; one event is in flight at a time (hazard rolls are suppressed while one
+# is approaching or open), and releasing the hold / disengaging / overheating / resetting
+# cancels an in-flight approach silently — the event never arrived, so there is no miss. Once
+# the window opens the player must perform the vent gesture on the rushed property's button
+# before it closes:
 #
 #   VENT    (1 lift):  release → re-press, gap ≤ vent_gap_max. One clean feather.
 #   VENT ×2 (2 lifts): release → tap (press ≤ vent_tap_max, then release) → re-press,
@@ -105,7 +113,7 @@ enum VentPhase {
 const MAX_VENT_LIFTS := 3
 
 ## Safety cushion (seconds of overdrive build) folded into the telegraph guarantee's fit bound.
-## The force-open is noticed on a tick boundary, so it can overshoot the bound by up to one
+## The force-spawn is noticed on a tick boundary, so it can overshoot the bound by up to one
 ## tick of build; without a cushion that overshoot would let heat touch the hard ceiling on an
 ## open window's LAST tick — an overheat mid-gesture, exactly what the guarantee forbids.
 ## Two 10 Hz ticks of build is plenty and costs the rider under 2% of the bar's depth.
@@ -115,6 +123,11 @@ const GUARANTEE_CUSHION_SECONDS := 0.2
 ## Fired on the UPWARD heat-1.0 crossing only (BUILDING → OVERDRIVE) — the single region edge
 ## left. Sliding back down through it is silent (de-escalation needs no fanfare).
 signal band_entered(band: Band)
+
+## A vent event just SPAWNED (the hazard roll — or the telegraph guarantee — fired this tick):
+## the window itself opens after `approach_seconds` of tick time, and will demand exactly
+## `required_lifts` when it does. The UI's incoming event bar starts its travel on this signal.
+signal vent_incoming(approach_seconds: float, required_lifts: int)
 
 ## A vent window just OPENED: the player has `duration` seconds to perform the gesture
 ## (`required_lifts` is 1 for the single feather, 2 for the double release).
@@ -195,6 +208,21 @@ var _was_rushing: bool = false
 ## see _tick_vent_windows.)
 var _vent_tier: int = 0
 
+## True while a spawned vent event is IN FLIGHT: `vent_incoming` has fired but the window has
+## not opened yet (the UI's red event bar is still traveling toward the target). Hazard rolls
+## are suppressed for the whole flight — one event in flight (or open) at a time.
+var _approaching: bool = false
+
+## Tick-time seconds until the in-flight event reaches the target and its window opens. The UI
+## derives the event bar's position from remaining / vent_approach_seconds. Stale when idle.
+var _approach_remaining: float = 0.0
+
+## Lifts the in-flight event announced at spawn. LOCKED here, never re-derived at open: the
+## window must demand exactly what vent_incoming told the player, because they commit to the
+## check based on what they saw coming. (The tier cannot change mid-flight anyway — only a
+## success moves it, and no window is open — but locking the value makes the promise explicit.)
+var _approach_required_lifts: int = 1
+
 ## True while a vent window is OPEN (the gesture clock is running).
 var _window_open: bool = false
 
@@ -243,7 +271,8 @@ func tick(delta: float, rushing: bool, frenzy_burning: bool) -> void:
 	# Overdrive is PER-EXCURSION (Plans/Rush_Cruise_Control.md): letting go of the rush hold
 	# disengages it, so the next press always starts back in safe cruise mode — the gamble is a
 	# fresh choice every time, never a sticky mode left on by accident. Ending the excursion
-	# also forfeits the vent ladder and any scheduled window: the ratchet is the reward for a
+	# also forfeits the vent ladder and any in-flight or open window (an approach cancels
+	# silently — the event never arrived, so there is no miss): the ratchet is the reward for a
 	# CONTINUOUS ride, not a bankable buff. (GameState keeps `rushing` true through a vent
 	# gesture's lifts, so a mid-gesture lift can never land here by accident.)
 	if not rushing:
@@ -326,6 +355,15 @@ func _tick_vent_windows(delta: float) -> void:
 			_miss_vent()
 		return
 
+	# An event in flight: run the approach clock down (tick delta only — the frenzy freeze
+	# already stopped this whole call) and open the announced window when the event reaches the
+	# target. No hazard rolls while approaching: one event in flight at a time.
+	if _approaching:
+		_approach_remaining -= delta
+		if _approach_remaining <= 0.0:
+			_open_window()
+		return
+
 	# The hazard only runs past the cruise point: below it there is nothing at risk (that heat
 	# is free to hold in cruise mode), so no check may ever demand a gesture there.
 	var floor_heat := cruise_heat()
@@ -335,12 +373,13 @@ func _tick_vent_windows(delta: float) -> void:
 	# TELEGRAPH GUARANTEE (Plans/Overdrive_Vent_Windows.md): a window must always OPEN — with
 	# its full duration still ahead — before heat could climb to the hard ceiling, or the
 	# backstop could kill a rider who was never given a check. With no arrival delay left to
-	# clamp (the hazard rolls tick by tick), the guarantee is a FORCE-OPEN: the moment heat
-	# reaches the last point where the whole window still fits at the overdrive build rate,
-	# the check opens regardless of the dice. Fairness beats randomness. _succeed_vent keeps
-	# post-vent heat at or below this bound, so the force-open always has room to work.
+	# clamp (the hazard rolls tick by tick), the guarantee is a FORCE-SPAWN: the moment heat
+	# reaches the last point where the whole EVENT — approach flight plus open window — still
+	# fits at the overdrive build rate, the check spawns regardless of the dice. Fairness beats
+	# randomness. _succeed_vent keeps post-vent heat at or below this bound, so the force-spawn
+	# always has room to work.
 	if tuning.rush_momentum_heat_build_hot_per_second > 0.0 and heat >= _window_fit_heat_bound():
-		_open_window()
+		_spawn_vent_event()
 		return
 
 	# The depth hazard itself: expected windows/second interpolates from rate_at_cruise (just
@@ -353,7 +392,7 @@ func _tick_vent_windows(delta: float) -> void:
 	var hazard_rate := lerpf(tuning.rush_momentum_vent_rate_at_cruise,
 			tuning.rush_momentum_vent_rate_at_ceiling, depth_frac)
 	if rng.randf() < hazard_rate * delta:
-		_open_window()
+		_spawn_vent_event()
 
 
 ## How long the NEXT window will stay open: the base duration decayed per achieved tier
@@ -364,13 +403,19 @@ func _next_window_duration() -> float:
 			tuning.rush_momentum_vent_duration_floor)
 
 
-## The highest heat from which the NEXT window still fully fits below the hard ceiling at the
-## overdrive build rate (cushion included — see GUARANTEE_CUSHION_SECONDS). The telegraph
-## guarantee's shared bound: the force-open fires when heat reaches it, and a vent's top-off
-## clamps heat back to it. Only meaningful when the overdrive build rate is positive.
+## The highest heat from which the NEXT vent event still fully fits below the hard ceiling at
+## the overdrive build rate. Heat keeps climbing through the WHOLE event — the approach flight
+## AND the open window — so the derivation reserves both legs plus the tick-boundary cushion:
+##
+##   heat_at_spawn + (approach_seconds + duration + cushion) × build_hot ≤ hard_ceiling
+##
+## rearranged for heat_at_spawn. This is the telegraph guarantee's shared bound: the force-spawn
+## fires when heat reaches it, and a vent's top-off clamps heat back to it (so the NEXT event's
+## approach + window always fit too). Only meaningful when the overdrive build rate is positive.
 func _window_fit_heat_bound() -> float:
 	return tuning.rush_momentum_hard_ceiling \
-			- (_next_window_duration() + GUARANTEE_CUSHION_SECONDS) \
+			- (tuning.rush_momentum_vent_approach_seconds + _next_window_duration() \
+					+ GUARANTEE_CUSHION_SECONDS) \
 			* tuning.rush_momentum_heat_build_hot_per_second
 
 
@@ -383,14 +428,26 @@ func _next_window_required_lifts() -> int:
 	return mini(1 + _vent_tier / step, MAX_VENT_LIFTS)
 
 
-## The hazard fired (or the telegraph guarantee forced the moment): open a window and arm the
-## gesture judge.
+## The hazard fired (or the telegraph guarantee forced the moment): put a vent event IN FLIGHT.
+## The demanded lifts are decided NOW and announced with the approach time — the gesture
+## escalates with the ladder (the approachable single feather early, Tim's double release
+## deeper, the triple pump deepest, capped at MAX_VENT_LIFTS) — and the window that opens when
+## the flight ends must demand exactly this announcement.
+func _spawn_vent_event() -> void:
+	_approaching = true
+	_approach_remaining = tuning.rush_momentum_vent_approach_seconds
+	_approach_required_lifts = _next_window_required_lifts()
+	vent_incoming.emit(_approach_remaining, _approach_required_lifts)
+
+
+## The in-flight event reached the target: open its window and arm the gesture judge.
 func _open_window() -> void:
+	_approaching = false
+	_approach_remaining = 0.0
 	_window_open = true
 	_window_remaining = _next_window_duration()
-	# The gesture escalates with the ladder: the approachable single feather early, Tim's
-	# double release deeper, the triple pump deepest (capped there — see MAX_VENT_LIFTS).
-	_window_required_lifts = _next_window_required_lifts()
+	# Exactly what the spawn announced — the player committed based on the incoming bar's pips.
+	_window_required_lifts = _approach_required_lifts
 	_window_lifts_done = 0
 	# Seed the judge from the live button state: mid-hold (the normal case) the gesture starts
 	# with its first release; if the finger happens to be up already, that release has in
@@ -454,13 +511,14 @@ func _succeed_vent() -> void:
 	heat = maxf(heat - tuning.rush_momentum_vent_heat_drop, cruise_heat())
 	_vent_tier += 1  # UNBOUNDED — the endless ladder's whole point (Tim 2026-07-18)
 	# TELEGRAPH GUARANTEE, success half — STILL REQUIRED under the hazard model (re-derived
-	# 2026-07-18): the guarantee's force-open can only fire at whatever heat the bar has
-	# ALREADY reached, so if a small heat_drop leaves post-vent heat above the next window's
-	# fit bound, the forced window would open too late to fully fit and the backstop could
-	# kill a clean rider mid-gesture. So a success also vents whatever extra heat is needed
-	# for the next (escalated) window to fully fit at the overdrive build rate — an adaptive
-	# top-off that only bites near the ceiling, where it reads as "the vent bought you exactly
-	# one more check," which is precisely the design.
+	# 2026-07-18; approach leg added 2026-07-19): the guarantee's force-spawn can only fire at
+	# whatever heat the bar has ALREADY reached, so if a small heat_drop leaves post-vent heat
+	# above the next event's fit bound, the forced event would spawn too late for its approach
+	# AND window to fully fit and the backstop could kill a clean rider mid-gesture. So a
+	# success also vents whatever extra heat is needed for the next (escalated) event — flight
+	# and window both — to fully fit at the overdrive build rate — an adaptive top-off that
+	# only bites near the ceiling, where it reads as "the vent bought you exactly one more
+	# check," which is precisely the design.
 	if tuning.rush_momentum_heat_build_hot_per_second > 0.0:
 		heat = minf(heat, maxf(_window_fit_heat_bound(), cruise_heat()))
 	_window_open = false
@@ -478,11 +536,16 @@ func _miss_vent() -> void:
 	_begin_overheat()
 
 
-## Forget the whole vent excursion: the ladder and the open window (the hazard is stateless).
-## Called on overheat, on reset, and when a release ends the excursion. (_button_pressed is
-## deliberately NOT touched — it mirrors the physical finger, not the excursion.)
+## Forget the whole vent excursion: the ladder, the open window, AND any event still in flight
+## (the hazard is stateless). An in-flight approach is cancelled SILENTLY — the event never
+## arrived, so there is no miss to report. Called on overheat, on reset, and when a release
+## ends the excursion. (_button_pressed is deliberately NOT touched — it mirrors the physical
+## finger, not the excursion.)
 func _clear_vent_state() -> void:
 	_vent_tier = 0
+	_approaching = false
+	_approach_remaining = 0.0
+	_approach_required_lifts = 1
 	_window_open = false
 	_window_remaining = 0.0
 	_window_lifts_done = 0
@@ -609,6 +672,18 @@ func effective_cruise_bonus() -> float:
 ## geometry stays exactly as tuned in Plans/Rush_Overheat.md.
 func cruise_heat() -> float:
 	return effective_cruise_bonus() / tuning.rush_momentum_bonus_at_hot
+
+
+## True while a spawned vent event is IN FLIGHT — vent_incoming has fired but its window has
+## not opened yet. The UI shows the traveling event bar while this holds.
+func is_vent_approaching() -> bool:
+	return _approaching
+
+
+## Seconds until the in-flight event reaches the target (its window opens); 0.0 when nothing is
+## approaching. The UI derives the red event bar's position from remaining / approach_seconds.
+func vent_approach_remaining() -> float:
+	return _approach_remaining if _approaching else 0.0
 
 
 ## True while a vent window is OPEN (the gesture clock is running). GameState uses this to keep

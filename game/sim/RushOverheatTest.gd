@@ -15,7 +15,7 @@ extends SceneTree
 #   4. The lockout: rush disabled, bonus 0, heat drains at the locked rate, and rush_ready
 #      fires only rearm_seconds AFTER the bar empties — then rushing re-enables.
 #   5. A frenzy burn FREEZES everything: build, bleed, lockout drain, re-arm countdown, the
-#      hazard dice, and an open window's gesture clock.
+#      hazard dice, an in-flight event's approach clock, and an open window's gesture clock.
 #   6. reset() from mid-lockout restores a clean, rushable state (the First Contact wipe).
 #   7. The bonus mapping: the Building segment hits its knob values, and the overdrive span
 #      is ONE continuous lerp — sampled densely, monotone, with NO kink where the old band
@@ -45,15 +45,25 @@ extends SceneTree
 #  18. The miss penalty: the re-arm gains vent_fail_rearm_per_tier seconds per achieved tier,
 #      CAPPED at vent_fail_rearm_cap, and Rapid Restart still scales the WHOLE lockout,
 #      sting included.
-#  19. The telegraph guarantee: across panel-plausible knob combos, EVERY window (deep tiers
-#      included) opens with its full duration still ahead of the projected ceiling arrival.
-#  20. THE DEPTH HAZARD ITSELF (statistical): with heat pinned shallow (~0.15 depth) vs deep
-#      (~0.85), the measured window arrival rates match the lerped knob rates — and their
-#      ratio matches the knobs' ratio — within a loose seeded tolerance.
+#  19. The telegraph guarantee: across panel-plausible knob combos — now including a stretched
+#      approach 4.0 — EVERY window (deep tiers included) opens with its full duration still
+#      ahead of the projected ceiling arrival (the force-spawn reserves approach + window).
+#  20. THE DEPTH HAZARD ITSELF (statistical): with heat pinned shallow vs deep, the measured
+#      event SPAWN rates match the lerped knob rates — and their ratio matches the knobs'
+#      ratio — within a loose seeded tolerance.
 #  21. AUTOPILOT SURVIVAL + DUTY CYCLE (measure, don't guess): modeled SKILLED (95% per-LIFT
 #      success) and SLOPPY (70%) venters ride each excursion until they MISS — no bail —
 #      reporting the survival curve (median / p90 tier reached) and the long-session average
 #      bonus vs the cruise baseline.
+#
+# The approach phase (Tim 2026-07-19 — the hazard roll SPAWNS an event that travels for
+# vent_approach_seconds before its window opens) adds:
+#  22. vent_incoming leads vent_window_opened by exactly approach_seconds of tick time, the
+#      announced lifts always equal the opened window's demand (across the whole escalation),
+#      and only one event is ever in flight or open at a time.
+#  23. An in-flight approach cancels SILENTLY on release, overheat, and reset — no miss, no
+#      lockout, and no phantom window later (an open only ever follows a fresh spawn's full
+#      approach).
 #
 # Exits with code 0 only if every check passes (1 otherwise), so CI/headless runs fail loudly.
 
@@ -92,6 +102,8 @@ func _initialize() -> void:
 	_test_telegraph_guarantee(tuning)
 	_test_depth_hazard_statistics(tuning)
 	_measure_vent_autopilot_survival(tuning)
+	_test_approach_phase(tuning)
+	_test_approach_cancellation(tuning)
 
 	print("")
 	if _failures == 0:
@@ -124,14 +136,26 @@ func _press_and_engage(state: RushMomentumState) -> void:
 	state.engage_overdrive()
 
 
-## Rush a pressed, engaged state until a vent window OPENS. Returns the seconds it took,
-## or -1.0 if the state overheated (or the cap tripped) before a window arrived.
+## Rush a pressed, engaged state until a vent window OPENS (riding through the approach phase
+## in between). Returns the seconds it took, or -1.0 if the state overheated (or the cap
+## tripped) before a window arrived.
 func _ride_to_window_open(state: RushMomentumState, cap_seconds := 30.0) -> float:
 	var elapsed := 0.0
 	while not state.is_vent_window_open() and not state.is_locked_out() and elapsed < cap_seconds:
 		state.tick(TICK_SECONDS, true, false)
 		elapsed += TICK_SECONDS
 	return elapsed if state.is_vent_window_open() else -1.0
+
+
+## Rush a pressed, engaged state until a vent event SPAWNS (vent_incoming fires — the approach
+## flight begins). Returns the seconds it took, or -1.0 if the state overheated (or the cap
+## tripped) before an event went in flight.
+func _ride_to_approach(state: RushMomentumState, cap_seconds := 30.0) -> float:
+	var elapsed := 0.0
+	while not state.is_vent_approaching() and not state.is_locked_out() and elapsed < cap_seconds:
+		state.tick(TICK_SECONDS, true, false)
+		elapsed += TICK_SECONDS
+	return elapsed if state.is_vent_approaching() else -1.0
 
 
 ## Perform a clean vent gesture of `lifts` lifts on brisk 0.1 s beats, well inside every
@@ -328,6 +352,21 @@ func _test_frenzy_freeze(tuning: TuningConfig) -> void:
 	_check("the hazard never opens a window during a burn (dice frozen)",
 		windows_opened[0] == 0 and not deep_burn.is_locked_out())
 	_check("deep heat holds exactly through the burn", is_equal_approx(deep_burn.heat, 1.4))
+
+	# APPROACH freeze: an in-flight event's approach clock halts too, so a burn can neither
+	# advance the flight nor open its window (an open mid-frenzy would shortchange the lead
+	# the player was promised to watch).
+	var approach_state := _fresh_state(tuning, 47)
+	var approach_opened := [0]
+	approach_state.vent_window_opened.connect(func(_lifts: int, _duration: float) -> void: approach_opened[0] += 1)
+	_press_and_engage(approach_state)
+	_check("(setup) an event went in flight for the freeze probe", _ride_to_approach(approach_state) >= 0.0)
+	var approach_before := approach_state.vent_approach_remaining()
+	for _i in range(100):  # 10 s of frenzy — several times the whole approach
+		approach_state.tick(TICK_SECONDS, true, true)
+	_check("an in-flight APPROACH halts during a burn (no open, travel time held)",
+		approach_state.is_vent_approaching() and approach_opened[0] == 0
+			and is_equal_approx(approach_state.vent_approach_remaining(), approach_before))
 
 	# Open-window freeze: an OPEN window's countdown halts, so a burn can never expire it.
 	var open_state := _fresh_state(tuning, 46)
@@ -988,33 +1027,52 @@ func _test_telegraph_guarantee(tuning: TuningConfig) -> void:
 	# For each combo, EVERY window — the first AND the escalated deep-tier ones, where heat
 	# rides closest to the ceiling — must open with its full duration still ahead of the
 	# projected hard-ceiling arrival: heat_at_open + duration × build_hot <= hard_ceiling
-	# (plus one tick of slack, since the open is noticed on a tick boundary). Each seed rides
-	# a clean multi-vent excursion so the checks sample the whole escalation curve, and each
-	# combo runs several seeds so the dice can't get lucky. The "rates 0" combo removes the
-	# hazard entirely: every window must then come from the force-open, the guarantee's own
+	# (plus one tick of slack, since the open is noticed on a tick boundary). Heat climbs
+	# through the approach flight before that open, so the force-spawn must reserve approach +
+	# window — this assert-at-open catches an under-reserved spawn automatically, and the
+	# combos sweep the approach knob too (including a stretched 4.0). Each seed rides a clean
+	# multi-vent excursion so the checks sample the whole escalation curve, and each combo runs
+	# several seeds so the dice can't get lucky. The "rates 0" combos remove the hazard
+	# entirely: every window must then come from the force-spawn, the guarantee's own
 	# machinery, with no lucky early roll to hide behind.
 	var combos := [
 		{"label": "defaults",
 			"rate_cruise": tuning.rush_momentum_vent_rate_at_cruise,
 			"rate_ceiling": tuning.rush_momentum_vent_rate_at_ceiling,
 			"build_hot": tuning.rush_momentum_heat_build_hot_per_second,
-			"duration": tuning.rush_momentum_vent_window_duration},
-		{"label": "rates 0 (pure force-open)", "rate_cruise": 0.0, "rate_ceiling": 0.0,
+			"duration": tuning.rush_momentum_vent_window_duration,
+			"approach": tuning.rush_momentum_vent_approach_seconds},
+		{"label": "rates 0 (pure force-spawn)", "rate_cruise": 0.0, "rate_ceiling": 0.0,
 			"build_hot": tuning.rush_momentum_heat_build_hot_per_second,
-			"duration": tuning.rush_momentum_vent_window_duration},
+			"duration": tuning.rush_momentum_vent_window_duration,
+			"approach": tuning.rush_momentum_vent_approach_seconds},
 		{"label": "rate_ceiling x4",
 			"rate_cruise": tuning.rush_momentum_vent_rate_at_cruise,
 			"rate_ceiling": tuning.rush_momentum_vent_rate_at_ceiling * 4.0,
 			"build_hot": tuning.rush_momentum_heat_build_hot_per_second,
-			"duration": tuning.rush_momentum_vent_window_duration},
+			"duration": tuning.rush_momentum_vent_window_duration,
+			"approach": tuning.rush_momentum_vent_approach_seconds},
 		{"label": "build_hot x2",
 			"rate_cruise": tuning.rush_momentum_vent_rate_at_cruise,
 			"rate_ceiling": tuning.rush_momentum_vent_rate_at_ceiling,
 			"build_hot": tuning.rush_momentum_heat_build_hot_per_second * 2.0,
-			"duration": tuning.rush_momentum_vent_window_duration},
+			"duration": tuning.rush_momentum_vent_window_duration,
+			"approach": tuning.rush_momentum_vent_approach_seconds},
 		{"label": "rates 0 + build_hot x2 + duration 1.5", "rate_cruise": 0.0, "rate_ceiling": 0.0,
 			"build_hot": tuning.rush_momentum_heat_build_hot_per_second * 2.0,
-			"duration": 1.5},
+			"duration": 1.5,
+			"approach": tuning.rush_momentum_vent_approach_seconds},
+		{"label": "approach 4.0",
+			"rate_cruise": tuning.rush_momentum_vent_rate_at_cruise,
+			"rate_ceiling": tuning.rush_momentum_vent_rate_at_ceiling,
+			"build_hot": tuning.rush_momentum_heat_build_hot_per_second,
+			"duration": tuning.rush_momentum_vent_window_duration,
+			"approach": 4.0},
+		{"label": "rates 0 + approach 4.0 (forced spawns, long flights)",
+			"rate_cruise": 0.0, "rate_ceiling": 0.0,
+			"build_hot": tuning.rush_momentum_heat_build_hot_per_second,
+			"duration": tuning.rush_momentum_vent_window_duration,
+			"approach": 4.0},
 	]
 	for combo_variant in combos:
 		var combo: Dictionary = combo_variant
@@ -1023,6 +1081,7 @@ func _test_telegraph_guarantee(tuning: TuningConfig) -> void:
 		combo_tuning.rush_momentum_vent_rate_at_ceiling = combo["rate_ceiling"]
 		combo_tuning.rush_momentum_heat_build_hot_per_second = combo["build_hot"]
 		combo_tuning.rush_momentum_vent_window_duration = combo["duration"]
+		combo_tuning.rush_momentum_vent_approach_seconds = combo["approach"]
 		var all_seeds_ok := true
 		for seed_value in range(1, 6):
 			var state := _fresh_state(combo_tuning, 3000 + seed_value)
@@ -1053,13 +1112,18 @@ func _test_telegraph_guarantee(tuning: TuningConfig) -> void:
 const HAZARD_TRIALS := 400
 
 func _test_depth_hazard_statistics(tuning: TuningConfig) -> void:
-	print("\n20. The depth hazard: measured arrival rates match the lerped knob rates by depth")
-	# Pin heat at a target depth and repeatedly time how long the hazard takes to open a
-	# window. The measured rate (1 / mean wait) must match lerp(rate_at_cruise,
-	# rate_at_ceiling, depth) at BOTH a shallow and a deep probe, and their ratio must match
-	# the knobs' ratio — the statistical proof that depth really is the cadence axis.
+	print("\n20. The depth hazard: measured spawn rates match the lerped knob rates by depth")
+	# Pin heat at a target depth and repeatedly time how long the hazard takes to SPAWN an
+	# event (vent_incoming — the approach after it is a fixed pipeline delay, not part of the
+	# arrival process, so measuring to the open would just add a constant and break the rate
+	# math). The measured rate (1 / mean wait) must match lerp(rate_at_cruise, rate_at_ceiling,
+	# depth) at BOTH a shallow and a deep probe, and their ratio must match the knobs' ratio —
+	# the statistical proof that depth really is the cadence axis. The deep probe sits at 0.60,
+	# safely BELOW the force-spawn bound (~0.69 depth at default knobs, now that the bound
+	# reserves the approach flight too): above it the guarantee fires instantly and the probe
+	# would measure the machinery, not the dice.
 	const SHALLOW_DEPTH := 0.15
-	const DEEP_DEPTH := 0.85
+	const DEEP_DEPTH := 0.60
 	var expected_shallow := lerpf(tuning.rush_momentum_vent_rate_at_cruise,
 			tuning.rush_momentum_vent_rate_at_ceiling, SHALLOW_DEPTH)
 	var expected_deep := lerpf(tuning.rush_momentum_vent_rate_at_cruise,
@@ -1086,11 +1150,12 @@ func _test_depth_hazard_statistics(tuning: TuningConfig) -> void:
 		absf(measured_ratio - expected_ratio) <= expected_ratio * 0.30)
 
 
-## Mean seconds the hazard takes to open a window with heat PINNED at `depth_frac` of the
-## overdrive span (cruise point → hard ceiling). The pin re-writes heat after every tick so
-## the measurement samples ONE point on the hazard curve instead of a climbing trajectory
-## (inside each tick heat briefly builds one tick past the pin — a ~1% depth bias the loose
-## tolerance absorbs). One state's rng stream serves every trial (reset() keeps the seed).
+## Mean seconds the hazard takes to SPAWN an event (the approach begins) with heat PINNED at
+## `depth_frac` of the overdrive span (cruise point → hard ceiling). The pin re-writes heat
+## after every tick so the measurement samples ONE point on the hazard curve instead of a
+## climbing trajectory (inside each tick heat briefly builds one tick past the pin — a ~1%
+## depth bias the loose tolerance absorbs). One state's rng stream serves every trial
+## (reset() keeps the seed and cancels the spawned flight for the next trial).
 func _measure_mean_arrival_seconds(tuning: TuningConfig, seed_value: int, depth_frac: float) -> float:
 	var state := _fresh_state(tuning, seed_value)
 	var target_heat := state.cruise_heat() \
@@ -1101,7 +1166,7 @@ func _measure_mean_arrival_seconds(tuning: TuningConfig, seed_value: int, depth_
 		_press_and_engage(state)
 		state.heat = target_heat
 		var waited := 0.0
-		while not state.is_vent_window_open() and waited < 120.0:
+		while not state.is_vent_approaching() and waited < 120.0:
 			state.tick(TICK_SECONDS, true, false)
 			state.heat = target_heat
 			waited += TICK_SECONDS
@@ -1210,8 +1275,12 @@ const AUTOPILOT_SECONDS := 600.0
 ## average by a couple of points, enough to mislead a retune.
 const AUTOPILOT_SEED_RUNS := 5
 
-## Ticks the autopilot waits after a window telegraphs before starting the gesture — a human
-## reaction beat (0.3 s), per the plan's modeled-venter spec.
+## Ticks the autopilot waits after a window OPENS before starting the gesture — a human
+## reaction beat (0.3 s), per the plan's modeled-venter spec. The approach phase hands a real
+## player free anticipation (they watch the event coming for approach_seconds before the
+## window opens), but the model deliberately keeps reacting from the OPEN and ignores that
+## benefit — a conservative floor: thumbs on glass should do at least this well, so the gates
+## below understate, never overstate, the mechanic's real pay.
 const AUTOPILOT_REACTION_TICKS := 3
 
 
@@ -1332,3 +1401,168 @@ func _run_vent_autopilot(tuning: TuningConfig, seed_value: int, gesture_success:
 		"overdrive_seconds": overdrive_seconds,
 		"climbing_seconds": climbing_seconds,
 	}
+
+
+func _test_approach_phase(tuning: TuningConfig) -> void:
+	print("\n22. The approach phase: spawns lead opens tick-exactly, lifts exactly as announced")
+	var approach_ticks := int(round(tuning.rush_momentum_vent_approach_seconds / TICK_SECONDS))
+
+	# --- The query surface, on one spawned flight ---
+	var probe := _fresh_state(tuning, 6001)
+	_press_and_engage(probe)
+	_check("(setup) an event went in flight", _ride_to_approach(probe) >= 0.0)
+	_check("in flight: is_vent_approaching() true, full lead remaining, no window open yet",
+		probe.is_vent_approaching() and not probe.is_vent_window_open()
+			and absf(probe.vent_approach_remaining()
+					- tuning.rush_momentum_vent_approach_seconds) < 0.0001)
+	probe.tick(TICK_SECONDS, true, false)
+	_check("vent_approach_remaining() counts down on the tick clock",
+		absf(probe.vent_approach_remaining()
+				- (tuning.rush_momentum_vent_approach_seconds - TICK_SECONDS)) < 0.0001)
+	var flight_guard := 0
+	while probe.is_vent_approaching() and flight_guard < 200:
+		probe.tick(TICK_SECONDS, true, false)
+		flight_guard += 1
+	_check("the flight ends in an OPEN window (approach cleared, remaining reads 0)",
+		probe.is_vent_window_open() and not probe.is_vent_approaching()
+			and is_zero_approx(probe.vent_approach_remaining()))
+
+	# --- The pairing invariants, across the whole escalation: one clean ride through 8 vents
+	# (with lifts_step_tiers = 3 that samples single, double, AND triple announcements),
+	# capturing every spawn and open with the exact tick it landed on. Every state.tick in
+	# this ride goes through the counted step closure, so the tick indices are honest.
+	var state := _fresh_state(tuning, 6000)
+	var tick_index := [0]
+	var spawns: Array = []           # [tick, announced approach_seconds, announced lifts]
+	var opens: Array = []            # [tick, demanded lifts]
+	var overlapping_spawns := [0]    # spawns while another event was in flight or open — must stay 0
+	var in_flight := [false]
+	state.vent_incoming.connect(func(approach_seconds: float, required_lifts: int) -> void:
+		if in_flight[0] or state.is_vent_window_open():
+			overlapping_spawns[0] += 1
+		in_flight[0] = true
+		spawns.append([tick_index[0], approach_seconds, required_lifts]))
+	state.vent_window_opened.connect(func(required_lifts: int, _duration: float) -> void:
+		in_flight[0] = false
+		opens.append([tick_index[0], required_lifts]))
+	_press_and_engage(state)
+	var step := func() -> void:
+		state.tick(TICK_SECONDS, true, false)
+		tick_index[0] += 1
+	const APPROACH_PROBE_VENTS := 8
+	var vents_done := 0
+	var safety := 0
+	while vents_done < APPROACH_PROBE_VENTS and not state.is_locked_out() and safety < 3000:
+		safety += 1
+		if state.is_vent_window_open():
+			# A clean gesture on brisk counted beats (mirrors _perform_clean_gesture, but every
+			# tick runs through the step closure so the captured indices stay exact).
+			var lifts := state.vent_required_lifts()
+			state.notify_rush_released()
+			step.call()
+			state.notify_rush_pressed()
+			for _extra_lift in range(lifts - 1):
+				step.call()
+				state.notify_rush_released()
+				step.call()
+				state.notify_rush_pressed()
+			vents_done += 1
+		else:
+			step.call()
+	_check("(setup) 8 clean vents ridden with spawn/open capture",
+		vents_done == APPROACH_PROBE_VENTS
+			and spawns.size() == APPROACH_PROBE_VENTS and opens.size() == APPROACH_PROBE_VENTS)
+	var leads_exact := true
+	var announcements_match := true
+	var announced_lift_counts := {}  # lifts value -> times announced (escalation coverage)
+	for i in range(mini(spawns.size(), opens.size())):
+		var spawn: Array = spawns[i]
+		var open_entry: Array = opens[i]
+		if int(open_entry[0]) - int(spawn[0]) != approach_ticks:
+			leads_exact = false
+		if absf(float(spawn[1]) - tuning.rush_momentum_vent_approach_seconds) > 0.0001:
+			leads_exact = false
+		if int(open_entry[1]) != int(spawn[2]):
+			announcements_match = false
+		announced_lift_counts[int(spawn[2])] = int(announced_lift_counts.get(int(spawn[2]), 0)) + 1
+	print("     (spawn->open leads in ticks, announced lifts: %s)" % [spawns])
+	_check("every window opened EXACTLY approach_seconds of tick time after its spawn",
+		leads_exact)
+	_check("every opened window demanded exactly the lifts its spawn announced",
+		announcements_match)
+	_check("the announced lifts covered the escalation (singles, doubles, and triples seen)",
+		announced_lift_counts.has(1) and announced_lift_counts.has(2)
+			and announced_lift_counts.has(3))
+	_check("only one event was ever in flight or open at a time (no overlapping spawns)",
+		overlapping_spawns[0] == 0)
+
+
+func _test_approach_cancellation(tuning: TuningConfig) -> void:
+	print("\n23. An in-flight approach cancels silently on release, overheat, and reset")
+	var approach_ticks := int(round(tuning.rush_momentum_vent_approach_seconds / TICK_SECONDS))
+
+	# --- Release: the bail move. The event never arrived, so there is no miss and no lockout —
+	# and no phantom window later: after remounting, an open can only follow a FRESH spawn's
+	# full approach, so nothing may open sooner than that.
+	var release_state := _fresh_state(tuning, 6100)
+	var release_misses := [0]
+	var release_opens := [0]
+	release_state.vent_missed.connect(func(_done: int, _required: int) -> void: release_misses[0] += 1)
+	release_state.vent_window_opened.connect(func(_lifts: int, _duration: float) -> void: release_opens[0] += 1)
+	_press_and_engage(release_state)
+	_check("(setup) an event went in flight", _ride_to_approach(release_state) >= 0.0)
+	release_state.notify_rush_released()
+	release_state.tick(TICK_SECONDS, false, false)
+	_check("one released tick cancels the flight silently (no miss, no lockout)",
+		not release_state.is_vent_approaching()
+			and is_zero_approx(release_state.vent_approach_remaining())
+			and release_misses[0] == 0 and not release_state.is_locked_out())
+	# Remount at once and hold: even an instant fresh spawn cannot open a window inside the
+	# next approach_ticks - 1 ticks, so ANY open here would be the cancelled event's ghost.
+	_press_and_engage(release_state)
+	for _i in range(approach_ticks - 1):
+		release_state.tick(TICK_SECONDS, true, false)
+	_check("no phantom window after the cancel (nothing can open before a fresh full approach)",
+		release_opens[0] == 0)
+
+	# --- Overheat mid-flight: white-box shove heat onto the backstop while the event is still
+	# approaching (a hand-poked build knob could do the same live). The backstop overheat must
+	# cancel the flight without inventing a miss for a window that never opened.
+	var overheat_state := _fresh_state(tuning, 6101)
+	var overheat_misses := [0]
+	var overheat_opens := [0]
+	overheat_state.vent_missed.connect(func(_done: int, _required: int) -> void: overheat_misses[0] += 1)
+	overheat_state.vent_window_opened.connect(func(_lifts: int, _duration: float) -> void: overheat_opens[0] += 1)
+	_press_and_engage(overheat_state)
+	_check("(setup) an event went in flight", _ride_to_approach(overheat_state) >= 0.0)
+	overheat_state.heat = tuning.rush_momentum_hard_ceiling
+	overheat_state.tick(TICK_SECONDS, true, false)
+	_check("a backstop overheat mid-flight cancels silently (locked out, no miss, no open)",
+		overheat_state.is_locked_out() and not overheat_state.is_vent_approaching()
+			and overheat_misses[0] == 0 and overheat_opens[0] == 0)
+	# Ride out the lockout, remount, and prove the machinery is clean: the next open arrives
+	# only via a fresh spawn's full approach (never sooner), with no leftover flight state.
+	var lockout_elapsed := 0.0
+	while overheat_state.is_locked_out() and lockout_elapsed < 120.0:
+		overheat_state.tick(TICK_SECONDS, false, false)
+		lockout_elapsed += TICK_SECONDS
+	_press_and_engage(overheat_state)
+	var reopen_seconds := _ride_to_window_open(overheat_state)
+	_check("after the lockout, windows arrive again — and never faster than a full approach",
+		reopen_seconds >= tuning.rush_momentum_vent_approach_seconds - 0.0001
+			and overheat_opens[0] == 1)
+
+	# --- Reset (the First Contact wipe): the flight is gone with everything else.
+	var reset_state := _fresh_state(tuning, 6102)
+	var reset_misses := [0]
+	reset_state.vent_missed.connect(func(_done: int, _required: int) -> void: reset_misses[0] += 1)
+	_press_and_engage(reset_state)
+	_check("(setup) an event went in flight", _ride_to_approach(reset_state) >= 0.0)
+	reset_state.reset()
+	_check("reset() wipes the flight silently (no miss, nothing approaching)",
+		not reset_state.is_vent_approaching()
+			and is_zero_approx(reset_state.vent_approach_remaining())
+			and reset_misses[0] == 0)
+	_press_and_engage(reset_state)
+	_check("a fresh ride after the reset spawns and opens windows normally",
+		_ride_to_window_open(reset_state) >= tuning.rush_momentum_vent_approach_seconds - 0.0001)

@@ -244,6 +244,29 @@ the chance of a vent event goes up as they go further into the overheat zone as 
   ≤ cruise, telegraph guarantee at every depth, plus a new statistical check that measured
   arrival rate actually rises with depth. Retune the two rate knobs to hit them.
 
+## Approach-bar presentation rework (Tim, 2026-07-19 — the bar becomes two instruments)
+
+Tim: vent events are good but need to be "as fun, but as intuitive as possible." The momentum
+bar is redesigned into two display modes:
+
+- **Cruise mode (overdrive NOT engaged):** the ENTIRE bar spans 0 → the cruise clamp — filling
+  the whole bar IS reaching cruise. Clean and safe-reading; no hazard wash.
+- **Overdrive mode (engaged):** the bar repurposes into the vent minigame instrument:
+  - A **target bar** fixed ~1/3 of the way from the left edge — the trigger point.
+  - Each scheduled vent event is a **bright red bar entering from the RIGHT edge**, traveling
+    left so the player SEES IT COMING. When it reaches the target bar, the event triggers
+    (the window opens).
+  - While the event is open, **the whole region right of the target** renders the event
+    mechanics — the lift pips and the window countdown — at bar scale.
+- **Core change to enable it:** the hazard roll now SCHEDULES an event instead of opening it
+  instantly — new signal `vent_incoming(approach_seconds, required_lifts)` fires at the roll,
+  the window opens after `rush_momentum_vent_approach_seconds` (new knob, first-cut 2.0 s) of
+  tick-time (frenzy freeze pauses the approach). One event in flight at a time; hazard rolls
+  suppress while one is approaching or open. The telegraph guarantee now reserves room for
+  approach + full window before the backstop.
+- Overheat lockout keeps the full-bar drain display; the success/miss chips stay above the bar;
+  heat still climbs underneath and still drives the hazard rate (urgency wash keyed on depth).
+
 ## Decision log
 
 - Overdrive must be skill-based with larger risk and reward; cruise keeps the safe floor

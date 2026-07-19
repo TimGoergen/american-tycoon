@@ -726,8 +726,15 @@ class OverdriveInstrumentOverlay extends Control:
 	## and a notch brighter than MUSTARD_GOLD so it stays readable ON the translucent gold
 	## backdrop it drains across. Geometry: hugs the region's bottom edge, below the centered
 	## pips, with a small gap so it never welds visually onto the frame.
-	const TIMER_STRIP_COLOR := Color("#F5C542")            # bright gold
-	const TIMER_STRIP_HEIGHT := 5.0
+	## Device-pass contrast fix (Tim 2026-07-18: strip and pips were "too dim to see"): the
+	## strip and pips sit on a GOLD backdrop over an amber fill wash, so gold-family marks
+	## vanished into their own hue. Brightness alone can't fix same-hue stacking — each mark
+	## now gets a DARK NAVY backing (a full-runway track under the strip, a halo behind each
+	## pip) so the bright mark reads by contrast at any wash depth.
+	const TIMER_STRIP_COLOR := Color("#FFF7E6")            # near-white warm, matches landed pips
+	const TIMER_TRACK_COLOR := Color("#1D2D50", 0.85)      # UiPalette.NAVY backing track
+	const TIMER_STRIP_HEIGHT := 8.0
+	const TIMER_TRACK_PAD := 2.0                           # navy border visible around the strip
 	const TIMER_STRIP_BOTTOM_GAP := 3.0
 	## In-bar gesture pips, BRIGHTENED (Tim 2026-07-18 night — the old cream washed out against
 	## the gold backdrop). A landed lift is a near-white disc — deliberately the most luminous
@@ -736,13 +743,15 @@ class OverdriveInstrumentOverlay extends Control:
 	## backdrop for contrast, while the solid-vs-outline SHAPE difference (not brightness
 	## alone) is what keeps filled-vs-owed instantly distinguishable at a glance.
 	const PIP_FILLED_COLOR := Color("#FFF7E6")             # near-white warm
-	const PIP_RING_COLOR := Color("#F5C542")               # bright gold, matches the strip
-	const PIP_OUTLINE := 4.0
+	const PIP_RING_COLOR := Color("#FFF7E6")               # near-white too — the halo, not hue, separates it
+	const PIP_HALO_COLOR := Color("#1D2D50", 0.85)         # navy halo behind every pip (contrast fix)
+	const PIP_HALO_PAD := 4.0                              # halo radius beyond the pip silhouette
+	const PIP_OUTLINE := 6.0
 	## Pip radius as a fraction of the bar's inner height, with a hard cap so a desktop-resized
 	## bar can't grow comedy pips. Three pips at this size fit the two-thirds-width region on
 	## the narrowest supported phone with room to spare.
-	const PIP_HEIGHT_FRAC := 0.28
-	const PIP_RADIUS_MAX := 15.0
+	const PIP_HEIGHT_FRAC := 0.34
+	const PIP_RADIUS_MAX := 20.0
 	## Center-to-center pip spacing, in pip radii.
 	const PIP_SPACING_RADII := 3.0
 
@@ -834,11 +843,16 @@ class OverdriveInstrumentOverlay extends Control:
 			draw_rect(Rect2(target_x, top, runway, bottom - top), WINDOW_BACKDROP_COLOR)
 			# The timer strip: anchored at the target, right end draining left as the window
 			# runs out (placement + drain-direction rationale in the class comment).
+			var strip_top := bottom - TIMER_STRIP_BOTTOM_GAP - TIMER_STRIP_HEIGHT
+			# Navy backing track across the FULL runway first — the strip drains against it,
+			# so both the remaining time and the elapsed gap read at a glance (contrast fix).
+			draw_rect(Rect2(target_x - TIMER_TRACK_PAD, strip_top - TIMER_TRACK_PAD,
+					runway + TIMER_TRACK_PAD * 2.0,
+					TIMER_STRIP_HEIGHT + TIMER_TRACK_PAD * 2.0), TIMER_TRACK_COLOR)
 			var strip_width := runway * clampf(_countdown_frac, 0.0, 1.0)
 			if strip_width > 0.0:
-				draw_rect(Rect2(target_x,
-						bottom - TIMER_STRIP_BOTTOM_GAP - TIMER_STRIP_HEIGHT,
-						strip_width, TIMER_STRIP_HEIGHT), TIMER_STRIP_COLOR)
+				draw_rect(Rect2(target_x, strip_top, strip_width, TIMER_STRIP_HEIGHT),
+						TIMER_STRIP_COLOR)
 			_draw_pips(target_x, right_x, top, bottom)
 
 		if _event_frac >= 0.0:
@@ -895,6 +909,9 @@ class OverdriveInstrumentOverlay extends Control:
 		var center_y := (top + bottom) * 0.5
 		for i in range(_required_lifts):
 			var center := Vector2(first_x + spacing * float(i), center_y)
+			# Navy halo behind every pip — the contrast plate the bright mark reads against
+			# (see the contrast-fix note at the constants).
+			draw_circle(center, pip_radius + PIP_HALO_PAD, PIP_HALO_COLOR)
 			if i < _lifts_done:
 				draw_circle(center, pip_radius, PIP_FILLED_COLOR)
 			else:

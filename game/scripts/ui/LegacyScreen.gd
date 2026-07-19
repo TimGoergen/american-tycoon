@@ -101,6 +101,15 @@ var _held_retain_index := -1
 var _retain_hold_elapsed := 0.0
 var _retain_hold_repeating := false
 
+# The wallet balance this screen last rendered. _process compares it against the live
+# wallet so that gems arriving or leaving WHILE the tab is open (a First Contact minigame
+# grant, a dev-tool award) re-render affordability everywhere — cards, wallet label,
+# retention rows, section badges — the frame the balance moves. Purchases made on this
+# screen also move the wallet, so this watcher would re-refresh a frame after them too;
+# harmless, refresh() is idempotent. -1 forces the first _process to sync. (Tim
+# 2026-07-18: stale snapshots advertised retention buys the wallet could not pay for.)
+var _last_rendered_wallet := -1
+
 
 ## Store the state and build the (static) card layout once.
 func setup(upgrades: LegacyUpgrades) -> void:
@@ -679,6 +688,23 @@ func _apply_retention_entry(entry: Dictionary) -> void:
 		button.disabled = not bool(entry["can_afford"])
 
 
+## Re-derive every retention entry's can_afford from the LIVE wallet and re-render the rows
+## and the section header. The entries' COSTS are stable while the tab is open (they only
+## change when a level is bought, which rebuilds the snapshot anyway) — affordability is the
+## one field that can go stale on its own, so the wallet watcher in _process fixes exactly
+## that field rather than needing Main to rebuild the whole snapshot.
+func _refresh_retention_affordability() -> void:
+	if _retention_entries.is_empty():
+		return
+	for entry_variant in _retention_entries:
+		var entry := entry_variant as Dictionary
+		var cost := int(entry["cost"])
+		entry["can_afford"] = cost >= 0 and _upgrades.available >= cost
+		if _retention_rows.has(int(entry["index"])):
+			_apply_retention_entry(entry)
+	_refresh_staff_section_header()
+
+
 # ---------------------------------------------------------------------------
 # Showing / refreshing
 # ---------------------------------------------------------------------------
@@ -738,6 +764,14 @@ func _on_buy_up() -> void:
 ## While a buy or retain button is held, keep purchasing on a calm cadence (after an
 ## initial delay) until the player releases or nothing more can be bought.
 func _process(delta: float) -> void:
+	# Wallet watcher (see _last_rendered_wallet). Only while actually on screen — the
+	# Estate tab re-syncs on entry anyway, and refreshing a hidden panel is wasted work.
+	if is_visible_in_tree() and _upgrades != null \
+			and _upgrades.available != _last_rendered_wallet:
+		_last_rendered_wallet = _upgrades.available
+		refresh()
+		_refresh_retention_affordability()
+
 	if _held_buy_id != "":
 		_hold_elapsed += delta
 		var threshold := HOLD_REPEAT_INTERVAL if _hold_repeating else HOLD_INITIAL_DELAY

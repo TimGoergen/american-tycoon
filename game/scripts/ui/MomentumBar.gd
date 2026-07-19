@@ -8,23 +8,22 @@ extends HBoxContainer
 # the OVR button is the ONE tappable piece, enabled only mid-hold (see below).
 #
 # Overheat (Plans/Rush_Overheat.md) turned the old 0..cap meter into a push-your-luck heat
-# gauge, so the meter shows the FULL heat range 0..hard_ceiling:
+# gauge, so the meter shows the FULL heat range 0..hard_ceiling. The depth-hazard rework
+# (Plans/Overdrive_Vent_Windows.md, Tim 2026-07-18 evening) then retired the Critical band:
+# heat has just TWO regions — Building (0 → 1.0) and OVERDRIVE (1.0 → the hard ceiling) — and
+# vent checks arrive more often the DEEPER the player rides, so every danger cue on this bar
+# ramps continuously with overdrive depth instead of announcing a band edge:
 #   • a wide teal CRUISE bar marks the cruise point — everything left of it is safe;
-#   • from the cruise bar to the hazard zone the track is ONE continuous amber ramp in a single
-#     hue, deepening across its whole width, with NO internal tick lines (Tim 2026-07-16: one
-#     continuous section, a single base color, the effect changing throughout — this replaced
-#     the original thin white heat==1.0 tick + flat amber Hot wash);
-#   • the Critical band [critical_start .. hard_ceiling] is hazard-striped dark red — gamble
-#     territory. Vent Windows (Plans/Overdrive_Vent_Windows.md, Tim 2026-07-17) retired the
-#     old hidden random ceiling: the bar now ends at the FIXED hard ceiling (the "you ignored
-#     everything" backstop), and the unpredictability lives in WHEN a vent window telegraphs
-#     instead — the skill check replaced the slot machine;
-#   • the fill and its bubbles shift purple → amber continuously from the cruise point to the
-#     hazard zone, then blinking red inside Critical, the blink growing faster and harder the
-#     deeper the player pushes;
-#   • crossing into Critical pops a large tier chip ("CRITICAL +55%!") quoting the peak bonus —
-#     the prize being approached — so the escalation is legible without reading the number
-#     (entering Hot is chipless: the fill shift and streaks carry it; Tim 2026-07-15);
+#   • from the cruise bar to the bar's END the track is ONE continuous amber-into-red wash,
+#     hazard stripes fading in across it, with NO internal tick lines and NO seams anywhere
+#     (Tim 2026-07-16 and 2026-07-18: one continuous section, the effect changing throughout);
+#   • the bar ends at the FIXED hard ceiling — the "you ignored everything" backstop that Vent
+#     Windows (Tim 2026-07-17) put where the old hidden random ceiling used to be: the real
+#     test is WHEN a vent window telegraphs, not where a secret line sits;
+#   • the fill and its bubbles shift purple → amber continuously with depth, a red blink fading
+#     in past the cruise point and growing faster and harder toward the ceiling. There is NO
+#     band-crossing chip any more (the old "CRITICAL +X%!" chip and its haptic left with the
+#     band): the vent telegraphs are the escalation drama now (Tim 2026-07-18);
 #   • on overheat the label swaps to "OVERHEATED" while the fill visibly drains (the drain IS
 #     the cooldown display), then "COOLING…" through the re-arm delay, then a bright READY flash.
 #
@@ -74,12 +73,12 @@ var _bubbles: GoldBubbles
 ## not locked out — "you are in overdrive" (was: only at max bonus; Tim 2026-07-15).
 var _streaks: MomentumStreaks
 
-## The custom-drawn band overlay: the wide teal cruise bar, the continuous amber ramp from it
-## to the hazard zone, and the hazard-striped Critical segment.
+## The custom-drawn zone overlay: the wide teal cruise bar, and the continuous amber-into-red
+## hazard wash (stripes and all) running from it to the bar's end.
 var _zones: BandZoneOverlay
 
-## The large chip shown over the meter: the short-lived "CRITICAL +X%!" band crossing, and —
-## Vent Windows — the held-open "VENT!" telegraph plus its success/miss resolution chips.
+## The large chip shown above the meter (Vent Windows): the held-open "VENT!" telegraph plus
+## its short-lived success/miss resolution chips.
 var _tier_chip: PanelContainer
 var _tier_chip_label: Label
 var _tier_chip_tween: Tween
@@ -105,8 +104,8 @@ var _ready_flash: ColorRect
 ## smoothing the frenzy meter uses; see BarSmoothing).
 var _displayed_fill := 0.0
 
-## The fill StyleBoxFlat, kept so _process can recolor the fill per band (and blink it in
-## Critical) by mutating bg_color — far cheaper than rebuilding the stylebox every frame.
+## The fill StyleBoxFlat, kept so _process can recolor the fill per heat depth (and drive the
+## warning blink) by mutating bg_color — far cheaper than rebuilding the stylebox every frame.
 var _fill_style: StyleBoxFlat
 
 ## Blink phase accumulator (radians). Advanced by the CURRENT blink frequency each frame, so the
@@ -118,11 +117,13 @@ var _blink_phase := 0.0
 enum _LabelState { NORMAL, CRUISING, OVERHEATED, COOLING }
 var _label_state_applied: int = -1
 
-## Blink ramp: frequency (Hz) and color-pulse strength at the START of Critical vs. at the very
-## top of the bar. Deeper into the gamble zone = faster, harder blinking = more urgent.
+## Blink ramp: the red warning blink keys CONTINUOUSLY on overdrive depth — heat's position
+## within [cruise point .. hard ceiling]. Frequency runs BLINK_HZ_MIN → BLINK_HZ_MAX across
+## that span; strength runs 0 → BLINK_STRENGTH_MAX. There is deliberately no strength floor:
+## a floor would snap the blink on at some depth, re-creating the very band edge the
+## depth-hazard rework removed (see _update_fill_color).
 const BLINK_HZ_MIN := 2.5
 const BLINK_HZ_MAX := 7.0
-const BLINK_STRENGTH_MIN := 0.35
 const BLINK_STRENGTH_MAX := 0.85
 
 ## How long the tier chip holds fully visible before fading (seconds).
@@ -202,14 +203,14 @@ func _ready() -> void:
 	# (Tim 2026-07-15) so the bright bubbles and white text pop against it.
 	UiPalette.style_framed_progress(_meter, UiPalette.DARK_PURPLE, UiPalette.PROGRESS_TRACK_GRAY)
 	add_child(_meter)
-	# Keep a handle on the fill stylebox so the band coloring / Critical blink can mutate its
+	# Keep a handle on the fill stylebox so the depth coloring / warning blink can mutate its
 	# bg_color per frame instead of rebuilding styleboxes (see _process).
 	_fill_style = _meter.get_theme_stylebox("fill") as StyleBoxFlat
 
 	# Band zones + the 1.0 and cruise ticks, custom-drawn (the same approach as MomentumStreaks).
-	# Added FIRST among the meter's overlays: it paints the Hot/Critical segments only over the
-	# UNFILLED track (the fill covers them as it advances, so they read as track decoration behind
-	# the fill), plus the always-on-top tick lines. Everything after it (bubbles, streaks, label)
+	# Added FIRST among the meter's overlays: it paints the hazard wash only over the UNFILLED
+	# track (the fill covers it as it advances, so it reads as track decoration behind the
+	# fill), plus the always-drawn cruise bar. Everything after it (bubbles, streaks, label)
 	# draws over it.
 	_zones = BandZoneOverlay.new()
 	_meter.add_child(_zones)
@@ -278,8 +279,8 @@ func _ready() -> void:
 	row.add_child(_label)
 	_apply_label_state(_LabelState.NORMAL)
 
-	# The tier chip: a large bold plate that eases in on an upward band crossing, holds ~1 s,
-	# then fades (see _show_tier_chip). It sits ABOVE the meter, not over it (Tim 2026-07-18:
+	# The tier chip: a large bold plate for the vent telegraph and its resolutions — timed chips
+	# ease in, hold ~1 s, then fade (see _show_tier_chip). It sits ABOVE the meter, not over it (Tim 2026-07-18:
 	# a chip covering the bar hid the fill/zones exactly when the player most needs to read
 	# them mid-vent) — anchored to the meter's top-center and growing upward, so however tall
 	# the chip gets (text only, or text + pips + countdown) its bottom edge stays a fixed gap
@@ -308,8 +309,8 @@ func _ready() -> void:
 	_tier_chip_label = Label.new()
 	_tier_chip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_tier_chip_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	# FONT_HEADLINE bold — the chip is the "you just crossed a tier" moment and must land at a
-	# glance (Tim's vision, §1b: large text, unmissable signals).
+	# FONT_HEADLINE bold — the chip is the act-NOW / payoff moment and must land at a glance
+	# (Tim's vision, §1b: large text, unmissable signals).
 	_tier_chip_label.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
 	_tier_chip_label.add_theme_font_override("font", UiPalette.make_bold_font())
 	_tier_chip_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -319,9 +320,9 @@ func _ready() -> void:
 	_vent_pips.visible = false
 	chip_column.add_child(_vent_pips)
 
-	# Band-edge signals: the chip + haptics fire on the crossings; overheat/re-arm swap the
-	# whole meter's presentation.
-	_rush_momentum.band_entered.connect(_on_band_entered)
+	# Overheat/re-arm swap the whole meter's presentation. (Deliberately NO band_entered
+	# connection: the depth-hazard rework retired the Critical band and its crossing chip —
+	# the vent telegraphs are the escalation drama now; Tim 2026-07-18.)
 	_rush_momentum.overheated.connect(_on_overheated)
 	_rush_momentum.rush_ready.connect(_on_rush_ready)
 	# Vent Windows: the telegraph and its three resolutions (Plans/Overdrive_Vent_Windows.md).
@@ -341,12 +342,11 @@ func _process(delta: float) -> void:
 	_displayed_fill = BarSmoothing.approach(_displayed_fill, target_fill, delta)
 	_meter.value = _displayed_fill
 
-	# Feed the zone overlay the cruise point and the hazard edge (as fill fractions) plus the
-	# current fill edge, so it can paint the ramp/hazard segments only over the still-unfilled
-	# track and keep the cruise bar where the clamp actually sits (Legacy can move it).
-	var critical_start_frac: float = clampf(_tuning.rush_momentum_critical_start / hard_ceiling, 0.0, 1.0)
+	# Feed the zone overlay the cruise point (as a fill fraction) plus the current fill edge,
+	# so it can paint the hazard wash only over the still-unfilled track and keep the cruise
+	# bar where the clamp actually sits (Legacy can move it).
 	var cruise_frac: float = clampf(_rush_momentum.cruise_heat() / hard_ceiling, 0.0, 1.0)
-	_zones.update_zones(cruise_frac, critical_start_frac, _displayed_fill)
+	_zones.update_zones(cruise_frac, _displayed_fill)
 
 	# While the vent telegraph is up, drain its countdown from the LIVE remaining time —
 	# remaining / telegraphed duration, so a tier-tightened window still drains exactly
@@ -412,15 +412,17 @@ func _process(delta: float) -> void:
 
 
 ## Recolor the fill AND its bubbles for the current heat: DARK_PURPLE at or below the cruise
-## point (and always while cruising), then one continuous purple → amber slide from the cruise
-## point all the way to the hazard edge — a single unbroken color story across the whole ramp
-## section, no seam at the old heat-1.0 cap (Tim 2026-07-16) — then blinking red inside
-## Critical, the blink ramping faster and harder as heat approaches the top of the bar.
-## Mutates the cached fill stylebox's bg_color, so no styleboxes are rebuilt.
+## point (and always while cruising), then ONE continuous story across the whole overdrive
+## span [cruise point .. hard ceiling]: the base color slides purple → amber with depth while
+## a red warning blink rides on top of it, both its strength and its frequency ramping with
+## the SAME depth. The blink's strength ramp starts at ZERO, so it fades in naturally just
+## past cruise — blink strength IS the depth ramp; there is no separate "blink region" that
+## switches on (the depth-hazard rework removed the Critical band, so no color behavior may
+## begin at an internal edge). Mutates the cached fill stylebox's bg_color, so no styleboxes
+## are rebuilt.
 func _update_fill_color(delta: float, locked_out: bool, cruising: bool) -> void:
 	var heat: float = _rush_momentum.heat
 	var cruise_heat: float = _rush_momentum.cruise_heat()
-	var critical_start: float = _tuning.rush_momentum_critical_start
 	var hard_ceiling: float = maxf(_tuning.rush_momentum_hard_ceiling, 0.0001)
 
 	if locked_out:
@@ -439,30 +441,26 @@ func _update_fill_color(delta: float, locked_out: bool, cruising: bool) -> void:
 		_blink_phase = 0.0
 		return
 
-	if heat < critical_start:
-		# The overdrive ramp [cruise point .. hazard edge]: fill and bubbles slide purple → amber
-		# by depth across the ENTIRE section, matching the track wash beneath.
-		var ramp_span: float = maxf(critical_start - cruise_heat, 0.0001)
-		var ramp_depth: float = clampf((heat - cruise_heat) / ramp_span, 0.0, 1.0)
-		_fill_style.bg_color = UiPalette.DARK_PURPLE.lerp(UiPalette.MUSTARD_GOLD, ramp_depth)
-		_bubbles.bubble_color = UiPalette.BRIGHT_PURPLE.lerp(UiPalette.PALE_GOLD, ramp_depth)
-		_blink_phase = 0.0
-		return
+	# Overdrive depth: how far into [cruise point .. hard ceiling] heat is riding — the same
+	# depth fraction the core's vent-check hazard rate interpolates on, so the bar's urgency
+	# and the actual danger climb together.
+	var depth_span: float = maxf(hard_ceiling - cruise_heat, 0.0001)
+	var depth_frac: float = clampf((heat - cruise_heat) / depth_span, 0.0, 1.0)
 
-	# Critical: blinking red, ramping with depth toward the hard ceiling. Phase accumulates at
-	# the CURRENT frequency so the ramp never makes the sine jump; strength widens the
-	# red↔pale-gold pulse.
-	var crit_span: float = maxf(hard_ceiling - critical_start, 0.0001)
-	var crit_depth: float = clampf((heat - critical_start) / crit_span, 0.0, 1.0)
-	var blink_hz: float = lerpf(BLINK_HZ_MIN, BLINK_HZ_MAX, crit_depth)
-	var strength: float = lerpf(BLINK_STRENGTH_MIN, BLINK_STRENGTH_MAX, crit_depth)
+	# Base color: fill and bubbles slide purple → amber across the ENTIRE overdrive span,
+	# matching the track wash beneath (unchanged from the banded era, just re-spanned).
+	var base_fill: Color = UiPalette.DARK_PURPLE.lerp(UiPalette.MUSTARD_GOLD, depth_frac)
+	_bubbles.bubble_color = UiPalette.BRIGHT_PURPLE.lerp(UiPalette.PALE_GOLD, depth_frac)
+
+	# The red warning blink, pulsing the base color toward KETCHUP_RED. Phase accumulates at
+	# the CURRENT frequency so the ramping frequency never makes the sine jump. Strength
+	# scales straight off depth_frac (zero at the cruise point): shallow overdrive barely
+	# shimmers, the top of the bar flashes hard and fast.
+	var blink_hz: float = lerpf(BLINK_HZ_MIN, BLINK_HZ_MAX, depth_frac)
+	var strength: float = BLINK_STRENGTH_MAX * depth_frac
 	_blink_phase += delta * blink_hz * TAU
-	# sin mapped to 0..1, scaled by strength: the fill pulses between pure KETCHUP_RED
-	# and a bright warning flash toward PALE_GOLD; the bubbles stay bright gold so they
-	# read through the pulse.
 	var pulse: float = (sin(_blink_phase) * 0.5 + 0.5) * strength
-	_fill_style.bg_color = UiPalette.KETCHUP_RED.lerp(UiPalette.PALE_GOLD, pulse)
-	_bubbles.bubble_color = UiPalette.PALE_GOLD
+	_fill_style.bg_color = base_fill.lerp(UiPalette.KETCHUP_RED, pulse)
 
 
 ## Swap the readout label's look per state. Only rebuilds the overrides on a change.
@@ -494,21 +492,6 @@ func _apply_label_state(state: int) -> void:
 			_label.add_theme_color_override("font_color", Color.WHITE)
 			_label.remove_theme_color_override("font_outline_color")
 			_label.add_theme_constant_override("outline_size", 0)
-
-
-## An upward band crossing. Only CRITICAL pops the tier chip (quoting the band's MAX bonus — the
-## prize being approached) plus a haptic tap; entering HOT is deliberately chipless (Tim
-## 2026-07-15: the amber fill shift and salmon streaks already announce it, and a chip at the
-## old cap read as noise). The chip sells the last rung of the gamble, not every rung.
-func _on_band_entered(band: RushMomentumState.Band) -> void:
-	if band == RushMomentumState.Band.CRITICAL:
-		# current_peak_bonus(), not the static bonus_peak knob: the peak is a LADDER now (Vent
-		# Windows) — base +55%, climbing per successful vent — and the chip must quote the top
-		# of THIS excursion's ladder, or a re-entry after a vent would understate the prize.
-		_show_tier_chip(
-			"CRITICAL +%d%%!" % int(round(_rush_momentum.current_peak_bonus() * 100.0)),
-			UiPalette.KETCHUP_RED, UiPalette.PALE_GOLD)
-		_vibrate(_tuning.rush_momentum_haptic_critical_ms)
 
 
 ## Heat hit the hard ceiling, or a vent window was missed: the shutdown moment. The
@@ -555,7 +538,7 @@ func _on_rush_ready() -> void:
 ## OPEN for the window's whole life — its resolution (success / miss / overheat) decides how
 ## it ends, so a knob-lengthened window can never outlive its own telegraph. The plate is
 ## bright MUSTARD_GOLD with NAVY text: gold is the "act now" family here, deliberately apart
-## from teal (cruise/calm) and red (critical/failure), and navy-on-gold is the standard
+## from teal (cruise/calm) and red (failure), and navy-on-gold is the standard
 ## action-button pairing, so the chip reads as "DO the thing" at a glance. The pips beneath
 ## show the demanded lifts (1 to 3 — the escalation's complexity axis) with the countdown bar
 ## under them.
@@ -605,8 +588,8 @@ func _on_vent_missed(lifts_done: int, _required_lifts: int) -> void:
 	_show_tier_chip("VENT MISSED!", UiPalette.KETCHUP_RED, UiPalette.PALE_GOLD)
 
 
-## Show the tier chip: set its text/colors, ease it in, hold, fade out. A new crossing while the
-## old chip is still up simply restarts the sequence with the new text. The end-of-fade cleanup
+## Show the tier chip: set its text/colors, ease it in, hold, fade out. A new chip request while
+## the old chip is still up simply restarts the sequence with the new text. The end-of-fade cleanup
 ## also retires the vent pips + miss strobe, so a miss chip tidies itself up and the next plain
 ## tier chip can never inherit stale pips.
 func _show_tier_chip(text: String, plate_color: Color, text_color: Color) -> void:
@@ -665,10 +648,10 @@ func _vibrate(duration_ms: float) -> void:
 ## Custom-drawn track decoration for the heat ranges (the same _draw approach MomentumStreaks
 ## uses): the wide teal CRUISE bar (where a plain hold clamps), then ONE continuous amber wash
 ## deepening from the cruise bar all the way to the bar's END — one continuous amber-into-red
-## gradient with no internal tick lines and no seam at the Critical edge (Tim 2026-07-16 removed
-## the heat==1.0 tick and flat Hot segment; Tim 2026-07-18 merged the amber ramp and the red
-## Critical base into a single blended section). The hazard stripes remain the Critical marker,
-## fading in gradually across the start of the span so they emerge from the wash.
+## gradient with no internal tick lines and no seams anywhere (Tim 2026-07-16 removed the
+## heat==1.0 tick and flat Hot segment; Tim 2026-07-18 merged the ramp and the red hazard base
+## into one blended section, and the depth-hazard rework then retired the Critical band, so the
+## whole overdrive span is a single gradient with the hazard stripes fading in across it).
 ##
 ## The bar's fill is painted by the ProgressBar itself, UNDER all child overlays — so to make the
 ## zones read as if they were on the track BEHIND the fill, each segment is clipped to start at
@@ -687,9 +670,10 @@ class BandZoneOverlay extends Control:
 	## How many vertical slices approximate the wash's left-to-right alpha gradient (draw_rect
 	## has no gradient fill; ~24 slices are indistinguishable from smooth at bar height).
 	const RAMP_SLICES := 24
-	## Critical segment: a dark red base with brighter red diagonal hazard stripes over it.
-	const CRITICAL_BASE := Color("#8E2F1E", 0.55)   # BRICK, translucent over the gray track
-	const CRITICAL_STRIPE := Color("#B5402A", 0.60)  # KETCHUP_RED stripes
+	## The hazard end of the wash: the dark red the gradient lands on at the bar's end, plus
+	## the brighter red diagonal stripes that fade in over it.
+	const HAZARD_BASE := Color("#8E2F1E", 0.55)   # BRICK, translucent over the gray track
+	const HAZARD_STRIPE := Color("#B5402A", 0.60)  # KETCHUP_RED stripes
 	const STRIPE_WIDTH := 8.0
 	## Horizontal distance between stripe left edges. Stripes run at 45°.
 	const STRIPE_SPACING := 26.0
@@ -699,10 +683,9 @@ class BandZoneOverlay extends Control:
 	const CRUISE_BAR_WIDTH := 10.0
 	const CRUISE_BAR_COLOR := Color("#9FD8D4", 0.9)  # ATOMIC_TEAL
 
-	## The cruise point, the hazard edge, and the current fill edge, all as fractions of the full
-	## bar (0..1). Fed every frame by the host's _process via update_zones.
+	## The cruise point and the current fill edge, as fractions of the full bar (0..1). Fed
+	## every frame by the host's _process via update_zones.
 	var _cruise_frac := 0.0
-	var _critical_start_frac := 0.78125
 	var _fill_frac := 0.0
 
 	func _ready() -> void:
@@ -710,13 +693,11 @@ class BandZoneOverlay extends Control:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	## Update the geometry; redraws only when something actually moved.
-	func update_zones(cruise_frac: float, critical_start_frac: float, fill_frac: float) -> void:
+	func update_zones(cruise_frac: float, fill_frac: float) -> void:
 		if is_equal_approx(cruise_frac, _cruise_frac) \
-				and is_equal_approx(critical_start_frac, _critical_start_frac) \
 				and is_equal_approx(fill_frac, _fill_frac):
 			return
 		_cruise_frac = cruise_frac
-		_critical_start_frac = critical_start_frac
 		_fill_frac = fill_frac
 		queue_redraw()
 
@@ -732,14 +713,13 @@ class BandZoneOverlay extends Control:
 		# off-by-inset the frenzy pop-floor marker had (Tim 2026-07-15). At fraction 1.0 this
 		# lands on size.x − inset, flush with the frame's inner right edge.
 		var cruise_x := maxf(_cruise_frac * size.x - EDGE_INSET, EDGE_INSET)
-		var critical_x := maxf(_critical_start_frac * size.x - EDGE_INSET, EDGE_INSET)
 		var right_x := size.x - EDGE_INSET
 		var fill_x := maxf(_fill_frac * size.x - EDGE_INSET, EDGE_INSET)
 
 		# The overheat wash [cruise bar .. bar end]: ONE continuous gradient across the whole
 		# danger span — amber at the cruise bar sliding into the dark hazard red at the far end,
-		# with no seam at the Critical edge (Tim 2026-07-18: the two sections should simply fade
-		# into each other). Sliced left-to-right (draw_rect has no gradient fill), each slice's
+		# with no internal seam (Tim 2026-07-18: the sections should simply fade into each
+		# other). Sliced left-to-right (draw_rect has no gradient fill), each slice's
 		# color AND alpha interpolated across the FULL span, then clipped to the unfilled track
 		# (see the class comment). Slicing the full span and skipping covered slices keeps the
 		# gradient anchored to the track — it never re-stretches as the fill advances.
@@ -747,7 +727,7 @@ class BandZoneOverlay extends Control:
 			var span := right_x - cruise_x
 			var slice_width := span / float(RAMP_SLICES)
 			var start_color := Color(RAMP_COLOR, RAMP_ALPHA_START)
-			var end_color := CRITICAL_BASE
+			var end_color := HAZARD_BASE
 			for i in range(RAMP_SLICES):
 				var slice_left := cruise_x + slice_width * float(i)
 				var slice_right := slice_left + slice_width
@@ -760,10 +740,10 @@ class BandZoneOverlay extends Control:
 						slice_color)
 
 		# Hazard stripes join the same fade: strength 0 at the cruise bar, full only at the bar's
-		# END, ramping across the WHOLE overheat span. Starting them at the Critical edge — even
-		# with a partial fade-in — still read as a boundary on device (Tim 2026-07-18 follow-up:
-		# a texture edge splits the section as surely as a color edge), so the stripes now share
-		# the wash's single left-to-right story and no x-position has a detectable seam.
+		# END, ramping across the WHOLE overheat span. Starting them anywhere mid-span — even
+		# with a partial fade-in — read as a boundary on device (Tim 2026-07-18 follow-up: a
+		# texture edge splits the section as surely as a color edge), so the stripes share the
+		# wash's single left-to-right story and no x-position has a detectable seam.
 		var stripes_left := maxf(cruise_x, fill_x)
 		if right_x > stripes_left:
 			_draw_hazard_stripes(stripes_left, right_x, top, bottom, cruise_x, right_x)
@@ -812,7 +792,7 @@ class BandZoneOverlay extends Control:
 				strength *= strength  # squared ramp — see the doc comment above
 				if strength > 0.0:
 					draw_line(from, to,
-							Color(CRITICAL_STRIPE, CRITICAL_STRIPE.a * strength), STRIPE_WIDTH)
+							Color(HAZARD_STRIPE, HAZARD_STRIPE.a * strength), STRIPE_WIDTH)
 			x0 += STRIPE_SPACING
 
 

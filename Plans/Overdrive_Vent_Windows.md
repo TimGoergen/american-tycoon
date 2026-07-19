@@ -214,6 +214,36 @@ a cliff, not a curve). Autopilot models skill **per lift** (not per gesture), wh
 makes triples genuinely harder and produces the compounding-odds survival curve above.
 Effective ladder: +55% base, +60% per vent, unbounded — a median skilled run peaks ~+535%.
 
+## Depth-hazard rework (Tim, 2026-07-18 evening — the Critical zone is retired)
+
+Tim, after the seamless-bar pass: "I think there shouldn't be a critical zone. It should just be
+the chance of a vent event goes up as they go further into the overheat zone as a whole."
+
+- **No Critical band.** `rush_momentum_critical_start` and `rush_momentum_bonus_at_critical`
+  retired. The heat model has two regions: Building (0 → 1.0, the old meter) and OVERDRIVE
+  (1.0 → hard ceiling). Bonus is one continuous lerp `bonus_at_hot → current_peak_bonus()`
+  across the whole overdrive span — no kink where a band edge used to be.
+- **Vent checks are a depth hazard, not a zone event.** While overdrive is engaged and heat is
+  past the cruise point, each tick rolls a window-open chance from a rate that interpolates
+  with depth: `rate = lerp(vent_rate_at_cruise, vent_rate_at_ceiling, depth_frac)` where
+  `depth_frac = (heat − cruise) / (hard_ceiling − cruise)`. First-cut knobs:
+  `rush_momentum_vent_rate_at_cruise` 0.05 windows/s (a check every ~20 s hovering shallow),
+  `rush_momentum_vent_rate_at_ceiling` 1.0 windows/s (relentless at the top). The per-tier
+  cadence decay is retired — depth IS the cadence axis now, and since a small `vent_heat_drop`
+  means long runs inevitably ride deeper, escalation-by-tier falls out naturally. Duration
+  decay and the lifts ladder stay as the tier-difficulty axes.
+- **Player-authored intensity:** venting drops heat, so where you sit in the hazard curve is
+  partly your call — shallow overdrive = rare checks, small climb; riding deep = frantic and
+  rich. The telegraph guarantee stays: a window always force-opens with its full duration
+  available before heat can reach the backstop.
+- **UI:** the "CRITICAL +X%!" band-crossing chip and its haptic are retired (the vent
+  telegraphs are the drama); urgency (blink rate/strength) keys continuously on depth_frac.
+  The band overlay's stripes/gradient already fade edge-free and merely lose the
+  critical_start input. `rush_momentum_haptic_critical_ms` retired with its moment.
+- **Sim gates unchanged in spirit:** skilled ≥ ~+62% avg with median death ~tier 6–10, sloppy
+  ≤ cruise, telegraph guarantee at every depth, plus a new statistical check that measured
+  arrival rate actually rises with depth. Retune the two rate knobs to hit them.
+
 ## Decision log
 
 - Overdrive must be skill-based with larger risk and reward; cruise keeps the safe floor

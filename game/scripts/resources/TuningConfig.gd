@@ -212,19 +212,15 @@ extends Resource
 ## (0.167 ≈ 6 s from cold to the Hot edge — matching the old build feel).
 @export var rush_momentum_heat_build_per_second: float = 0.167  # feel-tune
 
-## How fast heat climbs while rushing ABOVE the Hot edge (heat 1.0), in heat units per second.
-## Slower than the base build so the ride through the danger bands is a real decision window:
-## 0.075 stretches the climb from the Hot edge to the hard ceiling (0.60 units) to ~8 s
+## How fast heat climbs while rushing ABOVE heat 1.0 (the OVERDRIVE region), in heat units per
+## second. Slower than the base build so the ride through the danger zone is a real decision
+## window: 0.075 stretches the climb from heat 1.0 to the hard ceiling (0.60 units) to ~8 s
 ## (Tim 2026-07-15: "at least 5 to 8 seconds in the high heat zone").
 @export var rush_momentum_heat_build_hot_per_second: float = 0.075  # feel-tune
 
 ## How fast heat bleeds away when NOT rushing, in heat units per second
-## (0.333 ≈ 3 s to fully cool from the Hot edge — matching the old bleed feel).
+## (0.333 ≈ 3 s to fully cool from heat 1.0 — matching the old bleed feel).
 @export var rush_momentum_heat_bleed_per_second: float = 0.333  # feel-tune
-
-## Heat at which the Critical band (warning 2) begins. The Hot band spans 1.0 to here, and its
-## width is GUARANTEED safe — no vent window or overheat can ever land inside it.
-@export var rush_momentum_critical_start: float = 1.25  # feel-tune
 
 ## The FIXED overheat ceiling — the visible end of the bar and the "you ignored everything"
 ## backstop (Plans/Overdrive_Vent_Windows.md). Also the heat at which the bonus reaches the
@@ -233,17 +229,17 @@ extends Resource
 @export var rush_momentum_hard_ceiling: float = 1.60  # feel-tune
 
 ## The sustainable "cruise" bonus while holding rush WITHOUT overdrive engaged (0.25 = +25%).
-## Heat clamps at the matching point on the Building band and can never overheat there — the
-## danger bands are opt-in via the OVERDRIVE button (Plans/Rush_Cruise_Control.md). The Cooling
+## Heat clamps at the matching point on the Building region and can never overheat there — the
+## danger zone is opt-in via the OVERDRIVE button (Plans/Rush_Cruise_Control.md). The Cooling
 ## Systems Legacy upgrade adds to this, hard-capped at rush_momentum_bonus_at_hot (the old +30%).
 @export var rush_momentum_cruise_bonus: float = 0.25  # feel-tune
 
-## Bonus at the Hot edge (heat 1.0), as a fraction of property income. 0.30 keeps the old cap's
-## value — the Building band is exactly the pre-overheat meter.
+## Bonus at the Hot edge (heat 1.0 — the top of the Building region, where OVERDRIVE begins),
+## as a fraction of property income. 0.30 keeps the old cap's value — the Building region is
+## exactly the pre-overheat meter. Above heat 1.0 the bonus is ONE continuous lerp from here to
+## the ladder peak at the hard ceiling (the depth-hazard rework retired the Critical band and
+## its kink — Tim 2026-07-18 evening).
 @export var rush_momentum_bonus_at_hot: float = 0.30  # feel-tune
-
-## Bonus at the Critical edge (heat = critical_start).
-@export var rush_momentum_bonus_at_critical: float = 0.40  # feel-tune
 
 ## Bonus at the hard ceiling with NO vents achieved — the ladder's tier-0 peak. Each successful
 ## vent adds rush_momentum_vent_bonus_step on top, with NO cap (endless escalation). Only ever
@@ -251,9 +247,9 @@ extends Resource
 ## (~+71% for a skilled venter; see the vent-window block comment below).
 @export var rush_momentum_bonus_peak: float = 0.55  # feel-tune
 
-# --- Vent windows (Tim 2026-07-17, endless escalation 2026-07-18; design:
-# Plans/Overdrive_Vent_Windows.md) ---
-# While riding Critical with overdrive engaged, telegraphed vent windows periodically demand a
+# --- Vent windows (Tim 2026-07-17, endless escalation 2026-07-18, depth hazard 2026-07-18
+# evening; design: Plans/Overdrive_Vent_Windows.md) ---
+# While riding overdrive past the cruise point, telegraphed vent windows periodically demand a
 # gesture on the rushed property's button: VENT = one lift (release → re-press), VENT ×2 = the
 # double release (lift → tap → re-hold), VENT ×3 adds a second tap. Success vents heat and
 # ratchets the bonus ladder up a rung; a miss (or reaching the hard ceiling) is a full
@@ -262,41 +258,34 @@ extends Resource
 #
 # ENDLESS ESCALATION (Tim 2026-07-18, supersedes the old 4-tier cap): the windows never stop
 # arriving, and the DIFFICULTY CURVE replaces the tier cap as the run's ending. Each tier the
-# arrival delay and the window duration both decay geometrically toward floors, and the demanded
-# lifts step up 1 → 2 → 3 (hard-capped at 3 — a quad-pump is thumb mush; past ×3 the speed axes
-# carry the difficulty alone). The reward stays a flat unbounded step per vent: the brake is the
-# curve, not the reward. Every run therefore ends in flames eventually — the question is how
-# high you got (best streak = an implicit high score).
+# window duration decays geometrically toward a floor and the demanded lifts step up 1 → 2 → 3
+# (hard-capped at 3 — a quad-pump is thumb mush; past ×3 the speed axes carry the difficulty
+# alone). The reward stays a flat unbounded step per vent: the brake is the curve, not the
+# reward. Every run therefore ends in flames eventually — the question is how high you got
+# (best streak = an implicit high score).
 #
-# RETUNED for the endless model (sim section 20's survival-curve measurement, 2026-07-18): with
-# every run now ending in a lockout (no more bail-at-the-cap harvest), hitting the plan's
-# targets — skilled (95% per lift) median run tier ~6-10 with average ≥ the v1 +62%, sloppy
-# (70%) at or below cruise — needed heat to RIDE HIGH between vents (heat_drop 0.15 → 0.06,
-# so the bar visibly creeps toward the ceiling as tiers deepen) and a gentler duration decay
-# (0.92 → 0.975, so deep runs die to blown beats on the escalating gestures, not to a
-# too-short-to-finish cliff right where triples begin). Measured finals: skilled +71% avg,
-# median tier 8, p90 12; sloppy +23%; cruise +25%. Every knob is live in Balance Tuning.
+# DEPTH HAZARD (Tim 2026-07-18 evening, retires the Critical band): window arrival is no longer
+# a rolled delay inside a zone — it is a per-tick hazard whose rate interpolates with how DEEP
+# into the overdrive span (cruise point → hard ceiling) the heat currently sits. Shallow riding
+# = rare checks and a small climb; riding just under the backstop = relentless checks and the
+# tall pay. The old per-tier cadence decay is retired with the band: a small heat_drop means
+# long runs inevitably ride deeper, so cadence escalation now FALLS OUT of depth itself.
+#
+# TUNE HISTORY: the endless-model retunes (heat_drop 0.15 → 0.06 so the bar creeps toward the
+# ceiling; duration_decay 0.92 → 0.975 so deep runs die to blown beats, not a too-short-to-
+# finish cliff at the triples) carried over to the hazard model unchanged, and the sim gates
+# still hold — skilled (95% per lift) median run tier ~6-10 with average ≥ the v1 +62%, sloppy
+# (70%) at or below cruise. Every knob is live in Balance Tuning.
 
-## Earliest a vent window can arrive after entering Critical / after a vent (seconds) — the
-## TIER-0 base of the escalating cadence (each tier multiplies the rolled delay by delay_decay).
-## The brisk base cadence is what lets a skilled rider climb the ladder fast enough to matter,
-## and makes a sloppy rider's fumbles frequent enough that the risk stays real.
-@export var rush_momentum_vent_window_delay_min: float = 0.8  # feel-tune
+## Expected vent-window arrivals per second when heat sits just past the cruise point — the
+## SHALLOW end of the depth hazard (0.05 ≈ a check every ~20 s hovering there). Each tick rolls
+## lerp(rate_at_cruise, rate_at_ceiling, depth) × delta against the schedule rng, so arrival
+## stays the unpredictable part while the outcome stays player-owned.
+@export var rush_momentum_vent_rate_at_cruise: float = 0.05  # feel-tune
 
-## Latest arrival (seconds) — the rolled unpredictability, tier-0 base. The roll is clamped so
-## every window always fully fits before heat could reach the hard ceiling (the telegraph
-## guarantee).
-@export var rush_momentum_vent_window_delay_max: float = 1.6  # feel-tune
-
-## Per-tier multiplier on the rolled arrival delay (escalation axis 1, CADENCE): 0.85 = each
-## tier's windows arrive 15% sooner, geometrically, floored at vent_delay_floor. Tightened
-## from the plan's first-cut 0.88: the faster mid-tier cadence is what lets a skilled rider
-## bank deep tiers before the difficulty curve catches up.
-@export var rush_momentum_vent_delay_decay: float = 0.85  # feel-tune
-
-## The cadence floor (seconds): the escalating arrival delay never decays below this — past it,
-## the duration and lift axes carry the difficulty.
-@export var rush_momentum_vent_delay_floor: float = 0.35  # feel-tune
+## Expected arrivals per second at the hard ceiling — the DEEP end of the hazard (relentless).
+## Depth is the cadence axis now: riding higher is the player choosing more checks for more pay.
+@export var rush_momentum_vent_rate_at_ceiling: float = 1.0  # feel-tune
 
 ## Seconds the player has to COMPLETE the gesture once a window telegraphs — the TIER-0 base
 ## of the escalating duration (each tier multiplies it by duration_decay).
@@ -326,12 +315,13 @@ extends Resource
 ## is a fumbled re-hold, which misses the window.
 @export var rush_momentum_vent_tap_max: float = 0.25  # feel-tune
 
-## Heat vented on a successful gesture (clamped so venting keeps you IN Critical, never below).
-## Retuned 0.15 → 0.06 for the endless model: smaller than the heat built between checks, so
-## the bar CREEPS TOWARD THE CEILING as tiers deepen — deep runs visibly ride just under the
-## backstop (drama AND pay: the Critical bonus scales with how high the bar sits). A success
-## additionally clamps heat down just enough that the next window always fits (see
-## RushMomentumState._succeed_vent — the telegraph guarantee's other half).
+## Heat vented on a successful gesture (floored at the cruise point — success never ends the
+## ride). Retuned 0.15 → 0.06 for the endless model: smaller than the heat built between
+## checks, so the bar CREEPS TOWARD THE CEILING as tiers deepen — deep runs visibly ride just
+## under the backstop (drama AND pay: the overdrive bonus scales with how high the bar sits,
+## and under the depth hazard so does the check cadence). A success additionally clamps heat
+## down just enough that the next window always fits (see RushMomentumState._succeed_vent —
+## the telegraph guarantee's other half).
 @export var rush_momentum_vent_heat_drop: float = 0.06  # feel-tune
 
 ## Bonus added to the ladder's peak per successful vent (0.60 = +60 percentage points), with
@@ -365,16 +355,16 @@ extends Resource
 ## keeps building smoothly BETWEEN the discrete auto-rush pulses instead of bleeding in the gaps.
 @export var rush_momentum_grace_seconds: float = 0.5  # feel-tune
 
-## Haptic pulse lengths (milliseconds) for the momentum bar's three feedback beats: the tap on
-## entering Critical, the long thump on overheating, and the tick when rushing re-arms. Live
-## knobs so the haptic device pass can be dialed on the phone without a code round-trip
-## (phones vary a lot in how a given pulse length feels). 0 disables that pulse.
-@export var rush_momentum_haptic_critical_ms: float = 60.0  # feel-tune
+## Haptic pulse lengths (milliseconds) for the momentum bar's feedback beats: the long thump on
+## overheating and the tick when rushing re-arms. Live knobs so the haptic device pass can be
+## dialed on the phone without a code round-trip (phones vary a lot in how a given pulse length
+## feels). 0 disables that pulse. (The old Critical band-crossing tap retired with its band —
+## the vent telegraphs are the drama now.)
 @export var rush_momentum_haptic_overheat_ms: float = 200.0  # feel-tune
 @export var rush_momentum_haptic_ready_ms: float = 40.0  # feel-tune
 
-## The vent-window telegraph's own pulse — a beat longer than the Critical tap so "act NOW"
-## is distinguishable by feel alone with the eyes on the property row (plan follow-up item).
+## The vent-window telegraph's own pulse — long enough that "act NOW" is distinguishable by
+## feel alone with the eyes on the property row (plan follow-up item).
 @export var rush_momentum_haptic_vent_ms: float = 80.0  # feel-tune
 
 # --- Estate & tax (Spec §9) ---

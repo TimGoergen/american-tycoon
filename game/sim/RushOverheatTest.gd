@@ -6,17 +6,20 @@ extends SceneTree
 #
 # Usage: godot --headless --path . --script res://sim/RushOverheatTest.gd
 #
-# Proves, without any rendering:
-#   1. Building 0 → Hot takes ~6 s of sustained rushing (the old build feel is preserved).
-#   2. band_entered fires on the upward crossings, HOT then CRITICAL, in order.
+# Proves, without any rendering (DEPTH-HAZARD model, Tim 2026-07-18 evening — the Critical
+# band is retired; windows arrive from a per-tick hazard that rises with heat depth):
+#   1. Building 0 → heat 1.0 takes ~6 s of sustained rushing (the old build feel is preserved).
+#   2. band_entered fires exactly once, on the upward 1.0 crossing, emitting OVERDRIVE.
 #   3. Ignoring the vent telegraph is a MISS: the excursion overheats below the hard ceiling,
 #      with vent_missed announcing the blown window first.
 #   4. The lockout: rush disabled, bonus 0, heat drains at the locked rate, and rush_ready
 #      fires only rearm_seconds AFTER the bar empties — then rushing re-enables.
 #   5. A frenzy burn FREEZES everything: build, bleed, lockout drain, re-arm countdown, the
-#      vent-window scheduler, and an open window's gesture clock.
+#      hazard dice, and an open window's gesture clock.
 #   6. reset() from mid-lockout restores a clean, rushable state (the First Contact wipe).
-#   7. The piecewise bonus mapping hits the knob values exactly at each band edge.
+#   7. The bonus mapping: the Building segment hits its knob values, and the overdrive span
+#      is ONE continuous lerp — sampled densely, monotone, with NO kink where the old band
+#      edges used to sit.
 #
 # Cruise Control amendment (Plans/Rush_Cruise_Control.md) adds:
 #   8. The cruise clamp holds indefinitely — a long hold without overdrive never overheats
@@ -26,24 +29,28 @@ extends SceneTree
 #  11. Legacy cruise points (Cooling Systems) raise the clamp, hard-capped at bonus_at_hot;
 #      parked at heat 1.0 exactly, cruising never starts an excursion (the boundary rule).
 #  12. The lockout time scale (Rapid Restart) halves the whole lockout at level 5.
-#  13. DUTY CYCLE (legacy strategy): the cruise baseline vs the pre-vent-window "ride and
-#      release" rhythm — kept as the historical comparison point for the new numbers.
+#  13. DUTY CYCLE (legacy strategy): the cruise baseline, plus proof that the pre-vent-window
+#      "ride and release" dodge is DEAD — the depth hazard reaches below the retired Critical
+#      zone, so the old rhythm now eats the overheat it used to sidestep.
 #
-# Vent Windows (Plans/Overdrive_Vent_Windows.md, ENDLESS ESCALATION rework 2026-07-18) add:
-#  14. The scheduler is deterministic under a seeded rng (reproducible window times).
+# Vent Windows (Plans/Overdrive_Vent_Windows.md; endless escalation + depth hazard) add:
+#  14. The hazard is deterministic under a seeded rng (reproducible window times).
 #  15. The gesture judge: clean single, double, AND triple; gap-too-long; an intermediate tap
 #      held too long (on both the ×2 and ×3 gestures); expiry; and lifts on a closed window
 #      being ignored.
 #  16. The ladder math: peak bonuses follow bonus_peak + tier × vent_bonus_step with NO cap.
-#  17. Venting clamps at critical_start (never OUT of Critical); the escalation curves follow
-#      the knobs exactly — delay and duration decay geometrically to their floors, lifts step
+#  17. Venting floors at the cruise point (success never ends the ride); the escalation curves
+#      follow the knobs exactly — duration decays geometrically to its floor, lifts step
 #      1 → 2 → 3 and never exceed 3, and the windows NEVER stop arriving.
 #  18. The miss penalty: the re-arm gains vent_fail_rearm_per_tier seconds per achieved tier,
 #      CAPPED at vent_fail_rearm_cap, and Rapid Restart still scales the WHOLE lockout,
 #      sting included.
 #  19. The telegraph guarantee: across panel-plausible knob combos, EVERY window (deep tiers
 #      included) opens with its full duration still ahead of the projected ceiling arrival.
-#  20. AUTOPILOT SURVIVAL + DUTY CYCLE (measure, don't guess): modeled SKILLED (95% per-LIFT
+#  20. THE DEPTH HAZARD ITSELF (statistical): with heat pinned shallow (~0.15 depth) vs deep
+#      (~0.85), the measured window arrival rates match the lerped knob rates — and their
+#      ratio matches the knobs' ratio — within a loose seeded tolerance.
+#  21. AUTOPILOT SURVIVAL + DUTY CYCLE (measure, don't guess): modeled SKILLED (95% per-LIFT
 #      success) and SLOPPY (70%) venters ride each excursion until they MISS — no bail —
 #      reporting the survival curve (median / p90 tier reached) and the long-session average
 #      bonus vs the cruise baseline.
@@ -83,6 +90,7 @@ func _initialize() -> void:
 	_test_vent_clamp_and_escalation(tuning)
 	_test_miss_penalty(tuning)
 	_test_telegraph_guarantee(tuning)
+	_test_depth_hazard_statistics(tuning)
 	_measure_vent_autopilot_survival(tuning)
 
 	print("")
@@ -102,7 +110,7 @@ func _check(label: String, condition: bool) -> void:
 
 
 ## A fresh heat state with a deterministic rng seed, so every run reproduces exactly.
-## (The rng now rolls vent-window ARRIVAL times — the old random ceiling is retired.)
+## (The rng now rolls the per-tick window hazard — the old random ceiling is retired.)
 func _fresh_state(tuning: TuningConfig, seed_value: int) -> RushMomentumState:
 	var state := RushMomentumState.new(tuning)
 	state.rng.seed = seed_value
@@ -168,7 +176,7 @@ func _rush_until_overheat(state: RushMomentumState) -> float:
 
 
 func _test_build_time_to_hot(tuning: TuningConfig) -> void:
-	print("1. Building 0 -> Hot takes ~6 s of sustained rushing")
+	print("1. Building 0 -> heat 1.0 takes ~6 s of sustained rushing")
 	var state := _fresh_state(tuning, 1)
 	# Overdrive so the climb runs past the cruise clamp — this section times the raw build rate.
 	_press_and_engage(state)
@@ -176,14 +184,14 @@ func _test_build_time_to_hot(tuning: TuningConfig) -> void:
 	while state.heat < 1.0 and elapsed < 30.0:
 		state.tick(TICK_SECONDS, true, false)
 		elapsed += TICK_SECONDS
-	print("     (reached Hot at %.1f s)" % elapsed)
-	_check("Hot edge reached between 5.5 and 6.5 s", elapsed >= 5.5 and elapsed <= 6.5)
-	_check("bonus at the Hot edge ~= bonus_at_hot",
+	print("     (reached heat 1.0 at %.1f s)" % elapsed)
+	_check("heat 1.0 reached between 5.5 and 6.5 s", elapsed >= 5.5 and elapsed <= 6.5)
+	_check("bonus at heat 1.0 ~= bonus_at_hot",
 		absf(state.bonus - tuning.rush_momentum_bonus_at_hot) < 0.02)
 
 
 func _test_band_signals_and_missed_window(tuning: TuningConfig) -> void:
-	print("\n2 & 3. Band signals fire upward in order; an ignored vent window misses and overheats")
+	print("\n2 & 3. The OVERDRIVE crossing announces once; an ignored vent window misses and overheats")
 	var state := _fresh_state(tuning, 12345)
 	var bands_entered: Array = []
 	var overheat_count := [0]  # single-element array so the lambda can mutate it
@@ -195,29 +203,31 @@ func _test_band_signals_and_missed_window(tuning: TuningConfig) -> void:
 	state.vent_missed.connect(func(done: int, required: int) -> void: misses.append([done, required]))
 
 	_rush_until_overheat(state)
-	_check("band_entered fired exactly twice on the way up", bands_entered.size() == 2)
-	_check("first crossing was HOT",
-		bands_entered.size() >= 1 and bands_entered[0] == RushMomentumState.Band.HOT)
-	_check("second crossing was CRITICAL",
-		bands_entered.size() >= 2 and bands_entered[1] == RushMomentumState.Band.CRITICAL)
+	# The hazard CAN legitimately open a window below heat 1.0 (it runs from the cruise point
+	# up), so the crossing signal is "at most once, always OVERDRIVE" — with this seed the
+	# ride crosses 1.0 before its first window, so exactly once.
+	_check("band_entered fired exactly once on the way up (the 1.0 crossing)",
+		bands_entered.size() == 1)
+	_check("the crossing announced OVERDRIVE",
+		bands_entered.size() >= 1 and bands_entered[0] == RushMomentumState.Band.OVERDRIVE)
 	_check("exactly one vent window telegraphed before the shutdown", windows_opened[0] == 1)
 	_check("the ignored window was judged a MISS with zero lifts done",
 		misses.size() == 1 and misses[0][0] == 0)
 	_check("overheated fired exactly once", overheat_count[0] == 1)
 	print("     (missed the window and overheated at heat %.3f)" % state.heat)
-	_check("the missed-window overheat lands inside Critical, below the hard ceiling",
-		state.heat > tuning.rush_momentum_critical_start
+	_check("the missed-window overheat lands in the hazard zone, below the hard ceiling",
+		state.heat > state.cruise_heat()
 			and state.heat < tuning.rush_momentum_hard_ceiling)
 
-	# A second excursion rolls a fresh window ARRIVAL: the shutdown height differs because the
+	# A second excursion rolls fresh hazard dice: the shutdown height differs because the
 	# schedule (not the outcome) is the random part now — the anti-memorization property.
 	var first_overheat_heat := state.heat
 	state.reset()
 	_rush_until_overheat(state)
-	_check("second excursion also misses inside Critical",
-		state.heat > tuning.rush_momentum_critical_start
+	_check("second excursion also misses in the hazard zone, below the ceiling",
+		state.heat > state.cruise_heat()
 			and state.heat < tuning.rush_momentum_hard_ceiling)
-	_check("second excursion's window arrived at a different time (fresh schedule roll)",
+	_check("second excursion's window arrived at a different time (fresh hazard rolls)",
 		not is_equal_approx(state.heat, first_overheat_heat))
 
 
@@ -304,19 +314,20 @@ func _test_frenzy_freeze(tuning: TuningConfig) -> void:
 	_check("re-arm COUNTDOWN halts during a burn (rush_ready never fired)",
 		not ready_fired[0] and rearming.is_rearming())
 
-	# Vent SCHEDULER freeze: with a window rolled but not yet open, a long burn never opens it
-	# (the arrival countdown advances on tick delta only — no wall-clock leaks).
-	var pending := _fresh_state(tuning, 45)
+	# HAZARD freeze: parked deep in the hazard zone (rate near its relentless top), a long burn
+	# never opens a window — the dice simply are not rolled on frozen ticks. Heat is poked
+	# straight to depth (white-box, like the sim's other deep probes) so the setup itself
+	# cannot consume hazard rolls on the way up.
+	var deep_burn := _fresh_state(tuning, 45)
 	var windows_opened := [0]
-	pending.vent_window_opened.connect(func(_lifts: int, _duration: float) -> void: windows_opened[0] += 1)
-	_press_and_engage(pending)
-	while pending.current_band() != RushMomentumState.Band.CRITICAL:
-		pending.tick(TICK_SECONDS, true, false)
-	pending.tick(TICK_SECONDS, true, false)  # one Critical tick so the schedule is rolled
-	for _i in range(200):  # 20 s of frenzy — far beyond delay_max
-		pending.tick(TICK_SECONDS, true, true)
-	_check("a PENDING window never opens during a burn (scheduler frozen)",
-		windows_opened[0] == 0 and not pending.is_locked_out())
+	deep_burn.vent_window_opened.connect(func(_lifts: int, _duration: float) -> void: windows_opened[0] += 1)
+	_press_and_engage(deep_burn)
+	deep_burn.heat = 1.4  # deep: the per-tick hazard here would fire within a second or two
+	for _i in range(200):  # 20 s of frenzy — dozens of expected windows if the dice rolled
+		deep_burn.tick(TICK_SECONDS, true, true)
+	_check("the hazard never opens a window during a burn (dice frozen)",
+		windows_opened[0] == 0 and not deep_burn.is_locked_out())
+	_check("deep heat holds exactly through the burn", is_equal_approx(deep_burn.heat, 1.4))
 
 	# Open-window freeze: an OPEN window's countdown halts, so a burn can never expire it.
 	var open_state := _fresh_state(tuning, 46)
@@ -352,21 +363,21 @@ func _test_reset_mid_lockout(tuning: TuningConfig) -> void:
 
 
 func _test_bonus_mapping(tuning: TuningConfig) -> void:
-	print("\n7. The piecewise bonus mapping hits the formula at each probe point")
+	print("\n7. The bonus mapping hits the formula at each probe point, with NO kink above 1.0")
 	var state := _fresh_state(tuning, 6)
+	var hard_ceiling := tuning.rush_momentum_hard_ceiling
 	# Expected values from the knobs, so the test tracks any retune automatically:
-	#   heat 0.5  -> halfway up Building         = bonus_at_hot / 2
-	#   heat 1.0  -> the Hot edge                = bonus_at_hot
-	#   heat 1.25 -> the Critical edge           = bonus_at_critical
-	#   heat 1.5  -> partway through Critical    = lerp toward the tier-0 peak at hard_ceiling
-	var critical_fraction := (1.5 - tuning.rush_momentum_critical_start) \
-			/ (tuning.rush_momentum_hard_ceiling - tuning.rush_momentum_critical_start)
+	#   heat 0.5      -> halfway up Building        = bonus_at_hot / 2
+	#   heat 1.0      -> the overdrive edge         = bonus_at_hot
+	#   heat midway   -> half the overdrive span    = lerp(bonus_at_hot, tier-0 peak, 0.5)
+	#   hard ceiling  -> the tier-0 ladder peak     = bonus_peak
+	var overdrive_midpoint := (1.0 + hard_ceiling) / 2.0
 	var probes := [
 		[0.5, tuning.rush_momentum_bonus_at_hot * 0.5],
 		[1.0, tuning.rush_momentum_bonus_at_hot],
-		[tuning.rush_momentum_critical_start, tuning.rush_momentum_bonus_at_critical],
-		[1.5, lerpf(tuning.rush_momentum_bonus_at_critical, tuning.rush_momentum_bonus_peak,
-				critical_fraction)],
+		[overdrive_midpoint,
+				lerpf(tuning.rush_momentum_bonus_at_hot, tuning.rush_momentum_bonus_peak, 0.5)],
+		[hard_ceiling, tuning.rush_momentum_bonus_peak],
 	]
 	for probe in probes:
 		var probe_heat: float = probe[0]
@@ -374,6 +385,31 @@ func _test_bonus_mapping(tuning: TuningConfig) -> void:
 		var actual: float = state._bonus_for_heat(probe_heat)
 		_check("bonus at heat %.2f is %.4f (got %.4f)" % [probe_heat, expected, actual],
 			absf(actual - expected) < 0.0001)
+
+	# NO-KINK continuity sweep (the depth-hazard rework's whole point at the mapping level):
+	# sample the overdrive span densely and require the bonus to climb monotonically with every
+	# step bounded near the span's uniform slope — a leftover band edge would show up as either
+	# a jump (step too large) or a slope break (a run of steps well off uniform).
+	const KINK_SAMPLE_STEP := 0.005
+	var uniform_step := (tuning.rush_momentum_bonus_peak - tuning.rush_momentum_bonus_at_hot) \
+			/ (hard_ceiling - 1.0) * KINK_SAMPLE_STEP
+	var monotone := true
+	var max_step := 0.0
+	var previous := state._bonus_for_heat(1.0)
+	var sample_heat := 1.0 + KINK_SAMPLE_STEP
+	while sample_heat <= hard_ceiling + 0.0001:
+		var sample: float = state._bonus_for_heat(minf(sample_heat, hard_ceiling))
+		var step := sample - previous
+		if step < -0.0000001:
+			monotone = false
+		max_step = maxf(max_step, step)
+		previous = sample
+		sample_heat += KINK_SAMPLE_STEP
+	print("     (dense sweep 1.0..%.2f: max step %.6f, uniform step %.6f)"
+			% [hard_ceiling, max_step, uniform_step])
+	_check("the overdrive bonus climbs monotonically across the whole span", monotone)
+	_check("no sampled step exceeds 1.5x the uniform slope (no kink, no jump)",
+		max_step <= uniform_step * 1.5 + 0.0000001)
 
 
 func _test_cruise_clamp(tuning: TuningConfig) -> void:
@@ -426,8 +462,8 @@ func _test_overdrive_engage(tuning: TuningConfig) -> void:
 	_check("the resumed climb reaches a real overheat", state.is_locked_out())
 	_check("the overheat was the ignored window's MISS, below the hard ceiling",
 		missed[0] == 1 and state.heat < tuning.rush_momentum_hard_ceiling)
-	_check("HOT and CRITICAL both announced on the way up",
-		bands_entered == [RushMomentumState.Band.HOT, RushMomentumState.Band.CRITICAL])
+	_check("the OVERDRIVE crossing announced once on the way up",
+		bands_entered == [RushMomentumState.Band.OVERDRIVE])
 	_check("overdrive disengaged by the overheat", not state.is_overdrive_engaged())
 
 
@@ -435,10 +471,13 @@ func _test_overdrive_disengages_on_release(tuning: TuningConfig) -> void:
 	print("\n10. Overdrive is per-excursion: releasing the hold disengages it")
 	var state := _fresh_state(tuning, 101)
 	_press_and_engage(state)
-	# Ride ~2 s past the cruise point — above the clamp but still safely inside Hot, below
-	# Critical, so no vent window can be scheduled during the ride.
-	for _i in range(70):  # 7 s: ~6 s to the Hot edge plus ~1 s into Hot
+	# Ride ~2 s past the cruise point — shallow in the hazard zone. A check CAN arrive during
+	# even this shallow ride under the depth hazard, so vent any window cleanly: this section
+	# is about RELEASE semantics, and the setup must not die to an ignored telegraph.
+	for _i in range(70):  # 7 s: ~6 s to heat 1.0 plus ~1 s of overdrive build
 		state.tick(TICK_SECONDS, true, false)
+		if state.is_vent_window_open():
+			_perform_clean_gesture(state, state.vent_required_lifts())
 	_check("(setup) rode above the cruise point without overheating",
 		state.heat > state.cruise_heat() and not state.is_locked_out())
 	_check("(setup) overdrive engaged mid-ride", state.is_overdrive_engaged())
@@ -483,14 +522,14 @@ func _test_legacy_cruise_and_boundary(tuning: TuningConfig) -> void:
 	_check("max-Legacy cruise point is heat 1.0 exactly", is_equal_approx(state.cruise_heat(), 1.0))
 
 	# The min() is the hard guarantee: even absurd Legacy points can never push cruise past
-	# the old +30% cap (Hot/Critical bonuses stay exclusive to overdrive).
+	# the old +30% cap (overdrive bonuses stay exclusive to overdrive).
 	var over_capped := _fresh_state(tuning, 103)
 	over_capped.legacy_cruise_bonus = 0.50
 	_check("cruise bonus hard-caps at bonus_at_hot no matter the Legacy points",
 		is_equal_approx(over_capped.effective_cruise_bonus(), tuning.rush_momentum_bonus_at_hot))
 
 	# THE BOUNDARY RULE: parked at heat 1.0 while cruising must not start an excursion or read
-	# as Hot — Building is inclusive of 1.0; only overdrive pushing PAST the tick opens the ride.
+	# as OVERDRIVE — Building is inclusive of 1.0; only overdrive pushing PAST the tick opens the ride.
 	var overheat_count := [0]
 	var bands_entered: Array = []
 	state.overheated.connect(func() -> void: overheat_count[0] += 1)
@@ -501,7 +540,7 @@ func _test_legacy_cruise_and_boundary(tuning: TuningConfig) -> void:
 	_check("heat parks at 1.0 exactly", is_equal_approx(state.heat, 1.0))
 	_check("bonus pins at bonus_at_hot (the re-earned old cap)",
 		is_equal_approx(state.bonus, tuning.rush_momentum_bonus_at_hot))
-	_check("heat AT 1.0 while cruising still reads as BUILDING (never Hot)",
+	_check("heat AT 1.0 while cruising still reads as BUILDING (never OVERDRIVE)",
 		state.current_band() == RushMomentumState.Band.BUILDING)
 	_check("no excursion started at the boundary (no band signal, no overheat)",
 		bands_entered.is_empty() and overheat_count[0] == 0)
@@ -512,8 +551,9 @@ func _test_legacy_cruise_and_boundary(tuning: TuningConfig) -> void:
 	while not state.is_locked_out() and elapsed < 60.0:
 		state.tick(TICK_SECONDS, true, false)
 		elapsed += TICK_SECONDS
+	# Only ONE crossing signal exists now: pushing past the parked-at-1.0 boundary is it.
 	_check("overdrive from the 1.0 boundary rides to a normal overheat",
-		state.is_locked_out() and bands_entered.size() == 2)
+		state.is_locked_out() and bands_entered == [RushMomentumState.Band.OVERDRIVE])
 
 
 func _test_legacy_lockout_scale(tuning: TuningConfig) -> void:
@@ -543,15 +583,17 @@ func _measure_lockout_seconds(state: RushMomentumState) -> float:
 	return elapsed
 
 
-## The LEGACY balance measurement (kept as the historical comparison point): the pre-vent-window
-## "skilled" strategy rode heat up to 1.30 and released back to 1.00, never venting a window
-## (the ride's ~0.7 s of Critical per lap is far shorter than the earliest window arrival, so
-## no window ever opens). Its average vs cruise is the +10.3% edge Tim judged too small — the
-## number the vent-window autopilot (section 20) exists to beat.
+## The LEGACY balance measurement, reworked for the depth hazard: the pre-vent-window "skilled"
+## strategy rode heat to 1.30 and released back to 1.00, and under the old zone scheduler that
+## dodged every check (its Critical time per lap was shorter than any window's arrival). The
+## depth hazard closes that loophole — checks can arrive ANYWHERE past the cruise point — so
+## the old rhythm now eats the overheat it used to sidestep. This section keeps the cruise
+## baseline number and PROVES the dodge is dead; the honest overdrive numbers live in the
+## autopilot (section 21).
 func _measure_duty_cycle(tuning: TuningConfig) -> void:
-	print("\n13. LEGACY DUTY CYCLE — cruise baseline vs the old ride/release rhythm, 120 s")
-	const RIDE_TOP := 1.30   # release point: barely into Critical, gone before a window arrives
-	const VENT_BOTTOM := 1.0  # re-engage point, the Hot edge
+	print("\n13. LEGACY DUTY CYCLE — cruise baseline; the old ride/release dodge is dead, 120 s")
+	const RIDE_TOP := 1.30    # the old release point
+	const VENT_BOTTOM := 1.0  # the old re-engage point
 	var total_seconds := 120.0
 
 	# Baseline: the zone-out player just holds forever in cruise (no overdrive, no venting).
@@ -567,7 +609,9 @@ func _measure_duty_cycle(tuning: TuningConfig) -> void:
 	var cruise_average := cruise_bonus_seconds / total_seconds
 	_check("the cruise hold never overheats", not cruise_overheated[0])
 
-	# The old gamble: ride to the top of the safe zone and release, over and over.
+	# The old gamble: ride toward the ceiling and release, over and over, never gesturing.
+	# Each lap now spends seconds inside the hazard zone ignoring whatever window opens —
+	# an expected ~1-2 checks per lap — so over 120 s an overheat is a statistical certainty.
 	var state := _fresh_state(tuning, 2026)
 	state.engage_overdrive()
 	var overheated_during_run := [false]
@@ -580,7 +624,7 @@ func _measure_duty_cycle(tuning: TuningConfig) -> void:
 		state.tick(TICK_SECONDS, rushing, false)
 		elapsed += TICK_SECONDS
 		total_bonus_seconds += state.bonus * TICK_SECONDS
-		# The old rhythm: release at the ride top, re-engage at the Hot edge.
+		# The old rhythm: release at the ride top, re-engage at heat 1.0.
 		# Each re-engage taps OVERDRIVE again — the release tick disengaged it (per-excursion).
 		if rushing and state.heat >= RIDE_TOP:
 			rushing = false
@@ -589,16 +633,16 @@ func _measure_duty_cycle(tuning: TuningConfig) -> void:
 			state.engage_overdrive()
 
 	var average_bonus := total_bonus_seconds / total_seconds
-	_check("the old ride/release rhythm never overheats (windows never get time to open)",
-		not overheated_during_run[0])
+	_check("the old ride/release dodge now OVERHEATS (the hazard reaches its whole ride)",
+		overheated_during_run[0])
 	print("  >>> CRUISE BASELINE AVERAGE BONUS: +%.1f%% (holds at +%.0f%% forever, zero risk) <<<"
 			% [cruise_average * 100.0, cruise_state.effective_cruise_bonus() * 100.0])
-	print("  >>> OLD RIDE/RELEASE AVERAGE BONUS: +%.1f%% — the pre-vent-window comparison <<<"
+	print("  >>> OLD RIDE/RELEASE (never venting) NOW AVERAGES: +%.1f%% — the dodge is dead <<<"
 			% [average_bonus * 100.0])
 
 
 func _test_scheduler_determinism(tuning: TuningConfig) -> void:
-	print("\n14. The window scheduler is deterministic under a seeded rng")
+	print("\n14. The window hazard is deterministic under a seeded rng")
 	# Two identically seeded states must produce identical window times AND identical
 	# missed-window overheat heights; a different seed must diverge.
 	var first := _fresh_state(tuning, 555)
@@ -624,8 +668,8 @@ func _test_scheduler_determinism(tuning: TuningConfig) -> void:
 		first.is_locked_out() and is_equal_approx(first.heat, second.heat))
 
 	# Different seeds must actually vary. One pair of seeds CAN legitimately collide — open
-	# times are quantized to the 0.1 s tick across a ~1 s delay range — so probe a handful of
-	# seeds and require the first-window time to vary somewhere in the batch.
+	# times are quantized to the 0.1 s tick — so probe a handful of seeds and require the
+	# first-window time to vary somewhere in the batch.
 	var open_times_varied := false
 	for probe_seed in range(556, 562):
 		var probe := _fresh_state(tuning, probe_seed)
@@ -805,19 +849,20 @@ func _test_ladder_math(tuning: TuningConfig) -> void:
 
 
 func _test_vent_clamp_and_escalation(tuning: TuningConfig) -> void:
-	print("\n17. Venting clamps INSIDE Critical; the escalation curves follow the knobs")
+	print("\n17. Venting floors at the cruise point; the escalation curves follow the knobs")
 
-	# Clamp: with an absurdly large vent drop, a success still lands exactly at critical_start —
-	# venting keeps you IN Critical, never back to safety (the ratchet is the reward, not an exit).
+	# Floor: with an absurdly large vent drop, a success still lands exactly at the cruise
+	# point — success never ends the ride (the ratchet is the reward, not an exit), and heat
+	# at or under cruise is holdable for free anyway, so there is nothing lower to vent to.
 	var deep_drop: TuningConfig = tuning.duplicate()
 	deep_drop.rush_momentum_vent_heat_drop = 5.0
 	var clamp_state := _fresh_state(deep_drop, 900)
 	_press_and_engage(clamp_state)
-	_check("(setup) clamp-case vent succeeded", _vent_cleanly(clamp_state, 1))
-	_check("an oversized vent clamps heat at critical_start exactly",
-		is_equal_approx(clamp_state.heat, deep_drop.rush_momentum_critical_start))
-	_check("the vented state still reads as CRITICAL",
-		clamp_state.current_band() == RushMomentumState.Band.CRITICAL)
+	_check("(setup) floor-case vent succeeded", _vent_cleanly(clamp_state, 1))
+	_check("an oversized vent floors heat at the cruise point exactly",
+		is_equal_approx(clamp_state.heat, clamp_state.cruise_heat()))
+	_check("the ride survived the vent (still engaged, not locked out)",
+		clamp_state.is_overdrive_engaged() and not clamp_state.is_locked_out())
 
 	# The escalation curves: ride 10 clean vents — past the retired 4-tier cap — capturing
 	# every window's demanded lifts and duration, and check each against the knob formulas.
@@ -852,20 +897,16 @@ func _test_vent_clamp_and_escalation(tuning: TuningConfig) -> void:
 	_check("every window's demanded lifts follow 1 + tier / lifts_step_tiers", lifts_match)
 	_check("no window ever demanded more than 3 lifts", lifts_capped)
 
-	# The floors, white-box at an absurd depth (tier 40): both decays have long bottomed out.
-	# Poking _vent_tier directly is fair game here — riding 40 real vents would test nothing new.
+	# The floors, white-box at an absurd depth (tier 40): the duration decay has long bottomed
+	# out and the lifts sit at their cap. Poking _vent_tier directly is fair game here —
+	# riding 40 real vents would test nothing new. (There is no delay floor to probe anymore:
+	# cadence is the depth hazard's, measured statistically in section 20.)
 	var deep := _fresh_state(tuning, 902)
 	deep._vent_tier = 40
 	_check("duration bottoms out at duration_floor",
 		is_equal_approx(deep._next_window_duration(), tuning.rush_momentum_vent_duration_floor))
 	_check("demanded lifts bottom out at the 3-lift cap",
 		deep._next_window_required_lifts() == 3)
-	# Delay floor: schedule from the bottom of Critical (nowhere near the ceiling, so the
-	# telegraph clamp stays out of the way) and read the rolled arrival back.
-	deep.heat = tuning.rush_momentum_critical_start
-	deep._schedule_next_window()
-	_check("arrival delay bottoms out at delay_floor",
-		is_equal_approx(deep._window_arrival_remaining, tuning.rush_momentum_vent_delay_floor))
 
 
 func _test_miss_penalty(tuning: TuningConfig) -> void:
@@ -944,34 +985,42 @@ func _overheat_at_tier(state: RushMomentumState, tier: int) -> Dictionary:
 
 func _test_telegraph_guarantee(tuning: TuningConfig) -> void:
 	print("\n19. The telegraph guarantee holds across panel-plausible knob combos, at EVERY tier")
-	# For each combo, EVERY window — the first AND the escalated deep-tier ones, where the
-	# cadence is fastest and heat rides closest to the ceiling — must open with its full
-	# duration still ahead of the projected hard-ceiling arrival: heat_at_open + duration ×
-	# build_hot <= hard_ceiling (plus one tick of slack, since the open is quantized to the
-	# tick that notices the delay elapsed). Each seed rides a clean multi-vent excursion so the
-	# checks sample the whole escalation curve, and each combo runs several seeds so the roll
-	# can't get lucky.
+	# For each combo, EVERY window — the first AND the escalated deep-tier ones, where heat
+	# rides closest to the ceiling — must open with its full duration still ahead of the
+	# projected hard-ceiling arrival: heat_at_open + duration × build_hot <= hard_ceiling
+	# (plus one tick of slack, since the open is noticed on a tick boundary). Each seed rides
+	# a clean multi-vent excursion so the checks sample the whole escalation curve, and each
+	# combo runs several seeds so the dice can't get lucky. The "rates 0" combo removes the
+	# hazard entirely: every window must then come from the force-open, the guarantee's own
+	# machinery, with no lucky early roll to hide behind.
 	var combos := [
-		{"label": "defaults", "delay_max": tuning.rush_momentum_vent_window_delay_max,
+		{"label": "defaults",
+			"rate_cruise": tuning.rush_momentum_vent_rate_at_cruise,
+			"rate_ceiling": tuning.rush_momentum_vent_rate_at_ceiling,
 			"build_hot": tuning.rush_momentum_heat_build_hot_per_second,
 			"duration": tuning.rush_momentum_vent_window_duration},
-		{"label": "delay_max 8", "delay_max": 8.0,
+		{"label": "rates 0 (pure force-open)", "rate_cruise": 0.0, "rate_ceiling": 0.0,
 			"build_hot": tuning.rush_momentum_heat_build_hot_per_second,
 			"duration": tuning.rush_momentum_vent_window_duration},
-		{"label": "build_hot x2", "delay_max": tuning.rush_momentum_vent_window_delay_max,
+		{"label": "rate_ceiling x4",
+			"rate_cruise": tuning.rush_momentum_vent_rate_at_cruise,
+			"rate_ceiling": tuning.rush_momentum_vent_rate_at_ceiling * 4.0,
+			"build_hot": tuning.rush_momentum_heat_build_hot_per_second,
+			"duration": tuning.rush_momentum_vent_window_duration},
+		{"label": "build_hot x2",
+			"rate_cruise": tuning.rush_momentum_vent_rate_at_cruise,
+			"rate_ceiling": tuning.rush_momentum_vent_rate_at_ceiling,
 			"build_hot": tuning.rush_momentum_heat_build_hot_per_second * 2.0,
 			"duration": tuning.rush_momentum_vent_window_duration},
-		{"label": "delay_max 8 + build_hot x2", "delay_max": 8.0,
+		{"label": "rates 0 + build_hot x2 + duration 1.5", "rate_cruise": 0.0, "rate_ceiling": 0.0,
 			"build_hot": tuning.rush_momentum_heat_build_hot_per_second * 2.0,
-			"duration": tuning.rush_momentum_vent_window_duration},
-		{"label": "delay_max 8 + duration 1.5", "delay_max": 8.0,
-			"build_hot": tuning.rush_momentum_heat_build_hot_per_second,
 			"duration": 1.5},
 	]
 	for combo_variant in combos:
 		var combo: Dictionary = combo_variant
 		var combo_tuning: TuningConfig = tuning.duplicate()
-		combo_tuning.rush_momentum_vent_window_delay_max = combo["delay_max"]
+		combo_tuning.rush_momentum_vent_rate_at_cruise = combo["rate_cruise"]
+		combo_tuning.rush_momentum_vent_rate_at_ceiling = combo["rate_ceiling"]
 		combo_tuning.rush_momentum_heat_build_hot_per_second = combo["build_hot"]
 		combo_tuning.rush_momentum_vent_window_duration = combo["duration"]
 		var all_seeds_ok := true
@@ -998,8 +1047,70 @@ func _test_telegraph_guarantee(tuning: TuningConfig) -> void:
 			all_seeds_ok)
 
 
+## Trials per depth for the hazard-rate measurement. Wait times are geometric, so the sample
+## mean's relative error is ~1/sqrt(n) — 400 trials puts it near 5%, far inside the loose
+## 30% tolerance below (seeded, so a pass is a pass forever).
+const HAZARD_TRIALS := 400
+
+func _test_depth_hazard_statistics(tuning: TuningConfig) -> void:
+	print("\n20. The depth hazard: measured arrival rates match the lerped knob rates by depth")
+	# Pin heat at a target depth and repeatedly time how long the hazard takes to open a
+	# window. The measured rate (1 / mean wait) must match lerp(rate_at_cruise,
+	# rate_at_ceiling, depth) at BOTH a shallow and a deep probe, and their ratio must match
+	# the knobs' ratio — the statistical proof that depth really is the cadence axis.
+	const SHALLOW_DEPTH := 0.15
+	const DEEP_DEPTH := 0.85
+	var expected_shallow := lerpf(tuning.rush_momentum_vent_rate_at_cruise,
+			tuning.rush_momentum_vent_rate_at_ceiling, SHALLOW_DEPTH)
+	var expected_deep := lerpf(tuning.rush_momentum_vent_rate_at_cruise,
+			tuning.rush_momentum_vent_rate_at_ceiling, DEEP_DEPTH)
+
+	var measured_shallow := 1.0 / _measure_mean_arrival_seconds(tuning, 5000, SHALLOW_DEPTH)
+	var measured_deep := 1.0 / _measure_mean_arrival_seconds(tuning, 5001, DEEP_DEPTH)
+	var measured_ratio := measured_deep / measured_shallow
+	var expected_ratio := expected_deep / expected_shallow
+	print("     (shallow %.2f: measured %.3f/s vs knob-lerped %.3f/s | deep %.2f: measured %.3f/s vs %.3f/s)"
+			% [SHALLOW_DEPTH, measured_shallow, expected_shallow,
+			DEEP_DEPTH, measured_deep, expected_deep])
+	print("     (deep/shallow rate ratio: measured %.2f vs knob-implied %.2f)"
+			% [measured_ratio, expected_ratio])
+	# Loose tolerances on purpose: this is a statistical property, not an exact formula. The
+	# heat pin drifts up to one tick of build inside each tick (~1-2% of the span), and the
+	# geometric wait's sampling noise is ~5% at 400 trials — 30% covers both with a wide berth
+	# while still catching a broken lerp (which would be off by ~4x at one of the probes).
+	_check("shallow-depth arrival rate is within 30% of the knob-lerped rate",
+		absf(measured_shallow - expected_shallow) <= expected_shallow * 0.30)
+	_check("deep-depth arrival rate is within 30% of the knob-lerped rate",
+		absf(measured_deep - expected_deep) <= expected_deep * 0.30)
+	_check("the deep/shallow rate ratio matches the knobs' ratio within 30%",
+		absf(measured_ratio - expected_ratio) <= expected_ratio * 0.30)
+
+
+## Mean seconds the hazard takes to open a window with heat PINNED at `depth_frac` of the
+## overdrive span (cruise point → hard ceiling). The pin re-writes heat after every tick so
+## the measurement samples ONE point on the hazard curve instead of a climbing trajectory
+## (inside each tick heat briefly builds one tick past the pin — a ~1% depth bias the loose
+## tolerance absorbs). One state's rng stream serves every trial (reset() keeps the seed).
+func _measure_mean_arrival_seconds(tuning: TuningConfig, seed_value: int, depth_frac: float) -> float:
+	var state := _fresh_state(tuning, seed_value)
+	var target_heat := state.cruise_heat() \
+			+ depth_frac * (tuning.rush_momentum_hard_ceiling - state.cruise_heat())
+	var total_seconds := 0.0
+	for _trial in range(HAZARD_TRIALS):
+		state.reset()
+		_press_and_engage(state)
+		state.heat = target_heat
+		var waited := 0.0
+		while not state.is_vent_window_open() and waited < 120.0:
+			state.tick(TICK_SECONDS, true, false)
+			state.heat = target_heat
+			waited += TICK_SECONDS
+		total_seconds += waited
+	return total_seconds / HAZARD_TRIALS
+
+
 func _measure_vent_autopilot_survival(tuning: TuningConfig) -> void:
-	print("\n20. AUTOPILOT SURVIVAL + DUTY CYCLE — ride-until-you-miss venters vs cruise, %d s x %d seeds"
+	print("\n21. AUTOPILOT SURVIVAL + DUTY CYCLE — ride-until-you-miss venters vs cruise, %d s x %d seeds"
 			% [int(AUTOPILOT_SECONDS), AUTOPILOT_SEED_RUNS])
 
 	# Cruise baseline: the zone-out player holds forever, zero risk.
@@ -1039,10 +1150,10 @@ func _measure_vent_autopilot_survival(tuning: TuningConfig) -> void:
 	print("       sloppy:  %d vents, %d overheats — %d fumbled, %d outpaced)"
 			% [sloppy["vents"], sloppy["overheats"],
 			sloppy["missed_windows"] - sloppy["outpaced_windows"], sloppy["outpaced_windows"]])
-	print("      (per-seed time split, skilled: %.0f s Critical / %.0f s climbing / %.0f s locked out;"
-			% [skilled["critical_seconds"], skilled["climbing_seconds"], skilled["locked_seconds"]])
-	print("       per-seed time split, sloppy:  %.0f s Critical / %.0f s climbing / %.0f s locked out)"
-			% [sloppy["critical_seconds"], sloppy["climbing_seconds"], sloppy["locked_seconds"]])
+	print("      (per-seed time split, skilled: %.0f s overdrive / %.0f s building / %.0f s locked out;"
+			% [skilled["overdrive_seconds"], skilled["climbing_seconds"], skilled["locked_seconds"]])
+	print("       per-seed time split, sloppy:  %.0f s overdrive / %.0f s building / %.0f s locked out)"
+			% [sloppy["overdrive_seconds"], sloppy["climbing_seconds"], sloppy["locked_seconds"]])
 	print("      (targets: skilled median run tier ~6-10 with average >= the v1 +62%;")
 	print("       sloppy at or below cruise, so the risk stays real)")
 	_check("the skilled venter's median run reaches tier 6-10 (the survival target)",
@@ -1064,7 +1175,7 @@ func _run_vent_autopilot_seeds(tuning: TuningConfig, base_seed: int, gesture_suc
 	var totals := {
 		"average_bonus": 0.0, "vents": 0, "overheats": 0, "missed_windows": 0,
 		"clean_missed": 0, "outpaced_windows": 0, "excursion_tiers": [],
-		"locked_seconds": 0.0, "critical_seconds": 0.0, "climbing_seconds": 0.0,
+		"locked_seconds": 0.0, "overdrive_seconds": 0.0, "climbing_seconds": 0.0,
 	}
 	for s in range(AUTOPILOT_SEED_RUNS):
 		var run := _run_vent_autopilot(tuning, base_seed + s * 100, gesture_success)
@@ -1076,7 +1187,7 @@ func _run_vent_autopilot_seeds(tuning: TuningConfig, base_seed: int, gesture_suc
 		totals["outpaced_windows"] += run["outpaced_windows"]
 		(totals["excursion_tiers"] as Array).append_array(run["excursion_tiers"])
 		totals["locked_seconds"] += run["locked_seconds"] / AUTOPILOT_SEED_RUNS
-		totals["critical_seconds"] += run["critical_seconds"] / AUTOPILOT_SEED_RUNS
+		totals["overdrive_seconds"] += run["overdrive_seconds"] / AUTOPILOT_SEED_RUNS
 		totals["climbing_seconds"] += run["climbing_seconds"] / AUTOPILOT_SEED_RUNS
 	return totals
 
@@ -1178,7 +1289,7 @@ func _run_vent_autopilot(tuning: TuningConfig, seed_value: int, gesture_success:
 	# Where the run's time actually went — the breakdown that tells a retune WHICH phase to
 	# attack (riding pay vs recovery drag), instead of guessing from the average alone.
 	var locked_seconds := 0.0
-	var critical_seconds := 0.0
+	var overdrive_seconds := 0.0
 	var climbing_seconds := 0.0
 	var total_ticks := int(round(AUTOPILOT_SECONDS / TICK_SECONDS))
 	for _t in range(total_ticks):
@@ -1205,8 +1316,8 @@ func _run_vent_autopilot(tuning: TuningConfig, seed_value: int, gesture_success:
 		state.tick(TICK_SECONDS, rushing, false)
 		tick_index[0] += 1
 		total_bonus_seconds += state.bonus * TICK_SECONDS
-		if state.current_band() == RushMomentumState.Band.CRITICAL:
-			critical_seconds += TICK_SECONDS
+		if state.current_band() == RushMomentumState.Band.OVERDRIVE:
+			overdrive_seconds += TICK_SECONDS
 		else:
 			climbing_seconds += TICK_SECONDS
 	return {
@@ -1218,6 +1329,6 @@ func _run_vent_autopilot(tuning: TuningConfig, seed_value: int, gesture_success:
 		"outpaced_windows": outpaced_windows[0],
 		"excursion_tiers": excursion_tiers,
 		"locked_seconds": locked_seconds,
-		"critical_seconds": critical_seconds,
+		"overdrive_seconds": overdrive_seconds,
 		"climbing_seconds": climbing_seconds,
 	}

@@ -95,6 +95,19 @@ var rush_momentum_factor: float = 1.0
 ## after the player stops rushing this property. The grace bridges the gaps between rush pulses.
 var rush_active_grace: float = 0.0
 
+## True while this property is DOWN from an overheat (Plans/Overdrive_Vent_Windows.md, Tim
+## 2026-07-19): it was being actively rushed at the moment the excursion overheated, so the
+## machine that was pushed too hard is the machine that shut down. GameState sets it at the
+## overheat moment (every property inside its rushed grace freezes — all of them, if
+## multi-touch rushing several) and clears it at rush_ready / First Contact reset / dynasty
+## succession, so the freeze spans EXACTLY the lockout (drain + re-arm), never longer.
+## While true: the cycle does not advance (cycle_progress holds), nothing collects, staffed
+## auto-cycling is paused, and starting an idle cycle is refused — but SHOP actions (buying
+## units, staff levels) stay allowed, because shopping is not production.
+## NOT saved, on purpose: heat/lockout state never persists across sessions (RushMomentumState
+## has no save block), so a persisted freeze flag would have no lockout to end it.
+var is_overheat_frozen: bool = false
+
 ## Dynasty-wide property-income multiplier (the Legacy "Family Fortune" upgrade), mirrored
 ## here for DISPLAY only so the row's per-cycle figure reflects it (the live tick applies
 ## the same factor at point of payment via the global multiplier). Set by DynastyState.
@@ -352,6 +365,9 @@ func restore(
 	staff_level = 0
 	first_contact_income_multiplier = 1.0
 	first_contact_cycle_multiplier = 1.0
+	# The overheat freeze is transient (never saved — see its declaration), so a restored
+	# property always comes back UP: there is no persisted lockout that could ever end it.
+	is_overheat_frozen = false
 
 	if p_units > 0:
 		buy(p_units)
@@ -372,6 +388,12 @@ func restore(
 ## Staffed properties loop automatically; unstaffed stop after one cycle.
 ## `income_multiplier` (frenzy, events) applies at point of payment (Spec §3.4).
 func tick(delta: float, income_multiplier: float = 1.0) -> float:
+	# Overheat freeze: the whole property is DOWN for the lockout — the cycle holds exactly
+	# where it was (staffed auto-cycling included) and pays nothing. Returning before the
+	# loop below is what guarantees no collection path can leak: _collect only ever runs
+	# from this loop or from rush_cycle, and both are gated on the freeze.
+	if is_overheat_frozen:
+		return 0.0
 	if not is_cycle_running or units_owned == 0:
 		return 0.0
 
@@ -400,7 +422,11 @@ func tick(delta: float, income_multiplier: float = 1.0) -> float:
 
 
 ## Start verb (Layer 2): tap on an idle, unstaffed property starts its cycle.
+## Refused while overheat-frozen — a downed machine cannot be restarted early by tapping it
+## (GameState refuses the tap too; this is the belt to that brace).
 func start_cycle() -> void:
+	if is_overheat_frozen:
+		return
 	if not is_cycle_running and units_owned > 0:
 		_start_cycle_internal()
 
@@ -411,6 +437,11 @@ func start_cycle() -> void:
 ## 10 Hz logic tick collects it. That tick delay was making rushed income visibly lag the rushed
 ## cycles (Tim 2026-07-11). Returns the income earned by this rush (0 unless a cycle completed).
 func rush_cycle(income_multiplier: float = 1.0) -> float:
+	# Belt to GameState's brace: rush verbs are already globally dead during an overheat
+	# lockout (can_rush() is false whenever a property is frozen), but a frozen property must
+	# never pay even if some future caller forgets that gate.
+	if is_overheat_frozen:
+		return 0.0
 	if not is_cycle_running:
 		return 0.0
 	var effective_length := _effective_cycle_length()

@@ -77,6 +77,14 @@ func _init(property_configs: Array, p_tuning: TuningConfig) -> void:
 	frenzy = FrenzyState.new(p_tuning)
 	rush_momentum = RushMomentumState.new(p_tuning)
 	epoch = EpochState.new(p_tuning)
+	# OVERHEAT PROPERTY FREEZE (Plans/Overdrive_Vent_Windows.md, Tim 2026-07-19): the signal
+	# pair below is the one seam every overheat and every recovery flows through. `overheated`
+	# is emitted synchronously from RushMomentumState._begin_overheat — the single funnel for
+	# ALL overheat causes (missed window, blown gesture beat, AND the hard-ceiling backstop) —
+	# so connecting here can never miss one, unlike detecting a lockout edge in tick() (which
+	# would also fire a tick late, after the rushed-grace snapshot has started to decay).
+	rush_momentum.overheated.connect(_freeze_actively_rushed_properties)
+	rush_momentum.rush_ready.connect(unfreeze_all_properties)
 
 
 ## Advance the whole game by `delta` seconds of active play.
@@ -107,6 +115,8 @@ func tick(delta: float, extra_property_multiplier: float = 1.0) -> void:
 	# Point each property's momentum factor at the current bonus while it is still inside its
 	# actively-rushed grace, else back to 1.0; then decay that grace so the boost fades a beat after
 	# the player stops rushing it. This is what confines momentum to the rushed property.
+	# (Overheat-frozen properties always take the 1.0 branch: the freeze handler zeroed their
+	# grace, and no rush verb can refill it while the lockout has every rush verb dead.)
 	for prop_variant in economy.properties:
 		var p := prop_variant as PropertyState
 		p.rush_momentum_factor = rush_momentum.factor() if p.rush_active_grace > 0.0 else 1.0
@@ -119,9 +129,13 @@ func tick(delta: float, extra_property_multiplier: float = 1.0) -> void:
 	# current economy. Reads the same lifetime-earned tally the estate waterfall uses.
 	epoch.update(economy.cash_earned_this_gen)
 	# Reaching a new epoch (First Contact) wipes momentum — each epoch builds its own from scratch,
-	# which is what keeps Rush Momentum a per-epoch pinch instead of a run-long snowball.
+	# which is what keeps Rush Momentum a per-epoch pinch instead of a run-long snowball. The
+	# reset also ends any lockout, so every frozen property comes back up with it (a freeze may
+	# never outlive the lockout that caused it). Dynasty succession needs no equivalent call:
+	# it builds a brand-new GameState (DynastyState), whose properties are all born unfrozen.
 	if epoch.current_tier > tier_before:
 		rush_momentum.reset()
+		unfreeze_all_properties()
 	_update_displayed_income()
 	# Refresh the wage's "executive compensation" floor from the passive rate just
 	# computed: a clock-in tap pays a fraction of a second of the empire's income
@@ -166,6 +180,12 @@ func hold_tap_wage() -> void:
 ## Layer 2: tap a property. Starts the cycle if idle, rushes it if running.
 func tap_property(prop_index: int) -> void:
 	var prop := economy.properties[prop_index] as PropertyState
+	# An overheat-frozen property is DOWN: taps on it are fully dead — no frenzy fill, no cycle
+	# start — until rush_ready brings it back up. (The rush branch below would refuse via
+	# can_rush() anyway, since a freeze only exists during a lockout; this gate is what keeps
+	# the START verb from sneaking a downed machine back into production early.)
+	if prop.is_overheat_frozen:
+		return
 	if prop.is_cycle_running:
 		# During an overheat lockout the rush verb is fully DEAD (Plans/Rush_Overheat.md): no
 		# frenzy fill, no grace, no rush income. Starting an idle cycle (the else branch) still
@@ -235,6 +255,34 @@ func release_rush(prop_index: int) -> void:
 		if (prop_variant as PropertyState).rush_active_grace > 0.0:
 			return
 	_rush_grace_remaining = 0.0
+
+
+## The overheat moment (rush_momentum.overheated, connected in _init): every property still
+## inside its actively-rushed grace goes DOWN for the whole lockout (Tim 2026-07-19: ALL of
+## them, if multi-touch rushing several) — the machine that was pushed too hard is the machine
+## that shuts off, so the penalty is proportional to what was gambled. Fired synchronously
+## from inside rush_momentum.tick, BEFORE this tick's grace decay runs, so the grace values
+## are exactly the overheat-moment snapshot.
+func _freeze_actively_rushed_properties() -> void:
+	for prop_variant in economy.properties:
+		var p := prop_variant as PropertyState
+		if p.rush_active_grace > 0.0:
+			p.is_overheat_frozen = true
+			# A downed property is no longer "actively rushed": zero its grace so the factor
+			# loop in tick() holds its rush_momentum_factor at 1.0 for the whole freeze (the
+			# grace cannot refill meanwhile — every rush verb is dead during the lockout).
+			p.rush_active_grace = 0.0
+			p.rush_momentum_factor = 1.0
+
+
+## Bring every overheat-frozen property back up. Connected to rush_momentum.rush_ready (the
+## lockout's exact end) and called on the First Contact reset in tick(); dynasty succession
+## needs nothing because it builds a fresh GameState. These are the ONLY exits from the frozen
+## state, so a freeze can never outlive its lockout. Public so the headless sim can sweep-check
+## the invariant; the live game never needs to call it directly.
+func unfreeze_all_properties() -> void:
+	for prop_variant in economy.properties:
+		(prop_variant as PropertyState).is_overheat_frozen = false
 
 
 ## The OVERDRIVE opt-in (Plans/Rush_Cruise_Control.md): release the cruise clamp so heat resumes

@@ -187,6 +187,14 @@ const CATCHUP_RATE_HEADROOM := 1.0
 const SOLID_FLOW_PX := 110.0
 const SOLID_FLOW_RUSH_MULT := 1.6
 
+## The cycle bar's fill while the property is OVERHEAT-FROZEN (Plans/Overdrive_Vent_Windows.md,
+## Tim 2026-07-19): the same dark "dead machine" slate the momentum bar's lockout drain reveals,
+## so the two instruments tell one story — this bar going dead-slate and the momentum bar's
+## dead-slate re-arm countdown are the same shutdown. MUST match MomentumBar's LOCKOUT_GRAY
+## (#45464C); that const lives inside MomentumBar's private instrument class, so the value is
+## duplicated here rather than reached into.
+const FROZEN_SLATE := Color("#45464C")
+
 ## Whether the bar was pinned solid last frame — unpinning restarts the visible lap.
 var _was_pinned := false
 
@@ -229,6 +237,7 @@ const PER_SECOND_READOUT_THRESHOLD_SEC := 1.0
 ##   0 = normal green (idle/running, rush available)
 ##   1 = brighter green (rush button held)
 ##   2 = calm blue (staffed and running itself — rush is no longer an option)
+##   3 = dead slate (overheat-frozen — the machine is down; see FROZEN_SLATE)
 ## -1 = not yet applied.
 var _cycle_color_applied := -1
 
@@ -785,6 +794,12 @@ func is_hold_active() -> bool:
 ## can leave both engaged — both fingers are then mid-gesture, so holding both presentations
 ## through the window is the honest read.)
 func _vent_presentation_hold() -> bool:
+	# Never while overheat-frozen. Overheating CLOSES the vent window, so is_vent_window_open()
+	# is already false the moment a freeze begins — the explicit gate just makes the row's
+	# contract self-evident: the vent hold exists to keep a LIVE rush looking alive through the
+	# gesture's finger lifts, and it must never keep a frozen (dead) row looking alive instead.
+	if _prop != null and _prop.is_overheat_frozen:
+		return false
 	return _rush_momentum != null and _rush_momentum.is_vent_window_open() \
 			and _rush_hold_seconds >= RUSH_ENGAGE_SEC
 
@@ -813,7 +828,21 @@ func _refresh(delta: float) -> void:
 	# A rung the player owns no units of yet gets a drab gray "locked" look; once a
 	# unit is bought it switches to the normal cream styling (applied on change).
 	var owned := _prop.units_owned > 0
-	_apply_ownership_styling(owned)
+
+	# Overheat property FREEZE (Plans/Overdrive_Vent_Windows.md, Tim 2026-07-19): this property
+	# was actively being rushed at the moment the heat bar overheated, so the core has shut it
+	# DOWN for the whole lockout — cycle paused, collections refused, idle starts refused; it
+	# comes back the instant rushing re-arms. The row presents it as a dead machine: LOCKED-style
+	# portrait disc, the cycle bar dead-slate and frozen where it stopped, carbonation off, and
+	# the income readout dimmed and counted as 0. PRESENTATION ONLY, same principle as the
+	# rush-lockout dim below — nothing is disabled or hidden (no-moving-UI rule), because the
+	# player's finger may still be resting on the portrait when the freeze lands mid-hold: the
+	# hold pump and raw rush edges keep flowing to the core, which refuses them until rush_ready.
+	# (is_overheat_frozen is only ever true during a lockout, so rush_locked below is always
+	# true on a frozen row too — the freeze look layers ON TOP of the lockout look.)
+	var frozen := _prop.is_overheat_frozen
+
+	_apply_ownership_styling(owned, frozen)
 
 	# An unowned rung has no cycle to run, so the cycle bar is hidden until the player
 	# owns at least one unit (Tim, 2026-06-28).
@@ -844,6 +873,13 @@ func _refresh(delta: float) -> void:
 	var portrait_mode := ManagerCircle.PortraitMode.LOCKED
 	if owned:
 		portrait_mode = ManagerCircle.PortraitMode.STAFFED if staffed else ManagerCircle.PortraitMode.UNSTAFFED
+	# While overheat-frozen the disc wears the SAME drab-gray LOCKED look an unowned rung uses —
+	# the row's existing "not available" vocabulary, reused rather than inventing a new state —
+	# while staying interactive underneath so a finger already holding it keeps its raw
+	# edge/hold signals (the core refuses them; see the freeze note above). LOCKED also draws
+	# no staff level, which is honest here: the staffer is down with the machine.
+	if frozen:
+		portrait_mode = ManagerCircle.PortraitMode.LOCKED
 	# Rush Overheat lockout (Tim 2026-07-15): while rushing is shut down the portrait must LOOK
 	# disabled — the core ignores the rush verb during lockout, so a live-looking button that does
 	# nothing would read as a bug. PRESENTATION ONLY: the portrait stays interactive (a tap can
@@ -951,7 +987,10 @@ func _refresh(delta: float) -> void:
 	# while held) — Main sums these across rows for the hero panel's income headline
 	# (Tim, 2026-07-07), so the headline always equals the sum of the visible rows.
 	# Unowned rows show a buy-in PREVIEW, which is not income — they contribute 0.
-	if not owned or effective_length <= 0.0:
+	# An overheat-FROZEN row likewise contributes 0: the machine is down and pays nothing for
+	# the whole lockout (same reasoning as the owned-but-unstaffed rule below — a row that is
+	# not actually earning must not inflate the income headline).
+	if not owned or effective_length <= 0.0 or frozen:
 		_displayed_income_per_sec = 0.0
 	elif rushed_fractions_per_second > 0.0:
 		# Being rushed: it really earns at this rate right now (even an unstaffed rung, while held).
@@ -982,7 +1021,9 @@ func _refresh(delta: float) -> void:
 	# other circumstance the bar animates normally.
 	var rushed_solid := rushed_fractions_per_second > 0.0 \
 			and 1.0 / rushed_fractions_per_second <= RUSHED_SOLID_THRESHOLD_SEC
-	var pinned := bar_is_solid or rushed_solid
+	# A frozen row is never pinned "humming at full" — the machine is down, so the frozen
+	# branch below holds the bar exactly where the core stopped it instead.
+	var pinned := (bar_is_solid or rushed_solid) and not frozen
 	if _was_pinned and not pinned:
 		# Unpinning (rush released, usually): restart the visible lap from empty and let
 		# the easing below chase the real progress — holding at full would freeze the
@@ -991,7 +1032,19 @@ func _refresh(delta: float) -> void:
 		_finish_lap_pending = false
 	_was_pinned = pinned
 
-	if pinned:
+	if frozen:
+		# Overheat freeze: the core is holding cycle_progress still, so the displayed bar must
+		# hold too — mirror the true (stopped) value exactly and clear the animation machinery.
+		# Left to the running branch below, the displayed fraction would keep sweeping on its
+		# own (it advances at _sweep_rate every frame and only re-syncs phase at the wraps),
+		# animating a machine that is DOWN.
+		_displayed_cycle_fraction = true_fraction
+		_finish_lap_pending = false
+		# Park the eased sweep at the natural rate so the restart at rush_ready resumes at calm
+		# speed instead of inheriting the stale rushed rate from just before the overheat.
+		if effective_length > 0.0:
+			_sweep_rate = 1.0 / effective_length
+	elif pinned:
 		# Cycles complete faster than the eye/bar can follow — fill the rest of the way
 		# in a quick sprint (see PIN_FILL_PER_SEC; snapping straight to full read as
 		# sudden), then hold there. The income readout carries the information now; the
@@ -1063,13 +1116,19 @@ func _refresh(delta: float) -> void:
 	# rushable — see `interactive` above), so the bar drops its active green for a calm
 	# blue. Otherwise it stays green, brightening while the rush button is actively held.
 	var rush_no_longer_option := staffed and not interactive
-	_set_cycle_color(rush_no_longer_option, rush_engaged)
+	_set_cycle_color(rush_no_longer_option, rush_engaged, frozen)
 
 	# Carbonation TIER (Tim, 2026-07-10): the bar's actual fill speed no longer drives the
 	# bubbles — each state just picks a tier with a STATIC speed and agitation. Holding rush
 	# whips the liquid up (FRENZY); a normally cycling owned bar FLOWS; a static or unowned
 	# bar only fizzes (IDLE). The ease inside GoldBubbles smooths transitions between tiers.
-	if not owned:
+	# A dead machine doesn't fizz: the carbonation hides entirely while frozen (an effect
+	# overlay inside the bar, not a control, so the no-moving-UI rule doesn't apply) and is
+	# parked at IDLE so the rush_ready restart ramps up from still liquid rather than resuming
+	# mid-froth. Without this, a core that reports is_cycle_running during the pause would keep
+	# gold FLOWING fizz drifting across the dead-slate fill.
+	_cycle_bubbles.visible = not frozen
+	if not owned or frozen:
 		_cycle_bubbles.tier = GoldBubbles.Tier.IDLE
 	elif rush_engaged:
 		_cycle_bubbles.tier = GoldBubbles.Tier.FRENZY
@@ -1087,7 +1146,9 @@ func _refresh(delta: float) -> void:
 	# (rush_momentum_factor is 1 + bonus while the property is within its rush grace.)
 	var rushed_in_overdrive := _prop.rush_momentum_factor \
 			>= 1.0 + _prop.tuning.rush_momentum_bonus_at_hot - 0.001
-	_cycle_momentum_streaks.visible = owned and rushed_in_overdrive
+	# ... and never on a frozen row (overheat zeroes the momentum grace anyway; the explicit
+	# gate just guarantees no overdrive streak can outlive the machine it decorated).
+	_cycle_momentum_streaks.visible = owned and rushed_in_overdrive and not frozen
 
 	# The diagnosis overlay: live values driving this row's carbonation (reading the
 	# bubbles' internals directly is fine here — this label exists only to expose them).
@@ -1102,13 +1163,16 @@ func _refresh(delta: float) -> void:
 	_refresh_hire_button()
 
 
-## Pick the cycle bar's fill: calm blue once the property is automated and rush is no
-## longer an option, otherwise the active green (brightened while the rush button is held).
-## Only rebuilds the stylebox on a change — doing it every frame would be wasteful (same
-## pattern as FrenzyBar's burn-color swap).
-func _set_cycle_color(rush_no_longer_option: bool, rush_held: bool) -> void:
+## Pick the cycle bar's fill: dead slate while the property is overheat-frozen (the machine
+## is down — highest priority, overriding every live look), calm blue once the property is
+## automated and rush is no longer an option, otherwise the active green (brightened while
+## the rush button is held). Only rebuilds the stylebox on a change — doing it every frame
+## would be wasteful (same pattern as FrenzyBar's burn-color swap).
+func _set_cycle_color(rush_no_longer_option: bool, rush_held: bool, frozen: bool) -> void:
 	var want := 0
-	if rush_no_longer_option:
+	if frozen:
+		want = 3
+	elif rush_no_longer_option:
 		want = 2
 	elif rush_held:
 		want = 1
@@ -1116,7 +1180,9 @@ func _set_cycle_color(rush_no_longer_option: bool, rush_held: bool) -> void:
 		return
 	_cycle_color_applied = want
 	var fill := UiPalette.MONEY_GREEN
-	if want == 2:
+	if want == 3:
+		fill = FROZEN_SLATE
+	elif want == 2:
 		fill = UiPalette.CYCLE_BLUE
 	elif want == 1:
 		# Deeper, more saturated green for the active push. Color has no "saturate"
@@ -1140,15 +1206,25 @@ func _format_cycle_duration(seconds: float) -> String:
 	return Money.trim(seconds, 1) + "s"
 
 
-## Swap the row's panel background between the normal cream look (owned) and the drab gray
-## "locked" look (no units owned yet). Only rebuilds the styleboxes when the state actually
-## flips, not every frame. (The portrait button's own look is set live by ManagerCircle.)
-func _apply_ownership_styling(owned: bool) -> void:
-	var want := 0 if owned else 1
+## Swap the row's panel background and income readout between three looks:
+##   0 owned (normal)   — cream panel, per-cycle payout in bold black.
+##   1 unowned          — drab gray "locked" panel, dark-gray single-unit preview.
+##   2 overheat-frozen  — the panel KEEPS its owned cream (the player still owns it; only the
+##     machine is down), but the income readout dims to the same dark gray the unowned preview
+##     uses: the figure still shows what the machine would pay, and the dim says it is paying
+##     nothing right now. Reuses the row's existing dim vocabulary rather than inventing one.
+## Only rebuilds the styleboxes when the state actually flips, not every frame. (The portrait
+## button's own look is set live by ManagerCircle.)
+func _apply_ownership_styling(owned: bool, frozen: bool) -> void:
+	var want := 0
+	if not owned:
+		want = 1
+	elif frozen:
+		want = 2
 	if want == _ownership_style_applied:
 		return
 	_ownership_style_applied = want
-	if owned:
+	if want == 0:
 		add_theme_stylebox_override("panel", UiPalette.make_panel_style())
 		# Owned: the per-cycle payout in bold black (Tim, 2026-07-01).
 		_income_label.add_theme_color_override("font_color", Color.BLACK)
@@ -1156,10 +1232,15 @@ func _apply_ownership_styling(owned: bool) -> void:
 		# own colors — modulate stays white. Tinting it to the text color turned the whole
 		# icon into a solid black silhouette (Tim, 2026-07-09).
 		_income_icon.modulate = Color.WHITE
-	else:
+	elif want == 1:
 		add_theme_stylebox_override("panel", UiPalette.make_unowned_panel_style())
 		# Unowned: a drab dark-gray single-unit preview, matching the locked row look. Fade the
 		# color icon back with alpha (rather than recolor it) so it still reads as a dollar bill.
+		_income_label.add_theme_color_override("font_color", UiPalette.DARK_GRAY)
+		_income_icon.modulate = Color(1, 1, 1, 0.5)
+	else:
+		# Frozen: owned panel, dimmed readout (see the function comment above).
+		add_theme_stylebox_override("panel", UiPalette.make_panel_style())
 		_income_label.add_theme_color_override("font_color", UiPalette.DARK_GRAY)
 		_income_icon.modulate = Color(1, 1, 1, 0.5)
 

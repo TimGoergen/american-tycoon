@@ -244,7 +244,7 @@ extends Resource
 ## Bonus at the hard ceiling with NO vents achieved — the ladder's tier-0 peak. Each successful
 ## vent adds rush_momentum_vent_bonus_step on top, with NO cap (endless escalation). Only ever
 ## held for seconds at a time — the realistic average is the ride/vent duty cycle
-## (~+78% for a skilled venter; see the vent-window block comment below).
+## (~+75% for a skilled venter; see the vent-window block comment below).
 @export var rush_momentum_bonus_peak: float = 0.55  # feel-tune
 
 # --- Vent windows (Tim 2026-07-17, endless escalation 2026-07-18, depth hazard 2026-07-18
@@ -283,9 +283,17 @@ extends Resource
 # drift the approach caused: rates 0.5/3.0 → 0.7/3.4 (denser rates alone SATURATE — the
 # free ride is approach + refractory, not the hazard wait — three densities moved sloppy by
 # only 0.3 points) and the fail sting to 12.0 s/tier, cap 14.0, which lands almost entirely
-# on the shallow-death profile that was out-earning cruise. Sim gates hold — skilled (95%
-# per lift) +78% average with median run tier 8, sloppy (70%) at or below cruise (+24.6% vs
-# +24.9%). Every knob is live in Balance Tuning.
+# on the shallow-death profile that was out-earning cruise.
+#
+# The PROPERTY FREEZE retune (Tim 2026-07-19) then reversed the whole sting arms race: the
+# overheat now freezes the rushed properties for the entire lockout (see GameState), the sim
+# prices every frozen second at −100% of base income, and against those honest gates the
+# sting timeouts were not just unnecessary but HARMFUL (3.0/9.0 dragged a skilled venter to
+# +45%, under the +62% floor) — so approach 2.0 → 1.2 s (less riskless telegraph pay) and
+# the fail sting to 0.0/0.0 (the gates' floor; ~1.0/3.0 is the most they allow). Gates now:
+# skilled (95% per lift) +74.8% freeze-priced average with median run tier 8, sloppy (70%)
+# −12.7% — well under cruise (+24.9%), because a fumbled gamble now darkens your own earner.
+# Every knob is live in Balance Tuning.
 
 ## Expected vent-event spawns per second when heat sits just past the cruise point — the
 ## SHALLOW end of the depth hazard (0.5 ≈ a check every ~2 s hovering there). Each tick rolls
@@ -323,7 +331,11 @@ extends Resource
 ## its window instantly, and this is the travel time (seconds of tick time) of the incoming
 ## event bar from the bar's right edge to the target — the telegraph lead the player watches
 ## before the window opens and the gesture clock starts. Frenzy freeze pauses the flight.
-@export var rush_momentum_vent_approach_seconds: float = 2.0  # feel-tune
+## Shortened 2.0 → 1.2 with the property freeze (Tim 2026-07-19: "2 seconds feels leisurely —
+## I want to see it coming but not feel like I'm waiting for it"). The shorter flight also
+## attacks the sloppy free ride at its root — less riskless telegraph pay bundled with every
+## check — which, together with the freeze, is what let the fail sting drop to zero below.
+@export var rush_momentum_vent_approach_seconds: float = 1.2  # feel-tune
 
 ## Seconds the player has to COMPLETE the gesture once a window telegraphs — the TIER-0 base
 ## of the escalating duration (each tier multiplies it by duration_decay).
@@ -365,7 +377,7 @@ extends Resource
 ## Bonus added to the ladder's peak per successful vent (0.30 = +30 percentage points), with
 ## NO cap — the difficulty curve is the brake, not the reward curve (Tim 2026-07-18). The peak
 ## is only ever tasted near the top of a deep ride (a median skilled run tops out around
-## +55% + 8 × 30% = +295% peak, held for seconds; the honest long-session average is the +78%
+## +55% + 8 × 30% = +295% peak, held for seconds; the honest long-session average is the ~+75%
 ## the sim measures). Trimmed 0.60 → 0.30 for the approach phase (2026-07-19): every check now
 ## carries approach_seconds of paid telegraph riding, so the same tier pays for roughly twice
 ## as long — at the old step even a 70%-reliability rider out-earned cruise, killing the risk.
@@ -373,20 +385,24 @@ extends Resource
 
 ## Extra re-arm seconds per achieved vent tier when an excursion overheats — falling from
 ## higher hurts more. Applied BEFORE the Rapid Restart lockout scale (which divides the total).
-## Raised 3.0 → 6.0 for the approach phase (2026-07-19): with the cap unchanged this bites
-## almost exclusively at LOW-tier deaths (skilled deep-run stings were already capped), which
-## is exactly where a sloppy rider was still out-earning cruise on the richer approach rides.
-## 6.0 → 12.0 with the refractory (2026-07-18 night), same shallow-death targeting: with the
-## cap close by, tier-1 stings gain the whole raise while deep stings gain nothing.
-@export var rush_momentum_vent_fail_rearm_per_tier: float = 12.0  # feel-tune
+## ZEROED with the OVERHEAT PROPERTY FREEZE (Tim 2026-07-19). The sting had been ratcheted up
+## (3 → 6 → 12) solely to keep a sloppy rider from out-earning cruise; the freeze now carries
+## that deterrent for real — an overheat takes the rushed property itself offline for the
+## whole lockout, a cost proportional to what was gambled — and the sim's freeze-priced gates
+## actually FORCE the sting down: at the original 3.0/9.0 a skilled venter nets only +45%
+## (below the +62% worth-the-risk floor), and ~1.0/3.0 is the highest sting that still
+## passes. Zero is both the floor the gates allow and Tim's stated direction ("failure
+## pressure from difficulty, not timeouts"); falling from higher STILL hurts more, because a
+## higher fall drains longer and the frozen property is dark for all of it. The knob stays
+## live in Balance Tuning should device feel want a token sting back (keep ≤ ~1.0 s/tier).
+@export var rush_momentum_vent_fail_rearm_per_tier: float = 0.0  # feel-tune
 
 ## Cap on the per-tier re-arm sting (seconds). Deep runs must NOT earn ever-longer timeouts —
 ## Tim's direction (2026-07-18) is that failure pressure comes from the difficulty curve, not
-## the punishment; past this the fall costs the same no matter how high it was from. Raised
-## 9.0 → 14.0 with the refractory: the sloppy profile mostly dies at tier 2+, already ON the
-## cap, so the cap itself was the only sting lever left that could reach them (denser hazard
-## rates had saturated) — the cap still exists, and skilled deep runs pay the same flat sting.
-@export var rush_momentum_vent_fail_rearm_cap: float = 14.0  # feel-tune
+## the punishment; past this the fall costs the same no matter how high it was from. Zeroed
+## with the per-tier sting above (the property freeze is the punishment now — see its tune
+## note); the cap machinery stays in code and in the panel for the same what-if reason.
+@export var rush_momentum_vent_fail_rearm_cap: float = 0.0  # feel-tune
 
 ## Heat drained per second while OVERHEATED (the locked cooldown). 0.16 ≈ a 10 s lockout from a
 ## full 1.6 ceiling; the visibly draining bar is the cooldown display.

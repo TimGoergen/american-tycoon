@@ -77,6 +77,27 @@ extends SceneTree
 #  25. rearm_remaining_fraction() is 0 while riding and while the drain runs, exactly 1.0 the
 #      moment the re-arm delay starts, monotonically decreasing, and 0.0 at rush_ready.
 #
+# The OVERHEAT PROPERTY FREEZE (Tim 2026-07-19 — the rushed properties go DARK for the whole
+# lockout) adds sections driven through a full GameState (economy + heat model together, the
+# same seam the live game uses, because the freeze is GameState wiring, not heat-model state):
+#  26. The freeze set is EXACTLY the properties inside their rushed grace at the overheat
+#      moment — single-rush and multi-touch both — with factors parked at 1.0.
+#  27. A frozen property collects NOTHING across the WHOLE lockout (its cycle holds to the
+#      tick) while an unfrozen staffed property keeps earning; the freeze ends exactly at
+#      rush_ready, the cycle resumes, and no property anywhere is left frozen afterward.
+#  28. The First Contact reset (an epoch advance mid-lockout) unfreezes everything at once.
+#      (Dynasty succession needs no section: it builds a brand-new GameState, whose
+#      properties are all born unfrozen.)
+#  29. A frenzy burn during the lockout resurrects nothing: the frozen property stays down
+#      and pays zero through the burn (the multiplier has nothing to multiply), and the
+#      lockout clock stays frozen too.
+#  30. Taps on a frozen property are fully dead — no idle-cycle start, no frenzy fill —
+#      until rush_ready re-enables them.
+# METRIC CHANGE (same pass): the autopilot's earnings metric now PRICES the freeze — every
+# locked-out second counts as −100% of the rushed property's base income (bonus −1.0 in the
+# average), because that property is dark for the whole lockout. The sting knobs were retuned
+# DOWN against these freeze-priced gates (the freeze carries the deterrent now).
+#
 # Exits with code 0 only if every check passes (1 otherwise), so CI/headless runs fail loudly.
 
 ## One logic tick, matching the game's 10 Hz timestep.
@@ -117,6 +138,11 @@ func _initialize() -> void:
 	_test_approach_phase(tuning)
 	_test_approach_cancellation(tuning)
 	_test_vent_refractory_spacing(tuning)
+	_test_freeze_set(tuning)
+	_test_freeze_earnings_and_unfreeze(tuning)
+	_test_freeze_reset_unfreezes(tuning)
+	_test_freeze_frenzy_leak(tuning)
+	_test_freeze_idle_start_refused(tuning)
 
 	print("")
 	if _failures == 0:
@@ -1165,9 +1191,9 @@ func _test_depth_hazard_statistics(tuning: TuningConfig) -> void:
 	# math). The measured rate (1 / mean wait) must match lerp(rate_at_cruise, rate_at_ceiling,
 	# depth) at BOTH a shallow and a deep probe, and their ratio must match the knobs' ratio —
 	# the statistical proof that depth really is the cadence axis. The deep probe sits at 0.60,
-	# safely BELOW the force-spawn bound (~0.69 depth at default knobs, now that the bound
-	# reserves the approach flight too): above it the guarantee fires instantly and the probe
-	# would measure the machinery, not the dice.
+	# safely BELOW the force-spawn bound (~0.77 depth at default knobs — the 1.2 s approach
+	# reserves less flight room than the old 2.0 s did): above it the guarantee fires
+	# instantly and the probe would measure the machinery, not the dice.
 	const SHALLOW_DEPTH := 0.15
 	const DEEP_DEPTH := 0.60
 	var expected_shallow := lerpf(tuning.rush_momentum_vent_rate_at_cruise,
@@ -1256,10 +1282,12 @@ func _measure_vent_autopilot_survival(tuning: TuningConfig) -> void:
 	print("")
 	print("  >>> CRUISE BASELINE AVERAGE BONUS:  +%.1f%% (zero risk, zero skill) <<<"
 			% [cruise_average * 100.0])
-	print("  >>> SKILLED VENTER (95%% per lift):  +%.1f%% avg | survival median tier %d, p90 tier %d (%d runs) <<<"
+	# %+.1f (sign-aware): the freeze-priced sloppy average is legitimately NEGATIVE now, and
+	# a hardcoded "+" prefix printed it as the unreadable "+-12.7%".
+	print("  >>> SKILLED VENTER (95%% per lift):  %+.1f%% avg | survival median tier %d, p90 tier %d (%d runs) <<<"
 			% [skilled["average_bonus"] * 100.0, skilled_median, skilled_p90,
 			(skilled["excursion_tiers"] as Array).size()])
-	print("  >>> SLOPPY VENTER  (70%% per lift):  +%.1f%% avg | survival median tier %d, p90 tier %d (%d runs) <<<"
+	print("  >>> SLOPPY VENTER  (70%% per lift):  %+.1f%% avg | survival median tier %d, p90 tier %d (%d runs) <<<"
 			% [sloppy["average_bonus"] * 100.0, sloppy_median, sloppy_p90,
 			(sloppy["excursion_tiers"] as Array).size()])
 	print("      (skilled: %d vents, %d overheats — %d fumbled, %d outpaced by the deep-tier windows;"
@@ -1272,12 +1300,14 @@ func _measure_vent_autopilot_survival(tuning: TuningConfig) -> void:
 			% [skilled["overdrive_seconds"], skilled["climbing_seconds"], skilled["locked_seconds"]])
 	print("       per-seed time split, sloppy:  %.0f s overdrive / %.0f s building / %.0f s locked out)"
 			% [sloppy["overdrive_seconds"], sloppy["climbing_seconds"], sloppy["locked_seconds"]])
-	print("      (targets: skilled median run tier ~6-10 with average >= the v1 +62%;")
+	print("      (targets: skilled median run tier ~6-10 with FREEZE-PRICED average in +62-80%;")
 	print("       sloppy at or below cruise, so the risk stays real)")
 	_check("the skilled venter's median run reaches tier 6-10 (the survival target)",
 		skilled_median >= 6 and skilled_median <= 10)
-	_check("the skilled venter averages at least the v1 +62% (worth the risk)",
+	_check("the skilled venter averages at least +62% freeze-priced (worth the risk)",
 		skilled["average_bonus"] >= 0.62)
+	_check("the skilled venter averages at most +80% (the gamble stays a gamble, not a lock)",
+		skilled["average_bonus"] <= 0.80)
 	_check("the sloppy venter lands at or below cruise (the risk is real)",
 		sloppy["average_bonus"] <= cruise_average + 0.005)
 	_check("every skilled run eventually ends in an overheat (the endless ladder's designed ending)",
@@ -1419,6 +1449,12 @@ func _run_vent_autopilot(tuning: TuningConfig, seed_value: int, gesture_success:
 			state.tick(TICK_SECONDS, false, false)
 			tick_index[0] += 1
 			locked_seconds += TICK_SECONDS
+			# FREEZE-PRICED METRIC (Tim 2026-07-19): the overheat freezes the rushed property
+			# for the whole lockout, so every locked second is a second of its BASE income
+			# lost outright — bonus −1.0, not the old 0.0. The heat model itself lives below
+			# GameState (the freeze is GameState wiring), so the autopilot prices it here in
+			# the metric; the freeze semantics themselves are proven in sections 26-30.
+			total_bonus_seconds -= TICK_SECONDS
 			if not state.is_locked_out():
 				# Re-armed: straight back on the ride (the modeled venter never sulks).
 				pressed[0] = true
@@ -1735,3 +1771,244 @@ func _test_vent_refractory_spacing(tuning: TuningConfig) -> void:
 	_check("(setup) the deep top-off clamp engaged for several vents", clamped_count >= 4)
 	_check("clamped-deep gaps are bounded by refractory_max plus tick slack (the forced tail)",
 		clamped_bounded)
+
+
+# ---------------------------------------------------------------------------
+# The OVERHEAT PROPERTY FREEZE (sections 26-30) — driven through a FULL GameState
+# ---------------------------------------------------------------------------
+# The freeze is GameState wiring (it connects the heat model's overheat/ready signals to the
+# economy's properties), so these sections build the whole headless game — economy, frenzy,
+# epoch, heat model — and drive it exactly the way the scene layer does.
+
+
+## A full headless GameState with the real property ladder and a deterministic hazard seed.
+func _fresh_game(tuning: TuningConfig, seed_value: int) -> GameState:
+	var game := GameState.new(ConfigLoader.load_property_configs(), tuning)
+	game.rush_momentum.rng.seed = seed_value
+	return game
+
+
+## Seed a property with one unit and its first staffer (white-box grants — will_staff_levels
+## is the dynastic-retention seeding path, so no cash changes hands) so it auto-cycles like a
+## live staffed earner. Granting instead of buying keeps these sections about the freeze, not
+## the cost curve.
+func _seed_staffed_property(game: GameState, prop_index: int) -> void:
+	var p := game.economy.properties[prop_index] as PropertyState
+	p.buy(1)
+	p.will_staff_levels(1)
+
+
+## Ride a full GameState to an overheat: hold-rush every listed property each tick (so all of
+## them sit inside their rushed grace the whole ride), with overdrive engaged and no venting —
+## the first window's miss shuts the ride down. Returns true if the overheat happened.
+func _drive_game_to_overheat(game: GameState, rushed_props: Array) -> bool:
+	game.engage_rush_overdrive()
+	var elapsed := 0.0
+	while not game.rush_momentum.is_locked_out() and elapsed < 60.0:
+		for prop_index in rushed_props:
+			game.hold_rush_property(prop_index)
+		game.tick(TICK_SECONDS)
+		elapsed += TICK_SECONDS
+	return game.rush_momentum.is_locked_out()
+
+
+## True if any property in the game is still overheat-frozen (the invariant sweeps).
+func _any_property_frozen(game: GameState) -> bool:
+	for prop_variant in game.economy.properties:
+		if (prop_variant as PropertyState).is_overheat_frozen:
+			return true
+	return false
+
+
+func _test_freeze_set(tuning: TuningConfig) -> void:
+	print("\n26. The freeze set: exactly the rushed-at-overheat properties, single and multi")
+
+	# Single rush: three staffed earners, only property 0 rushed — the overheat downs 0 alone.
+	var game := _fresh_game(tuning, 8000)
+	for i in range(3):
+		_seed_staffed_property(game, i)
+	_check("(setup) single-rush ride overheated", _drive_game_to_overheat(game, [0]))
+	var p0 := game.economy.properties[0] as PropertyState
+	_check("the rushed property froze", p0.is_overheat_frozen)
+	_check("the unrushed staffed properties did NOT freeze",
+		not (game.economy.properties[1] as PropertyState).is_overheat_frozen
+			and not (game.economy.properties[2] as PropertyState).is_overheat_frozen)
+	_check("the frozen property's momentum factor parked at 1.0 with its grace cleared",
+		is_equal_approx(p0.rush_momentum_factor, 1.0) and is_zero_approx(p0.rush_active_grace))
+
+	# Multi-touch: two fingers rushing 0 AND 1 at the overheat — BOTH freeze (Tim's
+	# clarification: all of them), while the staffed bystander 2 stays up.
+	var multi := _fresh_game(tuning, 8001)
+	for i in range(3):
+		_seed_staffed_property(multi, i)
+	_check("(setup) multi-rush ride overheated", _drive_game_to_overheat(multi, [0, 1]))
+	_check("BOTH rushed properties froze (multi-touch freezes all of them)",
+		(multi.economy.properties[0] as PropertyState).is_overheat_frozen
+			and (multi.economy.properties[1] as PropertyState).is_overheat_frozen)
+	_check("the staffed bystander stayed up",
+		not (multi.economy.properties[2] as PropertyState).is_overheat_frozen)
+
+
+func _test_freeze_earnings_and_unfreeze(tuning: TuningConfig) -> void:
+	print("\n27. Frozen = zero income for the WHOLE lockout; unfreeze lands exactly at rush_ready")
+	# Property 1 (a multi-second cycle) is rushed and will freeze mid-cycle; property 0 (the
+	# ATM's sub-second cycles) is the unfrozen control that must keep completing and paying.
+	var game := _fresh_game(tuning, 8100)
+	_seed_staffed_property(game, 0)
+	_seed_staffed_property(game, 1)
+	var ready_fired := [false]
+	game.rush_momentum.rush_ready.connect(func() -> void: ready_fired[0] = true)
+	_check("(setup) ride on property 1 overheated", _drive_game_to_overheat(game, [1]))
+	var p1 := game.economy.properties[1] as PropertyState
+	_check("(setup) property 1 froze while its cycle was mid-flight",
+		p1.is_overheat_frozen and p1.is_cycle_running)
+
+	# Ride out the ENTIRE lockout (drain + re-arm), watching every tick: the frozen cycle may
+	# never move (no movement = no completion = no collection — _collect only runs off cycle
+	# completions), and the freeze may never lift before rush_ready.
+	var frozen_progress := p1.cycle_progress
+	var progress_ever_moved := false
+	var unfroze_early := false
+	var cash_before := game.economy.cash
+	var elapsed := 0.0
+	while not ready_fired[0] and elapsed < 120.0:
+		game.tick(TICK_SECONDS)
+		elapsed += TICK_SECONDS
+		if not ready_fired[0]:
+			if not p1.is_overheat_frozen:
+				unfroze_early = true
+			if not is_equal_approx(p1.cycle_progress, frozen_progress):
+				progress_ever_moved = true
+	print("     (lockout ran %.1f s; frozen cycle held at %.2f s of progress throughout)"
+			% [elapsed, frozen_progress])
+	_check("the frozen cycle held to the tick across the whole lockout (nothing collected)",
+		ready_fired[0] and not progress_ever_moved)
+	_check("the freeze never lifted early (it spans drain AND re-arm)", not unfroze_early)
+	_check("the unfrozen staffed property kept earning through the lockout",
+		game.economy.cash > cash_before)
+
+	# rush_ready is the exact unfreeze moment, and the held cycle simply resumes from where it
+	# froze. Probing progress at two co-prime offsets (0.3 s and 0.7 s) proves movement even
+	# if one probe happened to land a whole number of cycles later.
+	_check("rush_ready unfroze the property", not p1.is_overheat_frozen)
+	_check("no property anywhere is left frozen after rush_ready (the invariant sweep)",
+		not _any_property_frozen(game))
+	var resumed_from := p1.cycle_progress
+	var moved_at_3 := false
+	for i in range(7):
+		game.tick(TICK_SECONDS)
+		if i == 2 and not is_equal_approx(p1.cycle_progress, resumed_from):
+			moved_at_3 = true
+	var moved_at_7 := not is_equal_approx(p1.cycle_progress, resumed_from)
+	_check("the frozen cycle RESUMED at rush_ready (progress moves again)",
+		moved_at_3 or moved_at_7)
+
+
+func _test_freeze_reset_unfreezes(tuning: TuningConfig) -> void:
+	print("\n28. The First Contact reset (epoch advance mid-lockout) unfreezes everything")
+	var game := _fresh_game(tuning, 8200)
+	_seed_staffed_property(game, 0)
+	_check("(setup) ride overheated", _drive_game_to_overheat(game, [0]))
+	var p0 := game.economy.properties[0] as PropertyState
+	_check("(setup) frozen and locked out",
+		p0.is_overheat_frozen and game.rush_momentum.is_locked_out())
+
+	# Shove lifetime earnings over every threshold: the NEXT tick's epoch.update crosses into
+	# a new tier, which is the live First Contact path — rush_momentum.reset() plus the
+	# unfreeze sweep, both inside GameState.tick. (Dynasty succession needs no equivalent
+	# probe: DynastyState builds a brand-new GameState, whose properties are born unfrozen.)
+	game.economy.cash_earned_this_gen = 1e30
+	game.tick(TICK_SECONDS)
+	_check("(setup) the contact tick advanced the epoch", game.epoch.current_tier > 1)
+	_check("the reset ended the lockout and unfroze the rushed property",
+		game.rush_momentum.can_rush() and not p0.is_overheat_frozen)
+	_check("no property anywhere is left frozen after the reset (the invariant sweep)",
+		not _any_property_frozen(game))
+	var cash_before := game.economy.cash
+	for _i in range(10):
+		game.tick(TICK_SECONDS)
+	_check("the property earns again immediately after the reset", game.economy.cash > cash_before)
+
+
+func _test_freeze_frenzy_leak(tuning: TuningConfig) -> void:
+	print("\n29. A frenzy burn during the lockout resurrects nothing")
+	# Frozen property 1 (long cycle) + unfrozen ATM control, then pop a frenzy MID-LOCKOUT:
+	# the burn multiplies whatever collects, so the frozen property must give it literally
+	# nothing to multiply, and the lockout clock itself must hold (a burn freezes it).
+	var game := _fresh_game(tuning, 8300)
+	_seed_staffed_property(game, 0)
+	_seed_staffed_property(game, 1)
+	_check("(setup) ride on property 1 overheated", _drive_game_to_overheat(game, [1]))
+	var p1 := game.economy.properties[1] as PropertyState
+	_check("(setup) property 1 froze", p1.is_overheat_frozen)
+	game.frenzy.meter = 1.0
+	_check("(setup) a frenzy popped mid-lockout", game.pop_frenzy() and game.frenzy.is_burning())
+
+	var frozen_progress := p1.cycle_progress
+	var heat_at_pop := game.rush_momentum.heat
+	var cash_before := game.economy.cash
+	var frozen_moved := false
+	var heat_moved_during_burn := false
+	var burn_ticks := 0
+	while game.frenzy.is_burning() and burn_ticks < 600:
+		game.tick(TICK_SECONDS)
+		burn_ticks += 1
+		# Heat is only asserted while the burn is STILL running: the tick that ends the burn
+		# legitimately resumes the lockout drain.
+		if game.frenzy.is_burning() and not is_equal_approx(game.rush_momentum.heat, heat_at_pop):
+			heat_moved_during_burn = true
+		if not is_equal_approx(p1.cycle_progress, frozen_progress):
+			frozen_moved = true
+	_check("(setup) the burn ran and ended", burn_ticks > 5 and not game.frenzy.is_burning())
+	_check("the frozen property stayed down and paid NOTHING through the burn",
+		p1.is_overheat_frozen and not frozen_moved)
+	_check("the lockout clock stayed frozen through the burn (heat held)",
+		not heat_moved_during_burn and game.rush_momentum.is_locked_out())
+	_check("the unfrozen control still earned (the burn had something honest to multiply)",
+		game.economy.cash > cash_before)
+
+
+func _test_freeze_idle_start_refused(tuning: TuningConfig) -> void:
+	print("\n30. Taps on a frozen property are dead: no idle start, no frenzy fill, until ready")
+	# An UNSTAFFED single-unit ATM is manual: a tap starts its cycle, further taps rush it, and
+	# each completion stops it again. Tapping it every tick keeps it inside its rushed grace;
+	# the taps then STOP the moment the doomed vent window opens, so the ATM's 0.54 s cycle
+	# runs out inside the ~1 s window and the freeze catches it between cycles (IDLE) — the
+	# exact state the start-refusal must cover. It still freezes despite the stopped taps
+	# because an open window suspends grace decay (GameState's gesture-hold rule), so it is
+	# deterministically inside its rushed grace at the miss. No seed luck involved.
+	var game := _fresh_game(tuning, 8400)
+	var manual := game.economy.properties[0] as PropertyState
+	manual.buy(1)
+	_seed_staffed_property(game, 1)  # the staffed driver that carries the hold to the overheat
+	game.engage_rush_overdrive()
+	var elapsed := 0.0
+	while not game.rush_momentum.is_locked_out() and elapsed < 60.0:
+		if not game.rush_momentum.is_vent_window_open():
+			game.tap_property(0)   # start when idle, rush when running — the manual rhythm
+			game.hold_rush_property(1)
+		game.tick(TICK_SECONDS)
+		elapsed += TICK_SECONDS
+	_check("(setup) overheated with the manual property inside its rushed grace",
+		game.rush_momentum.is_locked_out() and manual.is_overheat_frozen)
+	_check("(setup) the manual property was IDLE at the freeze (its last cycle ran out)",
+		not manual.is_cycle_running)
+
+	# The dead tap: no cycle start, and no frenzy fill either — a downed machine gives nothing.
+	var meter_before := game.frenzy.meter
+	game.tap_property(0)
+	_check("a tap on the frozen idle property starts nothing and fills no frenzy",
+		not manual.is_cycle_running and is_equal_approx(game.frenzy.meter, meter_before))
+	manual.start_cycle()
+	_check("even a direct start_cycle() is refused while frozen (the belt below the verb)",
+		not manual.is_cycle_running)
+
+	# After rush_ready the same tap works again — the machine is back up.
+	var guard := 0.0
+	while game.rush_momentum.is_locked_out() and guard < 120.0:
+		game.tick(TICK_SECONDS)
+		guard += TICK_SECONDS
+	_check("(setup) the lockout ended and the property unfroze",
+		not game.rush_momentum.is_locked_out() and not manual.is_overheat_frozen)
+	game.tap_property(0)
+	_check("after rush_ready the same tap starts the cycle again", manual.is_cycle_running)

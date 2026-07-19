@@ -150,9 +150,14 @@ signal vent_succeeded(new_tier: int, new_peak_bonus: float)
 signal vent_missed(lifts_done: int, required_lifts: int)
 
 ## Heat hit the hard ceiling, or a vent window was missed. The lockout begins now.
+## EVERY overheat path funnels through _begin_overheat and emits this, which is why GameState
+## hangs the OVERHEAT PROPERTY FREEZE (Tim 2026-07-19) on it: at this exact moment, every
+## property still inside its rushed grace goes dark for the whole lockout.
 signal overheated
 
-## The post-overheat re-arm delay just finished; rushing is available again.
+## The post-overheat re-arm delay just finished; rushing is available again. Also the exact
+## moment GameState brings the overheat-frozen properties back up — the freeze spans the
+## lockout precisely, drain and re-arm both, and not a tick longer.
 signal rush_ready
 
 var tuning: TuningConfig
@@ -376,7 +381,11 @@ func _tick_vent_windows(delta: float) -> void:
 	# target. No hazard rolls while approaching: one event in flight at a time.
 	if _approaching:
 		_approach_remaining -= delta
-		if _approach_remaining <= 0.0:
+		# The epsilon is a float-boundary guard: repeated tick subtraction can leave a hair of
+		# remainder above zero (1.2 s − 12 × 0.1 s ≈ +2.8e-17), which would silently stretch
+		# the promised lead by a WHOLE extra tick. A vanishing remainder counts as arrival, so
+		# the open always lands tick-exactly on the approach the spawn announced.
+		if _approach_remaining <= 0.000001:
 			_open_window()
 		return
 

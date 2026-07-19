@@ -301,6 +301,27 @@ bar is redesigned into two display modes:
    `rearm_remaining_fraction()`: 1.0 at re-arm start → 0.0 at rush_ready, 0.0 otherwise) —
    the gray's retreat IS the re-arm timer, and the READY flash lands on a normal bar.
 
+## Overheat property freeze + shorter approach (Tim, 2026-07-19)
+
+Two changes, tuned as ONE balance pass because they trade against the same gate:
+
+- **Shorter approach:** `rush_momentum_vent_approach_seconds` 2.0 → **1.2** (Tim: "2 seconds
+  feels leisurely — I want to see it coming but not feel like I'm waiting for it"). This also
+  attacks the sloppy-player free ride at its root (less riskless pay bundled with each check).
+- **Overheat freezes the rushed properties:** during the whole lockout (drain + re-arm),
+  every property that was ACTIVELY BEING RUSHED at the overheat moment (Tim's clarification:
+  all of them, if multi-touch rushing several) is FROZEN — cycle paused, no collections, no
+  income from that property at all; it resumes at rush_ready. Rationale: makes the shutdown
+  thematically real (the machine is DOWN, not just un-rushable); the penalty becomes
+  PROPORTIONAL to what was gambled (your top earner goes dark, not a flat timer); it reaches
+  the sloppy player as real stakes instead of dead time, so **the sting timeouts come back
+  DOWN** (target: ≤ the original 3 s/tier / 9 s cap, lower if gates allow) — Tim's
+  "failure pressure from difficulty, not timeouts" restored.
+- Sim gate metric extended: frozen seconds count as −100% on that property (lost base income),
+  so the sloppy ≤ cruise / skilled +62–80% gates now price the freeze honestly.
+- UI: frozen property rows need a "down" presentation (dark/gray, consistent with the momentum
+  bar's dead-gray lockout, no-moving-UI rules).
+
 ## Decision log
 
 - Overdrive must be skill-based with larger risk and reward; cruise keeps the safe floor

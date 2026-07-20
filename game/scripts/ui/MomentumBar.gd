@@ -748,9 +748,20 @@ func _on_vent_lift_registered(lifts_done: int, _required_lifts: int) -> void:
 ## quotes the NEW excursion peak (the signal's value, so the number can never drift from the
 ## core's ladder), in celebratory money-green, plus the same full-meter white flash the READY
 ## moment uses — success should feel like a payoff, not mere survival.
-func _on_vent_succeeded(_new_tier: int, new_peak_bonus: float) -> void:
+func _on_vent_succeeded(new_tier: int, new_peak_bonus: float) -> void:
+	# "UP TO", not "PEAK" (Tim, 2026-07-20). This number is current_peak_bonus() — the CEILING of
+	# the ladder you have just unlocked, i.e. what you would earn riding at the hard backstop — not
+	# what you are earning right now. The bar's own "+X%" and the BANKED chip both report the LIVE
+	# lerped bonus, which is always lower unless heat is pinned at the ceiling. Tim read all three
+	# on device and reasonably took them for the same quantity disagreeing.
+	#
+	# The ceiling stays on screen deliberately rather than being hidden to make the numbers match:
+	# it is the whole reason riding deeper pays, so it earns its place — it just has to be LABELLED
+	# as a ceiling. Naming the tier alongside it also gives the run its running score, which is what
+	# Tim was looking for in this chip. The green plate and the chip's arrival remain the "you did
+	# it" signal, so the words are free to carry the new information instead of repeating it.
 	_show_tier_chip(
-			"VENTED — PEAK +%d%%!" % int(round(new_peak_bonus * 100.0)),
+			"TIER %d — UP TO +%d%%" % [new_tier, int(round(new_peak_bonus * 100.0))],
 			UiPalette.MONEY_GREEN, UiPalette.NAVY)
 	_ready_flash.color = Color(1, 1, 1, READY_FLASH_ALPHA)
 	var tween := create_tween()

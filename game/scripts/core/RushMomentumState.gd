@@ -86,10 +86,10 @@ class_name RushMomentumState
 # engage_overdrive() (the OVERDRIVE button): once engaged, everything behaves as described.
 # Overdrive is PER-EXCURSION — it disengages when the hold ends (and on overheat and reset).
 #
-# During a frenzy BURN everything freezes — no heat gain, no bleed, no lockout drain, no re-arm
-# countdown, no hazard rolls, and no open-window countdown. Everything here advances on tick
-# delta ONLY (never OS time), so the freeze is total and a window can never unfairly open or
-# expire mid-frenzy.
+# A frenzy burn does NOT pause any of this (Tim 2026-07-19 — see tick()): heat, hazard rolls,
+# approaches and open windows all keep running through a burn, so the two systems compound
+# instead of locking each other out. Everything here still advances on tick delta ONLY (never
+# OS time), which is what keeps every clock honest under pauses and scene reloads.
 #
 # bonus stays a pure function of (heat, vent tier), is applied to PROPERTY income only (never
 # the wage), and is threaded into both the payout AND the displayed rate so the cash always
@@ -225,8 +225,8 @@ var _vent_tier: int = 0
 ## Tick-time seconds of post-vent (or post-engage) QUIET left before the next event may spawn —
 ## the rolled REFRACTORY (Tim 2026-07-18 night). While positive, hazard dice AND the force-spawn
 ## hold their fire, so back-to-back events can never land metronomically. Rolled on the seeded
-## schedule rng in _start_refractory; ticks down on tick delta only (frenzy-frozen like every
-## other vent clock); cleared with the rest of the vent state.
+## schedule rng in _start_refractory; ticks down on tick delta only, like every other vent
+## clock; cleared with the rest of the vent state.
 var _refractory_remaining: float = 0.0
 
 ## True while a spawned vent event is IN FLIGHT: `vent_incoming` has fired but the window has
@@ -261,7 +261,7 @@ var _vent_phase: VentPhase = VentPhase.WAITING_FOR_LIFT
 
 ## Seconds spent in the current gesture phase. Reset on every press/release edge; the tick
 ## checks it against vent_gap_max / vent_tap_max so tolerances share the game's tick clock
-## (never OS time — the frenzy freeze must stop gesture clocks too).
+## (never OS time, so a pause or scene reload can never eat a gesture's tolerance).
 var _phase_elapsed: float = 0.0
 
 ## Whether the rushed property's button is currently held, tracked from the press/release
@@ -275,15 +275,18 @@ func _init(p_tuning: TuningConfig) -> void:
 
 
 ## Advance the heat model by one tick. `rushing` is true if the player rushed within the grace
-## window this tick; `frenzy_burning` is true while a frenzy burn is active. All rates are
-## per-second (see the TuningConfig knobs), so the behaviour is frame-rate independent.
-func tick(delta: float, rushing: bool, frenzy_burning: bool) -> void:
-	# Frenzy burn = a TRUE freeze (Tim 2026-07-15): no gain, no bleed, no lockout drain, no
-	# re-arm countdown — and no vent scheduling or window countdown either (a window expiring
-	# mid-frenzy would be an unfair miss). Everything holds until the burn ends.
-	if frenzy_burning:
-		return
-
+## window this tick. All rates are per-second (see the TuningConfig knobs), so the behaviour is
+## frame-rate independent.
+##
+## A frenzy burn used to FREEZE this whole model (Tim 2026-07-15): heat, bleed, lockout drain and
+## vent scheduling all held until the burn ended. That guarded a hidden-fuse gamble — back then an
+## overheat could rob a frenzy payoff with no warning. Vent Windows replaced the fuse with
+## telegraphed skill checks, so the guard outlived its reason while the freeze itself turned the
+## game's two best moments into mutually exclusive ones (Tim 2026-07-19: "I don't like the way
+## that frenzy and rush lock each other out"). The freeze is GONE: the vent game runs straight
+## through a burn, so riding checks while a multiplier burns is the peak of the loop — and
+## blowing one there costs the frenzy too, which is exactly the drama that makes it worth doing.
+func tick(delta: float, rushing: bool) -> void:
 	if _locked_out:
 		_tick_lockout(delta)
 		return
@@ -376,9 +379,9 @@ func _tick_vent_windows(delta: float) -> void:
 			_miss_vent()
 		return
 
-	# An event in flight: run the approach clock down (tick delta only — the frenzy freeze
-	# already stopped this whole call) and open the announced window when the event reaches the
-	# target. No hazard rolls while approaching: one event in flight at a time.
+	# An event in flight: run the approach clock down (tick delta only) and open the announced
+	# window when the event reaches the target. No hazard rolls while approaching: one event in
+	# flight at a time.
 	if _approaching:
 		_approach_remaining -= delta
 		# The epsilon is a float-boundary guard: repeated tick subtraction can leave a hair of

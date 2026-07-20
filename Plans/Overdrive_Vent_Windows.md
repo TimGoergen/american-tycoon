@@ -322,6 +322,26 @@ Two changes, tuned as ONE balance pass because they trade against the same gate:
 - UI: frozen property rows need a "down" presentation (dark/gray, consistent with the momentum
   bar's dead-gray lockout, no-moving-UI rules).
 
+## Frenzy freeze REMOVED (Tim, 2026-07-19)
+
+Tim: "I don't like the way that frenzy and rush lock each other out." The 2026-07-15 rule that a
+frenzy burn FREEZES the whole heat model (no heat, no bleed, no lockout drain, no re-arm, no
+hazard rolls, no window countdown) existed to protect a frenzy payoff from a hidden-fuse
+overheat. Vent Windows replaced that fuse with telegraphed skill checks, so the guard outlived
+its reason — while the freeze itself made the game's two best moments mutually exclusive
+(a burn switched the vent game off; a lockout starved the frenzy meter).
+
+- `RushMomentumState.tick()` no longer takes `frenzy_burning` at all — the heat model does not
+  know what a frenzy is. Heat climbs, the hazard rolls, approaches fly, windows count down, and
+  a lockout cools straight through a burn.
+- **Consequence, accepted:** you CAN now overheat mid-frenzy, and the property freeze means the
+  burn loses that property for the rest of the lockout. That is the drama that makes riding
+  checks under a live multiplier worth doing — the peak of the loop, with the peak of the risk.
+- Second consequence: a lockout can now COMPLETE inside a burn, so cooldown time and frenzy
+  time overlap instead of queueing (sim §29 asserts exactly this).
+- Chosen over two alternatives Tim declined: freezing heat but still serving windows, and
+  letting a lockout charge the frenzy meter.
+
 ## Decision log
 
 - Overdrive must be skill-based with larger risk and reward; cruise keeps the safe floor

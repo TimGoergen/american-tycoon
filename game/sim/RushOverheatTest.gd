@@ -14,8 +14,9 @@ extends SceneTree
 #      with vent_missed announcing the blown window first.
 #   4. The lockout: rush disabled, bonus 0, heat drains at the locked rate, and rush_ready
 #      fires only rearm_seconds AFTER the bar empties — then rushing re-enables.
-#   5. A frenzy burn FREEZES everything: build, bleed, lockout drain, re-arm countdown, the
-#      hazard dice, an in-flight event's approach clock, and an open window's gesture clock.
+#   5. A frenzy burn pauses NOTHING (Tim 2026-07-19): heat still climbs, the hazard dice
+#      still roll, vent windows still open, and a lockout still cools — the two systems run
+#      together instead of locking each other out.
 #   6. reset() from mid-lockout restores a clean, rushable state (the First Contact wipe).
 #   7. The bonus mapping: the Building segment hits its knob values, and the overdrive span
 #      is ONE continuous lerp — sampled densely, monotone, with NO kink where the old band
@@ -89,8 +90,8 @@ extends SceneTree
 #      (Dynasty succession needs no section: it builds a brand-new GameState, whose
 #      properties are all born unfrozen.)
 #  29. A frenzy burn during the lockout resurrects nothing: the frozen property stays down
-#      and pays zero through the burn (the multiplier has nothing to multiply), and the
-#      lockout clock stays frozen too.
+#      and pays zero through the burn (the multiplier has nothing to multiply) — while the
+#      lockout cooldown keeps draining right through it.
 #  30. Taps on a frozen property are fully dead — no idle-cycle start, no frenzy fill —
 #      until rush_ready re-enables them.
 # METRIC CHANGE (same pass): the autopilot's earnings metric now PRICES the freeze — every
@@ -181,7 +182,7 @@ func _press_and_engage(state: RushMomentumState) -> void:
 func _ride_to_window_open(state: RushMomentumState, cap_seconds := 30.0) -> float:
 	var elapsed := 0.0
 	while not state.is_vent_window_open() and not state.is_locked_out() and elapsed < cap_seconds:
-		state.tick(TICK_SECONDS, true, false)
+		state.tick(TICK_SECONDS, true)
 		elapsed += TICK_SECONDS
 	return elapsed if state.is_vent_window_open() else -1.0
 
@@ -192,7 +193,7 @@ func _ride_to_window_open(state: RushMomentumState, cap_seconds := 30.0) -> floa
 func _ride_to_approach(state: RushMomentumState, cap_seconds := 30.0) -> float:
 	var elapsed := 0.0
 	while not state.is_vent_approaching() and not state.is_locked_out() and elapsed < cap_seconds:
-		state.tick(TICK_SECONDS, true, false)
+		state.tick(TICK_SECONDS, true)
 		elapsed += TICK_SECONDS
 	return elapsed if state.is_vent_approaching() else -1.0
 
@@ -202,12 +203,12 @@ func _ride_to_approach(state: RushMomentumState, cap_seconds := 30.0) -> float:
 ## Ticks keep rushing=true through the lifts, exactly as GameState does while a window is open.
 func _perform_clean_gesture(state: RushMomentumState, lifts: int) -> void:
 	state.notify_rush_released()
-	state.tick(TICK_SECONDS, true, false)
+	state.tick(TICK_SECONDS, true)
 	state.notify_rush_pressed()
 	for _extra_lift in range(lifts - 1):
-		state.tick(TICK_SECONDS, true, false)
+		state.tick(TICK_SECONDS, true)
 		state.notify_rush_released()
-		state.tick(TICK_SECONDS, true, false)
+		state.tick(TICK_SECONDS, true)
 		state.notify_rush_pressed()
 
 
@@ -233,7 +234,7 @@ func _rush_until_overheat(state: RushMomentumState) -> float:
 	_press_and_engage(state)
 	var elapsed := 0.0
 	while not state.is_locked_out() and elapsed < 60.0:
-		state.tick(TICK_SECONDS, true, false)
+		state.tick(TICK_SECONDS, true)
 		elapsed += TICK_SECONDS
 	return elapsed
 
@@ -245,7 +246,7 @@ func _test_build_time_to_hot(tuning: TuningConfig) -> void:
 	_press_and_engage(state)
 	var elapsed := 0.0
 	while state.heat < 1.0 and elapsed < 30.0:
-		state.tick(TICK_SECONDS, true, false)
+		state.tick(TICK_SECONDS, true)
 		elapsed += TICK_SECONDS
 	print("     (reached heat 1.0 at %.1f s)" % elapsed)
 	_check("heat 1.0 reached between 5.5 and 6.5 s", elapsed >= 5.5 and elapsed <= 6.5)
@@ -301,7 +302,7 @@ func _test_overheat_lockout(tuning: TuningConfig) -> void:
 	state.rush_ready.connect(func() -> void: ready_fired[0] = true)
 	# The visual re-arm timer's getter reads 0 during ordinary riding (nothing is re-arming).
 	for _i in range(20):
-		state.tick(TICK_SECONDS, true, false)
+		state.tick(TICK_SECONDS, true)
 	_check("rearm_remaining_fraction() is 0 during normal riding",
 		is_zero_approx(state.rearm_remaining_fraction()))
 	_rush_until_overheat(state)
@@ -315,7 +316,7 @@ func _test_overheat_lockout(tuning: TuningConfig) -> void:
 	# rushing=true on purpose — taps during a lockout must not slow the drain.
 	var heat_before := state.heat
 	for _i in range(10):
-		state.tick(TICK_SECONDS, true, false)
+		state.tick(TICK_SECONDS, true)
 	var drained := heat_before - state.heat
 	print("     (drained %.3f heat in 1 s; knob says %.3f)" % [drained, tuning.rush_momentum_locked_drain_per_second])
 	_check("lockout drains at the locked rate (rush taps ignored)",
@@ -329,7 +330,7 @@ func _test_overheat_lockout(tuning: TuningConfig) -> void:
 	# (This excursion achieved no vent tiers, so there is no per-tier sting — section 18 covers it.)
 	var elapsed := 0.0
 	while state.heat > 0.0 and elapsed < 60.0:
-		state.tick(TICK_SECONDS, false, false)
+		state.tick(TICK_SECONDS, false)
 		elapsed += TICK_SECONDS
 	_check("rush_ready has NOT fired when the bar first empties", not ready_fired[0])
 	_check("is_rearming() is true once the bar is empty", state.is_rearming())
@@ -342,7 +343,7 @@ func _test_overheat_lockout(tuning: TuningConfig) -> void:
 	var last_fraction := state.rearm_remaining_fraction()
 	var rearm_elapsed := 0.0
 	while not ready_fired[0] and rearm_elapsed < 10.0:
-		state.tick(TICK_SECONDS, false, false)
+		state.tick(TICK_SECONDS, false)
 		rearm_elapsed += TICK_SECONDS
 		var fraction := state.rearm_remaining_fraction()
 		if fraction > last_fraction + 0.0001:
@@ -359,99 +360,60 @@ func _test_overheat_lockout(tuning: TuningConfig) -> void:
 
 
 func _test_frenzy_freeze(tuning: TuningConfig) -> void:
-	print("\n5. A frenzy burn freezes heat exactly (build, bleed, lockout, and vent clocks all halt)")
+	print("\n5. A frenzy burn no longer pauses ANYTHING — frenzy and the vent game run together")
+	# Tim 2026-07-19 dropped the frenzy freeze ("I don't like the way that frenzy and rush lock
+	# each other out"), so RushMomentumState no longer knows what a frenzy is — there is nothing
+	# left to freeze at the state layer. These checks therefore run on a whole GameState, the
+	# only layer where "during a burn" still means something, and they assert the INVERSE of the
+	# behaviour this section used to guard: heat climbs, the hazard rolls, windows open, and a
+	# lockout keeps cooling, all while a burn is running.
 
-	# Mid-build freeze: rushing during a burn adds no heat, and the bonus holds.
-	var state := _fresh_state(tuning, 42)
-	for _i in range(30):  # 3 s of rushing -> ~0.5 heat
-		state.tick(TICK_SECONDS, true, false)
-	var heat_before := state.heat
-	var bonus_before := state.bonus
-	for _i in range(50):  # 5 s of frenzy, still holding rush
-		state.tick(TICK_SECONDS, true, true)
-	_check("no heat GAIN during a burn (rush held)", is_equal_approx(state.heat, heat_before))
-	_check("bonus holds during a burn", is_equal_approx(state.bonus, bonus_before))
+	# Heat climbs during a burn while the player keeps rushing.
+	var game := _fresh_game(tuning, 5100)
+	_seed_staffed_property(game, 0)
+	game.frenzy.meter = 1.0
+	_check("(setup) a frenzy is burning", game.pop_frenzy() and game.frenzy.is_burning())
+	game.engage_rush_overdrive()
+	var heat_before := game.rush_momentum.heat
+	for _i in range(20):  # 2 s of rushing inside the burn
+		game.hold_rush_property(0)
+		game.tick(TICK_SECONDS)
+	_check("heat CLIMBS during a burn (rush held)", game.rush_momentum.heat > heat_before)
+	_check("the burn is still running (the probe stayed inside it)", game.frenzy.is_burning())
 
-	# Bleed freeze: released during a burn, heat still does not drain.
-	for _i in range(50):
-		state.tick(TICK_SECONDS, false, true)
-	_check("no heat BLEED during a burn (rush released)", is_equal_approx(state.heat, heat_before))
+	# The vent game itself runs: riding deep during a burn still spawns and opens events.
+	var vent_game := _fresh_game(tuning, 5101)
+	_seed_staffed_property(vent_game, 0)
+	vent_game.frenzy.meter = 1.0
+	_check("(setup) a frenzy is burning for the vent probe",
+		vent_game.pop_frenzy() and vent_game.frenzy.is_burning())
+	var opened := [0]
+	vent_game.rush_momentum.vent_window_opened.connect(
+		func(_lifts: int, _duration: float) -> void: opened[0] += 1)
+	vent_game.engage_rush_overdrive()
+	# Poke straight to depth (white-box, like the sim's other deep probes) so the hazard is at
+	# its relentless end and the probe measures the dice, not the climb.
+	vent_game.rush_momentum.heat = 1.4
+	var burning_throughout := true
+	for _i in range(60):  # 6 s: dozens of expected checks at this depth
+		vent_game.hold_rush_property(0)
+		vent_game.tick(TICK_SECONDS)
+		if not vent_game.frenzy.is_burning():
+			burning_throughout = false
+			break
+	_check("vent events still OPEN during a burn (the hazard dice keep rolling)", opened[0] > 0)
+	_check("(setup) the burn covered the whole vent probe", burning_throughout)
 
-	# Lockout freeze: the locked drain halts too...
-	var locked := _fresh_state(tuning, 43)
-	_rush_until_overheat(locked)
-	var locked_heat := locked.heat
-	for _i in range(50):
-		locked.tick(TICK_SECONDS, false, true)
-	_check("lockout DRAIN halts during a burn", is_equal_approx(locked.heat, locked_heat))
-
-	# ...and so does the re-arm countdown.
-	var rearming := _fresh_state(tuning, 44)
-	var ready_fired := [false]
-	rearming.rush_ready.connect(func() -> void: ready_fired[0] = true)
-	_rush_until_overheat(rearming)
-	while rearming.heat > 0.0:
-		rearming.tick(TICK_SECONDS, false, false)
-	_check("(setup) re-arm delay is running", rearming.is_rearming())
-	for _i in range(100):  # 10 s of frenzy — far beyond the 1.5 s re-arm
-		rearming.tick(TICK_SECONDS, false, true)
-	_check("re-arm COUNTDOWN halts during a burn (rush_ready never fired)",
-		not ready_fired[0] and rearming.is_rearming())
-
-	# HAZARD freeze: parked deep in the hazard zone (rate near its relentless top), a long burn
-	# never opens a window — the dice simply are not rolled on frozen ticks. Heat is poked
-	# straight to depth (white-box, like the sim's other deep probes) so the setup itself
-	# cannot consume hazard rolls on the way up.
-	var deep_burn := _fresh_state(tuning, 45)
-	var windows_opened := [0]
-	deep_burn.vent_window_opened.connect(func(_lifts: int, _duration: float) -> void: windows_opened[0] += 1)
-	_press_and_engage(deep_burn)
-	deep_burn.heat = 1.4  # deep: the per-tick hazard here would fire within a second or two
-	for _i in range(200):  # 20 s of frenzy — dozens of expected windows if the dice rolled
-		deep_burn.tick(TICK_SECONDS, true, true)
-	_check("the hazard never opens a window during a burn (dice frozen)",
-		windows_opened[0] == 0 and not deep_burn.is_locked_out())
-	_check("deep heat holds exactly through the burn", is_equal_approx(deep_burn.heat, 1.4))
-
-	# REFRACTORY freeze: the rolled post-engage quiet spell halts on frozen ticks too — it is
-	# a vent clock like any other, and a burn draining it would silently eat the randomized
-	# spacing the refractory exists to provide.
-	var refractory_state := _fresh_state(tuning, 48)
-	_press_and_engage(refractory_state)  # engaging rolls the refractory
-	var refractory_before := refractory_state.vent_refractory_remaining()
-	_check("(setup) engaging rolled a live refractory", refractory_before > 0.0)
-	for _i in range(50):  # 5 s of frenzy — several times the longest possible roll
-		refractory_state.tick(TICK_SECONDS, true, true)
-	_check("the refractory clock halts during a burn",
-		is_equal_approx(refractory_state.vent_refractory_remaining(), refractory_before))
-
-	# APPROACH freeze: an in-flight event's approach clock halts too, so a burn can neither
-	# advance the flight nor open its window (an open mid-frenzy would shortchange the lead
-	# the player was promised to watch).
-	var approach_state := _fresh_state(tuning, 47)
-	var approach_opened := [0]
-	approach_state.vent_window_opened.connect(func(_lifts: int, _duration: float) -> void: approach_opened[0] += 1)
-	_press_and_engage(approach_state)
-	_check("(setup) an event went in flight for the freeze probe", _ride_to_approach(approach_state) >= 0.0)
-	var approach_before := approach_state.vent_approach_remaining()
-	for _i in range(100):  # 10 s of frenzy — several times the whole approach
-		approach_state.tick(TICK_SECONDS, true, true)
-	_check("an in-flight APPROACH halts during a burn (no open, travel time held)",
-		approach_state.is_vent_approaching() and approach_opened[0] == 0
-			and is_equal_approx(approach_state.vent_approach_remaining(), approach_before))
-
-	# Open-window freeze: an OPEN window's countdown halts, so a burn can never expire it.
-	var open_state := _fresh_state(tuning, 46)
-	var open_missed := [0]
-	open_state.vent_missed.connect(func(_done: int, _required: int) -> void: open_missed[0] += 1)
-	_press_and_engage(open_state)
-	_check("(setup) a window opened for the freeze probe", _ride_to_window_open(open_state) >= 0.0)
-	var remaining_before := open_state.vent_window_remaining()
-	for _i in range(50):  # 5 s of frenzy — far beyond the ~1 s window
-		open_state.tick(TICK_SECONDS, true, true)
-	_check("an OPEN window's countdown halts during a burn (no miss, time held)",
-		open_state.is_vent_window_open() and open_missed[0] == 0
-			and is_equal_approx(open_state.vent_window_remaining(), remaining_before))
+	# A lockout keeps cooling through a burn: the punishment clock no longer waits for frenzy.
+	var locked := _fresh_game(tuning, 5102)
+	_seed_staffed_property(locked, 0)
+	_check("(setup) a ride overheated", _drive_game_to_overheat(locked, [0]))
+	locked.frenzy.meter = 1.0
+	_check("(setup) a frenzy popped mid-lockout", locked.pop_frenzy() and locked.frenzy.is_burning())
+	var locked_heat := locked.rush_momentum.heat
+	for _i in range(20):
+		locked.tick(TICK_SECONDS)
+	_check("the lockout DRAIN keeps running during a burn", locked.rush_momentum.heat < locked_heat)
 
 
 func _test_reset_mid_lockout(tuning: TuningConfig) -> void:
@@ -469,7 +431,7 @@ func _test_reset_mid_lockout(tuning: TuningConfig) -> void:
 	_check("vent ladder and window are wiped after reset",
 		state.vent_tier() == 0 and not state.is_vent_window_open())
 	# And the wiped state actually climbs again.
-	state.tick(1.0, true, false)
+	state.tick(1.0, true)
 	_check("a reset state builds heat again", state.heat > 0.0)
 
 
@@ -533,7 +495,7 @@ func _test_cruise_clamp(tuning: TuningConfig) -> void:
 
 	# 120 s of holding — twenty times the old time-to-Hot — without ever touching overdrive.
 	for _i in range(1200):
-		state.tick(TICK_SECONDS, true, false)
+		state.tick(TICK_SECONDS, true)
 
 	print("     (heat settled at %.4f; cruise point is %.4f)" % [state.heat, state.cruise_heat()])
 	_check("a long hold never overheats", overheat_count[0] == 0 and not state.is_locked_out())
@@ -559,7 +521,7 @@ func _test_overdrive_engage(tuning: TuningConfig) -> void:
 	# Settle into the cruise clamp first, then opt in.
 	state.notify_rush_pressed()
 	for _i in range(100):  # 10 s — well past the ~5 s climb to the clamp
-		state.tick(TICK_SECONDS, true, false)
+		state.tick(TICK_SECONDS, true)
 	_check("(setup) parked at the cruise clamp", is_equal_approx(state.heat, state.cruise_heat()))
 	state.engage_overdrive()
 	_check("is_overdrive_engaged() is true after the tap", state.is_overdrive_engaged())
@@ -567,7 +529,7 @@ func _test_overdrive_engage(tuning: TuningConfig) -> void:
 
 	var elapsed := 0.0
 	while not state.is_locked_out() and elapsed < 60.0:
-		state.tick(TICK_SECONDS, true, false)
+		state.tick(TICK_SECONDS, true)
 		elapsed += TICK_SECONDS
 	print("     (overheated %.1f s after engaging, at heat %.3f)" % [elapsed, state.heat])
 	_check("the resumed climb reaches a real overheat", state.is_locked_out())
@@ -586,7 +548,7 @@ func _test_overdrive_disengages_on_release(tuning: TuningConfig) -> void:
 	# even this shallow ride under the depth hazard, so vent any window cleanly: this section
 	# is about RELEASE semantics, and the setup must not die to an ignored telegraph.
 	for _i in range(70):  # 7 s: ~6 s to heat 1.0 plus ~1 s of overdrive build
-		state.tick(TICK_SECONDS, true, false)
+		state.tick(TICK_SECONDS, true)
 		if state.is_vent_window_open():
 			_perform_clean_gesture(state, state.vent_required_lifts())
 	_check("(setup) rode above the cruise point without overheating",
@@ -595,7 +557,7 @@ func _test_overdrive_disengages_on_release(tuning: TuningConfig) -> void:
 
 	# One released tick = the hold ended. That alone must disengage overdrive.
 	state.notify_rush_released()
-	state.tick(TICK_SECONDS, false, false)
+	state.tick(TICK_SECONDS, false)
 	_check("one non-rushing tick disengages overdrive", not state.is_overdrive_engaged())
 
 	# Re-holding WITHOUT tapping overdrive again is back in cruise mode: heat left over from
@@ -604,7 +566,7 @@ func _test_overdrive_disengages_on_release(tuning: TuningConfig) -> void:
 	state.overheated.connect(func() -> void: overheat_count[0] += 1)
 	state.notify_rush_pressed()
 	for _i in range(300):  # 30 s of plain holding
-		state.tick(TICK_SECONDS, true, false)
+		state.tick(TICK_SECONDS, true)
 	_check("the re-hold is cruising again", state.is_cruising())
 	_check("leftover ride heat bled back down to the cruise point",
 		is_equal_approx(state.heat, state.cruise_heat()))
@@ -647,7 +609,7 @@ func _test_legacy_cruise_and_boundary(tuning: TuningConfig) -> void:
 	state.band_entered.connect(func(band: RushMomentumState.Band) -> void: bands_entered.append(band))
 	state.notify_rush_pressed()
 	for _i in range(600):  # 60 s parked at the tick
-		state.tick(TICK_SECONDS, true, false)
+		state.tick(TICK_SECONDS, true)
 	_check("heat parks at 1.0 exactly", is_equal_approx(state.heat, 1.0))
 	_check("bonus pins at bonus_at_hot (the re-earned old cap)",
 		is_equal_approx(state.bonus, tuning.rush_momentum_bonus_at_hot))
@@ -660,7 +622,7 @@ func _test_legacy_cruise_and_boundary(tuning: TuningConfig) -> void:
 	state.engage_overdrive()
 	var elapsed := 0.0
 	while not state.is_locked_out() and elapsed < 60.0:
-		state.tick(TICK_SECONDS, true, false)
+		state.tick(TICK_SECONDS, true)
 		elapsed += TICK_SECONDS
 	# Only ONE crossing signal exists now: pushing past the parked-at-1.0 boundary is it.
 	_check("overdrive from the 1.0 boundary rides to a normal overheat",
@@ -689,7 +651,7 @@ func _measure_lockout_seconds(state: RushMomentumState) -> float:
 	_rush_until_overheat(state)
 	var elapsed := 0.0
 	while not ready_fired[0] and elapsed < 60.0:
-		state.tick(TICK_SECONDS, false, false)
+		state.tick(TICK_SECONDS, false)
 		elapsed += TICK_SECONDS
 	return elapsed
 
@@ -714,7 +676,7 @@ func _measure_duty_cycle(tuning: TuningConfig) -> void:
 	var cruise_bonus_seconds := 0.0
 	var cruise_elapsed := 0.0
 	while cruise_elapsed < total_seconds:
-		cruise_state.tick(TICK_SECONDS, true, false)
+		cruise_state.tick(TICK_SECONDS, true)
 		cruise_elapsed += TICK_SECONDS
 		cruise_bonus_seconds += cruise_state.bonus * TICK_SECONDS
 	var cruise_average := cruise_bonus_seconds / total_seconds
@@ -732,7 +694,7 @@ func _measure_duty_cycle(tuning: TuningConfig) -> void:
 	var total_bonus_seconds := 0.0
 	var elapsed := 0.0
 	while elapsed < total_seconds:
-		state.tick(TICK_SECONDS, rushing, false)
+		state.tick(TICK_SECONDS, rushing)
 		elapsed += TICK_SECONDS
 		total_bonus_seconds += state.bonus * TICK_SECONDS
 		# The old rhythm: release at the ride top, re-engage at heat 1.0.
@@ -769,11 +731,11 @@ func _test_scheduler_determinism(tuning: TuningConfig) -> void:
 	# Ride the same-seed pair to their (missed) overheat: identical shutdown heights.
 	var first_elapsed := 0.0
 	while not first.is_locked_out() and first_elapsed < 30.0:
-		first.tick(TICK_SECONDS, true, false)
+		first.tick(TICK_SECONDS, true)
 		first_elapsed += TICK_SECONDS
 	var second_elapsed := 0.0
 	while not second.is_locked_out() and second_elapsed < 30.0:
-		second.tick(TICK_SECONDS, true, false)
+		second.tick(TICK_SECONDS, true)
 		second_elapsed += TICK_SECONDS
 	_check("same seed reproduces the same missed-window overheat height",
 		first.is_locked_out() and is_equal_approx(first.heat, second.heat))
@@ -856,7 +818,7 @@ func _test_gesture_judge(tuning: TuningConfig) -> void:
 	gap_state.notify_rush_released()
 	var gap_ticks := int(ceil((tuning.rush_momentum_vent_gap_max + 0.2) / TICK_SECONDS))
 	for _i in range(gap_ticks):
-		gap_state.tick(TICK_SECONDS, true, false)
+		gap_state.tick(TICK_SECONDS, true)
 	_check("a gap past vent_gap_max is a MISS (0 lifts done) and overheats",
 		gap_misses.size() == 1 and gap_misses[0][0] == 0 and gap_overheated[0] == 1)
 
@@ -870,10 +832,10 @@ func _test_gesture_judge(tuning: TuningConfig) -> void:
 	_check("(setup) double window opened", _ride_to_window_open(tap_state) >= 0.0
 			and tap_state.vent_required_lifts() == 2)
 	tap_state.notify_rush_released()
-	tap_state.tick(TICK_SECONDS, true, false)
+	tap_state.tick(TICK_SECONDS, true)
 	tap_state.notify_rush_pressed()  # the middle tap goes down (lift 1 registers)...
 	for _i in range(tap_ticks):  # ...and never comes back up in time
-		tap_state.tick(TICK_SECONDS, true, false)
+		tap_state.tick(TICK_SECONDS, true)
 	_check("a middle tap held past vent_tap_max is a MISS showing 1 of 2 lifts done",
 		tap_misses.size() == 1 and tap_misses[0][0] == 1 and tap_misses[0][1] == 2
 			and tap_state.is_locked_out())
@@ -889,14 +851,14 @@ func _test_gesture_judge(tuning: TuningConfig) -> void:
 	_check("(setup) triple window opened", _ride_to_window_open(second_tap_state) >= 0.0
 			and second_tap_state.vent_required_lifts() == 3)
 	second_tap_state.notify_rush_released()
-	second_tap_state.tick(TICK_SECONDS, true, false)
+	second_tap_state.tick(TICK_SECONDS, true)
 	second_tap_state.notify_rush_pressed()   # first tap down (lift 1)
-	second_tap_state.tick(TICK_SECONDS, true, false)
+	second_tap_state.tick(TICK_SECONDS, true)
 	second_tap_state.notify_rush_released()  # first tap up, in time
-	second_tap_state.tick(TICK_SECONDS, true, false)
+	second_tap_state.tick(TICK_SECONDS, true)
 	second_tap_state.notify_rush_pressed()   # second tap down (lift 2)...
 	for _i in range(tap_ticks):  # ...held like a re-hold — but a third lift was still owed
-		second_tap_state.tick(TICK_SECONDS, true, false)
+		second_tap_state.tick(TICK_SECONDS, true)
 	_check("a SECOND tap held past vent_tap_max is a MISS showing 2 of 3 lifts done",
 		second_tap_misses.size() == 1 and second_tap_misses[0][0] == 2
 			and second_tap_misses[0][1] == 3 and second_tap_state.is_locked_out())
@@ -909,7 +871,7 @@ func _test_gesture_judge(tuning: TuningConfig) -> void:
 	_check("(setup) window opened for the expiry case", _ride_to_window_open(expiry_state) >= 0.0)
 	var expiry_ticks := int(ceil((tuning.rush_momentum_vent_window_duration + 0.2) / TICK_SECONDS))
 	for _i in range(expiry_ticks):
-		expiry_state.tick(TICK_SECONDS, true, false)
+		expiry_state.tick(TICK_SECONDS, true)
 	_check("holding through the whole window is a MISS (0 lifts done) and overheats",
 		expiry_misses.size() == 1 and expiry_misses[0][0] == 0 and expiry_state.is_locked_out())
 
@@ -921,12 +883,12 @@ func _test_gesture_judge(tuning: TuningConfig) -> void:
 	closed_state.vent_missed.connect(func(_done: int, _required: int) -> void: closed_signals[0] += 1)
 	_press_and_engage(closed_state)
 	for _i in range(30):  # 3 s: still climbing Building — far from any window
-		closed_state.tick(TICK_SECONDS, true, false)
+		closed_state.tick(TICK_SECONDS, true)
 	for _i in range(3):  # rapid lift/re-press flurry with no window open
 		closed_state.notify_rush_released()
-		closed_state.tick(TICK_SECONDS, true, false)
+		closed_state.tick(TICK_SECONDS, true)
 		closed_state.notify_rush_pressed()
-		closed_state.tick(TICK_SECONDS, true, false)
+		closed_state.tick(TICK_SECONDS, true)
 	_check("lifts with no window open emit no vent signals and change no vent state",
 		closed_signals[0] == 0 and closed_state.vent_tier() == 0
 			and not closed_state.is_locked_out())
@@ -1080,12 +1042,12 @@ func _overheat_at_tier(state: RushMomentumState, tier: int) -> Dictionary:
 	_vent_cleanly(state, tier)
 	var elapsed := 0.0
 	while not state.is_locked_out() and elapsed < 30.0:  # ride on, ignoring the next window
-		state.tick(TICK_SECONDS, true, false)
+		state.tick(TICK_SECONDS, true)
 		elapsed += TICK_SECONDS
 	var overheat_heat := state.heat
 	var lockout_seconds := 0.0
 	while not ready_fired[0] and lockout_seconds < 120.0:
-		state.tick(TICK_SECONDS, false, false)
+		state.tick(TICK_SECONDS, false)
 		lockout_seconds += TICK_SECONDS
 	return {
 		"clean_vents": clean_vents[0],
@@ -1246,7 +1208,7 @@ func _measure_mean_arrival_seconds(tuning: TuningConfig, seed_value: int, depth_
 		state.heat = target_heat
 		var waited := 0.0
 		while not state.is_vent_approaching() and waited < 120.0:
-			state.tick(TICK_SECONDS, true, false)
+			state.tick(TICK_SECONDS, true)
 			state.heat = target_heat
 			waited += TICK_SECONDS
 		total_seconds += waited
@@ -1262,7 +1224,7 @@ func _measure_vent_autopilot_survival(tuning: TuningConfig) -> void:
 	var cruise_bonus_seconds := 0.0
 	var cruise_ticks := int(round(AUTOPILOT_SECONDS / TICK_SECONDS))
 	for _i in range(cruise_ticks):
-		cruise_state.tick(TICK_SECONDS, true, false)
+		cruise_state.tick(TICK_SECONDS, true)
 		cruise_bonus_seconds += cruise_state.bonus * TICK_SECONDS
 	var cruise_average := cruise_bonus_seconds / AUTOPILOT_SECONDS
 
@@ -1446,7 +1408,7 @@ func _run_vent_autopilot(tuning: TuningConfig, seed_value: int, gesture_success:
 	var total_ticks := int(round(AUTOPILOT_SECONDS / TICK_SECONDS))
 	for _t in range(total_ticks):
 		if state.is_locked_out():
-			state.tick(TICK_SECONDS, false, false)
+			state.tick(TICK_SECONDS, false)
 			tick_index[0] += 1
 			locked_seconds += TICK_SECONDS
 			# FREEZE-PRICED METRIC (Tim 2026-07-19): the overheat freezes the rushed property
@@ -1471,7 +1433,7 @@ func _run_vent_autopilot(tuning: TuningConfig, seed_value: int, gesture_success:
 			planned.erase(tick_index[0])
 		# Mirror GameState's hold rule: an open window counts as rushing through the lifts.
 		var rushing: bool = pressed[0] or state.is_vent_window_open()
-		state.tick(TICK_SECONDS, rushing, false)
+		state.tick(TICK_SECONDS, rushing)
 		tick_index[0] += 1
 		total_bonus_seconds += state.bonus * TICK_SECONDS
 		if state.current_band() == RushMomentumState.Band.OVERDRIVE:
@@ -1504,13 +1466,13 @@ func _test_approach_phase(tuning: TuningConfig) -> void:
 		probe.is_vent_approaching() and not probe.is_vent_window_open()
 			and absf(probe.vent_approach_remaining()
 					- tuning.rush_momentum_vent_approach_seconds) < 0.0001)
-	probe.tick(TICK_SECONDS, true, false)
+	probe.tick(TICK_SECONDS, true)
 	_check("vent_approach_remaining() counts down on the tick clock",
 		absf(probe.vent_approach_remaining()
 				- (tuning.rush_momentum_vent_approach_seconds - TICK_SECONDS)) < 0.0001)
 	var flight_guard := 0
 	while probe.is_vent_approaching() and flight_guard < 200:
-		probe.tick(TICK_SECONDS, true, false)
+		probe.tick(TICK_SECONDS, true)
 		flight_guard += 1
 	_check("the flight ends in an OPEN window (approach cleared, remaining reads 0)",
 		probe.is_vent_window_open() and not probe.is_vent_approaching()
@@ -1536,7 +1498,7 @@ func _test_approach_phase(tuning: TuningConfig) -> void:
 		opens.append([tick_index[0], required_lifts]))
 	_press_and_engage(state)
 	var step := func() -> void:
-		state.tick(TICK_SECONDS, true, false)
+		state.tick(TICK_SECONDS, true)
 		tick_index[0] += 1
 	const APPROACH_PROBE_VENTS := 8
 	var vents_done := 0
@@ -1601,7 +1563,7 @@ func _test_approach_cancellation(tuning: TuningConfig) -> void:
 	_press_and_engage(release_state)
 	_check("(setup) an event went in flight", _ride_to_approach(release_state) >= 0.0)
 	release_state.notify_rush_released()
-	release_state.tick(TICK_SECONDS, false, false)
+	release_state.tick(TICK_SECONDS, false)
 	_check("one released tick cancels the flight silently (no miss, no lockout)",
 		not release_state.is_vent_approaching()
 			and is_zero_approx(release_state.vent_approach_remaining())
@@ -1610,7 +1572,7 @@ func _test_approach_cancellation(tuning: TuningConfig) -> void:
 	# next approach_ticks - 1 ticks, so ANY open here would be the cancelled event's ghost.
 	_press_and_engage(release_state)
 	for _i in range(approach_ticks - 1):
-		release_state.tick(TICK_SECONDS, true, false)
+		release_state.tick(TICK_SECONDS, true)
 	_check("no phantom window after the cancel (nothing can open before a fresh full approach)",
 		release_opens[0] == 0)
 
@@ -1625,7 +1587,7 @@ func _test_approach_cancellation(tuning: TuningConfig) -> void:
 	_press_and_engage(overheat_state)
 	_check("(setup) an event went in flight", _ride_to_approach(overheat_state) >= 0.0)
 	overheat_state.heat = tuning.rush_momentum_hard_ceiling
-	overheat_state.tick(TICK_SECONDS, true, false)
+	overheat_state.tick(TICK_SECONDS, true)
 	_check("a backstop overheat mid-flight cancels silently (locked out, no miss, no open)",
 		overheat_state.is_locked_out() and not overheat_state.is_vent_approaching()
 			and overheat_misses[0] == 0 and overheat_opens[0] == 0)
@@ -1633,7 +1595,7 @@ func _test_approach_cancellation(tuning: TuningConfig) -> void:
 	# only via a fresh spawn's full approach (never sooner), with no leftover flight state.
 	var lockout_elapsed := 0.0
 	while overheat_state.is_locked_out() and lockout_elapsed < 120.0:
-		overheat_state.tick(TICK_SECONDS, false, false)
+		overheat_state.tick(TICK_SECONDS, false)
 		lockout_elapsed += TICK_SECONDS
 	_press_and_engage(overheat_state)
 	var reopen_seconds := _ride_to_window_open(overheat_state)
@@ -1680,7 +1642,7 @@ func _test_vent_refractory_spacing(tuning: TuningConfig) -> void:
 		rolled >= refractory_min - 0.0001 and rolled <= refractory_max + 0.0001)
 	var waited := 0.0
 	while not hot.is_vent_approaching() and waited < 10.0:
-		hot.tick(TICK_SECONDS, true, false)
+		hot.tick(TICK_SECONDS, true)
 		waited += TICK_SECONDS
 	print("     (hot engage rolled %.2f s of quiet; certain hazard spawned after %.2f s)"
 			% [rolled, waited])
@@ -1727,7 +1689,7 @@ func _test_vent_refractory_spacing(tuning: TuningConfig) -> void:
 			last_success_tick[0] = -1)
 	_press_and_engage(state)
 	var step := func() -> void:
-		state.tick(TICK_SECONDS, true, false)
+		state.tick(TICK_SECONDS, true)
 		tick_index[0] += 1
 	const SPACING_PROBE_VENTS := 12
 	var vents_done := 0
@@ -1931,10 +1893,12 @@ func _test_freeze_reset_unfreezes(tuning: TuningConfig) -> void:
 
 
 func _test_freeze_frenzy_leak(tuning: TuningConfig) -> void:
-	print("\n29. A frenzy burn during the lockout resurrects nothing")
+	print("\n29. A frenzy burn during the lockout resurrects nothing, and the lockout keeps running")
 	# Frozen property 1 (long cycle) + unfrozen ATM control, then pop a frenzy MID-LOCKOUT:
 	# the burn multiplies whatever collects, so the frozen property must give it literally
-	# nothing to multiply, and the lockout clock itself must hold (a burn freezes it).
+	# nothing to multiply. The lockout clock now KEEPS RUNNING through the burn (Tim 2026-07-19
+	# dropped the frenzy freeze so the two systems never lock each other out) — cooling down
+	# during a burn is exactly the overlap that used to be impossible.
 	var game := _fresh_game(tuning, 8300)
 	_seed_staffed_property(game, 0)
 	_seed_staffed_property(game, 1)
@@ -1947,23 +1911,31 @@ func _test_freeze_frenzy_leak(tuning: TuningConfig) -> void:
 	var frozen_progress := p1.cycle_progress
 	var heat_at_pop := game.rush_momentum.heat
 	var cash_before := game.economy.cash
-	var frozen_moved := false
-	var heat_moved_during_burn := false
+	var moved_while_frozen := false
+	var heat_fell_during_burn := false
+	var thawed_during_burn := false
 	var burn_ticks := 0
 	while game.frenzy.is_burning() and burn_ticks < 600:
 		game.tick(TICK_SECONDS)
 		burn_ticks += 1
-		# Heat is only asserted while the burn is STILL running: the tick that ends the burn
-		# legitimately resumes the lockout drain.
-		if game.frenzy.is_burning() and not is_equal_approx(game.rush_momentum.heat, heat_at_pop):
-			heat_moved_during_burn = true
-		if not is_equal_approx(p1.cycle_progress, frozen_progress):
-			frozen_moved = true
+		if game.rush_momentum.heat < heat_at_pop:
+			heat_fell_during_burn = true
+		# Only while STILL frozen: now that a burn no longer holds the lockout, the cooldown
+		# can finish mid-burn, and a thawed property resuming its cycle is correct — the very
+		# overlap this section exists to prove. Keep the "pays nothing" assertion scoped to
+		# the frozen span, and re-baseline once it thaws.
+		if p1.is_overheat_frozen:
+			if not is_equal_approx(p1.cycle_progress, frozen_progress):
+				moved_while_frozen = true
+		else:
+			thawed_during_burn = true
 	_check("(setup) the burn ran and ended", burn_ticks > 5 and not game.frenzy.is_burning())
-	_check("the frozen property stayed down and paid NOTHING through the burn",
-		p1.is_overheat_frozen and not frozen_moved)
-	_check("the lockout clock stayed frozen through the burn (heat held)",
-		not heat_moved_during_burn and game.rush_momentum.is_locked_out())
+	_check("the frozen property paid NOTHING for as long as it stayed down",
+		not moved_while_frozen)
+	_check("the lockout cooldown KEPT DRAINING through the burn (no mutual freeze)",
+		heat_fell_during_burn)
+	_check("the lockout could even COMPLETE inside the burn (the overlap that used to be impossible)",
+		thawed_during_burn and not p1.is_overheat_frozen)
 	_check("the unfrozen control still earned (the burn had something honest to multiply)",
 		game.economy.cash > cash_before)
 

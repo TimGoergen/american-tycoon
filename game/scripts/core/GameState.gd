@@ -98,8 +98,9 @@ func _init(property_configs: Array, p_tuning: TuningConfig) -> void:
 func tick(delta: float, extra_property_multiplier: float = 1.0) -> void:
 	frenzy.tick(delta)
 	# Rush heat climbs while the player is actively rushing (rushed within the grace window)
-	# and bleeds otherwise; a frenzy BURN freezes the whole heat model (Tim 2026-07-15 — see
-	# RushMomentumState). The bonus MAGNITUDE is global, but it is applied ONLY to the properties
+	# and bleeds otherwise. A frenzy burn no longer freezes any of it (Tim 2026-07-19 — see
+	# RushMomentumState): the two systems run at once and compound.
+	# The bonus MAGNITUDE is global, but it is applied ONLY to the properties
 	# being actively rushed (Tim 2026-07-13) — via each property's own rush_momentum_factor below,
 	# NOT the whole-economy tick multiplier.
 	# While a vent window is open, the gesture's lifts (finger deliberately OFF the button —
@@ -108,8 +109,7 @@ func tick(delta: float, extra_property_multiplier: float = 1.0) -> void:
 	# neither the global build nor the rushed property's factor can bleed mid-gesture. The
 	# window is at most ~1 s, so freezing the decay for its span is imperceptible elsewhere.
 	var vent_gesture_holding := rush_momentum.is_vent_window_open()
-	rush_momentum.tick(delta, _rush_grace_remaining > 0.0 or vent_gesture_holding,
-			frenzy.is_burning())
+	rush_momentum.tick(delta, _rush_grace_remaining > 0.0 or vent_gesture_holding)
 	if not vent_gesture_holding:
 		_rush_grace_remaining = maxf(_rush_grace_remaining - delta, 0.0)
 	# Point each property's momentum factor at the current bonus while it is still inside its

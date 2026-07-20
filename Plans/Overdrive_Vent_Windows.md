@@ -715,3 +715,13 @@ Keep reporting cruise / skilled / sloppy as before; sloppy is expected to move v
   with the bar. The tail ends the instant rushing resumes (keeping the fresh-ladder anti-farm
   rule); an overheat still zeroes instantly. `banked_bonus()`/`banked_fraction()` deleted; the UI
   chip is now "SPINNING DOWN". Every release case pays, plain or deep. See the BUILT section above.
+- **The tail's bonus applies ONLY while the property's cycle is running — INTENDED, not a gap**
+  (Tim, 2026-07-20). A staffed property auto-cycles, so it earns the decaying bonus for the whole
+  tail; an UNSTAFFED property earns it on the one in-flight cycle it finishes after release, then
+  its cycle stops (`PropertyState.tick` line ~437) and no further bonus is paid even though the
+  meter keeps draining for a second or two more. Tim's explicit preference: the bonus should apply
+  only while a cycle is running — always if staffed, until the current cycle ends if unstaffed. So
+  an unstaffed tail that "fizzles" when its cycle stops is CORRECT; do NOT make unstaffed bailed
+  properties keep auto-cycling to close the visual gap (that option was raised and rejected). The
+  income header was fixed to match by keying its passive-rate branch on `is_cycle_running` rather
+  than `is_staffed` (commit 8387237), so the readout tracks payment exactly in both cases.

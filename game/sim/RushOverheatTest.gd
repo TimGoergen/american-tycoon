@@ -55,7 +55,10 @@ extends SceneTree
 #  21. AUTOPILOT SURVIVAL + DUTY CYCLE (measure, don't guess): modeled SKILLED (95% per-LIFT
 #      success) and SLOPPY (70%) venters ride each excursion until they MISS — no bail —
 #      reporting the survival curve (median / p90 tier reached) and the long-session average
-#      bonus vs the cruise baseline.
+#      bonus vs the cruise baseline. Plus, since "bailing pays" (Tim 2026-07-20), a third
+#      TIMID FARMER: skilled hands, but it bails at tier 1-2 every time to bank the spin-down
+#      instead of riding. Gated at or below cruise — if a farmer beats a rider, the cash-out
+#      is mispriced and the mechanic is broken.
 #
 # The approach phase (Tim 2026-07-19 — the hazard roll SPAWNS an event that travels for
 # vent_approach_seconds before its window opens) adds:
@@ -1238,6 +1241,14 @@ func _measure_vent_autopilot_survival(tuning: TuningConfig) -> void:
 	# swings the average by a couple of points, enough to mislead a retune.
 	var skilled := _run_vent_autopilot_seeds(tuning, 4001, 0.95)
 	var sloppy := _run_vent_autopilot_seeds(tuning, 4002, 0.70)
+	# THE TIMID FARMER (added with "bailing pays", Tim 2026-07-20): gestures as well as the
+	# skilled venter — this is NOT a bad player — but never takes a hard check. It engages, vents
+	# once or twice at shallow depth where the hazard is slow, bails to bank the tail, and
+	# remounts at once. Nothing modeled this before, because bailing paid nothing and the policy
+	# was strictly losing; now that a bail spins down, it is the strategy most likely to break
+	# the mechanic. If this FARMER beats a RIDER, the change is wrong at the design level and
+	# wants reverting, not retuning.
+	var timid := _run_vent_autopilot_seeds(tuning, 4003, 0.95, 1, 2)
 
 	var skilled_median := _tier_percentile(skilled["excursion_tiers"], 0.5)
 	var skilled_p90 := _tier_percentile(skilled["excursion_tiers"], 0.9)
@@ -1255,6 +1266,8 @@ func _measure_vent_autopilot_survival(tuning: TuningConfig) -> void:
 	print("  >>> SLOPPY VENTER  (70%% per lift):  %+.1f%% avg | survival median tier %d, p90 tier %d (%d runs) <<<"
 			% [sloppy["average_bonus"] * 100.0, sloppy_median, sloppy_p90,
 			(sloppy["excursion_tiers"] as Array).size()])
+	print("  >>> TIMID FARMER  (95%%, bails tier 1-2):  %+.1f%% avg | %d bails, %d overheats <<<"
+			% [timid["average_bonus"] * 100.0, timid["bails"], timid["overheats"]])
 	print("      (skilled: %d vents, %d overheats — %d fumbled, %d outpaced by the deep-tier windows;"
 			% [skilled["vents"], skilled["overheats"],
 			skilled["missed_windows"] - skilled["outpaced_windows"], skilled["outpaced_windows"]])
@@ -1278,31 +1291,49 @@ func _measure_vent_autopilot_survival(tuning: TuningConfig) -> void:
 	_check("every skilled run eventually ends in an overheat (the endless ladder's designed ending)",
 		skilled["overheats"] >= 1)
 	_check("no CLEAN, in-time gesture was ever judged a miss (autopilot and judge agree on the rules)",
-		skilled["clean_missed"] == 0 and sloppy["clean_missed"] == 0)
+		skilled["clean_missed"] == 0 and sloppy["clean_missed"] == 0
+			and timid["clean_missed"] == 0)
+	# THE FARM GATE. Cash-out has to be worth LESS than riding, or "bailing pays" pays too well
+	# and the ladder's difficulty curve stops being the thing worth engaging with.
+	_check("(setup) the timid farmer actually bailed rather than riding", timid["bails"] > 0)
+	_check("the TIMID FARMER lands at or below cruise (the cash-out is not a farm)",
+		timid["average_bonus"] <= cruise_average + 0.005)
+	_check("the timid farmer earns far less than the skilled rider (judgment still beats farming)",
+		timid["average_bonus"] < skilled["average_bonus"])
 
 
 ## Average _run_vent_autopilot over AUTOPILOT_SEED_RUNS seeds. average_bonus and the time
 ## splits come back as per-seed means; vents/overheats/misses as totals across all seeds;
 ## excursion_tiers as one pooled array (the survival curve's samples).
-func _run_vent_autopilot_seeds(tuning: TuningConfig, base_seed: int, gesture_success: float) -> Dictionary:
+func _run_vent_autopilot_seeds(tuning: TuningConfig, base_seed: int, gesture_success: float,
+		bail_min_tier := 0, bail_max_tier := 0) -> Dictionary:
 	var totals := {
 		"average_bonus": 0.0, "vents": 0, "overheats": 0, "missed_windows": 0,
-		"clean_missed": 0, "outpaced_windows": 0, "excursion_tiers": [],
+		"clean_missed": 0, "outpaced_windows": 0, "excursion_tiers": [], "bails": 0,
 		"locked_seconds": 0.0, "overdrive_seconds": 0.0, "climbing_seconds": 0.0,
 	}
 	for s in range(AUTOPILOT_SEED_RUNS):
-		var run := _run_vent_autopilot(tuning, base_seed + s * 100, gesture_success)
+		var run := _run_vent_autopilot(tuning, base_seed + s * 100, gesture_success,
+				bail_min_tier, bail_max_tier)
 		totals["average_bonus"] += run["average_bonus"] / AUTOPILOT_SEED_RUNS
 		totals["vents"] += run["vents"]
 		totals["overheats"] += run["overheats"]
 		totals["missed_windows"] += run["missed_windows"]
 		totals["clean_missed"] += run["clean_missed"]
 		totals["outpaced_windows"] += run["outpaced_windows"]
+		totals["bails"] += run["bails"]
 		(totals["excursion_tiers"] as Array).append_array(run["excursion_tiers"])
 		totals["locked_seconds"] += run["locked_seconds"] / AUTOPILOT_SEED_RUNS
 		totals["overdrive_seconds"] += run["overdrive_seconds"] / AUTOPILOT_SEED_RUNS
 		totals["climbing_seconds"] += run["climbing_seconds"] / AUTOPILOT_SEED_RUNS
 	return totals
+
+
+## Roll the tier this excursion will bail at, or 0 for the ride-until-you-miss policy.
+func _roll_bail_target(skill_rng: RandomNumberGenerator, bail_min_tier: int, bail_max_tier: int) -> int:
+	if bail_max_tier <= 0:
+		return 0
+	return skill_rng.randi_range(maxi(bail_min_tier, 1), bail_max_tier)
 
 
 ## The survival curve's percentile read: the tier at `fraction` of the way up the sorted
@@ -1338,7 +1369,16 @@ const AUTOPILOT_REACTION_TICKS := 3
 ## lands cleanly); RIDE UNTIL THE MISS — the endless ladder has no cap to bail at, so the excursion
 ## ends when a gesture is fumbled or a deep-tier window shrinks below what even a clean plan
 ## can finish in time (the designed difficulty wall); after any overheat, remount when re-armed.
-func _run_vent_autopilot(tuning: TuningConfig, seed_value: int, gesture_success: float) -> Dictionary:
+##
+## BAIL POLICY (added 2026-07-20 with "bailing pays"): with bail_max_tier > 0 the venter instead
+## rolls a bail target in [bail_min_tier, bail_max_tier] per excursion and lets go the moment it
+## reaches it, banking the tail — then remounts IMMEDIATELY (release for one tick, re-press,
+## re-engage). That immediate remount is deliberate: it is the strongest form of the farm and
+## exactly the tap-OVR-off-and-on shape the fresh-ladder rule exists to defeat, so gating on it
+## gates on the worst case rather than a polite one. bail_max_tier = 0 keeps the original
+## ride-until-you-miss policy.
+func _run_vent_autopilot(tuning: TuningConfig, seed_value: int, gesture_success: float,
+		bail_min_tier := 0, bail_max_tier := 0) -> Dictionary:
 	var state := _fresh_state(tuning, seed_value)
 	# The skill dice are a SEPARATE seeded rng, so the venter's fumbles can't perturb the
 	# window-schedule rolls (both stay reproducible run to run).
@@ -1354,15 +1394,22 @@ func _run_vent_autopilot(tuning: TuningConfig, seed_value: int, gesture_success:
 	var outpaced_windows := [0]  # clean plans the window was too short to fit — the difficulty wall
 	var planned_clean := [false]
 	var planned_fits := [false]
-	var excursion_tier := [0]    # vents THIS excursion — the survival stat, read at each overheat
+	var excursion_tier := [0]    # vents THIS excursion — the survival stat, read at each ending
 	var excursion_tiers: Array = []
+	var bails := [0]
+	# The tier THIS excursion intends to bail at (0 = ride until the miss). Rolled on the skill
+	# rng, not the schedule rng, so adding a bail policy cannot perturb window timing.
+	var bail_target := [_roll_bail_target(skill_rng, bail_min_tier, bail_max_tier)]
+	var bail_now := [false]     # set by the success that hit the target; acted on next tick
 	# Scheduled gesture edges, keyed by absolute tick index -> "press" or "release". Edges are
 	# executed just before that tick, like real input events arriving between logic ticks.
 	var planned: Dictionary = {}
 
 	state.vent_succeeded.connect(func(_tier: int, _peak: float) -> void:
 		vents[0] += 1
-		excursion_tier[0] += 1)
+		excursion_tier[0] += 1
+		if bail_target[0] > 0 and excursion_tier[0] >= bail_target[0]:
+			bail_now[0] = true)
 	state.vent_missed.connect(func(_done: int, _required: int) -> void:
 		missed_windows[0] += 1
 		if planned_clean[0] and planned_fits[0]:
@@ -1373,6 +1420,8 @@ func _run_vent_autopilot(tuning: TuningConfig, seed_value: int, gesture_success:
 		overheats[0] += 1
 		excursion_tiers.append(excursion_tier[0])
 		excursion_tier[0] = 0
+		bail_now[0] = false  # the run ended in flames; there is nothing left to bail out of
+		bail_target[0] = _roll_bail_target(skill_rng, bail_min_tier, bail_max_tier)
 		planned.clear())
 	state.vent_window_opened.connect(func(required_lifts: int, duration: float) -> void:
 		var base: int = tick_index[0] + AUTOPILOT_REACTION_TICKS
@@ -1426,7 +1475,18 @@ func _run_vent_autopilot(tuning: TuningConfig, seed_value: int, gesture_success:
 				state.notify_rush_pressed()
 				state.engage_overdrive()
 			continue
-		if planned.has(tick_index[0]):
+		# THE BAIL: one released tick ends the excursion, which banks the bonus at its current
+		# height and clears the ladder. Any half-planned gesture edges go with it.
+		var bailing_this_tick: bool = bail_now[0]
+		if bailing_this_tick:
+			bail_now[0] = false
+			bails[0] += 1
+			excursion_tiers.append(excursion_tier[0])
+			excursion_tier[0] = 0
+			pressed[0] = false
+			state.notify_rush_released()
+			planned.clear()
+		elif planned.has(tick_index[0]):
 			if planned[tick_index[0]] == "press":
 				pressed[0] = true
 				state.notify_rush_pressed()
@@ -1443,6 +1503,12 @@ func _run_vent_autopilot(tuning: TuningConfig, seed_value: int, gesture_success:
 			overdrive_seconds += TICK_SECONDS
 		else:
 			climbing_seconds += TICK_SECONDS
+		if bailing_this_tick:
+			# Straight back on: the banked tail keeps paying underneath the fresh climb.
+			pressed[0] = true
+			state.notify_rush_pressed()
+			state.engage_overdrive()
+			bail_target[0] = _roll_bail_target(skill_rng, bail_min_tier, bail_max_tier)
 	return {
 		"average_bonus": total_bonus_seconds / AUTOPILOT_SECONDS,
 		"vents": vents[0],
@@ -1450,6 +1516,7 @@ func _run_vent_autopilot(tuning: TuningConfig, seed_value: int, gesture_success:
 		"missed_windows": missed_windows[0],
 		"clean_missed": clean_missed[0],
 		"outpaced_windows": outpaced_windows[0],
+		"bails": bails[0],
 		"excursion_tiers": excursion_tiers,
 		"locked_seconds": locked_seconds,
 		"overdrive_seconds": overdrive_seconds,

@@ -530,8 +530,9 @@ func _process(delta: float) -> void:
 		_instrument.update_overdrive(TARGET_FRAC, event_frac, window_open, countdown_frac,
 				_rush_momentum.vent_required_lifts(), _window_lifts_done)
 	elif locked_out:
-		# The dead-bar gray: during the drain it back-fills behind the shown (eased) fill edge —
-		# the same _displayed_fill the meter draws, so the gray meets the red with no seam —
+		# The lockout paint: during the drain the overlay draws BOTH the red heat fill and the
+		# dead-bar gray behind it from the shown (eased) _displayed_fill edge, one renderer sharing
+		# one pixel edge so no track color can peek between red and gray (see _draw_lockout);
 		# and during the re-arm it recedes on the core's real countdown fraction.
 		# Snap UP, ease DOWN. The fraction jumps 0 → 1 the instant the drain ends and the re-arm
 		# begins; easing INTO that would draw a zero-width gray on the transition frame and grow
@@ -640,7 +641,11 @@ func _update_fill_color(delta: float, locked_out: bool, overdrive: bool) -> void
 	if locked_out:
 		# Draining after an overheat: a flat dark red — the punishment color, no blink (the
 		# urgency is over; the player is just watching the cooldown empty out).
-		_fill_style.bg_color = UiPalette.BRICK
+		# The OVERLAY paints the drain now; make the ProgressBar's own fill transparent so it
+		# never draws a second, pixel-misaligned red edge underneath the overlay's — that double
+		# edge was the source of the shimmering white sliver (Tim 2026-07-20; see _draw_lockout).
+		# Every other mode below restores an opaque fill color, so this only holds while locked out.
+		_fill_style.bg_color = Color(UiPalette.BRICK, 0.0)
 		_bubbles.bubble_color = UiPalette.BRIGHT_PURPLE
 		return
 
@@ -909,9 +914,12 @@ func _pulse_vent_telegraph(required_lifts: int) -> void:
 ##     but in MUSTARD_GOLD — the act-now family the old "VENT!" chip established — because
 ##     this line is where acting happens, not where safety ends. Drawn LAST so nothing tints it.
 ##
-## In LOCKOUT (Tim 2026-07-18 night) it draws the dead-bar gray:
-##   • drain phase: dark gray back-fills the track the shrinking red fill reveals, so the bar
-##     visibly dies from the right as it cools;
+## In LOCKOUT (Tim 2026-07-18 night) it draws the whole bar — the draining red heat fill AND the
+## dead-bar gray behind it (the host suppresses the ProgressBar's own fill while locked out, so
+## this overlay is the SINGLE renderer of the drain edge; Tim 2026-07-20):
+##   • drain phase: red heat fill on the left, dark gray filling the track it has vacated on the
+##     right, meeting at one shared rounded pixel, so the bar visibly dies from the right as it
+##     cools with no sliver of light track shimmering between the two;
 ##   • re-arm phase: the gray covers the whole bar, then its right edge recedes leftward in
 ##     proportion to the re-arm countdown, revealing the normal track gray behind it — the
 ##     gray's retreat IS the visual re-arm timer, and the READY flash lands on a bar that
@@ -988,6 +996,12 @@ class OverdriveInstrumentOverlay extends Control:
 	## neutral dark gray keeps its hue contrast where red on near-black would just be two
 	## dark shapes.
 	const LOCKOUT_GRAY := Color("#45464C")
+	## The draining heat fill during lockout, drawn BY THIS OVERLAY (Tim 2026-07-20). The
+	## host suppresses the ProgressBar's own fill while locked out and this overlay paints
+	## both the red drain and the gray behind it, so the drain edge is ONE edge shared by
+	## both rects — see _draw_lockout. Matches UiPalette.BRICK (the punishment color the
+	## fill wore before), following this class's hex-literal-with-palette-name convention.
+	const LOCKOUT_FILL_COLOR := Color("#8E2F1E")      # UiPalette.BRICK
 
 	## Display state, fed every frame by the host's _process (derived fresh from the core each
 	## frame — see the watchdog note there). _event_frac < 0 means no event bar. _active and
@@ -1026,9 +1040,10 @@ class OverdriveInstrumentOverlay extends Control:
 		_lifts_done = lifts_done
 		queue_redraw()
 
-	## Overheat lockout mode: the dead-bar gray. `fill_frac` is the meter's SHOWN (eased) fill,
-	## so the gray's left edge meets the draining red fill with no seam; `rearm_frac` is the
-	## core's re-arm countdown remaining (0 while the drain phase still runs).
+	## Overheat lockout mode: the overlay paints the whole bar. `fill_frac` is the meter's SHOWN
+	## (eased) fill; _draw_lockout draws the red heat fill left of that edge and the dead-bar gray
+	## right of it, sharing one rounded pixel so there is no seam. `rearm_frac` is the core's
+	## re-arm countdown remaining (0 while the drain phase still runs).
 	func update_lockout(fill_frac: float, rearm_frac: float) -> void:
 		if _lockout and is_equal_approx(fill_frac, _lockout_fill_frac) \
 				and is_equal_approx(rearm_frac, _rearm_frac):
@@ -1118,9 +1133,20 @@ class OverdriveInstrumentOverlay extends Control:
 			if gray_width > 0.0:
 				draw_rect(Rect2(left_x, top, gray_width, bottom - top), LOCKOUT_GRAY)
 			return
-		# Drain phase: gray back-fills the track behind the shown fill edge — the same
-		# frac × width − inset mapping the fill itself uses, so the two meet seamlessly.
-		var fill_x := clampf(_lockout_fill_frac * size.x - EDGE_INSET, left_x, right_x)
+		# Drain phase: THIS overlay paints the whole bar — red drain on the left, dead gray on
+		# the right — so both share ONE leading edge and no third color (the light track gray)
+		# can ever peek between them (Tim 2026-07-20: the drain had a thin, squiggly white sliver).
+		#
+		# The edge is rounded to a whole pixel with round(). Two renderers used to draw this drain:
+		# Godot's ProgressBar fill (right edge at round(frac × width) − inset, integer-snapped) and
+		# this overlay's gray (left edge at the UNROUNDED frac × width − inset). The two edges
+		# disagreed by a sub-pixel that oscillated 0–1px as the eased fill slid, revealing a shimmering
+		# strip of PROGRESS_TRACK_GRAY between them. Making one renderer draw both, at one rounded x,
+		# removes the seam by construction. The eased fill (_lockout_fill_frac) is unchanged — the edge
+		# still moves smoothly; it just lands on a whole pixel and stops shimmering.
+		var fill_x := clampf(round(_lockout_fill_frac * size.x) - EDGE_INSET, left_x, right_x)
+		if fill_x - left_x > 0.0:
+			draw_rect(Rect2(left_x, top, fill_x - left_x, bottom - top), LOCKOUT_FILL_COLOR)
 		if right_x - fill_x > 0.0:
 			draw_rect(Rect2(fill_x, top, right_x - fill_x, bottom - top), LOCKOUT_GRAY)
 

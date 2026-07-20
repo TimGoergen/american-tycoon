@@ -271,6 +271,15 @@ const OTHER_SECTION_TITLE := "Other"
 ## content and the scroll frame's edges (Tim, 2026-07-09 — the list felt cramped against the frame).
 const SCROLL_VERTICAL_MARGIN := 24
 
+## Width (px) permanently reserved at the right end of every section header for the
+## "this section has modified values" asterisk (Tim, 2026-07-20). The space is reserved on
+## EVERY header whether or not its asterisk is currently showing, so the header text never
+## reflows when a value is overridden or reverted (project rule: no moving UI elements).
+const SECTION_MARKER_WIDTH := 48
+## Font size of that asterisk. Deliberately larger than the header text: an asterisk is a small
+## glyph that sits high in its line box, so at header size it is easy to miss at arm's length.
+const SECTION_MARKER_SIZE := ROW_LABEL_SIZE + 12
+
 
 # One LineEdit per constant, keyed by constant name, read back on Apply.
 var _value_edits: Dictionary = {}
@@ -279,10 +288,14 @@ var _types: Dictionary = {}
 # The baked default for each constant, keyed by name — Apply only stores values
 # that differ from this, and rows that differ are flagged as overridden.
 var _baked: Dictionary = {}
+# Which collapsible section each constant was rendered into, keyed by constant name. Used to
+# refresh only that section's "modified" asterisk when its value is edited.
+var _section_of_knob: Dictionary = {}
 
 var _list: VBoxContainer
 # Each collapsible section, keyed by its title → { "button": Button header, "body": VBoxContainer,
-# "expanded": bool }. All sections start collapsed; the header-row arrow buttons drive them all.
+# "expanded": bool, "marker": Label }. All sections start collapsed; the header-row arrow buttons
+# drive them all. "marker" is the dark-gold asterisk shown when the section holds a modified value.
 var _sections: Dictionary = {}
 var _reset_dynasty_button: Button
 # Two-tap guard on the destructive wipe: armed by the first tap, fires on the second.
@@ -427,13 +440,32 @@ func _add_collapsible_section(title: String) -> VBoxContainer:
 	header.pressed.connect(_toggle_section.bind(title))
 	_list.add_child(header)
 
+	# The "section contains modified values" asterisk, overlaid on the header's right end rather
+	# than appended to the header's text. Two reasons: the button's text is left-aligned, so an
+	# appended "*" would sit next to the title instead of at the right edge; and an overlay
+	# occupies no layout space, so showing or hiding it cannot move the header text. The matching
+	# right-hand content margin in _make_section_plate keeps the title from ever running underneath.
+	var marker := Label.new()
+	marker.text = "*"
+	marker.set_anchors_preset(Control.PRESET_FULL_RECT)
+	marker.offset_right = -12
+	marker.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	marker.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	marker.add_theme_color_override("font_color", UiPalette.DARK_GOLD)
+	marker.add_theme_font_size_override("font_size", SECTION_MARKER_SIZE)
+	# Let taps fall through to the header button underneath, or the asterisk would eat the
+	# right end of the header's tap target.
+	marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	marker.visible = false
+	header.add_child(marker)
+
 	var body := VBoxContainer.new()
 	body.add_theme_constant_override("separation", 14)
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.visible = false   # collapsed by default
 	_list.add_child(body)
 
-	_sections[title] = {"button": header, "body": body, "expanded": false}
+	_sections[title] = {"button": header, "body": body, "expanded": false, "marker": marker}
 	_update_section_header(title)
 	return body
 
@@ -509,6 +541,9 @@ func _make_section_plate(color: Color) -> StyleBoxFlat:
 	style.set_border_width_all(3)
 	style.set_corner_radius_all(4)
 	style.set_content_margin_all(8)
+	# Keep the header's own text clear of the asterisk's reserved column at the right end,
+	# so a long section title wraps/clips before it can collide with the marker.
+	style.set_content_margin(SIDE_RIGHT, SECTION_MARKER_WIDTH)
 	return style
 
 
@@ -551,6 +586,47 @@ func _update_section_header(title: String) -> void:
 	(section["button"] as Button).text = "%s  %s" % [marker, title.to_upper()]
 
 
+## True when this constant's editor currently holds a value that differs from its baked default —
+## i.e. it is a live override. This deliberately reads the LineEdit rather than the value the row
+## was seeded with, so the flag tracks what the user has typed, not just what was loaded from
+## user://tuning_overrides.json. The parse matches _on_apply_pressed exactly (same int rounding),
+## so "modified" always means "Apply would write an override for this knob".
+##
+## A half-typed entry ("", "-", "0.") is not a number yet, so it counts as NOT modified — the same
+## way Apply skips it. That keeps the asterisk from flickering on every keystroke mid-edit.
+func _is_knob_modified(name: String) -> bool:
+	if not _value_edits.has(name):
+		return false
+	var text: String = (_value_edits[name] as LineEdit).text.strip_edges()
+	if not text.is_valid_float():
+		return false
+	var value: Variant
+	if _types[name] == TYPE_INT:
+		value = int(round(text.to_float()))
+	else:
+		value = text.to_float()
+	return value != _baked[name]
+
+
+## Show or hide one section's dark-gold asterisk to match whether any knob in it is modified.
+func _refresh_section_marker(title: String) -> void:
+	if not _sections.has(title):
+		return
+	var any_modified := false
+	for name in _section_of_knob:
+		if String(_section_of_knob[name]) == title and _is_knob_modified(String(name)):
+			any_modified = true
+			break
+	var section: Dictionary = _sections[title]
+	(section["marker"] as Label).visible = any_modified
+
+
+## Re-evaluate every section's asterisk (used once the rows are built).
+func _refresh_all_section_markers() -> void:
+	for title in _sections:
+		_refresh_section_marker(String(title))
+
+
 # ---------------------------------------------------------------------------
 # Showing / populating
 # ---------------------------------------------------------------------------
@@ -565,6 +641,7 @@ func open(effective_tuning: TuningConfig, baked_tuning: TuningConfig) -> void:
 	_types.clear()
 	_baked.clear()
 	_sections.clear()
+	_section_of_knob.clear()
 	for child in _list.get_children():
 		child.queue_free()
 
@@ -603,7 +680,11 @@ func open(effective_tuning: TuningConfig, baked_tuning: TuningConfig) -> void:
 		for pair in knobs_by_section[title]:
 			var name: String = pair[0]
 			var type: int = pair[1]
+			_section_of_knob[name] = String(title)
 			_add_constant_row(body, name, type, effective_tuning.get(name), baked_tuning.get(name))
+
+	# Sections start collapsed, so the asterisks are the only way to see which ones hold overrides.
+	_refresh_all_section_markers()
 
 	visible = true
 
@@ -669,13 +750,26 @@ func _add_constant_row(parent: VBoxContainer, name: String, type: int, current_v
 	var edit := LineEdit.new()
 	edit.text = _format_value(current_value)
 	edit.custom_minimum_size = Vector2(VALUE_COLUMN_WIDTH, VALUE_HEIGHT)
-	edit.alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	# LEFT-aligned, not right (Tim, 2026-07-20 — "it is not operating like a standard text
+	# editing field"). With right alignment, tapping near the end of the value put the caret on
+	# the wrong character, so backspace deleted the wrong one: Godot's LineEdit maps a tap to a
+	# caret column through the text's own left-to-right layout, and the extra offset that pushes
+	# right-aligned text over is not accounted for in that hit test. Left alignment removes the
+	# offset entirely, which is what makes the field behave like every other text box.
+	edit.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	edit.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	edit.add_theme_font_size_override("font_size", ROW_VALUE_SIZE)
 	# The STANDARD phone keyboard, not the numeric keypad: the values are numbers, but
 	# the numeric keypad has no arrow keys, which made moving the caret inside a long
 	# value nearly impossible (Tim, 2026-07-06).
 	edit.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_DEFAULT
+	# Nothing rewrites the text WHILE typing — assigning to LineEdit.text resets the caret to the
+	# start, which would fight every keystroke. The value is parsed and tidied only on COMMIT
+	# (Enter or leaving the field); see _normalize_value_text.
+	edit.text_submitted.connect(func(_submitted: String) -> void: _normalize_value_text(name))
+	edit.focus_exited.connect(func() -> void: _normalize_value_text(name))
+	# Read-only: keeps the section asterisk live as the user types, without touching the text.
+	edit.text_changed.connect(func(_new_text: String) -> void: _on_value_text_changed(name))
 	row.add_child(edit)
 
 	_value_edits[name] = edit
@@ -685,6 +779,43 @@ func _add_constant_row(parent: VBoxContainer, name: String, type: int, current_v
 ## cleanly (0.005, 1.15, 103600000000000), so no custom formatting is needed.
 func _format_value(value: Variant) -> String:
 	return str(value)
+
+
+## A value editor changed. This only READS the field — it never writes to it, because assigning to
+## LineEdit.text moves the caret and would break normal typing. All it does is keep the owning
+## section's "modified" asterisk in step with what is currently in the box.
+func _on_value_text_changed(name: String) -> void:
+	if _section_of_knob.has(name):
+		_refresh_section_marker(String(_section_of_knob[name]))
+
+
+## Tidy one value editor on COMMIT — when Enter is pressed or focus leaves the field, never while
+## the user is still typing. This is where stray whitespace (the phone keyboard's autocorrect likes
+## to add a trailing space) and odd-but-valid spellings like "1." or "1e3" get rendered back in the
+## panel's normal form, so the field ends up showing exactly the number Apply will store.
+##
+## A half-finished entry is left completely alone: if the text is not a number yet ("", "-", "0."),
+## or is already in normal form, nothing is assigned. That matters because assigning to .text resets
+## the caret, so the rule is to write only when the text genuinely has to change.
+func _normalize_value_text(name: String) -> void:
+	if not _value_edits.has(name):
+		return
+	var edit: LineEdit = _value_edits[name]
+	var text: String = edit.text.strip_edges()
+	if not text.is_valid_float():
+		return   # mid-edit or nonsense — leave it as typed; Apply already skips it
+	var value: Variant
+	if _types[name] == TYPE_INT:
+		value = int(round(text.to_float()))
+	else:
+		value = text.to_float()
+	var normalized := _format_value(value)
+	if edit.text != normalized:
+		edit.text = normalized
+		# The assignment above sent the caret to column 0; park it at the end, which is where a
+		# text field normally leaves it after a committed edit.
+		edit.caret_column = normalized.length()
+	_on_value_text_changed(name)
 
 
 # ---------------------------------------------------------------------------

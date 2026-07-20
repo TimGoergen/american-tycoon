@@ -251,6 +251,101 @@ items, catch/timing polish) ride along when their game is touched.
 
 ---
 
+## 6. Overdrive Vent Windows (branch `feature/overdrive-vent-windows`)
+
+*Added 2026-07-19. This is the only section with a branch not yet on `main` — the whole
+feature is waiting on this pass. Design of record: `Plans/Overdrive_Vent_Windows.md`;
+read its "Shipped state" section for current behaviour and knob values. Install the
+branch APK, not a `main` build.*
+
+**The trap to avoid:** the three biggest open questions cannot be answered by playing
+well. Skilled play is already sim-validated at +74.8%. What is unvalidated is what
+happens when you are bad, careless, or greedy — so this protocol deliberately spends
+half its time playing badly. Do not skip those sittings because they feel unproductive.
+
+### Sitting A — the freeze, played badly (~20 min). Answers open verdict 1.
+
+The sim says sloppy overdrive play now measures **−12.7%**: worse than not overdriving at
+all, worse than cruise, actively losing money. That is deliberate, but it has never been
+felt. Play a normal run and overdrive **recklessly** — ride deep, chase the ratchet, do
+not bail when the gestures get thick.
+
+- When a property freezes, what is the actual feeling: *tense and fair* (I gambled my
+  best earner and lost it), or *punitive* (the game took my toy away)?
+- Watch the income figure during a freeze. Does losing that property read as a
+  consequence you caused, or as the game being broken for a few seconds?
+- Roughly how long does a freeze last subjectively vs by the clock? A penalty that
+  *feels* twice its length is the signal to soften.
+- Do you find yourself avoiding overdrive entirely after two or three bad lockouts? That
+  would be the mechanic failing — cruise is meant to be a *choice*, not the safe default.
+
+**Verdict needed:** KEEP the full freeze, or soften to a partial income cut. If softening,
+name a fraction that would feel right.
+
+### Sitting B — fumbles and tolerances (~20 min). Answers verdicts 2 and 3.
+
+Fumble severity has **never been device-judged**, and the gesture tolerances are
+sloppy-thumb-generous first cuts (`vent_gap_max` 0.40 s, `vent_tap_max` 0.25 s) that only
+thumbs on glass can calibrate. Deliberately blow gestures in specific ways:
+
+- Perform a single lift when ×2 was demanded. Does the miss feedback show you *which
+  beat* you blew, or just that you failed?
+- Re-press too slowly (past the gap window). Was it obvious you were late, or did it feel
+  like the game did not register a lift you made? **The second answer is the important
+  one** — a tolerance problem masquerading as a skill problem is the worst outcome here.
+- At tier 3+ where triples begin: is a triple genuinely *hard*, or physically
+  awkward/unfinishable? Difficulty is the design; thumb mush is not.
+- Now the design question: full overheat on a fumble, or the parked soft-fail (forced
+  vent down to cruise, ratchet lost, run continues)? Ask it after a fumble that cost you
+  a deep run — that is when the answer is honest.
+
+Use Balance Tuning to probe `vent_gap_max` live if a tolerance feels wrong; note the value
+that fixed it rather than just "too tight."
+
+### Sitting C — the instrument, read at speed (~15 min). Answers verdict 4.
+
+Tonight's smoothing fix took the approach bar from moving on 15% of frames to 91%.
+
+- Does the 1.2 s approach read as *seeing it coming*, or still as *waiting for it*?
+  (2.0 s was your "leisurely"; 1.2 s is the correction — confirm it landed.)
+- Track the timer strip during a window. Smooth now, or still stepping?
+- The trailing gold sweep filling in behind the red bar — does the window opening land as
+  a brightness step, or does it read as the display repainting?
+- Landed pips (near-white discs) vs owed pips (gold rings): unmistakable at a glance
+  mid-gesture, at arm's length? You reported these too dim once already.
+- Frozen row presentation: dead slate bar, gray portrait, dark-gray 0 income. Does it say
+  *this machine is down* without you having to reason about it?
+
+### Sitting D — lockout scoping, verify the fix (~10 min). Regression check.
+
+Your 07-19 report was that an overheat locked properties you had never rushed. Two causes
+were fixed; confirm on device.
+
+- Rush **two** properties with multi-touch. Have a third property on the same tab that is
+  **unstaffed and untouched**. Overheat deliberately.
+- Expected: exactly the two you were riding go dark. The third keeps cycling and earning
+  normally, and you can still rush it — it just builds no heat and gets no bonus.
+- Also confirm the meter itself reads as down empire-wide (no bonus anywhere) while the
+  rest of the empire visibly plays on. That split is the whole design of the penalty; if
+  it reads as confusing rather than fair, that is a finding.
+
+### Sitting E — frenzy and overdrive together (~10 min). New interaction, never played.
+
+The frenzy/heat mutual freeze was removed today, so these two systems now run
+simultaneously for the first time.
+
+- Trigger a burn, then overdrive *during* it. Riding vent checks under a live multiplier
+  is meant to be the peak of the loop — is it thrilling or overwhelming?
+- Overheat mid-burn on purpose. You lose that property for the rest of the burn. Is that
+  the good kind of painful, or does it feel like the game wasted your best moment?
+- Confirm a lockout now cools *through* a burn rather than queueing behind it.
+
+**Log format, as always:** one-word verdict plus a specific note. "Tier 4 triple at ~9 s
+in, missed the third lift twice, felt like the window closed early" is actionable;
+"vents feel hard" is not.
+
+---
+
 ## Untested-backlog ledger
 
 One line per first-pass feature awaiting device sign-off. Strike through when
@@ -278,3 +373,18 @@ merges.)
       merged) — *game tab KEEP-leaning; held open on minigame lag + rush-bar TWEAK*
 - [ ] Buy/Hire hold pacing — KEEP 2026-07-06 *(kept unstruck only until the tuned
       values are promoted from the Dev Tuning screen into shipped defaults)*
+- [ ] **Overdrive Vent Windows** (`feature/overdrive-vent-windows`, not merged) — see §6;
+      the whole branch is blocked on that pass (2026-07-19)
+
+### Gap notice (2026-07-19)
+
+This doc lapsed between 2026-07-10 and 2026-07-19 — several features merged to `main` in
+that window without a line here, which is exactly the silent-backlog failure the doc
+exists to prevent. Only §6 has been backfilled so far. Still unrecorded and untested:
+
+- [ ] Escalating 52-property ladder (merged to `main`)
+- [ ] Rush Overheat heat model + prestige Option C + TURBO rework (merged)
+- [ ] Rush Cruise Control — device-verified KEEP, merged d294478 *(listed for completeness;
+      no action needed)*
+- [ ] Legacy Bonus System across all minigames (`feature/match3-difficulty`, not merged)
+- [ ] Match-3 difficulty rework: 7×6 board, harder ceiling, combo removed (same branch)

@@ -118,39 +118,44 @@ func tick(delta: float, extra_property_multiplier: float = 1.0) -> void:
 	# (Overheat-frozen properties always take the 1.0 branch: the freeze handler zeroed their
 	# grace, and no rush verb can refill it while the lockout has every rush verb dead.)
 	#
-	# THE BANKED BAIL TAIL (Plans/Overdrive_Vent_Windows.md "Bailing pays", Tim 2026-07-20) adds a
-	# second way to be paid. A voluntary bail banks the bonus and spins it down over several
-	# seconds — but the grace above expires half a second after the finger lifts, so on its own
-	# the tail would be pure decoration: the chip would count a reward down that the player never
-	# actually received (Tim, device, 2026-07-20). So the properties that were RIDING at the bail
-	# keep the elevated multiplier with the finger off, until the bank runs out.
+	# THE RELEASE TAIL (Plans/Overdrive_Vent_Windows.md "Bailing pays", Tim 2026-07-20) adds a
+	# second way to be paid. Letting go no longer collapses the bonus: it spins down as the heat
+	# bleeds, over several seconds. But the grace above expires half a second after the finger
+	# lifts, so on its own the tail would be pure decoration — the bar would count a reward down
+	# that the player never actually received (Tim, device, 2026-07-20: "the income rate per
+	# second display immediately drops back to the default amount even though the bar takes some
+	# seconds to drain"). So the properties that were RIDING keep the decaying multiplier with the
+	# finger off, until the tail ends.
 	#
-	# Knowing WHO was riding has to be recorded DURING the ride: by the bail tick every grace is
-	# already zero (release_rush clears them the instant the finger lifts), so there is nothing
+	# EVERY release case, not just an overdrive bail (Tim, 2026-07-20): the mark below used to be
+	# gated on is_overdrive_engaged(), which is precisely why a plain +15% cruise release paid
+	# nothing while its bar drained. Any property being rushed is marked.
+	#
+	# Knowing WHO was riding has to be recorded DURING the ride: by the release tick every grace
+	# is already zero (release_rush clears them the instant the finger lifts), so there is nothing
 	# left to read at the moment it matters. Hence the running mark below — the same shape as
 	# is_overheat_frozen, which is likewise stamped from a heat-model moment and cleared on one
 	# known set of exits.
-	var banked_bonus := rush_momentum.banked_bonus()
-	if banked_bonus <= 0.0:
-		# The bank is the single authority for when a spin-down ENDS. The moment it empties the
-		# marks come off, so no property can be left holding an elevated factor with nothing
-		# paying for it — that would be a permanent income multiplier, not a cosmetic bug.
-		clear_spindown_riders()
-	var overdrive_riding := rush_momentum.is_overdrive_engaged()
+	var tail_bonus := rush_momentum.bonus if rush_momentum.is_spinning_down() else 0.0
+	if tail_bonus <= 0.0:
+		# The heat model is the single authority for when a tail ENDS. The moment it stops paying
+		# the marks come off, so no property can be left holding an elevated factor with nothing
+		# behind it — that would be a permanent income multiplier, not a cosmetic bug. (While the
+		# player is actively rushing this also fires every tick, and the loop below immediately
+		# re-marks whoever is in grace, which is how the "who was riding" record stays current.)
+		clear_rush_tail_riders()
 	for prop_variant in economy.properties:
 		var p := prop_variant as PropertyState
-		if overdrive_riding and p.rush_active_grace > 0.0:
-			p.is_banked_spindown_rider = true
 		if p.rush_active_grace > 0.0:
-			# Actively rushed: the heat model already publishes max(live bonus, banked bonus) as
-			# its one `bonus` field, so factor() folds any tail in by itself. The branches are
+			# Actively rushed: record it as a rider AND pay the live bonus. The branches are
 			# mutually exclusive precisely so the tail can never be applied twice.
+			p.is_rush_tail_rider = true
 			p.rush_momentum_factor = rush_momentum.factor()
-		elif p.is_banked_spindown_rider and banked_bonus > 0.0:
-			# Bailed, finger off, bank still winding down — the reward for stopping. Deliberately
-			# the BANK alone rather than factor(): the live heat bonus stays confined to
-			# properties actually being rushed, which is the rule this whole loop exists to keep.
-			p.rush_momentum_factor = 1.0 + banked_bonus
+		elif p.is_rush_tail_rider and tail_bonus > 0.0:
+			# Released, finger off, meter still bleeding — the reward for stopping. The tail is
+			# confined to the properties that were actually being rushed, which is the rule this
+			# whole loop exists to keep.
+			p.rush_momentum_factor = 1.0 + tail_bonus
 		else:
 			p.rush_momentum_factor = 1.0
 		if not vent_gesture_holding:
@@ -169,10 +174,10 @@ func tick(delta: float, extra_property_multiplier: float = 1.0) -> void:
 	if epoch.current_tier > tier_before:
 		rush_momentum.reset()
 		unfreeze_all_properties()
-		# reset() wipes the bank too, so the sweep above would clear these next tick anyway —
-		# but a rider mark must never outlive its bank even for one tick, so it goes here with
-		# the freeze, on the same one line of thinking.
-		clear_spindown_riders()
+		# reset() wipes the heat and the retained peak too, so the sweep above would clear these
+		# next tick anyway — but a rider mark must never outlive its tail even for one tick, so
+		# it goes here with the freeze, on the same one line of thinking.
+		clear_rush_tail_riders()
 	_update_displayed_income()
 	# Refresh the wage's "executive compensation" floor from the passive rate just
 	# computed: a clock-in tap pays a fraction of a second of the empire's income
@@ -308,10 +313,10 @@ func release_rush(prop_index: int) -> void:
 ## from inside rush_momentum.tick, BEFORE this tick's grace decay runs, so the grace values
 ## are exactly the overheat-moment snapshot.
 func _freeze_actively_rushed_properties() -> void:
-	# An overheat zeroes the bank INSTANTLY (RushMomentumState._begin_overheat), so every banked
-	# tail dies here — including one still running from an earlier bail on some other property.
-	# The contrast between this and a bail's gentle spin-down is the entire value of bailing.
-	clear_spindown_riders()
+	# An overheat grants no tail and zeroes the bonus INSTANTLY (RushMomentumState._begin_overheat),
+	# so every tail dies here — including one still running from an earlier release on some other
+	# property. The contrast between this and a bail's gentle spin-down is the value of bailing.
+	clear_rush_tail_riders()
 	for prop_variant in economy.properties:
 		var p := prop_variant as PropertyState
 		if p.rush_active_grace > 0.0:
@@ -333,17 +338,17 @@ func unfreeze_all_properties() -> void:
 		(prop_variant as PropertyState).is_overheat_frozen = false
 
 
-## Drop every banked-bail-tail rider mark, and park the factors that were riding on it back at
-## 1.0. These are the ONLY three ways a tail ends — the bank emptying (the sweep in tick()), an
-## overheat (which zeroes the bank on the spot), and the First Contact reset — so a mark can
-## never outlive the bank that justified it. Public so the headless sim can sweep-check that
-## invariant; the live game reaches it through the three callers above.
-func clear_spindown_riders() -> void:
+## Drop every release-tail rider mark, and park the factors that were riding on it back at 1.0.
+## These are the ONLY three ways a tail ends — the heat model ceasing to pay one (the sweep in
+## tick()), an overheat (which zeroes the bonus on the spot), and the First Contact reset — so a
+## mark can never outlive the tail that justified it. Public so the headless sim can sweep-check
+## that invariant; the live game reaches it through the three callers above.
+func clear_rush_tail_riders() -> void:
 	for prop_variant in economy.properties:
 		var p := prop_variant as PropertyState
-		if not p.is_banked_spindown_rider:
+		if not p.is_rush_tail_rider:
 			continue
-		p.is_banked_spindown_rider = false
+		p.is_rush_tail_rider = false
 		# Only a property that is NOT currently being rushed gets parked: one still inside its
 		# grace has its factor set from factor() every tick anyway, and stomping it here would
 		# blank a live rushed bonus for a tick.

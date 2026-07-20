@@ -56,9 +56,10 @@ extends SceneTree
 #      success) and SLOPPY (70%) venters ride each excursion until they MISS — no bail —
 #      reporting the survival curve (median / p90 tier reached) and the long-session average
 #      bonus vs the cruise baseline. Plus, since "bailing pays" (Tim 2026-07-20), a third
-#      TIMID FARMER: skilled hands, but it bails at tier 1-2 every time to bank the spin-down
-#      instead of riding. Gated at or below cruise — if a farmer beats a rider, the cash-out
-#      is mispriced and the mechanic is broken.
+#      TIMID FARMER: skilled hands, but it bails at tier 1-2 every time and idles while the
+#      spin-down tail pays out, then remounts — the strongest cash-out farm the heat-unified
+#      tail permits. Gated at or below cruise — if a farmer beats a rider, the cash-out is
+#      mispriced and the mechanic is broken.
 #
 # The approach phase (Tim 2026-07-19 — the hazard roll SPAWNS an event that travels for
 # vent_approach_seconds before its window opens) adds:
@@ -100,14 +101,20 @@ extends SceneTree
 #  30. Taps on a frozen property are fully dead — no idle-cycle start, no frenzy fill —
 #      until rush_ready re-enables them.
 #
-# THE BANKED BAIL TAIL reaching income (Tim 2026-07-20 device report — the first "bailing pays"
-# build paid the bank to nobody once the rushed grace expired) adds, also through a GameState:
-#  32. After a FULL release, the properties that were riding at the bail keep an elevated income
-#      factor — matching the bank tick for tick, in the row's actual payout, not just the
-#      readout — until the bank empties; a never-rushed bystander is never paid it; and the
-#      factor, the bank and banked_fraction() all reach zero on the SAME tick (one clock).
-#  33. An overheat zeroes the bank on the spot and leaves NO property carrying a stale elevated
+# THE RELEASE TAIL reaching income (Tim 2026-07-20 device reports — the first "bailing pays"
+# build paid a separate bank to nobody once the rushed grace expired; the heat-unified rework
+# then fixed a plain-rush release snapping its income back while the bar still drained) adds,
+# also through a GameState:
+#  32. After a FULL release from an overdrive ride, the properties that were riding keep an
+#      elevated income factor — matching the decaying bonus tick for tick, in the row's actual
+#      payout, not just the readout — until the tail ends; a never-rushed bystander is never paid
+#      it; and the factor and the bonus reach zero on the SAME tick the heat does (one clock).
+#  33. An overheat zeroes the tail on the spot and leaves NO property carrying a stale elevated
 #      factor — the contrast that makes bailing worth choosing.
+#  34. TIM'S REPORTED CASE (the one that had no coverage): a PLAIN rush — cruise, NEVER overdrive
+#      — built to a modest bonus and released. The income multiplier must decay smoothly WITH the
+#      bar rather than snapping to 1.0, and the bonus and the heat must reach zero together. This
+#      is the case the gated-on-overdrive mark used to pay nothing.
 # METRIC CHANGE (same pass): the autopilot's earnings metric now PRICES the freeze — every
 # locked-out second counts as −100% of the rushed property's base income (bonus −1.0 in the
 # average), because that property is dark for the whole lockout. The sting knobs were retuned
@@ -159,8 +166,9 @@ func _initialize() -> void:
 	_test_freeze_frenzy_leak(tuning)
 	_test_freeze_idle_start_refused(tuning)
 	_test_lockout_spares_other_properties(tuning)
-	_test_banked_tail_reaches_income(tuning)
-	_test_banked_tail_cleared_by_overheat(tuning)
+	_test_release_tail_reaches_income(tuning)
+	_test_release_tail_cleared_by_overheat(tuning)
+	_test_plain_rush_release_decays_smoothly(tuning)
 
 	print("")
 	if _failures == 0:
@@ -1254,11 +1262,13 @@ func _measure_vent_autopilot_survival(tuning: TuningConfig) -> void:
 	var sloppy := _run_vent_autopilot_seeds(tuning, 4002, 0.70)
 	# THE TIMID FARMER (added with "bailing pays", Tim 2026-07-20): gestures as well as the
 	# skilled venter — this is NOT a bad player — but never takes a hard check. It engages, vents
-	# once or twice at shallow depth where the hazard is slow, bails to bank the tail, and
-	# remounts at once. Nothing modeled this before, because bailing paid nothing and the policy
-	# was strictly losing; now that a bail spins down, it is the strategy most likely to break
-	# the mechanic. If this FARMER beats a RIDER, the change is wrong at the design level and
-	# wants reverting, not retuning.
+	# once or twice at shallow depth where the hazard is slow, bails, idles while the spin-down
+	# tail pays out, then remounts. Under the heat-unified tail this waiting-out IS the farm: the
+	# tail ends the instant rushing resumes, so the cash-out and the ride can never overlap.
+	# Nothing modeled this before, because bailing paid nothing and the policy was strictly
+	# losing; now that a bail spins down, it is the strategy most likely to break the mechanic.
+	# If this FARMER beats a RIDER, the change is wrong at the design level and wants reverting,
+	# not retuning.
 	var timid := _run_vent_autopilot_seeds(tuning, 4003, 0.95, 1, 2)
 
 	var skilled_median := _tier_percentile(skilled["excursion_tiers"], 0.5)
@@ -1381,13 +1391,16 @@ const AUTOPILOT_REACTION_TICKS := 3
 ## ends when a gesture is fumbled or a deep-tier window shrinks below what even a clean plan
 ## can finish in time (the designed difficulty wall); after any overheat, remount when re-armed.
 ##
-## BAIL POLICY (added 2026-07-20 with "bailing pays"): with bail_max_tier > 0 the venter instead
-## rolls a bail target in [bail_min_tier, bail_max_tier] per excursion and lets go the moment it
-## reaches it, banking the tail — then remounts IMMEDIATELY (release for one tick, re-press,
-## re-engage). That immediate remount is deliberate: it is the strongest form of the farm and
-## exactly the tap-OVR-off-and-on shape the fresh-ladder rule exists to defeat, so gating on it
-## gates on the worst case rather than a polite one. bail_max_tier = 0 keeps the original
-## ride-until-you-miss policy.
+## BAIL POLICY (added 2026-07-20 with "bailing pays"; reworked for the HEAT-UNIFIED tail, same
+## date): with bail_max_tier > 0 the venter instead rolls a bail target in
+## [bail_min_tier, bail_max_tier] per excursion and lets go the moment it reaches it — then STAYS
+## OFF THE BUTTON until the spin-down tail has fully paid out, and only then remounts. That wait
+## is the whole farm under the new rules: the tail ENDS the instant rushing resumes (the
+## fresh-ladder anti-exploit), so a farmer that re-pressed immediately would collect essentially
+## nothing. Waiting out the tail is the strongest cash-out a farmer can actually get, so gating
+## on it gates on the worst realistic case. bail_max_tier = 0 keeps the original
+## ride-until-you-miss policy (which never bails, so it never grows a tail — it overheats, which
+## zeroes everything).
 func _run_vent_autopilot(tuning: TuningConfig, seed_value: int, gesture_success: float,
 		bail_min_tier := 0, bail_max_tier := 0) -> Dictionary:
 	var state := _fresh_state(tuning, seed_value)
@@ -1412,6 +1425,11 @@ func _run_vent_autopilot(tuning: TuningConfig, seed_value: int, gesture_success:
 	# rng, not the schedule rng, so adding a bail policy cannot perturb window timing.
 	var bail_target := [_roll_bail_target(skill_rng, bail_min_tier, bail_max_tier)]
 	var bail_now := [false]     # set by the success that hit the target; acted on next tick
+	# True while the farmer has bailed and is idling with the finger off, letting the spin-down
+	# tail pay out before remounting. Under the heat-unified tail, remounting ENDS the tail, so a
+	# realistic farmer waits it out — this flag models that wait (unused by the riders, which
+	# never bail).
+	var waiting_out_tail := [false]
 	# Scheduled gesture edges, keyed by absolute tick index -> "press" or "release". Edges are
 	# executed just before that tick, like real input events arriving between logic ticks.
 	var planned: Dictionary = {}
@@ -1486,8 +1504,9 @@ func _run_vent_autopilot(tuning: TuningConfig, seed_value: int, gesture_success:
 				state.notify_rush_pressed()
 				state.engage_overdrive()
 			continue
-		# THE BAIL: one released tick ends the excursion, which banks the bonus at its current
-		# height and clears the ladder. Any half-planned gesture edges go with it.
+		# THE BAIL: one released tick ends the excursion, retaining the bonus at its current
+		# height so it spins down as heat bleeds. Any half-planned gesture edges go with it, and
+		# the farmer then idles (waiting_out_tail) until the tail has fully paid.
 		var bailing_this_tick: bool = bail_now[0]
 		if bailing_this_tick:
 			bail_now[0] = false
@@ -1495,9 +1514,10 @@ func _run_vent_autopilot(tuning: TuningConfig, seed_value: int, gesture_success:
 			excursion_tiers.append(excursion_tier[0])
 			excursion_tier[0] = 0
 			pressed[0] = false
+			waiting_out_tail[0] = true
 			state.notify_rush_released()
 			planned.clear()
-		elif planned.has(tick_index[0]):
+		elif not waiting_out_tail[0] and planned.has(tick_index[0]):
 			if planned[tick_index[0]] == "press":
 				pressed[0] = true
 				state.notify_rush_pressed()
@@ -1514,8 +1534,11 @@ func _run_vent_autopilot(tuning: TuningConfig, seed_value: int, gesture_success:
 			overdrive_seconds += TICK_SECONDS
 		else:
 			climbing_seconds += TICK_SECONDS
-		if bailing_this_tick:
-			# Straight back on: the banked tail keeps paying underneath the fresh climb.
+		# Remount only once the tail has fully spun down: re-engaging any earlier would clear the
+		# tail (the fresh-ladder rule), throwing away the very cash-out the farmer bailed to
+		# collect. This models the strongest farm the new rules actually permit.
+		if waiting_out_tail[0] and not state.is_spinning_down():
+			waiting_out_tail[0] = false
 			pressed[0] = true
 			state.notify_rush_pressed()
 			state.engage_overdrive()
@@ -2105,14 +2128,20 @@ func _test_lockout_spares_other_properties(tuning: TuningConfig) -> void:
 
 
 # ---------------------------------------------------------------------------
-# THE BANKED BAIL TAIL (sections 32-33) — also driven through a full GameState
+# THE RELEASE TAIL (sections 32-34) — also driven through a full GameState
 # ---------------------------------------------------------------------------
-# "Bailing pays" (Tim 2026-07-20) first shipped as a heat-model feature only, and it was
-# COSMETIC: the bank counted down on screen while the income bonus it was meant to represent
-# expired with the rushed grace half a second after the finger lifted (Tim, device, 2026-07-20 —
-# "the player is shown a reward they never receive"). The bank now genuinely pays the properties
-# that were riding at the bail. The one thing the original had no test for is the one thing that
-# was broken, so these sections exist to make sure it cannot regress silently.
+# "Bailing pays" (Tim 2026-07-20) went through two device-driven reworks. It first shipped as a
+# heat-model feature only, and it was COSMETIC: a separate BANKED number counted down on screen
+# while the income bonus it was meant to represent expired with the rushed grace half a second
+# after the finger lifted. That was fixed by paying the riders the bank. Then Tim found the
+# deeper inconsistency on device: the bank decayed on its OWN clock while the bar plotted heat,
+# two different units, so "the income rate per second display immediately drops back to the
+# default amount even though the bar takes some seconds to drain" — and a PLAIN cruise release
+# banked nothing at all, snapping to 1.0 instantly. The fix UNIFIES everything on heat: the bonus
+# is a pure function of heat, the released ride RETAINS its lerp target, and whatever the bar
+# shows is what the player earns, in every release case. These sections make sure neither
+# regression can come back silently — the plain-rush case (34) had no coverage before, which is
+# exactly why it shipped broken.
 
 
 ## Perform a clean vent gesture through the GameState verbs (the seam the scene layer uses), so
@@ -2152,17 +2181,17 @@ func _ride_game_to_bail_point(game: GameState, prop_index: int, target_heat: flo
 	return false
 
 
-## True if any property is still marked as a banked-tail rider (the invariant sweep — a stale
+## True if any property is still marked as a release-tail rider (the invariant sweep — a stale
 ## mark IS a permanent income multiplier, so it gets its own explicit check).
-func _any_property_spindown_rider(game: GameState) -> bool:
+func _any_property_tail_rider(game: GameState) -> bool:
 	for prop_variant in game.economy.properties:
-		if (prop_variant as PropertyState).is_banked_spindown_rider:
+		if (prop_variant as PropertyState).is_rush_tail_rider:
 			return true
 	return false
 
 
-func _test_banked_tail_reaches_income(tuning: TuningConfig) -> void:
-	print("\n32. THE BANKED BAIL TAIL actually reaches INCOME after a full release")
+func _test_release_tail_reaches_income(tuning: TuningConfig) -> void:
+	print("\n32. THE RELEASE TAIL actually reaches INCOME after a full overdrive-ride release")
 	var game := _fresh_game(tuning, 9200)
 	_seed_staffed_property(game, 0)
 	_seed_staffed_property(game, 1)
@@ -2184,89 +2213,144 @@ func _test_banked_tail_reaches_income(tuning: TuningConfig) -> void:
 	# THE BAIL: the finger comes off and stays off. Nothing rushes anything from here on.
 	game.release_rush(0)
 	game.tick(TICK_SECONDS)
-	_check("the bail banked the bonus at its height",
-		is_equal_approx(game.rush_momentum.banked_bonus(), bonus_at_bail))
-	_check("banked_fraction() reads 1.0 at the instant of the bail",
-		is_equal_approx(game.rush_momentum.banked_fraction(), 1.0))
+	_check("the release started a spin-down (the tail is paying)",
+		game.rush_momentum.is_spinning_down())
+	# One tick of heat has bled, so the bonus sits JUST below the bail height — not collapsed to
+	# cruise. The old bank froze the exact height; the heat-unified tail begins bleeding at once,
+	# which is the whole point (bar and money are the same clock).
+	_check("the bonus is still near the bail height, not snapped back to cruise",
+		game.rush_momentum.bonus > bonus_at_bail - 0.05
+			and game.rush_momentum.bonus <= bonus_at_bail)
 
-	# Ride the WHOLE spin-down out with the finger off, watching all three clocks. The bug being
-	# guarded against lives exactly in this stretch: the grace expires after 0.5 s, and before
-	# the fix the rider's factor collapsed to 1.0 right there while the bank counted on for
-	# several more seconds.
+	# Ride the WHOLE spin-down out with the finger off, watching bar, bonus and income together.
+	# The bug being guarded against lives exactly in this stretch: the grace expires after 0.5 s,
+	# and before the fix the rider's factor collapsed to 1.0 right there while the tail (bar and
+	# chip) counted on for several more seconds.
 	var grace_expiry_ticks := int(round(tuning.rush_momentum_grace_seconds / TICK_SECONDS)) + 2
 	var elapsed := 0.0
 	var paid_after_grace := false
-	var factor_tracked_bank := true
-	var fraction_monotone := true
+	var factor_tracked_tail := true
+	var bonus_monotone := true
 	var bystander_ever_boosted := false
 	var income_beat_base_after_grace := false
-	var last_fraction := 1.0
+	var last_bonus := game.rush_momentum.bonus
 	var ticks := 0
-	while game.rush_momentum.banked_bonus() > 0.0 and elapsed < 60.0:
+	while game.rush_momentum.is_spinning_down() and elapsed < 60.0:
 		game.tick(TICK_SECONDS)
 		elapsed += TICK_SECONDS
 		ticks += 1
-		var banked := game.rush_momentum.banked_bonus()
-		var fraction := game.rush_momentum.banked_fraction()
-		if fraction > last_fraction + 0.0001:
-			fraction_monotone = false
-		last_fraction = fraction
+		var live_bonus := game.rush_momentum.bonus
+		if live_bonus > last_bonus + 0.0001:
+			bonus_monotone = false
+		last_bonus = live_bonus
 		if not is_equal_approx(bystander.rush_momentum_factor, 1.0):
 			bystander_ever_boosted = true
-		if ticks > grace_expiry_ticks and banked > 0.0:
+		if ticks > grace_expiry_ticks and game.rush_momentum.is_spinning_down():
 			paid_after_grace = true
-			if not is_equal_approx(rider.rush_momentum_factor, 1.0 + banked):
-				factor_tracked_bank = false
+			if not is_equal_approx(rider.rush_momentum_factor, 1.0 + live_bonus):
+				factor_tracked_tail = false
 			if rider.get_income_per_cycle() > base_per_cycle:
 				income_beat_base_after_grace = true
 	print("     (spin-down from +%.0f%% ran %.1f s, well past the %.1f s rushed grace)"
 			% [bonus_at_bail * 100.0, elapsed, tuning.rush_momentum_grace_seconds])
 	_check("(setup) the tail outlived the rushed grace (there was something to test)",
 		paid_after_grace)
-	_check("THE FIX: the bailed rider's income factor tracked the bank with the finger OFF",
-		factor_tracked_bank)
+	_check("THE FIX: the bailed rider's income factor tracked the decaying bonus with the finger OFF",
+		factor_tracked_tail)
 	_check("and the elevated factor reached the row's ACTUAL PAYOUT, not just the readout",
 		income_beat_base_after_grace)
 	_check("the never-rushed bystander was never paid the tail", not bystander_ever_boosted)
-	_check("banked_fraction() fell monotonically to 0.0 with the bank (bar and money, one clock)",
-		fraction_monotone and is_zero_approx(game.rush_momentum.banked_fraction()))
+	_check("the bonus fell monotonically to 0.0 with the heat (bar and money, one clock)",
+		bonus_monotone and is_zero_approx(game.rush_momentum.bonus))
 
-	# All three clocks end together: the tick the bank empties is the tick the factor parks and
-	# the tick the mark comes off. No property may be left carrying an elevated multiplier.
-	_check("the rider's factor parked back at 1.0 the moment the bank ran out",
+	# The clocks end together: the tick the heat empties is the tick the factor parks and the tick
+	# the mark comes off. No property may be left carrying an elevated multiplier.
+	_check("the rider's factor parked back at 1.0 the moment the tail ran out",
 		is_equal_approx(rider.rush_momentum_factor, 1.0))
 	_check("no property is left marked as a tail rider after the spin-down (invariant sweep)",
-		not _any_property_spindown_rider(game))
+		not _any_property_tail_rider(game))
 	_check("and its payout is back to base",
 		is_equal_approx(rider.get_income_per_cycle(), base_per_cycle))
 
 
-func _test_banked_tail_cleared_by_overheat(tuning: TuningConfig) -> void:
-	print("\n33. An overheat kills the tail INSTANTLY — no property keeps an elevated factor")
+func _test_release_tail_cleared_by_overheat(tuning: TuningConfig) -> void:
+	print("\n33. An overheat kills the bonus INSTANTLY — no tail, no property keeps an elevated factor")
 	var game := _fresh_game(tuning, 9300)
 	_seed_staffed_property(game, 0)
 	_seed_staffed_property(game, 1)
-	var rider := game.economy.properties[0] as PropertyState
 
-	# Bail once to put a real tail in the air, then remount on property 1 and ride THAT into an
-	# overheat while property 0's tail is still paying. The overheat must take both: the freeze
-	# downs property 1, and zeroing the bank ends property 0's tail on the spot.
-	_check("(setup) reached a bail point", _ride_game_to_bail_point(game, 0, 1.15))
-	game.release_rush(0)
+	# Ride property 0 into an overheat and confirm the bonus dies on the spot rather than spinning
+	# down. (A prior tail cannot be kept "in the air" past the start of this ride: resuming rushing
+	# ENDS any tail by the fresh-ladder rule, so the only honest contrast to test is that the ride
+	# which overheats leaves nothing decaying — the opposite of a voluntary bail.)
+	_check("(setup) the ride on property 0 overheated", _drive_game_to_overheat(game, [0]))
+	_check("the overheat zeroed the bonus on the spot", is_zero_approx(game.rush_momentum.bonus))
+	_check("it is NOT spinning down (an overheat grants no tail — the contrast with a bail)",
+		not game.rush_momentum.is_spinning_down())
+	_check("no property is left marked as a tail rider", not _any_property_tail_rider(game))
+	# Tick once past the freeze handler so the factor sweep has run, then confirm nothing is left
+	# elevated (the frozen rider is parked at 1.0 for the whole lockout; the bystander at 1.0 too).
 	game.tick(TICK_SECONDS)
-	_check("(setup) a tail is in the air", game.rush_momentum.banked_bonus() > 0.0)
-	_check("(setup) the bailed rider is carrying it", rider.is_banked_spindown_rider)
-
-	_check("(setup) the follow-up ride on property 1 overheated",
-		_drive_game_to_overheat(game, [1]))
-	_check("the overheat zeroed the bank on the spot",
-		is_zero_approx(game.rush_momentum.banked_bonus()))
-	_check("banked_fraction() is 0.0 (nothing left to display)",
-		is_zero_approx(game.rush_momentum.banked_fraction()))
-	_check("no property is left marked as a tail rider", not _any_property_spindown_rider(game))
 	var every_factor_parked := true
 	for prop_variant in game.economy.properties:
 		if not is_equal_approx((prop_variant as PropertyState).rush_momentum_factor, 1.0):
 			every_factor_parked = false
 	_check("every property's momentum factor is parked at 1.0 (no stale elevated multiplier)",
 		every_factor_parked)
+
+
+func _test_plain_rush_release_decays_smoothly(tuning: TuningConfig) -> void:
+	print("\n34. TIM'S CASE: a PLAIN rush (never overdrive) decays smoothly on release, no snap")
+	var game := _fresh_game(tuning, 9400)
+	_seed_staffed_property(game, 0)
+	var rider := game.economy.properties[0] as PropertyState
+	rider.buy(99)  # a real stack so the floored payout shows the bonus (see section 32)
+	var base_per_cycle := rider.get_income_per_cycle()
+
+	# Hold a PLAIN cruise rush — never engage overdrive — until it has built a modest bonus. The
+	# cruise clamp caps the bonus at the cruise level, which is exactly the "fifteen percent" kind
+	# of number Tim reported. Ride until heat reaches the clamp (bonus at its cruise ceiling).
+	var elapsed := 0.0
+	while game.rush_momentum.bonus < tuning.rush_momentum_cruise_bonus - 0.001 and elapsed < 30.0:
+		game.hold_rush_property(0)
+		game.tick(TICK_SECONDS)
+		elapsed += TICK_SECONDS
+	var bonus_at_release := game.rush_momentum.bonus
+	_check("(setup) the plain rush built a real bonus without ever touching overdrive",
+		bonus_at_release > 0.05 and not game.rush_momentum.is_overdrive_engaged())
+	_check("(setup) the rider's payout was elevated while rushing",
+		rider.get_income_per_cycle() > base_per_cycle)
+
+	# RELEASE and stay off. Under the old overdrive-gated mark this snapped the income straight to
+	# base while the bar still drained — Tim's exact report. It must now decay smoothly instead.
+	game.release_rush(0)
+	game.tick(TICK_SECONDS)
+	_check("the release started a spin-down (a plain rush now earns a tail too)",
+		game.rush_momentum.is_spinning_down())
+
+	var grace_expiry_ticks := int(round(tuning.rush_momentum_grace_seconds / TICK_SECONDS)) + 2
+	var ticks := 0
+	var paid_after_grace := false
+	var factor_tracked_bonus := true
+	var bonus_monotone := true
+	var last_bonus := game.rush_momentum.bonus
+	while game.rush_momentum.is_spinning_down() and ticks < 600:
+		game.tick(TICK_SECONDS)
+		ticks += 1
+		var live_bonus := game.rush_momentum.bonus
+		if live_bonus > last_bonus + 0.0001:
+			bonus_monotone = false
+		last_bonus = live_bonus
+		if ticks > grace_expiry_ticks and game.rush_momentum.is_spinning_down():
+			paid_after_grace = true
+			if not is_equal_approx(rider.rush_momentum_factor, 1.0 + live_bonus):
+				factor_tracked_bonus = false
+	_check("THE FIX: the plain rush's income kept decaying with the bar past the grace, not snapping",
+		paid_after_grace and factor_tracked_bonus)
+	_check("the bonus fell monotonically to 0.0 (smooth decay, no cliff)",
+		bonus_monotone and is_zero_approx(game.rush_momentum.bonus))
+	_check("heat and bonus reached zero together", is_zero_approx(game.rush_momentum.heat))
+	_check("the rider's factor and payout parked back at base when the tail ran out",
+		is_equal_approx(rider.rush_momentum_factor, 1.0)
+			and is_equal_approx(rider.get_income_per_cycle(), base_per_cycle))
+	_check("no property is left marked as a tail rider", not _any_property_tail_rider(game))

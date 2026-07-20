@@ -44,17 +44,18 @@ extends HBoxContainer
 # the chip is the only place the blown beat can stay visible long enough to learn from
 # (the plan's rule: miss-feedback is what makes a skill mechanic learnable).
 #
-# BANKED BONUS (Tim 2026-07-20): bailing out voluntarily now KEEPS the earned bonus and spins it
-# down gradually, while an overheat still zeroes it on the spot. That difference is invisible in
-# the "+X%" readout alone — both cases just show a number — so a teal "BANKED +X% — DRAINING"
-# chip rides above the bar for the whole spin-down. An overheat shows no such chip, so the two
-# outcomes are told apart by the chip's PRESENCE, which is the only way a player ever discovers
-# that bailing is a real option. Both chips share one upward-growing stack above the bar so they
-# can never overlap.
+# THE RELEASE TAIL (Tim 2026-07-20): letting go no longer collapses the bonus — it spins down as
+# the heat bleeds, while an overheat still zeroes it on the spot. That difference is invisible in
+# the "+X%" readout alone — both cases just show a number — so a teal "SPINNING DOWN +X%" chip
+# rides above the bar for the whole tail. An overheat shows no such chip, so the two outcomes are
+# told apart by the chip's PRESENCE, which is the only way a player ever discovers that bailing is
+# a real option. Both chips share one upward-growing stack above the bar so they can never overlap.
 #
-# During a spin-down the FILL changes meaning too (Tim device report, 2026-07-20): it plots the
-# BANKED BONUS rather than heat, so the emptying bar IS the bonus expiring and the bar, the chip
-# and the income all end on the same clock. See the spin-down branch in _process.
+# The FILL needs no special case for it: the bonus is a pure function of heat now, and the bar
+# already plots heat, so the ordinary fill IS the tail draining. Bar, chip and income run on the
+# one clock by construction rather than by three displays being kept in sync (an earlier build
+# banked a separate decaying number and had to special-case the fill to chase it — that is the
+# inconsistency this design removed).
 #
 # Cruise Control (Plans/Rush_Cruise_Control.md) rules still apply: the OVR button is ALWAYS
 # visible (Tim 2026-07-16: moving UI elements are annoying) but ENABLED only once the hold has
@@ -103,10 +104,10 @@ var _tier_chip_tween: Tween
 ## top-to-bottom so the one nearest the bar is the LAST child.
 var _chip_stack: VBoxContainer
 
-## The banked-bonus chip: shown for as long as a voluntarily banked bonus is spinning down,
-## so the player can tell a bail (you keep it, it drains) from an overheat (it is gone now).
-var _banked_chip: PanelContainer
-var _banked_chip_label: Label
+## The spin-down chip: shown for as long as a released hold is still paying a decaying bonus,
+## so the player can tell a bail (it spins down) from an overheat (it is gone now).
+var _spindown_chip: PanelContainer
+var _spindown_chip_label: Label
 
 ## The miss-feedback pips inside the chip (see VentPipRow at the bottom of this file).
 ## Visible only on the "VENT MISSED!" chip — see the class comment for why the chip keeps
@@ -349,7 +350,7 @@ func _ready() -> void:
 	# above the siblings drawn after this bar.
 	#
 	# A container (rather than two separately anchored chips) exists because there are now two
-	# kinds of chip — the timed vent resolutions and the persistent banked-bonus readout — and
+	# kinds of chip — the timed vent resolutions and the persistent spin-down readout — and
 	# they must never share pixels when both are up.
 	_chip_stack = VBoxContainer.new()
 	_chip_stack.anchor_left = 0.5
@@ -365,7 +366,7 @@ func _ready() -> void:
 	_meter.add_child(_chip_stack)
 
 	# The tier chip: a large bold plate for the vent resolutions — chips ease in, hold ~1 s,
-	# then fade (see _show_tier_chip). Sits at the TOP of the stack, so a banked chip below it
+	# then fade (see _show_tier_chip). Sits at the TOP of the stack, so a spin-down chip below it
 	# never pushes it over the bar.
 	_tier_chip = PanelContainer.new()
 	_tier_chip.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -395,40 +396,40 @@ func _ready() -> void:
 	_vent_pips.visible = false
 	chip_column.add_child(_vent_pips)
 
-	# The BANKED chip: the spin-down readout. Unlike the tier chip this one is not a timed
-	# celebration — it is shown for as long as a bailed-out bonus is still draining, and it is
-	# the ONLY place the player can learn that bailing pays at all (Tim 2026-07-20: "yes, and say
-	# so in the UI"). Without it, bailing and overheating look identical from the outside and the
-	# whole cash-out half of the loop stays invisible.
+	# The SPINNING DOWN chip: the release-tail readout. Unlike the tier chip this one is not a
+	# timed celebration — it is shown for as long as a released hold is still paying a decaying
+	# bonus, and it is the ONLY place the player can learn that bailing pays at all (Tim
+	# 2026-07-20: "yes, and say so in the UI"). Without it, bailing and overheating look identical
+	# from the outside and the whole cash-out half of the loop stays invisible.
 	#
 	# Sits at the BOTTOM of the stack, nearest the bar, because it annotates the bar's own "+X%"
-	# readout: it is saying "that number you are reading is banked, and it is going down".
-	_banked_chip = PanelContainer.new()
-	_banked_chip.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	_banked_chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_banked_chip.visible = false
-	_chip_stack.add_child(_banked_chip)
+	# readout: it is saying "that number you are reading is easing off, not blowing up".
+	_spindown_chip = PanelContainer.new()
+	_spindown_chip.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_spindown_chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_spindown_chip.visible = false
+	_chip_stack.add_child(_spindown_chip)
 
 	# ATOMIC_TEAL on NAVY: teal is already this bar's "safe / settled" color (the CRUISE readout
-	# uses it), which is exactly what a banked bonus is — deliberately nothing like the gold
+	# uses it), which is exactly what a spinning-down bonus is — deliberately nothing like the gold
 	# act-now family or the red failure family. An overheat shows no chip at all and the number
 	# simply goes, so the two outcomes are told apart by presence, not by shades of a plate.
-	_banked_chip_label = Label.new()
-	_banked_chip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_banked_chip_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_banked_chip_label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
-	_banked_chip_label.add_theme_font_override("font", UiPalette.make_bold_font())
-	_banked_chip_label.add_theme_color_override("font_color", UiPalette.INK_NAVY)
-	_banked_chip_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_banked_chip.add_child(_banked_chip_label)
+	_spindown_chip_label = Label.new()
+	_spindown_chip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_spindown_chip_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_spindown_chip_label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
+	_spindown_chip_label.add_theme_font_override("font", UiPalette.make_bold_font())
+	_spindown_chip_label.add_theme_color_override("font_color", UiPalette.INK_NAVY)
+	_spindown_chip_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_spindown_chip.add_child(_spindown_chip_label)
 
-	var banked_plate := StyleBoxFlat.new()
-	banked_plate.bg_color = UiPalette.ATOMIC_TEAL
-	banked_plate.border_color = UiPalette.NAVY
-	banked_plate.set_border_width_all(3)
-	banked_plate.set_corner_radius_all(8)
-	banked_plate.set_content_margin_all(10)
-	_banked_chip.add_theme_stylebox_override("panel", banked_plate)
+	var spindown_plate := StyleBoxFlat.new()
+	spindown_plate.bg_color = UiPalette.ATOMIC_TEAL
+	spindown_plate.border_color = UiPalette.NAVY
+	spindown_plate.set_border_width_all(3)
+	spindown_plate.set_corner_radius_all(8)
+	spindown_plate.set_content_margin_all(10)
+	_spindown_chip.add_theme_stylebox_override("panel", spindown_plate)
 
 	# Overheat/re-arm swap the whole meter's presentation. (Deliberately NO band_entered
 	# connection: the depth-hazard rework retired the Critical band and its crossing chip —
@@ -475,7 +476,7 @@ func _process(delta: float) -> void:
 		# class comment for why pinned-full beat fill-as-countdown). Checked BEFORE the
 		# spin-down because re-engaging during a spin-down starts a fresh ride (the bank keeps
 		# decaying underneath as a cushion): the player is back in the minigame, and the
-		# instrument needs its full stage. The BANKED chip keeps narrating the tail.
+		# instrument needs its full stage. The spin-down chip keeps narrating the tail.
 		target_fill = 1.0
 	else:
 		# CRUISE/BUILD: the whole bar spans 0 → the cruise clamp, so filling the bar IS
@@ -483,32 +484,14 @@ func _process(delta: float) -> void:
 		# guard covers a hand-poked zero cruise bonus.
 		var cruise: float = maxf(_rush_momentum.cruise_heat(), 0.0001)
 		target_fill = clampf(_rush_momentum.heat / cruise, 0.0, 1.0)
+		# A RELEASE TAIL needs nothing extra here (Tim 2026-07-20). The bonus follows heat down
+		# the whole way, so this same heat fill is already the tail's remaining length: it starts
+		# pinned full (heat sits at or above the clamp right after any ride) and reaches zero on
+		# the exact tick the bonus does. An earlier build banked a separate number on its own
+		# rate and had to special-case the fill to chase it; heat being the one clock is what
+		# retired that special case.
 
-		# SPIN-DOWN after a voluntary bail (Tim device report, 2026-07-20: "the visual of the
-		# drain looks wrecked… the bar appears to end earlier than the countdown, and the bonus
-		# ends when the bar has drained"). The cause was THREE clocks: the fill plotted HEAT
-		# (bleeding in heat units) while the bank decayed in BONUS units. Same rate number,
-		# different units, so they finished at different times and neither matched the income.
-		#
-		# The cure is to change what the bar MEANS for the duration of a spin-down: while the
-		# bank is what is being paid, the fill is the BANK, so the emptying bar IS the bonus
-		# expiring. One clock — bar, chip and income all reach zero together.
-		#
-		# max(), not a replacement, for two reasons:
-		#   • The handoff IN is then exactly continuous. At the instant of the bail the bar was
-		#     the pinned-full overdrive stage (1.0) and banked_fraction() starts at 1.0, so the
-		#     fill simply continues from full and starts falling — no snap to a new height. The
-		#     cruise term is 1.0 there too (heat is above the clamp right after a ride), so all
-		#     three agree on the transition frame.
-		#   • The handoff OUT can then only ever step DOWN, never up. A spin-down also ends when
-		#     a NEW ride's live bonus overtakes the bank, and at that moment the two terms are
-		#     normalized differently (heat-vs-clamp against bank-vs-bank-at-bail), so they need
-		#     not be equal. Showing the larger of the two throughout means the fill is already
-		#     at or above where the cruise reading picks up, and the ease absorbs the rest.
-		if _rush_momentum.is_spinning_down():
-			target_fill = maxf(target_fill, clampf(_rush_momentum.banked_fraction(), 0.0, 1.0))
-
-	# Smoothing category for the spin-down fill: EASED, like every other fill mode, and
+	# Smoothing category for the tail's fill: EASED, like every other fill mode, and
 	# deliberately NOT the frame-rate PREDICTION the approach bar and timer strip use. Those two
 	# are reaction beats — the bar touching the target IS the window opening, the strip emptying
 	# IS the miss — so a display that lagged would lie about a moment the player must hit, and
@@ -580,20 +563,18 @@ func _process(delta: float) -> void:
 	elif locked_out:
 		_label.text = "OVERHEATED"
 		_apply_label_state(_LabelState.OVERHEATED)
-	elif cruising and is_equal_approx(_rush_momentum.heat, _rush_momentum.cruise_heat()) \
-			and not _rush_momentum.is_spinning_down():
+	elif cruising and is_equal_approx(_rush_momentum.heat, _rush_momentum.cruise_heat()):
 		# Sitting exactly on the clamp: the steady, content cruise state. The bonus quotes
 		# effective_cruise_bonus() (base +25% plus Cooling Systems levels), never a hardcoded
 		# number. While still CLIMBING toward the clamp the normal "+X%" branch below narrates
 		# the climb, exactly as before.
 		#
-		# The spin-down guard is load-bearing (Tim device report, 2026-07-20). After a bail you
-		# can re-press and settle onto the clamp while a BANKED bonus is still leading — the core
-		# is paying max(live, banked), so quoting the cruise constant here would show "+25%" while
-		# the player actually earns the banked value, and the BANKED chip beside it said so. The
-		# readout must never contradict what is being paid, least of all by UNDERSELLING the
-		# reward this whole mechanic exists to grant. Falling through to the "+X%" branch below
-		# reports the true effective bonus, and the chip keeps naming where it comes from.
+		# This branch can no longer contradict what is being paid, and the guard an earlier build
+		# needed here is gone with the bank that caused it. Two independent reasons: a tail only
+		# exists while NOT rushing (is_cruising() requires the opposite), and the bonus is a pure
+		# function of heat, so sitting exactly ON the clamp pays exactly the cruise constant. A
+		# re-press after a deep ride settles onto the clamp only after heat has bled down to it,
+		# and the "+X%" branch below narrates every richer moment on the way.
 		_label.text = "CRUISE +%d%%" % int(round(_rush_momentum.effective_cruise_bonus() * 100.0))
 		_apply_label_state(_LabelState.CRUISING)
 	else:
@@ -604,21 +585,21 @@ func _process(delta: float) -> void:
 	# shutdown reads as dead air, not business as usual.
 	_bubbles.visible = not locked_out
 
-	# The BANKED chip: up for exactly as long as a voluntarily banked bonus is still worth more
-	# than the live state would pay. This is the ONLY signal that bailing is different from
-	# blowing up (Tim 2026-07-20: "yes, and say so in the UI") — an overheat zeroes the bonus
-	# instantly, so it simply never shows this chip, and the contrast between "BANKED … DRAINING"
-	# and nothing at all is what teaches the choice.
+	# The SPINNING DOWN chip: up for exactly as long as a released hold is still paying a
+	# decaying bonus. This is the ONLY signal that bailing is different from blowing up (Tim
+	# 2026-07-20: "yes, and say so in the UI") — an overheat zeroes the bonus instantly, so it
+	# simply never shows this chip, and the contrast between a live spin-down and nothing at all
+	# is what teaches the choice.
 	#
-	# The chip quotes banked_bonus() rather than the bar's own "+X%" readout on purpose: they are
-	# the same number during a spin-down (the core's effective bonus IS the banked value while it
-	# leads), and naming the source here keeps the chip honest if that ever stops being true.
-	# Hidden during a lockout regardless, so a stale chip can never sit over the overheat display.
+	# It quotes the LIVE effective bonus, which is the same number the "+X%" readout beside it
+	# shows: the chip's job is not to add a figure but to say WHY that figure is falling — the
+	# machine is easing off, not blowing up. Hidden during a lockout regardless, so a stale chip
+	# can never sit over the overheat display.
 	var spinning_down: bool = _rush_momentum.is_spinning_down() and not locked_out
-	_banked_chip.visible = spinning_down
+	_spindown_chip.visible = spinning_down
 	if spinning_down:
-		_banked_chip_label.text = "BANKED +%d%% — DRAINING" \
-				% int(round(_rush_momentum.banked_bonus() * 100.0))
+		_spindown_chip_label.text = "SPINNING DOWN +%d%%" \
+				% int(round(_rush_momentum.bonus * 100.0))
 
 	# The salmon streaks mark the overdrive ride itself now: with the fill pinned full, they are
 	# the motion cue that the bar has switched into its minigame instrument. Never while merely
@@ -793,7 +774,7 @@ func _on_vent_lift_registered(lifts_done: int, _required_lifts: int) -> void:
 func _on_vent_succeeded(new_tier: int, new_peak_bonus: float) -> void:
 	# "UP TO", not "PEAK" (Tim, 2026-07-20). This number is current_peak_bonus() — the CEILING of
 	# the ladder you have just unlocked, i.e. what you would earn riding at the hard backstop — not
-	# what you are earning right now. The bar's own "+X%" and the BANKED chip both report the LIVE
+	# what you are earning right now. The bar's own "+X%" and the spin-down chip both report the LIVE
 	# lerped bonus, which is always lower unless heat is pinned at the ceiling. Tim read all three
 	# on device and reasonably took them for the same quantity disagreeing.
 	#

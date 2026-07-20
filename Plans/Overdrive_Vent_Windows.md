@@ -519,7 +519,78 @@ this branch merges. Protocol: checklist §6 sitting E.
   and not in the Family Ledger. Scope the stats screen as a home for future stats, not a
   one-stat page.
 
-## Bailing pays: the banked bonus spins down (Tim, 2026-07-20 — NOT YET BUILT)
+## Bailing pays: the tail spins down on the heat clock (Tim, 2026-07-20 — BUILT)
+
+> **The bank was superseded before it survived a day.** The section below (kept for the
+> reasoning trail) designed a SEPARATE banked value decaying on its own rate. Tim's device play
+> on 2026-07-20 found the inconsistency that forced a rethink: "if the player holds a rush and
+> gets the bonus up to, say, fifteen percent and then lets go, the player's income rate per
+> second display immediately drops back to the default amount even though the bar takes some
+> seconds to drain." Two separate faults, one root cause — TWO tails on TWO clocks in TWO units:
+>
+> - A PLAIN cruise release (no overdrive) banked NOTHING — the bank only fired when overdrive was
+>   engaged — so its income died with the 0.5 s grace while the bar kept draining on heat. That is
+>   the snap Tim saw.
+> - An OVERDRIVE bail banked the bonus and decayed it at `heat_bleed_per_second` read as BONUS
+>   POINTS/s, while the bar was special-cased to follow the bank's own fraction. The heat bleed
+>   and the bonus bleed were the same NUMBER in DIFFERENT UNITS, so bar and money only ever
+>   agreed by accident. Patching the plain case with a bank would have desynced it the other way
+>   (at +15% a bank empties in 0.45 s while the bar takes ~1.5 s).
+>
+> **The build unifies everything on HEAT as the single clock** (Tim, 2026-07-20): whatever the
+> bar shows is what the player earns, in every release case, plain or deep. The bank mechanism is
+> deleted; what follows is the design as built.
+>
+> ### As built (heat-unified tail)
+>
+> - **No banked value.** The bonus stays a pure function of heat. The only reason a release used
+>   to snap was that `_clear_vent_state()` zeroed `_vent_tier` the instant the hold ended, which
+>   collapsed the bonus lerp's top end to the base peak. Instead, a release that leaves a live
+>   bonus RETAINS THE LERP TARGET the ride had earned (`_retained_peak_bonus`), so
+>   `_bonus_for_heat(heat)` keeps lerping toward it as heat bleeds. The bonus decays smoothly to
+>   zero exactly as the bar empties — a +15% cruise release and a tier-12 bail alike.
+> - **The tail is for WALKING AWAY; it ends the moment rushing resumes** (cruise or a fresh
+>   overdrive engage), on overheat, and on every reset. That keeps "re-engaging starts a FRESH
+>   ladder" intact and closes the tap-OVR-on-and-off tier-farming exploit — a retained peak that
+>   survived a re-press would BE that exploit. Re-pressing after a deep bail steps the bonus down;
+>   the player chose to re-enter, the ladder is genuinely fresh, and the step is the honest
+>   expression of that.
+> - **GameState pays the tail in EVERY release case.** The rider mark (`is_rush_tail_rider`,
+>   renamed from `is_banked_spindown_rider`) is no longer gated on `is_overdrive_engaged()` — that
+>   gate was exactly why the plain rush paid nothing — so any property being rushed is marked and
+>   keeps the decaying multiplier with the finger off until the tail ends. The mark-never-outlives-
+>   its-tail invariant and the sweep on overheat / First Contact / tail-end are unchanged.
+> - **Overheat still zeroes instantly, no tail.** The contrast is the whole value of bailing.
+> - **UI simplified.** The fill has no spin-down special case anymore: the bonus follows heat and
+>   the bar already plots heat, so the ordinary heat fill IS the tail draining. The chip reads
+>   "SPINNING DOWN +X%" off the live effective bonus (renamed from "BANKED … DRAINING"); an
+>   overheat still shows NO chip. `is_spinning_down()` survives (the UI needs it) and now means "a
+>   tail is decaying": not locked out, not rushing, bonus still above zero.
+> - **`banked_bonus()` / `banked_fraction()` are gone**; nothing needs them because the tail's
+>   remaining value IS `bonus` and its remaining length IS the heat fill.
+>
+> ### Sim as built
+>
+> Sections 32/33 were adapted to the heat-unified tail (same assertions: the tail reaches a
+> property's ACTUAL PAYOUT past grace, a never-rushed bystander never gets it, everything reaches
+> zero on the same tick, an overheat leaves nothing elevated). **Section 34 was ADDED for Tim's
+> exact reported case** — a plain rush built to a modest bonus, released, asserted to decay
+> smoothly with the bar and to reach zero with the heat — the case that had NO coverage, which is
+> why it shipped broken. The autopilot's timid farmer was reworked: under the new rules the tail
+> ends the instant rushing resumes, so the strongest real farm is to bail and IDLE while the tail
+> pays out before remounting (the old immediate-remount now collects almost nothing).
+>
+> **Gates re-measured (600 s × 5 seeds), all pass:** cruise **+24.9%** · skilled (95%/lift)
+> **+74.8%** (median death tier 8, p90 15) · sloppy (70%/lift) **−12.7%** · timid farmer (95%,
+> bails tier 1-2) **+14.4%** (was +25.1% under the bank). Skilled and sloppy are unchanged — riders
+> overheat, which never grew a tail under either design — as expected. The timid farmer MOVED and
+> now lands clearly below cruise: the heat-unified tail plus the mandatory idle-to-collect makes
+> the cash-out farm strictly worse than a genuine ride, so the farm gate passes with real margin
+> rather than on assertion slack.
+
+---
+
+## Bailing pays: the banked bonus spins down (Tim, 2026-07-20 — SUPERSEDED, see above)
 
 Tim: if the player builds a bonus through vent successes and then chooses to STOP rather than
 ride to failure, there should be a benefit — the bonus should drain from its current height
@@ -636,3 +707,11 @@ Keep reporting cruise / skilled / sloppy as before; sloppy is expected to move v
   design left stopping as pure loss-avoidance, so the ladder rewarded only gesture execution and
   never judgment. Re-engaging during the spin-down starts a fresh ladder but keeps the decaying
   bank, which closes the tap-OVR-to-farm-tiers exploit.
+- **The bank is REPLACED by a heat-unified tail; whatever the bar shows is what you earn** (Tim,
+  device, 2026-07-20 — supersedes the entry directly above). The bank decayed on its own clock in
+  bonus units while the bar plotted heat, and a plain cruise release banked nothing at all — so a
+  +15% hold's income snapped to default while its bar still drained. The bonus is now a pure
+  function of heat and a release RETAINS its lerp target so the bonus follows heat down to zero
+  with the bar. The tail ends the instant rushing resumes (keeping the fresh-ladder anti-farm
+  rule); an overheat still zeroes instantly. `banked_bonus()`/`banked_fraction()` deleted; the UI
+  chip is now "SPINNING DOWN". Every release case pays, plain or deep. See the BUILT section above.

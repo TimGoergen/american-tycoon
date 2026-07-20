@@ -79,11 +79,30 @@ class_name RushMomentumState
 # vent ladder and any pending window (the gamble is always a fresh choice).
 #
 # BAILING PAYS (Tim 2026-07-20; Plans/Overdrive_Vent_Windows.md "Bailing pays"): that voluntary
-# release is the endless ladder's cash-out move, so it now BANKS the bonus at its current height
-# and SPINS IT DOWN at the meter's ordinary bleed rate instead of collapsing to the base peak.
-# An overheat, by contrast, still zeroes everything on the spot. That asymmetry is the point:
-# it makes knowing WHEN TO STOP a rewarded skill alongside executing the gestures, and it reads
-# right physically — a machine you ease off of spins down, one you blow up stops dead.
+# release is the endless ladder's cash-out move, so the bonus does not collapse when the finger
+# lifts — it SPINS DOWN as the heat bleeds, and everything the player was earning keeps being
+# earned until the meter is empty. An overheat, by contrast, still zeroes everything on the spot.
+# That asymmetry is the point: it makes knowing WHEN TO STOP a rewarded skill alongside executing
+# the gestures, and it reads right physically — a machine you ease off of spins down, one you
+# blow up stops dead.
+#
+# HEAT IS THE ONE CLOCK for that tail (Tim 2026-07-20, device — superseding the first build of
+# this feature). The original shipped a separate BANKED number decaying on its own rate, which
+# made two tails on two clocks: a plain cruise release banked nothing and died with the grace,
+# while an overdrive bail decayed a bank at the heat-bleed knob read as BONUS POINTS per second —
+# the same number in a different unit, so the bar and the money only ever agreed by accident. Tim
+# saw the honest version of that on device: "the income rate per second display immediately drops
+# back to the default amount even though the bar takes some seconds to drain." The bank is GONE.
+# Instead, a release that leaves a live bonus RETAINS THE LERP TARGET the ride had earned
+# (_retained_peak_bonus), so the ordinary bonus-from-heat mapping keeps paying while heat bleeds
+# and reaches zero exactly when the bar empties. Whatever the bar shows IS what the player earns,
+# in every release case — a +15% cruise release and a tier-12 bail alike.
+#
+# The tail is for WALKING AWAY, and it ends the moment rushing resumes (cruise or a fresh
+# overdrive engage), on overheat, and on every reset. That is what keeps "re-engaging starts a
+# FRESH ladder" true and closes the tap-OVR-on-and-off tier-farming exploit — a retained peak
+# that survived a re-press would BE that exploit. Re-pressing after a deep bail therefore steps
+# the bonus down, which is the honest expression of a genuinely fresh ladder.
 #
 # CRUISE CONTROL amendment (Tim 2026-07-16; design of record: Plans/Rush_Cruise_Control.md):
 # holding rush is SAFE FOREVER by default. Without overdrive engaged, heat climbs normally but
@@ -275,24 +294,18 @@ var _phase_elapsed: float = 0.0
 ## WAITING_FOR_LIFT, while one that opens with the finger already up starts in GAP.
 var _button_pressed: bool = false
 
-## THE BANKED BAIL BONUS (Tim 2026-07-20 — "bailing pays"; see below and the design of record).
-## Captured at the height the bonus had reached the moment a VOLUNTARY bail ended an overdrive
-## ride, then spun down every tick until it runs out. 0.0 whenever no spin-down is active.
+## THE RETAINED PEAK — the whole of the "bailing pays" tail (Tim 2026-07-20; see the header).
+## The bonus lerp's TOP END, held over from the ride that just ended so the bonus keeps following
+## heat down instead of falling off a cliff. 0.0 whenever no tail is running.
 ##
-## Deliberately SEPARATE from _vent_tier, which still clears on the bail: the tier drives vent
-## DIFFICULTY and belongs to the ride, while this is only a number winding down. Keeping them
-## apart is what lets a re-engage start a fresh ladder while the old tail keeps paying.
-var _banked_bonus: float = 0.0
-
-## The height _banked_bonus had at the INSTANT of the bail — the divisor behind banked_fraction().
-## Kept as its own field because _banked_bonus itself is already winding down, so there is no way
-## to recover the starting height from it later. 0.0 whenever no spin-down is active.
+## Deliberately NOT a second decaying number: _bonus_for_heat() already maps heat → bonus, and
+## the ONLY reason a release used to snap was that _clear_vent_state() zeroed _vent_tier and
+## collapsed that map's top end to the base peak. Retaining the target instead of banking a value
+## is what keeps the tail on the same clock as the bar — one bleed rate, one ending.
 ##
-## This exists because the spin-down has to be ONE clock with three faces (Tim 2026-07-20): the
-## income the riders keep collecting, the banked chip counting down, and the momentum bar's fill
-## must all end together. The bank is the single authority for "when is it over", and this
-## fraction is how the bar reads that authority — it drains 1.0 → 0.0 in step with the money.
-var _banked_bonus_at_bail: float = 0.0
+## Kept separate from _vent_tier, which still clears on release: the tier drives vent DIFFICULTY
+## and belongs to the ride, while this is only a payout height winding down with the meter.
+var _retained_peak_bonus: float = 0.0
 
 
 func _init(p_tuning: TuningConfig) -> void:
@@ -316,9 +329,6 @@ func tick(delta: float, rushing: bool) -> void:
 		_tick_lockout(delta)
 		return
 
-	# Any live spin-down winds down on the same clock as everything else here.
-	_tick_banked_bonus(delta)
-
 	var was_rushing := _was_rushing
 	_was_rushing = rushing
 	# Overdrive is PER-EXCURSION (Plans/Rush_Cruise_Control.md): letting go of the rush hold
@@ -331,19 +341,24 @@ func tick(delta: float, rushing: bool) -> void:
 	# used to read "the ratchet is the reward for a CONTINUOUS ride, not a bankable buff." That
 	# call is overturned. It left stopping as pure loss-avoidance — bailing and overheating paid
 	# the same, differing only in punishment — so the ladder rewarded gesture execution and never
-	# JUDGMENT. Now a voluntary bail BANKS the bonus at its current height and spins it down
-	# (_bank_bail_bonus), which is the cash-out half of a push-your-luck loop. The ratchet itself
-	# still dies here; only the number survives, decaying.
+	# JUDGMENT. Now the height the ride reached is RETAINED as the bonus lerp's target while heat
+	# bleeds, which is the cash-out half of a push-your-luck loop. The ratchet itself still dies
+	# here; only the payout height survives, following the meter down.
 	# (GameState keeps `rushing` true through a vent gesture's lifts, so a mid-gesture lift can
 	# never land here by accident.)
 	if not rushing:
-		# Only the EDGE banks: the first non-rushing tick after a live overdrive ride. Later
-		# non-rushing ticks must not re-bank, or the already-decayed tail would keep topping
-		# itself back up off the max() in `bonus`.
-		if was_rushing and _overdrive_engaged:
-			_bank_bail_bonus()
+		# Only the EDGE retains, and only if there is still something to pay: the first
+		# non-rushing tick after a live ride, captured BEFORE _clear_vent_state() drops the tier
+		# the peak is derived from. A release with the bonus already at zero starts no tail.
+		if was_rushing and bonus > 0.0:
+			_retained_peak_bonus = current_peak_bonus()
 		_overdrive_engaged = false
 		_clear_vent_state()
+	else:
+		# Rushing again — cruise or a fresh overdrive engage — ENDS the tail on the spot. The
+		# tail is for walking away; letting it survive a re-press would resume a ladder that is
+		# supposed to be fresh, which is exactly the tap-OVR-on-and-off farming exploit.
+		_retained_peak_bonus = 0.0
 
 	# Rushing WITHOUT overdrive = cruising: heat clamps at the cruise point and no overheat is
 	# possible. Everything below — the band signals, the vent scheduler, the ceiling check —
@@ -362,6 +377,10 @@ func tick(delta: float, rushing: bool) -> void:
 		heat += build_rate * delta
 	else:
 		heat = maxf(heat - tuning.rush_momentum_heat_bleed_per_second * delta, 0.0)
+		if heat <= 0.0:
+			# The meter is empty, so the tail is spent: bar, bonus and income all end here,
+			# on the same tick, by construction.
+			_retained_peak_bonus = 0.0
 
 	# The one region edge left: announce the upward crossing into OVERDRIVE (the UI keys its
 	# urgency continuously on depth, so this is the only discrete moment worth a signal).
@@ -384,42 +403,11 @@ func tick(delta: float, rushing: bool) -> void:
 	_publish_bonus()
 
 
-## Spin the banked bail bonus down by one tick, at the meter's EXISTING bleed rate (Tim was
-## explicit: no new rate knob). The knob is a heat rate and this is a bonus fraction, so the
-## number is reused as "bonus points per second" rather than converted through the heat→bonus
-## mapping — deliberately, because that is the reading that makes the tail's LENGTH scale with
-## its HEIGHT. Converting through the mapping would drain any height in the same fixed time,
-## which would pay a tier-12 bail exactly as briefly as a tier-1 one and kill the whole point:
-## a deep run's tail should be long because it starts high, with no extra tuning.
-func _tick_banked_bonus(delta: float) -> void:
-	if _banked_bonus <= 0.0:
-		return
-	_banked_bonus = maxf(
-			_banked_bonus - tuning.rush_momentum_heat_bleed_per_second * delta, 0.0)
-	if _banked_bonus <= 0.0:
-		# The tail is spent. Drop the remembered height with it so banked_fraction() reads a
-		# clean 0.0 — and, more importantly, so GameState's sweep sees the spin-down END on the
-		# same tick the money stops, which is what keeps the three clocks finishing together.
-		_banked_bonus_at_bail = 0.0
-
-
-## A voluntary bail just ended an overdrive ride: capture the bonus where it stood so it can
-## spin down instead of falling off a cliff. max() against any tail still running, so bailing
-## out of a shallow re-engage can never CUT a taller tail short — the player keeps the better
-## of the two, and a bail is never a punishment.
-func _bank_bail_bonus() -> void:
-	_banked_bonus = maxf(_banked_bonus, bonus)
-	# Restart the spin-down's readout from the NEW height. Taking the max the same way keeps the
-	# rule "a bail is never a punishment" true for the fraction too: bailing out of a shallow
-	# re-engage can neither cut a taller tail short nor make the bar jump back up.
-	_banked_bonus_at_bail = maxf(_banked_bonus_at_bail, _banked_bonus)
-
-
-## Set the single effective `bonus` the whole game reads: whatever the live state would pay, or
-## the spinning-down bank if that is still higher. One field stays the one truth (payout,
-## display, and danger state all read it), so nothing downstream has to know a bail happened.
+## Set the single effective `bonus` the whole game reads. It is now a PURE function of heat and
+## the current lerp target — nothing downstream has to know whether a ride or a tail is paying,
+## because both are the same mapping evaluated at whatever heat the bar is showing.
 func _publish_bonus() -> void:
-	bonus = maxf(_bonus_for_heat(heat), _banked_bonus)
+	bonus = _bonus_for_heat(heat)
 
 
 ## The safe half of a rush hold (Plans/Rush_Cruise_Control.md): heat climbs normally but CLAMPS
@@ -742,11 +730,12 @@ func _begin_overheat() -> void:
 	# from at most the ceiling. (A missed-window overheat simply drains from wherever heat was.)
 	heat = minf(heat, tuning.rush_momentum_hard_ceiling)
 	bonus = 0.0
-	# An overheat zeroes the BANK INSTANTLY too (Tim 2026-07-20). The contrast with a voluntary
-	# bail's spin-down is the entire value of bailing: if a blown run also wound down, choosing
-	# to stop would carry no weight and the push-your-luck decision would be no decision at all.
-	_banked_bonus = 0.0
-	_banked_bonus_at_bail = 0.0
+	# An overheat grants NO tail (Tim 2026-07-20). The contrast with a voluntary bail's spin-down
+	# is the entire value of bailing: if a blown run also wound down, choosing to stop would
+	# carry no weight and the push-your-luck decision would be no decision at all. (The lockout
+	# drain zeroes `bonus` every tick regardless; dropping the retained peak is what makes sure
+	# nothing is left to pay when the meter comes back up.)
+	_retained_peak_bonus = 0.0
 	_locked_out = true
 	_rearming = false
 	# Capture the ladder's re-arm sting BEFORE clearing it — the re-arm delay is not computed
@@ -782,7 +771,7 @@ func _bonus_for_heat(current_heat: float) -> float:
 	# Overdrive: bonus_at_hot → the current ladder peak, ONE lerp across [1.0, hard_ceiling].
 	var overdrive_progress := clampf(
 		(current_heat - overdrive_start) / (hard_ceiling - overdrive_start), 0.0, 1.0)
-	return lerpf(tuning.rush_momentum_bonus_at_hot, current_peak_bonus(), overdrive_progress)
+	return lerpf(tuning.rush_momentum_bonus_at_hot, _lerp_peak_bonus(), overdrive_progress)
 
 
 ## The bonus at the hard ceiling with the CURRENT vent tier: the top of the reward ladder the
@@ -790,6 +779,14 @@ func _bonus_for_heat(current_heat: float) -> float:
 ## difficulty curve is the brake, not the reward curve).
 func current_peak_bonus() -> float:
 	return tuning.rush_momentum_bonus_peak + _vent_tier * tuning.rush_momentum_vent_bonus_step
+
+
+## The lerp target _bonus_for_heat() actually uses: the live ladder peak while riding, or the
+## RETAINED peak of the ride that just ended while its tail bleeds off. max() rather than a
+## branch so a re-press can only ever raise it — the tail is cleared on the re-press anyway, and
+## this keeps the mapping monotone no matter what order those two things land in.
+func _lerp_peak_bonus() -> float:
+	return maxf(current_peak_bonus(), _retained_peak_bonus)
 
 
 ## The live property-income multiplier (1 + bonus). Multiplied into every property payout AND its
@@ -802,14 +799,15 @@ func factor() -> float:
 ## clamp so heat resumes climbing into overdrive — vent windows, hard ceiling,
 ## lockout and all. A no-op during an overheat lockout (the button is dead).
 ##
-## Engaging during a spin-down starts a FRESH LADDER at tier 0 while the banked tail keeps
-## decaying underneath (it is not touched here) and keeps paying until the new ride's own bonus
-## overtakes it. That rule is LOAD-BEARING, not a convenience: because the ladder never RESUMES,
-## there is no way to farm tiers by tapping OVR off and on — each re-engage buys a cushion under
-## the next climb, never a shortcut up it. (Tim 2026-07-20.)
+## Engaging during a spin-down ENDS the tail and starts a FRESH LADDER at tier 0. That rule is
+## LOAD-BEARING, not a convenience: a retained peak that survived a re-press would let a player
+## farm height by tapping OVR off and on, so re-entering deliberately steps the bonus down to
+## what the fresh ladder pays at the current heat. The player chose to re-enter; the ladder is
+## genuinely fresh, and the step is the honest expression of that. (Tim 2026-07-20.)
 func engage_overdrive() -> void:
 	if _locked_out:
 		return
+	_retained_peak_bonus = 0.0
 	if not _overdrive_engaged:
 		# Fresh opt-in: start a rolled refractory so the FIRST event of the ride is not
 		# metronomic either (engaging at the cruise clamp used to make the first spawn's timing
@@ -883,32 +881,15 @@ func vent_required_lifts() -> int:
 	return _window_required_lifts
 
 
-## The banked bail bonus still spinning down, as a fraction (2.95 = the +295% tail of a deep
-## bail); 0.0 when no spin-down is active. The UI reads this to show the bail as BANKED — the
-## contrast with an overheat's instant zero is what teaches players the option exists.
-func banked_bonus() -> float:
-	return maxf(_banked_bonus, 0.0)
-
-
-## How much of the banked tail is LEFT, as a fraction: 1.0 at the instant of the bail, falling to
-## 0.0 as the bank expires, and 0.0 whenever no spin-down is in progress.
+## True while a TAIL is decaying: the finger is off, no lockout is running, and there is still a
+## bonus being paid as heat bleeds away. This is the state the UI narrates as a spin-down — the
+## reward for bailing rather than blowing up — and it goes false the instant rushing resumes or
+## the meter empties, which is exactly when the tail stops paying.
 ##
-## The momentum bar's spin-down drain reads this so the FILL and the MONEY end on the same tick
-## (Tim 2026-07-20). Before this existed, the bar drained heat at 0.333 heat-units/s while the
-## bank drained 0.333 bonus-points/s — the same number in two different units, so the two clocks
-## were never going to finish together. Anything that wants to display the spin-down should ask
-## the bank, because the bank is what actually pays.
-func banked_fraction() -> float:
-	if _banked_bonus <= 0.0 or _banked_bonus_at_bail <= 0.0:
-		return 0.0
-	return clampf(_banked_bonus / _banked_bonus_at_bail, 0.0, 1.0)
-
-
-## True while a banked bail value is still above what the live state would otherwise pay — i.e.
-## the spin-down is the thing currently being paid. Goes false the moment the bank runs out OR a
-## new ride's own bonus overtakes it, which is exactly when the UI should stop calling it a tail.
+## Note there is no separate value to read: during a tail the effective bonus IS `bonus`, and the
+## bar's ordinary heat fill IS the tail's remaining length. One clock, one number.
 func is_spinning_down() -> bool:
-	return not _locked_out and _banked_bonus > _bonus_for_heat(heat)
+	return not _locked_out and not _was_rushing and bonus > 0.0
 
 
 ## Successful vents this excursion (unbounded) — the bonus ladder's current rung.
@@ -966,6 +947,5 @@ func reset() -> void:
 	_rearm_tier_sting = 0.0
 	_overdrive_engaged = false
 	_was_rushing = false
-	_banked_bonus = 0.0
-	_banked_bonus_at_bail = 0.0
+	_retained_peak_bonus = 0.0
 	_clear_vent_state()

@@ -195,6 +195,16 @@ const SOLID_FLOW_RUSH_MULT := 1.6
 ## duplicated here rather than reached into.
 const FROZEN_SLATE := Color("#45464C")
 
+## The frozen row's explanatory banner (Tim, 2026-07-20 device verdict): a dark row stated the
+## fact without explaining it, so an "OVERHEATED" plate plus a countdown now sits over the cycle
+## band. The COUNTDOWN is the point — a wait you can see the end of is a bounded wait; an
+## unexplained dark row is an open-ended one. Its plate is the same dead slate the frozen bar
+## wears, so the row's look is unchanged apart from finally carrying words.
+const FROZEN_BANNER_TEXT := "OVERHEATED"
+## Cream on slate is the project's highest-contrast pairing and matches the row's other
+## light-on-dark text; the countdown rides the same line so there is one thing to read.
+const FROZEN_BANNER_FONT_SIZE := UiPalette.FONT_SUBHEAD
+
 ## Whether the bar was pinned solid last frame — unpinning restarts the visible lap.
 var _was_pinned := false
 
@@ -302,6 +312,16 @@ var _cycle_bubbles: GoldBubbles
 var _cycle_momentum_streaks: MomentumStreaks
 ## Diagnosis readout over the bar, shown when tuning.carb_debug_overlay = 1.
 var _carb_debug_label: Label
+## The "OVERHEATED + countdown" plate shown only while THIS property is overheat-frozen. It is an
+## OVERLAY on the cycle band the row already occupies — nothing is resized or re-laid-out when it
+## appears, so a finger resting on the row (or a scroll in progress) is never disturbed.
+var _frozen_banner: PanelContainer
+var _frozen_banner_label: Label
+## The whole-seconds figure the banner last showed, kept so the countdown can only ever go DOWN
+## within one freeze. The two halves of the lockout are measured differently (see
+## _overheat_seconds_remaining), and a readout that ticked back UP at the handoff would look broken.
+## INT_MAX-ish sentinel = "no freeze in progress"; reset every time the row thaws.
+var _frozen_seconds_shown: int = 1 << 30
 var _buy_button: Button
 var _buy_caption_label: Label
 ## Property-tab icon before the buy button's "+N" count.
@@ -493,6 +513,35 @@ func _ready() -> void:
 	_income_label.add_theme_color_override("font_outline_color", UiPalette.CREAM)
 	_income_label.add_theme_constant_override("outline_size", 4)
 	bar_cell.add_child(_income_label)
+
+	# The overheat-freeze banner, added LAST inside the bar cell so it draws OVER the cycle bar
+	# and the income readout (see FROZEN_BANNER_TEXT). It is anchored to the cell's full rect, so
+	# it borrows space the row already occupies rather than adding any of its own — the row's
+	# height and every control's position are identical frozen or not (no-moving-UI rule). It also
+	# ignores the mouse, so the swipe-to-scroll pass-through and any finger already on the row keep
+	# working exactly as before.
+	_frozen_banner = PanelContainer.new()
+	_frozen_banner.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_frozen_banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_frozen_banner.visible = false
+	var frozen_plate := StyleBoxFlat.new()
+	frozen_plate.bg_color = FROZEN_SLATE
+	frozen_plate.set_corner_radius_all(4)
+	_frozen_banner.add_theme_stylebox_override("panel", frozen_plate)
+	bar_cell.add_child(_frozen_banner)
+
+	_frozen_banner_label = Label.new()
+	_frozen_banner_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_frozen_banner_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_frozen_banner_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_frozen_banner_label.add_theme_font_size_override("font_size", FROZEN_BANNER_FONT_SIZE)
+	_frozen_banner_label.add_theme_font_override("font", UiPalette.make_bold_font())
+	_frozen_banner_label.add_theme_color_override("font_color", UiPalette.CREAM)
+	# A navy outline keeps the word legible even where the plate is overdrawn by the streaks or a
+	# future effect — the same faux-weight trick the income readout uses in reverse.
+	_frozen_banner_label.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
+	_frozen_banner_label.add_theme_constant_override("outline_size", 4)
+	_frozen_banner.add_child(_frozen_banner_label)
 
 	# Buy / hire buttons (bulk-buy is mandatory — GDD §3.1). The buy button's
 	# count follows the global buy-mode toggle.
@@ -1165,8 +1214,67 @@ func _refresh(delta: float) -> void:
 			_cycle_bubbles.tier, _cycle_bubbles._agitation, int(_cycle_bubbles._base_speed_px),
 		]
 
+	_refresh_frozen_banner(frozen)
+
 	_refresh_buy_button()
 	_refresh_hire_button()
+
+
+## Show / hide the "OVERHEATED + countdown" plate and keep its number current. Called every frame
+## from _refresh; the plate itself never moves or resizes the row (see _ready).
+func _refresh_frozen_banner(frozen: bool) -> void:
+	if not frozen:
+		_frozen_banner.visible = false
+		_frozen_seconds_shown = 1 << 30  # sentinel: the next freeze starts its countdown fresh
+		return
+	# Whole seconds, rounded UP: the freeze is not over until the figure would reach zero, so
+	# "1" must stay on screen through the last partial second rather than flashing a "0" the
+	# player would read as "it should have thawed by now".
+	var seconds := int(ceil(_overheat_seconds_remaining()))
+	seconds = maxi(seconds, 1)
+	# Monotone: never let the readout tick back up mid-freeze (see _frozen_seconds_shown).
+	seconds = mini(seconds, _frozen_seconds_shown)
+	_frozen_seconds_shown = seconds
+	_frozen_banner_label.text = "%s  %ds" % [FROZEN_BANNER_TEXT, seconds]
+	_frozen_banner.visible = true
+
+
+## Seconds until this row THAWS — i.e. until RushMomentumState fires rush_ready, which is the exact
+## moment GameState brings the frozen properties back up. The lockout has two halves and the core
+## exposes each of them differently, so the two are added here rather than read from one getter:
+##
+##   • the locked DRAIN, still running: heat is public and drains at a known constant rate, so the
+##     remaining drain time is heat / rate exactly.
+##   • the post-drain RE-ARM: the core publishes only rearm_remaining_fraction() (the momentum
+##     bar's dead-gray timer needs a fraction, not seconds), so the fraction is multiplied back out
+##     by the delay's full length, rebuilt here from the same knobs the core uses.
+##
+## Rebuilding that length needs the per-tier failure sting, which the core captures privately at the
+## overheat moment and never exposes. We substitute its CAP knob — the largest it can ever be — so
+## the estimate errs HIGH. That direction is deliberate: over-estimating ends the countdown a beat
+## early (the row simply lights back up), while under-estimating would park it at "1s" while the
+## property was still dark, which is precisely the open-ended wait this banner exists to remove.
+## Both sting knobs ship at 0.0 today ("the freeze is the penalty"), so today the figure is exact.
+##
+## NOT read from a UI-side timer of our own: the core owns this clock, it advances on tick time
+## (so pauses and scene reloads stay honest), and a parallel timer would drift away from the thaw.
+func _overheat_seconds_remaining() -> float:
+	if _rush_momentum == null:
+		return 0.0
+	var tuning := _prop.tuning
+	# The "Rapid Restart" Legacy upgrade shrinks BOTH halves of the lockout. The core clamps the
+	# scale before using it, so clamp identically here or the two clocks disagree.
+	var lockout_scale := clampf(_rush_momentum.lockout_time_scale, 0.05, 1.0)
+	var rearm_total := (tuning.rush_momentum_rearm_seconds
+			+ tuning.rush_momentum_vent_fail_rearm_cap) * lockout_scale
+	if _rush_momentum.is_rearming():
+		# The drain is done; only the re-arm tail is left.
+		return _rush_momentum.rearm_remaining_fraction() * rearm_total
+	# Still draining: the drain left, plus the whole re-arm that follows it.
+	var drain_rate := tuning.rush_momentum_locked_drain_per_second / lockout_scale
+	if drain_rate <= 0.0:
+		return rearm_total
+	return _rush_momentum.heat / drain_rate + rearm_total
 
 
 ## Pick the cycle bar's fill: dead slate while the property is overheat-frozen (the machine

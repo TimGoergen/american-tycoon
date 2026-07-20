@@ -127,11 +127,11 @@ can land now (rides work item 3's framing pass); real art stays M3.*
       match flashes identically to a clean one, so the −60% is imperceptible. Fix =
       distinct match feedback: red flash + docked score float on avoid matches, normal
       "+N" float on clean ones (make the impact visible, not bigger).
-      **TOO EASY (2026-07-07):** Tim (a match-3 fan) maxes the score almost every
-      round — the skill ceiling must be real once work item 4 makes great play the only
-      upside, or the bonus is effectively flat. Levers to feel-tune (land WITH item 4):
-      perfect threshold up from 200, tighter clock, or +1 gem color; put the threshold
-      in TuningConfig.
+      ~~**TOO EASY (2026-07-07):** Tim (a match-3 fan) maxes the score almost every
+      round...~~ **RESOLVED (2026-07-20):** Tim: "the difficulty currently feels good, I do
+      not max out the game as often as I used to due to other changes." The bigger 7×6 board,
+      the harder ceiling, and the work-item-4 reward reshape did the job between them — no
+      difficulty lever needed. The per-match feedback TWEAK above is still open.
 - [ ] **Basketball** — **KEEP w/ TWEAKs; FIX SHIPPED (2026-07-10, `feature/minigame-feedback`).**
       Both TWEAKs built: (1) a backboard now sits behind the drifting hoop (translucent board + dark
       frame + shooter's square; cosmetic, no bank-shot collision yet); (2) the launch is no longer
@@ -156,9 +156,19 @@ can land now (rides work item 3's framing pass); real art stays M3.*
 - [x] ~~**Get Ready gate**~~ — **KEEP (2026-07-10, Tim: "the get ready looks good").** Text scaled
       up (GET_READY_TEXT_SCALE 1.4) and the block vertically centered so it reads as one balanced
       group (fixed the tall-phone empty-gap look). Framing copy already lands via work item 3.
-- [ ] **Challenge mode** — not separately verdicted this session.
-- [ ] **Result screen** — re-judge after the work-item-4 reward reshape (the "Legacy
-      lost" framing changes when standard play becomes neutral).
+- [ ] **Challenge mode** — **REWORK (Tim, 2026-07-20): the idea's right, the execution isn't.**
+      Today it is endless free-play per minigame with a persistent best score per type
+      (`ChallengeScores.gd`) and no stakes — a high-score table with no reason to visit it.
+      Tim wants a **combination of two fixes**: (a) **give it stakes** — a run should pay
+      something real (Legacy or a bonus), because pure high scores don't motivate him; and
+      (b) **give it goals, not just scores** — replace the raw endless number with named
+      targets to beat ("clear 12 rounds", "catch 40 coins"), a ladder to climb rather than a
+      number to exceed. Needs a design pass before build; the two fixes interact (goals are
+      the natural thing to attach payouts to).
+- [ ] **Result screen** — **DECIDED (Tim, 2026-07-20): keep loss framing, soften the wording.**
+      Losing something should still sting a little, but a 10% shortfall must not read as a
+      catastrophe. Rejected: reframing everything as upside-only ("+18% BONUS", never mention
+      loss) and leading with what was KEPT. Copy pass, no math change.
 - [x] ~~**Minigame screen performance (2026-07-06).**~~ **FIXED, device-verified
       (Tim, 2026-07-07: "totally fixed").** Root cause: the whole game screen kept
       drawing at 60fps beneath the opaque modal (economy-freezing modals now hide the
@@ -241,13 +251,12 @@ items, catch/timing polish) ride along when their game is touched.
   (both rebuild the epoch-arrival moment). Identity guardrails: few-and-huge grants
   (not another incremental shop), and scope it apart from Legacy — e.g. run/epoch-
   scoped rocket fuel vs gems' permanent floor, or effects gems never touch.
-- **Rush limiter:** evaluate constraining rush (currently always-correct to hold) via
-  a cooldown reducible with Legacy gems. Lean toward a STAMINA METER (drain + refill,
-  gems extend tank/rate) over a hard lockout, so it reads as a resource to spend, not
-  a dead button. **Envisioned PER PROPERTY (Tim, 2026-07-07):** each property's crew
-  tires independently, so constant rushing becomes a rotation across the ladder —
-  rewarding active two-handed play instead of parking on one button. Prototype behind
-  a tuning flag after the current economy items land.
+- ~~**Rush limiter:**~~ **DROPPED as superseded (Tim, 2026-07-20).** The idea was a per-property
+  stamina meter so constant rushing became a rotation across the ladder. Rush Overheat and then
+  Vent Windows arrived in the meantime and already constrain rushing while rewarding active
+  play — Tim: a second limiter on top would be noise. Recorded rather than deleted because the
+  underlying goal (reward two-handed play ACROSS properties, not parking on one button) is still
+  a live design value and may want an expression someday; it just won't be this one.
 
 ---
 
@@ -262,6 +271,14 @@ branch APK, not a `main` build.*
 well. Skilled play is already sim-validated at +74.8%. What is unvalidated is what
 happens when you are bad, careless, or greedy — so this protocol deliberately spends
 half its time playing badly. Do not skip those sittings because they feel unproductive.
+
+**Narrowed by the 2026-07-20 design interview.** Four of the five open questions turned out
+to be design calls, not feel calls, and Tim answered them: the freeze stays a full stop and
+sloppy play is ALLOWED to go negative; a fumble is a full overheat; the ladder stays
+unbounded at every epoch; vent haptics will encode lift count as pulse count. So **sitting A
+no longer asks whether the penalty should be softened — that is settled.** It now asks only
+whether the settled design *feels* the way it reads on paper. Sitting B likewise keeps its
+tolerance work and drops its fumble-severity question.
 
 ### Sitting A — the freeze, played badly (~20 min). Answers open verdict 1.
 
@@ -279,8 +296,10 @@ not bail when the gestures get thick.
 - Do you find yourself avoiding overdrive entirely after two or three bad lockouts? That
   would be the mechanic failing — cruise is meant to be a *choice*, not the safe default.
 
-**Verdict needed:** KEEP the full freeze, or soften to a partial income cut. If softening,
-name a fraction that would feel right.
+**Verdict needed (revised 2026-07-20):** the full freeze is now settled design — Tim has
+confirmed bad play SHOULD cost real money. So this sitting is no longer a keep-or-soften
+vote; it asks whether the *execution* delivers the intent. If the freeze reads as punitive
+rather than tense, the fix is presentation or duration, NOT reducing the income loss.
 
 ### Sitting B — fumbles and tolerances (~20 min). Answers verdicts 2 and 3.
 
@@ -295,9 +314,9 @@ thumbs on glass can calibrate. Deliberately blow gestures in specific ways:
   one** — a tolerance problem masquerading as a skill problem is the worst outcome here.
 - At tier 3+ where triples begin: is a triple genuinely *hard*, or physically
   awkward/unfinishable? Difficulty is the design; thumb mush is not.
-- Now the design question: full overheat on a fumble, or the parked soft-fail (forced
-  vent down to cruise, ratchet lost, run continues)? Ask it after a fumble that cost you
-  a deep run — that is when the answer is honest.
+- ~~Full overheat on a fumble, or the parked soft-fail?~~ **SETTLED 2026-07-20: full
+  overheat, soft-fail rejected.** What remains is only whether a fumble is *legible* — after
+  a blown gesture, did you know what you did wrong?
 
 Use Balance Tuning to probe `vent_gap_max` live if a tolerance feels wrong; note the value
 that fixed it rather than just "too tight."

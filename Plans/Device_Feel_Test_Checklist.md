@@ -280,6 +280,41 @@ no longer asks whether the penalty should be softened — that is settled.** It 
 whether the settled design *feels* the way it reads on paper. Sitting B likewise keeps its
 tolerance work and drops its fumble-severity question.
 
+### Device verdicts — 2026-07-20 (Tim played the current build)
+
+Four of the five sittings are now answered. **Only sitting E remains untested.**
+
+- [x] ~~**Sitting A — the freeze.**~~ **KEEP w/ TWEAK.** Tim: "I like it, but I think there
+      should be text over any overheated property to make it clear why they went dark." The
+      penalty itself lands; the gap is legibility — a dark row currently states a fact without
+      explaining it. **TWEAK: `OVERHEATED` + a countdown on each frozen row** (Tim's pick over
+      a bare label, a softer "COOLING DOWN", or a voiced line) so the wait is bounded rather
+      than open-ended. Not a moving-UI violation: it appears on a state the row already has.
+- [x] ~~**Sitting B — tolerances.**~~ **KEEP.** Misses felt like Tim's own ("mine — I was too
+      slow"), which is the answer we most wanted: `vent_gap_max` 0.40 / `vent_tap_max` 0.25
+      stay as shipped. The feared failure mode — clean lifts going unregistered and reading as
+      difficulty — did not occur. Fumble severity was settled by the 07-20 design interview.
+- [ ] **Sitting C — the instrument.** **TWEAK ×2, both open.**
+      1. **Approach still too slow at 1.2 s.** The smoothing fix landed (motion is no longer
+         jerky) but the runway still reads as waiting. Tim wants a **live knob pass** rather
+         than a guessed number — and `rush_momentum_vent_approach_seconds` is *already* exposed
+         in Balance Tuning (labelled "Vent Approach Sec"), so this needs no build work; dial it
+         on device. **Re-run the sim gates afterward:** a shorter runway trims the riskless paid
+         time bundled into every check, which moves skilled *and* sloppy averages.
+      2. **Pips readable but too small.** Contrast is fixed; size is the remaining gap. They are
+         currently capped by `PIP_RADIUS_MAX` (20 px) in `MomentumBar.gd`, so raising
+         `PIP_HEIGHT_FRAC` alone will do nothing — lift the cap too.
+- [x] ~~**Sitting D — lockout scoping.**~~ **FIXED, confirmed.** Only the properties Tim was
+      actually rushing went dark; the rest of the empire kept cycling and earning. The 07-19
+      bug is closed.
+- [ ] **Sitting E — frenzy + overdrive together.** **STILL UNTESTED** — the combination didn't
+      come up. This is the one genuinely unknown interaction left on the branch: the mutual
+      freeze was removed 07-19, so a burn and a vent run have never been played simultaneously,
+      and overheating mid-burn (losing the property for the rest of the multiplier) has never
+      been felt. Protocol below unchanged; do this before merging.
+
+---
+
 ### Sitting A — the freeze, played badly (~20 min). Answers open verdict 1.
 
 The sim says sloppy overdrive play now measures **−12.7%**: worse than not overdriving at

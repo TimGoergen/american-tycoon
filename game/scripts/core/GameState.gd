@@ -117,9 +117,42 @@ func tick(delta: float, extra_property_multiplier: float = 1.0) -> void:
 	# the player stops rushing it. This is what confines momentum to the rushed property.
 	# (Overheat-frozen properties always take the 1.0 branch: the freeze handler zeroed their
 	# grace, and no rush verb can refill it while the lockout has every rush verb dead.)
+	#
+	# THE BANKED BAIL TAIL (Plans/Overdrive_Vent_Windows.md "Bailing pays", Tim 2026-07-20) adds a
+	# second way to be paid. A voluntary bail banks the bonus and spins it down over several
+	# seconds — but the grace above expires half a second after the finger lifts, so on its own
+	# the tail would be pure decoration: the chip would count a reward down that the player never
+	# actually received (Tim, device, 2026-07-20). So the properties that were RIDING at the bail
+	# keep the elevated multiplier with the finger off, until the bank runs out.
+	#
+	# Knowing WHO was riding has to be recorded DURING the ride: by the bail tick every grace is
+	# already zero (release_rush clears them the instant the finger lifts), so there is nothing
+	# left to read at the moment it matters. Hence the running mark below — the same shape as
+	# is_overheat_frozen, which is likewise stamped from a heat-model moment and cleared on one
+	# known set of exits.
+	var banked_bonus := rush_momentum.banked_bonus()
+	if banked_bonus <= 0.0:
+		# The bank is the single authority for when a spin-down ENDS. The moment it empties the
+		# marks come off, so no property can be left holding an elevated factor with nothing
+		# paying for it — that would be a permanent income multiplier, not a cosmetic bug.
+		clear_spindown_riders()
+	var overdrive_riding := rush_momentum.is_overdrive_engaged()
 	for prop_variant in economy.properties:
 		var p := prop_variant as PropertyState
-		p.rush_momentum_factor = rush_momentum.factor() if p.rush_active_grace > 0.0 else 1.0
+		if overdrive_riding and p.rush_active_grace > 0.0:
+			p.is_banked_spindown_rider = true
+		if p.rush_active_grace > 0.0:
+			# Actively rushed: the heat model already publishes max(live bonus, banked bonus) as
+			# its one `bonus` field, so factor() folds any tail in by itself. The branches are
+			# mutually exclusive precisely so the tail can never be applied twice.
+			p.rush_momentum_factor = rush_momentum.factor()
+		elif p.is_banked_spindown_rider and banked_bonus > 0.0:
+			# Bailed, finger off, bank still winding down — the reward for stopping. Deliberately
+			# the BANK alone rather than factor(): the live heat bonus stays confined to
+			# properties actually being rushed, which is the rule this whole loop exists to keep.
+			p.rush_momentum_factor = 1.0 + banked_bonus
+		else:
+			p.rush_momentum_factor = 1.0
 		if not vent_gesture_holding:
 			p.rush_active_grace = maxf(p.rush_active_grace - delta, 0.0)
 	var tier_before := epoch.current_tier
@@ -136,6 +169,10 @@ func tick(delta: float, extra_property_multiplier: float = 1.0) -> void:
 	if epoch.current_tier > tier_before:
 		rush_momentum.reset()
 		unfreeze_all_properties()
+		# reset() wipes the bank too, so the sweep above would clear these next tick anyway —
+		# but a rider mark must never outlive its bank even for one tick, so it goes here with
+		# the freeze, on the same one line of thinking.
+		clear_spindown_riders()
 	_update_displayed_income()
 	# Refresh the wage's "executive compensation" floor from the passive rate just
 	# computed: a clock-in tap pays a fraction of a second of the empire's income
@@ -271,6 +308,10 @@ func release_rush(prop_index: int) -> void:
 ## from inside rush_momentum.tick, BEFORE this tick's grace decay runs, so the grace values
 ## are exactly the overheat-moment snapshot.
 func _freeze_actively_rushed_properties() -> void:
+	# An overheat zeroes the bank INSTANTLY (RushMomentumState._begin_overheat), so every banked
+	# tail dies here — including one still running from an earlier bail on some other property.
+	# The contrast between this and a bail's gentle spin-down is the entire value of bailing.
+	clear_spindown_riders()
 	for prop_variant in economy.properties:
 		var p := prop_variant as PropertyState
 		if p.rush_active_grace > 0.0:
@@ -290,6 +331,24 @@ func _freeze_actively_rushed_properties() -> void:
 func unfreeze_all_properties() -> void:
 	for prop_variant in economy.properties:
 		(prop_variant as PropertyState).is_overheat_frozen = false
+
+
+## Drop every banked-bail-tail rider mark, and park the factors that were riding on it back at
+## 1.0. These are the ONLY three ways a tail ends — the bank emptying (the sweep in tick()), an
+## overheat (which zeroes the bank on the spot), and the First Contact reset — so a mark can
+## never outlive the bank that justified it. Public so the headless sim can sweep-check that
+## invariant; the live game reaches it through the three callers above.
+func clear_spindown_riders() -> void:
+	for prop_variant in economy.properties:
+		var p := prop_variant as PropertyState
+		if not p.is_banked_spindown_rider:
+			continue
+		p.is_banked_spindown_rider = false
+		# Only a property that is NOT currently being rushed gets parked: one still inside its
+		# grace has its factor set from factor() every tick anyway, and stomping it here would
+		# blank a live rushed bonus for a tick.
+		if p.rush_active_grace <= 0.0:
+			p.rush_momentum_factor = 1.0
 
 
 ## The OVERDRIVE opt-in (Plans/Rush_Cruise_Control.md): release the cruise clamp so heat resumes

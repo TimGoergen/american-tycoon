@@ -52,6 +52,10 @@ extends HBoxContainer
 # that bailing is a real option. Both chips share one upward-growing stack above the bar so they
 # can never overlap.
 #
+# During a spin-down the FILL changes meaning too (Tim device report, 2026-07-20): it plots the
+# BANKED BONUS rather than heat, so the emptying bar IS the bonus expiring and the bar, the chip
+# and the income all end on the same clock. See the spin-down branch in _process.
+#
 # Cruise Control (Plans/Rush_Cruise_Control.md) rules still apply: the OVR button is ALWAYS
 # visible (Tim 2026-07-16: moving UI elements are annoying) but ENABLED only once the hold has
 # REACHED the cruise clamp; any other time it wears the gray-outlined "can't trigger" plate.
@@ -452,8 +456,7 @@ func _process(delta: float) -> void:
 	# the eased fill never visibly jumps on a transition:
 	#   • cruise → overdrive: engaging requires heat AT the cruise clamp, i.e. a full bar,
 	#     which is exactly overdrive's pinned 1.0;
-	#   • overdrive → cruise (bail): heat is above the clamp, so heat/cruise clamps to 1.0
-	#     and the bar stays full until the bleed brings heat back under the clamp;
+	#   • overdrive → spin-down (bail): see the spin-down branch — both sides are 1.0;
 	#   • overdrive → lockout (overheat): heat is at/near the hard ceiling, so heat/ceiling
 	#     starts ≈ 1.0 and the drain animates down from there;
 	#   • lockout → cruise (re-arm): heat drained to 0, and 0/cruise is 0.
@@ -463,11 +466,16 @@ func _process(delta: float) -> void:
 	if locked_out:
 		# OVERHEAT: the full-heat drain display, unchanged — fill = heat / hard_ceiling so the
 		# visible drain IS the cooldown. Guard the knob so a 0 can't divide by zero.
+		# (An overheat zeroes the bank on the spot and is_spinning_down() is false throughout a
+		# lockout, so the spin-down fill below can never leak into this display.)
 		var hard_ceiling: float = maxf(_tuning.rush_momentum_hard_ceiling, 0.0001)
 		target_fill = clampf(_rush_momentum.heat / hard_ceiling, 0.0, 1.0)
 	elif overdrive:
 		# OVERDRIVE: pinned full — the bar is the minigame stage, not a heat plot (see the
-		# class comment for why pinned-full beat fill-as-countdown).
+		# class comment for why pinned-full beat fill-as-countdown). Checked BEFORE the
+		# spin-down because re-engaging during a spin-down starts a fresh ride (the bank keeps
+		# decaying underneath as a cushion): the player is back in the minigame, and the
+		# instrument needs its full stage. The BANKED chip keeps narrating the tail.
 		target_fill = 1.0
 	else:
 		# CRUISE/BUILD: the whole bar spans 0 → the cruise clamp, so filling the bar IS
@@ -475,6 +483,40 @@ func _process(delta: float) -> void:
 		# guard covers a hand-poked zero cruise bonus.
 		var cruise: float = maxf(_rush_momentum.cruise_heat(), 0.0001)
 		target_fill = clampf(_rush_momentum.heat / cruise, 0.0, 1.0)
+
+		# SPIN-DOWN after a voluntary bail (Tim device report, 2026-07-20: "the visual of the
+		# drain looks wrecked… the bar appears to end earlier than the countdown, and the bonus
+		# ends when the bar has drained"). The cause was THREE clocks: the fill plotted HEAT
+		# (bleeding in heat units) while the bank decayed in BONUS units. Same rate number,
+		# different units, so they finished at different times and neither matched the income.
+		#
+		# The cure is to change what the bar MEANS for the duration of a spin-down: while the
+		# bank is what is being paid, the fill is the BANK, so the emptying bar IS the bonus
+		# expiring. One clock — bar, chip and income all reach zero together.
+		#
+		# max(), not a replacement, for two reasons:
+		#   • The handoff IN is then exactly continuous. At the instant of the bail the bar was
+		#     the pinned-full overdrive stage (1.0) and banked_fraction() starts at 1.0, so the
+		#     fill simply continues from full and starts falling — no snap to a new height. The
+		#     cruise term is 1.0 there too (heat is above the clamp right after a ride), so all
+		#     three agree on the transition frame.
+		#   • The handoff OUT can then only ever step DOWN, never up. A spin-down also ends when
+		#     a NEW ride's live bonus overtakes the bank, and at that moment the two terms are
+		#     normalized differently (heat-vs-clamp against bank-vs-bank-at-bail), so they need
+		#     not be equal. Showing the larger of the two throughout means the fill is already
+		#     at or above where the cruise reading picks up, and the ease absorbs the rest.
+		if _rush_momentum.is_spinning_down():
+			target_fill = maxf(target_fill, clampf(_rush_momentum.banked_fraction(), 0.0, 1.0))
+
+	# Smoothing category for the spin-down fill: EASED, like every other fill mode, and
+	# deliberately NOT the frame-rate PREDICTION the approach bar and timer strip use. Those two
+	# are reaction beats — the bar touching the target IS the window opening, the strip emptying
+	# IS the miss — so a display that lagged would lie about a moment the player must hit, and
+	# they earn the extra machinery. A spin-down is a readout: there is no input to time against
+	# it, only money quietly running out. The ease costs well under a tenth of a second of lag on
+	# an ending that is seconds long, and using the SAME pipeline as the other fill modes is what
+	# keeps the bail transition seamless — a predicted fill handed off to an eased one would put a
+	# visible seam at exactly the moment this fix exists to smooth.
 	_displayed_fill = BarSmoothing.approach(_displayed_fill, target_fill, delta)
 	_meter.value = _displayed_fill
 

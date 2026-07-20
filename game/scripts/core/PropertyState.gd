@@ -108,6 +108,21 @@ var rush_active_grace: float = 0.0
 ## has no save block), so a persisted freeze flag would have no lockout to end it.
 var is_overheat_frozen: bool = false
 
+## True while this property is riding out a BANKED BAIL TAIL (Plans/Overdrive_Vent_Windows.md
+## "Bailing pays", Tim 2026-07-20): it was one of the properties being actively rushed at the
+## moment the player voluntarily let go of an overdrive ride, so it keeps collecting the banked
+## bonus — finger off the glass — until the bank spins down to nothing. That is what makes
+## STOPPING a real reward rather than merely a survivable exit.
+##
+## Deliberately shaped like is_overheat_frozen above: both are per-property marks that GameState
+## sets from a moment in the shared heat model and clears on exactly one set of exits. The exits
+## here are the end of the spin-down, an overheat (which zeroes the bank on the spot — that
+## contrast is the whole point of bailing), and the First Contact reset. GameState sweeps the
+## flag off the instant the bank empties, because a property left marked with no bank behind it
+## would carry a permanent income multiplier — an economy bug, not a cosmetic one.
+## NOT saved, for the same reason the freeze is not: no heat/lockout/bank state persists.
+var is_banked_spindown_rider: bool = false
+
 ## Dynasty-wide property-income multiplier (the Legacy "Family Fortune" upgrade), mirrored
 ## here for DISPLAY only so the row's per-cycle figure reflects it (the live tick applies
 ## the same factor at point of payment via the global multiplier). Set by DynastyState.
@@ -368,6 +383,10 @@ func restore(
 	# The overheat freeze is transient (never saved — see its declaration), so a restored
 	# property always comes back UP: there is no persisted lockout that could ever end it.
 	is_overheat_frozen = false
+	# Same reasoning for the banked bail tail: no bank survives a session, so a restored
+	# property must never come back still claiming one.
+	is_banked_spindown_rider = false
+	rush_momentum_factor = 1.0
 
 	if p_units > 0:
 		buy(p_units)

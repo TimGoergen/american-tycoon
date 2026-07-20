@@ -284,6 +284,16 @@ var _button_pressed: bool = false
 ## apart is what lets a re-engage start a fresh ladder while the old tail keeps paying.
 var _banked_bonus: float = 0.0
 
+## The height _banked_bonus had at the INSTANT of the bail — the divisor behind banked_fraction().
+## Kept as its own field because _banked_bonus itself is already winding down, so there is no way
+## to recover the starting height from it later. 0.0 whenever no spin-down is active.
+##
+## This exists because the spin-down has to be ONE clock with three faces (Tim 2026-07-20): the
+## income the riders keep collecting, the banked chip counting down, and the momentum bar's fill
+## must all end together. The bank is the single authority for "when is it over", and this
+## fraction is how the bar reads that authority — it drains 1.0 → 0.0 in step with the money.
+var _banked_bonus_at_bail: float = 0.0
+
 
 func _init(p_tuning: TuningConfig) -> void:
 	tuning = p_tuning
@@ -386,6 +396,11 @@ func _tick_banked_bonus(delta: float) -> void:
 		return
 	_banked_bonus = maxf(
 			_banked_bonus - tuning.rush_momentum_heat_bleed_per_second * delta, 0.0)
+	if _banked_bonus <= 0.0:
+		# The tail is spent. Drop the remembered height with it so banked_fraction() reads a
+		# clean 0.0 — and, more importantly, so GameState's sweep sees the spin-down END on the
+		# same tick the money stops, which is what keeps the three clocks finishing together.
+		_banked_bonus_at_bail = 0.0
 
 
 ## A voluntary bail just ended an overdrive ride: capture the bonus where it stood so it can
@@ -394,6 +409,10 @@ func _tick_banked_bonus(delta: float) -> void:
 ## of the two, and a bail is never a punishment.
 func _bank_bail_bonus() -> void:
 	_banked_bonus = maxf(_banked_bonus, bonus)
+	# Restart the spin-down's readout from the NEW height. Taking the max the same way keeps the
+	# rule "a bail is never a punishment" true for the fraction too: bailing out of a shallow
+	# re-engage can neither cut a taller tail short nor make the bar jump back up.
+	_banked_bonus_at_bail = maxf(_banked_bonus_at_bail, _banked_bonus)
 
 
 ## Set the single effective `bonus` the whole game reads: whatever the live state would pay, or
@@ -727,6 +746,7 @@ func _begin_overheat() -> void:
 	# bail's spin-down is the entire value of bailing: if a blown run also wound down, choosing
 	# to stop would carry no weight and the push-your-luck decision would be no decision at all.
 	_banked_bonus = 0.0
+	_banked_bonus_at_bail = 0.0
 	_locked_out = true
 	_rearming = false
 	# Capture the ladder's re-arm sting BEFORE clearing it — the re-arm delay is not computed
@@ -870,6 +890,20 @@ func banked_bonus() -> float:
 	return maxf(_banked_bonus, 0.0)
 
 
+## How much of the banked tail is LEFT, as a fraction: 1.0 at the instant of the bail, falling to
+## 0.0 as the bank expires, and 0.0 whenever no spin-down is in progress.
+##
+## The momentum bar's spin-down drain reads this so the FILL and the MONEY end on the same tick
+## (Tim 2026-07-20). Before this existed, the bar drained heat at 0.333 heat-units/s while the
+## bank drained 0.333 bonus-points/s — the same number in two different units, so the two clocks
+## were never going to finish together. Anything that wants to display the spin-down should ask
+## the bank, because the bank is what actually pays.
+func banked_fraction() -> float:
+	if _banked_bonus <= 0.0 or _banked_bonus_at_bail <= 0.0:
+		return 0.0
+	return clampf(_banked_bonus / _banked_bonus_at_bail, 0.0, 1.0)
+
+
 ## True while a banked bail value is still above what the live state would otherwise pay — i.e.
 ## the spin-down is the thing currently being paid. Goes false the moment the bank runs out OR a
 ## new ride's own bonus overtakes it, which is exactly when the UI should stop calling it a tail.
@@ -933,4 +967,5 @@ func reset() -> void:
 	_overdrive_engaged = false
 	_was_rushing = false
 	_banked_bonus = 0.0
+	_banked_bonus_at_bail = 0.0
 	_clear_vent_state()

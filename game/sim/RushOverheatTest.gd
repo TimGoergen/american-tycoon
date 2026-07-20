@@ -99,6 +99,15 @@ extends SceneTree
 #      keeps rushing for income and frenzy through the lockout, just without the bonus.
 #  30. Taps on a frozen property are fully dead — no idle-cycle start, no frenzy fill —
 #      until rush_ready re-enables them.
+#
+# THE BANKED BAIL TAIL reaching income (Tim 2026-07-20 device report — the first "bailing pays"
+# build paid the bank to nobody once the rushed grace expired) adds, also through a GameState:
+#  32. After a FULL release, the properties that were riding at the bail keep an elevated income
+#      factor — matching the bank tick for tick, in the row's actual payout, not just the
+#      readout — until the bank empties; a never-rushed bystander is never paid it; and the
+#      factor, the bank and banked_fraction() all reach zero on the SAME tick (one clock).
+#  33. An overheat zeroes the bank on the spot and leaves NO property carrying a stale elevated
+#      factor — the contrast that makes bailing worth choosing.
 # METRIC CHANGE (same pass): the autopilot's earnings metric now PRICES the freeze — every
 # locked-out second counts as −100% of the rushed property's base income (bonus −1.0 in the
 # average), because that property is dark for the whole lockout. The sting knobs were retuned
@@ -150,6 +159,8 @@ func _initialize() -> void:
 	_test_freeze_frenzy_leak(tuning)
 	_test_freeze_idle_start_refused(tuning)
 	_test_lockout_spares_other_properties(tuning)
+	_test_banked_tail_reaches_income(tuning)
+	_test_banked_tail_cleared_by_overheat(tuning)
 
 	print("")
 	if _failures == 0:
@@ -2091,3 +2102,171 @@ func _test_lockout_spares_other_properties(tuning: TuningConfig) -> void:
 	_check("rushing it still charged the frenzy meter", game.frenzy.meter > 0.0)
 	_check("but it carried NO momentum bonus (the meter is down for everyone)", not bonus_leaked)
 	_check("the frozen rider stayed down throughout", frozen_rider.is_overheat_frozen)
+
+
+# ---------------------------------------------------------------------------
+# THE BANKED BAIL TAIL (sections 32-33) — also driven through a full GameState
+# ---------------------------------------------------------------------------
+# "Bailing pays" (Tim 2026-07-20) first shipped as a heat-model feature only, and it was
+# COSMETIC: the bank counted down on screen while the income bonus it was meant to represent
+# expired with the rushed grace half a second after the finger lifted (Tim, device, 2026-07-20 —
+# "the player is shown a reward they never receive"). The bank now genuinely pays the properties
+# that were riding at the bail. The one thing the original had no test for is the one thing that
+# was broken, so these sections exist to make sure it cannot regress silently.
+
+
+## Perform a clean vent gesture through the GameState verbs (the seam the scene layer uses), so
+## the grace/window interplay is exercised exactly as the live game does it rather than on the
+## bare heat model.
+func _game_vent_cleanly(game: GameState, prop_index: int) -> void:
+	var lifts := game.rush_momentum.vent_required_lifts()
+	game.notify_rush_released(prop_index)
+	game.tick(TICK_SECONDS)
+	game.notify_rush_pressed(prop_index)
+	for _extra_lift in range(lifts - 1):
+		game.hold_rush_property(prop_index)
+		game.tick(TICK_SECONDS)
+		game.notify_rush_released(prop_index)
+		game.tick(TICK_SECONDS)
+		game.notify_rush_pressed(prop_index)
+
+
+## Hold-rush one property with overdrive engaged until heat reaches `target_heat` with nothing
+## in flight — a clean moment to let go. Vents any window that opens on the way (a real player
+## climbing to a bail point does the same). Returns false if the ride overheated instead.
+func _ride_game_to_bail_point(game: GameState, prop_index: int, target_heat: float) -> bool:
+	game.engage_rush_overdrive()
+	var elapsed := 0.0
+	while elapsed < 30.0:
+		if game.rush_momentum.is_locked_out():
+			return false
+		if game.rush_momentum.is_vent_window_open():
+			_game_vent_cleanly(game, prop_index)
+			elapsed += 0.5
+			continue
+		if game.rush_momentum.heat >= target_heat and not game.rush_momentum.is_vent_approaching():
+			return true
+		game.hold_rush_property(prop_index)
+		game.tick(TICK_SECONDS)
+		elapsed += TICK_SECONDS
+	return false
+
+
+## True if any property is still marked as a banked-tail rider (the invariant sweep — a stale
+## mark IS a permanent income multiplier, so it gets its own explicit check).
+func _any_property_spindown_rider(game: GameState) -> bool:
+	for prop_variant in game.economy.properties:
+		if (prop_variant as PropertyState).is_banked_spindown_rider:
+			return true
+	return false
+
+
+func _test_banked_tail_reaches_income(tuning: TuningConfig) -> void:
+	print("\n32. THE BANKED BAIL TAIL actually reaches INCOME after a full release")
+	var game := _fresh_game(tuning, 9200)
+	_seed_staffed_property(game, 0)
+	_seed_staffed_property(game, 1)
+	var rider := game.economy.properties[0] as PropertyState
+	var bystander := game.economy.properties[1] as PropertyState
+	# Stack the rider up before measuring. A single first-rung unit pays $1 a cycle, and payouts
+	# are FLOORED (Spec §1), so floor($1 × 1.44) is still $1 — the bonus would be invisible in
+	# the cash for reasons that have nothing to do with this feature. A real stack makes the
+	# payout check test what it claims to test.
+	rider.buy(99)
+	var base_per_cycle := rider.get_income_per_cycle()
+
+	_check("(setup) the ride reached a clean bail point without overheating",
+		_ride_game_to_bail_point(game, 0, 1.15))
+	var bonus_at_bail := game.rush_momentum.bonus
+	_check("(setup) the ride was genuinely in overdrive, well above the cruise bonus",
+		bonus_at_bail > tuning.rush_momentum_cruise_bonus + 0.02)
+
+	# THE BAIL: the finger comes off and stays off. Nothing rushes anything from here on.
+	game.release_rush(0)
+	game.tick(TICK_SECONDS)
+	_check("the bail banked the bonus at its height",
+		is_equal_approx(game.rush_momentum.banked_bonus(), bonus_at_bail))
+	_check("banked_fraction() reads 1.0 at the instant of the bail",
+		is_equal_approx(game.rush_momentum.banked_fraction(), 1.0))
+
+	# Ride the WHOLE spin-down out with the finger off, watching all three clocks. The bug being
+	# guarded against lives exactly in this stretch: the grace expires after 0.5 s, and before
+	# the fix the rider's factor collapsed to 1.0 right there while the bank counted on for
+	# several more seconds.
+	var grace_expiry_ticks := int(round(tuning.rush_momentum_grace_seconds / TICK_SECONDS)) + 2
+	var elapsed := 0.0
+	var paid_after_grace := false
+	var factor_tracked_bank := true
+	var fraction_monotone := true
+	var bystander_ever_boosted := false
+	var income_beat_base_after_grace := false
+	var last_fraction := 1.0
+	var ticks := 0
+	while game.rush_momentum.banked_bonus() > 0.0 and elapsed < 60.0:
+		game.tick(TICK_SECONDS)
+		elapsed += TICK_SECONDS
+		ticks += 1
+		var banked := game.rush_momentum.banked_bonus()
+		var fraction := game.rush_momentum.banked_fraction()
+		if fraction > last_fraction + 0.0001:
+			fraction_monotone = false
+		last_fraction = fraction
+		if not is_equal_approx(bystander.rush_momentum_factor, 1.0):
+			bystander_ever_boosted = true
+		if ticks > grace_expiry_ticks and banked > 0.0:
+			paid_after_grace = true
+			if not is_equal_approx(rider.rush_momentum_factor, 1.0 + banked):
+				factor_tracked_bank = false
+			if rider.get_income_per_cycle() > base_per_cycle:
+				income_beat_base_after_grace = true
+	print("     (spin-down from +%.0f%% ran %.1f s, well past the %.1f s rushed grace)"
+			% [bonus_at_bail * 100.0, elapsed, tuning.rush_momentum_grace_seconds])
+	_check("(setup) the tail outlived the rushed grace (there was something to test)",
+		paid_after_grace)
+	_check("THE FIX: the bailed rider's income factor tracked the bank with the finger OFF",
+		factor_tracked_bank)
+	_check("and the elevated factor reached the row's ACTUAL PAYOUT, not just the readout",
+		income_beat_base_after_grace)
+	_check("the never-rushed bystander was never paid the tail", not bystander_ever_boosted)
+	_check("banked_fraction() fell monotonically to 0.0 with the bank (bar and money, one clock)",
+		fraction_monotone and is_zero_approx(game.rush_momentum.banked_fraction()))
+
+	# All three clocks end together: the tick the bank empties is the tick the factor parks and
+	# the tick the mark comes off. No property may be left carrying an elevated multiplier.
+	_check("the rider's factor parked back at 1.0 the moment the bank ran out",
+		is_equal_approx(rider.rush_momentum_factor, 1.0))
+	_check("no property is left marked as a tail rider after the spin-down (invariant sweep)",
+		not _any_property_spindown_rider(game))
+	_check("and its payout is back to base",
+		is_equal_approx(rider.get_income_per_cycle(), base_per_cycle))
+
+
+func _test_banked_tail_cleared_by_overheat(tuning: TuningConfig) -> void:
+	print("\n33. An overheat kills the tail INSTANTLY — no property keeps an elevated factor")
+	var game := _fresh_game(tuning, 9300)
+	_seed_staffed_property(game, 0)
+	_seed_staffed_property(game, 1)
+	var rider := game.economy.properties[0] as PropertyState
+
+	# Bail once to put a real tail in the air, then remount on property 1 and ride THAT into an
+	# overheat while property 0's tail is still paying. The overheat must take both: the freeze
+	# downs property 1, and zeroing the bank ends property 0's tail on the spot.
+	_check("(setup) reached a bail point", _ride_game_to_bail_point(game, 0, 1.15))
+	game.release_rush(0)
+	game.tick(TICK_SECONDS)
+	_check("(setup) a tail is in the air", game.rush_momentum.banked_bonus() > 0.0)
+	_check("(setup) the bailed rider is carrying it", rider.is_banked_spindown_rider)
+
+	_check("(setup) the follow-up ride on property 1 overheated",
+		_drive_game_to_overheat(game, [1]))
+	_check("the overheat zeroed the bank on the spot",
+		is_zero_approx(game.rush_momentum.banked_bonus()))
+	_check("banked_fraction() is 0.0 (nothing left to display)",
+		is_zero_approx(game.rush_momentum.banked_fraction()))
+	_check("no property is left marked as a tail rider", not _any_property_spindown_rider(game))
+	var every_factor_parked := true
+	for prop_variant in game.economy.properties:
+		if not is_equal_approx((prop_variant as PropertyState).rush_momentum_factor, 1.0):
+			every_factor_parked = false
+	_check("every property's momentum factor is parked at 1.0 (no stale elevated multiplier)",
+		every_factor_parked)

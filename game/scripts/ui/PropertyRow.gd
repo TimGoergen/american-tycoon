@@ -1050,14 +1050,23 @@ func _refresh(delta: float) -> void:
 	elif rushed_fractions_per_second > 0.0:
 		# Being rushed: it really earns at this rate right now (even an unstaffed rung, while held).
 		_displayed_income_per_sec = per_cycle * rushed_fractions_per_second
-	elif _prop.is_staffed:
-		# Staffed: it auto-runs, so it earns this passive rate hands-off.
+	elif _prop.is_cycle_running:
+		# Its cycle is RUNNING, so it genuinely produces per_cycle when that cycle completes — earn
+		# this passive rate. Two ways to be here: STAFFED (auto-runs hands-off), or an unstaffed
+		# cycle still IN FLIGHT — e.g. finishing the last cycle after a rush is released, while the
+		# release-tail bonus is still draining. That in-flight cycle WILL pay per_cycle × the decaying
+		# rush_momentum_factor, so the headline must track the drain here, not snap straight to base
+		# the instant the finger lifts (Tim 2026-07-20: the header dropped to base while the cycle was
+		# still running and the momentum bar was still draining).
 		_displayed_income_per_sec = per_cycle / effective_length
 	else:
-		# Owned but UNSTAFFED and not being rushed: it stops after each payout and needs a manual
-		# tap to run again, so it earns nothing passively — it must NOT inflate the income headline
-		# (Tim 2026-07-13: two staffed properties made ~70 B/s, but the headline read ~80 B/s, the
-		# extra coming from owned-but-unstaffed rungs' theoretical rates being summed in).
+		# Owned but UNSTAFFED and its cycle has STOPPED (idle): an unstaffed rung halts after each
+		# payout and needs a manual tap or a rush to run again, so a stopped one earns nothing
+		# passively and must NOT inflate the income headline (Tim 2026-07-13: two staffed properties
+		# made ~70 B/s, but the headline read ~80 B/s, the extra coming from idle unstaffed rungs'
+		# theoretical rates being summed in). is_cycle_running is exactly what separates "about to
+		# pay this cycle" from "stopped, earning nothing" — the earlier is_staffed gate missed a
+		# running unstaffed cycle and read it as idle.
 		_displayed_income_per_sec = 0.0
 
 	# Smooth, constant-velocity cycle bar (see _displayed_cycle_fraction above). Measured

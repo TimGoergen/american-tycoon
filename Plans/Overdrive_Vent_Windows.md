@@ -519,6 +519,63 @@ this branch merges. Protocol: checklist §6 sitting E.
   and not in the Family Ledger. Scope the stats screen as a home for future stats, not a
   one-stat page.
 
+## Bailing pays: the banked bonus spins down (Tim, 2026-07-20 — NOT YET BUILT)
+
+Tim: if the player builds a bonus through vent successes and then chooses to STOP rather than
+ride to failure, there should be a benefit — the bonus should drain from its current height
+rather than dropping straight to cruise level.
+
+**Why this matters more than it looks.** As shipped, bailing and overheating leave the bonus in
+the same place; they differ only in punishment (the lockout). So stopping is pure loss-avoidance
+and never a gain, and the only skill the ladder rewards is gesture execution. Paying for a
+voluntary bail makes **knowing when to stop** its own rewarded skill and turns every tier into a
+real decision: one more vent, or bank the decay? That is the cash-out half of a push-your-luck
+loop, which this mechanic has been missing. It also reads better physically — a machine you
+ease off of spins down; one you blow up stops dead.
+
+**This reverses an earlier decision, deliberately.** The comment at `RushMomentumState.gd:299`
+states "the ratchet is the reward for a CONTINUOUS ride, not a bankable buff." That call is
+overturned by this section; update the comment when building rather than leaving the code
+asserting the opposite of its behaviour.
+
+### Root cause (verified in code, 2026-07-20)
+
+The heat drain is already correct — on release, heat bleeds from its current height at
+`rush_momentum_heat_bleed_per_second` (line 322). What snaps is the **ratchet**: `not rushing`
+calls `_clear_vent_state()`, zeroing `_vent_tier`, so `current_peak_bonus()` collapses to
+`rush_momentum_bonus_peak` and `_bonus_for_heat()` lerps toward a base peak while the meter is
+still visibly draining. The bonus falls off a cliff the frame you let go.
+
+### Design
+
+- **Drain rate:** the existing meter bleed, unchanged (Tim: "the same as it is currently for the
+  rush / cruise meter, just starting from a higher number"). No new rate knob — a deep run's
+  tail is naturally longer because it starts higher, which rewards depth without extra tuning.
+- **Banked value, not a live ratchet.** On voluntary bail, capture the bonus at its current
+  height as a decaying banked value that falls at the bleed rate. Keep it separate from
+  `_vent_tier`, which still clears — the tier drives vent difficulty and belongs to the ride,
+  while the banked number is just a spin-down. Effective bonus = max(banked decaying value,
+  whatever the current state would otherwise pay).
+- **Re-engage: fresh ladder, keep the drain** (Tim). Re-pressing and engaging overdrive during
+  the spin-down starts the ratchet at tier 0, but the banked value keeps decaying underneath and
+  still applies until the new ride's own bonus overtakes it. This is what makes the rule safe:
+  there is no way to farm tiers by tapping OVR on and off, because the ladder never resumes —
+  and it gives a banked tail a second use as a cushion under the next climb.
+- **Overheat still zeroes instantly, and the UI must say so** (Tim). The instant zero is the
+  whole reason a bail is worth anything; if a blown run also spun down, the choice would carry
+  no weight. Make the contrast legible — the bail should visibly read as *banked* — or players
+  will never learn the option exists. This pairs with the `OVERHEATED` + countdown row text.
+
+### Sim consequence — must re-gate before this merges
+
+This deliberately re-introduces the "free ride" earlier sim passes engineered out. The plan
+already notes that **sloppy play only lands below cruise because the bail decision is judged at
+the same reliability as the gestures** — paying for bails lifts the sloppy average directly, and
+Tim confirmed on 2026-07-20 that sloppy must stay negative. Expect to pay for this elsewhere:
+the shorter approach Tim is already dialing is the natural offset, since it trims riskless paid
+time at the same time. Re-run the gates (cruise / skilled / sloppy) after building, and treat a
+sloppy figure back at or above cruise as a failure of this feature, not of the tune.
+
 ## Decision log
 
 - Overdrive must be skill-based with larger risk and reward; cruise keeps the safe floor
@@ -554,3 +611,9 @@ this branch merges. Protocol: checklist §6 sitting E.
 - The parked per-property "rush limiter / stamina meter" idea is DROPPED as superseded by Vent
   Windows: overheat plus vent checks already constrain rushing and reward active play, and a
   second limiter on top would be noise (Tim, 2026-07-20).
+- **A voluntary bail now PAYS: the banked bonus spins down from its height at the normal meter
+  bleed rate, while an overheat still zeroes instantly** (Tim, 2026-07-20). This REVERSES the
+  earlier "the ratchet is the reward for a CONTINUOUS ride, not a bankable buff" call — that
+  design left stopping as pure loss-avoidance, so the ladder rewarded only gesture execution and
+  never judgment. Re-engaging during the spin-down starts a fresh ladder but keeps the decaying
+  bank, which closes the tap-OVR-to-farm-tiers exploit.

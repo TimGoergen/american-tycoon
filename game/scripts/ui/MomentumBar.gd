@@ -107,6 +107,26 @@ var _vent_approach_seconds := 1.0
 ## Reset when a window opens; meaningless while none is open.
 var _window_lifts_done := 0
 
+# Frame-rate display clocks for the two moving vent elements (Tim 2026-07-19: "the vent event bar
+# movement is jerky, both the incoming event as well as the event timer"). The core owns both
+# times, but it only republishes them on the 10 Hz LOGIC tick, while this bar redraws every frame
+# — so reading them raw made the event bar and the timer strip step ~10 times a second. An event
+# crosses its whole runway in ~1.2 s, which is only about a dozen steps: very visibly chunky.
+#
+# These local copies run down on the FRAME delta and stay pinned to the core's authoritative value
+# (see _predict_clock). Deliberately NOT BarSmoothing: an eased follow would LAG, and these two
+# elements make promises the core keeps exactly — the bar reaching the target IS the window
+# opening, and the strip emptying IS the miss. Prediction keeps them frame-smooth AND on time.
+var _approach_display := 0.0
+var _approach_core_seen := 0.0
+var _window_display := 0.0
+var _window_core_seen := 0.0
+
+## The re-arm gray's receding edge has the same 10 Hz source, but it is a cooldown readout rather
+## than a promise the player acts on, so it takes the cheaper cure: the standard eased follow the
+## fill already uses. A few ms of lag on "the bar is coming back" costs nothing.
+var _rearm_display := 0.0
+
 ## Full-rect white flash played when rush re-arms — re-availability must be unmissable
 ## (Tim 2026-07-15), so the whole meter blinks bright once alongside the label reverting.
 var _ready_flash: ColorRect
@@ -399,20 +419,32 @@ func _process(delta: float) -> void:
 		# pauses the core's approach clock) visibly halts the bar mid-flight.
 		var event_frac := -1.0  # negative = no event bar drawn
 		if _rush_momentum.is_vent_approaching() and _vent_approach_seconds > 0.0:
-			event_frac = clampf(
-					_rush_momentum.vent_approach_remaining() / _vent_approach_seconds, 0.0, 1.0)
+			var approach_core := _rush_momentum.vent_approach_remaining()
+			_approach_display = _predict_clock(
+					_approach_display, approach_core, _approach_core_seen, delta)
+			_approach_core_seen = approach_core
+			event_frac = clampf(_approach_display / _vent_approach_seconds, 0.0, 1.0)
 		var window_open := _rush_momentum.is_vent_window_open()
 		var countdown_frac := 0.0
 		if window_open:
-			countdown_frac = clampf(
-					_rush_momentum.vent_window_remaining() / _vent_window_duration, 0.0, 1.0)
+			var window_core := _rush_momentum.vent_window_remaining()
+			_window_display = _predict_clock(_window_display, window_core, _window_core_seen, delta)
+			_window_core_seen = window_core
+			countdown_frac = clampf(_window_display / _vent_window_duration, 0.0, 1.0)
 		_instrument.update_overdrive(TARGET_FRAC, event_frac, window_open, countdown_frac,
 				_rush_momentum.vent_required_lifts(), _window_lifts_done)
 	elif locked_out:
 		# The dead-bar gray: during the drain it back-fills behind the shown (eased) fill edge —
 		# the same _displayed_fill the meter draws, so the gray meets the red with no seam —
 		# and during the re-arm it recedes on the core's real countdown fraction.
-		_instrument.update_lockout(_displayed_fill, _rush_momentum.rearm_remaining_fraction())
+		# Snap UP, ease DOWN. The fraction jumps 0 → 1 the instant the drain ends and the re-arm
+		# begins; easing INTO that would draw a zero-width gray on the transition frame and grow
+		# it, flashing the dead bar back to life for a moment before it recedes. Only the recede
+		# needs smoothing.
+		var rearm_core := _rush_momentum.rearm_remaining_fraction()
+		_rearm_display = rearm_core if rearm_core > _rearm_display \
+				else BarSmoothing.approach(_rearm_display, rearm_core, delta)
+		_instrument.update_lockout(_displayed_fill, _rearm_display)
 	else:
 		_instrument.update_idle()
 
@@ -461,6 +493,24 @@ func _process(delta: float) -> void:
 ## Recolor the fill AND its bubbles for the current display mode. Cruise/build mode is the calm
 ## instrument: always DARK_PURPLE, no wash, no blink (Tim 2026-07-19: clean and safe-reading).
 ## In OVERDRIVE mode the fill is pinned full and its COLOR carries the depth urgency instead:
+## Advance one frame-rate display clock (see the _approach_display fields for why these exist).
+##
+## `core_value` is the core's authoritative seconds-remaining, republished only on the 10 Hz logic
+## tick; `core_seen` is what it read LAST frame. The rules:
+##   • The core's value going UP means a brand-new event or window — prediction can never do that,
+##     so take it exactly. (Comparing against core_seen, not against the display: between ticks the
+##     display legitimately falls BELOW a held core value, and treating that as a jump would snap
+##     the bar back every frame — the very stutter this fixes.)
+##   • Otherwise run down on the frame delta, clamped to stay within one logic tick of the truth.
+##     The display leaves each tick equal to the core and arrives at the next exactly a tick lower,
+##     so it glides continuously while never drifting more than one tick out of step.
+func _predict_clock(display: float, core_value: float, core_seen: float, delta: float) -> float:
+	if core_value > core_seen:
+		return core_value
+	var tick_seconds := 1.0 / maxf(float(_tuning.logic_hz), 1.0)
+	return clampf(display - delta, maxf(core_value - tick_seconds, 0.0), core_value)
+
+
 ## purple → amber sliding with overdrive depth — heat's position within [cruise point .. hard
 ## ceiling], the same fraction the core's hazard rate interpolates on, so the bar's urgency and
 ## the actual vent-check danger climb together — with the red warning blink ramping in strength
@@ -570,6 +620,11 @@ func _on_rush_ready() -> void:
 ## calibrate their gesture timing against. The visual "NOW" is the red bar reaching the target.
 func _on_vent_incoming(approach_seconds: float, _required_lifts: int) -> void:
 	_vent_approach_seconds = maxf(approach_seconds, 0.001)
+	# Start the display clock exactly at the spawn value: the event is at the right edge NOW.
+	# (_predict_clock's snap-on-increase rule would catch this anyway; setting it here makes the
+	# first drawn frame exact rather than inferred.)
+	_approach_display = _vent_approach_seconds
+	_approach_core_seen = _vent_approach_seconds
 	_vibrate(_tuning.rush_momentum_haptic_vent_ms)
 
 
@@ -579,6 +634,9 @@ func _on_vent_incoming(approach_seconds: float, _required_lifts: int) -> void:
 ## approaching red bar the player has been watching for the whole approach.
 func _on_vent_window_opened(_required_lifts: int, duration: float) -> void:
 	_vent_window_duration = maxf(duration, 0.001)
+	# The countdown starts full this instant — same reasoning as the approach clock above.
+	_window_display = _vent_window_duration
+	_window_core_seen = _vent_window_duration
 	_window_lifts_done = 0
 
 

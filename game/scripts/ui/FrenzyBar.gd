@@ -147,7 +147,11 @@ func _process(delta: float) -> void:
 
 	if _frenzy.mode == FrenzyState.Mode.BURNING:
 		_set_burn_style(true)
-		var seconds_left := _frenzy.meter * _tuning.frenzy_burn_duration
+		# Second Wind (duration_multiplier) divides the drain RATE, so real seconds left are
+		# meter × base duration × that multiplier. Omitting it understated the countdown by
+		# exactly the multiplier — at ~8 levels the label ticked down 1 per 3 real seconds
+		# and read as a broken clock (Tim's device report, 2026-07-19).
+		var seconds_left := _frenzy.meter * _tuning.frenzy_burn_duration * _frenzy.duration_multiplier
 		# Multiplier reads "2.4×" (the × trails the number) per Tim's call — via Money.trim
 		# so a whole multiplier reads "2×", never "2.0×" (Tim, 2026-07-03). The button's icon
 		# already conveys "TURBO", so the readout is just the reward.
@@ -158,7 +162,9 @@ func _process(delta: float) -> void:
 		if _frenzy.can_pop():
 			# Live preview of what a pop right now would lock in.
 			var preview_mult := 1.0 + (_tuning.frenzy_max_multiplier - 1.0) * _frenzy.meter
-			var preview_secs := _frenzy.meter * _tuning.frenzy_burn_duration
+			# Same Second Wind scaling as the burn readout above — the promise the preview
+			# makes must be the one the burn keeps.
+			var preview_secs := _frenzy.meter * _tuning.frenzy_burn_duration * _frenzy.duration_multiplier
 			_label.text = "%s× for %ds" % [Money.trim(preview_mult, 1), int(preview_secs)]
 		else:
 			# Below the pop floor there is no reward to preview — a pop isn't possible yet,

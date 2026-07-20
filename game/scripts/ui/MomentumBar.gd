@@ -538,11 +538,20 @@ func _process(delta: float) -> void:
 	elif locked_out:
 		_label.text = "OVERHEATED"
 		_apply_label_state(_LabelState.OVERHEATED)
-	elif cruising and is_equal_approx(_rush_momentum.heat, _rush_momentum.cruise_heat()):
+	elif cruising and is_equal_approx(_rush_momentum.heat, _rush_momentum.cruise_heat()) \
+			and not _rush_momentum.is_spinning_down():
 		# Sitting exactly on the clamp: the steady, content cruise state. The bonus quotes
 		# effective_cruise_bonus() (base +25% plus Cooling Systems levels), never a hardcoded
 		# number. While still CLIMBING toward the clamp the normal "+X%" branch below narrates
 		# the climb, exactly as before.
+		#
+		# The spin-down guard is load-bearing (Tim device report, 2026-07-20). After a bail you
+		# can re-press and settle onto the clamp while a BANKED bonus is still leading — the core
+		# is paying max(live, banked), so quoting the cruise constant here would show "+25%" while
+		# the player actually earns the banked value, and the BANKED chip beside it said so. The
+		# readout must never contradict what is being paid, least of all by UNDERSELLING the
+		# reward this whole mechanic exists to grant. Falling through to the "+X%" branch below
+		# reports the true effective bonus, and the chip keeps naming where it comes from.
 		_label.text = "CRUISE +%d%%" % int(round(_rush_momentum.effective_cruise_bonus() * 100.0))
 		_apply_label_state(_LabelState.CRUISING)
 	else:

@@ -92,6 +92,8 @@ extends SceneTree
 #  29. A frenzy burn during the lockout resurrects nothing: the frozen property stays down
 #      and pays zero through the burn (the multiplier has nothing to multiply) — while the
 #      lockout cooldown keeps draining right through it.
+#  31. An overheat downs only the properties that were being RUSHED: a bystander property
+#      keeps rushing for income and frenzy through the lockout, just without the bonus.
 #  30. Taps on a frozen property are fully dead — no idle-cycle start, no frenzy fill —
 #      until rush_ready re-enables them.
 # METRIC CHANGE (same pass): the autopilot's earnings metric now PRICES the freeze — every
@@ -144,6 +146,7 @@ func _initialize() -> void:
 	_test_freeze_reset_unfreezes(tuning)
 	_test_freeze_frenzy_leak(tuning)
 	_test_freeze_idle_start_refused(tuning)
+	_test_lockout_spares_other_properties(tuning)
 
 	print("")
 	if _failures == 0:
@@ -1984,3 +1987,40 @@ func _test_freeze_idle_start_refused(tuning: TuningConfig) -> void:
 		not game.rush_momentum.is_locked_out() and not manual.is_overheat_frozen)
 	game.tap_property(0)
 	_check("after rush_ready the same tap starts the cycle again", manual.is_cycle_running)
+
+
+func _test_lockout_spares_other_properties(tuning: TuningConfig) -> void:
+	print("\n31. An overheat downs only the RUSHED properties — the rest of the empire plays on")
+	# Tim 2026-07-19: during a lockout, properties he had never rushed (including unstaffed ones)
+	# also went dead, so the whole tab read as punished. An overheat now takes the heat METER and
+	# the properties that were riding it — nothing else. Property 1 rides to the overheat;
+	# property 0 (untouched, staffed) must still rush for income and frenzy through the lockout,
+	# while gaining NO momentum bonus (the meter is down for everyone until rush_ready).
+	var game := _fresh_game(tuning, 9100)
+	_seed_staffed_property(game, 0)
+	_seed_staffed_property(game, 1)
+	_check("(setup) the ride on property 1 overheated", _drive_game_to_overheat(game, [1]))
+	var bystander := game.economy.properties[0] as PropertyState
+	var frozen_rider := game.economy.properties[1] as PropertyState
+	_check("(setup) the rushed property froze, the bystander did not",
+		frozen_rider.is_overheat_frozen and not bystander.is_overheat_frozen)
+	_check("(setup) the meter is locked out", game.rush_momentum.is_locked_out())
+
+	# The bystander is mid-cycle and rushable: hold-rush it for a spell of the lockout.
+	game.frenzy.meter = 0.0
+	var cash_before := game.economy.cash
+	var progress_before := bystander.cycle_progress
+	var bonus_leaked := false
+	for _i in range(20):
+		game.hold_rush_property(0)
+		game.tick(TICK_SECONDS)
+		if not is_equal_approx(bystander.rush_momentum_factor, 1.0):
+			bonus_leaked = true
+		if not game.rush_momentum.is_locked_out():
+			break
+	_check("the bystander still RUSHES during someone else's lockout (its cycle advanced)",
+		bystander.cycle_progress != progress_before or game.economy.cash > cash_before)
+	_check("the bystander still earned through the lockout", game.economy.cash > cash_before)
+	_check("rushing it still charged the frenzy meter", game.frenzy.meter > 0.0)
+	_check("but it carried NO momentum bonus (the meter is down for everyone)", not bonus_leaked)
+	_check("the frozen rider stayed down throughout", frozen_rider.is_overheat_frozen)

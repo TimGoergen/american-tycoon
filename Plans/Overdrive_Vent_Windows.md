@@ -342,6 +342,24 @@ its reason — while the freeze itself made the game's two best moments mutually
 - Chosen over two alternatives Tim declined: freezing heat but still serving windows, and
   letting a lockout charge the frenzy meter.
 
+## Lockout scoped to the rushed properties (Tim, 2026-07-19)
+
+Tim, on device: "The overheat lockout still appears to apply to all properties and not just
+properties that were actively being rushed... other properties on the same tab that did not have
+any staff were also locked." Two separate causes, both fixed:
+
+- **Core:** `tap_property` / `hold_rush_property` refused the rush verb globally on
+  `can_rush()`, so an overheat on one property made the WHOLE empire unrushable. Now only a
+  FROZEN property refuses; every other property keeps rushing through the lockout — real income,
+  real frenzy fill — but grants no heat and no momentum bonus, because the meter itself is down
+  until rush_ready. (The explicit frozen guard in `hold_rush_property` is load-bearing now: it
+  used to be covered incidentally by the `can_rush()` gate.)
+- **UI:** `PropertyRow`'s lockout dim keyed off the shared meter's `is_locked_out()`, graying
+  every row's portrait at once. It now keys off that row's own `is_overheat_frozen`.
+
+So the punishment is exactly: the meter is down (no bonus anywhere) and the properties you were
+riding are dark. The rest of the empire plays on. Sim §31 locks this in.
+
 ## Decision log
 
 - Overdrive must be skill-based with larger risk and reward; cruise keeps the safe floor

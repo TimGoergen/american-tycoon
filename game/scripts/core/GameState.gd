@@ -187,25 +187,28 @@ func tap_property(prop_index: int) -> void:
 	if prop.is_overheat_frozen:
 		return
 	if prop.is_cycle_running:
-		# During an overheat lockout the rush verb is fully DEAD (Plans/Rush_Overheat.md): no
-		# frenzy fill, no grace, no rush income. Starting an idle cycle (the else branch) still
-		# works while locked out — only rushing is the overheating act.
-		if not rush_momentum.can_rush():
-			return
 		frenzy.on_tap()
-		# Keep the global momentum meter building, and mark THIS property as actively rushed so the
-		# bonus applies to it and only it. Its rush_momentum_factor is refreshed now, so this very
-		# payout already carries the bonus, and the tick keeps it lit while the grace holds.
-		_rush_grace_remaining = tuning.rush_momentum_grace_seconds
-		prop.rush_active_grace = tuning.rush_momentum_grace_seconds
-		prop.rush_momentum_factor = rush_momentum.factor()
+		# An overheat takes down the HEAT METER and the properties that were being rushed on it —
+		# not the rest of the empire (Tim 2026-07-19: the lockout was reaching properties that had
+		# nothing to do with the overheat, which read as the whole tab going dead). A property that
+		# is not frozen stays rushable right through someone else's lockout: it earns its normal
+		# rushed cycle and feeds frenzy. What it CANNOT do is build heat or carry a momentum bonus
+		# — the meter is out of commission until rush_ready — so the punishment is losing the
+		# bonus and the downed properties, never the ability to play.
+		if rush_momentum.can_rush():
+			# Keep the global momentum meter building, and mark THIS property as actively rushed so
+			# the bonus applies to it and only it. Its rush_momentum_factor is refreshed now, so this
+			# very payout already carries the bonus, and the tick keeps it lit while the grace holds.
+			_rush_grace_remaining = tuning.rush_momentum_grace_seconds
+			prop.rush_active_grace = tuning.rush_momentum_grace_seconds
+			prop.rush_momentum_factor = rush_momentum.factor()
 		# Rush pays at the SAME multiplier the tick uses — frenzy and the dynasty's Family Fortune;
 		# Rush Momentum is now folded in per-property via _collect's rush_momentum_factor (set just
 		# above), so the rushed cycle collects exactly the full rate the row shows (Tim 2026-07-12/13).
 		economy.credit_property_income(prop.rush_cycle(frenzy.get_multiplier() * prop.legacy_income_multiplier))
 	else:
 		# Starting an idle cycle is still a real tap (it feeds frenzy) and is allowed even
-		# during an overheat lockout — see the can_rush() gate above.
+		# during an overheat lockout — only a FROZEN property refuses, up at the top of this func.
 		frenzy.on_tap()
 		prop.start_cycle()
 
@@ -217,17 +220,21 @@ func hold_rush_property(prop_index: int) -> void:
 	var prop := economy.properties[prop_index] as PropertyState
 	if not prop.is_cycle_running:
 		return
-	# During an overheat lockout the held rush is fully DEAD too: no frenzy fill, no grace, no
-	# rush income (Plans/Rush_Overheat.md).
-	if not rush_momentum.can_rush():
+	# A frozen property is DOWN: the held rush is dead on it until rush_ready. This guard is
+	# LOAD-BEARING now — it used to be covered incidentally by the can_rush() gate below, but that
+	# gate no longer refuses the whole empire (see tap_property).
+	if prop.is_overheat_frozen:
 		return
 	frenzy.on_tap(tuning.frenzy_fill_hold_factor)
-	# Keep the global momentum meter building, and mark THIS property as actively rushed so the
-	# bonus applies to it and only it (refreshed now so this payout already carries it; the tick
-	# keeps it lit while the grace holds).
-	_rush_grace_remaining = tuning.rush_momentum_grace_seconds
-	prop.rush_active_grace = tuning.rush_momentum_grace_seconds
-	prop.rush_momentum_factor = rush_momentum.factor()
+	# Same rule as tap_property: a property that is not frozen keeps rushing through someone
+	# else's lockout for income and frenzy, but the downed meter grants no heat and no bonus.
+	if rush_momentum.can_rush():
+		# Keep the global momentum meter building, and mark THIS property as actively rushed so the
+		# bonus applies to it and only it (refreshed now so this payout already carries it; the tick
+		# keeps it lit while the grace holds).
+		_rush_grace_remaining = tuning.rush_momentum_grace_seconds
+		prop.rush_active_grace = tuning.rush_momentum_grace_seconds
+		prop.rush_momentum_factor = rush_momentum.factor()
 	# Rush pays at the SAME multiplier the tick uses — frenzy and the dynasty's Family Fortune — and
 	# credits immediately if it completes; Rush Momentum is folded in per-property via _collect's
 	# rush_momentum_factor (set just above), so the cash keeps pace with the rushed bar AND the full

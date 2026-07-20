@@ -40,11 +40,11 @@ var prop_index: int = -1
 var _prop: PropertyState
 var _economy: EconomyState
 var _frenzy: FrenzyState
-## The shared Rush Momentum / heat state (Rush Overheat, Tim 2026-07-15). Read-only here: the row
-## checks is_locked_out() so the portrait LOOKS disabled while rushing is shut down — the core
-## already ignores rush requests during lockout, but an unresponsive live-looking button reads as
-## a bug, not a cooldown. Also read for is_vent_window_open(), which holds the rush presentation
-## up through the vent gesture's finger lifts (see _vent_presentation_hold).
+## The shared Rush Momentum / heat state (Rush Overheat, Tim 2026-07-15). Read-only here, and now
+## only for is_vent_window_open(), which holds the rush presentation up through the vent gesture's
+## finger lifts (see _vent_presentation_hold). The "rushing is shut down" LOOK is no longer taken
+## from this shared state: an overheat downs only the properties that were being rushed, so the
+## row keys that dim off its OWN is_overheat_frozen flag instead (Tim 2026-07-19).
 var _rush_momentum: RushMomentumState
 ## The generation's reached epoch — the highest staffer tier any property may be hired
 ## or upgraded to right now. Read live so the hire button unlocks the moment a new
@@ -881,11 +881,17 @@ func _refresh(delta: float) -> void:
 	if frozen:
 		portrait_mode = ManagerCircle.PortraitMode.LOCKED
 	# Rush Overheat lockout (Tim 2026-07-15): while rushing is shut down the portrait must LOOK
-	# disabled — the core ignores the rush verb during lockout, so a live-looking button that does
-	# nothing would read as a bug. PRESENTATION ONLY: the portrait stays interactive (a tap can
-	# still start an idle cycle, which is not a rush), and buy/hire are untouched. A gray, dimmed
-	# modulate mutes the whole disc; the rush-held look below is suppressed for the duration.
-	var rush_locked := _rush_momentum != null and _rush_momentum.is_locked_out()
+	# disabled — the core ignores the rush verb, so a live-looking button that does nothing would
+	# read as a bug. PRESENTATION ONLY: the portrait stays interactive (a tap can still start an
+	# idle cycle, which is not a rush), and buy/hire are untouched. A gray, dimmed modulate mutes
+	# the whole disc; the rush-held look below is suppressed for the duration.
+	#
+	# This is PER-PROPERTY, keyed on the freeze — NOT on the global meter (Tim 2026-07-19: during
+	# an overheat, unrelated properties, including unstaffed ones he had never rushed, also looked
+	# locked; the whole tab read as dead). Only the properties that were actually being rushed go
+	# down; everyone else keeps rushing through the lockout for income and frenzy (see
+	# GameState.tap_property), so their portraits must keep looking alive.
+	var rush_locked := frozen
 	_manager_circle.modulate = Color(0.55, 0.55, 0.55) if rush_locked else Color.WHITE
 	# The infinity "rushing" icon shows whether the primary Button or a secondary finger holds it
 	# — hidden during lockout, when holding produces no rushes. The vent presentation hold (see

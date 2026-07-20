@@ -566,15 +566,34 @@ still visibly draining. The bonus falls off a cliff the frame you let go.
   no weight. Make the contrast legible — the bail should visibly read as *banked* — or players
   will never learn the option exists. This pairs with the `OVERHEATED` + countdown row text.
 
-### Sim consequence — must re-gate before this merges
+### Sim consequence — the gate is a TIMID model, not the sloppy one
 
-This deliberately re-introduces the "free ride" earlier sim passes engineered out. The plan
-already notes that **sloppy play only lands below cruise because the bail decision is judged at
-the same reliability as the gestures** — paying for bails lifts the sloppy average directly, and
-Tim confirmed on 2026-07-20 that sloppy must stay negative. Expect to pay for this elsewhere:
-the shorter approach Tim is already dialing is the natural offset, since it trims riskless paid
-time at the same time. Re-run the gates (cruise / skilled / sloppy) after building, and treat a
-sloppy figure back at or above cruise as a failure of this feature, not of the tune.
+*(Corrected 2026-07-20 after Tim pushed back on the first draft of this section, which claimed
+the change would reward sloppy play. That was wrong, and the correction changes what to test.)*
+
+**Bailing cleanly is not sloppy play — it is the skill this change exists to reward.** The
+sloppy model is 70% success *per lift*; it loses money by MISSING GESTURES, not by stopping. A
+run that ends in a miss banks nothing, because an overheat still zeroes instantly, so the sloppy
+model collects only on the minority of runs where it chooses to stop before blowing up.
+
+The payout is also strongly **asymmetric toward skilled play**, because the banked value scales
+with the tier reached: sloppy dies at median tier 2 (banking ~+115% for a ~2.3 s tail), while
+skilled dies at median tier 8 and routinely passes 12 (banking +295% or more, with a
+proportionally longer spin-down). **This change should WIDEN the skill gap, not close it.**
+
+The real risk is a **timid** strategy, which nothing in the sim currently models because it was
+strictly losing until this change made it pay: engage overdrive, take one or two easy vents at
+shallow depth where hazard rates are low, bail, bank the tail, repeat. That is not a player who
+is bad at the gesture — it is a player who never takes the hard ones and farms the cash-out.
+
+Structural mitigations already exist (each cycle costs approach time plus a refractory roll, and
+shallow depth means slow hazard rates, so the farm carries real setup overhead), but whether
+they suffice is empirical.
+
+**Gate to add when building:** a third autopilot model — **timid, bails at tier 1–2 every
+time** — required to land **at or below cruise**. If a farmer beats a rider, the mechanic is
+broken. If the farmer underperforms a genuine ride, the change is doing exactly what it should.
+Keep reporting cruise / skilled / sloppy as before; sloppy is expected to move very little.
 
 ## Decision log
 

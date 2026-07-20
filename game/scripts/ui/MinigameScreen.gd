@@ -1479,9 +1479,14 @@ func _fill_amount_statement(mult: float) -> void:
 		_stat_impact_val.text = "+%s" % _format_amount(delta)
 		_stat_impact_val.add_theme_color_override("font_color", UiPalette.DARK_MONEY_GREEN)
 	elif mult < 1.0 - 0.001:
-		_result_verdict_label.text = "WEAK ROUND"
+		# Copy pass (Tim, 2026-07-20): the loss framing STAYS — falling short still costs something —
+		# but the keep floor was retuned 0.5 -> 0.9, so the worst round now gives up a tenth, not a
+		# half. "WEAK ROUND / kept 90%" was written for the old floor and read like a catastrophe.
+		# We now name the SHORTFALL itself ("−10%"), which is both honest about the loss and
+		# self-scaling: a small miss reads small. No math changed.
+		_result_verdict_label.text = "CAME UP SHORT"
 		_result_verdict_label.add_theme_color_override("font_color", _keep_color(mult))
-		_stat_impact_key.text = "Weak round  (kept %d%%)" % int(round(mult * 100.0))
+		_stat_impact_key.text = "Short of full  (−%d%%)" % int(round((1.0 - mult) * 100.0))
 		_stat_impact_val.text = "−%s" % _format_amount(-delta)
 		_stat_impact_val.add_theme_color_override("font_color", UiPalette.KETCHUP_RED)
 	else:
@@ -1549,8 +1554,11 @@ func _refresh_legacy_result_line(mult: float) -> void:
 		_result_legacy_label.text = ("LEGACY BONUS  +%s gems!" % Money.abbrev(amount)) + ("  (great round!)" if great else "")
 		_result_legacy_label.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD)
 	else:
-		# Collected a gem but the round was too weak to keep it (bad result → keep nothing).
-		_result_legacy_label.text = "Legacy bonus lost — a stronger round keeps it"
+		# Collected a gem but the round fell short of the "full" line, which is what keeps it. This IS
+		# a real all-or-nothing loss, so it still says so — just without the harsher "lost" (Tim,
+		# 2026-07-20 copy pass). "Legacy" is correct here at every site: the gem bonus is always
+		# Legacy, even on the cash-pile round.
+		_result_legacy_label.text = "Legacy bonus just missed — reach full to keep it"
 		_result_legacy_label.add_theme_color_override("font_color", UiPalette.KETCHUP_RED)
 	_result_legacy_label.visible = true
 

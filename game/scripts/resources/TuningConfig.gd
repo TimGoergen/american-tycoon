@@ -426,8 +426,16 @@ extends Resource
 @export var rush_momentum_haptic_ready_ms: float = 40.0  # feel-tune
 
 ## The vent-window telegraph's own pulse — long enough that "act NOW" is distinguishable by
-## feel alone with the eyes on the property row (plan follow-up item).
+## feel alone with the eyes on the property row (plan follow-up item). The telegraph fires ONE
+## PULSE PER REQUIRED LIFT (Tim 2026-07-20): a x2 window buzzes twice, a x3 three times, so the
+## thumb learns the demand before the eyes read the pips — deliberate redundant encoding for the
+## moment the mechanic is fastest.
 @export var rush_momentum_haptic_vent_ms: float = 80.0  # feel-tune
+
+## Silence between those telegraph pulses (milliseconds). Without a gap a x3 window would feel
+## like one long buzz rather than three counted beats, which is the whole point of the pulse
+## train. 0 runs the pulses back-to-back.
+@export var rush_momentum_haptic_vent_gap_ms: float = 70.0  # feel-tune
 
 # --- Estate & tax (Spec §9) ---
 

@@ -44,6 +44,14 @@ extends HBoxContainer
 # the chip is the only place the blown beat can stay visible long enough to learn from
 # (the plan's rule: miss-feedback is what makes a skill mechanic learnable).
 #
+# BANKED BONUS (Tim 2026-07-20): bailing out voluntarily now KEEPS the earned bonus and spins it
+# down gradually, while an overheat still zeroes it on the spot. That difference is invisible in
+# the "+X%" readout alone — both cases just show a number — so a teal "BANKED +X% — DRAINING"
+# chip rides above the bar for the whole spin-down. An overheat shows no such chip, so the two
+# outcomes are told apart by the chip's PRESENCE, which is the only way a player ever discovers
+# that bailing is a real option. Both chips share one upward-growing stack above the bar so they
+# can never overlap.
+#
 # Cruise Control (Plans/Rush_Cruise_Control.md) rules still apply: the OVR button is ALWAYS
 # visible (Tim 2026-07-16: moving UI elements are annoying) but ENABLED only once the hold has
 # REACHED the cruise clamp; any other time it wears the gray-outlined "can't trigger" plate.
@@ -86,6 +94,15 @@ var _instrument: OverdriveInstrumentOverlay
 var _tier_chip: PanelContainer
 var _tier_chip_label: Label
 var _tier_chip_tween: Tween
+
+## The column the chips live in, anchored above the meter (see _ready). Chips are stacked
+## top-to-bottom so the one nearest the bar is the LAST child.
+var _chip_stack: VBoxContainer
+
+## The banked-bonus chip: shown for as long as a voluntarily banked bonus is spinning down,
+## so the player can tell a bail (you keep it, it drains) from an overheat (it is gone now).
+var _banked_chip: PanelContainer
+var _banked_chip_label: Label
 
 ## The miss-feedback pips inside the chip (see VentPipRow at the bottom of this file).
 ## Visible only on the "VENT MISSED!" chip — see the class comment for why the chip keeps
@@ -168,6 +185,8 @@ const TIER_CHIP_HOLD_SEC := 1.0
 ## Pixels between the meter's top edge and the chip's bottom edge (Tim 2026-07-18: the chip
 ## must not cover the bar).
 const TIER_CHIP_GAP_ABOVE_BAR := 8.0
+## Vertical gap between stacked chips when more than one is up.
+const CHIP_STACK_SEPARATION := 6.0
 const TIER_CHIP_FADE_IN_SEC := 0.12
 const TIER_CHIP_FADE_OUT_SEC := 0.4
 
@@ -230,8 +249,12 @@ func _ready() -> void:
 	_meter.max_value = 1.0
 	_meter.show_percentage = false
 	# A touch shorter than a full action button — it is a secondary read-out, not a tap target,
-	# but still tall enough to read at a glance.
-	_meter.custom_minimum_size = Vector2(0, int(UiPalette.STANDARD_BUTTON_HEIGHT * 0.7))
+	# but still tall enough to read at a glance. Raised 0.7 → 0.85 (Tim 2026-07-20: the in-bar
+	# vent pips read as "readable but small"). The pips are sized off this inner height, and
+	# at 0.7 there was no vertical room left to grow them once the timer strip along the
+	# bottom edge is reserved. 0.85 also brings this meter CLOSER to the frenzy meter below
+	# it, which is a full button tall.
+	_meter.custom_minimum_size = Vector2(0, int(UiPalette.STANDARD_BUTTON_HEIGHT * 0.85))
 	_meter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_meter.size_flags_vertical = Control.SIZE_FILL
 	_meter.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -314,24 +337,37 @@ func _ready() -> void:
 	row.add_child(_label)
 	_apply_label_state(_LabelState.NORMAL)
 
+	# The CHIP STACK: the column of plates that live ABOVE the meter, never over it (Tim
+	# 2026-07-18: a chip covering the bar hid the fill exactly when the player most needs to read
+	# it mid-vent). Anchored to the meter's top-center and growing UPWARD, so however tall its
+	# chips get, the bottom chip's lower edge stays a fixed gap above the bar. Chips are listed
+	# top-to-bottom, so the LAST child is the one nearest the bar. z_index lifts the whole stack
+	# above the siblings drawn after this bar.
+	#
+	# A container (rather than two separately anchored chips) exists because there are now two
+	# kinds of chip — the timed vent resolutions and the persistent banked-bonus readout — and
+	# they must never share pixels when both are up.
+	_chip_stack = VBoxContainer.new()
+	_chip_stack.anchor_left = 0.5
+	_chip_stack.anchor_right = 0.5
+	_chip_stack.anchor_top = 0.0
+	_chip_stack.anchor_bottom = 0.0
+	_chip_stack.offset_bottom = -TIER_CHIP_GAP_ABOVE_BAR
+	_chip_stack.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_chip_stack.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_chip_stack.add_theme_constant_override("separation", int(CHIP_STACK_SEPARATION))
+	_chip_stack.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_chip_stack.z_index = 10
+	_meter.add_child(_chip_stack)
+
 	# The tier chip: a large bold plate for the vent resolutions — chips ease in, hold ~1 s,
-	# then fade (see _show_tier_chip). It sits ABOVE the meter, not over it (Tim 2026-07-18:
-	# a chip covering the bar hid the fill exactly when the player most needs to read it
-	# mid-vent) — anchored to the meter's top-center and growing upward, so however tall
-	# the chip gets (text only, or text + miss pips) its bottom edge stays a fixed gap
-	# above the bar. z_index lifts it above the siblings drawn after this bar.
+	# then fade (see _show_tier_chip). Sits at the TOP of the stack, so a banked chip below it
+	# never pushes it over the bar.
 	_tier_chip = PanelContainer.new()
-	_tier_chip.anchor_left = 0.5
-	_tier_chip.anchor_right = 0.5
-	_tier_chip.anchor_top = 0.0
-	_tier_chip.anchor_bottom = 0.0
-	_tier_chip.offset_bottom = -TIER_CHIP_GAP_ABOVE_BAR
-	_tier_chip.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_tier_chip.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_tier_chip.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_tier_chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_tier_chip.z_index = 10
 	_tier_chip.visible = false
-	_meter.add_child(_tier_chip)
+	_chip_stack.add_child(_tier_chip)
 
 	# The chip's content column: the big text line, with the miss-feedback pips beneath it.
 	# The pip row only shows on the miss chip; every other chip keeps it hidden, so those
@@ -354,6 +390,41 @@ func _ready() -> void:
 	_vent_pips = VentPipRow.new()
 	_vent_pips.visible = false
 	chip_column.add_child(_vent_pips)
+
+	# The BANKED chip: the spin-down readout. Unlike the tier chip this one is not a timed
+	# celebration — it is shown for as long as a bailed-out bonus is still draining, and it is
+	# the ONLY place the player can learn that bailing pays at all (Tim 2026-07-20: "yes, and say
+	# so in the UI"). Without it, bailing and overheating look identical from the outside and the
+	# whole cash-out half of the loop stays invisible.
+	#
+	# Sits at the BOTTOM of the stack, nearest the bar, because it annotates the bar's own "+X%"
+	# readout: it is saying "that number you are reading is banked, and it is going down".
+	_banked_chip = PanelContainer.new()
+	_banked_chip.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_banked_chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_banked_chip.visible = false
+	_chip_stack.add_child(_banked_chip)
+
+	# ATOMIC_TEAL on NAVY: teal is already this bar's "safe / settled" color (the CRUISE readout
+	# uses it), which is exactly what a banked bonus is — deliberately nothing like the gold
+	# act-now family or the red failure family. An overheat shows no chip at all and the number
+	# simply goes, so the two outcomes are told apart by presence, not by shades of a plate.
+	_banked_chip_label = Label.new()
+	_banked_chip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_banked_chip_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_banked_chip_label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
+	_banked_chip_label.add_theme_font_override("font", UiPalette.make_bold_font())
+	_banked_chip_label.add_theme_color_override("font_color", UiPalette.INK_NAVY)
+	_banked_chip_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_banked_chip.add_child(_banked_chip_label)
+
+	var banked_plate := StyleBoxFlat.new()
+	banked_plate.bg_color = UiPalette.ATOMIC_TEAL
+	banked_plate.border_color = UiPalette.NAVY
+	banked_plate.set_border_width_all(3)
+	banked_plate.set_corner_radius_all(8)
+	banked_plate.set_content_margin_all(10)
+	_banked_chip.add_theme_stylebox_override("panel", banked_plate)
 
 	# Overheat/re-arm swap the whole meter's presentation. (Deliberately NO band_entered
 	# connection: the depth-hazard rework retired the Critical band and its crossing chip —
@@ -481,6 +552,22 @@ func _process(delta: float) -> void:
 	# A locked meter is not accruing anything: hide the carbonation while it drains/re-arms so the
 	# shutdown reads as dead air, not business as usual.
 	_bubbles.visible = not locked_out
+
+	# The BANKED chip: up for exactly as long as a voluntarily banked bonus is still worth more
+	# than the live state would pay. This is the ONLY signal that bailing is different from
+	# blowing up (Tim 2026-07-20: "yes, and say so in the UI") — an overheat zeroes the bonus
+	# instantly, so it simply never shows this chip, and the contrast between "BANKED … DRAINING"
+	# and nothing at all is what teaches the choice.
+	#
+	# The chip quotes banked_bonus() rather than the bar's own "+X%" readout on purpose: they are
+	# the same number during a spin-down (the core's effective bonus IS the banked value while it
+	# leads), and naming the source here keeps the chip honest if that ever stops being true.
+	# Hidden during a lockout regardless, so a stale chip can never sit over the overheat display.
+	var spinning_down: bool = _rush_momentum.is_spinning_down() and not locked_out
+	_banked_chip.visible = spinning_down
+	if spinning_down:
+		_banked_chip_label.text = "BANKED +%d%% — DRAINING" \
+				% int(round(_rush_momentum.banked_bonus() * 100.0))
 
 	# The salmon streaks mark the overdrive ride itself now: with the fill pinned full, they are
 	# the motion cue that the bar has switched into its minigame instrument. Never while merely
@@ -618,14 +705,16 @@ func _on_rush_ready() -> void:
 ## with time to act on it). At window-open a buzz would land at the exact instant the player
 ## should already be lifting — too late to help, and it would smear the physical beat players
 ## calibrate their gesture timing against. The visual "NOW" is the red bar reaching the target.
-func _on_vent_incoming(approach_seconds: float, _required_lifts: int) -> void:
+## The pulse also COUNTS the demand: one buzz per required lift (Tim 2026-07-20) — see
+## _pulse_vent_telegraph.
+func _on_vent_incoming(approach_seconds: float, required_lifts: int) -> void:
 	_vent_approach_seconds = maxf(approach_seconds, 0.001)
 	# Start the display clock exactly at the spawn value: the event is at the right edge NOW.
 	# (_predict_clock's snap-on-increase rule would catch this anyway; setting it here makes the
 	# first drawn frame exact rather than inferred.)
 	_approach_display = _vent_approach_seconds
 	_approach_core_seen = _vent_approach_seconds
-	_vibrate(_tuning.rush_momentum_haptic_vent_ms)
+	_pulse_vent_telegraph(required_lifts)
 
 
 ## The event reached the target: the window is open, the gesture clock is running. All the
@@ -711,6 +800,33 @@ func _vibrate(duration_ms: float) -> void:
 		Input.vibrate_handheld(int(duration_ms))
 
 
+## The vent telegraph's haptic: ONE PULSE PER REQUIRED LIFT (Tim 2026-07-20). A x2 window buzzes
+## twice, a x3 three times, so the thumb already knows the demand before the eyes get to the pips
+## — deliberate redundant encoding for the moment the mechanic is fastest.
+##
+## The pulses are played as a train rather than one long buzz: each pulse waits out its OWN length
+## plus the gap knob before the next fires, so the player feels distinct counted beats. This is a
+## coroutine (it awaits scene-tree timers), which is why it is fire-and-forget from the signal
+## handler — the caller does not await it.
+##
+## Sized to fit inside the approach: at the shipped 80 ms pulse + 70 ms gap, three pulses take
+## ~370 ms against a 1.2 s runway. The is_inside_tree() re-check after each wait covers the bar
+## being torn down mid-train (screen change, First Contact reset).
+func _pulse_vent_telegraph(required_lifts: int) -> void:
+	var pulse_ms: float = _tuning.rush_momentum_haptic_vent_ms
+	if pulse_ms < 1.0 or not OS.has_feature("mobile"):
+		return  # knob disabled, or desktop — no train to play
+	var pulses: int = maxi(required_lifts, 1)
+	var gap_ms: float = maxf(_tuning.rush_momentum_haptic_vent_gap_ms, 0.0)
+	for i in range(pulses):
+		_vibrate(pulse_ms)
+		if i == pulses - 1:
+			return
+		await get_tree().create_timer((pulse_ms + gap_ms) / 1000.0).timeout
+		if not is_inside_tree():
+			return
+
+
 # ---------------------------------------------------------------------------
 # The overdrive instrument overlay
 # ---------------------------------------------------------------------------
@@ -794,6 +910,11 @@ class OverdriveInstrumentOverlay extends Control:
 	const TIMER_STRIP_HEIGHT := 8.0
 	const TIMER_TRACK_PAD := 2.0                           # navy border visible around the strip
 	const TIMER_STRIP_BOTTOM_GAP := 3.0
+	## Everything the timer strip claims off the bar's bottom edge (gap + strip + the navy
+	## backing track's padding). The pips are centered in the space ABOVE this band rather
+	## than in the whole region, so the bigger pips (see PIP_RADIUS_MAX) can never overlap
+	## the strip — two separate reads must never share pixels.
+	const TIMER_STRIP_RESERVED := TIMER_STRIP_BOTTOM_GAP + TIMER_STRIP_HEIGHT + TIMER_TRACK_PAD
 	## In-bar gesture pips, BRIGHTENED (Tim 2026-07-18 night — the old cream washed out against
 	## the gold backdrop). A landed lift is a near-white disc — deliberately the most luminous
 	## mark on the whole bar, because a registered beat is the confirmation the gesture lives
@@ -803,13 +924,18 @@ class OverdriveInstrumentOverlay extends Control:
 	const PIP_FILLED_COLOR := Color("#FFF7E6")             # near-white warm
 	const PIP_RING_COLOR := Color("#FFF7E6")               # near-white too — the halo, not hue, separates it
 	const PIP_HALO_COLOR := Color("#1D2D50", 0.85)         # navy halo behind every pip (contrast fix)
-	const PIP_HALO_PAD := 4.0                              # halo radius beyond the pip silhouette
-	const PIP_OUTLINE := 6.0
+	const PIP_HALO_PAD := 5.0                              # halo radius beyond the pip silhouette
+	const PIP_OUTLINE := 8.0
 	## Pip radius as a fraction of the bar's inner height, with a hard cap so a desktop-resized
 	## bar can't grow comedy pips. Three pips at this size fit the two-thirds-width region on
 	## the narrowest supported phone with room to spare.
-	const PIP_HEIGHT_FRAC := 0.34
-	const PIP_RADIUS_MAX := 20.0
+	## SIZE BUMP (Tim 2026-07-20: pips "readable but small"). BOTH numbers had to move: the
+	## cap was the BINDING constraint at the shipped bar height, so raising the fraction
+	## alone would have changed nothing on the phone. Radius 20 → 26 px (diameter 40 → 52).
+	## The halo pad and the ring stroke went up with it (4 → 5, 6 → 8) so the proportions —
+	## and so the filled-disc vs owed-ring read — stay as crisp as before, just larger.
+	const PIP_HEIGHT_FRAC := 0.40
+	const PIP_RADIUS_MAX := 26.0
 	## Center-to-center pip spacing, in pip radii.
 	const PIP_SPACING_RADII := 3.0
 
@@ -902,7 +1028,7 @@ class OverdriveInstrumentOverlay extends Control:
 			# The timer strip: anchored at the target, right end draining left as the window
 			# runs out (placement + drain-direction rationale in the class comment).
 			var strip_top := bottom - TIMER_STRIP_BOTTOM_GAP - TIMER_STRIP_HEIGHT
-			# Navy backing track across the FULL runway first — the strip drains against it,
+		# Navy backing track across the FULL runway first — the strip drains against it,
 			# so both the remaining time and the elapsed gap read at a glance (contrast fix).
 			draw_rect(Rect2(target_x - TIMER_TRACK_PAD, strip_top - TIMER_TRACK_PAD,
 					runway + TIMER_TRACK_PAD * 2.0,
@@ -960,11 +1086,19 @@ class OverdriveInstrumentOverlay extends Control:
 	## They sit ON TOP of the steady backdrop and keep a fixed position — progress is the pips
 	## filling, time is the strip draining; two separate reads, neither moving the other.
 	func _draw_pips(region_left: float, region_right: float, top: float, bottom: float) -> void:
-		var pip_radius := minf((bottom - top) * PIP_HEIGHT_FRAC, PIP_RADIUS_MAX)
+		# The band the pips live in: everything above the pixels the timer strip reserves.
+		var pip_band_bottom := bottom - TIMER_STRIP_RESERVED
+		var center_y := (top + pip_band_bottom) * 0.5
+		# Largest pip (INCLUDING its navy halo) that still fits inside that band. This is a
+		# safety net for short/resized bars — at the shipped bar height PIP_RADIUS_MAX binds
+		# first, which is the intended size.
+		var radius_fit := (pip_band_bottom - top) * 0.5 - PIP_HALO_PAD
+		var pip_radius := minf(minf((bottom - top) * PIP_HEIGHT_FRAC, PIP_RADIUS_MAX), radius_fit)
+		if pip_radius <= 0.0:
+			return
 		var spacing := pip_radius * PIP_SPACING_RADII
 		var row_width := spacing * float(_required_lifts - 1)
 		var first_x := (region_left + region_right) * 0.5 - row_width * 0.5
-		var center_y := (top + bottom) * 0.5
 		for i in range(_required_lifts):
 			var center := Vector2(first_x + spacing * float(i), center_y)
 			# Navy halo behind every pip — the contrast plate the bright mark reads against

@@ -46,3 +46,6 @@ audit_settle_rate = 0.08
 audit_threshold = 1
 earth_economy_target = 103600000000000.0
 autosave_cadence = 10.0
+challenge_goal_growth = 1.6
+challenge_reward_base_pct = 0.005
+challenge_reward_decay = 0.6

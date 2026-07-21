@@ -21,7 +21,10 @@ class_name GameState
 # slate / zero earned; a v4 is_staffed:true becomes one hire; a pre-v6 save starts the wage at
 # level 0; pre-v9 staff_tier + staff_level pairs are merged onto the one ladder — each old
 # tier hire counts as one ladder level; see the migration in load_save_dict).
-const SAVE_VERSION := 10
+# v11 added the dynasty's Challenge-Mode cleared-tier record (DynastyState.challenge_highest_tiers,
+# the permanent diminishing income bonus); older saves load with a warning and default it to empty
+# (→ 0 bonus).
+const SAVE_VERSION := 11
 
 var tuning: TuningConfig
 var economy: EconomyState

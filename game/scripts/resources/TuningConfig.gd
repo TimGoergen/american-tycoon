@@ -472,6 +472,26 @@ extends Resource
 # Legacy became a spendable upgrade currency. Per-level upgrade magnitudes and
 # costs now live in LegacyUpgradeCatalog.gd, not here.
 
+# --- Challenge Mode goal ladders (Plans/Challenge_Mode.md §3, §7) ---
+# Each minigame has an infinite escalating goal ladder; clearing a tier grants a permanent,
+# geometrically diminishing global income bonus that survives prestige. These three knobs shape the
+# whole system (the per-game first-tier thresholds T0 live in ChallengeGoals.GAME_BASE_THRESHOLDS).
+# All FIRST-PASS, device-tune. Because DECAY < 1 the per-game bonus CONVERGES to
+# base_pct/(1−decay) — bounded so it can't run away (Tim's rate-limit requirement).
+
+## Per-tier growth of a game's score threshold: threshold(t) = T0 × this^(t-1). ~1.5–1.8 makes each
+## rung a real step up (Plans/Challenge_Mode.md §3.1).
+@export var challenge_goal_growth: float = 1.6  # feel-tune
+
+## The tier-1 global income bonus, as a fraction (0.005 = +0.5%). Each further tier pays this ×
+## decay^(t-1), so tier 1 is the biggest slice (Plans/Challenge_Mode.md §3.2).
+@export var challenge_reward_base_pct: float = 0.005  # feel-tune
+
+## Geometric decay of the per-tier bonus (0.6 = each tier pays 60% of the last). < 1 bounds the
+## per-game total to base_pct/(1−decay) — with 0.005/0.6 each game asymptotes to +1.25%, ~7.5%
+## across all six (Plans/Challenge_Mode.md §3.2).
+@export var challenge_reward_decay: float = 0.6  # feel-tune
+
 # --- Prestige minigame (GDD §5.5, Spec §9.3) ---
 # At prestige the player plays a minigame whose performance sets how much of the run's base
 # Legacy they KEEP: legacy_awarded = floor(base_legacy × mult). Reward curve reshaped (Tim,

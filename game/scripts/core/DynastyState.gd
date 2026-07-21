@@ -47,6 +47,13 @@ var dynastic_taps: int = 0
 ## spending never reduces it.
 var lifetime_cash_earned: float = 0.0
 
+## The highest CHALLENGE-MODE tier the bloodline has ever cleared, per minigame — {game_key ->
+## highest tier cleared, int} (Plans/Challenge_Mode.md §3.3). Dynasty-wide and permanent: it lives
+## in the dynasty save so the diminishing global income bonus it grants SURVIVES PRESTIGE, mirroring
+## best_vent_streak (another dynasty-wide earned record). The game_key is a minigame's
+## display_name() — see ChallengeGoals. Empty for a save that predates Challenge Mode → 0 bonus.
+var challenge_highest_tiers: Dictionary = {}
+
 ## The deepest VENT TIER the bloodline has ever reached in a single overdrive excursion — an
 ## implicit high score (Plans/Overdrive_Vent_Windows.md, Tim 2026-07-20). A vent tier is the
 ## count of successful vents in one ride; a skilled run dies around tier 8. This is an ALL-TIME
@@ -92,6 +99,20 @@ func get_best_vent_streak() -> int:
 	return best_vent_streak
 
 
+## Record that a challenge run cleared `tier` of a minigame. Raises the per-game high only — a
+## worse run can never lower a bank already earned (push-your-luck: you keep every tier cleared,
+## Plans/Challenge_Mode.md §3.1). `game_key` is the minigame's display_name() (see ChallengeGoals).
+func note_challenge_tier(game_key: String, tier: int) -> void:
+	var previous := int(challenge_highest_tiers.get(game_key, 0))
+	challenge_highest_tiers[game_key] = maxi(previous, tier)
+
+
+## The whole-mode Challenge income bonus in force right now (a fraction; 0.0 when nothing is
+## cleared). The diminishing geometric sum across all games — see ChallengeGoals.total_income_bonus.
+func get_challenge_income_bonus() -> float:
+	return ChallengeGoals.total_income_bonus(challenge_highest_tiers)
+
+
 ## Connect the living generation's overheat signal to the best-streak recorder. Called every time
 ## `current` is (re)assigned — construction, succession, and load all build a FRESH GameState with
 ## a FRESH RushMomentumState, so the record has to re-subscribe to the new instance each time or it
@@ -107,11 +128,14 @@ func tick(delta: float) -> void:
 	current.tick(delta, get_legacy_income_multiplier())
 
 
-## The property-income multiplier in force this instant. It comes entirely from
-## the purchased Family Fortune upgrade now (1.0 when nothing is bought), so the
-## acceleration is something the player chooses to buy, not an automatic bonus.
+## The property-income multiplier in force this instant. It is the purchased Family Fortune upgrade
+## (1.0 when nothing is bought) TIMES the permanent Challenge-goal income bonus (1 + total), both
+## dynasty-wide. This is the SINGLE source of that factor: the passive tick reads it live here (via
+## tick() below), and _apply_upgrade_effects seeds each property's legacy_income_multiplier FIELD
+## from this same method so the rush-collect path and the display read an identical value — the
+## bonus therefore lands on income exactly once regardless of collection path.
 func get_legacy_income_multiplier() -> float:
-	return upgrades.property_income_multiplier()
+	return upgrades.property_income_multiplier() * (1.0 + get_challenge_income_bonus())
 
 
 # ---------------------------------------------------------------------------
@@ -158,6 +182,15 @@ func _configure_retention_pricing() -> void:
 	# Push the global Legacy-upgrade cost multiplier into the (stateless) catalog too, so every
 	# upgrade price reflects the tuning knob (Tim 2026-07-14 — the prestige-runaway brake).
 	LegacyUpgradeCatalog.cost_multiplier = tuning.legacy_upgrade_cost_multiplier
+	# Same pattern for the (stateless) Challenge-goal curve: push the ladder/reward knobs in from
+	# tuning so every threshold and diminishing-reward query sees the tuned curve. Re-pushed on
+	# every construction/load — see the GOTCHA in ChallengeGoals (a sim sets the TUNING field, not
+	# the static, or this would overwrite it).
+	ChallengeGoals.configure(
+		tuning.challenge_goal_growth,
+		tuning.challenge_reward_base_pct,
+		tuning.challenge_reward_decay
+	)
 
 
 # ---------------------------------------------------------------------------
@@ -303,7 +336,11 @@ func _apply_upgrade_effects(game: GameState) -> void:
 	var staff_cost := upgrades.staff_cost_multiplier()
 	var rush_power := upgrades.rush_power_multiplier()
 	var auto_speed := upgrades.auto_click_speed_multiplier()
-	var income_mult := upgrades.property_income_multiplier()
+	# Family Fortune × the permanent Challenge-goal income bonus — the SAME value the passive tick
+	# reads via get_legacy_income_multiplier(). Seeding the property field from that one method (not
+	# from upgrades alone) is what keeps the rush-collect path (which reads this field) and the
+	# passive path applying the challenge bonus identically — exactly once, never twice, never missed.
+	var income_mult := get_legacy_income_multiplier()
 	for prop in game.economy.properties:
 		var p := prop as PropertyState
 		p.set_cycle_speed_multiplier(cycle_speed)
@@ -349,6 +386,7 @@ func to_save_dict() -> Dictionary:
 		"dynastic_taps": dynastic_taps,
 		"lifetime_cash_earned": lifetime_cash_earned,
 		"best_vent_streak": best_vent_streak,
+		"challenge_highest_tiers": challenge_highest_tiers,
 		"ancestors": ancestors,
 		"current": current.to_save_dict(),
 	}
@@ -369,6 +407,9 @@ func load_save_dict(data: Dictionary) -> void:
 	lifetime_cash_earned = float(data.get("lifetime_cash_earned", 0.0))
 	# Pre-stats-screen saves have no best-streak record; default to 0 (never reached a vent).
 	best_vent_streak = int(data.get("best_vent_streak", 0))
+	# Pre-Challenge-Mode saves have no cleared-tier record; default to empty (→ 0 income bonus).
+	# Duplicate so the loaded dynasty owns its own dictionary, not the save's (like `ancestors`).
+	challenge_highest_tiers = (data.get("challenge_highest_tiers", {}) as Dictionary).duplicate()
 	# Pre-Family-Ledger saves have no ancestor list; default to empty. Duplicate each
 	# entry so the loaded dynasty owns its own dictionaries, not the save's.
 	ancestors = []

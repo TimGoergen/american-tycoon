@@ -294,24 +294,20 @@ Four of the five sittings are now answered. **Only sitting E remains untested.**
       slow"), which is the answer we most wanted: `vent_gap_max` 0.40 / `vent_tap_max` 0.25
       stay as shipped. The feared failure mode — clean lifts going unregistered and reading as
       difficulty — did not occur. Fumble severity was settled by the 07-20 design interview.
-- [ ] **Sitting C — the instrument.** **TWEAK ×2, both open.**
-      1. **Approach still too slow at 1.2 s.** The smoothing fix landed (motion is no longer
-         jerky) but the runway still reads as waiting. Tim wants a **live knob pass** rather
-         than a guessed number — and `rush_momentum_vent_approach_seconds` is *already* exposed
-         in Balance Tuning (labelled "Vent Approach Sec"), so this needs no build work; dial it
-         on device. **Re-run the sim gates afterward:** a shorter runway trims the riskless paid
-         time bundled into every check, which moves skilled *and* sloppy averages.
-      2. **Pips readable but too small.** Contrast is fixed; size is the remaining gap. They are
-         currently capped by `PIP_RADIUS_MAX` (20 px) in `MomentumBar.gd`, so raising
-         `PIP_HEIGHT_FRAC` alone will do nothing — lift the cap too.
+- [x] ~~**Sitting C — the instrument.**~~ **BOTH RESOLVED.**
+      1. ~~Approach too slow at 1.2 s.~~ **DIALED to 0.7 s and promoted to the shipped default**
+         (Tim, 2026-07-20; commit ff7e725). Re-gated as promised: cruise +24.9% · skilled +68.7%
+         (still in band) · sloppy −18.3% · timid +11.6% — all gates pass with MORE margin than at
+         1.2 s (less riskless paid time per check makes the farm worse, not better).
+      2. ~~Pips too small.~~ **FIXED (commit ee9f39a):** `PIP_RADIUS_MAX` 20→26 and the meter
+         height 0.7→0.85 so they clear the timer strip. Re-judge size on the next build if needed.
 - [x] ~~**Sitting D — lockout scoping.**~~ **FIXED, confirmed.** Only the properties Tim was
       actually rushing went dark; the rest of the empire kept cycling and earning. The 07-19
       bug is closed.
-- [ ] **Sitting E — frenzy + overdrive together.** **STILL UNTESTED** — the combination didn't
-      come up. This is the one genuinely unknown interaction left on the branch: the mutual
-      freeze was removed 07-19, so a burn and a vent run have never been played simultaneously,
-      and overheating mid-burn (losing the property for the rest of the multiplier) has never
-      been felt. Protocol below unchanged; do this before merging.
+- [x] ~~**Sitting E — frenzy + overdrive together.**~~ **KEEP (Tim, 2026-07-20: "looks good").**
+      The last genuinely unknown interaction on the branch — a burn and a vent run running at
+      once, and overheating mid-burn — plays well. This was the final device item gating the
+      merge.
 
 ---
 

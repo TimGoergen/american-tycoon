@@ -6,9 +6,10 @@ extends ColorRect
 # Minigame Tuning stays only as a developer shortcut). A full-screen modal built on the same
 # black-bezel frame + top-left ◀ BACK pattern as AboutScreen and StatsScreen.
 #
-# It lists the six minigames; each row shows the highest tier the bloodline has cleared, the
-# permanent income bonus that tier is already paying, and the next goal to reach. Tapping a game's
-# PLAY button launches an endless CHALLENGE run.
+# It lists the six minigames; each row shows the highest tier the bloodline has cleared, that tier's
+# earned contribution to BOTH reward tracks (income + Legacy), and the next payout goal to reach.
+# Tapping a game's PLAY button launches a keep-alive CHALLENGE run (the clock drains, scoring tops it
+# up, and the best tier reached is banked when it hits zero).
 #
 # Like MinigameReviewScreen, this screen owns its OWN MinigameScreen host (_player) so a challenge
 # run never touches the real prestige flow. When a run ends, _player emits challenge_finished; we
@@ -107,8 +108,9 @@ func _ready() -> void:
 	# --- Header: title, the running total bonus, and a one-line explainer of the mode. ---
 	column.add_child(UiPalette.make_tab_title("CHALLENGES"))
 
-	# The prominent total global-income bonus readout (e.g. "TOTAL BONUS  +3.2% INCOME"), large and
-	# gold so it reads as the headline reward. Filled in _refresh.
+	# The prominent running-totals readout — BOTH reward tracks, on two lines (e.g.
+	# "INCOME  +3.2%" / "LEGACY  +2.0%"), large and gold so they read as the headline reward.
+	# Filled in _refresh.
 	_total_bonus_label = Label.new()
 	_total_bonus_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_total_bonus_label.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
@@ -117,7 +119,7 @@ func _ready() -> void:
 	column.add_child(_total_bonus_label)
 
 	var explainer := Label.new()
-	explainer.text = "Beat your best in each game for a permanent income bonus. Higher tiers pay less."
+	explainer.text = "Beat your best in each game to climb its tier ladder. Every 5th tier pays a permanent bonus — income or Legacy."
 	explainer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	explainer.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	explainer.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
@@ -166,8 +168,10 @@ func _refresh() -> void:
 	if _dynasty == null:
 		return
 
-	var total_pct := _dynasty.get_challenge_income_bonus() * 100.0
-	_total_bonus_label.text = "TOTAL BONUS  +%.1f%% INCOME" % total_pct
+	# Both running totals, one per track, on two lines so each reward is legible on its own.
+	var income_pct := _dynasty.get_challenge_income_bonus() * 100.0
+	var legacy_pct := _dynasty.get_challenge_legacy_bonus() * 100.0
+	_total_bonus_label.text = "INCOME  +%.1f%%\nLEGACY  +%.1f%%" % [income_pct, legacy_pct]
 
 	for child in _rows_column.get_children():
 		child.queue_free()
@@ -184,19 +188,34 @@ func _refresh() -> void:
 ## Build one large, tappable game row: the game name and its earned tier/bonus on the left, the next
 ## goal beneath, and a big PLAY button on the right that launches this game's challenge run.
 func _make_game_row(game_key: String, type_script: Script) -> Control:
-	# NOTE (Wave 2): this screen still reads the OLD Challenge model's shape. These reads are minimally
-	# rewired to the new authored-ladder ChallengeGoals API only so the project parses and boots — Wave
-	# 2 rebuilds this screen for the finite ladder + the two reward tracks (income + Legacy). Until
-	# then it shows the income track and the NEXT payout tier as the "next goal".
+	# The bloodline's cleared tier for this game, and its earned contribution to EACH reward track.
 	var cleared_tier := int(_dynasty.challenge_highest_tiers.get(game_key, 0))
-	var earned_pct := ChallengeGoals.income_bonus_for(cleared_tier) * 100.0
-	# The next tier that actually pays out (every 5th), and the score to reach it. -1 once mastered.
+	var earned_income := ChallengeGoals.income_bonus_for(cleared_tier) * 100.0
+	var earned_legacy := ChallengeGoals.legacy_bonus_for(cleared_tier) * 100.0
+
+	# "Tier N cleared" plus whichever track contributions are nonzero (a fresh game shows tier 0 alone).
+	var earned_text := "Tier %d cleared" % cleared_tier
+	var earned_parts: Array = []
+	if earned_income > 0.001:
+		earned_parts.append("+%.1f%% income" % earned_income)
+	if earned_legacy > 0.001:
+		earned_parts.append("+%.1f%% legacy" % earned_legacy)
+	if not earned_parts.is_empty():
+		earned_text += "   " + "  ·  ".join(earned_parts)
+
+	# The next reward: the next tier that actually pays out (every 5th), the score to reach it, and
+	# which track it pays. -1 once the ladder is mastered (all six payouts earned).
 	var next_tier := ChallengeGoals.next_payout_tier(cleared_tier)
-	var next_threshold := 0
-	var next_reward_pct := 0.0
-	if next_tier > 0:
-		next_threshold = int(round(ChallengeGoals.score_step(game_key) * float(next_tier)))
-		next_reward_pct = float(ChallengeGoals.payout_at_tier(next_tier).get("pct", 0.0))
+	var next_text := ""
+	var mastered := next_tier == -1
+	if mastered:
+		next_text = "MASTERED — all rewards earned"
+	else:
+		var payout := ChallengeGoals.payout_at_tier(next_tier)
+		var reach := int(round(ChallengeGoals.score_step(game_key) * float(next_tier)))
+		var track := String(payout.get("type", "")).to_upper()
+		var pct := float(payout.get("pct", 0.0))
+		next_text = "Next: reach %s (tier %d)  →  +%d%% %s" % [_round_score(reach), next_tier, int(round(pct)), track]
 
 	# The row sits on the cream card plate so it reads as a distinct, tappable block on the frame.
 	var card := PanelContainer.new()
@@ -215,12 +234,12 @@ func _make_game_row(game_key: String, type_script: Script) -> Control:
 	row.add_child(info)
 
 	info.add_child(_make_info_label(game_key, UiPalette.FONT_SUBHEAD, UiPalette.NAVY, true))
-	info.add_child(_make_info_label(
-		"Tier %d cleared   +%.1f%%" % [cleared_tier, earned_pct],
-		UiPalette.FONT_BODY, UiPalette.DARK_GOLD, false))
-	info.add_child(_make_info_label(
-		"Next: reach %d  →  +%.1f%%" % [next_threshold, next_reward_pct],
-		UiPalette.FONT_LABEL, UiPalette.NAVY, false))
+	info.add_child(_make_info_label(earned_text, UiPalette.FONT_BODY, UiPalette.DARK_GOLD, false))
+	# The next-reward line reads as an earned summit when mastered (green, bold), a goal otherwise.
+	if mastered:
+		info.add_child(_make_info_label(next_text, UiPalette.FONT_LABEL, UiPalette.DARK_MONEY_GREEN, true))
+	else:
+		info.add_child(_make_info_label(next_text, UiPalette.FONT_LABEL, UiPalette.NAVY, false))
 
 	# Right: a big PLAY button. Large tappable target (Tim's low-vision rule).
 	var play := Button.new()
@@ -235,6 +254,20 @@ func _make_game_row(game_key: String, type_script: Script) -> Control:
 	row.add_child(play_center)
 
 	return card
+
+
+## Format a whole score with thousands separators ("30,000"), so the higher-scale games (Match Three
+## reaches into the tens of thousands) read cleanly in the "Next: reach …" line.
+func _round_score(value: int) -> String:
+	var digits := str(absi(value))
+	var grouped := ""
+	var count := 0
+	for i in range(digits.length() - 1, -1, -1):
+		grouped = digits[i] + grouped
+		count += 1
+		if count % 3 == 0 and i > 0:
+			grouped = "," + grouped
+	return grouped
 
 
 ## One text line inside a game row. `emphasize` faux-bolds it (used for the game name).

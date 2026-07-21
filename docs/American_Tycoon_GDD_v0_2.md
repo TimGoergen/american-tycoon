@@ -637,6 +637,22 @@ Resolved since v0.1: ~~automation/managers~~ (§6), ~~dynasty identity~~ (§8.2)
 Captured ideas for later development. Nothing here is in current scope; each needs its
 own design pass before it becomes a milestone.
 
+- **Tutorial / onboarding system (Tim, 2026-07-20).** A guided layer that makes sure every system
+  is understood and explained. The game now stacks a lot — the property ladder + milestones, the
+  wage / clock-in, the rush → cruise → overdrive vent-check skill game, Frenzy / TURBO, epochs &
+  First Contact, prestige + the Estate Office Legacy shop, staffing tiers & retention, the minigame
+  library, the Balance Tuning panel — and a new player currently meets all of it at once with no
+  explanation. **Open:** format (an interruptive step-by-step walkthrough vs. contextual
+  *just-in-time* tips that fire when each system first becomes relevant — first rush, first
+  milestone, first First Contact, first prestige); whether it is skippable and replayable; where
+  progress persists (its own `user://` file so "already taught" survives prestige, rather than the
+  per-generation save); whether it doubles as a **systems glossary / help screen** reachable from
+  Settings for later reference; and how the prompts honor the standing low-vision / large-UI rule.
+  *Take:* strong fit and probably overdue — the systems have outgrown "figure it out." Recommend
+  contextual just-in-time teaching over a front-loaded wall: idle games are learned by doing, the
+  systems already unlock gradually (rush before overdrive, epochs before prestige), and a glossary
+  in Settings covers the "wait, what did that do?" case without gating the fun.
+
 - **Temporary boosts.** Abilities that grant a *very high but very short-lived* increase in
   income — a brief, dramatic spike the player triggers on demand. Distinct from the Frenzy
   meter (§5.1/§9), which is an earned, self-charging burst. **Not cash-purchasable and not

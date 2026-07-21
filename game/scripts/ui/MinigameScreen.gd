@@ -218,6 +218,10 @@ var _baked_backdrop_px: Vector2i = Vector2i.ZERO
 var _challenge_mode: bool = false
 var _score_label: Label
 var _highscore_label: Label
+## The live "next tier" target readout — the score the run must reach for its next challenge tier
+## (and, when that tier pays out, the reward it grants), so the player always sees what they are
+## pushing toward during a run (Tim, 2026-07-21). Challenge-mode only.
+var _challenge_target_label: Label
 ## The CHALLENGE end view — shown when a run ends (DONE/Back) INSTEAD of closing straight away, so the
 ## tier-credit feedback has somewhere to land (Challenge Mode Phase 2). A dedicated view, deliberately
 ## separate from the reward `_result_view` (the reward statement must not carry challenge feedback).
@@ -527,6 +531,12 @@ func _build_play_view() -> Control:
 	_highscore_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_highscore_label.visible = false
 	column.add_child(_highscore_label)
+
+	# The "next tier" target — the score to aim for next, plus the reward when that tier pays out.
+	_challenge_target_label = _make_label("", UiPalette.FONT_LABEL, UiPalette.NAVY)
+	_challenge_target_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_challenge_target_label.visible = false
+	column.add_child(_challenge_target_label)
 
 	# The keep-alive TIMER bar (Challenge Mode only): a horizontal bar that empties as the clock runs
 	# down, the seconds remaining printed over it. It replaces the reward timer + spectrum bar in
@@ -1253,6 +1263,7 @@ func _set_challenge_chrome(on: bool) -> void:
 	_keep_bar.visible = not on
 	_score_label.visible = on
 	_highscore_label.visible = on
+	_challenge_target_label.visible = on
 	# The keep-alive timer bar takes the reward chrome's place in a challenge run.
 	if _challenge_timer_margin != null:
 		_challenge_timer_margin.visible = on
@@ -1329,6 +1340,27 @@ func _update_challenge_score() -> void:
 	if score > _challenge_high:
 		_challenge_high = score
 	_highscore_label.text = "Best: %s" % _group_thousands(_challenge_high)
+	_update_challenge_target(score)
+
+
+## Fill the "next tier" target readout from the run's live score: the score needed to reach the next
+## tier, plus the reward if that tier is a payout tier. Shows a MASTERED state at the top of the
+## ladder so the readout is never a dead "next: —".
+func _update_challenge_target(score: int) -> void:
+	if _challenge_target_label == null:
+		return
+	var current_tier := ChallengeGoals.tier_for_score(_active_type_key, score)
+	if current_tier >= ChallengeGoals.MAX_TIER:
+		_challenge_target_label.text = "MASTERED — top tier reached"
+		return
+	var next_tier := current_tier + 1
+	var target := int(round(float(next_tier) * ChallengeGoals.score_step(_active_type_key)))
+	var text := "Next tier: %s" % _group_thousands(target)
+	var payout := ChallengeGoals.payout_at_tier(next_tier)
+	if not payout.is_empty():
+		# The next tier pays out — show its reward so the target reads as a concrete goal.
+		text += "  →  +%d%% %s" % [int(payout["pct"]), String(payout["type"]).to_upper()]
+	_challenge_target_label.text = text
 
 
 ## Advance the keep-alive run timer one frame (Wave 2, Plans/Challenge_Mode.md §1). Only called from

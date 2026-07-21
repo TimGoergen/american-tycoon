@@ -669,6 +669,8 @@ func _build_property_tab() -> Control:
 		row.tap_requested.connect(_on_tap_requested)
 		row.hold_rush_requested.connect(_on_hold_rush_requested)
 		row.rush_hold_released.connect(_on_rush_hold_released)
+		row.rush_pressed.connect(_on_rush_pressed)
+		row.rush_released.connect(_on_rush_released)
 		row.hire_requested.connect(_on_hire_requested)
 		row.set_buy_mode(_buy_mode)
 		ladder.add_child(row)
@@ -1335,6 +1337,18 @@ func _on_rush_hold_released(prop_index: int) -> void:
 	game.release_rush(prop_index)
 
 
+## Raw finger-down/finger-up edges on a row's rush control, forwarded verbatim for the
+## Overdrive Vent Window gesture reader (Plans/Overdrive_Vent_Windows.md). GameState routes
+## them to RushMomentumState, which only interprets them while a vent window is open on the
+## overdriven property — outside a window they are inert, so plain rush taps stay plain.
+func _on_rush_pressed(prop_index: int) -> void:
+	game.notify_rush_pressed(prop_index)
+
+
+func _on_rush_released(prop_index: int) -> void:
+	game.notify_rush_released(prop_index)
+
+
 ## Player pressed a row's staff button: buy the next rung of that property's sequential
 ## staff ladder (hiring IS level 1 of each block — GDD §6.1, epoch-depth redesign). The
 ## row re-reads game state every frame, so a purchase shows on the next _process refresh.
@@ -1611,6 +1625,12 @@ func _on_retain_requested(property_index: int) -> void:
 ## mid-life) and persist, so a purchase is never lost to a crash before autosave.
 func _on_upgrade_purchased(_upgrade_id: String) -> void:
 	dynasty.refresh_current_generation_effects()
+	# The purchase just drained the shared Legacy wallet, and the Household Staff rows carry
+	# can_afford SNAPSHOTS — without a rebuild they keep advertising affordability the wallet
+	# no longer has (enabled RETAIN buttons + a wrong "+x affordable" badge; Tim's device
+	# report 2026-07-18). In-place update, same as _on_retain_requested, so a held button
+	# under the player's finger survives.
+	_legacy_screen.update_retention_entries(_build_retention_entries())
 	SaveManager.save_dict_to_file(dynasty.to_save_dict())
 
 

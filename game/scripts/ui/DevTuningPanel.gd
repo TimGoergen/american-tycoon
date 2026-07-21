@@ -128,16 +128,32 @@ const DESCRIPTIONS := {
 	"rush_momentum_heat_build_per_second": "How fast heat climbs while rushing (heat/sec; 1.0 heat = the Hot edge).",
 	"rush_momentum_heat_build_hot_per_second": "Slower climb rate above the Hot edge (heat/sec; sets time-in-danger).",
 	"rush_momentum_heat_bleed_per_second": "How fast heat cools when NOT rushing (heat/sec).",
-	"rush_momentum_critical_start": "Heat where the Critical band begins (Hot spans 1.0 to here, always safe).",
-	"rush_momentum_ceiling_min": "Lowest possible overheat point (rolled each climb; min Critical depth).",
-	"rush_momentum_ceiling_max": "Highest possible overheat point, and where the bonus peaks.",
+	"rush_momentum_hard_ceiling": "Heat that instantly overheats — the bar's fixed end (vent windows are the real test).",
 	"rush_momentum_cruise_bonus": "Safe rush bonus while holding WITHOUT overdrive (0.25 = +25%; capped at the Hot-edge bonus).",
 	"rush_momentum_bonus_at_hot": "Income bonus at the Hot edge, heat 1.0 (0.30 = +30%).",
-	"rush_momentum_bonus_at_critical": "Income bonus at the Critical edge (0.40 = +40%).",
 	"rush_momentum_bonus_peak": "Income bonus at max possible heat (0.55 = +55%).",
 	"rush_momentum_locked_drain_per_second": "Heat drained per second while overheated (sets the lockout length).",
 	"rush_momentum_rearm_seconds": "Extra delay after a full cool-down before rushing re-enables.",
 	"rush_momentum_grace_seconds": "How long you still count as rushing after your last rush (bridges the pulse gaps).",
+	"rush_momentum_vent_rate_at_cruise": "Expected vent checks per second while hovering just past the cruise point (0.05 = about one every 20 s); riding deeper raises the rate.",
+	"rush_momentum_vent_rate_at_ceiling": "Expected vent checks per second at the very top of the bar (1.0 = about one per second) — the frantic end of the deeper-is-more-frequent ramp.",
+	"rush_momentum_vent_refractory_min": "Shortest rolled quiet time after a vent (or engaging overdrive) before the next event can spawn (seconds).",
+	"rush_momentum_vent_refractory_max": "Longest rolled quiet time before the next vent event (seconds) — the gap is rolled fresh each time so spacing feels random.",
+	"rush_momentum_vent_approach_seconds": "How long an incoming vent event takes to travel across the bar to the trigger point (seconds of warning).",
+	"rush_momentum_vent_window_duration": "Seconds to finish the vent gesture once the window telegraphs.",
+	"rush_momentum_vent_duration_decay": "Window duration multiplier per tier reached (0.92 = 8% less time each tier).",
+	"rush_momentum_vent_duration_floor": "Shortest the escalating window duration can get (seconds).",
+	"rush_momentum_vent_gap_max": "Longest pause allowed between vent gesture beats (seconds; bigger = more forgiving).",
+	"rush_momentum_vent_tap_max": "Longest press that still counts as the quick middle tap of VENT x2 (seconds).",
+	"rush_momentum_vent_heat_drop": "Heat released by a successful vent (small drop = deep runs keep riding near the top).",
+	"rush_momentum_vent_bonus_step": "Peak bonus added per successful vent (0.20 = +20% per rung; no cap).",
+	"rush_momentum_vent_lifts_step_tiers": "Tiers between lift escalations (3 = demand 1 lift, then 2 from tier 3, then 3 from tier 6; max 3 lifts).",
+	"rush_momentum_vent_fail_rearm_per_tier": "Extra re-arm seconds per earned vent tier when you overheat; 0 = off.",
+	"rush_momentum_vent_fail_rearm_cap": "Most extra re-arm seconds the per-tier sting can add (keeps deep-run failures from ever-longer timeouts).",
+	"rush_momentum_haptic_overheat_ms": "Vibration length (ms) when a rush overheats; 0 = off.",
+	"rush_momentum_haptic_ready_ms": "Vibration length (ms) when rushing re-arms after a lockout; 0 = off.",
+	"rush_momentum_haptic_vent_ms": "Vibration length (ms) of EACH vent telegraph pulse — one pulse per required lift, so a x2 window buzzes twice; 0 = off.",
+	"rush_momentum_haptic_vent_gap_ms": "Silence (ms) between those vent telegraph pulses, so a x2/x3 reads as counted beats instead of one long buzz.",
 	"frenzy_max_multiplier": "Peak income multiplier during a frenzy burn.",
 	"frenzy_burn_duration": "How long a full frenzy burn lasts (seconds).",
 	"frenzy_fill_per_tap": "Meter fill added per tap (fraction of the full bar).",
@@ -169,15 +185,31 @@ const DISPLAY_NAMES := {
 	"rush_momentum_heat_build_per_second": "Heat Build /s",
 	"rush_momentum_heat_build_hot_per_second": "Hot Heat Build /s",
 	"rush_momentum_heat_bleed_per_second": "Heat Bleed /s",
-	"rush_momentum_critical_start": "Critical Band Start",
-	"rush_momentum_ceiling_min": "Overheat Ceiling Min",
-	"rush_momentum_ceiling_max": "Overheat Ceiling Max",
+	"rush_momentum_hard_ceiling": "Hard Ceiling",
 	"rush_momentum_bonus_at_hot": "Bonus At Hot",
-	"rush_momentum_bonus_at_critical": "Bonus At Critical",
 	"rush_momentum_bonus_peak": "Bonus Peak",
 	"rush_momentum_locked_drain_per_second": "Overheat Drain /s",
 	"rush_momentum_rearm_seconds": "Re-arm Seconds",
 	"rush_momentum_grace_seconds": "Momentum Grace Sec",
+	"rush_momentum_vent_rate_at_cruise": "Vent Rate At Cruise",
+	"rush_momentum_vent_rate_at_ceiling": "Vent Rate At Ceiling",
+	"rush_momentum_vent_refractory_min": "Vent Quiet Min",
+	"rush_momentum_vent_refractory_max": "Vent Quiet Max",
+	"rush_momentum_vent_approach_seconds": "Vent Approach Sec",
+	"rush_momentum_vent_window_duration": "Vent Window Sec",
+	"rush_momentum_vent_duration_decay": "Vent Window Decay",
+	"rush_momentum_vent_duration_floor": "Vent Window Floor",
+	"rush_momentum_vent_gap_max": "Vent Gap Max",
+	"rush_momentum_vent_tap_max": "Vent Tap Max",
+	"rush_momentum_vent_heat_drop": "Vent Heat Drop",
+	"rush_momentum_vent_bonus_step": "Vent Bonus Step",
+	"rush_momentum_vent_lifts_step_tiers": "Vent Lift Step Tiers",
+	"rush_momentum_vent_fail_rearm_per_tier": "Vent Fail Re-arm /Tier",
+	"rush_momentum_vent_fail_rearm_cap": "Vent Fail Re-arm Cap",
+	"rush_momentum_haptic_overheat_ms": "Overheat Haptic ms",
+	"rush_momentum_haptic_ready_ms": "Ready Haptic ms",
+	"rush_momentum_haptic_vent_ms": "Vent Haptic ms",
+	"rush_momentum_haptic_vent_gap_ms": "Vent Haptic Gap ms",
 	"k_legacy": "Legacy Payout Scale",
 	"alpha_legacy": "Legacy Payout Curve",
 	"legacy_upgrade_cost_multiplier": "Legacy Upgrade Cost x",
@@ -239,6 +271,16 @@ const OTHER_SECTION_TITLE := "Other"
 ## content and the scroll frame's edges (Tim, 2026-07-09 — the list felt cramped against the frame).
 const SCROLL_VERTICAL_MARGIN := 24
 
+## Width (px) permanently reserved at the right end of every section header for the
+## "this section has modified values" asterisk (Tim, 2026-07-20). The space is reserved on
+## EVERY header whether or not its asterisk is currently showing, so the header text never
+## reflows when a value is overridden or reverted (project rule: no moving UI elements).
+const SECTION_MARKER_WIDTH := 48
+## Diameter of the "modified" dot on a section header. A drawn filled circle rather than a glyph
+## (Tim, 2026-07-20: the gold asterisk was hard to read on the header background) — a solid white
+## disc reads at arm's length regardless of the font's glyph coverage.
+const SECTION_DOT_DIAMETER := 26
+
 
 # One LineEdit per constant, keyed by constant name, read back on Apply.
 var _value_edits: Dictionary = {}
@@ -247,10 +289,14 @@ var _types: Dictionary = {}
 # The baked default for each constant, keyed by name — Apply only stores values
 # that differ from this, and rows that differ are flagged as overridden.
 var _baked: Dictionary = {}
+# Which collapsible section each constant was rendered into, keyed by constant name. Used to
+# refresh only that section's "modified" asterisk when its value is edited.
+var _section_of_knob: Dictionary = {}
 
 var _list: VBoxContainer
 # Each collapsible section, keyed by its title → { "button": Button header, "body": VBoxContainer,
-# "expanded": bool }. All sections start collapsed; the header-row arrow buttons drive them all.
+# "expanded": bool, "marker": Panel }. All sections start collapsed; the header-row arrow buttons
+# drive them all. "marker" is the white dot shown when the section holds a modified value.
 var _sections: Dictionary = {}
 var _reset_dynasty_button: Button
 # Two-tap guard on the destructive wipe: armed by the first tap, fires on the second.
@@ -395,13 +441,40 @@ func _add_collapsible_section(title: String) -> VBoxContainer:
 	header.pressed.connect(_toggle_section.bind(title))
 	_list.add_child(header)
 
+	# The "section contains modified values" asterisk, overlaid on the header's right end rather
+	# than appended to the header's text. Two reasons: the button's text is left-aligned, so an
+	# appended "*" would sit next to the title instead of at the right edge; and an overlay
+	# occupies no layout space, so showing or hiding it cannot move the header text. The matching
+	# right-hand content margin in _make_section_plate keeps the title from ever running underneath.
+	# A solid white disc, drawn as a Panel with a fully-rounded stylebox rather than a text glyph,
+	# so it reads regardless of the header font's glyph set (Tim, 2026-07-20). Pinned to the
+	# right-center of the header, vertically centered on a fixed diameter.
+	var marker := Panel.new()
+	var dot := StyleBoxFlat.new()
+	dot.bg_color = Color.WHITE
+	dot.set_corner_radius_all(SECTION_DOT_DIAMETER / 2)
+	marker.add_theme_stylebox_override("panel", dot)
+	marker.anchor_left = 1.0
+	marker.anchor_right = 1.0
+	marker.anchor_top = 0.5
+	marker.anchor_bottom = 0.5
+	marker.offset_left = -SECTION_DOT_DIAMETER - 12
+	marker.offset_right = -12
+	marker.offset_top = -SECTION_DOT_DIAMETER / 2.0
+	marker.offset_bottom = SECTION_DOT_DIAMETER / 2.0
+	# Let taps fall through to the header button underneath, or the dot would eat the
+	# right end of the header's tap target.
+	marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	marker.visible = false
+	header.add_child(marker)
+
 	var body := VBoxContainer.new()
 	body.add_theme_constant_override("separation", 14)
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.visible = false   # collapsed by default
 	_list.add_child(body)
 
-	_sections[title] = {"button": header, "body": body, "expanded": false}
+	_sections[title] = {"button": header, "body": body, "expanded": false, "marker": marker}
 	_update_section_header(title)
 	return body
 
@@ -477,6 +550,9 @@ func _make_section_plate(color: Color) -> StyleBoxFlat:
 	style.set_border_width_all(3)
 	style.set_corner_radius_all(4)
 	style.set_content_margin_all(8)
+	# Keep the header's own text clear of the asterisk's reserved column at the right end,
+	# so a long section title wraps/clips before it can collide with the marker.
+	style.set_content_margin(SIDE_RIGHT, SECTION_MARKER_WIDTH)
 	return style
 
 
@@ -519,6 +595,47 @@ func _update_section_header(title: String) -> void:
 	(section["button"] as Button).text = "%s  %s" % [marker, title.to_upper()]
 
 
+## True when this constant's editor currently holds a value that differs from its baked default —
+## i.e. it is a live override. This deliberately reads the LineEdit rather than the value the row
+## was seeded with, so the flag tracks what the user has typed, not just what was loaded from
+## user://tuning_overrides.json. The parse matches _on_apply_pressed exactly (same int rounding),
+## so "modified" always means "Apply would write an override for this knob".
+##
+## A half-typed entry ("", "-", "0.") is not a number yet, so it counts as NOT modified — the same
+## way Apply skips it. That keeps the asterisk from flickering on every keystroke mid-edit.
+func _is_knob_modified(name: String) -> bool:
+	if not _value_edits.has(name):
+		return false
+	var text: String = (_value_edits[name] as LineEdit).text.strip_edges()
+	if not text.is_valid_float():
+		return false
+	var value: Variant
+	if _types[name] == TYPE_INT:
+		value = int(round(text.to_float()))
+	else:
+		value = text.to_float()
+	return value != _baked[name]
+
+
+## Show or hide one section's white "modified" dot to match whether any knob in it is modified.
+func _refresh_section_marker(title: String) -> void:
+	if not _sections.has(title):
+		return
+	var any_modified := false
+	for name in _section_of_knob:
+		if String(_section_of_knob[name]) == title and _is_knob_modified(String(name)):
+			any_modified = true
+			break
+	var section: Dictionary = _sections[title]
+	(section["marker"] as Panel).visible = any_modified
+
+
+## Re-evaluate every section's asterisk (used once the rows are built).
+func _refresh_all_section_markers() -> void:
+	for title in _sections:
+		_refresh_section_marker(String(title))
+
+
 # ---------------------------------------------------------------------------
 # Showing / populating
 # ---------------------------------------------------------------------------
@@ -533,6 +650,7 @@ func open(effective_tuning: TuningConfig, baked_tuning: TuningConfig) -> void:
 	_types.clear()
 	_baked.clear()
 	_sections.clear()
+	_section_of_knob.clear()
 	for child in _list.get_children():
 		child.queue_free()
 
@@ -571,7 +689,11 @@ func open(effective_tuning: TuningConfig, baked_tuning: TuningConfig) -> void:
 		for pair in knobs_by_section[title]:
 			var name: String = pair[0]
 			var type: int = pair[1]
+			_section_of_knob[name] = String(title)
 			_add_constant_row(body, name, type, effective_tuning.get(name), baked_tuning.get(name))
+
+	# Sections start collapsed, so the asterisks are the only way to see which ones hold overrides.
+	_refresh_all_section_markers()
 
 	visible = true
 
@@ -637,13 +759,26 @@ func _add_constant_row(parent: VBoxContainer, name: String, type: int, current_v
 	var edit := LineEdit.new()
 	edit.text = _format_value(current_value)
 	edit.custom_minimum_size = Vector2(VALUE_COLUMN_WIDTH, VALUE_HEIGHT)
-	edit.alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	# LEFT-aligned, not right (Tim, 2026-07-20 — "it is not operating like a standard text
+	# editing field"). With right alignment, tapping near the end of the value put the caret on
+	# the wrong character, so backspace deleted the wrong one: Godot's LineEdit maps a tap to a
+	# caret column through the text's own left-to-right layout, and the extra offset that pushes
+	# right-aligned text over is not accounted for in that hit test. Left alignment removes the
+	# offset entirely, which is what makes the field behave like every other text box.
+	edit.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	edit.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	edit.add_theme_font_size_override("font_size", ROW_VALUE_SIZE)
 	# The STANDARD phone keyboard, not the numeric keypad: the values are numbers, but
 	# the numeric keypad has no arrow keys, which made moving the caret inside a long
 	# value nearly impossible (Tim, 2026-07-06).
 	edit.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_DEFAULT
+	# Nothing rewrites the text WHILE typing — assigning to LineEdit.text resets the caret to the
+	# start, which would fight every keystroke. The value is parsed and tidied only on COMMIT
+	# (Enter or leaving the field); see _normalize_value_text.
+	edit.text_submitted.connect(func(_submitted: String) -> void: _normalize_value_text(name))
+	edit.focus_exited.connect(func() -> void: _normalize_value_text(name))
+	# Read-only: keeps the section asterisk live as the user types, without touching the text.
+	edit.text_changed.connect(func(_new_text: String) -> void: _on_value_text_changed(name))
 	row.add_child(edit)
 
 	_value_edits[name] = edit
@@ -653,6 +788,43 @@ func _add_constant_row(parent: VBoxContainer, name: String, type: int, current_v
 ## cleanly (0.005, 1.15, 103600000000000), so no custom formatting is needed.
 func _format_value(value: Variant) -> String:
 	return str(value)
+
+
+## A value editor changed. This only READS the field — it never writes to it, because assigning to
+## LineEdit.text moves the caret and would break normal typing. All it does is keep the owning
+## section's "modified" asterisk in step with what is currently in the box.
+func _on_value_text_changed(name: String) -> void:
+	if _section_of_knob.has(name):
+		_refresh_section_marker(String(_section_of_knob[name]))
+
+
+## Tidy one value editor on COMMIT — when Enter is pressed or focus leaves the field, never while
+## the user is still typing. This is where stray whitespace (the phone keyboard's autocorrect likes
+## to add a trailing space) and odd-but-valid spellings like "1." or "1e3" get rendered back in the
+## panel's normal form, so the field ends up showing exactly the number Apply will store.
+##
+## A half-finished entry is left completely alone: if the text is not a number yet ("", "-", "0."),
+## or is already in normal form, nothing is assigned. That matters because assigning to .text resets
+## the caret, so the rule is to write only when the text genuinely has to change.
+func _normalize_value_text(name: String) -> void:
+	if not _value_edits.has(name):
+		return
+	var edit: LineEdit = _value_edits[name]
+	var text: String = edit.text.strip_edges()
+	if not text.is_valid_float():
+		return   # mid-edit or nonsense — leave it as typed; Apply already skips it
+	var value: Variant
+	if _types[name] == TYPE_INT:
+		value = int(round(text.to_float()))
+	else:
+		value = text.to_float()
+	var normalized := _format_value(value)
+	if edit.text != normalized:
+		edit.text = normalized
+		# The assignment above sent the caret to column 0; park it at the end, which is where a
+		# text field normally leaves it after a committed edit.
+		edit.caret_column = normalized.length()
+	_on_value_text_changed(name)
 
 
 # ---------------------------------------------------------------------------

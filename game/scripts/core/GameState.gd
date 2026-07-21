@@ -77,6 +77,14 @@ func _init(property_configs: Array, p_tuning: TuningConfig) -> void:
 	frenzy = FrenzyState.new(p_tuning)
 	rush_momentum = RushMomentumState.new(p_tuning)
 	epoch = EpochState.new(p_tuning)
+	# OVERHEAT PROPERTY FREEZE (Plans/Overdrive_Vent_Windows.md, Tim 2026-07-19): the signal
+	# pair below is the one seam every overheat and every recovery flows through. `overheated`
+	# is emitted synchronously from RushMomentumState._begin_overheat — the single funnel for
+	# ALL overheat causes (missed window, blown gesture beat, AND the hard-ceiling backstop) —
+	# so connecting here can never miss one, unlike detecting a lockout edge in tick() (which
+	# would also fire a tick late, after the rushed-grace snapshot has started to decay).
+	rush_momentum.overheated.connect(_freeze_actively_rushed_properties)
+	rush_momentum.rush_ready.connect(unfreeze_all_properties)
 
 
 ## Advance the whole game by `delta` seconds of active play.
@@ -90,19 +98,68 @@ func _init(property_configs: Array, p_tuning: TuningConfig) -> void:
 func tick(delta: float, extra_property_multiplier: float = 1.0) -> void:
 	frenzy.tick(delta)
 	# Rush heat climbs while the player is actively rushing (rushed within the grace window)
-	# and bleeds otherwise; a frenzy BURN freezes the whole heat model (Tim 2026-07-15 — see
-	# RushMomentumState). The bonus MAGNITUDE is global, but it is applied ONLY to the properties
+	# and bleeds otherwise. A frenzy burn no longer freezes any of it (Tim 2026-07-19 — see
+	# RushMomentumState): the two systems run at once and compound.
+	# The bonus MAGNITUDE is global, but it is applied ONLY to the properties
 	# being actively rushed (Tim 2026-07-13) — via each property's own rush_momentum_factor below,
 	# NOT the whole-economy tick multiplier.
-	rush_momentum.tick(delta, _rush_grace_remaining > 0.0, frenzy.is_burning())
-	_rush_grace_remaining = maxf(_rush_grace_remaining - delta, 0.0)
+	# While a vent window is open, the gesture's lifts (finger deliberately OFF the button —
+	# Plans/Overdrive_Vent_Windows.md) must not read as "stopped rushing": the player still
+	# counts as rushing even with the grace expired, and the grace timers below are frozen so
+	# neither the global build nor the rushed property's factor can bleed mid-gesture. The
+	# window is at most ~1 s, so freezing the decay for its span is imperceptible elsewhere.
+	var vent_gesture_holding := rush_momentum.is_vent_window_open()
+	rush_momentum.tick(delta, _rush_grace_remaining > 0.0 or vent_gesture_holding)
+	if not vent_gesture_holding:
+		_rush_grace_remaining = maxf(_rush_grace_remaining - delta, 0.0)
 	# Point each property's momentum factor at the current bonus while it is still inside its
 	# actively-rushed grace, else back to 1.0; then decay that grace so the boost fades a beat after
 	# the player stops rushing it. This is what confines momentum to the rushed property.
+	# (Overheat-frozen properties always take the 1.0 branch: the freeze handler zeroed their
+	# grace, and no rush verb can refill it while the lockout has every rush verb dead.)
+	#
+	# THE RELEASE TAIL (Plans/Overdrive_Vent_Windows.md "Bailing pays", Tim 2026-07-20) adds a
+	# second way to be paid. Letting go no longer collapses the bonus: it spins down as the heat
+	# bleeds, over several seconds. But the grace above expires half a second after the finger
+	# lifts, so on its own the tail would be pure decoration — the bar would count a reward down
+	# that the player never actually received (Tim, device, 2026-07-20: "the income rate per
+	# second display immediately drops back to the default amount even though the bar takes some
+	# seconds to drain"). So the properties that were RIDING keep the decaying multiplier with the
+	# finger off, until the tail ends.
+	#
+	# EVERY release case, not just an overdrive bail (Tim, 2026-07-20): the mark below used to be
+	# gated on is_overdrive_engaged(), which is precisely why a plain +15% cruise release paid
+	# nothing while its bar drained. Any property being rushed is marked.
+	#
+	# Knowing WHO was riding has to be recorded DURING the ride: by the release tick every grace
+	# is already zero (release_rush clears them the instant the finger lifts), so there is nothing
+	# left to read at the moment it matters. Hence the running mark below — the same shape as
+	# is_overheat_frozen, which is likewise stamped from a heat-model moment and cleared on one
+	# known set of exits.
+	var tail_bonus := rush_momentum.bonus if rush_momentum.is_spinning_down() else 0.0
+	if tail_bonus <= 0.0:
+		# The heat model is the single authority for when a tail ENDS. The moment it stops paying
+		# the marks come off, so no property can be left holding an elevated factor with nothing
+		# behind it — that would be a permanent income multiplier, not a cosmetic bug. (While the
+		# player is actively rushing this also fires every tick, and the loop below immediately
+		# re-marks whoever is in grace, which is how the "who was riding" record stays current.)
+		clear_rush_tail_riders()
 	for prop_variant in economy.properties:
 		var p := prop_variant as PropertyState
-		p.rush_momentum_factor = rush_momentum.factor() if p.rush_active_grace > 0.0 else 1.0
-		p.rush_active_grace = maxf(p.rush_active_grace - delta, 0.0)
+		if p.rush_active_grace > 0.0:
+			# Actively rushed: record it as a rider AND pay the live bonus. The branches are
+			# mutually exclusive precisely so the tail can never be applied twice.
+			p.is_rush_tail_rider = true
+			p.rush_momentum_factor = rush_momentum.factor()
+		elif p.is_rush_tail_rider and tail_bonus > 0.0:
+			# Released, finger off, meter still bleeding — the reward for stopping. The tail is
+			# confined to the properties that were actually being rushed, which is the rule this
+			# whole loop exists to keep.
+			p.rush_momentum_factor = 1.0 + tail_bonus
+		else:
+			p.rush_momentum_factor = 1.0
+		if not vent_gesture_holding:
+			p.rush_active_grace = maxf(p.rush_active_grace - delta, 0.0)
 	var tier_before := epoch.current_tier
 	economy.tick(delta, frenzy.get_multiplier() * extra_property_multiplier)
 	peak_net_worth = maxf(peak_net_worth, economy.get_net_worth())
@@ -110,9 +167,17 @@ func tick(delta: float, extra_property_multiplier: float = 1.0) -> void:
 	# current economy. Reads the same lifetime-earned tally the estate waterfall uses.
 	epoch.update(economy.cash_earned_this_gen)
 	# Reaching a new epoch (First Contact) wipes momentum — each epoch builds its own from scratch,
-	# which is what keeps Rush Momentum a per-epoch pinch instead of a run-long snowball.
+	# which is what keeps Rush Momentum a per-epoch pinch instead of a run-long snowball. The
+	# reset also ends any lockout, so every frozen property comes back up with it (a freeze may
+	# never outlive the lockout that caused it). Dynasty succession needs no equivalent call:
+	# it builds a brand-new GameState (DynastyState), whose properties are all born unfrozen.
 	if epoch.current_tier > tier_before:
 		rush_momentum.reset()
+		unfreeze_all_properties()
+		# reset() wipes the heat and the retained peak too, so the sweep above would clear these
+		# next tick anyway — but a rider mark must never outlive its tail even for one tick, so
+		# it goes here with the freeze, on the same one line of thinking.
+		clear_rush_tail_riders()
 	_update_displayed_income()
 	# Refresh the wage's "executive compensation" floor from the passive rate just
 	# computed: a clock-in tap pays a fraction of a second of the empire's income
@@ -157,26 +222,35 @@ func hold_tap_wage() -> void:
 ## Layer 2: tap a property. Starts the cycle if idle, rushes it if running.
 func tap_property(prop_index: int) -> void:
 	var prop := economy.properties[prop_index] as PropertyState
+	# An overheat-frozen property is DOWN: taps on it are fully dead — no frenzy fill, no cycle
+	# start — until rush_ready brings it back up. (The rush branch below would refuse via
+	# can_rush() anyway, since a freeze only exists during a lockout; this gate is what keeps
+	# the START verb from sneaking a downed machine back into production early.)
+	if prop.is_overheat_frozen:
+		return
 	if prop.is_cycle_running:
-		# During an overheat lockout the rush verb is fully DEAD (Plans/Rush_Overheat.md): no
-		# frenzy fill, no grace, no rush income. Starting an idle cycle (the else branch) still
-		# works while locked out — only rushing is the overheating act.
-		if not rush_momentum.can_rush():
-			return
 		frenzy.on_tap()
-		# Keep the global momentum meter building, and mark THIS property as actively rushed so the
-		# bonus applies to it and only it. Its rush_momentum_factor is refreshed now, so this very
-		# payout already carries the bonus, and the tick keeps it lit while the grace holds.
-		_rush_grace_remaining = tuning.rush_momentum_grace_seconds
-		prop.rush_active_grace = tuning.rush_momentum_grace_seconds
-		prop.rush_momentum_factor = rush_momentum.factor()
+		# An overheat takes down the HEAT METER and the properties that were being rushed on it —
+		# not the rest of the empire (Tim 2026-07-19: the lockout was reaching properties that had
+		# nothing to do with the overheat, which read as the whole tab going dead). A property that
+		# is not frozen stays rushable right through someone else's lockout: it earns its normal
+		# rushed cycle and feeds frenzy. What it CANNOT do is build heat or carry a momentum bonus
+		# — the meter is out of commission until rush_ready — so the punishment is losing the
+		# bonus and the downed properties, never the ability to play.
+		if rush_momentum.can_rush():
+			# Keep the global momentum meter building, and mark THIS property as actively rushed so
+			# the bonus applies to it and only it. Its rush_momentum_factor is refreshed now, so this
+			# very payout already carries the bonus, and the tick keeps it lit while the grace holds.
+			_rush_grace_remaining = tuning.rush_momentum_grace_seconds
+			prop.rush_active_grace = tuning.rush_momentum_grace_seconds
+			prop.rush_momentum_factor = rush_momentum.factor()
 		# Rush pays at the SAME multiplier the tick uses — frenzy and the dynasty's Family Fortune;
 		# Rush Momentum is now folded in per-property via _collect's rush_momentum_factor (set just
 		# above), so the rushed cycle collects exactly the full rate the row shows (Tim 2026-07-12/13).
 		economy.credit_property_income(prop.rush_cycle(frenzy.get_multiplier() * prop.legacy_income_multiplier))
 	else:
 		# Starting an idle cycle is still a real tap (it feeds frenzy) and is allowed even
-		# during an overheat lockout — see the can_rush() gate above.
+		# during an overheat lockout — only a FROZEN property refuses, up at the top of this func.
 		frenzy.on_tap()
 		prop.start_cycle()
 
@@ -188,17 +262,21 @@ func hold_rush_property(prop_index: int) -> void:
 	var prop := economy.properties[prop_index] as PropertyState
 	if not prop.is_cycle_running:
 		return
-	# During an overheat lockout the held rush is fully DEAD too: no frenzy fill, no grace, no
-	# rush income (Plans/Rush_Overheat.md).
-	if not rush_momentum.can_rush():
+	# A frozen property is DOWN: the held rush is dead on it until rush_ready. This guard is
+	# LOAD-BEARING now — it used to be covered incidentally by the can_rush() gate below, but that
+	# gate no longer refuses the whole empire (see tap_property).
+	if prop.is_overheat_frozen:
 		return
 	frenzy.on_tap(tuning.frenzy_fill_hold_factor)
-	# Keep the global momentum meter building, and mark THIS property as actively rushed so the
-	# bonus applies to it and only it (refreshed now so this payout already carries it; the tick
-	# keeps it lit while the grace holds).
-	_rush_grace_remaining = tuning.rush_momentum_grace_seconds
-	prop.rush_active_grace = tuning.rush_momentum_grace_seconds
-	prop.rush_momentum_factor = rush_momentum.factor()
+	# Same rule as tap_property: a property that is not frozen keeps rushing through someone
+	# else's lockout for income and frenzy, but the downed meter grants no heat and no bonus.
+	if rush_momentum.can_rush():
+		# Keep the global momentum meter building, and mark THIS property as actively rushed so the
+		# bonus applies to it and only it (refreshed now so this payout already carries it; the tick
+		# keeps it lit while the grace holds).
+		_rush_grace_remaining = tuning.rush_momentum_grace_seconds
+		prop.rush_active_grace = tuning.rush_momentum_grace_seconds
+		prop.rush_momentum_factor = rush_momentum.factor()
 	# Rush pays at the SAME multiplier the tick uses — frenzy and the dynasty's Family Fortune — and
 	# credits immediately if it completes; Rush Momentum is folded in per-property via _collect's
 	# rush_momentum_factor (set just above), so the cash keeps pace with the rushed bar AND the full
@@ -213,6 +291,12 @@ func hold_rush_property(prop_index: int) -> void:
 ## 2026-07-15). So end this property's rushed state now, and stop the global build unless
 ## some OTHER property is still inside its own rushed grace (a second finger).
 func release_rush(prop_index: int) -> void:
+	# During an open vent window a lift is a GESTURE BEAT, not a quit (Plans/
+	# Overdrive_Vent_Windows.md): zeroing the graces here would drop the rushed property's
+	# factor and end the excursion mid-gesture. The judge in RushMomentumState decides how the
+	# window resolves; a real walk-away simply misses the window and overheats there.
+	if rush_momentum.is_vent_window_open():
+		return
 	var prop := economy.properties[prop_index] as PropertyState
 	prop.rush_active_grace = 0.0
 	prop.rush_momentum_factor = 1.0
@@ -220,6 +304,56 @@ func release_rush(prop_index: int) -> void:
 		if (prop_variant as PropertyState).rush_active_grace > 0.0:
 			return
 	_rush_grace_remaining = 0.0
+
+
+## The overheat moment (rush_momentum.overheated, connected in _init): every property still
+## inside its actively-rushed grace goes DOWN for the whole lockout (Tim 2026-07-19: ALL of
+## them, if multi-touch rushing several) — the machine that was pushed too hard is the machine
+## that shuts off, so the penalty is proportional to what was gambled. Fired synchronously
+## from inside rush_momentum.tick, BEFORE this tick's grace decay runs, so the grace values
+## are exactly the overheat-moment snapshot.
+func _freeze_actively_rushed_properties() -> void:
+	# An overheat grants no tail and zeroes the bonus INSTANTLY (RushMomentumState._begin_overheat),
+	# so every tail dies here — including one still running from an earlier release on some other
+	# property. The contrast between this and a bail's gentle spin-down is the value of bailing.
+	clear_rush_tail_riders()
+	for prop_variant in economy.properties:
+		var p := prop_variant as PropertyState
+		if p.rush_active_grace > 0.0:
+			p.is_overheat_frozen = true
+			# A downed property is no longer "actively rushed": zero its grace so the factor
+			# loop in tick() holds its rush_momentum_factor at 1.0 for the whole freeze (the
+			# grace cannot refill meanwhile — every rush verb is dead during the lockout).
+			p.rush_active_grace = 0.0
+			p.rush_momentum_factor = 1.0
+
+
+## Bring every overheat-frozen property back up. Connected to rush_momentum.rush_ready (the
+## lockout's exact end) and called on the First Contact reset in tick(); dynasty succession
+## needs nothing because it builds a fresh GameState. These are the ONLY exits from the frozen
+## state, so a freeze can never outlive its lockout. Public so the headless sim can sweep-check
+## the invariant; the live game never needs to call it directly.
+func unfreeze_all_properties() -> void:
+	for prop_variant in economy.properties:
+		(prop_variant as PropertyState).is_overheat_frozen = false
+
+
+## Drop every release-tail rider mark, and park the factors that were riding on it back at 1.0.
+## These are the ONLY three ways a tail ends — the heat model ceasing to pay one (the sweep in
+## tick()), an overheat (which zeroes the bonus on the spot), and the First Contact reset — so a
+## mark can never outlive the tail that justified it. Public so the headless sim can sweep-check
+## that invariant; the live game reaches it through the three callers above.
+func clear_rush_tail_riders() -> void:
+	for prop_variant in economy.properties:
+		var p := prop_variant as PropertyState
+		if not p.is_rush_tail_rider:
+			continue
+		p.is_rush_tail_rider = false
+		# Only a property that is NOT currently being rushed gets parked: one still inside its
+		# grace has its factor set from factor() every tick anyway, and stomping it here would
+		# blank a live rushed bonus for a tick.
+		if p.rush_active_grace <= 0.0:
+			p.rush_momentum_factor = 1.0
 
 
 ## The OVERDRIVE opt-in (Plans/Rush_Cruise_Control.md): release the cruise clamp so heat resumes
@@ -230,6 +364,20 @@ func engage_rush_overdrive() -> void:
 	if not rush_momentum.can_rush():
 		return
 	rush_momentum.engage_overdrive()
+
+
+## Press edge on a property's rush button — the raw finger-down moment, forwarded to the vent
+## gesture judge (Plans/Overdrive_Vent_Windows.md). Only meaningful during an overdrive ride:
+## the core ignores edges when no vent window is open or pending, so ordinary rush taps are
+## unaffected. `prop_index` is accepted for symmetry with the other property verbs; the heat
+## model is global, so the judge does not need it (only one property rides overdrive at a time).
+func notify_rush_pressed(_prop_index: int) -> void:
+	rush_momentum.notify_rush_pressed()
+
+
+## Release edge on a property's rush button — the raw finger-up moment. See notify_rush_pressed.
+func notify_rush_released(_prop_index: int) -> void:
+	rush_momentum.notify_rush_released()
 
 
 ## Pop the frenzy meter if allowed. Returns true if a burn started.

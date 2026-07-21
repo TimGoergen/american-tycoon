@@ -8,7 +8,13 @@ conversation over combo-escalation (judgment-only) and active-venting-taps (too 
 **double-release vent gesture is Tim's idea** (2026-07-17): "the player releases, taps, then
 holds, creating two separate lifts."
 
-**Status:** Design agreed in conversation 2026-07-17; not yet implemented.
+**Status:** BUILT, fully device-verified, and MERGED to `main` (2026-07-20). Every device sitting
+in `Plans/Device_Feel_Test_Checklist.md` §6 is struck, including frenzy+overdrive together
+("looks good") and the bail tail. The design below is chronological — each dated section reworked
+the one above it on Tim's device feedback, so **read the "Shipped state" section for what the code
+does**; the earlier sections are the reasoning trail, and several of their knob values are
+superseded (notably: the bank was replaced by a heat-unified tail, and `vent_approach_seconds` is
+0.7, not the 1.2/2.0 earlier sections cite).
 
 ## The problem this solves
 
@@ -145,6 +151,527 @@ the same pattern).
 - Whether VENT ×2 deserves a distinct haptic signature (double-pulse) — new knob if so.
 - Whether the +115% cap should scale with epoch depth — parked, revisit with Late Epoch Sinks.
 
+## Sim retune addendum (2026-07-17, build session — SUPERSEDED, no veto needed)
+
+> **Resolved by events.** The choice offered below (tall ladder vs plan-faithful knobs) was
+> overtaken by Tim's 2026-07-18 endless-escalation direction, which retired the tier cap this
+> addendum was tuning. Kept for the reasoning; every knob in its table has since been replaced.
+
+The autopilot found the plan's first-cut knobs **cannot hit the plan's own targets**: with a
++115% tier-3 top, a skilled venter averages only ~+45–50% — climb time and occasional lockouts
+dilute the average no matter how well you play. Hitting the +60–80% skilled target required a
+**taller, faster, harsher** ladder, shipped as the new defaults:
+
+| Knob | Plan first-cut | Shipped default |
+|---|---|---|
+| `vent_window_delay_min/max` | 2.0 / 4.0 | **0.8 / 1.6** (a check ~every 1.2 s in Critical) |
+| `vent_bonus_step` | 0.20 | **0.45** |
+| `vent_max_tiers` | 3 | **4** |
+| `vent_fail_rearm_per_tier` | 1.0 | **3.0** |
+
+Ladder peaks are now **+55% → +100% → +145% → +190% → +235%** (was +55…+115%). Measured duty
+cycle: cruise +24.9%, **skilled (95%) +61.9%**, **sloppy (70%) +24.2%** — both targets hit
+(old pre-vent skilled rhythm: +34.8%). Also: the sloppy model only lands below cruise because
+the *bail decision* at the tier cap is judged at the same reliability as the gestures —
+knowing when to let go is itself a skill moment.
+
+**Tim's choice:** accept the tall ladder (+235% top, checks every ~1.2 s — an intense minigame),
+or revert to plan-faithful knobs and accept a ~+45% skilled average. Both are two knob edits in
+Balance Tuning; the cadence is equally a device-feel question.
+
+## Endless escalation rework (Tim, 2026-07-18 — supersedes the tier cap)
+
+Tim's verdict on the built v1: likes the vent mechanic, but it is "still relatively limited" —
+he wants "more of an infinite scaling rather than a relatively short limit before you overheat,"
+with the failure state coming "from the mechanic becoming more difficult and complicated,
+including increasing the number of vent events and speed that must be accomplished in order to
+keep going."
+
+So: **the tier cap is gone; the difficulty curve replaces the ceiling as the ending.**
+
+- **Windows never stop.** `vent_max_tiers` retired. Every successful vent ratchets the bonus
+  AND the difficulty; the run ends when you finally miss (or bail by releasing). Deep runs are
+  self-limiting: even at 95% per-gesture skill, survival odds compound away — the designed
+  outcome is that every overdrive run eventually ends in flames, and the question is how high
+  you got. Best streak = an implicit high score (numbers-go-brrr, pillar 4).
+- **Three escalation axes, per tier (all knobs):**
+  1. *Cadence* — window arrival delay decays geometrically (`vent_delay_decay`, first-cut 0.88)
+     toward a floor (`vent_delay_floor`, 0.35 s): more vent events, faster.
+  2. *Speed* — window duration decays (`vent_duration_decay`, 0.92) toward a floor
+     (`vent_duration_floor`, 0.45 s): less time to perform each gesture.
+  3. *Complexity* — required lifts escalate 1 → 2 → 3 (`vent_lifts_step_tiers`, first-cut: +1
+     lift every 3 tiers, hard-capped at 3 — a quad-pump is thumb mush, so past ×3 the speed
+     axes carry the difficulty alone). The old `vent_double_from_tier` is superseded.
+- **Reward stays a flat unbounded step** (`vent_bonus_step`) per vent — the difficulty curve is
+  the brake, not the reward curve. No cap on the peak bonus.
+- **Punishment does NOT escalate without bound:** the per-tier fail sting keeps its rate but
+  gains a cap (`vent_fail_rearm_cap`, first-cut 9 s extra) — Tim's direction is that failure
+  pressure comes from difficulty, not from ever-longer timeouts. The hard heat ceiling remains
+  only as the ignored-everything backstop.
+- **Sim gates change shape:** report the skilled/sloppy *survival curves* (median and p90 tier
+  reached) and average bonus; targets — skilled median run reaches tier ~6–10 with average
+  bonus ≥ the v1 +61.9%, sloppy still at or below cruise, and the telegraph guarantee holds at
+  every escalated cadence (floors included).
+
+**Shipped tune (2026-07-18, sim-validated — 600 s × 5 seeds):** cruise +24.9% · skilled (95%)
+**+71.3% avg, median death at tier 8, p90 tier 12** · sloppy (70%) +23.0%, median tier 2. Every
+skilled run ends on a blown beat, never the backstop. Retunes vs first-cut, all sim-forced:
+`vent_bonus_step` 0.45→**0.60**; `vent_heat_drop` 0.15→**0.06** (deep runs must visibly ride
+just under the backstop or the average is unreachable — success also tops heat off so the next
+window always fits before the ceiling); `vent_delay_decay` **0.85**; `vent_duration_decay`
+0.92→**0.975** (at 0.92 a ×3 window became physically unfinishable right when triples begin —
+a cliff, not a curve). Autopilot models skill **per lift** (not per gesture), which is what
+makes triples genuinely harder and produces the compounding-odds survival curve above.
+Effective ladder: +55% base, +60% per vent, unbounded — a median skilled run peaks ~+535%.
+
+> **Later correction (recorded 2026-07-19):** `vent_bonus_step` did not stay at 0.60. The
+> approach-bar rework (`ef005c0`) halved it to **0.30** — the approach delay bundles riskless
+> paid time into every check, so each vent buys more wall-clock than it did when this section
+> was tuned, and the step had to come down to keep the skilled average on target. The ladder is
+> therefore +55% base, **+30% per vent**, unbounded. This edit went unrecorded at the time; the
+> gates were re-measured after it and still pass (see Shipped state).
+
+## Depth-hazard rework (Tim, 2026-07-18 evening — the Critical zone is retired)
+
+Tim, after the seamless-bar pass: "I think there shouldn't be a critical zone. It should just be
+the chance of a vent event goes up as they go further into the overheat zone as a whole."
+
+- **No Critical band.** `rush_momentum_critical_start` and `rush_momentum_bonus_at_critical`
+  retired. The heat model has two regions: Building (0 → 1.0, the old meter) and OVERDRIVE
+  (1.0 → hard ceiling). Bonus is one continuous lerp `bonus_at_hot → current_peak_bonus()`
+  across the whole overdrive span — no kink where a band edge used to be.
+- **Vent checks are a depth hazard, not a zone event.** While overdrive is engaged and heat is
+  past the cruise point, each tick rolls a window-open chance from a rate that interpolates
+  with depth: `rate = lerp(vent_rate_at_cruise, vent_rate_at_ceiling, depth_frac)` where
+  `depth_frac = (heat − cruise) / (hard_ceiling − cruise)`. First-cut knobs:
+  `rush_momentum_vent_rate_at_cruise` 0.05 windows/s (a check every ~20 s hovering shallow),
+  `rush_momentum_vent_rate_at_ceiling` 1.0 windows/s (relentless at the top). The per-tier
+  cadence decay is retired — depth IS the cadence axis now, and since a small `vent_heat_drop`
+  means long runs inevitably ride deeper, escalation-by-tier falls out naturally. Duration
+  decay and the lifts ladder stay as the tier-difficulty axes.
+- **Player-authored intensity:** venting drops heat, so where you sit in the hazard curve is
+  partly your call — shallow overdrive = rare checks, small climb; riding deep = frantic and
+  rich. The telegraph guarantee stays: a window always force-opens with its full duration
+  available before heat can reach the backstop.
+- **UI:** the "CRITICAL +X%!" band-crossing chip and its haptic are retired (the vent
+  telegraphs are the drama); urgency (blink rate/strength) keys continuously on depth_frac.
+  The band overlay's stripes/gradient already fade edge-free and merely lose the
+  critical_start input. `rush_momentum_haptic_critical_ms` retired with its moment.
+- **Sim gates unchanged in spirit:** skilled ≥ ~+62% avg with median death ~tier 6–10, sloppy
+  ≤ cruise, telegraph guarantee at every depth, plus a new statistical check that measured
+  arrival rate actually rises with depth. Retune the two rate knobs to hit them.
+
+## Approach-bar presentation rework (Tim, 2026-07-18 night — the bar becomes two instruments)
+
+Tim: vent events are good but need to be "as fun, but as intuitive as possible." The momentum
+bar is redesigned into two display modes:
+
+- **Cruise mode (overdrive NOT engaged):** the ENTIRE bar spans 0 → the cruise clamp — filling
+  the whole bar IS reaching cruise. Clean and safe-reading; no hazard wash.
+- **Overdrive mode (engaged):** the bar repurposes into the vent minigame instrument:
+  - A **target bar** fixed ~1/3 of the way from the left edge — the trigger point.
+  - Each scheduled vent event is a **bright red bar entering from the RIGHT edge**, traveling
+    left so the player SEES IT COMING. When it reaches the target bar, the event triggers
+    (the window opens).
+  - While the event is open, **the whole region right of the target** renders the event
+    mechanics — the lift pips and the window countdown — at bar scale.
+- **Core change to enable it:** the hazard roll now SCHEDULES an event instead of opening it
+  instantly — new signal `vent_incoming(approach_seconds, required_lifts)` fires at the roll,
+  the window opens after `rush_momentum_vent_approach_seconds` (new knob, first-cut 2.0 s) of
+  tick-time (frenzy freeze pauses the approach). One event in flight at a time; hazard rolls
+  suppress while one is approaching or open. The telegraph guarantee now reserves room for
+  approach + full window before the backstop.
+- Overheat lockout keeps the full-bar drain display; the success/miss chips stay above the bar;
+  heat still climbs underneath and still drives the hazard rate (urgency wash keyed on depth).
+
+### Instrument refinements (Tim, 2026-07-18 night — five polish passes on the built v1)
+
+1. **Trailing fill.** The approaching red bar is no longer alone: the region from the bar back
+   to the RIGHT edge fills with a dim variant of the event gold as it travels — the event
+   "fills in behind" its leading edge, reading as a region sweeping in. Same MUSTARD_GOLD
+   family as the open-window dressing (dim 0.25 alpha vs the backdrop's 0.40), so the trail
+   growing to full width IS the backdrop appearing — approach and open event share one
+   identity, and the open lands as a brightness step, not a repaint.
+2. **Brighter pips.** Landed lifts are now near-white discs (#FFF7E6 — the most luminous mark
+   on the bar) and owed lifts bright-gold rings (#F5C542); the solid-vs-outline shape keeps
+   filled-vs-owed unmistakable while both pop off the gold backdrop the old cream sank into.
+3. **Thin timer strip.** The full-region draining countdown plate is replaced by a steady
+   event backdrop plus a thin (5 px) bright-gold timer bar hugging the region's bottom edge,
+   spanning target → right edge and draining right-to-left toward the target — the classic
+   timer strip, continuing the everything-collapses-into-the-target motion language and
+   staying clear of the centered pips.
+4. **Rolled refractory (core).** Post-resolution arrivals felt near-metronomic (deep rides sit
+   on the force-spawn bound). Every vent success — and every fresh overdrive engage — now
+   rolls a quiet spell in [`vent_refractory_min` 0.4, `vent_refractory_max` 1.2] s (seeded
+   rng, tick-time, frenzy-frozen) during which hazard dice AND the force-spawn hold fire.
+   Guarantee reconciliation: the post-vent top-off now reserves refractory_max + approach +
+   duration + cushion of climb room, and an engage-time roll is clamped to the climb room
+   left, so a worst-case quiet can never push an event past the backstop. Miss/overheat paths
+   need no refractory (they end in lockout). Sim retune (rates saturate — the free ride is
+   approach + refractory, not hazard wait): rates 0.5/3.0 → **0.7/3.4**, fail sting
+   6.0 → **12.0 s/tier**, cap 9.0 → **14.0 s**. Gates: cruise +24.9%, skilled +78.1%
+   (median death tier 8, p90 13), sloppy +24.6% — at or below cruise.
+5. **Lockout dead-bar gray.** During the overheat drain the track revealed behind the
+   shrinking red fill is a dark slate gray (#45464C — clearly "dead" vs the normal #B6BAC0
+   track, still hue-contrasting the BRICK fill); once drained, the gray covers the bar and
+   its right edge recedes leftward on the real re-arm countdown (new core getter
+   `rearm_remaining_fraction()`: 1.0 at re-arm start → 0.0 at rush_ready, 0.0 otherwise) —
+   the gray's retreat IS the re-arm timer, and the READY flash lands on a normal bar.
+
+## Overheat property freeze + shorter approach (Tim, 2026-07-19)
+
+Two changes, tuned as ONE balance pass because they trade against the same gate:
+
+- **Shorter approach:** `rush_momentum_vent_approach_seconds` 2.0 → **1.2** (Tim: "2 seconds
+  feels leisurely — I want to see it coming but not feel like I'm waiting for it"). This also
+  attacks the sloppy-player free ride at its root (less riskless pay bundled with each check).
+- **Overheat freezes the rushed properties:** during the whole lockout (drain + re-arm),
+  every property that was ACTIVELY BEING RUSHED at the overheat moment (Tim's clarification:
+  all of them, if multi-touch rushing several) is FROZEN — cycle paused, no collections, no
+  income from that property at all; it resumes at rush_ready. Rationale: makes the shutdown
+  thematically real (the machine is DOWN, not just un-rushable); the penalty becomes
+  PROPORTIONAL to what was gambled (your top earner goes dark, not a flat timer); it reaches
+  the sloppy player as real stakes instead of dead time, so **the sting timeouts come back
+  DOWN** — Tim's "failure pressure from difficulty, not timeouts" restored.
+  **Shipped outcome: the sting went to ZERO, not merely down.** The target written here was
+  "≤ the original 3 s/tier / 9 s cap"; with the freeze pricing failure honestly, the gates held
+  with `vent_fail_rearm_per_tier` and `vent_fail_rearm_cap` both at **0.0** (from 12.0 / 14.0),
+  so no dead-time sting remains at all. Failure now costs exactly the drain, the re-arm, and
+  the frozen property's lost income.
+- Sim gate metric extended: frozen seconds count as −100% on that property (lost base income),
+  so the sloppy ≤ cruise / skilled +62–80% gates now price the freeze honestly.
+- UI: frozen property rows need a "down" presentation (dark/gray, consistent with the momentum
+  bar's dead-gray lockout, no-moving-UI rules). **Shipped:** frozen rows wear the dead slate on
+  a stopped cycle bar, the portrait drops to the established locked-gray disc, and the income
+  figure dims to a dark-gray 0 — nothing hides or moves, the finger can stay down through the
+  freeze, and everything restores at rush_ready.
+- **Result, and the one verdict still open:** cruise +24.9% · skilled **+74.8%** (median death
+  tier 8, p90 15) · sloppy **−12.7%**. Skilled clears its gate; sloppy no longer merely sits
+  *at* cruise but goes **negative** — bad overdrive play now actively loses money. That is the
+  honest consequence of a proportional penalty and it is deliberate, but it is harsher than the
+  gate this section set out to hit. **Awaiting Tim's device verdict:** if it reads as brutal
+  rather than tense, the freeze softens from a full stop to a partial income cut.
+
+## Frenzy freeze REMOVED (Tim, 2026-07-19)
+
+Tim: "I don't like the way that frenzy and rush lock each other out." The 2026-07-15 rule that a
+frenzy burn FREEZES the whole heat model (no heat, no bleed, no lockout drain, no re-arm, no
+hazard rolls, no window countdown) existed to protect a frenzy payoff from a hidden-fuse
+overheat. Vent Windows replaced that fuse with telegraphed skill checks, so the guard outlived
+its reason — while the freeze itself made the game's two best moments mutually exclusive
+(a burn switched the vent game off; a lockout starved the frenzy meter).
+
+- `RushMomentumState.tick()` no longer takes `frenzy_burning` at all — the heat model does not
+  know what a frenzy is. Heat climbs, the hazard rolls, approaches fly, windows count down, and
+  a lockout cools straight through a burn.
+- **Consequence, accepted:** you CAN now overheat mid-frenzy, and the property freeze means the
+  burn loses that property for the rest of the lockout. That is the drama that makes riding
+  checks under a live multiplier worth doing — the peak of the loop, with the peak of the risk.
+- Second consequence: a lockout can now COMPLETE inside a burn, so cooldown time and frenzy
+  time overlap instead of queueing (sim §29 asserts exactly this).
+- Chosen over two alternatives Tim declined: freezing heat but still serving windows, and
+  letting a lockout charge the frenzy meter.
+
+## Lockout scoped to the rushed properties (Tim, 2026-07-19)
+
+Tim, on device: "The overheat lockout still appears to apply to all properties and not just
+properties that were actively being rushed... other properties on the same tab that did not have
+any staff were also locked." Two separate causes, both fixed:
+
+- **Core:** `tap_property` / `hold_rush_property` refused the rush verb globally on
+  `can_rush()`, so an overheat on one property made the WHOLE empire unrushable. Now only a
+  FROZEN property refuses; every other property keeps rushing through the lockout — real income,
+  real frenzy fill — but grants no heat and no momentum bonus, because the meter itself is down
+  until rush_ready. (The explicit frozen guard in `hold_rush_property` is load-bearing now: it
+  used to be covered incidentally by the `can_rush()` gate.)
+- **UI:** `PropertyRow`'s lockout dim keyed off the shared meter's `is_locked_out()`, graying
+  every row's portrait at once. It now keys off that row's own `is_overheat_frozen`.
+
+So the punishment is exactly: the meter is down (no bonus anywhere) and the properties you were
+riding are dark. The rest of the empire plays on. Sim §31 locks this in.
+
+## Frame-smooth approach bar and timer strip (Tim, 2026-07-19 — device report)
+
+Tim on device: the incoming event bar and the event timer both move jerkily. Cause: the core
+owns those times but republishes them only on the 10 Hz LOGIC tick, while the bar redraws every
+frame — so both stepped ~10×/s, and an event crossing its whole runway in 1.2 s gets only about
+a dozen steps. Measured against a 60 fps sample: the bar moved on 15% of frames, jumps up to
+8.3% of the runway.
+
+- **Fix:** local display clocks running down on the FRAME delta, pinned to the core's
+  authoritative value — snapping when the core's value goes UP (a brand-new event or window,
+  which prediction can never produce) and otherwise clamped within one logic tick of truth, so
+  the display leaves each tick equal to the core and arrives at the next exactly one tick lower.
+- **Deliberately NOT the eased `BarSmoothing` used elsewhere:** an eased follow LAGS, and these
+  two elements make promises the core keeps exactly — the bar reaching the target IS the window
+  opening, the strip emptying IS the miss. A lagging display would lie about both.
+- The re-arm gray's receding edge had the same 10 Hz source and now eases, since it is a
+  cooldown readout rather than something the player acts on — but it SNAPS UP and only eases
+  DOWN, because the fraction jumps 0 → 1 the instant the drain ends and easing into that would
+  flash a zero-width gray and grow it back.
+- After: 91% of frames move, max step 1.4%.
+
+---
+
+## Shipped state as of 2026-07-19 (`feature/overdrive-vent-windows` @ `90b48f8`)
+
+The single place to look for what the code does today. Everything above is the reasoning trail.
+
+**Mechanic.** Hold to rush → cruise clamps at +25% → second finger on OVR opts into overdrive.
+There is no Critical band: heat runs Building (0 → 1.0) then OVERDRIVE (1.0 → hard ceiling 1.60),
+with bonus one continuous lerp from +30% to the current peak. While overdrive is engaged, each
+tick rolls a vent-event chance from a rate that rises with depth. A roll SCHEDULES an event: a
+red bar enters from the right edge and travels 1.2 s toward a target line at ~1/3 width. On
+arrival the window opens and the player must complete the lift gesture (1 lift, +1 more every
+3 tiers, hard-capped at 3) before the timer strip drains. Success vents a little heat, tops it
+off, ratchets the bonus +30%, and rolls a refractory quiet spell. A miss overheats. There is no
+tier cap — the difficulty curve is the ending, and every skilled run eventually dies on a blown
+beat rather than the backstop.
+
+**Overheat.** The meter goes down empire-wide (no bonus anywhere) and every property that was
+actively being rushed FREEZES for the whole lockout — cycle paused, no income — thawing at
+rush_ready. Every other property keeps rushing, earning, and filling frenzy; it simply builds no
+heat and carries no bonus. There is no dead-time sting on top. Frenzy does not freeze the heat
+model at all: burns and vent checks run together, and you can overheat mid-burn.
+
+**Verified knob values** (read from `TuningConfig.gd` 2026-07-19; `tuning.tres` carries no
+`rush_momentum` overrides, so these script defaults are what ships):
+
+| Knob | Shipped | Note |
+|---|---|---|
+| `rush_momentum_hard_ceiling` | 1.60 | fixed backstop; the random roll is gone |
+| `rush_momentum_cruise_bonus` | 0.25 | the safe floor |
+| `rush_momentum_bonus_at_hot` | 0.30 | bottom of the continuous overdrive lerp |
+| `rush_momentum_bonus_peak` | 0.55 | base top, before any vent ratchet |
+| `rush_momentum_vent_bonus_step` | **0.30** | per vent, unbounded (was 0.60 in the 07-18 section) |
+| `rush_momentum_vent_heat_drop` | 0.06 | small on purpose: deep runs ride near the backstop |
+| `rush_momentum_vent_rate_at_cruise` | 0.7 | windows/s hovering shallow |
+| `rush_momentum_vent_rate_at_ceiling` | 3.4 | windows/s at the top |
+| `rush_momentum_vent_approach_seconds` | **0.7** | travel time of the incoming red bar (device-tuned from 1.2, Tim 2026-07-20) |
+| `rush_momentum_vent_window_duration` | 1.0 | gesture time once open |
+| `rush_momentum_vent_duration_decay` | 0.975 | per tier, floor 0.45 |
+| `rush_momentum_vent_lifts_step_tiers` | 3 | +1 lift every 3 tiers, capped at 3 |
+| `rush_momentum_vent_gap_max` / `_tap_max` | 0.40 / 0.25 | gesture tolerances |
+| `rush_momentum_vent_refractory_min` / `_max` | 0.4 / 1.2 | rolled quiet spell after each vent |
+| `rush_momentum_vent_fail_rearm_per_tier` / `_cap` | **0.0 / 0.0** | sting retired; the freeze is the penalty |
+| `rush_momentum_rearm_seconds` | 1.5 | base re-arm |
+| `rush_momentum_grace_seconds` | 0.5 | covers the lifts mid-gesture |
+| `rush_momentum_haptic_vent_ms` | 80.0 | telegraph pulse |
+
+**Retired knobs** (removed, not merely unused): `ceiling_min`/`ceiling_max` (the random roll),
+`critical_start`/`bonus_at_critical` (the Critical band), `haptic_critical_ms`, `vent_max_tiers`,
+`vent_double_from_tier`, `vent_window_delay_min`/`_max`, `vent_delay_decay`/`_floor`,
+`vent_window_tighten`.
+
+**Sim gates** (`RushOverheatTest.gd`, ALL CHECKS PASSED; 600 s × 5 seeds; current at approach 0.7,
+Tim 2026-07-20): cruise +24.9% · skilled (95%/lift) **+68.7%**, median death tier 8, p90 15 ·
+sloppy (70%/lift) **−18.3%** · timid farmer (95%, bails tier 1–2) **+11.6%**, below cruise. (At the
+earlier 1.2 approach these read +74.8% / −12.7% / +14.4%; the shorter approach trims riskless paid
+time per check, so skilled eased, sloppy cost more, and the farm dropped further below cruise —
+all gates pass with more margin.)
+
+### Design verdicts — RESOLVED (Tim interview, 2026-07-20)
+
+Four of the five open questions were design calls rather than feel calls, and Tim answered
+them directly. Three confirm the code as built; one adds work.
+
+1. **Sloppy at −12.7% — ACCEPTED as designed.** Tim: bad overdrive play SHOULD cost real
+   money, because that is what makes cruise a genuine choice and the skill worth learning.
+   The freeze stays a full stop; do NOT soften it to a partial income cut. The original
+   "sloppy ≤ cruise" gate is formally superseded by "sloppy may go negative."
+2. **Fumble severity — FULL OVERHEAT, as built.** The parked soft-fail (forced vent to cruise,
+   ratchet lost) is **rejected**, as is the tier-scaled middle option. A blown gesture ends the
+   run exactly like a timeout. Consistent with verdict 1: the stakes are the point.
+3. **Ladder cap — STAYS UNBOUNDED AT EVERY EPOCH.** No epoch-depth scaling of `vent_bonus_step`.
+   The difficulty curve is the only ceiling, everywhere, and a monster run stays theoretically
+   possible forever. This closes the question that was parked with Late Epoch Sinks.
+4. **Vent haptics — PULSE COUNT = LIFT COUNT.** *(New work.)* A ×2 window buzzes twice, a ×3
+   three times, so the thumb learns the demand before the eyes read the pips. Deliberate
+   redundant encoding for exactly the moment the mechanic gets fastest. Needs its own knob
+   riding the shipped `rush_momentum_haptic_*_ms` pattern.
+
+### Device verdicts — 2026-07-20 (Tim played the current build)
+
+1. **Freeze feel — KEEP w/ TWEAK.** The penalty lands as intended. The gap is legibility: a
+   dark row states a fact without explaining it. **Add `OVERHEATED` + a countdown to each
+   frozen row** so the wait is bounded rather than open-ended.
+2. **Gesture tolerances — KEEP as shipped.** Misses felt earned ("mine — I was too slow"), so
+   `vent_gap_max` 0.40 / `vent_tap_max` 0.25 stand. The failure mode we most feared — clean
+   lifts going unregistered and masquerading as difficulty — did not occur.
+3. **Approach still too slow at 1.2 s — TWEAK, live knob pass.** The smoothing fixed the motion
+   but the runway still reads as waiting. `rush_momentum_vent_approach_seconds` is already
+   exposed in Balance Tuning, so this is a dial, not a build. **Re-run the sim gates after
+   tuning:** a shorter runway trims the riskless paid time in every check and moves both the
+   skilled and sloppy averages.
+4. **Pips readable but too small — TWEAK.** Contrast is fixed; size is not. Note they are capped
+   by `PIP_RADIUS_MAX` (20 px) in `MomentumBar.gd`, so raising `PIP_HEIGHT_FRAC` alone does
+   nothing — the cap has to move with it.
+5. **Lockout scoping — CONFIRMED FIXED.** Only the rushed properties went dark; the rest of the
+   empire kept earning. The 07-19 bug is closed.
+
+**Still untested — the last unknown on this branch:** frenzy + overdrive together. The mutual
+freeze was removed 07-19, so a burn and a vent run have never been played at the same time, and
+overheating mid-burn — losing the property for the remainder of the multiplier — has never been
+felt. It is the interaction most likely to produce a surprise, and it should be played before
+this branch merges. Protocol: checklist §6 sitting E.
+
+### New work generated by the interview (2026-07-20)
+
+- **Vent haptic pulse count** (small) — see design verdict 4.
+- **Best-streak record** (medium) — the deepest tier ever reached is currently invisible.
+  Tim wants it BOTH at the moment of death ("TIER 9 — BEST 14" on the overheat beat) and
+  persisted in a **new stats screen**, which this would be the first resident of. Explicitly
+  NOT on the momentum bar (no permanent HUD real estate for a mechanic still proving itself)
+  and not in the Family Ledger. Scope the stats screen as a home for future stats, not a
+  one-stat page.
+
+## Bailing pays: the tail spins down on the heat clock (Tim, 2026-07-20 — BUILT)
+
+> **The bank was superseded before it survived a day.** The section below (kept for the
+> reasoning trail) designed a SEPARATE banked value decaying on its own rate. Tim's device play
+> on 2026-07-20 found the inconsistency that forced a rethink: "if the player holds a rush and
+> gets the bonus up to, say, fifteen percent and then lets go, the player's income rate per
+> second display immediately drops back to the default amount even though the bar takes some
+> seconds to drain." Two separate faults, one root cause — TWO tails on TWO clocks in TWO units:
+>
+> - A PLAIN cruise release (no overdrive) banked NOTHING — the bank only fired when overdrive was
+>   engaged — so its income died with the 0.5 s grace while the bar kept draining on heat. That is
+>   the snap Tim saw.
+> - An OVERDRIVE bail banked the bonus and decayed it at `heat_bleed_per_second` read as BONUS
+>   POINTS/s, while the bar was special-cased to follow the bank's own fraction. The heat bleed
+>   and the bonus bleed were the same NUMBER in DIFFERENT UNITS, so bar and money only ever
+>   agreed by accident. Patching the plain case with a bank would have desynced it the other way
+>   (at +15% a bank empties in 0.45 s while the bar takes ~1.5 s).
+>
+> **The build unifies everything on HEAT as the single clock** (Tim, 2026-07-20): whatever the
+> bar shows is what the player earns, in every release case, plain or deep. The bank mechanism is
+> deleted; what follows is the design as built.
+>
+> ### As built (heat-unified tail)
+>
+> - **No banked value.** The bonus stays a pure function of heat. The only reason a release used
+>   to snap was that `_clear_vent_state()` zeroed `_vent_tier` the instant the hold ended, which
+>   collapsed the bonus lerp's top end to the base peak. Instead, a release that leaves a live
+>   bonus RETAINS THE LERP TARGET the ride had earned (`_retained_peak_bonus`), so
+>   `_bonus_for_heat(heat)` keeps lerping toward it as heat bleeds. The bonus decays smoothly to
+>   zero exactly as the bar empties — a +15% cruise release and a tier-12 bail alike.
+> - **The tail is for WALKING AWAY; it ends the moment rushing resumes** (cruise or a fresh
+>   overdrive engage), on overheat, and on every reset. That keeps "re-engaging starts a FRESH
+>   ladder" intact and closes the tap-OVR-on-and-off tier-farming exploit — a retained peak that
+>   survived a re-press would BE that exploit. Re-pressing after a deep bail steps the bonus down;
+>   the player chose to re-enter, the ladder is genuinely fresh, and the step is the honest
+>   expression of that.
+> - **GameState pays the tail in EVERY release case.** The rider mark (`is_rush_tail_rider`,
+>   renamed from `is_banked_spindown_rider`) is no longer gated on `is_overdrive_engaged()` — that
+>   gate was exactly why the plain rush paid nothing — so any property being rushed is marked and
+>   keeps the decaying multiplier with the finger off until the tail ends. The mark-never-outlives-
+>   its-tail invariant and the sweep on overheat / First Contact / tail-end are unchanged.
+> - **Overheat still zeroes instantly, no tail.** The contrast is the whole value of bailing.
+> - **UI simplified.** The fill has no spin-down special case anymore: the bonus follows heat and
+>   the bar already plots heat, so the ordinary heat fill IS the tail draining. The chip reads
+>   "SPINNING DOWN +X%" off the live effective bonus (renamed from "BANKED … DRAINING"); an
+>   overheat still shows NO chip. `is_spinning_down()` survives (the UI needs it) and now means "a
+>   tail is decaying": not locked out, not rushing, bonus still above zero.
+> - **`banked_bonus()` / `banked_fraction()` are gone**; nothing needs them because the tail's
+>   remaining value IS `bonus` and its remaining length IS the heat fill.
+>
+> ### Sim as built
+>
+> Sections 32/33 were adapted to the heat-unified tail (same assertions: the tail reaches a
+> property's ACTUAL PAYOUT past grace, a never-rushed bystander never gets it, everything reaches
+> zero on the same tick, an overheat leaves nothing elevated). **Section 34 was ADDED for Tim's
+> exact reported case** — a plain rush built to a modest bonus, released, asserted to decay
+> smoothly with the bar and to reach zero with the heat — the case that had NO coverage, which is
+> why it shipped broken. The autopilot's timid farmer was reworked: under the new rules the tail
+> ends the instant rushing resumes, so the strongest real farm is to bail and IDLE while the tail
+> pays out before remounting (the old immediate-remount now collects almost nothing).
+>
+> **Gates re-measured (600 s × 5 seeds), all pass:** cruise **+24.9%** · skilled (95%/lift)
+> **+74.8%** (median death tier 8, p90 15) · sloppy (70%/lift) **−12.7%** · timid farmer (95%,
+> bails tier 1-2) **+14.4%** (was +25.1% under the bank). Skilled and sloppy are unchanged — riders
+> overheat, which never grew a tail under either design — as expected. The timid farmer MOVED and
+> now lands clearly below cruise: the heat-unified tail plus the mandatory idle-to-collect makes
+> the cash-out farm strictly worse than a genuine ride, so the farm gate passes with real margin
+> rather than on assertion slack.
+
+---
+
+## Bailing pays: the banked bonus spins down (Tim, 2026-07-20 — SUPERSEDED, see above)
+
+Tim: if the player builds a bonus through vent successes and then chooses to STOP rather than
+ride to failure, there should be a benefit — the bonus should drain from its current height
+rather than dropping straight to cruise level.
+
+**Why this matters more than it looks.** As shipped, bailing and overheating leave the bonus in
+the same place; they differ only in punishment (the lockout). So stopping is pure loss-avoidance
+and never a gain, and the only skill the ladder rewards is gesture execution. Paying for a
+voluntary bail makes **knowing when to stop** its own rewarded skill and turns every tier into a
+real decision: one more vent, or bank the decay? That is the cash-out half of a push-your-luck
+loop, which this mechanic has been missing. It also reads better physically — a machine you
+ease off of spins down; one you blow up stops dead.
+
+**This reverses an earlier decision, deliberately.** The comment at `RushMomentumState.gd:299`
+states "the ratchet is the reward for a CONTINUOUS ride, not a bankable buff." That call is
+overturned by this section; update the comment when building rather than leaving the code
+asserting the opposite of its behaviour.
+
+### Root cause (verified in code, 2026-07-20)
+
+The heat drain is already correct — on release, heat bleeds from its current height at
+`rush_momentum_heat_bleed_per_second` (line 322). What snaps is the **ratchet**: `not rushing`
+calls `_clear_vent_state()`, zeroing `_vent_tier`, so `current_peak_bonus()` collapses to
+`rush_momentum_bonus_peak` and `_bonus_for_heat()` lerps toward a base peak while the meter is
+still visibly draining. The bonus falls off a cliff the frame you let go.
+
+### Design
+
+- **Drain rate:** the existing meter bleed, unchanged (Tim: "the same as it is currently for the
+  rush / cruise meter, just starting from a higher number"). No new rate knob — a deep run's
+  tail is naturally longer because it starts higher, which rewards depth without extra tuning.
+- **Banked value, not a live ratchet.** On voluntary bail, capture the bonus at its current
+  height as a decaying banked value that falls at the bleed rate. Keep it separate from
+  `_vent_tier`, which still clears — the tier drives vent difficulty and belongs to the ride,
+  while the banked number is just a spin-down. Effective bonus = max(banked decaying value,
+  whatever the current state would otherwise pay).
+- **Re-engage: fresh ladder, keep the drain** (Tim). Re-pressing and engaging overdrive during
+  the spin-down starts the ratchet at tier 0, but the banked value keeps decaying underneath and
+  still applies until the new ride's own bonus overtakes it. This is what makes the rule safe:
+  there is no way to farm tiers by tapping OVR on and off, because the ladder never resumes —
+  and it gives a banked tail a second use as a cushion under the next climb.
+- **Overheat still zeroes instantly, and the UI must say so** (Tim). The instant zero is the
+  whole reason a bail is worth anything; if a blown run also spun down, the choice would carry
+  no weight. Make the contrast legible — the bail should visibly read as *banked* — or players
+  will never learn the option exists. This pairs with the `OVERHEATED` + countdown row text.
+
+### Sim consequence — the gate is a TIMID model, not the sloppy one
+
+*(Corrected 2026-07-20 after Tim pushed back on the first draft of this section, which claimed
+the change would reward sloppy play. That was wrong, and the correction changes what to test.)*
+
+**Bailing cleanly is not sloppy play — it is the skill this change exists to reward.** The
+sloppy model is 70% success *per lift*; it loses money by MISSING GESTURES, not by stopping. A
+run that ends in a miss banks nothing, because an overheat still zeroes instantly, so the sloppy
+model collects only on the minority of runs where it chooses to stop before blowing up.
+
+The payout is also strongly **asymmetric toward skilled play**, because the banked value scales
+with the tier reached: sloppy dies at median tier 2 (banking ~+115% for a ~2.3 s tail), while
+skilled dies at median tier 8 and routinely passes 12 (banking +295% or more, with a
+proportionally longer spin-down). **This change should WIDEN the skill gap, not close it.**
+
+The real risk is a **timid** strategy, which nothing in the sim currently models because it was
+strictly losing until this change made it pay: engage overdrive, take one or two easy vents at
+shallow depth where hazard rates are low, bail, bank the tail, repeat. That is not a player who
+is bad at the gesture — it is a player who never takes the hard ones and farms the cash-out.
+
+Structural mitigations already exist (each cycle costs approach time plus a refractory roll, and
+shallow depth means slow hazard rates, so the farm carries real setup overhead), but whether
+they suffice is empirical.
+
+**Gate to add when building:** a third autopilot model — **timid, bails at tier 1–2 every
+time** — required to land **at or below cruise**. If a farmer beats a rider, the mechanic is
+broken. If the farmer underperforms a genuine ride, the change is doing exactly what it should.
+Keep reporting cruise / skilled / sloppy as before; sloppy is expected to move very little.
+
 ## Decision log
 
 - Overdrive must be skill-based with larger risk and reward; cruise keeps the safe floor
@@ -158,3 +685,49 @@ the same pattern).
 - Miss-feedback must show which beat was blown (conversation, 2026-07-17).
 - Hold presentation must persist through the gesture's lifts (Claude's guardrail, flagged in
   conversation).
+- Tier cap retired in favour of an endless difficulty curve (Tim, 2026-07-18).
+- Critical band retired; vent odds become a continuous depth hazard (Tim, 2026-07-18 evening).
+- The momentum bar becomes two instruments, and events visibly approach from the right
+  (Tim, 2026-07-18 night).
+- Overheat freezes the properties that were being rushed; the dead-time sting goes to zero
+  because the freeze is a proportional, real-money penalty (Tim, 2026-07-19).
+- Frenzy no longer freezes the heat model — burns and vent checks run together, and overheating
+  mid-burn is accepted drama (Tim, 2026-07-19).
+- Lockout is scoped to the rushed properties; the rest of the empire plays on (Tim, 2026-07-19).
+- Approach bar and timer strip predict between logic ticks rather than easing, because they make
+  promises the core keeps exactly (Claude's call, 2026-07-19).
+- Sloppy overdrive play is ALLOWED to go negative; the freeze stays a full stop. Bad play should
+  cost real money, or cruise is not a real choice (Tim, 2026-07-20).
+- A fumble is a full overheat; the soft-fail-to-cruise option is rejected (Tim, 2026-07-20).
+- The vent ladder stays unbounded at every epoch — no depth scaling of the bonus step
+  (Tim, 2026-07-20); this also closes the question parked with Late Epoch Sinks.
+- Vent haptics encode the lift count as a pulse count (Tim, 2026-07-20).
+- Best streak is recorded and shown at the overheat moment plus a new stats screen — not on the
+  momentum bar, not in the Family Ledger (Tim, 2026-07-20).
+- The parked per-property "rush limiter / stamina meter" idea is DROPPED as superseded by Vent
+  Windows: overheat plus vent checks already constrain rushing and reward active play, and a
+  second limiter on top would be noise (Tim, 2026-07-20).
+- **A voluntary bail now PAYS: the banked bonus spins down from its height at the normal meter
+  bleed rate, while an overheat still zeroes instantly** (Tim, 2026-07-20). This REVERSES the
+  earlier "the ratchet is the reward for a CONTINUOUS ride, not a bankable buff" call — that
+  design left stopping as pure loss-avoidance, so the ladder rewarded only gesture execution and
+  never judgment. Re-engaging during the spin-down starts a fresh ladder but keeps the decaying
+  bank, which closes the tap-OVR-to-farm-tiers exploit.
+- **The bank is REPLACED by a heat-unified tail; whatever the bar shows is what you earn** (Tim,
+  device, 2026-07-20 — supersedes the entry directly above). The bank decayed on its own clock in
+  bonus units while the bar plotted heat, and a plain cruise release banked nothing at all — so a
+  +15% hold's income snapped to default while its bar still drained. The bonus is now a pure
+  function of heat and a release RETAINS its lerp target so the bonus follows heat down to zero
+  with the bar. The tail ends the instant rushing resumes (keeping the fresh-ladder anti-farm
+  rule); an overheat still zeroes instantly. `banked_bonus()`/`banked_fraction()` deleted; the UI
+  chip is now "SPINNING DOWN". Every release case pays, plain or deep. See the BUILT section above.
+- **The tail's bonus applies ONLY while the property's cycle is running — INTENDED, not a gap**
+  (Tim, 2026-07-20). A staffed property auto-cycles, so it earns the decaying bonus for the whole
+  tail; an UNSTAFFED property earns it on the one in-flight cycle it finishes after release, then
+  its cycle stops (`PropertyState.tick` line ~437) and no further bonus is paid even though the
+  meter keeps draining for a second or two more. Tim's explicit preference: the bonus should apply
+  only while a cycle is running — always if staffed, until the current cycle ends if unstaffed. So
+  an unstaffed tail that "fizzles" when its cycle stops is CORRECT; do NOT make unstaffed bailed
+  properties keep auto-cycling to close the visual gap (that option was raised and rejected). The
+  income header was fixed to match by keying its passive-rate branch on `is_cycle_running` rather
+  than `is_staffed` (commit 8387237), so the readout tracks payment exactly in both cases.

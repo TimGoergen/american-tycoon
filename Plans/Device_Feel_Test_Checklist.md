@@ -127,11 +127,11 @@ can land now (rides work item 3's framing pass); real art stays M3.*
       match flashes identically to a clean one, so the −60% is imperceptible. Fix =
       distinct match feedback: red flash + docked score float on avoid matches, normal
       "+N" float on clean ones (make the impact visible, not bigger).
-      **TOO EASY (2026-07-07):** Tim (a match-3 fan) maxes the score almost every
-      round — the skill ceiling must be real once work item 4 makes great play the only
-      upside, or the bonus is effectively flat. Levers to feel-tune (land WITH item 4):
-      perfect threshold up from 200, tighter clock, or +1 gem color; put the threshold
-      in TuningConfig.
+      ~~**TOO EASY (2026-07-07):** Tim (a match-3 fan) maxes the score almost every
+      round...~~ **RESOLVED (2026-07-20):** Tim: "the difficulty currently feels good, I do
+      not max out the game as often as I used to due to other changes." The bigger 7×6 board,
+      the harder ceiling, and the work-item-4 reward reshape did the job between them — no
+      difficulty lever needed. The per-match feedback TWEAK above is still open.
 - [ ] **Basketball** — **KEEP w/ TWEAKs; FIX SHIPPED (2026-07-10, `feature/minigame-feedback`).**
       Both TWEAKs built: (1) a backboard now sits behind the drifting hoop (translucent board + dark
       frame + shooter's square; cosmetic, no bank-shot collision yet); (2) the launch is no longer
@@ -156,9 +156,19 @@ can land now (rides work item 3's framing pass); real art stays M3.*
 - [x] ~~**Get Ready gate**~~ — **KEEP (2026-07-10, Tim: "the get ready looks good").** Text scaled
       up (GET_READY_TEXT_SCALE 1.4) and the block vertically centered so it reads as one balanced
       group (fixed the tall-phone empty-gap look). Framing copy already lands via work item 3.
-- [ ] **Challenge mode** — not separately verdicted this session.
-- [ ] **Result screen** — re-judge after the work-item-4 reward reshape (the "Legacy
-      lost" framing changes when standard play becomes neutral).
+- [ ] **Challenge mode** — **REWORK (Tim, 2026-07-20): the idea's right, the execution isn't.**
+      Today it is endless free-play per minigame with a persistent best score per type
+      (`ChallengeScores.gd`) and no stakes — a high-score table with no reason to visit it.
+      Tim wants a **combination of two fixes**: (a) **give it stakes** — a run should pay
+      something real (Legacy or a bonus), because pure high scores don't motivate him; and
+      (b) **give it goals, not just scores** — replace the raw endless number with named
+      targets to beat ("clear 12 rounds", "catch 40 coins"), a ladder to climb rather than a
+      number to exceed. Needs a design pass before build; the two fixes interact (goals are
+      the natural thing to attach payouts to).
+- [ ] **Result screen** — **DECIDED (Tim, 2026-07-20): keep loss framing, soften the wording.**
+      Losing something should still sting a little, but a 10% shortfall must not read as a
+      catastrophe. Rejected: reframing everything as upside-only ("+18% BONUS", never mention
+      loss) and leading with what was KEPT. Copy pass, no math change.
 - [x] ~~**Minigame screen performance (2026-07-06).**~~ **FIXED, device-verified
       (Tim, 2026-07-07: "totally fixed").** Root cause: the whole game screen kept
       drawing at 60fps beneath the opaque modal (economy-freezing modals now hide the
@@ -241,13 +251,148 @@ items, catch/timing polish) ride along when their game is touched.
   (both rebuild the epoch-arrival moment). Identity guardrails: few-and-huge grants
   (not another incremental shop), and scope it apart from Legacy — e.g. run/epoch-
   scoped rocket fuel vs gems' permanent floor, or effects gems never touch.
-- **Rush limiter:** evaluate constraining rush (currently always-correct to hold) via
-  a cooldown reducible with Legacy gems. Lean toward a STAMINA METER (drain + refill,
-  gems extend tank/rate) over a hard lockout, so it reads as a resource to spend, not
-  a dead button. **Envisioned PER PROPERTY (Tim, 2026-07-07):** each property's crew
-  tires independently, so constant rushing becomes a rotation across the ladder —
-  rewarding active two-handed play instead of parking on one button. Prototype behind
-  a tuning flag after the current economy items land.
+- ~~**Rush limiter:**~~ **DROPPED as superseded (Tim, 2026-07-20).** The idea was a per-property
+  stamina meter so constant rushing became a rotation across the ladder. Rush Overheat and then
+  Vent Windows arrived in the meantime and already constrain rushing while rewarding active
+  play — Tim: a second limiter on top would be noise. Recorded rather than deleted because the
+  underlying goal (reward two-handed play ACROSS properties, not parking on one button) is still
+  a live design value and may want an expression someday; it just won't be this one.
+
+---
+
+## 6. Overdrive Vent Windows (branch `feature/overdrive-vent-windows`)
+
+*Added 2026-07-19. This is the only section with a branch not yet on `main` — the whole
+feature is waiting on this pass. Design of record: `Plans/Overdrive_Vent_Windows.md`;
+read its "Shipped state" section for current behaviour and knob values. Install the
+branch APK, not a `main` build.*
+
+**The trap to avoid:** the three biggest open questions cannot be answered by playing
+well. Skilled play is already sim-validated at +74.8%. What is unvalidated is what
+happens when you are bad, careless, or greedy — so this protocol deliberately spends
+half its time playing badly. Do not skip those sittings because they feel unproductive.
+
+**Narrowed by the 2026-07-20 design interview.** Four of the five open questions turned out
+to be design calls, not feel calls, and Tim answered them: the freeze stays a full stop and
+sloppy play is ALLOWED to go negative; a fumble is a full overheat; the ladder stays
+unbounded at every epoch; vent haptics will encode lift count as pulse count. So **sitting A
+no longer asks whether the penalty should be softened — that is settled.** It now asks only
+whether the settled design *feels* the way it reads on paper. Sitting B likewise keeps its
+tolerance work and drops its fumble-severity question.
+
+### Device verdicts — 2026-07-20 (Tim played the current build)
+
+Four of the five sittings are now answered. **Only sitting E remains untested.**
+
+- [x] ~~**Sitting A — the freeze.**~~ **KEEP w/ TWEAK.** Tim: "I like it, but I think there
+      should be text over any overheated property to make it clear why they went dark." The
+      penalty itself lands; the gap is legibility — a dark row currently states a fact without
+      explaining it. **TWEAK: `OVERHEATED` + a countdown on each frozen row** (Tim's pick over
+      a bare label, a softer "COOLING DOWN", or a voiced line) so the wait is bounded rather
+      than open-ended. Not a moving-UI violation: it appears on a state the row already has.
+- [x] ~~**Sitting B — tolerances.**~~ **KEEP.** Misses felt like Tim's own ("mine — I was too
+      slow"), which is the answer we most wanted: `vent_gap_max` 0.40 / `vent_tap_max` 0.25
+      stay as shipped. The feared failure mode — clean lifts going unregistered and reading as
+      difficulty — did not occur. Fumble severity was settled by the 07-20 design interview.
+- [x] ~~**Sitting C — the instrument.**~~ **BOTH RESOLVED.**
+      1. ~~Approach too slow at 1.2 s.~~ **DIALED to 0.7 s and promoted to the shipped default**
+         (Tim, 2026-07-20; commit ff7e725). Re-gated as promised: cruise +24.9% · skilled +68.7%
+         (still in band) · sloppy −18.3% · timid +11.6% — all gates pass with MORE margin than at
+         1.2 s (less riskless paid time per check makes the farm worse, not better).
+      2. ~~Pips too small.~~ **FIXED (commit ee9f39a):** `PIP_RADIUS_MAX` 20→26 and the meter
+         height 0.7→0.85 so they clear the timer strip. Re-judge size on the next build if needed.
+- [x] ~~**Sitting D — lockout scoping.**~~ **FIXED, confirmed.** Only the properties Tim was
+      actually rushing went dark; the rest of the empire kept cycling and earning. The 07-19
+      bug is closed.
+- [x] ~~**Sitting E — frenzy + overdrive together.**~~ **KEEP (Tim, 2026-07-20: "looks good").**
+      The last genuinely unknown interaction on the branch — a burn and a vent run running at
+      once, and overheating mid-burn — plays well. This was the final device item gating the
+      merge.
+
+---
+
+### Sitting A — the freeze, played badly (~20 min). Answers open verdict 1.
+
+The sim says sloppy overdrive play now measures **−12.7%**: worse than not overdriving at
+all, worse than cruise, actively losing money. That is deliberate, but it has never been
+felt. Play a normal run and overdrive **recklessly** — ride deep, chase the ratchet, do
+not bail when the gestures get thick.
+
+- When a property freezes, what is the actual feeling: *tense and fair* (I gambled my
+  best earner and lost it), or *punitive* (the game took my toy away)?
+- Watch the income figure during a freeze. Does losing that property read as a
+  consequence you caused, or as the game being broken for a few seconds?
+- Roughly how long does a freeze last subjectively vs by the clock? A penalty that
+  *feels* twice its length is the signal to soften.
+- Do you find yourself avoiding overdrive entirely after two or three bad lockouts? That
+  would be the mechanic failing — cruise is meant to be a *choice*, not the safe default.
+
+**Verdict needed (revised 2026-07-20):** the full freeze is now settled design — Tim has
+confirmed bad play SHOULD cost real money. So this sitting is no longer a keep-or-soften
+vote; it asks whether the *execution* delivers the intent. If the freeze reads as punitive
+rather than tense, the fix is presentation or duration, NOT reducing the income loss.
+
+### Sitting B — fumbles and tolerances (~20 min). Answers verdicts 2 and 3.
+
+Fumble severity has **never been device-judged**, and the gesture tolerances are
+sloppy-thumb-generous first cuts (`vent_gap_max` 0.40 s, `vent_tap_max` 0.25 s) that only
+thumbs on glass can calibrate. Deliberately blow gestures in specific ways:
+
+- Perform a single lift when ×2 was demanded. Does the miss feedback show you *which
+  beat* you blew, or just that you failed?
+- Re-press too slowly (past the gap window). Was it obvious you were late, or did it feel
+  like the game did not register a lift you made? **The second answer is the important
+  one** — a tolerance problem masquerading as a skill problem is the worst outcome here.
+- At tier 3+ where triples begin: is a triple genuinely *hard*, or physically
+  awkward/unfinishable? Difficulty is the design; thumb mush is not.
+- ~~Full overheat on a fumble, or the parked soft-fail?~~ **SETTLED 2026-07-20: full
+  overheat, soft-fail rejected.** What remains is only whether a fumble is *legible* — after
+  a blown gesture, did you know what you did wrong?
+
+Use Balance Tuning to probe `vent_gap_max` live if a tolerance feels wrong; note the value
+that fixed it rather than just "too tight."
+
+### Sitting C — the instrument, read at speed (~15 min). Answers verdict 4.
+
+Tonight's smoothing fix took the approach bar from moving on 15% of frames to 91%.
+
+- Does the 1.2 s approach read as *seeing it coming*, or still as *waiting for it*?
+  (2.0 s was your "leisurely"; 1.2 s is the correction — confirm it landed.)
+- Track the timer strip during a window. Smooth now, or still stepping?
+- The trailing gold sweep filling in behind the red bar — does the window opening land as
+  a brightness step, or does it read as the display repainting?
+- Landed pips (near-white discs) vs owed pips (gold rings): unmistakable at a glance
+  mid-gesture, at arm's length? You reported these too dim once already.
+- Frozen row presentation: dead slate bar, gray portrait, dark-gray 0 income. Does it say
+  *this machine is down* without you having to reason about it?
+
+### Sitting D — lockout scoping, verify the fix (~10 min). Regression check.
+
+Your 07-19 report was that an overheat locked properties you had never rushed. Two causes
+were fixed; confirm on device.
+
+- Rush **two** properties with multi-touch. Have a third property on the same tab that is
+  **unstaffed and untouched**. Overheat deliberately.
+- Expected: exactly the two you were riding go dark. The third keeps cycling and earning
+  normally, and you can still rush it — it just builds no heat and gets no bonus.
+- Also confirm the meter itself reads as down empire-wide (no bonus anywhere) while the
+  rest of the empire visibly plays on. That split is the whole design of the penalty; if
+  it reads as confusing rather than fair, that is a finding.
+
+### Sitting E — frenzy and overdrive together (~10 min). New interaction, never played.
+
+The frenzy/heat mutual freeze was removed today, so these two systems now run
+simultaneously for the first time.
+
+- Trigger a burn, then overdrive *during* it. Riding vent checks under a live multiplier
+  is meant to be the peak of the loop — is it thrilling or overwhelming?
+- Overheat mid-burn on purpose. You lose that property for the rest of the burn. Is that
+  the good kind of painful, or does it feel like the game wasted your best moment?
+- Confirm a lockout now cools *through* a burn rather than queueing behind it.
+
+**Log format, as always:** one-word verdict plus a specific note. "Tier 4 triple at ~9 s
+in, missed the third lift twice, felt like the window closed early" is actionable;
+"vents feel hard" is not.
 
 ---
 
@@ -278,3 +423,18 @@ merges.)
       merged) — *game tab KEEP-leaning; held open on minigame lag + rush-bar TWEAK*
 - [ ] Buy/Hire hold pacing — KEEP 2026-07-06 *(kept unstruck only until the tuned
       values are promoted from the Dev Tuning screen into shipped defaults)*
+- [ ] **Overdrive Vent Windows** (`feature/overdrive-vent-windows`, not merged) — see §6;
+      the whole branch is blocked on that pass (2026-07-19)
+
+### Gap notice (2026-07-19)
+
+This doc lapsed between 2026-07-10 and 2026-07-19 — several features merged to `main` in
+that window without a line here, which is exactly the silent-backlog failure the doc
+exists to prevent. Only §6 has been backfilled so far. Still unrecorded and untested:
+
+- [ ] Escalating 52-property ladder (merged to `main`)
+- [ ] Rush Overheat heat model + prestige Option C + TURBO rework (merged)
+- [ ] Rush Cruise Control — device-verified KEEP, merged d294478 *(listed for completeness;
+      no action needed)*
+- [ ] Legacy Bonus System across all minigames (`feature/match3-difficulty`, not merged)
+- [ ] Match-3 difficulty rework: 7×6 board, harder ceiling, combo removed (same branch)

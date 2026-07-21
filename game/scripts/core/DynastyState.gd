@@ -113,6 +113,40 @@ func get_challenge_income_bonus() -> float:
 	return ChallengeGoals.total_income_bonus(challenge_highest_tiers)
 
 
+## Credit a finished CHALLENGE run for one minigame (Plans/Challenge_Mode.md §5 step 2). Reads the
+## highest tier the run's `score` clears, and if that beats what the bloodline had banked for this
+## game, raises the record and re-applies the living generation's effects so the higher global income
+## bonus takes hold MID-LIFE — the same way a Legacy purchase applies immediately via
+## refresh_current_generation_effects (never waiting for the next heir). RAISE-ONLY: a worse or equal
+## run changes nothing (push-your-luck — you keep every tier you have ever cleared, §3.1). `game_key`
+## is the minigame's display_name() (see ChallengeGoals). Returns a small report the UI turns into
+## the "NEW TIER — +X% global" feedback (see MinigameScreen.show_challenge_credit):
+##   improved      — bool, did this run raise the banked tier?
+##   old_tier      — the banked tier before this run
+##   new_tier      — the tier this run's score clears
+##   tiers_gained  — new_tier − old_tier (positive only when improved)
+##   bonus_before  — the whole-mode income bonus (a fraction) before crediting
+##   bonus_after   — the whole-mode income bonus (a fraction) after crediting
+func credit_challenge_score(game_key: String, score: float) -> Dictionary:
+	var old_tier := int(challenge_highest_tiers.get(game_key, 0))
+	var new_tier := ChallengeGoals.highest_tier_for_score(game_key, score)
+	var bonus_before := get_challenge_income_bonus()
+	var improved := new_tier > old_tier
+	if improved:
+		note_challenge_tier(game_key, new_tier)
+		# Apply the higher bonus to the generation that is alive right now, mirroring how a Legacy
+		# purchase takes hold mid-life — otherwise the reward wouldn't be felt until the next heir.
+		refresh_current_generation_effects()
+	return {
+		"improved": improved,
+		"old_tier": old_tier,
+		"new_tier": new_tier,
+		"tiers_gained": new_tier - old_tier,
+		"bonus_before": bonus_before,
+		"bonus_after": get_challenge_income_bonus(),
+	}
+
+
 ## Connect the living generation's overheat signal to the best-streak recorder. Called every time
 ## `current` is (re)assigned — construction, succession, and load all build a FRESH GameState with
 ## a FRESH RushMomentumState, so the record has to re-subscribe to the new instance each time or it

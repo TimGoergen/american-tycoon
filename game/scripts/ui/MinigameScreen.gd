@@ -29,6 +29,13 @@ signal back_pressed
 ## System.md). Main banks it to the dynasty wallet. Never emitted in review/Challenge or on Skip.
 signal legacy_bonus_earned(amount: int)
 
+## Emitted when a CHALLENGE run ends (DONE or Back), carrying the game's key (its display_name()) and
+## the final Minigame.get_score() (Plans/Challenge_Mode.md §5 step 2). The host has NO dynasty, so it
+## only reports the raw result — Main credits any newly-cleared tiers into the dynasty bonus and hands
+## the outcome back via show_challenge_credit for the "NEW TIER" feedback. This is separate from the
+## arcade high-score store (ChallengeScores), which _end_challenge still updates directly.
+signal challenge_finished(game_key: String, final_score: int)
+
 # The minigame library — the host draws one at random each round so the player doesn't know
 # which they'll get. Add new types here (Phase 2).
 const MINIGAME_TYPES := [
@@ -211,6 +218,14 @@ var _baked_backdrop_px: Vector2i = Vector2i.ZERO
 var _challenge_mode: bool = false
 var _score_label: Label
 var _highscore_label: Label
+## The CHALLENGE end view — shown when a run ends (DONE/Back) INSTEAD of closing straight away, so the
+## tier-credit feedback has somewhere to land (Challenge Mode Phase 2). A dedicated view, deliberately
+## separate from the reward `_result_view` (the reward statement must not carry challenge feedback).
+## `_challenge_score_label` shows the final score; `_challenge_credit_label` is filled by
+## show_challenge_credit with the "NEW TIER" line once Main reports the credit back.
+var _challenge_end_view: Control
+var _challenge_score_label: Label
+var _challenge_credit_label: Label
 ## The best score to beat this run — starts at the saved high score and rises live as the player
 ## passes it, so the "Best" readout ticks up in real time.
 var _challenge_high: int = 0
@@ -300,6 +315,10 @@ func _ready() -> void:
 	slot.add_child(_play_view)
 	_result_view = _build_result_view()
 	slot.add_child(_result_view)
+	# The Challenge end view shares the same slot (only one view is ever visible at a time), so the
+	# tier-credit feedback shows on the same card the run played on.
+	_challenge_end_view = _build_challenge_end_view()
+	slot.add_child(_challenge_end_view)
 
 	# The Begin gate floats on top of the card, covering the play/result views until the player
 	# presses Begin. Added to the panel after the slot so it draws over everything inside the card.
@@ -657,6 +676,78 @@ func _build_result_view() -> Control:
 	return column
 
 
+## The CHALLENGE end view (Challenge Mode Phase 2): shown when a run ends (DONE/Back) instead of
+## closing straight away, so the tier-credit "NEW TIER" feedback has somewhere to land. Deliberately
+## separate from the reward `_result_view` — a challenge run banks no Legacy, so it shows the final
+## score and the credit line only, then a BACK TO LIST button that actually leaves.
+func _build_challenge_end_view() -> Control:
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 24)
+	column.visible = false
+
+	# An expanding spacer above the text block (mirrored below the button) centers the text vertically.
+	var top_spacer := Control.new()
+	top_spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	column.add_child(top_spacer)
+
+	var heading := _make_label("CHALLENGE COMPLETE", UiPalette.FONT_HEADLINE, UiPalette.NAVY)
+	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	column.add_child(heading)
+
+	# The final score (filled by _show_challenge_end from the run's get_score()).
+	_challenge_score_label = _make_label("", UiPalette.FONT_SUBHEAD, UiPalette.NAVY)
+	_challenge_score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	column.add_child(_challenge_score_label)
+
+	# The tier-credit line, filled by show_challenge_credit once Main reports the credit back. DARK_GOLD
+	# with a navy outline so the "NEW TIER" reward reads as a positive windfall AND stays legible over
+	# the translucent cream card + themed backdrop (same treatment as the reward-screen Legacy line, so
+	# it never washes out — a light color would). Large headline font for the low-vision rule.
+	_challenge_credit_label = _make_label("", UiPalette.FONT_HEADLINE, UiPalette.DARK_GOLD)
+	_challenge_credit_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_challenge_credit_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_challenge_credit_label.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
+	_challenge_credit_label.add_theme_constant_override("outline_size", 4)
+	_challenge_credit_label.visible = false
+	column.add_child(_challenge_credit_label)
+
+	# Push the exit button to the bottom of the card, mirroring the reward view's CONTINUE placement.
+	var bottom_spacer := Control.new()
+	bottom_spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	column.add_child(bottom_spacer)
+
+	# BACK TO LIST: an 8×-ratio button centered at 80% width (10 / 80 / 10 pads), matching CONTINUE. It
+	# is the ONLY control that actually leaves the run now — connected to _exit_challenge, NOT the play
+	# view's Back (which re-enters _end_challenge), so pressing it can't loop back into the end view.
+	var exit_row := HBoxContainer.new()
+	var left_pad := Control.new()
+	left_pad.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left_pad.size_flags_stretch_ratio = 1.0
+	exit_row.add_child(left_pad)
+
+	var exit_button := Button.new()
+	exit_button.custom_minimum_size = Vector2(0, 112)  # matches CONTINUE (80 * 1.4)
+	exit_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	exit_button.size_flags_stretch_ratio = 8.0
+	UiPalette.style_button(exit_button, true)
+	exit_button.text = "BACK TO LIST"
+	exit_button.pressed.connect(_exit_challenge)
+	exit_row.add_child(exit_button)
+
+	var right_pad := Control.new()
+	right_pad.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right_pad.size_flags_stretch_ratio = 1.0
+	exit_row.add_child(right_pad)
+
+	column.add_child(exit_row)
+
+	var exit_bottom := Control.new()
+	exit_bottom.custom_minimum_size = Vector2(0, CHROME_MARGIN)
+	column.add_child(exit_bottom)
+
+	return column
+
+
 ## The "Get Ready" gate over the card: the drawn type's name, goal, stakes, and a big BEGIN button.
 ## No opaque scrim — the gate lets the 70%-translucent card (and the backdrop through it) show, so
 ## Get Ready reads at the same 70% as the rest of the panel (Tim, 2026-06-30). The not-yet-started
@@ -973,6 +1064,8 @@ func start_game(
 	_play_view.visible = false
 	_play_view.modulate = Color.WHITE
 	_result_view.visible = false
+	if _challenge_end_view != null:
+		_challenge_end_view.visible = false  # a reward round never shows the Challenge end view
 	_playing = false
 	_skip_button.visible = false  # revealed on Begin (see _start_active_round)
 	if _gem_badge != null:
@@ -1061,6 +1154,8 @@ func start_challenge(type_script: Script) -> void:
 	_play_view.visible = false
 	_play_view.modulate = Color.WHITE
 	_result_view.visible = false
+	if _challenge_end_view != null:
+		_challenge_end_view.visible = false  # a fresh run starts on the gate, not the end view
 	_playing = false
 	_skip_button.visible = false  # revealed on Begin (see _start_active_round)
 	if _gem_badge != null:
@@ -1177,13 +1272,72 @@ func _group_thousands(value: int) -> String:
 	return ("-" if value < 0 else "") + grouped
 
 
-## End a Challenge run: record the final score (updates the saved high score if beaten) and return
-## to the Minigame Tuning list. Called by DONE and by Back.
+## End a Challenge run: record the final score, show the Challenge end view (with any tier-credit
+## feedback), and wait there for BACK TO LIST. Called by DONE and by Back. No longer closes the
+## screen itself — _exit_challenge does that once the player has seen the result.
 func _end_challenge() -> void:
 	_playing = false
 	var score := _active_minigame.get_score() if _active_minigame != null else 0
+	# Keep driving the arcade "Best" store (unchanged) — that still powers the tuning list's Best
+	# label. The dynasty tier credit is a SEPARATE path, reported via challenge_finished below.
 	ChallengeScores.record_score(_active_type_key, score)
+	# Swap to the end view showing the final score; the credit line stays blank until Main reports.
+	_show_challenge_end(score)
+	# Report the finished run so Main can credit any newly-cleared tiers into the dynasty bonus and
+	# hand the outcome back to show_challenge_credit. Signals are synchronous, so by the time this
+	# returns the credit line is already filled (when routed through Main).
+	challenge_finished.emit(_active_type_key, score)
+
+
+## Reveal the Challenge end view: hide the play chrome and result view, show the final score, and
+## clear the credit line so it is blank until show_challenge_credit fills it (a run credited through
+## Main fills it synchronously during the challenge_finished emit).
+func _show_challenge_end(score: int) -> void:
+	_skip_button.visible = false
+	_play_view.visible = false
+	_result_view.visible = false
+	if _challenge_score_label != null:
+		_challenge_score_label.text = "Final score: %s" % _group_thousands(score)
+	if _challenge_credit_label != null:
+		_challenge_credit_label.text = ""
+		_challenge_credit_label.visible = false
+	if _challenge_end_view != null:
+		_challenge_end_view.visible = true
+	visible = true
+
+
+## Fill the Challenge end view's tier-credit line from Main's credit report (see
+## DynastyState.credit_challenge_score). Called by Main (via MinigameReviewScreen) after crediting.
+##   improved → the "NEW TIER" windfall: the tier just cleared, the % global income it JUST added
+##              (bonus_after − bonus_before), and the running total from bonus_after.
+##   not improved → a quiet neutral line naming the best tier still held (or an invitation to reach
+##                  the first goal if none is cleared yet).
+func show_challenge_credit(result: Dictionary) -> void:
+	if _challenge_credit_label == null:
+		return
+	if bool(result.get("improved", false)):
+		var new_tier := int(result.get("new_tier", 0))
+		var gained_pct := (float(result.get("bonus_after", 0.0)) - float(result.get("bonus_before", 0.0))) * 100.0
+		var total_pct := float(result.get("bonus_after", 0.0)) * 100.0
+		_challenge_credit_label.text = "NEW TIER %d  —  +%.1f%% GLOBAL INCOME\n(total +%.1f%%)" % [new_tier, gained_pct, total_pct]
+		_challenge_credit_label.add_theme_color_override("font_color", UiPalette.DARK_GOLD)
+	else:
+		var best := int(result.get("old_tier", 0))
+		if best > 0:
+			_challenge_credit_label.text = "No new tier — best is tier %d" % best
+		else:
+			_challenge_credit_label.text = "No tier cleared yet — reach the first goal to earn a bonus"
+		# A quiet navy for the neutral line, so a non-improving run doesn't read as a reward.
+		_challenge_credit_label.add_theme_color_override("font_color", UiPalette.NAVY)
+	_challenge_credit_label.visible = true
+
+
+## Leave the Challenge run for good: only reached from the end view's BACK TO LIST button. Clears
+## Challenge Mode, hides the screen, and returns to the Minigame Tuning list (back_pressed).
+func _exit_challenge() -> void:
 	_challenge_mode = false
+	if _challenge_end_view != null:
+		_challenge_end_view.visible = false
 	visible = false
 	back_pressed.emit()
 

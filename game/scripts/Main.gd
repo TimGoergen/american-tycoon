@@ -555,6 +555,10 @@ func _build_ui() -> void:
 	_minigame_review_screen = MinigameReviewScreen.new()
 	_minigame_review_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_minigame_review_screen.setup(tuning)
+	# A finished CHALLENGE run reports here so the dynasty can bank any newly-cleared tier
+	# (Plans/Challenge_Mode.md §5 step 2). The challenge runs on the review screen's own host, so the
+	# result bubbles up through it — Main holds the dynasty, credits, saves, and hands feedback back.
+	_minigame_review_screen.challenge_finished.connect(_on_challenge_finished)
 	add_child(_minigame_review_screen)
 
 	_show_tab(TAB_PROPERTY)
@@ -1728,6 +1732,18 @@ func _on_legacy_bonus_earned(amount: int) -> void:
 		return
 	dynasty.upgrades.grant_bonus(amount)
 	SaveManager.save_dict_to_file(dynasty.to_save_dict())
+
+
+## A CHALLENGE run finished (Plans/Challenge_Mode.md §5 step 2). Credit the score into the dynasty:
+## if it cleared a higher tier than the bloodline had banked, the tier is recorded and the living
+## generation's global income bonus is refreshed immediately (inside credit_challenge_score). Persist
+## only when something actually changed, then hand the credit report back to the challenge screen so
+## it can show the "NEW TIER" feedback on its end view.
+func _on_challenge_finished(game_key: String, final_score: int) -> void:
+	var result := dynasty.credit_challenge_score(game_key, float(final_score))
+	if result["improved"]:
+		SaveManager.save_dict_to_file(dynasty.to_save_dict())
+	_minigame_review_screen.show_challenge_credit(result)
 
 
 ## The minigame ended: persist the player's "skip future minigames" choice, then apply its

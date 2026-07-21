@@ -15,6 +15,12 @@ extends ColorRect
 ## unfreezes the economy.
 signal closed
 
+## Re-emitted from the review screen's own MinigameScreen (`_player`) when a CHALLENGE run ends
+## (Challenge Mode Phase 2). The challenge runs on THIS screen's host, not Main's, so its result has
+## to bubble up one level: Main connects here to credit the tier and hand feedback back (via
+## show_challenge_credit). Carries the game's key and its final score, unchanged.
+signal challenge_finished(game_key: String, final_score: int)
+
 # Sample values fed to the reviewed minigame so its live "Legacy kept" readout shows
 # meaningful numbers. They are display-only — review play never banks anything.
 const SAMPLE_BASE_LEGACY := 100
@@ -82,6 +88,9 @@ func _ready() -> void:
 	_player.back_pressed.connect(_return_to_list)
 	# In review the result multiplier is ignored — Continue/Skip just return to the list.
 	_player.finished.connect(func(_multiplier: float, _opt_out: bool) -> void: _return_to_list())
+	# Bubble a finished Challenge run up to Main (which holds the dynasty and does the crediting).
+	_player.challenge_finished.connect(func(game_key: String, final_score: int) -> void:
+		challenge_finished.emit(game_key, final_score))
 	add_child(_player)
 
 
@@ -270,6 +279,12 @@ func _on_type_pressed(type_script: Script) -> void:
 		_player.start_game(
 			MinigameScreen.legacy_reward(SAMPLE_BASE_LEGACY), SAMPLE_BONUS_MAX, type_script, true
 		)
+
+
+## Forward Main's tier-credit report to the challenge host so its end view can show the "NEW TIER"
+## feedback. Called by Main right after crediting, while the end view is up (see MinigameScreen).
+func show_challenge_credit(result: Dictionary) -> void:
+	_player.show_challenge_credit(result)
 
 
 func _return_to_list() -> void:

@@ -37,6 +37,7 @@ func _initialize() -> void:
 	_test_convergence()
 	_test_dynasty_record_and_roundtrip(tuning)
 	_test_bonus_folds_once(tuning)
+	_test_credit_challenge_score(tuning)
 	_test_configure_from_tuning_gotcha(tuning)
 
 	print("")
@@ -239,6 +240,60 @@ func _test_bonus_folds_once(tuning: TuningConfig) -> void:
 	plain.refresh_current_generation_effects()
 	_check("with no tiers cleared the multiplier is exactly Family Fortune (bonus is +0%)",
 		is_equal_approx(plain.get_legacy_income_multiplier(), plain.upgrades.property_income_multiplier()))
+
+
+# ---------------------------------------------------------------------------
+# 5b. credit_challenge_score: the Phase 2 crediting path (raise-only, live refresh)
+# ---------------------------------------------------------------------------
+func _test_credit_challenge_score(tuning: TuningConfig) -> void:
+	print("-- credit_challenge_score: credits new tiers, refreshes the living gen, raises only --")
+	# Build the dynasty FIRST (that re-pushes the tuned curve into ChallengeGoals), then read the
+	# thresholds off the configured curve — so the test scores stay correct whatever the tuning values.
+	var dynasty := DynastyState.new(ConfigLoader.load_property_configs(), tuning)
+	var game := ChallengeGoals.TIMING_BAR
+
+	# 1. A run that clears tier 3 exactly (a score AT tier 3's threshold, still below tier 4's).
+	var score := ChallengeGoals.threshold(game, 3)
+	var expected_tier := ChallengeGoals.highest_tier_for_score(game, score)
+	var result := dynasty.credit_challenge_score(game, score)
+
+	_check("a clearing run reports improved", bool(result["improved"]))
+	_check("old_tier was 0 for a never-cleared game", int(result["old_tier"]) == 0)
+	_check("new_tier matches highest_tier_for_score", int(result["new_tier"]) == expected_tier)
+	_check("tiers_gained equals new_tier - old_tier", int(result["tiers_gained"]) == expected_tier)
+	_check("challenge_highest_tiers was raised to new_tier",
+		int(dynasty.challenge_highest_tiers.get(game, 0)) == expected_tier)
+	_check("the bonus rose from bonus_before to bonus_after",
+		float(result["bonus_after"]) > float(result["bonus_before"]))
+	_check("get_challenge_income_bonus() now equals the reported bonus_after",
+		is_equal_approx(dynasty.get_challenge_income_bonus(), float(result["bonus_after"])))
+
+	# The LIVING generation must already feel the credited bonus — proof refresh_current_generation_
+	# effects ran inside credit_challenge_score (mid-life, not only for the next heir).
+	var expected_mult := dynasty.upgrades.property_income_multiplier() * (1.0 + dynasty.get_challenge_income_bonus())
+	var all_fields_match := true
+	for prop in dynasty.current.economy.properties:
+		if not is_equal_approx((prop as PropertyState).legacy_income_multiplier, expected_mult):
+			all_fields_match = false
+	_check("the living generation's property income multiplier reflects the credit (refresh applied)",
+		all_fields_match)
+
+	# 2. A run BELOW the next threshold clears no new tier -> improved false, nothing changes.
+	var bonus_before := dynasty.get_challenge_income_bonus()
+	var below := ChallengeGoals.threshold(game, expected_tier + 1) - 0.001
+	var no_gain := dynasty.credit_challenge_score(game, below)
+	_check("a run short of the next threshold does NOT improve", not bool(no_gain["improved"]))
+	_check("a short run leaves the banked tier unchanged",
+		int(dynasty.challenge_highest_tiers.get(game, 0)) == expected_tier)
+	_check("a short run leaves the income bonus unchanged",
+		is_equal_approx(dynasty.get_challenge_income_bonus(), bonus_before))
+
+	# 3. Crediting a much LOWER score after the high one cannot lower the tier (raise-only push-luck).
+	var low := ChallengeGoals.threshold(game, 1)
+	var worse := dynasty.credit_challenge_score(game, low)
+	_check("a lower later score does NOT improve", not bool(worse["improved"]))
+	_check("raise-only: the banked tier is never lowered",
+		int(dynasty.challenge_highest_tiers.get(game, 0)) == expected_tier)
 
 
 # ---------------------------------------------------------------------------

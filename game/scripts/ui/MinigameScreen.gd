@@ -1340,20 +1340,22 @@ func _update_challenge_score() -> void:
 	if score > _challenge_high:
 		_challenge_high = score
 	_highscore_label.text = "Best: %s" % _group_thousands(_challenge_high)
-	_update_challenge_target(score)
+	_update_challenge_target(_challenge_high)
 
 
-## Fill the "next tier" target readout from the run's live score: the score needed to reach the next
-## tier, plus the reward if that tier is a payout tier. Shows a MASTERED state at the top of the
-## ladder so the readout is never a dead "next: —".
-func _update_challenge_target(score: int) -> void:
+## Fill the "next tier" target readout from the player's BEST score for this game — NOT the live run
+## score. The target is the next UNREACHED tier above their best (best starts at the saved high score
+## and only rises once the run beats it), so it stays a stable goal instead of ticking upward every
+## time the live score passes a tier they have already banked (Tim, 2026-07-21). Shows a MASTERED
+## state at the top of the ladder so the readout is never a dead "next: —".
+func _update_challenge_target(best_score: int) -> void:
 	if _challenge_target_label == null:
 		return
-	var current_tier := ChallengeGoals.tier_for_score(_active_type_key, score)
-	if current_tier >= ChallengeGoals.MAX_TIER:
+	var best_tier := ChallengeGoals.tier_for_score(_active_type_key, best_score)
+	if best_tier >= ChallengeGoals.MAX_TIER:
 		_challenge_target_label.text = "MASTERED — top tier reached"
 		return
-	var next_tier := current_tier + 1
+	var next_tier := best_tier + 1
 	var target := int(round(float(next_tier) * ChallengeGoals.score_step(_active_type_key)))
 	var text := "Next tier: %s" % _group_thousands(target)
 	var payout := ChallengeGoals.payout_at_tier(next_tier)

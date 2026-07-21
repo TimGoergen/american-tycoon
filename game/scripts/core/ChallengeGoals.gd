@@ -1,28 +1,37 @@
 class_name ChallengeGoals
 
-# The catalog + math for CHALLENGE MODE's escalating goal ladders (Plans/Challenge_Mode.md §3).
+# The catalog + math for CHALLENGE MODE's AUTHORED TIER LADDERS (Plans/Challenge_Mode.md).
 # A pure DATA-plus-MATH table in code, the same shape as LegacyUpgradeCatalog.gd / EpochCatalog.gd:
 # static, stateless, no scene tree, no instance to create.
 #
-# Each of the 6 minigames has its own INFINITE escalating ladder of goal tiers. Tier `t` (t ≥ 1)
-# has a score threshold on that game's Minigame.get_score():
+# THE MODEL (rebuilt 2026-07-20 — replaces the old geometric diminishing-returns curve):
+# Each of the six minigames climbs a simple, FINITE ladder of round score checkpoints. A game's TIER
+# is just how many whole STEPs its Minigame.get_score() has passed:
 #
-#     threshold(game, t) = T0(game) × GROWTH^(t-1)
+#     tier(game, score) = floor(score / STEP(game))          clamped to MAX_TIER (30)
 #
-# Clearing tier `t` grants a PERMANENT, geometrically DIMINISHING global income bonus:
+# STEP is per-game because each game's get_score() lives on a wildly different scale (Match Three's
+# cumulative points vs. Memory's round count). Tiers are mostly progress-only; a PERCENT PAYOUT lands
+# on every 5th tier, on a SINGLE schedule shared by all six games, ALTERNATING income and Legacy and
+# escalating in value:
 #
-#     tier_reward(t)          = BASE_PCT × DECAY^(t-1)                       (a fraction, e.g. 0.005)
-#     game_income_bonus(n)    = BASE_PCT × (1 − DECAY^n) / (1 − DECAY)       (closed-form geo. sum)
+#     tier  5 → +1% INCOME      tier 10 → +1% LEGACY
+#     tier 15 → +2% INCOME      tier 20 → +2% LEGACY
+#     tier 25 → +1% INCOME      tier 30 → +1% LEGACY
 #
-# where n = the highest tier cleared for that game. Because DECAY < 1 the per-game sum CONVERGES to
-# BASE_PCT/(1−DECAY) even with infinitely many tiers — so there is no hard ceiling (you can always
-# climb one more rung) yet the total is bounded and cannot run away (Tim's rate-limit requirement,
-# satisfied by math, not a cap — see §3.2). The whole-mode bonus is the sum across all six games.
+# So a single mastered game maxes at +4% income AND +4% Legacy; all six maxed ≈ +24% income + +24%
+# Legacy (Tim's ~25/25 target). A `bonus_scale` knob nudges the whole thing and lets Tim retune live.
+# This is FINITE — there is a real "mastered" top at tier 30 (MAX_TIER). That intentionally REVERSES
+# the old "no hard ceiling" design: mastery is now a reachable summit, not an endless trickle.
+#
+# TWO REWARD TRACKS, both permanent and dynasty-wide (survive prestige):
+#   • the INCOME payouts feed the property-income multiplier (DynastyState.get_legacy_income_multiplier)
+#   • the LEGACY payouts feed the Legacy-YIELD multiplier (the Estate Lawyers lever —
+#     DynastyState.get_legacy_yield_multiplier, alongside LegacyUpgrades.legacy_yield_multiplier()).
 #
 # The game KEY is each minigame type's DISPLAY NAME — the exact string returned by that type's
-# Minigame.display_name(). MinigameScreen keys ChallengeScores by _active_type_key =
-# _active_minigame.display_name() (MinigameScreen.gd §1054), so using display_name() here keeps the
-# challenge-goal ladders, the arcade high-score store, and the (later) player-facing screen all
+# Minigame.display_name(). MinigameScreen keys challenge scores by _active_minigame.display_name(), so
+# using display_name() here keeps the ladders, the arcade score store, and the CHALLENGES screen all
 # addressing each game by the SAME string. Verified against each *Minigame.gd's display_name().
 
 
@@ -37,112 +46,184 @@ const CATCH_MONEY    := "Catch the Money"   # CatchMoneyMinigame.display_name()
 const BALANCE_BOOKS  := "Balance the Books" # BalanceMinigame.display_name()
 
 
-# ── First-tier thresholds, per game (T0) ──────────────────────────────────────
-# ALL FIRST-PASS, DEVICE-TUNE (Plans/Challenge_Mode.md §7 — "T0 per game TBD from each type's
-# get_score scale"). Each game's get_score() measures something on a very different scale, so T0 is
-# per-game, not shared. The rationale for each starting target, read off that game's get_score():
-#   Timing Bar        — get_score() = successful lock count; a few good locks per round → T0 = 6.
-#   Memory Match      — get_score() = rounds recalled; each round adds a step, so small → T0 = 4.
-#   Match Three       — get_score() = cumulative points (POINTS_PER_GEM = 10, a 3-match ≈ 30+);
-#                       climbs into the hundreds fast → T0 = 200.
-#   Micro Basketball  — get_score() = baskets sunk (~6 a strong round) → T0 = 5.
-#   Catch the Money   — get_score() = coins caught; a steady stream → T0 = 15.
-#   Balance the Books — get_score() = whole seconds spent in the gold zone → T0 = 20.
-const GAME_BASE_THRESHOLDS := {
-	TIMING_BAR:    6.0,
-	MEMORY_MATCH:  4.0,
-	MATCH_THREE:   200.0,
-	BASKETBALL:    5.0,
-	CATCH_MONEY:   15.0,
-	BALANCE_BOOKS: 20.0,
+# ── The payout schedule (shared by all six games) ─────────────────────────────
+const PAYOUT_INTERVAL := 5   # a payout lands on every 5th tier
+const MAX_TIER := 30         # the finite "mastered" summit — 6 payouts, then done
+
+## The single payout schedule: {tier -> {"pct": whole-percent float, "type": "income"|"legacy"}}.
+## `pct` is in WHOLE PERCENT (1.0 = +1%); the *_bonus_for() helpers divide by 100 to a fraction and
+## apply the bonus_scale knob. ALTERNATES income/legacy and escalates 1→1→2→2→1→1 per track, so each
+## game tops out at +4% income and +4% Legacy. THE SAME for every game (score scale differs, reward
+## schedule does not). See Plans/Challenge_Mode.md.
+const PAYOUT_SCHEDULE := {
+	5:  {"pct": 1.0, "type": "income"},
+	10: {"pct": 1.0, "type": "legacy"},
+	15: {"pct": 2.0, "type": "income"},
+	20: {"pct": 2.0, "type": "legacy"},
+	25: {"pct": 1.0, "type": "income"},
+	30: {"pct": 1.0, "type": "legacy"},
 }
 
 
-## Every game key, in a stable order (used by the later CHALLENGES screen and by total_income_bonus).
+# ── Per-game STEP (score per tier) ────────────────────────────────────────────
+# ALL FIRST-PASS, DEVICE-TUNE. A game's tier is floor(get_score() / STEP), so STEP is the round score
+# a single rung is worth. Sized off each game's get_score() scale so tier 30 (the +4/+4 summit) is a
+# real but reachable mastery target. Rationale, read off each game's get_score():
+#   Match Three       — get_score() = cumulative points (POINTS_PER_GEM = 10, a 3-match ≈ 30+); climbs
+#                       into the thousands, so STEP = 1000 (tier 30 = 30,000 points — a long climb).
+#   Timing Bar        — get_score() = successful lock count; STEP = 1 (one tier per lock).
+#   Memory Match      — get_score() = rounds recalled. FLAG (low ceiling): this is a small round count,
+#                       so tier 30 (30 rounds) is likely UNREACHABLE in one run — the top payouts may
+#                       never pay out at STEP = 1. Left at 1 for now; device-tune (a sub-1 STEP or a
+#                       compressed reachable payout set may be needed). See Plans §"Low-ceiling games".
+#   Micro Basketball  — get_score() = baskets sunk. FLAG (low ceiling): ~6 a strong round, so tier 30
+#                       (30 baskets) is likely UNREACHABLE at STEP = 1 — same caveat as Memory. STEP = 1
+#                       for now; device-tune.
+#   Catch the Money   — get_score() = coins caught; a steady stream, STEP = 2 (tier 30 = 60 coins).
+#   Balance the Books — get_score() = whole seconds in the gold zone; STEP = 2 (tier 30 = 60 seconds).
+const STEP := {
+	MATCH_THREE:   1000.0,
+	TIMING_BAR:    1.0,
+	MEMORY_MATCH:  1.0,
+	BASKETBALL:    1.0,
+	CATCH_MONEY:   2.0,
+	BALANCE_BOOKS: 2.0,
+}
+
+
+# ── Per-game keep-alive TIMER seconds-per-point (Wave 2 reads this) ───────────
+# The challenge run's keep-alive timer tops up by this many seconds for each POINT the run's
+# get_score() gains (Plans §"Keep-alive run timer"; the mechanic itself is Wave 2). Sized inversely to
+# how fast each game scores so a top-up feels comparable across games — Match Three racks up points in
+# bulk (tiny per-point top-up), the slower games grant a fat second or more per point. ALL FIRST-PASS,
+# DEVICE-TUNE.
+const SECONDS_PER_POINT := {
+	MATCH_THREE:   0.02,
+	TIMING_BAR:    3.0,
+	MEMORY_MATCH:  4.0,
+	BASKETBALL:    3.0,
+	CATCH_MONEY:   1.5,
+	BALANCE_BOOKS: 2.0,
+}
+
+
+## Every game key, in a stable order (used by the CHALLENGES screen and by the total_* sums).
 static func game_keys() -> Array:
-	return GAME_BASE_THRESHOLDS.keys()
+	return STEP.keys()
 
 
-# ── Curve parameters (configured from TuningConfig) ───────────────────────────
-# GROWTH, BASE_PCT and DECAY are Balance-Tuning knobs, but this table is stateless — so they live
-# here as `static var` config with sensible defaults and are pushed in from tuning by DynastyState,
-# the same "configure a stateless table from tuning" pattern LegacyUpgradeCatalog.cost_multiplier /
+# ── Configurable knobs (pushed in from TuningConfig) ──────────────────────────
+# bonus_scale, timer_start and timer_cap are Balance-Tuning knobs, but this table is stateless — so
+# they live here as `static var` config with sensible defaults and are pushed in from tuning by
+# DynastyState, the same "configure a stateless table from tuning" pattern LegacyUpgradeCatalog and
 # StaffRetention use. The math below reads these statics.
 #
-# GOTCHA (project note): DynastyState re-pushes this config on EVERY construction/load, so a sim
-# that wants a custom curve must set the TUNING field before building the dynasty (or call
-# configure() AFTER), never poke the statics and then build a dynasty — the build would overwrite
-# them. The defaults mirror tuning.tres so a headless call that skips configure() still behaves.
-static var growth := 1.6     # per-tier score-threshold growth (tuning.challenge_goal_growth)
-static var base_pct := 0.005 # tier-1 income bonus, a fraction (tuning.challenge_reward_base_pct)
-static var decay := 0.6      # geometric decay of the per-tier bonus (tuning.challenge_reward_decay)
+# GOTCHA (project note): DynastyState re-pushes this config on EVERY construction/load, so a sim that
+# wants custom knobs must set the TUNING field before building the dynasty (or call configure() AFTER),
+# never poke the statics and then build a dynasty — the build would overwrite them. The defaults mirror
+# tuning.tres so a headless call that skips configure() still behaves.
+static var bonus_scale := 1.0    # global x on every payout (tuning.challenge_bonus_scale)
+static var timer_start := 6.0    # keep-alive timer's starting seconds (tuning.challenge_timer_start_seconds)
+static var timer_cap := 15.0     # keep-alive timer's max seconds (tuning.challenge_timer_cap_seconds)
 
 
-## Push the curve knobs in from tuning. Called by DynastyState wherever the other stateless tables
-## are configured, so every threshold/reward query sees the tuned curve.
-static func configure(p_growth: float, p_base_pct: float, p_decay: float) -> void:
-	growth = p_growth
-	base_pct = p_base_pct
-	decay = p_decay
+## Push the knobs in from tuning. Called by DynastyState wherever the other stateless tables are
+## configured, so every bonus/timer query sees the tuned values.
+static func configure(p_bonus_scale: float, p_timer_start: float, p_timer_cap: float) -> void:
+	bonus_scale = p_bonus_scale
+	timer_start = p_timer_start
+	timer_cap = p_timer_cap
 
 
 # ── The math ──────────────────────────────────────────────────────────────────
 
-## The get_score() a run must reach to clear tier `t` (1-based) of a game: T0 × GROWTH^(t-1).
-## Returns INF for an unknown game key so no score can ever "clear" a game that isn't in the table.
-static func threshold(game_key: String, tier: int) -> float:
-	if not GAME_BASE_THRESHOLDS.has(game_key) or tier < 1:
-		return INF
-	var t0 := float(GAME_BASE_THRESHOLDS[game_key])
-	return t0 * pow(growth, float(tier - 1))
+## The round score one tier is worth for a game (STEP). Returns INF for an unknown key so no score can
+## ever clear a tier of a game that isn't in the table (floor(score / INF) == 0).
+static func score_step(game_key: String) -> float:
+	return float(STEP.get(game_key, INF))
 
 
-## The permanent income bonus (a fraction) granted by clearing ONE tier `t`: BASE_PCT × DECAY^(t-1).
-## Diminishes geometrically, so tier 1 pays the most and each further rung pays a shrinking sliver.
-static func tier_reward(tier: int) -> float:
-	if tier < 1:
-		return 0.0
-	return base_pct * pow(decay, float(tier - 1))
-
-
-## The total income bonus (a fraction) from keeping the highest tier cleared for ONE game — the
-## closed-form geometric sum of tier_reward(1..cleared), NOT a loop:
-##     BASE_PCT × (1 − DECAY^cleared) / (1 − DECAY)
-## 0 when cleared = 0. Because DECAY < 1 this converges to BASE_PCT/(1−DECAY) as cleared grows.
-static func game_income_bonus(cleared_tier: int) -> float:
-	if cleared_tier <= 0:
-		return 0.0
-	# Guard the DECAY == 1 singularity (the closed form divides by 1 − DECAY). At exactly 1.0 the
-	# per-tier reward never diminishes, so the sum is just linear: cleared × BASE_PCT. (This is a
-	# safety net for a hand-set tuning value; the design intends DECAY < 1 so the sum converges.)
-	if is_equal_approx(decay, 1.0):
-		return base_pct * float(cleared_tier)
-	return base_pct * (1.0 - pow(decay, float(cleared_tier))) / (1.0 - decay)
-
-
-## How many tiers a given get_score() clears for a game — the highest tier `t` whose threshold the
-## score meets (0 if it doesn't reach tier 1). Monotonic in score by construction: it counts up
-## while score ≥ threshold(t), so it is exactly consistent with threshold() at every boundary (a
-## score AT a tier's threshold clears that tier). A simple count keeps it provably aligned with the
-## threshold formula; scores are small bounded integers, so the loop is cheap.
-static func highest_tier_for_score(game_key: String, score: float) -> int:
-	if not GAME_BASE_THRESHOLDS.has(game_key):
+## The tier a given get_score() reaches for a game: floor(score / STEP), clamped to [0, MAX_TIER].
+## Simple round checkpoints — no growth curve. Unknown game key or non-positive score → 0.
+static func tier_for_score(game_key: String, score: float) -> int:
+	var step := score_step(game_key)
+	if step <= 0.0 or score < 0.0:
 		return 0
-	# A non-growing curve (GROWTH ≤ 1) would let every rung sit at/below the same score and the
-	# count never terminate; the design keeps GROWTH > 1, but guard the misconfiguration anyway.
-	if growth <= 1.0:
-		return 1 if score >= threshold(game_key, 1) else 0
-	var tier := 0
-	while score >= threshold(game_key, tier + 1):
-		tier += 1
-	return tier
+	var tier := int(floor(score / step))
+	return clampi(tier, 0, MAX_TIER)
 
 
-## The whole-mode income bonus (a fraction): the sum of each game's game_income_bonus over its
-## highest cleared tier. `highest_tiers` is {game_key -> highest tier cleared, int}; missing games
-## contribute 0. This is the number folded into property income as (1 + total_income_bonus).
+## The payout that lands AT a given tier: {"pct": whole-percent float, "type": "income"|"legacy"}.
+## Empty {} for a progress-only tier (anything not on the every-5th schedule, or above MAX_TIER).
+static func payout_at_tier(tier: int) -> Dictionary:
+	return PAYOUT_SCHEDULE.get(tier, {})
+
+
+## The next tier that pays out, above `cleared_tier` — the next multiple of PAYOUT_INTERVAL. Returns -1
+## when the ladder is mastered (no payout tier left ≤ MAX_TIER). Used by the screen for "next reward
+## at tier N".
+static func next_payout_tier(cleared_tier: int) -> int:
+	var next_tier := (int(floor(float(cleared_tier) / float(PAYOUT_INTERVAL))) + 1) * PAYOUT_INTERVAL
+	if next_tier > MAX_TIER:
+		return -1
+	return next_tier
+
+
+## Sum the whole-percent payouts of one track ("income" or "legacy") at every payout tier ≤ cleared,
+## then scale and convert to a FRACTION (× bonus_scale ÷ 100). The shared helper behind income_bonus_for
+## and legacy_bonus_for.
+static func _summed_payout(cleared_tier: int, track: String) -> float:
+	var pct_total := 0.0
+	for tier in PAYOUT_SCHEDULE:
+		if int(tier) <= cleared_tier and String(PAYOUT_SCHEDULE[tier]["type"]) == track:
+			pct_total += float(PAYOUT_SCHEDULE[tier]["pct"])
+	return pct_total * bonus_scale / 100.0
+
+
+## The permanent INCOME bonus (a fraction) from a single game's cleared tier — the summed income
+## payouts up to that tier, × bonus_scale. A game mastered to tier 30 gives +4% (× scale).
+static func income_bonus_for(cleared_tier: int) -> float:
+	return _summed_payout(cleared_tier, "income")
+
+
+## The permanent LEGACY-YIELD bonus (a fraction) from a single game's cleared tier — the summed legacy
+## payouts up to that tier, × bonus_scale. A game mastered to tier 30 gives +4% (× scale).
+static func legacy_bonus_for(cleared_tier: int) -> float:
+	return _summed_payout(cleared_tier, "legacy")
+
+
+## The whole-mode INCOME bonus (a fraction): the sum of each game's income_bonus_for over its highest
+## cleared tier. `highest_tiers` is {game_key -> highest tier cleared, int}; missing games contribute 0.
+## This is folded into property income as (1 + total_income_bonus).
 static func total_income_bonus(highest_tiers: Dictionary) -> float:
 	var total := 0.0
 	for game_key in highest_tiers:
-		total += game_income_bonus(int(highest_tiers[game_key]))
+		total += income_bonus_for(int(highest_tiers[game_key]))
 	return total
+
+
+## The whole-mode LEGACY-YIELD bonus (a fraction): the sum of each game's legacy_bonus_for over its
+## highest cleared tier. Folded into the Legacy-yield path as (1 + total_legacy_bonus).
+static func total_legacy_bonus(highest_tiers: Dictionary) -> float:
+	var total := 0.0
+	for game_key in highest_tiers:
+		total += legacy_bonus_for(int(highest_tiers[game_key]))
+	return total
+
+
+# ── Keep-alive run timer params (Wave 2 reads these) ──────────────────────────
+
+## Seconds the keep-alive timer tops up per POINT of get_score() gained, for a game. 0 for an unknown
+## key (an unrecognised game grants no time).
+static func seconds_per_point(game_key: String) -> float:
+	return float(SECONDS_PER_POINT.get(game_key, 0.0))
+
+
+## The keep-alive timer's starting seconds (tuning knob).
+static func timer_start_seconds() -> float:
+	return timer_start
+
+
+## The keep-alive timer's maximum seconds — top-ups never bank past this (tuning knob).
+static func timer_cap_seconds() -> float:
+	return timer_cap

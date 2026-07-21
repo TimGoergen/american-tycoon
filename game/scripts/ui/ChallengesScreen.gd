@@ -184,13 +184,19 @@ func _refresh() -> void:
 ## Build one large, tappable game row: the game name and its earned tier/bonus on the left, the next
 ## goal beneath, and a big PLAY button on the right that launches this game's challenge run.
 func _make_game_row(game_key: String, type_script: Script) -> Control:
+	# NOTE (Wave 2): this screen still reads the OLD Challenge model's shape. These reads are minimally
+	# rewired to the new authored-ladder ChallengeGoals API only so the project parses and boots — Wave
+	# 2 rebuilds this screen for the finite ladder + the two reward tracks (income + Legacy). Until
+	# then it shows the income track and the NEXT payout tier as the "next goal".
 	var cleared_tier := int(_dynasty.challenge_highest_tiers.get(game_key, 0))
-	var earned_pct := ChallengeGoals.game_income_bonus(cleared_tier) * 100.0
-	var next_tier := cleared_tier + 1
-	# The next goal's threshold, shown as a plain score number. TODO (later polish, §3.4): present
-	# per-game score nouns ("locks", "coins", "points"…) instead of a bare number.
-	var next_threshold := int(round(ChallengeGoals.threshold(game_key, next_tier)))
-	var next_reward_pct := ChallengeGoals.tier_reward(next_tier) * 100.0
+	var earned_pct := ChallengeGoals.income_bonus_for(cleared_tier) * 100.0
+	# The next tier that actually pays out (every 5th), and the score to reach it. -1 once mastered.
+	var next_tier := ChallengeGoals.next_payout_tier(cleared_tier)
+	var next_threshold := 0
+	var next_reward_pct := 0.0
+	if next_tier > 0:
+		next_threshold = int(round(ChallengeGoals.score_step(game_key) * float(next_tier)))
+		next_reward_pct = float(ChallengeGoals.payout_at_tier(next_tier).get("pct", 0.0))
 
 	# The row sits on the cream card plate so it reads as a distinct, tappable block on the frame.
 	var card := PanelContainer.new()

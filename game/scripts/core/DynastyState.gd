@@ -107,10 +107,18 @@ func note_challenge_tier(game_key: String, tier: int) -> void:
 	challenge_highest_tiers[game_key] = maxi(previous, tier)
 
 
-## The whole-mode Challenge income bonus in force right now (a fraction; 0.0 when nothing is
-## cleared). The diminishing geometric sum across all games — see ChallengeGoals.total_income_bonus.
+## The whole-mode Challenge INCOME bonus in force right now (a fraction; 0.0 when nothing is cleared).
+## The summed income-track payouts across all games — see ChallengeGoals.total_income_bonus. Folded
+## into property income by get_legacy_income_multiplier below.
 func get_challenge_income_bonus() -> float:
 	return ChallengeGoals.total_income_bonus(challenge_highest_tiers)
+
+
+## The whole-mode Challenge LEGACY-YIELD bonus in force right now (a fraction; 0.0 when nothing is
+## cleared). The summed legacy-track payouts across all games — see ChallengeGoals.total_legacy_bonus.
+## Folded into the Legacy-yield path by get_legacy_yield_multiplier below (the SECOND reward track).
+func get_challenge_legacy_bonus() -> float:
+	return ChallengeGoals.total_legacy_bonus(challenge_highest_tiers)
 
 
 ## Credit a finished CHALLENGE run for one minigame (Plans/Challenge_Mode.md §5 step 2). Reads the
@@ -121,29 +129,43 @@ func get_challenge_income_bonus() -> float:
 ## run changes nothing (push-your-luck — you keep every tier you have ever cleared, §3.1). `game_key`
 ## is the minigame's display_name() (see ChallengeGoals). Returns a small report the UI turns into
 ## the "NEW TIER — +X% global" feedback (see MinigameScreen.show_challenge_credit):
-##   improved      — bool, did this run raise the banked tier?
-##   old_tier      — the banked tier before this run
-##   new_tier      — the tier this run's score clears
-##   tiers_gained  — new_tier − old_tier (positive only when improved)
-##   bonus_before  — the whole-mode income bonus (a fraction) before crediting
-##   bonus_after   — the whole-mode income bonus (a fraction) after crediting
+## The reward now has TWO tracks (income + Legacy-yield), so the report carries both — Wave 2's
+## feedback shows whichever track the newly-cleared tier paid:
+##   improved       — bool, did this run raise the banked tier?
+##   old_tier       — the banked tier before this run
+##   new_tier       — the tier this run's score clears
+##   tiers_gained   — new_tier − old_tier (positive only when improved)
+##   income_before  — the whole-mode INCOME bonus (a fraction) before crediting
+##   income_after   — the whole-mode INCOME bonus (a fraction) after crediting
+##   legacy_before  — the whole-mode LEGACY-yield bonus (a fraction) before crediting
+##   legacy_after   — the whole-mode LEGACY-yield bonus (a fraction) after crediting
+##   bonus_before   — alias of income_before (kept so the existing MinigameScreen readout still works)
+##   bonus_after    — alias of income_after  (kept so the existing MinigameScreen readout still works)
 func credit_challenge_score(game_key: String, score: float) -> Dictionary:
 	var old_tier := int(challenge_highest_tiers.get(game_key, 0))
-	var new_tier := ChallengeGoals.highest_tier_for_score(game_key, score)
-	var bonus_before := get_challenge_income_bonus()
+	var new_tier := ChallengeGoals.tier_for_score(game_key, score)
+	var income_before := get_challenge_income_bonus()
+	var legacy_before := get_challenge_legacy_bonus()
 	var improved := new_tier > old_tier
 	if improved:
 		note_challenge_tier(game_key, new_tier)
-		# Apply the higher bonus to the generation that is alive right now, mirroring how a Legacy
+		# Apply the higher bonuses to the generation that is alive right now, mirroring how a Legacy
 		# purchase takes hold mid-life — otherwise the reward wouldn't be felt until the next heir.
 		refresh_current_generation_effects()
+	var income_after := get_challenge_income_bonus()
+	var legacy_after := get_challenge_legacy_bonus()
 	return {
 		"improved": improved,
 		"old_tier": old_tier,
 		"new_tier": new_tier,
 		"tiers_gained": new_tier - old_tier,
-		"bonus_before": bonus_before,
-		"bonus_after": get_challenge_income_bonus(),
+		"income_before": income_before,
+		"income_after": income_after,
+		"legacy_before": legacy_before,
+		"legacy_after": legacy_after,
+		# Legacy aliases for the existing MinigameScreen readout (Wave 2 will read the split tracks).
+		"bonus_before": income_before,
+		"bonus_after": income_after,
 	}
 
 
@@ -170,6 +192,16 @@ func tick(delta: float) -> void:
 ## bonus therefore lands on income exactly once regardless of collection path.
 func get_legacy_income_multiplier() -> float:
 	return upgrades.property_income_multiplier() * (1.0 + get_challenge_income_bonus())
+
+
+## The Legacy-YIELD multiplier in force this instant — the SECOND challenge reward track. It is the
+## purchased Estate Lawyers upgrade (upgrades.legacy_yield_multiplier(), 1.0 when nothing is bought)
+## TIMES the permanent Challenge-goal LEGACY bonus (1 + total). This is the SINGLE source of that
+## factor: get_draft_will() converts the estate through this one method, so the Challenge Legacy bonus
+## lands on the Legacy grant exactly once (mirrors how get_legacy_income_multiplier folds the income
+## bonus once for property income).
+func get_legacy_yield_multiplier() -> float:
+	return upgrades.legacy_yield_multiplier() * (1.0 + get_challenge_legacy_bonus())
 
 
 # ---------------------------------------------------------------------------
@@ -216,14 +248,14 @@ func _configure_retention_pricing() -> void:
 	# Push the global Legacy-upgrade cost multiplier into the (stateless) catalog too, so every
 	# upgrade price reflects the tuning knob (Tim 2026-07-14 — the prestige-runaway brake).
 	LegacyUpgradeCatalog.cost_multiplier = tuning.legacy_upgrade_cost_multiplier
-	# Same pattern for the (stateless) Challenge-goal curve: push the ladder/reward knobs in from
-	# tuning so every threshold and diminishing-reward query sees the tuned curve. Re-pushed on
-	# every construction/load — see the GOTCHA in ChallengeGoals (a sim sets the TUNING field, not
-	# the static, or this would overwrite it).
+	# Same pattern for the (stateless) Challenge-goal tables: push the bonus-scale + keep-alive timer
+	# knobs in from tuning so every payout and timer query sees the tuned values. Re-pushed on every
+	# construction/load — see the GOTCHA in ChallengeGoals (a sim sets the TUNING field, not the
+	# static, or this would overwrite it).
 	ChallengeGoals.configure(
-		tuning.challenge_goal_growth,
-		tuning.challenge_reward_base_pct,
-		tuning.challenge_reward_decay
+		tuning.challenge_bonus_scale,
+		tuning.challenge_timer_start_seconds,
+		tuning.challenge_timer_cap_seconds
 	)
 
 
@@ -252,11 +284,13 @@ func get_draft_will() -> Dictionary:
 	# Legacy converts directly from the post-tax net (Spec §9.3); the exemption already
 	# gates small estates. The old seed-cash subtraction is gone — seed money is granted,
 	# so it was never part of the earned gross. The "Estate Lawyers" upgrade then boosts
-	# the yield; floor after the multiplier so Legacy stays a whole number.
+	# the yield; floor after the multiplier so Legacy stays a whole number. The multiplier comes from
+	# the single-source get_legacy_yield_multiplier so the Challenge Legacy-track bonus is folded in
+	# here exactly once (the ONLY caller of that method) — never doubled, never missed.
 	var base_gain := EstateWaterfall.legacy_gain(
 		will["estate_net"], tuning.k_legacy, tuning.alpha_legacy
 	)
-	will["legacy_gain"] = int(floor(float(base_gain) * upgrades.legacy_yield_multiplier()))
+	will["legacy_gain"] = int(floor(float(base_gain) * get_legacy_yield_multiplier()))
 	return will
 
 

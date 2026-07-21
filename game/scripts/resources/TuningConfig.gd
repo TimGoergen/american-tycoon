@@ -472,25 +472,24 @@ extends Resource
 # Legacy became a spendable upgrade currency. Per-level upgrade magnitudes and
 # costs now live in LegacyUpgradeCatalog.gd, not here.
 
-# --- Challenge Mode goal ladders (Plans/Challenge_Mode.md §3, §7) ---
-# Each minigame has an infinite escalating goal ladder; clearing a tier grants a permanent,
-# geometrically diminishing global income bonus that survives prestige. These three knobs shape the
-# whole system (the per-game first-tier thresholds T0 live in ChallengeGoals.GAME_BASE_THRESHOLDS).
-# All FIRST-PASS, device-tune. Because DECAY < 1 the per-game bonus CONVERGES to
-# base_pct/(1−decay) — bounded so it can't run away (Tim's rate-limit requirement).
+# --- Challenge Mode tier ladders (Plans/Challenge_Mode.md) ---
+# Each minigame climbs a FINITE authored ladder (tier = floor(score / per-game STEP), capped at tier
+# 30); a payout lands every 5th tier on a single schedule shared by all games, alternating income and
+# Legacy-yield and escalating in value, so each game maxes at +4% income + +4% Legacy (~24/24 across
+# all six — Tim's ~25/25 target). The payout schedule and per-game STEP live in ChallengeGoals; these
+# three knobs are the live-tunable global levers. All FIRST-PASS, device-tune.
 
-## Per-tier growth of a game's score threshold: threshold(t) = T0 × this^(t-1). ~1.5–1.8 makes each
-## rung a real step up (Plans/Challenge_Mode.md §3.1).
-@export var challenge_goal_growth: float = 1.6  # feel-tune
+## Global multiplier on every Challenge tier payout, both tracks. 1.0 = the authored schedule (~24/24
+## across all six games). Raise to make mastery pay more, lower to soften it. Plans/Challenge_Mode.md.
+@export var challenge_bonus_scale: float = 1.0  # feel-tune
 
-## The tier-1 global income bonus, as a fraction (0.005 = +0.5%). Each further tier pays this ×
-## decay^(t-1), so tier 1 is the biggest slice (Plans/Challenge_Mode.md §3.2).
-@export var challenge_reward_base_pct: float = 0.005  # feel-tune
+## The Challenge keep-alive run TIMER's starting seconds — a run begins with this little on the clock
+## and drains until scoring tops it up (Wave 2 mechanic; ChallengeGoals reads it). Plans/Challenge_Mode.md.
+@export var challenge_timer_start_seconds: float = 6.0  # feel-tune
 
-## Geometric decay of the per-tier bonus (0.6 = each tier pays 60% of the last). < 1 bounds the
-## per-game total to base_pct/(1−decay) — with 0.005/0.6 each game asymptotes to +1.25%, ~7.5%
-## across all six (Plans/Challenge_Mode.md §3.2).
-@export var challenge_reward_decay: float = 0.6  # feel-tune
+## The Challenge keep-alive run TIMER's maximum seconds — top-ups never bank the clock past this, so a
+## strong streak can't stockpile a huge cushion (Wave 2 mechanic). Plans/Challenge_Mode.md.
+@export var challenge_timer_cap_seconds: float = 15.0  # feel-tune
 
 # --- Prestige minigame (GDD §5.5, Spec §9.3) ---
 # At prestige the player plays a minigame whose performance sets how much of the run's base

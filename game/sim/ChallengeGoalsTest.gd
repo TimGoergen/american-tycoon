@@ -1,22 +1,25 @@
 extends SceneTree
 
-# Headless verification for CHALLENGE MODE's goal ladders + diminishing-reward math (Phase 1 of the
-# Challenge Mode rework; design of record: Plans/Challenge_Mode.md).
+# Headless verification for CHALLENGE MODE's AUTHORED TIER LADDERS + two-track payout math (the core
+# wave of the Challenge Mode rework; design of record: Plans/Challenge_Mode.md).
 #
 # Usage: godot --headless --path . --script res://sim/ChallengeGoalsTest.gd
 #
 # Proves, without any rendering:
-#   1. highest_tier_for_score is monotonic in score and exactly consistent with threshold() at the
-#      boundaries (just below tier t -> t-1; at/above -> >= t).
-#   2. The closed-form game_income_bonus equals an explicit tier-by-tier sum of tier_reward.
-#   3. CONVERGENCE: game_income_bonus(cleared) climbs toward BASE_PCT/(1-DECAY) as cleared grows,
-#      never exceeding it — the bounded-but-uncapped property that is the whole rate-limiter.
-#   4. DynastyState.challenge_highest_tiers: note_challenge_tier only ever RAISES, and the record
-#      (and its income bonus) survives a save/load round-trip.
-#   5. _apply_upgrade_effects folds the challenge bonus into property income EXACTLY ONCE: a
-#      property's effective income multiplier = Family Fortune x (1 + total challenge bonus).
-#   6. The GOTCHA: ChallengeGoals is configured from the TUNING field, and DynastyState re-pushes
-#      that config on construction — so poking the static then building a dynasty is overwritten.
+#   1. tier_for_score = floor(score / STEP), clamped to MAX_TIER, monotonic, unknown key -> 0.
+#   2. payout_at_tier returns the authored schedule (income/legacy alternation, escalating values) on
+#      every 5th tier and {} elsewhere; next_payout_tier walks the schedule and reports -1 when maxed.
+#   3. income_bonus_for / legacy_bonus_for are the summed same-track payouts x bonus_scale (a mastered
+#      game -> +4% income and +4% Legacy at scale 1.0), and the whole-mode totals sum across games.
+#   4. DynastyState.challenge_highest_tiers: note_challenge_tier only ever RAISES, and the record (and
+#      both bonuses) survive a save/load round-trip; a pre-Challenge save loads clean.
+#   5. Both reward tracks fold in EXACTLY ONCE: get_legacy_income_multiplier = Family Fortune x (1 +
+#      income bonus) on every property, and get_legacy_yield_multiplier = Estate Lawyers x (1 + Legacy
+#      bonus) at the single Legacy-conversion site.
+#   6. credit_challenge_score raises the tier, refreshes the living gen, and moves BOTH tracks live;
+#      raise-only (a worse/short run changes nothing).
+#   7. The GOTCHA: ChallengeGoals is configured from the TUNING fields, and DynastyState re-pushes that
+#      config on construction — so poking the static then building a dynasty is overwritten.
 #
 # Exits 0 only if every check passes (1 otherwise), so headless/CI runs fail loudly.
 
@@ -24,7 +27,7 @@ var _failures := 0
 
 
 func _initialize() -> void:
-	print("=== Challenge Goals — headless verification ===\n")
+	print("=== Challenge Goals — headless verification (authored tier ladders) ===\n")
 
 	var tuning := ConfigLoader.load_tuning(false)
 	if tuning == null:
@@ -32,11 +35,11 @@ func _initialize() -> void:
 		quit(1)
 		return
 
-	_test_highest_tier_matches_threshold()
-	_test_closed_form_equals_explicit_sum()
-	_test_convergence()
+	_test_tier_for_score()
+	_test_payout_schedule()
+	_test_bonus_sums()
 	_test_dynasty_record_and_roundtrip(tuning)
-	_test_bonus_folds_once(tuning)
+	_test_both_tracks_fold_once(tuning)
 	_test_credit_challenge_score(tuning)
 	_test_configure_from_tuning_gotcha(tuning)
 
@@ -57,102 +60,127 @@ func _check(label: String, condition: bool) -> void:
 
 
 # ---------------------------------------------------------------------------
-# 1. highest_tier_for_score <-> threshold consistency
+# 1. tier_for_score = floor(score / STEP), clamped, monotonic
 # ---------------------------------------------------------------------------
-func _test_highest_tier_matches_threshold() -> void:
-	print("-- highest_tier_for_score is monotonic and matches threshold --")
-	# A clean curve so the arithmetic is easy to eyeball (T0 for Timing Bar = 6, growth = 2 here).
-	ChallengeGoals.configure(2.0, 0.01, 0.5)
-	var game := ChallengeGoals.TIMING_BAR
+func _test_tier_for_score() -> void:
+	print("-- tier_for_score = floor(score/STEP), clamped to MAX_TIER, monotonic --")
+	ChallengeGoals.configure(1.0, 6.0, 15.0)  # scale 1.0 for a clean read
+	var game := ChallengeGoals.TIMING_BAR       # STEP = 1.0
+	var step := ChallengeGoals.score_step(game)
 
-	# Below tier 1's threshold -> 0 tiers cleared.
-	_check("a score below T0 clears 0 tiers", ChallengeGoals.highest_tier_for_score(game, 5.0) == 0)
+	_check("Timing Bar STEP is 1.0", is_equal_approx(step, 1.0))
+	_check("a score below one STEP clears 0 tiers", ChallengeGoals.tier_for_score(game, step - 0.001) == 0)
+	_check("score at 1x STEP clears tier 1", ChallengeGoals.tier_for_score(game, step) == 1)
+	_check("score at 4.9x STEP clears tier 4 (floor)", ChallengeGoals.tier_for_score(game, step * 4.9) == 4)
 
-	# At / above each tier's threshold clears exactly that tier; a hair below clears one less.
-	var boundary_ok := true
-	for tier in range(1, 9):
-		var at := ChallengeGoals.threshold(game, tier)
-		var just_below := at - 0.001
-		if ChallengeGoals.highest_tier_for_score(game, at) < tier:
-			boundary_ok = false  # a score AT the threshold must clear that tier
-		if ChallengeGoals.highest_tier_for_score(game, just_below) != tier - 1:
-			boundary_ok = false  # a score just under it must clear exactly tier-1
-	_check("at/above threshold(t) clears >= t; just below clears t-1 (every boundary 1..8)",
-		boundary_ok)
+	# Clamp: any score at/above MAX_TIER x STEP stops at MAX_TIER (finite summit).
+	_check("score at MAX_TIER x STEP clears exactly MAX_TIER",
+		ChallengeGoals.tier_for_score(game, step * ChallengeGoals.MAX_TIER) == ChallengeGoals.MAX_TIER)
+	_check("a huge score is clamped to MAX_TIER (no runaway past the summit)",
+		ChallengeGoals.tier_for_score(game, 1e9) == ChallengeGoals.MAX_TIER)
+
+	# Match Three uses a much larger STEP (1000): confirms the per-game scale is honoured.
+	_check("Match Three STEP is 1000", is_equal_approx(ChallengeGoals.score_step(ChallengeGoals.MATCH_THREE), 1000.0))
+	_check("Match Three needs 5000 points for tier 5",
+		ChallengeGoals.tier_for_score(ChallengeGoals.MATCH_THREE, 5000.0) == 5)
 
 	# Monotonic: sweeping the score upward never lowers the cleared-tier count.
 	var monotone := true
 	var last := 0
 	var s := 0.0
-	while s <= 2000.0:
-		var tiers := ChallengeGoals.highest_tier_for_score(game, s)
-		if tiers < last:
+	while s <= 40.0:
+		var tier := ChallengeGoals.tier_for_score(game, s)
+		if tier < last:
 			monotone = false
-		last = tiers
-		s += 3.0
+		last = tier
+		s += 0.25
 	_check("cleared-tier count never decreases as score rises (monotonic)", monotone)
 
-	# An unknown game key clears nothing.
-	_check("an unknown game key clears 0 tiers",
-		ChallengeGoals.highest_tier_for_score("Not A Game", 1e9) == 0)
+	_check("an unknown game key clears 0 tiers", ChallengeGoals.tier_for_score("Not A Game", 1e9) == 0)
 
 
 # ---------------------------------------------------------------------------
-# 2. closed-form geometric sum == explicit tier-by-tier sum
+# 2. the payout schedule + next_payout_tier
 # ---------------------------------------------------------------------------
-func _test_closed_form_equals_explicit_sum() -> void:
-	print("-- game_income_bonus closed form == explicit sum of tier_reward --")
-	ChallengeGoals.configure(1.6, 0.005, 0.6)
+func _test_payout_schedule() -> void:
+	print("-- payout_at_tier follows the authored income/legacy schedule; next_payout_tier walks it --")
 
-	_check("game_income_bonus(0) is exactly 0", is_zero_approx(ChallengeGoals.game_income_bonus(0)))
+	# The exact authored schedule: alternating tracks, escalating 1/1/2/2/1/1 per track.
+	var expected := {
+		5:  {"pct": 1.0, "type": "income"},
+		10: {"pct": 1.0, "type": "legacy"},
+		15: {"pct": 2.0, "type": "income"},
+		20: {"pct": 2.0, "type": "legacy"},
+		25: {"pct": 1.0, "type": "income"},
+		30: {"pct": 1.0, "type": "legacy"},
+	}
+	var schedule_ok := true
+	for tier in expected:
+		var got := ChallengeGoals.payout_at_tier(tier)
+		if got.is_empty() or not is_equal_approx(float(got["pct"]), float(expected[tier]["pct"])) \
+				or String(got["type"]) != String(expected[tier]["type"]):
+			schedule_ok = false
+	_check("every payout tier (5,10,15,20,25,30) matches the authored pct + track", schedule_ok)
 
-	var all_match := true
-	for cleared in [1, 2, 3, 5, 10, 25]:
-		var explicit := 0.0
-		for t in range(1, cleared + 1):
-			explicit += ChallengeGoals.tier_reward(t)
-		var closed := ChallengeGoals.game_income_bonus(cleared)
-		if not is_equal_approx(explicit, closed):
-			all_match = false
-	_check("closed form matches the tier-by-tier sum for cleared in {1,2,3,5,10,25}", all_match)
+	# Progress-only tiers pay nothing; nothing past the summit pays.
+	_check("a between-payout tier (12) pays nothing", ChallengeGoals.payout_at_tier(12).is_empty())
+	_check("tier 0 pays nothing", ChallengeGoals.payout_at_tier(0).is_empty())
+	_check("past the summit (35) pays nothing", ChallengeGoals.payout_at_tier(35).is_empty())
 
-	# The DECAY == 1 guard: no singularity, and the sum degrades to linear cleared x BASE_PCT.
-	ChallengeGoals.configure(1.6, 0.005, 1.0)
-	_check("DECAY == 1 falls back to linear (5 tiers -> 5 x base_pct)",
-		is_equal_approx(ChallengeGoals.game_income_bonus(5), 0.005 * 5.0))
+	# next_payout_tier: next multiple of 5 above cleared, -1 once maxed.
+	_check("next payout above 0 is 5", ChallengeGoals.next_payout_tier(0) == 5)
+	_check("next payout above 5 is 10", ChallengeGoals.next_payout_tier(5) == 10)
+	_check("next payout above 7 is 10", ChallengeGoals.next_payout_tier(7) == 10)
+	_check("next payout above 25 is 30", ChallengeGoals.next_payout_tier(25) == 30)
+	_check("next payout above 30 (mastered) is -1", ChallengeGoals.next_payout_tier(30) == -1)
 
 
 # ---------------------------------------------------------------------------
-# 3. convergence: bounded but uncapped
+# 3. income_bonus_for / legacy_bonus_for sums + whole-mode totals
 # ---------------------------------------------------------------------------
-func _test_convergence() -> void:
-	print("-- game_income_bonus converges to BASE_PCT/(1-DECAY), never exceeding it --")
-	var base_pct := 0.005
-	var decay := 0.6
-	ChallengeGoals.configure(1.6, base_pct, decay)
-	var limit := base_pct / (1.0 - decay)  # the per-game asymptote (0.005/0.4 = 0.0125 = +1.25%)
+func _test_bonus_sums() -> void:
+	print("-- income_bonus_for / legacy_bonus_for sum same-track payouts x bonus_scale --")
+	ChallengeGoals.configure(1.0, 6.0, 15.0)
 
-	# Monotonically increasing and always strictly under the limit.
-	var increasing := true
-	var under_limit := true
-	var previous := ChallengeGoals.game_income_bonus(0)
-	for cleared in range(1, 200):
-		var bonus := ChallengeGoals.game_income_bonus(cleared)
-		if bonus < previous:
-			increasing = false
-		if bonus > limit + 1e-9:
-			under_limit = false
-		previous = bonus
-	_check("the per-game bonus rises monotonically with cleared tiers", increasing)
-	_check("the per-game bonus NEVER exceeds the BASE_PCT/(1-DECAY) limit", under_limit)
+	# Nothing cleared -> both bonuses 0.
+	_check("income_bonus_for(0) is 0", is_zero_approx(ChallengeGoals.income_bonus_for(0)))
+	_check("legacy_bonus_for(0) is 0", is_zero_approx(ChallengeGoals.legacy_bonus_for(0)))
 
-	# Deep in the ladder it is within a whisker of the limit (converged) yet still strictly below it
-	# (no hard ceiling). NOTE: tier 40 (not 200) because pow(0.6, 200) underflows to 0.0 in double
-	# precision, which would make the closed form round to EXACTLY the limit — a float artifact, not
-	# a real breach. At tier 40 the gap is still representable, so the strict inequality is honest.
-	var deep := ChallengeGoals.game_income_bonus(40)
-	_check("40 tiers is within 0.01%% of the limit (converged)", absf(limit - deep) < limit * 0.0001)
-	_check("even 40 tiers is still strictly below the limit (no hard ceiling)", deep < limit)
+	# Cleared tier 5 -> only the tier-5 income payout (+1%), no Legacy yet.
+	_check("tier 5 gives +1% income", is_equal_approx(ChallengeGoals.income_bonus_for(5), 0.01))
+	_check("tier 5 gives +0% Legacy", is_zero_approx(ChallengeGoals.legacy_bonus_for(5)))
+
+	# Cleared tier 10 -> income 1% (t5), Legacy 1% (t10).
+	_check("tier 10 gives +1% income", is_equal_approx(ChallengeGoals.income_bonus_for(10), 0.01))
+	_check("tier 10 gives +1% Legacy", is_equal_approx(ChallengeGoals.legacy_bonus_for(10), 0.01))
+
+	# Mastered (tier 30) -> income 1+2+1 = 4%, Legacy 1+2+1 = 4%.
+	_check("a mastered game gives +4% income (1+2+1)", is_equal_approx(ChallengeGoals.income_bonus_for(30), 0.04))
+	_check("a mastered game gives +4% Legacy (1+2+1)", is_equal_approx(ChallengeGoals.legacy_bonus_for(30), 0.04))
+
+	# The bonus_scale knob scales BOTH tracks.
+	ChallengeGoals.configure(0.5, 6.0, 15.0)
+	_check("bonus_scale 0.5 halves the income bonus (+2% at tier 30)",
+		is_equal_approx(ChallengeGoals.income_bonus_for(30), 0.02))
+	_check("bonus_scale 0.5 halves the Legacy bonus (+2% at tier 30)",
+		is_equal_approx(ChallengeGoals.legacy_bonus_for(30), 0.02))
+	ChallengeGoals.configure(1.0, 6.0, 15.0)
+
+	# Whole-mode totals sum across games. Two mastered games -> +8% each track.
+	var tiers := {ChallengeGoals.TIMING_BAR: 30, ChallengeGoals.MATCH_THREE: 30}
+	_check("total income across two mastered games is +8%",
+		is_equal_approx(ChallengeGoals.total_income_bonus(tiers), 0.08))
+	_check("total Legacy across two mastered games is +8%",
+		is_equal_approx(ChallengeGoals.total_legacy_bonus(tiers), 0.08))
+
+	# All six games mastered -> ~24% each track (Tim's ~25/25 target, scale 1.0).
+	var all_maxed := {}
+	for key in ChallengeGoals.game_keys():
+		all_maxed[key] = 30
+	_check("all six mastered is +24% income (~25 target)",
+		is_equal_approx(ChallengeGoals.total_income_bonus(all_maxed), 0.24))
+	_check("all six mastered is +24% Legacy (~25 target)",
+		is_equal_approx(ChallengeGoals.total_legacy_bonus(all_maxed), 0.24))
 
 
 # ---------------------------------------------------------------------------
@@ -162,156 +190,188 @@ func _test_dynasty_record_and_roundtrip(tuning: TuningConfig) -> void:
 	print("-- DynastyState.challenge_highest_tiers: only-raises + save/load round-trip --")
 	var dynasty := DynastyState.new(ConfigLoader.load_property_configs(), tuning)
 
-	_check("a fresh bloodline has no cleared tiers and 0 challenge bonus",
+	_check("a fresh bloodline has no cleared tiers and 0 income/Legacy bonus",
 		dynasty.challenge_highest_tiers.is_empty()
-		and is_zero_approx(dynasty.get_challenge_income_bonus()))
+		and is_zero_approx(dynasty.get_challenge_income_bonus())
+		and is_zero_approx(dynasty.get_challenge_legacy_bonus()))
 
 	# note_challenge_tier raises only: a later WORSE run cannot lower a banked tier.
-	dynasty.note_challenge_tier(ChallengeGoals.TIMING_BAR, 3)
-	dynasty.note_challenge_tier(ChallengeGoals.TIMING_BAR, 1)  # worse -> ignored
+	dynasty.note_challenge_tier(ChallengeGoals.TIMING_BAR, 15)
+	dynasty.note_challenge_tier(ChallengeGoals.TIMING_BAR, 3)  # worse -> ignored
 	_check("note_challenge_tier keeps the MAX (a worse later run cannot lower it)",
-		int(dynasty.challenge_highest_tiers[ChallengeGoals.TIMING_BAR]) == 3)
-	dynasty.note_challenge_tier(ChallengeGoals.TIMING_BAR, 5)  # better -> raises
+		int(dynasty.challenge_highest_tiers[ChallengeGoals.TIMING_BAR]) == 15)
+	dynasty.note_challenge_tier(ChallengeGoals.TIMING_BAR, 20)  # better -> raises
 	_check("a better run raises the banked tier",
-		int(dynasty.challenge_highest_tiers[ChallengeGoals.TIMING_BAR]) == 5)
+		int(dynasty.challenge_highest_tiers[ChallengeGoals.TIMING_BAR]) == 20)
 
-	# A second game contributes its own independent bonus.
-	dynasty.note_challenge_tier(ChallengeGoals.BASKETBALL, 2)
-	var expected_bonus := ChallengeGoals.game_income_bonus(5) + ChallengeGoals.game_income_bonus(2)
-	_check("the whole-mode bonus sums both games' cleared tiers",
-		is_equal_approx(dynasty.get_challenge_income_bonus(), expected_bonus))
-	_check("the whole-mode bonus is positive with tiers cleared",
-		dynasty.get_challenge_income_bonus() > 0.0)
+	# A second game contributes its own independent bonus on both tracks.
+	dynasty.note_challenge_tier(ChallengeGoals.BASKETBALL, 5)
+	var expected_income := ChallengeGoals.income_bonus_for(20) + ChallengeGoals.income_bonus_for(5)
+	var expected_legacy := ChallengeGoals.legacy_bonus_for(20) + ChallengeGoals.legacy_bonus_for(5)
+	_check("the whole-mode income bonus sums both games' cleared tiers",
+		is_equal_approx(dynasty.get_challenge_income_bonus(), expected_income))
+	_check("the whole-mode Legacy bonus sums both games' cleared tiers",
+		is_equal_approx(dynasty.get_challenge_legacy_bonus(), expected_legacy))
 
-	# Round-trip: a reborn dynasty restores the record and the identical bonus.
+	# Round-trip: a reborn dynasty restores the record and the identical bonuses.
 	var reborn := DynastyState.new(ConfigLoader.load_property_configs(), tuning)
 	reborn.load_save_dict(dynasty.to_save_dict())
 	_check("challenge_highest_tiers survives a save/load round-trip",
-		int(reborn.challenge_highest_tiers.get(ChallengeGoals.TIMING_BAR, 0)) == 5
-		and int(reborn.challenge_highest_tiers.get(ChallengeGoals.BASKETBALL, 0)) == 2)
-	_check("the restored dynasty reports the identical challenge bonus",
-		is_equal_approx(reborn.get_challenge_income_bonus(), expected_bonus))
+		int(reborn.challenge_highest_tiers.get(ChallengeGoals.TIMING_BAR, 0)) == 20
+		and int(reborn.challenge_highest_tiers.get(ChallengeGoals.BASKETBALL, 0)) == 5)
+	_check("the restored dynasty reports the identical income + Legacy bonuses",
+		is_equal_approx(reborn.get_challenge_income_bonus(), expected_income)
+		and is_equal_approx(reborn.get_challenge_legacy_bonus(), expected_legacy))
 
-	# An old save with no challenge field loads clean with a zero bonus.
+	# An old save with no challenge field loads clean with zero bonuses.
 	var legacy_only := DynastyState.new(ConfigLoader.load_property_configs(), tuning)
 	var stripped := dynasty.to_save_dict()
 	stripped.erase("challenge_highest_tiers")
 	legacy_only.load_save_dict(stripped)
-	_check("a pre-Challenge-Mode save loads with an empty record and 0 bonus",
+	_check("a pre-Challenge-Mode save loads with an empty record and 0 bonuses",
 		legacy_only.challenge_highest_tiers.is_empty()
-		and is_zero_approx(legacy_only.get_challenge_income_bonus()))
+		and is_zero_approx(legacy_only.get_challenge_income_bonus())
+		and is_zero_approx(legacy_only.get_challenge_legacy_bonus()))
 
 
 # ---------------------------------------------------------------------------
-# 5. the bonus folds into property income EXACTLY once
+# 5. both reward tracks fold in exactly once
 # ---------------------------------------------------------------------------
-func _test_bonus_folds_once(tuning: TuningConfig) -> void:
-	print("-- _apply_upgrade_effects folds the challenge bonus into property income exactly once --")
+func _test_both_tracks_fold_once(tuning: TuningConfig) -> void:
+	print("-- income folds into property income once; Legacy folds into the yield once --")
 	var dynasty := DynastyState.new(ConfigLoader.load_property_configs(), tuning)
 
-	# Give the dynasty a known Family Fortune level so the baseline multiplier is a fixed number,
-	# then clear some challenge tiers. The effective property multiplier must be the PRODUCT of the
-	# two — the challenge bonus applied once, on top of Family Fortune (never squared, never dropped).
-	dynasty.upgrades.levels[LegacyUpgradeCatalog.FAMILY_FORTUNE] = 2  # 1.20^2 = 1.44x income
-	dynasty.note_challenge_tier(ChallengeGoals.MATCH_THREE, 4)
-	dynasty.note_challenge_tier(ChallengeGoals.CATCH_MONEY, 2)
-	dynasty.refresh_current_generation_effects()  # re-runs _apply_upgrade_effects on the living gen
+	# Known Family Fortune + Estate Lawyers levels so both baselines are fixed, then clear tiers that
+	# pay on BOTH tracks (tier 10 pays income at t5 and Legacy at t10).
+	dynasty.upgrades.levels[LegacyUpgradeCatalog.FAMILY_FORTUNE] = 2
+	dynasty.upgrades.levels[LegacyUpgradeCatalog.ESTATE_LAWYERS] = 3
+	dynasty.note_challenge_tier(ChallengeGoals.MATCH_THREE, 10)
+	dynasty.note_challenge_tier(ChallengeGoals.CATCH_MONEY, 15)
+	dynasty.refresh_current_generation_effects()
 
+	# --- Income track: Family Fortune x (1 + income bonus), applied once, on every property. ---
 	var family_fortune := dynasty.upgrades.property_income_multiplier()
-	var challenge_bonus := dynasty.get_challenge_income_bonus()
-	var expected := family_fortune * (1.0 + challenge_bonus)
-
-	_check("the challenge bonus is actually non-zero for this test", challenge_bonus > 0.0)
-	_check("get_legacy_income_multiplier() = Family Fortune x (1 + challenge bonus)",
-		is_equal_approx(dynasty.get_legacy_income_multiplier(), expected))
-
-	# Every property's live field (the one the rush-collect path and the row display read) carries
-	# that exact same product — proof the passive path and the rush path apply the bonus identically.
+	var income_bonus := dynasty.get_challenge_income_bonus()
+	var expected_income_mult := family_fortune * (1.0 + income_bonus)
+	_check("the income bonus is non-zero for this test", income_bonus > 0.0)
+	_check("get_legacy_income_multiplier() = Family Fortune x (1 + income bonus)",
+		is_equal_approx(dynasty.get_legacy_income_multiplier(), expected_income_mult))
 	var all_fields_match := true
 	for prop in dynasty.current.economy.properties:
-		if not is_equal_approx((prop as PropertyState).legacy_income_multiplier, expected):
+		if not is_equal_approx((prop as PropertyState).legacy_income_multiplier, expected_income_mult):
 			all_fields_match = false
 	_check("every property's legacy_income_multiplier field equals that same product (rush path)",
 		all_fields_match)
 
-	# With NO tiers cleared the multiplier is plain Family Fortune (the +0% baseline is neutral).
+	# --- Legacy track: Estate Lawyers x (1 + Legacy bonus), applied once at the conversion site. ---
+	var estate_lawyers := dynasty.upgrades.legacy_yield_multiplier()
+	var legacy_bonus := dynasty.get_challenge_legacy_bonus()
+	var expected_yield_mult := estate_lawyers * (1.0 + legacy_bonus)
+	_check("the Legacy bonus is non-zero for this test", legacy_bonus > 0.0)
+	_check("get_legacy_yield_multiplier() = Estate Lawyers x (1 + Legacy bonus)",
+		is_equal_approx(dynasty.get_legacy_yield_multiplier(), expected_yield_mult))
+
+	# Prove the conversion site actually uses that multiplier once: with a fixed pre-multiplier gain,
+	# the will's legacy_gain must equal floor(base_gain x get_legacy_yield_multiplier()). We back the
+	# base gain out from the will with the bonus removed, then confirm re-applying it reproduces it.
+	var will := dynasty.get_draft_will()
+	var base_gain := EstateWaterfall.legacy_gain(will["estate_net"], tuning.k_legacy, tuning.alpha_legacy)
+	var expected_gain := int(floor(float(base_gain) * expected_yield_mult))
+	_check("the draft will's legacy_gain applies the yield multiplier exactly once",
+		int(will["legacy_gain"]) == expected_gain)
+
+	# With NO tiers cleared, both multipliers are plain (bonus is +0%, neutral).
 	var plain := DynastyState.new(ConfigLoader.load_property_configs(), tuning)
 	plain.upgrades.levels[LegacyUpgradeCatalog.FAMILY_FORTUNE] = 2
+	plain.upgrades.levels[LegacyUpgradeCatalog.ESTATE_LAWYERS] = 3
 	plain.refresh_current_generation_effects()
-	_check("with no tiers cleared the multiplier is exactly Family Fortune (bonus is +0%)",
+	_check("with no tiers cleared the income multiplier is exactly Family Fortune",
 		is_equal_approx(plain.get_legacy_income_multiplier(), plain.upgrades.property_income_multiplier()))
+	_check("with no tiers cleared the yield multiplier is exactly Estate Lawyers",
+		is_equal_approx(plain.get_legacy_yield_multiplier(), plain.upgrades.legacy_yield_multiplier()))
 
 
 # ---------------------------------------------------------------------------
-# 5b. credit_challenge_score: the Phase 2 crediting path (raise-only, live refresh)
+# 6. credit_challenge_score: credits new tiers, refreshes, moves BOTH tracks, raise-only
 # ---------------------------------------------------------------------------
 func _test_credit_challenge_score(tuning: TuningConfig) -> void:
-	print("-- credit_challenge_score: credits new tiers, refreshes the living gen, raises only --")
-	# Build the dynasty FIRST (that re-pushes the tuned curve into ChallengeGoals), then read the
-	# thresholds off the configured curve — so the test scores stay correct whatever the tuning values.
+	print("-- credit_challenge_score: credits a new tier, refreshes, moves both tracks, raise-only --")
+	# Build the dynasty FIRST (that re-pushes the tuned knobs into ChallengeGoals), then read STEP off
+	# the configured table — so the test scores stay correct whatever the tuning values.
 	var dynasty := DynastyState.new(ConfigLoader.load_property_configs(), tuning)
-	var game := ChallengeGoals.TIMING_BAR
+	var game := ChallengeGoals.TIMING_BAR  # STEP = 1.0, so a score of N clears tier N
 
-	# 1. A run that clears tier 3 exactly (a score AT tier 3's threshold, still below tier 4's).
-	var score := ChallengeGoals.threshold(game, 3)
-	var expected_tier := ChallengeGoals.highest_tier_for_score(game, score)
+	# A run that clears tier 10 exactly — pays income (t5) AND Legacy (t10).
+	var score := ChallengeGoals.score_step(game) * 10.0
+	var expected_tier := ChallengeGoals.tier_for_score(game, score)
 	var result := dynasty.credit_challenge_score(game, score)
 
 	_check("a clearing run reports improved", bool(result["improved"]))
 	_check("old_tier was 0 for a never-cleared game", int(result["old_tier"]) == 0)
-	_check("new_tier matches highest_tier_for_score", int(result["new_tier"]) == expected_tier)
+	_check("new_tier matches tier_for_score", int(result["new_tier"]) == expected_tier)
 	_check("tiers_gained equals new_tier - old_tier", int(result["tiers_gained"]) == expected_tier)
 	_check("challenge_highest_tiers was raised to new_tier",
 		int(dynasty.challenge_highest_tiers.get(game, 0)) == expected_tier)
-	_check("the bonus rose from bonus_before to bonus_after",
-		float(result["bonus_after"]) > float(result["bonus_before"]))
-	_check("get_challenge_income_bonus() now equals the reported bonus_after",
-		is_equal_approx(dynasty.get_challenge_income_bonus(), float(result["bonus_after"])))
 
-	# The LIVING generation must already feel the credited bonus — proof refresh_current_generation_
-	# effects ran inside credit_challenge_score (mid-life, not only for the next heir).
-	var expected_mult := dynasty.upgrades.property_income_multiplier() * (1.0 + dynasty.get_challenge_income_bonus())
+	# BOTH tracks moved in the report and match the live dynasty getters.
+	_check("income_after rose above income_before",
+		float(result["income_after"]) > float(result["income_before"]))
+	_check("legacy_after rose above legacy_before",
+		float(result["legacy_after"]) > float(result["legacy_before"]))
+	_check("get_challenge_income_bonus() equals the reported income_after",
+		is_equal_approx(dynasty.get_challenge_income_bonus(), float(result["income_after"])))
+	_check("get_challenge_legacy_bonus() equals the reported legacy_after",
+		is_equal_approx(dynasty.get_challenge_legacy_bonus(), float(result["legacy_after"])))
+	# The legacy aliases still carry the income track (kept for the existing MinigameScreen readout).
+	_check("bonus_after alias equals income_after (MinigameScreen compat)",
+		is_equal_approx(float(result["bonus_after"]), float(result["income_after"])))
+
+	# The LIVING generation already feels the income credit (proof refresh ran inside credit).
+	var expected_income_mult := dynasty.upgrades.property_income_multiplier() * (1.0 + dynasty.get_challenge_income_bonus())
 	var all_fields_match := true
 	for prop in dynasty.current.economy.properties:
-		if not is_equal_approx((prop as PropertyState).legacy_income_multiplier, expected_mult):
+		if not is_equal_approx((prop as PropertyState).legacy_income_multiplier, expected_income_mult):
 			all_fields_match = false
 	_check("the living generation's property income multiplier reflects the credit (refresh applied)",
 		all_fields_match)
+	# And the live Legacy-yield multiplier reflects the credited Legacy track.
+	var expected_yield_mult := dynasty.upgrades.legacy_yield_multiplier() * (1.0 + dynasty.get_challenge_legacy_bonus())
+	_check("the live Legacy-yield multiplier reflects the credited Legacy track",
+		is_equal_approx(dynasty.get_legacy_yield_multiplier(), expected_yield_mult))
 
-	# 2. A run BELOW the next threshold clears no new tier -> improved false, nothing changes.
-	var bonus_before := dynasty.get_challenge_income_bonus()
-	var below := ChallengeGoals.threshold(game, expected_tier + 1) - 0.001
+	# A run BELOW the next tier clears nothing new -> improved false, nothing changes.
+	var income_before := dynasty.get_challenge_income_bonus()
+	var below := ChallengeGoals.score_step(game) * float(expected_tier + 1) - 0.001
 	var no_gain := dynasty.credit_challenge_score(game, below)
-	_check("a run short of the next threshold does NOT improve", not bool(no_gain["improved"]))
+	_check("a run short of the next tier does NOT improve", not bool(no_gain["improved"]))
 	_check("a short run leaves the banked tier unchanged",
 		int(dynasty.challenge_highest_tiers.get(game, 0)) == expected_tier)
 	_check("a short run leaves the income bonus unchanged",
-		is_equal_approx(dynasty.get_challenge_income_bonus(), bonus_before))
+		is_equal_approx(dynasty.get_challenge_income_bonus(), income_before))
 
-	# 3. Crediting a much LOWER score after the high one cannot lower the tier (raise-only push-luck).
-	var low := ChallengeGoals.threshold(game, 1)
-	var worse := dynasty.credit_challenge_score(game, low)
+	# A much LOWER score after the high one cannot lower the tier (raise-only push-luck).
+	var worse := dynasty.credit_challenge_score(game, ChallengeGoals.score_step(game))
 	_check("a lower later score does NOT improve", not bool(worse["improved"]))
 	_check("raise-only: the banked tier is never lowered",
 		int(dynasty.challenge_highest_tiers.get(game, 0)) == expected_tier)
 
 
 # ---------------------------------------------------------------------------
-# 6. the config GOTCHA: DynastyState pushes the TUNING field into the static
+# 7. the config GOTCHA: DynastyState pushes the TUNING fields into the statics
 # ---------------------------------------------------------------------------
 func _test_configure_from_tuning_gotcha(tuning: TuningConfig) -> void:
-	print("-- ChallengeGoals is configured from the TUNING field (the DynastyState re-push GOTCHA) --")
-	# Poke the statics with bogus values, set DIFFERENT values on the tuning field, then build a
-	# dynasty. Construction must overwrite the bogus statics with the tuning field's values — which
-	# is exactly why a sim must set the TUNING field, not the static (setting the static is futile).
+	print("-- ChallengeGoals is configured from the TUNING fields (the DynastyState re-push GOTCHA) --")
+	# Poke the statics with bogus values, set DIFFERENT values on the tuning fields, then build a
+	# dynasty. Construction must overwrite the bogus statics with the tuning fields' values — which is
+	# exactly why a sim must set the TUNING field, not the static (setting the static is futile).
 	ChallengeGoals.configure(99.0, 99.0, 99.0)
-	tuning.challenge_goal_growth = 1.7
-	tuning.challenge_reward_base_pct = 0.004
-	tuning.challenge_reward_decay = 0.55
+	tuning.challenge_bonus_scale = 0.75
+	tuning.challenge_timer_start_seconds = 5.0
+	tuning.challenge_timer_cap_seconds = 12.0
 	var _dynasty := DynastyState.new(ConfigLoader.load_property_configs(), tuning)
-	_check("building a dynasty overwrote the static growth from the tuning field",
-		is_equal_approx(ChallengeGoals.growth, 1.7))
-	_check("building a dynasty overwrote the static base_pct from the tuning field",
-		is_equal_approx(ChallengeGoals.base_pct, 0.004))
-	_check("building a dynasty overwrote the static decay from the tuning field",
-		is_equal_approx(ChallengeGoals.decay, 0.55))
+	_check("building a dynasty overwrote the static bonus_scale from tuning",
+		is_equal_approx(ChallengeGoals.bonus_scale, 0.75))
+	_check("building a dynasty overwrote the static timer_start from tuning",
+		is_equal_approx(ChallengeGoals.timer_start_seconds(), 5.0))
+	_check("building a dynasty overwrote the static timer_cap from tuning",
+		is_equal_approx(ChallengeGoals.timer_cap_seconds(), 12.0))

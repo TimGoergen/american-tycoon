@@ -68,6 +68,11 @@ signal overdrive_requested
 var _rush_momentum: RushMomentumState
 var _tuning: TuningConfig
 
+## The bloodline, read only for its all-time best vent streak on the death chip (Tim 2026-07-20).
+## Threaded in from Main via set_dynasty (like setup() threads the rush state) rather than reached
+## through the scene tree, so this UI-only dependency stays an explicit hand-off, not a lookup.
+var _dynasty: DynastyState
+
 ## The OVR button, pinned left of the meter (the FrenzyBar layout). Always visible; enabled
 ## only while cruising — see _process.
 var _overdrive_button: Button
@@ -207,6 +212,12 @@ const READY_FLASH_FADE_SEC := 0.5
 func setup(rush_momentum: RushMomentumState, tuning: TuningConfig) -> void:
 	_rush_momentum = rush_momentum
 	_tuning = tuning
+
+
+## Hand the bar the bloodline so the death chip can quote the all-time best streak. Kept apart
+## from setup() because the dynasty is a UI-display concern, not part of the heat instrument.
+func set_dynasty(dynasty: DynastyState) -> void:
+	_dynasty = dynasty
 
 
 func _ready() -> void:
@@ -716,8 +727,20 @@ func _apply_label_state(state: int) -> void:
 ## clears itself the moment the mode flips, so there is no telegraph to dismiss here any more);
 ## this handler only adds the long haptic thump so the failure lands physically as well as
 ## visually.
-func _on_overheated() -> void:
+func _on_overheated(ended_vent_tier: int) -> void:
 	_vibrate(_tuning.rush_momentum_haptic_overheat_ms)
+	# The death chip: how high this run got, and the bloodline best it is measured against (Tim
+	# 2026-07-20). Reuses the vent-success chip's shape (see _on_vent_succeeded) in a hot ketchup
+	# red so it reads as the shutdown, not a payoff. best = max(this run, the stored record): both
+	# DynastyState and this bar listen to `overheated`, and DynastyState connects first (it hooks
+	# the generation before Main builds this bar), so the record is already updated — but taking the
+	# max makes the chip correct regardless of listener order rather than depending on it.
+	var best := ended_vent_tier
+	if _dynasty != null:
+		best = maxi(ended_vent_tier, _dynasty.get_best_vent_streak())
+	_show_tier_chip(
+			"TIER %d — BEST %d" % [ended_vent_tier, best],
+			UiPalette.KETCHUP_RED, UiPalette.PALE_GOLD)
 
 
 ## The re-arm delay finished: rush is available again. Flash the whole meter bright once (plus a

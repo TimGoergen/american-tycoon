@@ -21,7 +21,7 @@ class_name GameState
 # slate / zero earned; a v4 is_staffed:true becomes one hire; a pre-v6 save starts the wage at
 # level 0; pre-v9 staff_tier + staff_level pairs are merged onto the one ladder — each old
 # tier hire counts as one ladder level; see the migration in load_save_dict).
-const SAVE_VERSION := 9
+const SAVE_VERSION := 10
 
 var tuning: TuningConfig
 var economy: EconomyState
@@ -312,7 +312,9 @@ func release_rush(prop_index: int) -> void:
 ## that shuts off, so the penalty is proportional to what was gambled. Fired synchronously
 ## from inside rush_momentum.tick, BEFORE this tick's grace decay runs, so the grace values
 ## are exactly the overheat-moment snapshot.
-func _freeze_actively_rushed_properties() -> void:
+## `_ended_vent_tier` is the streak the excursion reached; this freeze handler does not use it
+## (the death chip and the bloodline record do), but the parameter must match the signal.
+func _freeze_actively_rushed_properties(_ended_vent_tier: int) -> void:
 	# An overheat grants no tail and zeroes the bonus INSTANTLY (RushMomentumState._begin_overheat),
 	# so every tail dies here — including one still running from an earlier release on some other
 	# property. The contrast between this and a bail's gentle spin-down is the value of bailing.

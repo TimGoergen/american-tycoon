@@ -120,6 +120,13 @@ extends SceneTree
 # average), because that property is dark for the whole lockout. The sting knobs were retuned
 # DOWN against these freeze-priced gates (the freeze carries the deterrent now).
 #
+# BEST VENT STREAK (Tim 2026-07-20 — the deepest tier ever reached is now an implicit high score,
+# recorded on the bloodline and shown at the overheat moment plus a new stats screen) adds:
+#  35. The overheat signal carries the ENDED tier, snapshotted in _begin_overheat BEFORE the
+#      ladder is cleared (a naive read would see the zeroed tier); DynastyState.note_vent_streak
+#      keeps a running MAX that never decreases across overheats and equals the deepest tier ever
+#      seen; and that record survives a save/load round-trip.
+#
 # Exits with code 0 only if every check passes (1 otherwise), so CI/headless runs fail loudly.
 
 ## One logic tick, matching the game's 10 Hz timestep.
@@ -169,6 +176,7 @@ func _initialize() -> void:
 	_test_release_tail_reaches_income(tuning)
 	_test_release_tail_cleared_by_overheat(tuning)
 	_test_plain_rush_release_decays_smoothly(tuning)
+	_test_best_vent_streak_record(tuning)
 
 	print("")
 	if _failures == 0:
@@ -287,7 +295,7 @@ func _test_band_signals_and_missed_window(tuning: TuningConfig) -> void:
 	var windows_opened := [0]
 	var misses: Array = []
 	state.band_entered.connect(func(band: RushMomentumState.Band) -> void: bands_entered.append(band))
-	state.overheated.connect(func() -> void: overheat_count[0] += 1)
+	state.overheated.connect(func(_ended: int) -> void: overheat_count[0] += 1)
 	state.vent_window_opened.connect(func(_lifts: int, _duration: float) -> void: windows_opened[0] += 1)
 	state.vent_missed.connect(func(done: int, required: int) -> void: misses.append([done, required]))
 
@@ -515,7 +523,7 @@ func _test_cruise_clamp(tuning: TuningConfig) -> void:
 	var state := _fresh_state(tuning, 99)
 	var overheat_count := [0]
 	var bands_entered: Array = []
-	state.overheated.connect(func() -> void: overheat_count[0] += 1)
+	state.overheated.connect(func(_ended: int) -> void: overheat_count[0] += 1)
 	state.band_entered.connect(func(band: RushMomentumState.Band) -> void: bands_entered.append(band))
 
 	# 120 s of holding — twenty times the old time-to-Hot — without ever touching overdrive.
@@ -588,7 +596,7 @@ func _test_overdrive_disengages_on_release(tuning: TuningConfig) -> void:
 	# Re-holding WITHOUT tapping overdrive again is back in cruise mode: heat left over from
 	# the ride bleeds DOWN to the cruise point (never sustained for free) and pins there.
 	var overheat_count := [0]
-	state.overheated.connect(func() -> void: overheat_count[0] += 1)
+	state.overheated.connect(func(_ended: int) -> void: overheat_count[0] += 1)
 	state.notify_rush_pressed()
 	for _i in range(300):  # 30 s of plain holding
 		state.tick(TICK_SECONDS, true)
@@ -630,7 +638,7 @@ func _test_legacy_cruise_and_boundary(tuning: TuningConfig) -> void:
 	# as OVERDRIVE — Building is inclusive of 1.0; only overdrive pushing PAST the tick opens the ride.
 	var overheat_count := [0]
 	var bands_entered: Array = []
-	state.overheated.connect(func() -> void: overheat_count[0] += 1)
+	state.overheated.connect(func(_ended: int) -> void: overheat_count[0] += 1)
 	state.band_entered.connect(func(band: RushMomentumState.Band) -> void: bands_entered.append(band))
 	state.notify_rush_pressed()
 	for _i in range(600):  # 60 s parked at the tick
@@ -697,7 +705,7 @@ func _measure_duty_cycle(tuning: TuningConfig) -> void:
 	# Baseline: the zone-out player just holds forever in cruise (no overdrive, no venting).
 	var cruise_state := _fresh_state(tuning, 2025)
 	var cruise_overheated := [false]
-	cruise_state.overheated.connect(func() -> void: cruise_overheated[0] = true)
+	cruise_state.overheated.connect(func(_ended: int) -> void: cruise_overheated[0] = true)
 	var cruise_bonus_seconds := 0.0
 	var cruise_elapsed := 0.0
 	while cruise_elapsed < total_seconds:
@@ -713,7 +721,7 @@ func _measure_duty_cycle(tuning: TuningConfig) -> void:
 	var state := _fresh_state(tuning, 2026)
 	state.engage_overdrive()
 	var overheated_during_run := [false]
-	state.overheated.connect(func() -> void: overheated_during_run[0] = true)
+	state.overheated.connect(func(_ended: int) -> void: overheated_during_run[0] = true)
 
 	var rushing := true
 	var total_bonus_seconds := 0.0
@@ -837,7 +845,7 @@ func _test_gesture_judge(tuning: TuningConfig) -> void:
 	var gap_misses: Array = []
 	var gap_overheated := [0]
 	gap_state.vent_missed.connect(func(done: int, required: int) -> void: gap_misses.append([done, required]))
-	gap_state.overheated.connect(func() -> void: gap_overheated[0] += 1)
+	gap_state.overheated.connect(func(_ended: int) -> void: gap_overheated[0] += 1)
 	_press_and_engage(gap_state)
 	_check("(setup) window opened for the gap-too-long case", _ride_to_window_open(gap_state) >= 0.0)
 	gap_state.notify_rush_released()
@@ -1445,7 +1453,7 @@ func _run_vent_autopilot(tuning: TuningConfig, seed_value: int, gesture_success:
 			clean_missed[0] += 1
 		elif planned_clean[0]:
 			outpaced_windows[0] += 1)
-	state.overheated.connect(func() -> void:
+	state.overheated.connect(func(_ended: int) -> void:
 		overheats[0] += 1
 		excursion_tiers.append(excursion_tier[0])
 		excursion_tier[0] = 0
@@ -2354,3 +2362,53 @@ func _test_plain_rush_release_decays_smoothly(tuning: TuningConfig) -> void:
 		is_equal_approx(rider.rush_momentum_factor, 1.0)
 			and is_equal_approx(rider.get_income_per_cycle(), base_per_cycle))
 	_check("no property is left marked as a tail rider", not _any_property_tail_rider(game))
+
+
+func _test_best_vent_streak_record(tuning: TuningConfig) -> void:
+	print("\n35. BEST VENT STREAK: the ended tier is captured pre-clear; the bloodline record is monotonic")
+
+	# --- Part A: the pre-clear capture. A run that vents three tiers then overheats must EMIT 3 as
+	# the ended tier, even though _begin_overheat zeroes the ladder in the very same call. ---
+	var state := _fresh_state(tuning, 8800)
+	var captured := [-1]
+	state.overheated.connect(func(ended: int) -> void: captured[0] = ended)
+	_press_and_engage(state)
+	_check("(setup) vented three tiers cleanly", _vent_cleanly(state, 3) and state.vent_tier() == 3)
+	# Ignore the next window (keep rushing, never gesture) -> a miss -> overheat.
+	var elapsed := 0.0
+	while not state.is_locked_out() and elapsed < 30.0:
+		state.tick(TICK_SECONDS, true)
+		elapsed += TICK_SECONDS
+	_check("overheated after ignoring the next window", state.is_locked_out())
+	_check("the overheat signal carried the reached tier (3), captured before the ladder cleared",
+		captured[0] == 3)
+	_check("the state's own tier was zeroed by the overheat", state.vent_tier() == 0)
+
+	# --- Part B: the bloodline record. note_vent_streak (what the overheated signal is wired to
+	# on the living generation) keeps a running MAX. Feed a sequence with lower LATER runs and a
+	# tie, and require the record to never decrease and to equal the deepest tier ever seen. ---
+	var dynasty := DynastyState.new(ConfigLoader.load_property_configs(), tuning)
+	_check("a fresh bloodline's best streak is 0", dynasty.get_best_vent_streak() == 0)
+	var feed := [3, 1, 7, 2, 7, 0]
+	var expected_running := [3, 3, 7, 7, 7, 7]  # the running max after each ended run
+	var monotone := true
+	var matched := true
+	var last := dynasty.get_best_vent_streak()
+	for i in range(feed.size()):
+		dynasty.note_vent_streak(feed[i])
+		var now := dynasty.get_best_vent_streak()
+		if now < last:
+			monotone = false
+		if now != expected_running[i]:
+			matched = false
+		last = now
+	_check("the record is the running MAX of every ended tier (a lower later run cannot lower it)",
+		matched)
+	_check("the record never decreased across the sequence", monotone)
+	_check("the final record equals the deepest tier ever seen (7)",
+		dynasty.get_best_vent_streak() == 7)
+
+	# --- Part C: persistence. The record round-trips through save/load. ---
+	var reborn := DynastyState.new(ConfigLoader.load_property_configs(), tuning)
+	reborn.load_save_dict(dynasty.to_save_dict())
+	_check("best_vent_streak survives a save/load round-trip", reborn.get_best_vent_streak() == 7)

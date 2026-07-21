@@ -178,7 +178,11 @@ signal vent_missed(lifts_done: int, required_lifts: int)
 ## EVERY overheat path funnels through _begin_overheat and emits this, which is why GameState
 ## hangs the OVERHEAT PROPERTY FREEZE (Tim 2026-07-19) on it: at this exact moment, every
 ## property still inside its rushed grace goes dark for the whole lockout.
-signal overheated
+##
+## `ended_vent_tier` carries the vent streak the dying excursion reached, captured BEFORE the
+## ladder is cleared (Tim 2026-07-20). It is the "how high did you get" number: the death chip
+## reads it, and DynastyState folds it into the bloodline's all-time best.
+signal overheated(ended_vent_tier: int)
 
 ## The post-overheat re-arm delay just finished; rushing is available again. Also the exact
 ## moment GameState brings the overheat-frozen properties back up — the freeze spans the
@@ -744,10 +748,13 @@ func _begin_overheat() -> void:
 	# from ever-longer timeouts (Tim 2026-07-18).
 	_rearm_tier_sting = minf(tuning.rush_momentum_vent_fail_rearm_per_tier * _vent_tier,
 			tuning.rush_momentum_vent_fail_rearm_cap)
+	# Snapshot the streak this run reached BEFORE the clear zeroes it — the overheat signal
+	# carries it out to the death chip and the bloodline best-streak record (Tim 2026-07-20).
+	var ended_vent_tier := _vent_tier
 	_clear_vent_state()
 	# The gamble ended (badly) — the next rush hold after the lockout starts back in cruise mode.
 	_overdrive_engaged = false
-	overheated.emit()
+	overheated.emit(ended_vent_tier)
 
 
 ## The lockout time scale, guarded so a bad value can never stall the drain (divide-by-zero)

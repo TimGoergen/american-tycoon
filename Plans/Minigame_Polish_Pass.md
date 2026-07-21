@@ -209,3 +209,40 @@ game already** (rim flash, spin, aiming guide, tuned physics) — use it as the 
 3. **Difficulty direction is per-game, not uniform.** Some games get harder (Timing Bar, Catch
    Money), some get clearer/confirmed (Match Three, Memory, Balance), Basketball holds. See the
    direction table at the top of §2.
+
+---
+
+## 6. Future roadmap — Challenge Mode goals, end-game wipes, over-screen contrast (Tim, 2026-07-20)
+
+Forward-looking direction beyond the polish pass, captured here as the next minigame body of
+work. Ties into the deferred **Challenge Mode rework** (stakes + goals). Not yet built — these are
+Tim's thoughts to design against later.
+
+### 6.1 Goals define bonuses
+Challenge Mode **goals award a small % global increase** (a dynasty-wide bump), not a one-off
+payout. Goals become a lasting reason to play rather than a single-run bonus.
+> *Take:* on-theme for a tycoon game where everything compounds, and it reuses the same lever as
+> Legacy upgrades — so keep the % small and size it against the Legacy catalog, or stacked goals
+> could outrun the economy. Good idea; the tuning risk is compounding, not the concept.
+
+### 6.2 End-of-minigame "grow to fill" wipe transition
+When a round ends, a **game-specific object grows to fill the screen** as a wipe into the next
+screen — a signature payoff beat, one per game:
+- **Basketball** → a basketball grows to fill the screen.
+- **Catch Money** → a fountain of coins.
+- **Match Three** → a fountain of all gem colors.
+- **Memory** → the four board panels spin as a group and grow to fill the screen.
+- **Timing Bar, Balance, and any other types** → *recommended placeholders, to be defined later*
+  (candidate: Timing Bar → the sweeping marker/zone expands outward; Balance → the gold zone
+  swells to fill). Finalize per game when built.
+> *Take:* strong juice and gives each game an identity beat the library currently lacks (§4 calls
+> out uneven celebration weight). Build it as ONE shared transition hook the host drives, with
+> each game supplying its own "grow" art — consistent with the reward-agnostic host contract
+> (§0), so the transition never touches scoring.
+
+### 6.3 Minigame-over screen: darken light-color fonts for the translucent background
+Because the result/over screen sits over the 50%-alpha translucent card + themed backdrop (§Status
+as-built delta 1), the **lighter-color fonts wash out**. Darken all lighter-color fonts on the
+minigame-over screen for contrast.
+> *Take:* a concrete readability fix (Tim's standing low-vision rule, §4), not really "future" —
+> small and safe to pull forward from this roadmap whenever wanted.

@@ -374,19 +374,19 @@ Earth runs on **one currency — the dollar.** Alien civilizations are *flavor, 
   | Tier | Civilization | Economy vs. Earth | Staffer income ×| Flavor |
   |---|---|---|---|---|
   | 1 | **Earth** | 1× (~$103.6T) | 1× | The honest starting grind; tier 1 just turns on automation. |
-  | 2 | **Luminari Collective** (Solaria Prime, *Photons*) | 30× | 40× | Energy/light beings — money now moves at light speed. |
-  | 3 | **Geth-Sentinel Grid** (Rannoch-01, *Logic Nodes*) | 900× | 1,600× | Cybernetic collective — finance run entirely by machines. |
-  | 4 | **Mycelium Unity** (Spore-Deep, *Spores*) | 27,000× | 64,000× | Fungal hive-mind — money that literally spreads and self-replicates. |
-  | 5 | **Quartzite Conglomerate** (Geode-7, *Prisms*) | 810,000× | 2,560,000× | Crystalloid — wealth crystallized, harder than diamond and just as cold. |
-  | 6 | **Chronophage Enclave** (Tempus, *Seconds*) | 24,300,000× | 102,400,000× | Time-eaters — they sell you time itself, by the second, at a ruinous markup. |
+  | 2 | **Luminari Collective** (Solaria Prime, *Photons*) | ×16,807 | 1× | Energy/light beings — money now moves at light speed. |
+  | 3 | **Geth-Sentinel Grid** (Rannoch-01, *Logic Nodes*) | ×282,475,249 | 1× | Cybernetic collective — finance run entirely by machines. |
+  | 4 | **Mycelium Unity** (Spore-Deep, *Spores*) | ×4.75e12 | 1× | Fungal hive-mind — money that literally spreads and self-replicates. |
+  | 5 | **Quartzite Conglomerate** (Geode-7, *Prisms*) | ×7.98e16 | 1× | Crystalloid — wealth crystallized, harder than diamond and just as cold. |
+  | 6 | **Chronophage Enclave** (Tempus, *Seconds*) | ×1.34e21 | 1× | Time-eaters — they sell you time itself, by the second, at a ruinous markup. |
 
   Arc: energy → automation → proliferation → crystallization → time, each a different flavor of "the aliens make your money machine inhuman." More civilizations can be added as data rows — `docs/alien_civilizations.md` holds 100.
 
-  **Epoch pacing — the law (reworked 2026-06-27).** Time to clear an epoch ≈ (dollars to earn) ÷ (income/sec), so the **per-epoch duration ratio = economy_step ÷ staff_step**. The original v1 numbers (economy ×1,000/epoch, staff ×~17/epoch) made each epoch ~60× *longer* than the last — epoch 2 stalled into hours of nothing-new, epoch 6 into millennia. The ladder is now **matched geometric, staff stepping slightly faster than the economy**: `economy_scale = 30^(tier−1)`, `staff_income_multiplier = 40^(tier−1)`. Because 40 > 30, each epoch arrives ~0.75× the time of the last — the §5.1 "it speeds up every time" feel, not a wall. The trade-off: top-epoch economy is now ~24M× Earth (still vast, ~7 orders of magnitude over the run) rather than 10¹⁵×. *Values are first-pass in `EpochCatalog.gd`; the epoch-timing study in `sim/Sim.gd` (`_run_epoch_timing_study`) measures the live ladder and verifies the duration ratio on every run, and the dynasty sim confirms "speeds up every time" still holds.* **Note — what the ladder does NOT govern:** alien-staff *affordability* is always 0.1% of the epoch economy (`earth_target × economy_scale × staff_cost_fraction`), independent of these steps; "staff too cheap at contact" is a separate `staff_cost_fraction` knob (open tuning item). And the ladder fixes *pacing only* — it does not by itself give the player something to **do** during an epoch (the per-epoch upgrade-track / modifier-choice idea in Future Features remains the engagement half).
+  **Epoch pacing.** Time to clear an epoch ≈ (dollars to earn) ÷ (income/sec). As shipped: `economy_scale = (7^5)^(tier−1)` — each epoch's earn-to-clear threshold is **×16,807** the last — and `staff_income_multiplier` is **FLAT (1.0 every tier)**. The property cohort's own ~7×/rung base magnitude carries the epoch leap (not a staff-vs-economy exponent race), and the escalating cohorts (**6/7/8/9/10** rungs for epochs 2–6) hold the new-property unlock cadence nearly flat (~3.2–4.0 min median) so it "speeds up every time" without a wall. *Live values in `EpochCatalog.gd`; `sim/UnlockCadence.gd` measures the cadence and the dynasty sim confirms the feel. (History: the earlier v1 `economy 30^ / staff 40^` matched-geometric law is retired — it ballooned staffed old properties and made aliens feel weak, then trivially cheap.)* **Note — what the ladder does NOT govern:** alien-staff *affordability* is ~**1%** of the epoch economy (`earth_target × economy_scale × staff_cost_fraction`, `staff_cost_fraction = 0.01`), a separate knob; and the ladder fixes *pacing only* — the per-epoch upgrade-track / modifier-choice idea in Future Features remains the engagement half.
 
-> **CONTINUOUS LADDER + ESCALATING COHORTS — SHIPPED (2026-07-12 / 2026-07-15).** The table's
-> *Economy vs. Earth* and *Staffer income ×* columns above, and the matched-geometric pacing law
-> (30^/40^), are now **historical** — see `EpochCatalog.gd` for live values. As shipped:
+> **CONTINUOUS LADDER + ESCALATING COHORTS — SHIPPED (2026-07-12 / 2026-07-15).** The table and
+> pacing paragraph above now show the live ladder (`EpochCatalog.gd`; the earlier matched-geometric
+> `30^/40^` law is retired). The mechanics in full:
 > - **Economy scale:** `economy_scale = (7^5)^(tier−1)` — each epoch's earn-to-clear threshold is
 >   **×16807** the last (1, 16807, 2.82e8, 4.75e12, 7.98e16, 1.34e21). That matches how far the
 >   property magnitudes climb within the epoch (Tim's "each new property is a ~7× jump, like a new

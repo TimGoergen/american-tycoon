@@ -560,7 +560,7 @@ func _build_result_view() -> Control:
 	column.add_child(_result_heading_label)
 
 	# The verdict headline — how the round went, colored by tier.
-	_result_verdict_label = _make_label("", UiPalette.FONT_DISPLAY, UiPalette.MUSTARD_GOLD)
+	_result_verdict_label = _make_label("", UiPalette.FONT_DISPLAY, UiPalette.DARK_GOLD)
 	_result_verdict_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(_result_verdict_label)
 
@@ -605,9 +605,10 @@ func _build_result_view() -> Control:
 	_result_summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(_result_summary_label)
 
-	# The Legacy-gem bonus line — shown only when the player collected a gem this round. Gold with a
-	# navy outline so the windfall reads as special against the cream result card.
-	_result_legacy_label = _make_label("", UiPalette.FONT_SUBHEAD, UiPalette.MUSTARD_GOLD)
+	# The Legacy-gem bonus line — shown only when the player collected a gem this round. Dark gold
+	# with a navy outline so the windfall reads as special AND stays legible over the translucent
+	# result card + themed backdrop (Tim, 2026-07-20 contrast pass).
+	_result_legacy_label = _make_label("", UiPalette.FONT_SUBHEAD, UiPalette.DARK_GOLD)
 	_result_legacy_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_result_legacy_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_result_legacy_label.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
@@ -1485,7 +1486,10 @@ func _fill_amount_statement(mult: float) -> void:
 		# We now name the SHORTFALL itself ("−10%"), which is both honest about the loss and
 		# self-scaling: a small miss reads small. No math changed.
 		_result_verdict_label.text = "CAME UP SHORT"
-		_result_verdict_label.add_theme_color_override("font_color", _keep_color(mult))
+		# Darkened a touch so the pale (near-full) top of the keep gradient still reads on the
+		# translucent result card (Tim, 2026-07-20 contrast pass). _keep_color is shared with the
+		# in-round bar, so darken only here at the result call site.
+		_result_verdict_label.add_theme_color_override("font_color", _keep_color(mult).darkened(0.2))
 		_stat_impact_key.text = "Short of full  (−%d%%)" % int(round((1.0 - mult) * 100.0))
 		_stat_impact_val.text = "−%s" % _format_amount(-delta)
 		_stat_impact_val.add_theme_color_override("font_color", UiPalette.KETCHUP_RED)
@@ -1512,8 +1516,11 @@ func _fill_first_contact_statement(mult: float) -> void:
 	var cycle_mult := float(info["cycle"])
 
 	_result_verdict_label.text = String(info["label"])
+	# First Contact's positive terms use a teal accent, darkened ~0.5 so it reads over the
+	# translucent result card + themed backdrop (Tim, 2026-07-20 contrast pass). Applied at each
+	# teal result site below too; the pale ATOMIC_TEAL is left untouched everywhere else in-game.
 	_result_verdict_label.add_theme_color_override(
-		"font_color", UiPalette.DARK_MONEY_GREEN if bucket == 0 else UiPalette.ATOMIC_TEAL)
+		"font_color", UiPalette.DARK_MONEY_GREEN if bucket == 0 else UiPalette.ATOMIC_TEAL.darkened(0.5))
 
 	_stat_base_key.text = _base_label  # "Base income"
 	_stat_base_val.text = "%s / cycle" % _format_amount(_base_amount)
@@ -1528,10 +1535,10 @@ func _fill_first_contact_statement(mult: float) -> void:
 	else:
 		_stat_impact_key.text = "Income boost"
 		_stat_impact_val.text = "+%d%%" % int(round((income_mult - 1.0) * 100.0))
-		_stat_impact_val.add_theme_color_override("font_color", UiPalette.ATOMIC_TEAL)
+		_stat_impact_val.add_theme_color_override("font_color", UiPalette.ATOMIC_TEAL.darkened(0.5))
 		_stat_impact2_key.text = "Faster cycles"
 		_stat_impact2_val.text = "−%d%%" % int(round((1.0 - cycle_mult) * 100.0))
-		_stat_impact2_val.add_theme_color_override("font_color", UiPalette.ATOMIC_TEAL)
+		_stat_impact2_val.add_theme_color_override("font_color", UiPalette.ATOMIC_TEAL.darkened(0.5))
 		_stat_impact2_row.visible = true
 
 	_stat_impact_key.add_theme_color_override("font_color", UiPalette.NAVY)
@@ -1552,7 +1559,7 @@ func _refresh_legacy_result_line(mult: float) -> void:
 	if amount > 0:
 		var great := _legacy_bonus_factor(mult) > 1.0
 		_result_legacy_label.text = ("LEGACY BONUS  +%s gems!" % Money.abbrev(amount)) + ("  (great round!)" if great else "")
-		_result_legacy_label.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD)
+		_result_legacy_label.add_theme_color_override("font_color", UiPalette.DARK_GOLD)
 	else:
 		# Collected a gem but the round fell short of the "full" line, which is what keeps it. This IS
 		# a real all-or-nothing loss, so it still says so — just without the harsher "lost" (Tim,

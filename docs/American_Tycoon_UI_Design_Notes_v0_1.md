@@ -52,8 +52,9 @@ The only screen built today (M1). Listed so we can see what exists vs. what M2 a
 **Main screen** (portrait), top to bottom:
 - Income/sec hero ticket (stamp-pop on purchase) — `HeroStat.gd`
 - Frenzy bar — `FrenzyBar.gd`
-- Scrolling property ladder, 12 rows (name, owned count, milestone slider, cycle
-  progress, buy buttons, hire button) — `PropertyRow.gd`
+- Scrolling property ladder — 12 rows at Earth, growing to the full **52 rungs** as alien
+  epochs unlock (name, owned count, milestone slider, cycle progress, buy buttons, hire
+  button) — `PropertyRow.gd`
 - Global buy-mode toggle (×1 / ×10 / UPGRADE / MAX)
 - Wage button (permanent, bottom) — `WagePanel.gd`
 - Welcome-back overlay (offline return) — `WelcomeBackOverlay.gd`

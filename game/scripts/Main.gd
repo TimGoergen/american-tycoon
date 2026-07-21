@@ -38,6 +38,7 @@ var _momentum_bar: MomentumBar
 var _wage_panel: WagePanel
 var _welcome_overlay: WelcomeBackOverlay
 var _about_screen: AboutScreen
+var _stats_screen: StatsScreen
 var _will_screen: WillScreen
 var _legacy_screen: LegacyScreen
 var _ledger_screen: FamilyLedgerScreen
@@ -498,6 +499,14 @@ func _build_ui() -> void:
 	_about_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_about_screen)
 
+	# The Statistics modal (Settings → Stats), hidden until opened. Reads the bloodline for its
+	# stat rows; its own Back button closes it (nothing to restore — the game runs behind it).
+	_stats_screen = StatsScreen.new()
+	_stats_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_stats_screen.set_dynasty(dynasty)
+	_stats_screen.closed.connect(_on_stats_closed)
+	add_child(_stats_screen)
+
 	# The "new ventures" nudge (epoch pager discoverability), hidden until a next tab first
 	# becomes affordable. SHOW ME jumps to it; NOT NOW closes.
 	_venture_overlay = NewVenturesOverlay.new()
@@ -575,6 +584,8 @@ func _build_property_tab() -> Control:
 	# the frenzy bar's pop_requested below.
 	_momentum_bar = MomentumBar.new()
 	_momentum_bar.setup(game.rush_momentum, tuning)
+	# The dynasty is read only for the overheat death chip's all-time best streak (Tim 2026-07-20).
+	_momentum_bar.set_dynasty(dynasty)
 	_momentum_bar.overdrive_requested.connect(_on_overdrive_requested)
 	v.add_child(_momentum_bar)
 
@@ -1149,6 +1160,15 @@ func _build_settings_tab() -> Control:
 	minigame_tuning_button.pressed.connect(_on_minigame_tuning_pressed)
 	bottom_buttons.add_child(minigame_tuning_button)
 
+	# Stats: opens the Statistics modal (Best Vent Streak and other bloodline numbers; Tim 2026-07-20).
+	var stats_button := Button.new()
+	stats_button.custom_minimum_size = Vector2(0, tuning_button_height)
+	stats_button.add_theme_font_size_override("font_size", TUNING_BUTTON_FONT)
+	UiPalette.style_button(stats_button, false)
+	stats_button.text = "STATS"
+	stats_button.pressed.connect(_on_stats_pressed)
+	bottom_buttons.add_child(stats_button)
+
 	# About: opens the modal with the logo, name, version, and credits (Tim, 2026-07-09).
 	var about_button := Button.new()
 	about_button.custom_minimum_size = Vector2(0, tuning_button_height)
@@ -1393,6 +1413,17 @@ func _on_minigame_tuning_pressed() -> void:
 ## hides it again (no state to restore — the game keeps running behind it).
 func _on_about_pressed() -> void:
 	_about_screen.open()
+
+
+## Stats pressed: show the Statistics modal. It reads the bloodline's current numbers on open;
+## its own Back button hides it again (the game keeps running behind it).
+func _on_stats_pressed() -> void:
+	_stats_screen.open()
+
+
+## The Statistics modal's Back button was pressed. Nothing to restore — the modal self-hides.
+func _on_stats_closed() -> void:
+	pass
 
 
 ## Apply tuning edits: persist the overrides, save the run so no progress is lost,

@@ -47,6 +47,14 @@ var dynastic_taps: int = 0
 ## spending never reduces it.
 var lifetime_cash_earned: float = 0.0
 
+## The deepest VENT TIER the bloodline has ever reached in a single overdrive excursion — an
+## implicit high score (Plans/Overdrive_Vent_Windows.md, Tim 2026-07-20). A vent tier is the
+## count of successful vents in one ride; a skilled run dies around tier 8. This is an ALL-TIME
+## record that must outlive any single run: RushMomentumState._vent_tier is wiped on every reset
+## (First Contact) and every overheat, so the lasting memory has to live up here, above the run.
+## Updated by note_vent_streak, hooked to the living generation's `overheated` signal below.
+var best_vent_streak: int = 0
+
 ## One record per deceased generation, oldest first — the Family Ledger (GDD §8.2).
 ## Each entry is a Dictionary: { "name": String (e.g. "Wellington Pemberton VIII"),
 ## "generation": int, "fortune": float (the life's cash_earned_this_gen — the
@@ -64,11 +72,33 @@ func _init(property_configs: Array, p_tuning: TuningConfig) -> void:
 	staff_retention = StaffRetention.new()
 	_configure_retention_pricing()
 	current = _new_generation()
+	_record_overheats_from_current()
 
 
 # ---------------------------------------------------------------------------
 # Driving the living generation
 # ---------------------------------------------------------------------------
+
+
+## Fold a just-ended vent streak into the bloodline's all-time best. Wired to the LIVING
+## generation's overheated signal (see _record_overheats_from_current). The tier arrives already
+## captured pre-clear, so this is a plain running maximum.
+func note_vent_streak(ended_vent_tier: int) -> void:
+	best_vent_streak = maxi(best_vent_streak, ended_vent_tier)
+
+
+## The deepest vent streak the bloodline has ever reached (0 if no overdrive run has ended yet).
+func get_best_vent_streak() -> int:
+	return best_vent_streak
+
+
+## Connect the living generation's overheat signal to the best-streak recorder. Called every time
+## `current` is (re)assigned — construction, succession, and load all build a FRESH GameState with
+## a FRESH RushMomentumState, so the record has to re-subscribe to the new instance each time or it
+## would keep listening to a dead one. (A First Contact reset reuses the same instance, so its
+## connection survives untouched.)
+func _record_overheats_from_current() -> void:
+	current.rush_momentum.overheated.connect(note_vent_streak)
 
 ## Advance the current generation by `delta` seconds, applying the dynasty's
 ## property-income multiplier (from the Legacy "Family Fortune" upgrade) to
@@ -221,6 +251,7 @@ func perform_succession(
 		staff_retention.record_ladder_high(i, prop.staff_level)
 
 	current = _new_generation()
+	_record_overheats_from_current()
 	return will
 
 
@@ -317,6 +348,7 @@ func to_save_dict() -> Dictionary:
 		"generation": generation,
 		"dynastic_taps": dynastic_taps,
 		"lifetime_cash_earned": lifetime_cash_earned,
+		"best_vent_streak": best_vent_streak,
 		"ancestors": ancestors,
 		"current": current.to_save_dict(),
 	}
@@ -335,6 +367,8 @@ func load_save_dict(data: Dictionary) -> void:
 	dynastic_taps = int(data.get("dynastic_taps", 0))
 	# Pre-basis-swap saves have no dynasty-wide earned total; default to 0.0.
 	lifetime_cash_earned = float(data.get("lifetime_cash_earned", 0.0))
+	# Pre-stats-screen saves have no best-streak record; default to 0 (never reached a vent).
+	best_vent_streak = int(data.get("best_vent_streak", 0))
 	# Pre-Family-Ledger saves have no ancestor list; default to empty. Duplicate each
 	# entry so the loaded dynasty owns its own dictionaries, not the save's.
 	ancestors = []
@@ -357,6 +391,7 @@ func load_save_dict(data: Dictionary) -> void:
 		upgrades.earned_lifetime = carried
 
 	current = GameState.new(_property_configs, tuning)
+	_record_overheats_from_current()
 	var current_data: Variant = data.get("current", data)
 	if current_data is Dictionary:
 		current.load_save_dict(current_data)

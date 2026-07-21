@@ -69,11 +69,11 @@ extends Resource
 ## Seconds a held BUY button waits before its first auto-repeat.
 @export var buy_hold_initial_delay: float = 0.45  # feel-tune
 ## Seconds between each BUY auto-repeat after the first.
-@export var buy_hold_repeat_interval: float = 0.35  # feel-tune
+@export var buy_hold_repeat_interval: float = 0.1  # device-tuned (Tim, 2026-07-20)
 ## Seconds a held HIRE/UPGRADE button waits before its first auto-repeat.
 @export var hire_hold_initial_delay: float = 0.45  # feel-tune
 ## Seconds between each HIRE/UPGRADE auto-repeat after the first.
-@export var hire_hold_repeat_interval: float = 0.35  # feel-tune
+@export var hire_hold_repeat_interval: float = 0.1  # device-tuned (Tim, 2026-07-20)
 
 # --- Staffing & offline (Spec §6) ---
 
@@ -335,7 +335,7 @@ extends Resource
 ## I want to see it coming but not feel like I'm waiting for it"). The shorter flight also
 ## attacks the sloppy free ride at its root — less riskless telegraph pay bundled with every
 ## check — which, together with the freeze, is what let the fail sting drop to zero below.
-@export var rush_momentum_vent_approach_seconds: float = 1.2  # feel-tune
+@export var rush_momentum_vent_approach_seconds: float = 0.7  # device-tuned (Tim, 2026-07-20)
 
 ## Seconds the player has to COMPLETE the gesture once a window telegraphs — the TIER-0 base
 ## of the escalating duration (each tier multiplies it by duration_decay).

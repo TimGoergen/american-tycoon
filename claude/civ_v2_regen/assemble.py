@@ -27,8 +27,10 @@ import sys
 from pathlib import Path
 
 REGEN_DIR = Path(r"C:\Claude\American Tycoon\claude\civ_v2_regen")
-SCRATCH = Path(r"C:\Users\chefq\AppData\Local\Temp\claude\C--Users-chefq"
-               r"\26e4d961-d6d6-40f2-98ea-e60746bd0c0b\scratchpad")
+# Live-game snapshots (live_properties.json, live_rosters.json) are produced by the reproducible
+# exporter game/sim/DumpLiveCivData.gd. Run that first, then this. (Previously these were dumped
+# by hand into a throwaway session temp folder, which broke reproducibility.)
+SCRATCH = REGEN_DIR / "live_snapshot"
 DRAFT_PATH = Path(r"C:\Claude\American Tycoon\docs\civilizations_v2_draft.json")
 
 INCOME_RATIO = 0.01824

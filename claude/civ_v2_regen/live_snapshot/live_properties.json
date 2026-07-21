@@ -1,0 +1,418 @@
+[
+	{
+		"cost": 50,
+		"cycle": 0.54,
+		"income": 5,
+		"name": "ATM",
+		"staffer": "ATM Technician",
+		"tier": 0
+	},
+	{
+		"cost": 350,
+		"cycle": 1.765,
+		"income": 78.45,
+		"name": "Money Tree",
+		"staffer": "Botanical Manager",
+		"tier": 0
+	},
+	{
+		"cost": 2500,
+		"cycle": 3.077,
+		"income": 683.74,
+		"name": "NFTs",
+		"staffer": "NFT Community Manager",
+		"tier": 0
+	},
+	{
+		"cost": 17500,
+		"cycle": 4.47,
+		"income": 4966,
+		"name": "Tax Increment Financing",
+		"staffer": "Tax Strategist",
+		"tier": 0
+	},
+	{
+		"cost": 120000,
+		"cycle": 6.233,
+		"income": 34630,
+		"name": "Cross Border Distribution",
+		"staffer": "Logistics Director",
+		"tier": 0
+	},
+	{
+		"cost": 850000,
+		"cycle": 8.15,
+		"income": 226381,
+		"name": "Money Laundering",
+		"staffer": "Freshness Consultant",
+		"tier": 0
+	},
+	{
+		"cost": 6000000,
+		"cycle": 11.401,
+		"income": 1583415,
+		"name": "Day Trading",
+		"staffer": "Portfolio Analyst",
+		"tier": 0
+	},
+	{
+		"cost": 42000000,
+		"cycle": 15.67,
+		"income": 10552056,
+		"name": "Flipping Houses",
+		"staffer": "Property Manager",
+		"tier": 0
+	},
+	{
+		"cost": 290000000,
+		"cycle": 21.986,
+		"income": 81430202,
+		"name": "Multi Level Marketing",
+		"staffer": "Downline Coordinator",
+		"tier": 0
+	},
+	{
+		"cost": 2000000000,
+		"cycle": 30.778,
+		"income": 569958344,
+		"name": "Hedge Fund",
+		"staffer": "Fund Administrator",
+		"tier": 0
+	},
+	{
+		"cost": 14000000000,
+		"cycle": 43.023,
+		"income": 3824309933,
+		"name": "Legislative Assets",
+		"staffer": "Lobbyist",
+		"tier": 0
+	},
+	{
+		"cost": 100000000000,
+		"cycle": 60,
+		"income": 29629629630,
+		"name": "Executive Assets",
+		"staffer": "Chief of Staff",
+		"tier": 0
+	},
+	{
+		"cost": 10360000000000,
+		"cycle": 60,
+		"income": 189000000000,
+		"name": "Photon Exchange",
+		"staffer": "Photon Exchange Director",
+		"tier": 2
+	},
+	{
+		"cost": 174100000000000000.0,
+		"cycle": 60,
+		"income": 3177000000000000.0,
+		"name": "Data Foundry",
+		"staffer": "Foundry Core",
+		"tier": 3
+	},
+	{
+		"cost": 2926000000000000000000.0,
+		"cycle": 60,
+		"income": 53390000000000000000.0,
+		"name": "Spore Bank",
+		"staffer": "Spore Banker",
+		"tier": 4
+	},
+	{
+		"cost": 49179999999999998000000000.0,
+		"cycle": 60,
+		"income": 897300000000000000000000.0,
+		"name": "Prism Vault",
+		"staffer": "Prism Vault Keeper",
+		"tier": 5
+	},
+	{
+		"cost": 826600000000000120000000000000.0,
+		"cycle": 60,
+		"income": 15080000000000000000000000000.0,
+		"name": "Time Bank",
+		"staffer": "Time Banker",
+		"tier": 6
+	},
+	{
+		"cost": 52430000000000,
+		"cycle": 60,
+		"income": 956600000000,
+		"name": "Beam Utilities",
+		"staffer": "Beam Grid Operator",
+		"tier": 2
+	},
+	{
+		"cost": 265400000000000,
+		"cycle": 60,
+		"income": 4841000000000,
+		"name": "Solar Futures Desk",
+		"staffer": "Flare Futures Broker",
+		"tier": 2
+	},
+	{
+		"cost": 1343000000000000.0,
+		"cycle": 60,
+		"income": 24500000000000,
+		"name": "Dyson Holdings",
+		"staffer": "Dyson Site Foreman",
+		"tier": 2
+	},
+	{
+		"cost": 698900000000000000.0,
+		"cycle": 60,
+		"income": 12750000000000000.0,
+		"name": "Server Metropolis",
+		"staffer": "Rack City Warden",
+		"tier": 3
+	},
+	{
+		"cost": 2806000000000000000.0,
+		"cycle": 60,
+		"income": 51200000000000000.0,
+		"name": "Algorithm Mines",
+		"staffer": "Mining Subroutine",
+		"tier": 3
+	},
+	{
+		"cost": 11260000000000000000.0,
+		"cycle": 60,
+		"income": 205600000000000000.0,
+		"name": "Robo-Labor Agency",
+		"staffer": "Labor Dispatch Core",
+		"tier": 3
+	},
+	{
+		"cost": 9872999999999999700000.0,
+		"cycle": 60,
+		"income": 180200000000000000000.0,
+		"name": "Hyphae Networks",
+		"staffer": "Hyphae Line-Tender",
+		"tier": 4
+	},
+	{
+		"cost": 33319999999999998000000.0,
+		"cycle": 60,
+		"income": 607900000000000000000.0,
+		"name": "Biomass Refinery",
+		"staffer": "Decay Refiner",
+		"tier": 4
+	},
+	{
+		"cost": 112400000000000000000000.0,
+		"cycle": 60,
+		"income": 2051000000000000000000.0,
+		"name": "Terraforming Co-op",
+		"staffer": "Sporefall Steward",
+		"tier": 4
+	},
+	{
+		"cost": 145000000000000000000000000.0,
+		"cycle": 60,
+		"income": 2644999999999999800000000.0,
+		"name": "Gem Exchange",
+		"staffer": "Facet Floor Trader",
+		"tier": 5
+	},
+	{
+		"cost": 427399999999999970000000000.0,
+		"cycle": 60,
+		"income": 7797000000000000000000000.0,
+		"name": "Laser Lens Works",
+		"staffer": "Lens Grinder Prime",
+		"tier": 5
+	},
+	{
+		"cost": 1259999999999999900000000000.0,
+		"cycle": 60,
+		"income": 22980000000000000000000000.0,
+		"name": "Monolith Realty",
+		"staffer": "Monolith Concierge",
+		"tier": 5
+	},
+	{
+		"cost": 2187000000000000100000000000000.0,
+		"cycle": 60,
+		"income": 39900000000000004000000000000.0,
+		"name": "Deadline Futures",
+		"staffer": "Deadline Enforcer",
+		"tier": 6
+	},
+	{
+		"cost": 5786000000000000500000000000000.0,
+		"cycle": 60,
+		"income": 105599999999999990000000000000.0,
+		"name": "Moment Market",
+		"staffer": "Moment Appraiser",
+		"tier": 6
+	},
+	{
+		"cost": 15310000000000001000000000000000.0,
+		"cycle": 60,
+		"income": 279299999999999990000000000000.0,
+		"name": "Eternity Escrow",
+		"staffer": "Eternity Notary",
+		"tier": 6
+	},
+	{
+		"cost": 34400000000000000.0,
+		"cycle": 60,
+		"income": 627600000000000,
+		"name": "Starcore Syndicate",
+		"staffer": "Stellar Core Magnate",
+		"tier": 2
+	},
+	{
+		"cost": 728900000000000000000.0,
+		"cycle": 60,
+		"income": 13300000000000000000.0,
+		"name": "Singularity Holdings",
+		"staffer": "Singularity Overmind",
+		"tier": 3
+	},
+	{
+		"cost": 14570000000000000000000000.0,
+		"cycle": 60,
+		"income": 265900000000000010000000.0,
+		"name": "Biosphere Trust",
+		"staffer": "All-Biosphere Overlord",
+		"tier": 4
+	},
+	{
+		"cost": 280400000000000010000000000000.0,
+		"cycle": 60,
+		"income": 5116000000000000100000000000.0,
+		"name": "Geode Dominion",
+		"staffer": "Geode Sovereign",
+		"tier": 5
+	},
+	{
+		"cost": 5251000000000000000000000000000000.0,
+		"cycle": 60,
+		"income": 95789999999999995000000000000000.0,
+		"name": "Causality Capital",
+		"staffer": "Sovereign of Cause & Effect",
+		"tier": 6
+	},
+	{
+		"cost": 6798000000000000.0,
+		"cycle": 60,
+		"income": 124000000000000,
+		"name": "Supernova Underwriters",
+		"staffer": "Supernova Underwriter",
+		"tier": 2
+	},
+	{
+		"cost": 45220000000000000000.0,
+		"cycle": 60,
+		"income": 825200000000000000.0,
+		"name": "Sentience Leasing Corp",
+		"staffer": "Sentience Lease Daemon",
+		"tier": 3
+	},
+	{
+		"cost": 181600000000000000000.0,
+		"cycle": 60,
+		"income": 3313000000000000000.0,
+		"name": "Planetary Mainframe",
+		"staffer": "Planetary Mainframe Core",
+		"tier": 3
+	},
+	{
+		"cost": 379300000000000000000000.0,
+		"cycle": 60,
+		"income": 6921999999999999500000.0,
+		"name": "Rotworld Orchards",
+		"staffer": "Rotworld Orchard-Tender",
+		"tier": 4
+	},
+	{
+		"cost": 1280000000000000000000000.0,
+		"cycle": 60,
+		"income": 23360000000000000000000.0,
+		"name": "Panspermia Logistics",
+		"staffer": "Panspermia Drift-Shepherd",
+		"tier": 4
+	},
+	{
+		"cost": 4318999999999999800000000.0,
+		"cycle": 60,
+		"income": 78809999999999997000000.0,
+		"name": "Moonrot Colonies",
+		"staffer": "Moonrot Colony-Mother",
+		"tier": 4
+	},
+	{
+		"cost": 3714000000000000000000000000.0,
+		"cycle": 60,
+		"income": 67750000000000003000000000.0,
+		"name": "Bedrock Annuities",
+		"staffer": "Bedrock Annuity Setter",
+		"tier": 5
+	},
+	{
+		"cost": 10950000000000000000000000000.0,
+		"cycle": 60,
+		"income": 199700000000000010000000000.0,
+		"name": "Tectonic Arbitrage",
+		"staffer": "Tectonic Plate Broker",
+		"tier": 5
+	},
+	{
+		"cost": 32270000000000002000000000000.0,
+		"cycle": 60,
+		"income": 588799999999999980000000000.0,
+		"name": "Mantle Extraction Concern",
+		"staffer": "Mantle Vein Magnate",
+		"tier": 5
+	},
+	{
+		"cost": 95119999999999993000000000000.0,
+		"cycle": 60,
+		"income": 1736000000000000100000000000.0,
+		"name": "Planetcore Assay",
+		"staffer": "Planetcore Assay-Lord",
+		"tier": 5
+	},
+	{
+		"cost": 40500000000000000000000000000000.0,
+		"cycle": 60,
+		"income": 738899999999999960000000000000.0,
+		"name": "Hindsight Hedge Fund",
+		"staffer": "Hindsight Fund Oracle",
+		"tier": 6
+	},
+	{
+		"cost": 107200000000000000000000000000000.0,
+		"cycle": 60,
+		"income": 1954999999999999900000000000000.0,
+		"name": "Nostalgia Refinery",
+		"staffer": "Nostalgia Distiller",
+		"tier": 6
+	},
+	{
+		"cost": 283500000000000000000000000000000.0,
+		"cycle": 60,
+		"income": 5172000000000000300000000000000.0,
+		"name": "Timeline Repossessions",
+		"staffer": "Timeline Repo Agent",
+		"tier": 6
+	},
+	{
+		"cost": 750100000000000000000000000000000.0,
+		"cycle": 60,
+		"income": 13680000000000001000000000000000.0,
+		"name": "Millennium Mortgage",
+		"staffer": "Thousand-Year Lienholder",
+		"tier": 6
+	},
+	{
+		"cost": 1985000000000000000000000000000000.0,
+		"cycle": 60,
+		"income": 36210000000000002000000000000000.0,
+		"name": "Big Bang Buyback",
+		"staffer": "Repossessor of the First Second",
+		"tier": 6
+	}
+]

@@ -119,22 +119,29 @@ Cycle 60 s, r0, and accent color are inherited from the epoch's flagship. Becaus
 - **Rush verb:** a tap on a *running* cycle advances it by `RUSH_PCT × cycle_length` (live 10% — ~10 taps completes any cycle at any altitude; scaled further by the Strong-Arm Tactics Legacy upgrade). Percentage, never fixed seconds: this is what makes tapping auto-scale with capital. Holding auto-rushes at `hold_rush_per_second` (5/s).
 - Both verbs feed the frenzy meter (§7) and the dynastic tap count (§5).
 
-### 4.1 Rush Overheat + Cruise Control (shipped 2026-07-16; Plans/Rush_Overheat.md, Plans/Rush_Cruise_Control.md)
-Rushing heats the property up — **heat IS the momentum meter** (one scalar, no timers; heat unit 1.0 = the old momentum cap). Bonus is a pure piecewise-linear function of heat; the factor `1 + bonus` multiplies **only the actively rushed property's** income (magnitude builds globally, application is per-property — §3.4).
+### 4.1 Rush Overheat → Cruise → Overdrive Vent Windows (shipped; vent windows merged to main 2026-07-20)
+**Design of record: `Plans/Overdrive_Vent_Windows.md`** (supersedes the Critical-band model of `Plans/Rush_Overheat.md`; cruise from `Plans/Rush_Cruise_Control.md` is unchanged).
 
-| Band | Heat | Bonus | |
+Rushing heats the property up — **heat IS the momentum meter** (one scalar, no timers; heat unit 1.0 = the old Building cap). Bonus is a pure function of heat; the factor `1 + bonus` multiplies **only the actively rushed property's** income (magnitude builds globally, application is per-property — §3.4).
+
+**RETIRED in the Vent Windows rework** (removed, not merely unused): the secretly-rolled overheat ceiling (`rush_momentum_ceiling_min/max`, the old uniform 1.40–1.60 roll) and the entire **Critical band** (`rush_momentum_critical_start`, `bonus_at_critical`, `haptic_critical_ms`). Heat now has just two regions:
+
+| Region | Heat | Bonus | Rates |
 |---|---|---|---|
-| Building | 0 → 1.0 (inclusive) | 0% → +30% | build 0.167/s, bleed 0.333/s |
-| Hot | 1.0 → 1.25 | +30% → +40% | overdrive build 0.075/s; always safe for its width |
-| Critical | 1.25 → rolled ceiling | +40% → +55% (at 1.60) | ceiling rolled **per excursion**, uniform 1.40–1.60 |
-| OVERHEAT | heat hits ceiling | 0%, rush disabled | locked drain 0.16/s (~8–12 s), then 1.5 s re-arm |
+| Building | 0 → 1.0 (inclusive) | 0% → +30% (`bonus_at_hot`) | build 0.167/s, bleed 0.333/s |
+| OVERDRIVE | 1.0 → hard ceiling **1.60** (fixed) | continuous lerp `bonus_at_hot` → current peak (no kink) | overdrive build 0.075/s |
+| OVERHEAT | miss a check, or hit the ceiling | 0%, rush frozen | locked drain 0.16/s, then 1.5 s re-arm |
 
-- **Cruise (default, 2026-07-16):** holding without overdrive is safe forever — heat clamps at the cruise point, `cruise_heat = effective_cruise_bonus / bonus_at_hot` (≈0.833 at the base **+25%** `rush_momentum_cruise_bonus`). No overheat possible while cruising.
-- **OVERDRIVE is an opt-in button** (visible/enabled while a rush hold is live, no lockout): releases the clamp and rides the danger bands as shipped. **Per-excursion** — disengages on release, overheat, and reset; the ceiling re-rolls each time heat crosses 1.0 upward. Building is inclusive of heat 1.0 (max-Legacy cruise parks there without starting an excursion).
-- **Frenzy burn = a true freeze** (no gain, bleed, lockout drain, or re-arm countdown).
-- Legacy upgrades ("Rush" category, §9.4): **Cooling Systems** +0.01 cruise bonus/level, max 5 (hard cap at +30% = the old always-on cap); **Rapid Restart** −10% total lockout/level, max 5 (drain rate ÷ scale, re-arm × scale — never zero).
-- Duty-cycle (sim-measured): cruise averages **+24.5%**; a skilled ride/vent overdrive loop averages **+34.8%**.
-- Knobs (`rush_momentum_*` heat/bonus/drain/re-arm family, Balance Tuning) supersede `rush_momentum_max_bonus`; grace 0.5 s bridges auto-rush pulses. Full reset at each First Contact.
+- **Cruise (default):** holding without overdrive is safe forever — heat clamps at `cruise_heat = effective_cruise_bonus / bonus_at_hot` (≈0.833 at the base **+25%** `rush_momentum_cruise_bonus`). No overheat possible while cruising.
+- **OVERDRIVE is the opt-in OVR button** (visible/enabled while a rush hold is live): releases the clamp. The bonus lerps from +30% at heat 1.0 toward the run's current **peak** = `bonus_peak` (base **+55%**) + `vent_bonus_step` (**+30%**) per successful vent — **unbounded, no tier cap.** Per-excursion: disengages on release, overheat, and reset.
+- **Vent checks are a depth hazard.** While overdrive is engaged, each tick rolls a window-open chance at `rate = lerp(vent_rate_at_cruise, vent_rate_at_ceiling, depth_frac)`, where `depth_frac = (heat − cruise) / (hard_ceiling − cruise)` — **0.7 windows/s** shallow rising to **3.4/s** at the backstop. A roll **schedules** an event (signal `vent_incoming(approach_seconds, required_lifts)`): a red approach bar travels for `vent_approach_seconds` (**0.7 s**) toward a target line at ~1/3 bar width, then the **window opens** for `vent_window_duration` (1.0 s, decaying by `vent_duration_decay` 0.975 per tier toward a 0.45 s floor). One event in flight at a time; hazard rolls suppress while one is approaching or open. Every vent success and every fresh engage rolls a refractory quiet spell in [`vent_refractory_min` 0.4, `vent_refractory_max` 1.2] s.
+- **The gesture:** complete `required_lifts` clean lifts (**1**, +1 more every `vent_lifts_step_tiers` = **3 tiers**, hard-capped at **3**) before the timer strip drains. Tolerances `vent_gap_max` 0.40 / `vent_tap_max` 0.25 s; `grace_seconds` **0.5** bridges the lifts so the held-rush presentation never flickers mid-gesture. **Success** vents `vent_heat_drop` (0.06) heat, tops heat off (so the next window still fits before the ceiling), and ratchets the bonus by `vent_bonus_step`. **A miss** (window expires, or a wrong/incomplete gesture) **= OVERHEAT.**
+- **Telegraph guarantee:** scheduling always reserves approach + full window duration (+ `refractory_max` on the post-vent path) of climb room before heat can reach the hard ceiling, so every overheat is a missed check, never an ambush — at every escalated cadence including the floors.
+- **Overheat = property freeze (not a global lockout).** The meter drains empire-wide with no bonus anywhere; every property that was **actively being rushed** at the overheat moment FREEZES — cycle paused, no collections, no income — until `rush_ready`. Every *other* property keeps rushing, earning, and filling frenzy, but grants no heat and no bonus while the meter is down (only a `is_overheat_frozen` property refuses the rush verb; the global `can_rush()` gate no longer blocks the whole empire). The re-arm sting is **zero** (`vent_fail_rearm_per_tier` and `vent_fail_rearm_cap` both 0.0) — the freeze is the whole penalty, proportional and real-money; failure costs exactly the drain, the re-arm, and the frozen property's lost income.
+- **Frenzy no longer freezes the heat model** (removed 2026-07-19): `RushMomentumState.tick()` no longer takes `frenzy_burning`. Heat climbs, hazards roll, approaches fly, windows count down, and a lockout cools straight through a burn — you can overheat mid-frenzy and lose that property for the rest of the multiplier.
+- **Bailing pays — the heat-unified tail.** A release that leaves a live bonus retains the ride's earned lerp target (`_retained_peak_bonus`), so `_bonus_for_heat(heat)` keeps lerping toward it as heat bleeds: the bonus decays to zero exactly as the bar empties, and bar, income, and the "SPINNING DOWN +X%" chip all run on the one heat clock. The tail ends the instant rushing resumes (cruise or a fresh engage — preserving the fresh-ladder anti-farm rule and closing the tap-OVR-on/off exploit), on overheat, and on reset. It applies **only while the property's cycle is running** (`is_cycle_running`): a staffed property earns it for the whole tail; an unstaffed one earns it through the one in-flight cycle it finishes, then its cycle stops. An **overheat still zeroes instantly, no tail** — the contrast is the whole value of bailing. (An earlier separate `banked_bonus()`/`banked_fraction()` mechanism was built, then deleted for this heat-unified tail.)
+- Legacy ("Rush" category, §9.4): **Cooling Systems** +0.01 cruise bonus/level, max 5 (hard cap at +30%); **Rapid Restart** −10% total lockout/level, max 5 — both unchanged.
+- **Duty cycle** (sim-measured, `RushOverheatTest.gd`, current build at approach 0.7 s): cruise **+24.9%**, a skilled venter (95%/lift) **+68.7%** (median death at tier 8), a sloppy venter (70%/lift) **−18.3%** (bad overdrive play loses real money — accepted by Tim as the honest cost of a proportional penalty), a timid cash-out farmer (bails tier 1–2) **+11.6%** (below cruise). All `rush_momentum_*` knobs live in Balance Tuning; `rush_momentum_max_bonus` and the retired knobs above are superseded. Full reset at each First Contact.
 
 ## 5. Wage Ladder (Active Layer 1) — Hybrid Credentials
 
@@ -339,10 +346,13 @@ Godot Resources (the 2022 ScriptableObject pattern, ported):
 | FRENZY_MAX_MULT | 5.6× | device-tuned (was 4×) |
 | T_BURN | 30 s | device-tuned (was 90 s) |
 | FRENZY_FILL / DECAY / IDLE_GRACE / POP_FLOOR | 0.4%/tap / 0.5%/s / 5 s / 15% | feel-tune M1 |
-| rush heat build / hot build / bleed | 0.167 / 0.075 / 0.333 per s | feel-tune (2026-07-16, §4.1) |
-| rush critical_start / ceiling_min–max | 1.25 / 1.40–1.60 heat | feel-tune (2026-07-16, §4.1) |
-| rush bonus at hot / critical / peak / cruise | +30% / +40% / +55% / +25% | feel-tune (2026-07-16, §4.1) |
-| rush locked drain / re-arm | 0.16 per s (~10 s lockout) / 1.5 s | feel-tune (2026-07-16, §4.1) |
+| rush heat build / overdrive build / bleed | 0.167 / 0.075 / 0.333 per s | live (§4.1) |
+| rush hard ceiling / vent rate cruise–ceiling / approach | 1.60 heat / 0.7–3.4 win/s / 0.7 s | live (Vent Windows, §4.1) |
+| rush bonus at hot / base peak / vent step / cruise | +30% / +55% / +30% per vent (unbounded) / +25% | live (Vent Windows, §4.1) |
+| rush vent window dur / duration decay / lifts step / refractory | 1.0 s / 0.975 per tier (floor 0.45) / +1 per 3 tiers, cap 3 / 0.4–1.2 s | live (Vent Windows, §4.1) |
+| rush vent gap_max / tap_max / grace / heat drop | 0.40 / 0.25 / 0.5 / 0.06 | live (Vent Windows, §4.1) |
+| rush locked drain / re-arm / fail sting | 0.16 per s / 1.5 s / 0.0 (freeze is the penalty) | live (Vent Windows, §4.1) |
+| ~~rush critical_start / ceiling_min–max / bonus_at_critical~~ | — | RETIRED (random ceiling + Critical band, §4.1) |
 | EXEMPTION base / TAX_RATE base | $1M / 60% | TBD-SIM |
 | LOOPHOLE_RATE_FLOOR | 5% | TBD-SIM |
 | K_LEGACY / ALPHA / LEGACY_BASE (power curve) | 0.50 / 0.22 / $1k | feel-tune (Option C, 2026-07-14) |

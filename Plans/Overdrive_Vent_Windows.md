@@ -8,11 +8,13 @@ conversation over combo-escalation (judgment-only) and active-venting-taps (too 
 **double-release vent gesture is Tim's idea** (2026-07-17): "the player releases, taps, then
 holds, creating two separate lifts."
 
-**Status:** BUILT and pushed on `feature/overdrive-vent-windows` (tip `90b48f8`, 2026-07-19), not
-yet merged to `main`. The design below is chronological — each dated section reworked the one
-above it on Tim's device feedback, so **read the "Shipped state" section at the bottom for what
-the code actually does today**; the earlier sections are the reasoning trail, and several of
-their knob values have since been superseded.
+**Status:** BUILT, fully device-verified, and MERGED to `main` (2026-07-20). Every device sitting
+in `Plans/Device_Feel_Test_Checklist.md` §6 is struck, including frenzy+overdrive together
+("looks good") and the bail tail. The design below is chronological — each dated section reworked
+the one above it on Tim's device feedback, so **read the "Shipped state" section for what the code
+does**; the earlier sections are the reasoning trail, and several of their knob values are
+superseded (notably: the bank was replaced by a heat-unified tail, and `vent_approach_seconds` is
+0.7, not the 1.2/2.0 earlier sections cite).
 
 ## The problem this solves
 
@@ -445,7 +447,7 @@ model at all: burns and vent checks run together, and you can overheat mid-burn.
 | `rush_momentum_vent_heat_drop` | 0.06 | small on purpose: deep runs ride near the backstop |
 | `rush_momentum_vent_rate_at_cruise` | 0.7 | windows/s hovering shallow |
 | `rush_momentum_vent_rate_at_ceiling` | 3.4 | windows/s at the top |
-| `rush_momentum_vent_approach_seconds` | 1.2 | travel time of the incoming red bar |
+| `rush_momentum_vent_approach_seconds` | **0.7** | travel time of the incoming red bar (device-tuned from 1.2, Tim 2026-07-20) |
 | `rush_momentum_vent_window_duration` | 1.0 | gesture time once open |
 | `rush_momentum_vent_duration_decay` | 0.975 | per tier, floor 0.45 |
 | `rush_momentum_vent_lifts_step_tiers` | 3 | +1 lift every 3 tiers, capped at 3 |
@@ -461,8 +463,12 @@ model at all: burns and vent checks run together, and you can overheat mid-burn.
 `vent_double_from_tier`, `vent_window_delay_min`/`_max`, `vent_delay_decay`/`_floor`,
 `vent_window_tighten`.
 
-**Sim gates** (`RushOverheatTest.gd`, ALL CHECKS PASSED; 600 s × 5 seeds): cruise +24.9% ·
-skilled (95%/lift) **+74.8%**, median death tier 8, p90 15 · sloppy (70%/lift) **−12.7%**.
+**Sim gates** (`RushOverheatTest.gd`, ALL CHECKS PASSED; 600 s × 5 seeds; current at approach 0.7,
+Tim 2026-07-20): cruise +24.9% · skilled (95%/lift) **+68.7%**, median death tier 8, p90 15 ·
+sloppy (70%/lift) **−18.3%** · timid farmer (95%, bails tier 1–2) **+11.6%**, below cruise. (At the
+earlier 1.2 approach these read +74.8% / −12.7% / +14.4%; the shorter approach trims riskless paid
+time per check, so skilled eased, sloppy cost more, and the farm dropped further below cruise —
+all gates pass with more margin.)
 
 ### Design verdicts — RESOLVED (Tim interview, 2026-07-20)
 

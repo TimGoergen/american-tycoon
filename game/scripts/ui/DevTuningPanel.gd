@@ -276,9 +276,10 @@ const SCROLL_VERTICAL_MARGIN := 24
 ## EVERY header whether or not its asterisk is currently showing, so the header text never
 ## reflows when a value is overridden or reverted (project rule: no moving UI elements).
 const SECTION_MARKER_WIDTH := 48
-## Font size of that asterisk. Deliberately larger than the header text: an asterisk is a small
-## glyph that sits high in its line box, so at header size it is easy to miss at arm's length.
-const SECTION_MARKER_SIZE := ROW_LABEL_SIZE + 12
+## Diameter of the "modified" dot on a section header. A drawn filled circle rather than a glyph
+## (Tim, 2026-07-20: the gold asterisk was hard to read on the header background) — a solid white
+## disc reads at arm's length regardless of the font's glyph coverage.
+const SECTION_DOT_DIAMETER := 26
 
 
 # One LineEdit per constant, keyed by constant name, read back on Apply.
@@ -294,8 +295,8 @@ var _section_of_knob: Dictionary = {}
 
 var _list: VBoxContainer
 # Each collapsible section, keyed by its title → { "button": Button header, "body": VBoxContainer,
-# "expanded": bool, "marker": Label }. All sections start collapsed; the header-row arrow buttons
-# drive them all. "marker" is the dark-gold asterisk shown when the section holds a modified value.
+# "expanded": bool, "marker": Panel }. All sections start collapsed; the header-row arrow buttons
+# drive them all. "marker" is the white dot shown when the section holds a modified value.
 var _sections: Dictionary = {}
 var _reset_dynasty_button: Button
 # Two-tap guard on the destructive wipe: armed by the first tap, fires on the second.
@@ -445,15 +446,23 @@ func _add_collapsible_section(title: String) -> VBoxContainer:
 	# appended "*" would sit next to the title instead of at the right edge; and an overlay
 	# occupies no layout space, so showing or hiding it cannot move the header text. The matching
 	# right-hand content margin in _make_section_plate keeps the title from ever running underneath.
-	var marker := Label.new()
-	marker.text = "*"
-	marker.set_anchors_preset(Control.PRESET_FULL_RECT)
+	# A solid white disc, drawn as a Panel with a fully-rounded stylebox rather than a text glyph,
+	# so it reads regardless of the header font's glyph set (Tim, 2026-07-20). Pinned to the
+	# right-center of the header, vertically centered on a fixed diameter.
+	var marker := Panel.new()
+	var dot := StyleBoxFlat.new()
+	dot.bg_color = Color.WHITE
+	dot.set_corner_radius_all(SECTION_DOT_DIAMETER / 2)
+	marker.add_theme_stylebox_override("panel", dot)
+	marker.anchor_left = 1.0
+	marker.anchor_right = 1.0
+	marker.anchor_top = 0.5
+	marker.anchor_bottom = 0.5
+	marker.offset_left = -SECTION_DOT_DIAMETER - 12
 	marker.offset_right = -12
-	marker.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	marker.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	marker.add_theme_color_override("font_color", UiPalette.DARK_GOLD)
-	marker.add_theme_font_size_override("font_size", SECTION_MARKER_SIZE)
-	# Let taps fall through to the header button underneath, or the asterisk would eat the
+	marker.offset_top = -SECTION_DOT_DIAMETER / 2.0
+	marker.offset_bottom = SECTION_DOT_DIAMETER / 2.0
+	# Let taps fall through to the header button underneath, or the dot would eat the
 	# right end of the header's tap target.
 	marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	marker.visible = false
@@ -608,7 +617,7 @@ func _is_knob_modified(name: String) -> bool:
 	return value != _baked[name]
 
 
-## Show or hide one section's dark-gold asterisk to match whether any knob in it is modified.
+## Show or hide one section's white "modified" dot to match whether any knob in it is modified.
 func _refresh_section_marker(title: String) -> void:
 	if not _sections.has(title):
 		return
@@ -618,7 +627,7 @@ func _refresh_section_marker(title: String) -> void:
 			any_modified = true
 			break
 	var section: Dictionary = _sections[title]
-	(section["marker"] as Label).visible = any_modified
+	(section["marker"] as Panel).visible = any_modified
 
 
 ## Re-evaluate every section's asterisk (used once the rows are built).

@@ -1,21 +1,47 @@
 # American Tycoon — Project Instructions
 
-## Before Any Work
+American Tycoon is a Godot 4 / GDScript idle-tycoon game. The Godot project is the `game/` subfolder
+(`game/project.godot`, main scene `game/Main.tscn`). The repo root also holds `docs/` (design canon),
+`Plans/` (design & implementation docs), and `claude/` (working files).
 
-Read `/docs` before starting any task. The authoritative sources are:
+## Before any work
+Read `/docs` — the authoritative sources:
+- **GDD v0.2** — canon for design intent (see §0.1 *the anti-pillar*: what this game must never become).
+- **Mechanics Spec v0.1** — canon for math and formulas.
+- **M1 Brief** — canon for the current milestone scope.
 
-- **GDD v0.2** — canon for design intent
-- **Mechanics Spec v0.1** — canon for math and formulas
-- **M1 Brief** — canon for current milestone scope
+Every implementation is judged against **Principle 4 (playable and fun first)** and the anti-pillar.
 
-## Standing Review Criteria
+## Hard rules
+- **No tuning constants in code.** Costs, rates, multipliers, timings, etc. load from `game/config/`
+  (`tuning.tres` + `config/properties/*.tres`). The Balance Tuning dev panel edits them on device.
+- **GDScript only.** Prioritize human readability — clear names, brief comments on non-obvious choices.
 
-Every implementation must be evaluated against:
+## Code map (`game/`)
+- `scripts/core/` — headless game state + rules (NO scene tree). See its `CLAUDE.md`.
+- `scripts/ui/` — screens, overlays, HUD, the minigame library. See its `CLAUDE.md`.
+- `scripts/Main.gd` — the root screen that wires the UI to the core.
+- `scripts/resources/` — the `.tres`-backed data classes (`PropertyConfig.gd`, `TuningConfig.gd`).
+- `sim/` — headless verification (SceneTree scripts). See its `CLAUDE.md`.
+- `config/` — `tuning.tres` and `properties/NN_*.tres` (the 52-property ladder, in `ConfigLoader.PROPERTY_PATHS` order).
+- There are **no autoloads**. Shared helpers are `class_name` static classes (`ConfigLoader`, `EpochCatalog`,
+  `UiPalette`, `Money`, `SaveManager`, …) used directly, e.g. `ConfigLoader.load_tuning()`.
 
-- **Principle 4** — playable and fun first
-- **The anti-pillar** — GDD §0.1 (what this game must never become)
+## Build / verify (headless)
+Godot 4.5.1 is **NOT on PATH** — invoke by absolute path:
+`D:\Downloads\Godot_v4.5.1-stable_win64\Godot_v4.5.1-stable_win64_console.exe`
+- Parse a script: `<godot> --headless --path game --check-only --script res://scripts/…gd`
+- Run a sim: `<godot> --headless --path game --script res://sim/SomeTest.gd`
+- Boot a few frames: `<godot> --headless --path game --quit-after 90`
 
-## Rules
+**GOTCHAS (these bite every time):**
+- A NEW `class_name` isn't in the global class cache until a project import. Run
+  `<godot> --headless --editor --quit --path game` first, or `--script` errors "Could not resolve external class".
+- That editor import **rewrites `game/project.godot`** (reorders sections, strips comments) — `git restore game/project.godot`
+  afterward so you don't ship the churn.
+- **`game/config/tuning.tres` overrides the `@export` defaults in `TuningConfig.gd`.** A knob change only ships if
+  the value isn't already baked in the `.tres` — grep `tuning.tres` before assuming a default change ships.
 
-- **No tuning constants in code.** All tuning values (costs, rates, multipliers, timings, etc.) load from `/config`.
-- **Script language: GDScript.**
+## Repo / git
+- `feature/**` branches build + ship a Firebase APK on every push; a push to `main` runs a full release build.
+- Per-feature branches; confirm before pushing `main`. American Tycoon plans go in `Plans/`; design canon in `docs/`.

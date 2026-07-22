@@ -802,35 +802,16 @@ func _ensure_board_bg(size: Vector2) -> void:
 			_board_source.decompress()
 		_board_source.convert(Image.FORMAT_RGBA8)
 	var image := _board_source.duplicate() as Image
-	# Zoom the court art out as far as possible while still covering the board (Tim, 2026-07-21):
-	# CONTAIN the whole image (the art is 768x1376, taller than the board, so the old COVER fit cropped
-	# its top/bottom) and fill the leftover margin with a colour sampled from the art's edges. That
-	# keeps the board fully covered (no transparent gaps) while showing all of the court, and the
-	# sampled fill reads as a natural extension of the art rather than a hard bar.
-	var contain := minf(float(target.x) / image.get_width(), float(target.y) / image.get_height())
-	var draw_w := maxi(1, int(round(image.get_width() * contain)))
-	var draw_h := maxi(1, int(round(image.get_height() * contain)))
-	image.resize(draw_w, draw_h, Image.INTERPOLATE_BILINEAR)
-	var fitted := Image.create(target.x, target.y, false, Image.FORMAT_RGBA8)
-	fitted.fill(_edge_fill_colour(_board_source))
-	# Centre the contained art; contain guarantees draw_w<=target.x and draw_h<=target.y, so the
-	# margin sits on one axis only and the offsets are never negative.
-	fitted.blit_rect(image, Rect2i(Vector2i.ZERO, Vector2i(draw_w, draw_h)),
-		Vector2i((target.x - draw_w) / 2, (target.y - draw_h) / 2))
+	# Scale to COVER the board (fill fully, crop the overflow), then center-crop to size.
+	var cover := maxf(float(target.x) / image.get_width(), float(target.y) / image.get_height())
+	image.resize(
+		int(ceil(image.get_width() * cover)), int(ceil(image.get_height() * cover)),
+		Image.INTERPOLATE_BILINEAR
+	)
+	var crop_offset := Vector2i((image.get_width() - target.x) / 2, (image.get_height() - target.y) / 2)
+	var fitted := image.get_region(Rect2i(crop_offset, target))
 	_round_image_corners(fitted, BOARD_CORNER_RADIUS)
 	_board_bg = ImageTexture.create_from_image(fitted)
-
-
-## The colour to fill the backdrop's letterbox margin with: the average of the court art's four edge
-## midpoints, so the fill blends into the art's border instead of reading as a hard bar.
-func _edge_fill_colour(src: Image) -> Color:
-	var w := src.get_width()
-	var h := src.get_height()
-	var total := Color(0, 0, 0, 0)
-	for sample in [src.get_pixel(w / 2, 0), src.get_pixel(w / 2, h - 1),
-			src.get_pixel(0, h / 2), src.get_pixel(w - 1, h / 2)]:
-		total += sample
-	return total * 0.25
 
 
 ## Make the four corners of `image` transparent to a quarter-circle of `radius`, so the backdrop

@@ -218,10 +218,12 @@ var _baked_backdrop_px: Vector2i = Vector2i.ZERO
 var _challenge_mode: bool = false
 var _score_label: Label
 var _highscore_label: Label
-## The live "next tier" target readout — the score the run must reach for its next challenge tier
-## (and, when that tier pays out, the reward it grants), so the player always sees what they are
-## pushing toward during a run (Tim, 2026-07-21). Challenge-mode only.
-var _challenge_target_label: Label
+## The one-row container holding Score + Best SIDE BY SIDE (Tim, 2026-07-21). The two used to stack as
+## separate centered lines, which ate a whole line of card height and shrank the game board; they now
+## share one row ("Score: 1,240   Best: 3,100"). Kept as a field so _set_challenge_chrome can show/hide
+## the row as a unit. The separate "Next tier" target LINE was removed entirely — that info folded into
+## the progress bar's own label (see _update_challenge_progress).
+var _challenge_score_row: Control
 ## The CHALLENGE end view — shown when a run ends (DONE/Back) INSTEAD of closing straight away, so the
 ## tier-credit feedback has somewhere to land (Challenge Mode Phase 2). A dedicated view, deliberately
 ## separate from the reward `_result_view` (the reward statement must not carry challenge feedback).
@@ -519,7 +521,9 @@ static func _clear_image_corners(image: Image, radius: int) -> void:
 
 func _build_play_view() -> Control:
 	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 12)
+	# Tightened 12 -> 10 (Tim, 2026-07-21) as part of reclaiming challenge-chrome height for the board;
+	# still a clear gap between the stacked rows.
+	column.add_theme_constant_override("separation", 10)
 
 	# The first row carries two things side by side: the Back button (review mode only) on the left,
 	# and the round timer right-aligned. It sits inside a MarginContainer so the Back button and timer
@@ -544,25 +548,26 @@ func _build_play_view() -> Control:
 	_purpose_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(_purpose_label)
 
-	# Challenge Mode readouts (hidden in normal reward rounds): the live score, big and central like
-	# the timer it replaces, with the best-to-beat under it. start_challenge shows them; start_game
-	# hides them.
+	# Challenge Mode readouts (hidden in normal reward rounds): the live score and the best-to-beat, now
+	# SIDE BY SIDE on ONE row (Tim, 2026-07-21) instead of two stacked centered lines. The score keeps the
+	# big display font it had (it replaces the timer as the focal point); Best sits a size down beside it.
+	# Reclaiming that stacked line — plus folding the old "Next tier" line into the progress bar below —
+	# gives the game board noticeably more height (the play area expands to fill whatever the chrome
+	# leaves). start_challenge fills them; _set_challenge_chrome shows/hides the whole row.
+	_challenge_score_row = HBoxContainer.new()
+	_challenge_score_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_challenge_score_row.add_theme_constant_override("separation", 28)
+	_challenge_score_row.visible = false
+	column.add_child(_challenge_score_row)
+
 	_score_label = _make_label("", UiPalette.FONT_DISPLAY, UiPalette.MONEY_GREEN)
-	_score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_score_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_score_label.add_theme_font_override("font", UiPalette.make_bold_font())
-	_score_label.visible = false
-	column.add_child(_score_label)
+	_challenge_score_row.add_child(_score_label)
 
 	_highscore_label = _make_label("", UiPalette.FONT_SUBHEAD, UiPalette.DARK_GOLD)
-	_highscore_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_highscore_label.visible = false
-	column.add_child(_highscore_label)
-
-	# The "next tier" target — the score to aim for next, plus the reward when that tier pays out.
-	_challenge_target_label = _make_label("", UiPalette.FONT_LABEL, UiPalette.NAVY)
-	_challenge_target_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_challenge_target_label.visible = false
-	column.add_child(_challenge_target_label)
+	_highscore_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_challenge_score_row.add_child(_highscore_label)
 
 	# The GLOBAL progress-to-next-tier bar (Challenge Mode, all games): a large horizontal bar that
 	# fills with live progress from the player's best-tier boundary toward the next tier, tinted +
@@ -573,13 +578,15 @@ func _build_play_view() -> Control:
 	var progress_margin := MarginContainer.new()
 	progress_margin.add_theme_constant_override("margin_left", CHROME_MARGIN)
 	progress_margin.add_theme_constant_override("margin_right", CHROME_MARGIN)
-	progress_margin.add_theme_constant_override("margin_top", 10)
+	progress_margin.add_theme_constant_override("margin_top", 6)  # trimmed 10 -> 6 to reclaim board height
 	progress_margin.visible = false
 	column.add_child(progress_margin)
 	_challenge_progress_margin = progress_margin
 
 	_challenge_progress_bar = Control.new()
-	_challenge_progress_bar.custom_minimum_size = Vector2(0, 60)  # large, legible (low-vision rule)
+	# 60 -> 54: modestly shorter to give the board more room; still large and legible (low-vision rule),
+	# and it now carries the folded-in target score in its label, so the info density earns its height.
+	_challenge_progress_bar.custom_minimum_size = Vector2(0, 54)
 	_challenge_progress_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_challenge_progress_bar.draw.connect(_draw_challenge_progress_bar)
 	progress_margin.add_child(_challenge_progress_bar)
@@ -605,13 +612,15 @@ func _build_play_view() -> Control:
 	var challenge_timer_margin := MarginContainer.new()
 	challenge_timer_margin.add_theme_constant_override("margin_left", CHROME_MARGIN)
 	challenge_timer_margin.add_theme_constant_override("margin_right", CHROME_MARGIN)
-	challenge_timer_margin.add_theme_constant_override("margin_top", 14)
+	challenge_timer_margin.add_theme_constant_override("margin_top", 8)  # trimmed 14 -> 8 to reclaim board height
 	challenge_timer_margin.visible = false
 	column.add_child(challenge_timer_margin)
 	_challenge_timer_margin = challenge_timer_margin
 
 	_challenge_timer_bar = Control.new()
-	_challenge_timer_bar.custom_minimum_size = Vector2(0, 68)  # large, unmissable (low-vision rule)
+	# 68 -> 62: modestly shorter to reclaim board height; still large and unmissable (low-vision rule) —
+	# it stays the tallest chrome bar because the keep-alive clock is the core tension of a run.
+	_challenge_timer_bar.custom_minimum_size = Vector2(0, 62)
 	_challenge_timer_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_challenge_timer_bar.draw.connect(_draw_challenge_timer_bar)
 	challenge_timer_margin.add_child(_challenge_timer_bar)
@@ -1334,9 +1343,10 @@ func start_challenge(type_script: Script) -> void:
 func _set_challenge_chrome(on: bool) -> void:
 	_timer_label.visible = not on
 	_keep_bar.visible = not on
-	_score_label.visible = on
-	_highscore_label.visible = on
-	_challenge_target_label.visible = on
+	# Score + Best now share one row — toggle the row as a unit so it vanishes cleanly in reward mode
+	# (no leftover empty line). The "Next tier" target line was removed; its info lives on the bar below.
+	if _challenge_score_row != null:
+		_challenge_score_row.visible = on
 	# The global progress-to-next-tier bar shows for EVERY challenge game (self-ending included).
 	if _challenge_progress_margin != null:
 		_challenge_progress_margin.visible = on
@@ -1417,30 +1427,9 @@ func _update_challenge_score() -> void:
 	if score > _challenge_high:
 		_challenge_high = score
 	_highscore_label.text = "Best: %s" % _group_thousands(_challenge_high)
-	_update_challenge_target(_challenge_high)
+	# The "next tier" target readout is no longer a separate line — its target score is folded into the
+	# progress bar's own label (see _update_challenge_progress), so one call keeps everything current.
 	_update_challenge_progress()
-
-
-## Fill the "next tier" target readout from the player's BEST score for this game — NOT the live run
-## score. The target is the next UNREACHED tier above their best (best starts at the saved high score
-## and only rises once the run beats it), so it stays a stable goal instead of ticking upward every
-## time the live score passes a tier they have already banked (Tim, 2026-07-21). Shows a MASTERED
-## state at the top of the ladder so the readout is never a dead "next: —".
-func _update_challenge_target(best_score: int) -> void:
-	if _challenge_target_label == null:
-		return
-	var best_tier := ChallengeGoals.tier_for_score(_active_type_key, best_score)
-	if best_tier >= ChallengeGoals.MAX_TIER:
-		_challenge_target_label.text = "MASTERED — top tier reached"
-		return
-	var next_tier := best_tier + 1
-	var target := int(round(float(next_tier) * ChallengeGoals.score_step(_active_type_key)))
-	var text := "Next tier: %s" % _group_thousands(target)
-	var payout := ChallengeGoals.payout_at_tier(next_tier)
-	if not payout.is_empty():
-		# The next tier pays out — show its reward so the target reads as a concrete goal.
-		text += "  →  +%d%% %s" % [int(payout["pct"]), String(payout["type"]).to_upper()]
-	_challenge_target_label.text = text
 
 
 ## Refresh the GLOBAL progress-to-next-tier bar (Tim, 2026-07-21). The fill is the run's LIVE progress
@@ -1477,16 +1466,21 @@ func _update_challenge_progress() -> void:
 		_challenge_progress_fill = clampf((float(score) - lo) / span, 0.0, 1.0)
 		var next_tier := best_tier + 1
 		var payout := ChallengeGoals.payout_at_tier(next_tier)
+		# The target SCORE for the next tier is this tier's upper boundary — folded into the bar's label
+		# (Tim, 2026-07-21) now that the separate "Next tier" text line was removed, so the goal score
+		# still shows, just on the bar itself.
+		var target := int(round(hi))
 		if not payout.is_empty():
-			# The next tier pays out — tint by track and name the reward, so the goal reads.
+			# The next tier pays out — tint by track and name the target score AND the reward, so the
+			# goal reads in one line: "NEXT: 1,240 → +5% INCOME".
 			_challenge_progress_is_payout = true
 			_challenge_progress_payout_track = String(payout["type"])
-			_challenge_progress_label.text = "NEXT REWARD:  +%d%% %s" % [int(payout["pct"]), String(payout["type"]).to_upper()]
+			_challenge_progress_label.text = "NEXT: %s  →  +%d%% %s" % [_group_thousands(target), int(payout["pct"]), String(payout["type"]).to_upper()]
 		else:
-			# A progress-only tier — a plain "climbing toward tier N" readout.
+			# A progress-only tier — name the tier being climbed toward AND its target score.
 			_challenge_progress_is_payout = false
 			_challenge_progress_payout_track = ""
-			_challenge_progress_label.text = "PROGRESS TO TIER %d" % next_tier
+			_challenge_progress_label.text = "TIER %d AT %s" % [next_tier, _group_thousands(target)]
 	_challenge_progress_bar.queue_redraw()
 
 

@@ -99,6 +99,13 @@ func is_busy() -> bool:
 func uses_timer() -> bool:
 	return true
 
+## CHALLENGE MODE self-ending hook (Plans/Challenge_Mode.md, Wave A). Override to TRUE if this game
+## ends its OWN challenge run (via the `completed` signal — e.g. a wrong tap) instead of the shared
+## keep-alive timer. The host then skips the timer for it and treats `completed` as the run end.
+## (Memory will override this in Wave B.) Default false: the run is governed by the keep-alive timer.
+func challenge_self_ends() -> bool:
+	return false
+
 ## A short, human-readable name for this minigame type. The random prestige draw doesn't
 ## need it, but the Minigame Tuning review screen (Settings) lists every type by name so
 ## they can each be opened and tested. Override in each type.

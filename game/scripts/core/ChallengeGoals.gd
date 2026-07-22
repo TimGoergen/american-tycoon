@@ -72,20 +72,22 @@ const PAYOUT_SCHEDULE := {
 #   Match Three       — get_score() = cumulative points (POINTS_PER_GEM = 10, a 3-match ≈ 30+); climbs
 #                       into the thousands, so STEP = 1000 (tier 30 = 30,000 points — a long climb).
 #   Timing Bar        — get_score() = successful lock count; STEP = 1 (one tier per lock).
-#   Memory Match      — get_score() = rounds recalled. FLAG (low ceiling): this is a small round count,
-#                       so tier 30 (30 rounds) is likely UNREACHABLE in one run — the top payouts may
-#                       never pay out at STEP = 1. Left at 1 for now; device-tune (a sub-1 STEP or a
-#                       compressed reachable payout set may be needed). See Plans §"Low-ceiling games".
-#   Micro Basketball  — get_score() = baskets sunk. FLAG (low ceiling): ~6 a strong round, so tier 30
-#                       (30 baskets) is likely UNREACHABLE at STEP = 1 — same caveat as Memory. STEP = 1
-#                       for now; device-tune.
+#   Memory Match      — get_score() = rounds recalled. LOW-CEILING game: a small round count, so a
+#                       STEP of 1 put the summit far out of reach. STEP = 0.2 (five rungs per whole
+#                       round) so the ladder is reachable. NOTE: this pairs with Wave B, which makes
+#                       Memory's get_score() = completed 1→6 CLIMBS — so 0.2 means one climb clears one
+#                       PAYOUT tier (every 5th rung), and 6 climbs = tier 30 mastered. If Wave B changes
+#                       Memory's scoring, re-check this. See Plans §"Low-ceiling games".
+#   Micro Basketball  — get_score() = baskets sunk; ~6 a strong round, so a STEP of 1 put the summit out
+#                       of reach. STEP = 0.25 (four rungs per basket) so ~8 baskets reach the top tier —
+#                       a reachable mastery target for a slow-to-line-up game.
 #   Catch the Money   — get_score() = coins caught; a steady stream, STEP = 2 (tier 30 = 60 coins).
 #   Balance the Books — get_score() = whole seconds in the gold zone; STEP = 2 (tier 30 = 60 seconds).
 const STEP := {
 	MATCH_THREE:   1000.0,
 	TIMING_BAR:    1.0,
-	MEMORY_MATCH:  1.0,
-	BASKETBALL:    1.0,
+	MEMORY_MATCH:  0.2,   # low-ceiling: 5 rungs per round; pairs with Wave B's 1→6-climb Memory scoring
+	BASKETBALL:    0.25,  # low-ceiling: 4 rungs per basket (~8 baskets = tier 30 mastered)
 	CATCH_MONEY:   2.0,
 	BALANCE_BOOKS: 2.0,
 }
@@ -98,12 +100,23 @@ const STEP := {
 # bulk (tiny per-point top-up), the slower games grant a fat second or more per point. ALL FIRST-PASS,
 # DEVICE-TUNE.
 const SECONDS_PER_POINT := {
-	MATCH_THREE:   0.02,
+	MATCH_THREE:   0.012,  # less clock per match → a harder push (Tim, 2026-07-21; was 0.02)
 	TIMING_BAR:    3.0,
 	MEMORY_MATCH:  4.0,
-	BASKETBALL:    3.0,
+	BASKETBALL:    5.0,    # more clock per basket — baskets are slow to line up (Tim; was 3.0)
 	CATCH_MONEY:   1.5,
 	BALANCE_BOOKS: 2.0,
+}
+
+
+# ── Per-game keep-alive TIMER starting-seconds override ───────────────────────
+# A game listed here starts its keep-alive run with THIS many seconds instead of the global
+# `timer_start` knob, so a game that needs a longer runway to get going can have one. FIRST-PASS,
+# DEVICE-TUNE. Micro Basketball gets a longer opening budget because lining up the first few shots is
+# slow (Tim, 2026-07-21: "too difficult to line up multiple shots"). Games not listed fall back to the
+# global knob (default 6.0). See timer_start_seconds().
+const TIMER_START := {
+	BASKETBALL: 10.0,
 }
 
 
@@ -219,9 +232,11 @@ static func seconds_per_point(game_key: String) -> float:
 	return float(SECONDS_PER_POINT.get(game_key, 0.0))
 
 
-## The keep-alive timer's starting seconds (tuning knob).
-static func timer_start_seconds() -> float:
-	return timer_start
+## The keep-alive timer's starting seconds for a game: the per-game TIMER_START override if the game
+## has one, else the global `timer_start` tuning knob. Called with a game key by the host; called with
+## no key (the default "") it always returns the global knob.
+static func timer_start_seconds(game_key := "") -> float:
+	return float(TIMER_START.get(game_key, timer_start))
 
 
 ## The keep-alive timer's maximum seconds — top-ups never bank past this (tuning knob).

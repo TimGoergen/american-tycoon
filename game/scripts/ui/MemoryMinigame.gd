@@ -13,12 +13,15 @@ extends Minigame
 # result. The host countdown is held (is_busy) only during those end beats so they're seen — the
 # watch/play timing is unchanged, so difficulty is unchanged.
 #
-# Challenge Mode (2026-06-30): when the host sets `challenge_mode` true before begin(), this runs
-# ENDLESSLY. There is no target and no game-over: a wrong tap does NOT end play — it soft-resets the
-# CURRENT round (same length, a fresh random sequence) so the player retries, and the sequence only
-# grows once a round is recalled correctly. We never emit `completed` in this mode; the host ends the
-# run itself and reads get_score() (rounds cleared) live. Normal (reward) mode is unchanged: every
-# new branch below is guarded on `challenge_mode`, so the wrong-tap game-over beat still fires.
+# Challenge Mode (Wave B, 2026-07-21): when the host sets `challenge_mode` true before begin(), this is
+# a self-ending Simon run (challenge_self_ends() -> true, so the host runs NO keep-alive timer for it —
+# the game owns its ending). The sequence CLIMBS 1,2,3,4,5,6 (one pad longer each round); recalling the
+# TARGET_ROUNDS-length round finishes one full CLIMB, after which the sequence RESETS to length 1 and
+# the player climbs again — endless. A WRONG TAP ends the run (classic Simon fail): the shared game-over
+# beat fires and emits `completed`, which the host routes to record + credit + end the view. The
+# challenge SCORE is the number of completed climbs (get_score below), so one climb clears one payout
+# tier and six climbs master the ladder (ChallengeGoals STEP = 0.2). Normal (reward) mode is unchanged:
+# every new behavior below is guarded on `challenge_mode`.
 #
 # Legacy Bonus (2026-07-10, Plans/Legacy_Bonus_System.md): after clearing ALL rounds (mastering the
 # main game), there is a chance-gated BONUS ROUND. In it the four pads are made IDENTICAL — each
@@ -51,6 +54,9 @@ const PAD_FLASH_SCALE := 1.14
 var _sequence: Array = []
 var _input_index: int = 0
 var _rounds_done: int = 0
+## Challenge Mode only: how many full 1->6 CLIMBS have been completed this run. This is the challenge
+## SCORE (get_score reports it) — each finished climb is one point. Unused in reward mode.
+var _climbs_done: int = 0
 var _accepting_input: bool = false
 var _running: bool = false
 ## True only while an end beat (game-over flash / round-clear celebration) is playing. The host
@@ -91,6 +97,13 @@ func how_to_play() -> String:
 ## end itself (it always emits `completed` on a clear, a miss, or the end of the bonus round).
 func uses_timer() -> bool:
 	return false
+
+
+## Challenge Mode self-ending (Wave B): TRUE, so the host runs NO shared keep-alive timer for Memory and
+## treats this game's `completed` signal as the end of the challenge run. Memory ends itself on a wrong
+## tap (the game-over beat emits `completed`); the host then records get_score() and credits the run.
+func challenge_self_ends() -> bool:
+	return true
 
 
 func begin(tuning: TuningConfig) -> void:
@@ -153,10 +166,13 @@ func get_performance() -> float:
 	return clampf(float(_rounds_done) / float(TARGET_ROUNDS), 0.0, 1.0)
 
 
-## Rounds cleared this run — the raw high-score for Challenge Mode. It equals the highest sequence
-## length recalled correctly, is cumulative and NON-DECREASING (a wrong tap leaves it unchanged), and
-## the host samples it live. Fine to return in both modes; the host only uses it in Challenge Mode.
+## The Challenge Mode high-score: the number of full 1->6 CLIMBS completed this run (each climb = one
+## point). ChallengeGoals pairs this with STEP 0.2, so one climb clears one payout tier and six climbs
+## master the ladder. Reward mode is untouched — the host never reads get_score() there — but for
+## clarity it still reports rounds cleared, its old meaning.
 func get_score() -> int:
+	if challenge_mode:
+		return _climbs_done
 	return _rounds_done
 
 
@@ -225,19 +241,9 @@ func _start_round() -> void:
 	await _playback_then_enable("Watch…")
 
 
-## Challenge Mode only: replay the CURRENT round after a miss. The sequence keeps its length (so the
-## player retries the same difficulty, not an easier one) but gets a fresh random pattern, then plays
-## back and re-enables input. The score is untouched — no round was cleared.
-func _soft_reset_round() -> void:
-	var length := _sequence.size()
-	_sequence.clear()
-	for _i in range(length):
-		_sequence.append(_rng.randi_range(0, 3))
-	await _playback_then_enable("Missed — watch again…")
-
-
-## Shared tail for both a fresh round and a Challenge-Mode retry: reset the input cursor, play the
-## sequence back with input locked, then (if still running) hand the turn to the player.
+## Shared tail for a round start (a fresh round, or the first round of a new Challenge climb after a
+## reset): reset the input cursor, play the sequence back with input locked, then (if still running)
+## hand the turn to the player.
 func _playback_then_enable(watch_text: String) -> void:
 	_input_index = 0
 	_set_status(watch_text, UiPalette.MUSTARD_GOLD)
@@ -289,13 +295,9 @@ func _on_pad_input(event: InputEvent, pad_id: int) -> void:
 		)
 
 	if pad_id != _sequence[_input_index]:
-		if challenge_mode:
-			# Challenge Mode: a miss never ends play. Keep the score, then soft-reset the current
-			# round (same length, fresh pattern) so the player retries. No game-over beat.
-			_accepting_input = false
-			_soft_reset_round()
-			return
-		# Normal mode: the game ends here with whatever rounds were banked, after a red game-over beat.
+		# A wrong tap ends the game (classic Simon fail), in BOTH modes, after a red game-over beat that
+		# emits `completed`. Reward mode ends with whatever rounds were banked; Challenge Mode ends the
+		# run, and the host credits the completed-climb count (get_score) it routes off that `completed`.
 		_running = false
 		_accepting_input = false
 		_play_game_over_beat(pad_id)
@@ -307,11 +309,19 @@ func _on_pad_input(event: InputEvent, pad_id: int) -> void:
 		_rounds_done += 1
 		_accepting_input = false
 		if challenge_mode:
-			# Challenge Mode: no target and no win screen — grow by one and keep going forever.
-			_set_status("Round %d cleared!" % _rounds_done, UiPalette.MONEY_GREEN)
-			# Challenge Mode has no end-beat celebration, so the chip is the per-round success
-			# cue here (Tim, 2026-07-11 — every minigame shows success feedback like Match-3).
-			FloatingChip.spawn(self, _board_center(), "CLEARED!", UiPalette.MONEY_GREEN)
+			# Challenge Mode climbs 1->6, then resets and climbs again — endless until a wrong tap. When
+			# the TARGET_ROUNDS-length round is recalled, a full CLIMB is done: bank it (that's the score),
+			# clear the sequence, and _start_round() rebuilds from length 1. Otherwise keep growing by one.
+			# There is no end-beat here, so the floating chip is the per-round success cue (Tim, 2026-07-11
+			# — every minigame shows success feedback like Match-3); a completed climb gets a bigger gold one.
+			if _sequence.size() >= TARGET_ROUNDS:
+				_climbs_done += 1
+				_sequence.clear()
+				_set_status("Climb %d complete — again!" % _climbs_done, UiPalette.MONEY_GREEN)
+				FloatingChip.spawn(self, _board_center(), "CLIMB %d!" % _climbs_done, UiPalette.MUSTARD_GOLD)
+			else:
+				_set_status("Round %d cleared!" % _sequence.size(), UiPalette.MONEY_GREEN)
+				FloatingChip.spawn(self, _board_center(), "CLEARED!", UiPalette.MONEY_GREEN)
 			_start_round()
 		elif _rounds_done >= TARGET_ROUNDS:
 			# Full game — the main reward is now maxed. If this run earned a shot at the gem bonus

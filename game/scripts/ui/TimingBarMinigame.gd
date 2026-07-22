@@ -51,11 +51,14 @@ const ZONE_GHOST_TIME := 0.5
 ## Everything below is gated on challenge_mode; normal (reward/prestige) play is untouched.
 ## ALL VALUES FIRST-PASS — DEVICE-TUNE (feel is device-only).
 
-## Marker speed in Challenge Mode: it slowly RISES AND FALLS over many LOCKS (a lock-based wave) across
-## the SAME speed range regular mode sweeps — from BASE_SPEED up to its top speed after TARGET_LOCKS of
-## SPEED_RAMP (Tim, 2026-07-22: it needs to reach regular mode's fast end, not just creep slowly). The
-## range is computed in _challenge_marker_speed. Sampled once per lock, so speed is steady per sweep.
-const CHALLENGE_SPEED_PERIOD_LOCKS := 14.0           # locks for one slow fast -> slow -> fast cycle
+## Marker speed in Challenge Mode: a TIME-based wave (so the change is visible within a run) spanning the
+## SAME range regular mode sweeps — BASE_SPEED up to its top after TARGET_LOCKS of SPEED_RAMP. Its swing
+## GROWS from CHALLENGE_SPEED_START_SWING of the range to the full range over the first
+## CHALLENGE_SPEED_SWING_RAMP_SECONDS, so the rise/fall grows more noticeable the longer you survive, at
+## a gentle rate of change (Tim, 2026-07-22). Computed in _challenge_marker_speed.
+const CHALLENGE_SPEED_PERIOD_SECONDS := 8.0          # seconds for one slow -> fast -> slow cycle
+const CHALLENGE_SPEED_SWING_RAMP_SECONDS := 16.0     # seconds for the swing to grow to the full range
+const CHALLENGE_SPEED_START_SWING := 0.45            # initial swing as a fraction of the full range
 
 ## Zone half-width in Challenge Mode: a slow grow/shrink between these modest bounds, waving over many
 ## LOCKS (not seconds). The long lock-period keeps it a gentle drift, never a fast bounce. Sampled once
@@ -166,12 +169,12 @@ func begin(tuning: TuningConfig) -> void:
 	_marker_pos = 0.0
 	_marker_dir = 1.0
 	_success_count = 0
-	# Challenge Mode's sweep speed rides a slow lock-based wave across regular mode's speed range
-	# (starts at the wave's centre); normal mode starts at BASE_SPEED and ×SPEED_RAMP per lock.
+	_challenge_drift_time = 0.0
+	# Challenge Mode's sweep speed rides a TIME-based wave across regular mode's speed range, the swing
+	# growing over the run (see _challenge_marker_speed); normal mode starts at BASE_SPEED, ×SPEED_RAMP.
 	_marker_speed = _challenge_marker_speed() if challenge_mode else BASE_SPEED
 	_zone_drift_dir = 1.0
 	_locks_until_flip = _rng.randi_range(CHALLENGE_ZONE_FLIP_LOCKS_MIN, CHALLENGE_ZONE_FLIP_LOCKS_MAX)
-	_challenge_drift_time = 0.0
 	_locks = 0
 	_accuracy_sum = 0.0
 	_running = true
@@ -299,8 +302,10 @@ func _process(delta: float) -> void:
 		# collects it — so this is purely to keep the cue visually attached.)
 		if _legacy_gem_active:
 			_legacy_gem_center = _zone_center
-	# Advance the marker at its steady sweep speed. Both modes hold _marker_speed constant within a
-	# sweep; it only changes per lock (normal: ×SPEED_RAMP; challenge: resampled from the speed wave).
+	# Challenge mode refreshes its live TIME-based sweep speed each frame so the marker visibly speeds up
+	# and slows within a run; normal mode holds _marker_speed steady within a sweep (×SPEED_RAMP per lock).
+	if challenge_mode:
+		_marker_speed = _challenge_marker_speed()
 	_marker_pos += _marker_dir * _marker_speed * delta
 	if _marker_pos >= 1.0:
 		_marker_pos = 1.0
@@ -378,11 +383,10 @@ func _on_lock() -> void:
 		elif accuracy >= 0.6:
 			chip_text = "GREAT!"
 		FloatingChip.spawn(_bar, Vector2(_marker_pos * _bar.size.x, _bar.size.y * 0.5), chip_text, chip_color)
-	# Update the sweep speed for the next sweep. Normal mode multiplies by SPEED_RAMP; Challenge Mode
-	# resamples its slow speed wave at the new lock count, and every few locks flips the zone's drift
-	# direction (on top of the edge bounce).
+	# Per successful lock: normal mode speeds the sweep up (×SPEED_RAMP). Challenge Mode's sweep speed is a
+	# live time-based wave set each frame in _process, so here it only flips the zone's drift direction
+	# every few locks (on top of the edge bounce).
 	if challenge_mode:
-		_marker_speed = _challenge_marker_speed()
 		_locks_until_flip -= 1
 		if _locks_until_flip <= 0:
 			_zone_drift_dir = -_zone_drift_dir
@@ -437,10 +441,16 @@ func _current_zone_half() -> float:
 ## sweeps: from BASE_SPEED (its opening) up to BASE_SPEED × SPEED_RAMP^(TARGET_LOCKS-1) (its top after a
 ## full run). Sampled once per lock so the speed is steady within each sweep.
 func _challenge_marker_speed() -> float:
+	# Spans regular mode's range (BASE_SPEED up to its top after a full run) but rides a TIME clock so the
+	# speed visibly rises and falls WITHIN a run (the lock-based version barely moved in short runs). The
+	# swing GROWS from a fraction to the full range over CHALLENGE_SPEED_SWING_RAMP_SECONDS, so the
+	# variation grows more noticeable the longer you last — a gentle rate of change, not a wobble.
 	var fast := BASE_SPEED * pow(SPEED_RAMP, float(TARGET_LOCKS - 1))
 	var mid := (BASE_SPEED + fast) * 0.5
-	var amp := (fast - BASE_SPEED) * 0.5
-	return mid + amp * sin(TAU * float(_success_count) / CHALLENGE_SPEED_PERIOD_LOCKS)
+	var full_amp := (fast - BASE_SPEED) * 0.5
+	var growth := clampf(_challenge_drift_time / CHALLENGE_SPEED_SWING_RAMP_SECONDS, 0.0, 1.0)
+	var amp := full_amp * lerpf(CHALLENGE_SPEED_START_SWING, 1.0, growth)
+	return mid + amp * sin(TAU * _challenge_drift_time / CHALLENGE_SPEED_PERIOD_SECONDS)
 
 
 ## Challenge Mode: the zone's current glide speed — a gentle lock-based wave around CHALLENGE_ZONE_DRIFT_MID

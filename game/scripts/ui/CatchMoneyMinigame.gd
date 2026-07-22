@@ -168,6 +168,10 @@ func get_performance() -> float:
 ## Challenge Mode's running high score = coins CAUGHT this run. It only ever increases (a miss
 ## never subtracts here — see the class note), so the host can sample it live for a high-score bar.
 func get_score() -> int:
+	if challenge_mode:
+		# Missed coins count against you (Tim, 2026-07-22): each drop subtracts from the score, and the
+		# host's keep-alive timer drains on the drop. Floored at 0 so tiers/readouts never go negative.
+		return maxi(0, _caught - _missed)
 	return _caught
 
 

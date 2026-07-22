@@ -1550,8 +1550,9 @@ func _tick_challenge_timer(delta: float) -> void:
 		_challenge_time_left -= delta
 		var score := _active_minigame.get_score() if _active_minigame != null else 0
 		var gained := score - _challenge_last_score
-		if gained > 0:
-			_challenge_time_left += float(gained) * ChallengeGoals.seconds_per_point(_active_type_key)
+		# A negative gain DRAINS the timer — only Catch Money can produce one (a missed coin drops its
+		# score, so missed coins count against you; Tim 2026-07-22). Every other game's score only rises.
+		_challenge_time_left += float(gained) * ChallengeGoals.seconds_per_point(_active_type_key)
 		_challenge_last_score = score
 		_challenge_time_left = clampf(_challenge_time_left, 0.0, ChallengeGoals.timer_cap_seconds())
 	# Advance the low-time pulse phase and refresh the readout every frame — even while busy, so a

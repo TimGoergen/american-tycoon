@@ -255,9 +255,9 @@ const DISPLAY_NAMES := {
 ## categories. Each section owns a set of knobs matched by NAME PREFIX (a plain "starts-with"
 ## test), so adding a new knob to TuningConfig usually lands in the right section with no UI
 ## change. The order here is the order the sections appear. A knob is placed in the FIRST
-## section whose prefix list matches it; anything unmatched falls into the "Other" section
-## appended at the end. Each entry is { "title": String, "prefixes": Array[String] } — a
-## prefix that is a full knob name (e.g. "logic_hz") simply matches only that one knob.
+## section whose prefix list matches it; anything unmatched falls into the catch-all section
+## (CATCH_ALL_SECTION_TITLE) appended at the end. Each entry is { "title": String, "prefixes":
+## Array[String] } — a prefix that is a full knob name (e.g. "logic_hz") matches only that knob.
 const SECTIONS := [
 	{"title": "Core Loop", "prefixes": [
 		"logic_hz", "m1_starting_cash", "band_step", "cycle_floor", "rush_pct",
@@ -270,16 +270,24 @@ const SECTIONS := [
 	{"title": "Staff", "prefixes": ["staff_"]},
 	{"title": "Retention", "prefixes": ["retention_"]},
 	{"title": "Carbonation", "prefixes": ["carb_"]},
-	{"title": "Minigames", "prefixes": ["minigame_", "match3_", "basketball_"]},
+	# NOTE: the challenge tier-cost dials (basketball_tier_*) are deliberately NOT caught here — they
+	# belong to the "Challenge Mode" catch-all with the rest of the challenge dials (Tim, 2026-07-22).
+	# So this lists the SPECIFIC basketball physics prefixes rather than a broad "basketball_", which
+	# would otherwise scoop the tier-cost knobs back in.
+	{"title": "Minigames", "prefixes": ["minigame_", "match3_", "basketball_launch_", "basketball_max_", "memory_gem_"]},
 	{"title": "Legacy Bonus", "prefixes": ["legacy_bonus_", "legacy_gem_chance_"]},
 	{"title": "Offline", "prefixes": ["offline_"]},
 	{"title": "Estate & Legacy", "prefixes": ["estate_", "loophole_", "k_legacy", "alpha_legacy", "legacy_upgrade_cost_multiplier"]},
 	{"title": "Events", "prefixes": ["crash_", "audit_"]},
 ]
 
-## The catch-all section title for knobs no SECTIONS prefix matched (so a newly added knob
-## always appears somewhere, even before it is sorted into a real section).
-const OTHER_SECTION_TITLE := "Other"
+## The catch-all section title for knobs no SECTIONS prefix matched (so a newly added knob always
+## appears somewhere, even before it is sorted into a real section). It is titled "Challenge Mode"
+## (Tim, 2026-07-22) because every knob that currently falls through is a Challenge Mode dial — the
+## per-game tier costs (basketball_tier_*, memory_tier_*), the Balance challenge knobs (balance_*),
+## and the shared challenge_* levers. If a future NON-challenge knob is ever added without a matching
+## section, it would land here too; sort it into a real section (or add one) when that happens.
+const CATCH_ALL_SECTION_TITLE := "Challenge Mode"
 
 ## Vertical breathing room (px) above the first section and below the last, between the scroll
 ## content and the scroll frame's edges (Tim, 2026-07-09 — the list felt cramped against the frame).
@@ -689,12 +697,12 @@ func open(effective_tuning: TuningConfig, baked_tuning: TuningConfig) -> void:
 			knobs_by_section[section_title] = []
 		knobs_by_section[section_title].append([name, type])
 
-	# Render the sections in the fixed SECTIONS order, then the catch-all "Other" last. Only a
-	# section that actually owns at least one knob gets a header (empty sections are skipped).
+	# Render the sections in the fixed SECTIONS order, then the catch-all ("Challenge Mode") last. Only
+	# a section that actually owns at least one knob gets a header (empty sections are skipped).
 	var ordered_titles: Array = []
 	for section in SECTIONS:
 		ordered_titles.append(String(section["title"]))
-	ordered_titles.append(OTHER_SECTION_TITLE)
+	ordered_titles.append(CATCH_ALL_SECTION_TITLE)
 
 	for title in ordered_titles:
 		if not knobs_by_section.has(title):
@@ -713,14 +721,14 @@ func open(effective_tuning: TuningConfig, baked_tuning: TuningConfig) -> void:
 
 
 ## The title of the section a knob belongs to: the first SECTIONS entry with a prefix the knob
-## name starts with, or the catch-all "Other" when nothing matches. A prefix that is a full knob
-## name simply matches only that knob.
+## name starts with, or the catch-all ("Challenge Mode") when nothing matches. A prefix that is a
+## full knob name simply matches only that knob.
 func _section_title_for(name: String) -> String:
 	for section in SECTIONS:
 		for prefix in section["prefixes"]:
 			if name.begins_with(String(prefix)):
 				return String(section["title"])
-	return OTHER_SECTION_TITLE
+	return CATCH_ALL_SECTION_TITLE
 
 
 ## One constant row, added to `parent` (its collapsible section's body): the name and a concise

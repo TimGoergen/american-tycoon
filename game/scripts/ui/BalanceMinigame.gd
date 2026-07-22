@@ -332,6 +332,20 @@ func _draw_track() -> void:
 	var zone_h := (ZONE_HALF * 2.0) * h
 	_track.draw_rect(Rect2(0, zone_y, w, zone_h), UiPalette.MUSTARD_GOLD)
 
+	# CHALLENGE MODE: the "charge to the next point" gauge, drawn INSIDE the gold zone so the player
+	# reads it right where they hold the marker (Tim, 2026-07-22). get_score() banks one point per whole
+	# second in-zone, so the fraction toward the next second fills the band left→right. It advances ONLY
+	# while in-zone (_time_in_zone pauses out of zone) and never drains — a truthful "this much more
+	# in-zone time to the next point," matching the monotonic score. Drawn before the edges/marker so
+	# they stay on top.
+	if challenge_mode:
+		var point_progress: float = _time_in_zone - floorf(_time_in_zone)
+		var charge_w := w * point_progress
+		_track.draw_rect(Rect2(0, zone_y, charge_w, zone_h), UiPalette.CREAM)
+		if charge_w >= 2.0:
+			# A bright leading edge so the charging front is easy to track as it sweeps toward the point.
+			_track.draw_rect(Rect2(charge_w - 3.0, zone_y, 3.0, zone_h), Color.WHITE)
+
 	# Boundary warning: the zone's top/bottom edges brighten toward white (and thicken)
 	# as the marker nears them, pulsing on the shared phase — an early "about to fall
 	# out" cue rather than only the marker flipping red at the last instant.

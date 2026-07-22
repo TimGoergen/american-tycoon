@@ -436,10 +436,8 @@ func _current_zone_half() -> float:
 	return lerpf(ZONE_HALF, ZONE_HALF_MIN, progress)
 
 
-## Challenge Mode: the sweep speed for the current successful-lock count — a slow wave that rises and
-## falls over many locks (period CHALLENGE_SPEED_PERIOD_LOCKS), spanning the SAME range regular mode
-## sweeps: from BASE_SPEED (its opening) up to BASE_SPEED × SPEED_RAMP^(TARGET_LOCKS-1) (its top after a
-## full run). Sampled once per lock so the speed is steady within each sweep.
+## Challenge Mode: the marker's current sweep speed — a time-based wave with a growing swing across
+## regular mode's speed range (details below).
 func _challenge_marker_speed() -> float:
 	# Spans regular mode's range (BASE_SPEED up to its top after a full run) but rides a TIME clock so the
 	# speed visibly rises and falls WITHIN a run (the lock-based version barely moved in short runs). The

@@ -87,7 +87,8 @@ const STEP := {
 	MATCH_THREE:   1000.0,
 	TIMING_BAR:    1.0,
 	MEMORY_MATCH:  0.2,   # low-ceiling: 5 rungs per round; pairs with Wave B's 1→6-climb Memory scoring
-	BASKETBALL:    0.25,  # low-ceiling: 4 rungs per basket (~8 baskets = tier 30 mastered)
+	BASKETBALL:    2.0,   # ~2 baskets per tier (Tim 2026-07-22: a basket shouldn't jump tiers); its low
+	                      # score ceiling then caps it at low tiers — intended, not a bug
 	CATCH_MONEY:   2.0,
 	BALANCE_BOOKS: 2.0,
 }

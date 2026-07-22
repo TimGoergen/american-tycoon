@@ -341,10 +341,14 @@ func _draw_track() -> void:
 	if challenge_mode:
 		var point_progress: float = _time_in_zone - floorf(_time_in_zone)
 		var charge_w := w * point_progress
-		_track.draw_rect(Rect2(0, zone_y, charge_w, zone_h), UiPalette.CREAM)
+		# A THIN gauge inside the zone — ~20% of the zone height, sitting ~20% up from the zone's bottom
+		# (Tim, 2026-07-22) — so it reads without covering the whole target.
+		var gauge_h := zone_h * 0.2
+		var gauge_y := zone_y + zone_h * 0.6
+		_track.draw_rect(Rect2(0, gauge_y, charge_w, gauge_h), UiPalette.CREAM)
 		if charge_w >= 2.0:
 			# A bright leading edge so the charging front is easy to track as it sweeps toward the point.
-			_track.draw_rect(Rect2(charge_w - 3.0, zone_y, 3.0, zone_h), Color.WHITE)
+			_track.draw_rect(Rect2(charge_w - 3.0, gauge_y, 3.0, gauge_h), Color.WHITE)
 
 	# Boundary warning: the zone's top/bottom edges brighten toward white (and thicken)
 	# as the marker nears them, pulsing on the shared phase — an early "about to fall

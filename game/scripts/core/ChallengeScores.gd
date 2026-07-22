@@ -27,6 +27,14 @@ static func get_high_score(type_key: String) -> int:
 	return int(_load().get(type_key, 0))
 
 
+## Wipe ALL Challenge Mode high scores. Challenge scores live in their own user:// file, independent of
+## the dynasty save, so the dev "Reset Game" (which only deletes the dynasty save) leaves them behind
+## unless it also calls this (Tim, 2026-07-22 — highest tier survived a reset).
+static func clear() -> void:
+	if FileAccess.file_exists(SAVE_PATH):
+		DirAccess.remove_absolute(SAVE_PATH)
+
+
 ## Record a Challenge Mode score for a type. If it beats the stored best, saves it and returns true
 ## (a new high score); otherwise leaves the file untouched and returns false.
 static func record_score(type_key: String, score: int) -> bool:

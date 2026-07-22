@@ -1490,6 +1490,9 @@ func _on_dev_defaults_requested() -> void:
 ## reload, which re-runs startup with no save present and so begins a fresh run.
 func _on_dev_reset_dynasty_requested() -> void:
 	SaveManager.delete_save_file()
+	# Challenge Mode high scores (highest tier) live in their own user:// file, not the dynasty save,
+	# so wipe them too or they survive the reset (Tim, 2026-07-22).
+	ChallengeScores.clear()
 	get_tree().reload_current_scene()
 
 

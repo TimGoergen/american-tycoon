@@ -221,8 +221,8 @@ var _highscore_label: Label
 ## The one-row container holding Score + Best SIDE BY SIDE (Tim, 2026-07-21). The two used to stack as
 ## separate centered lines, which ate a whole line of card height and shrank the game board; they now
 ## share one row ("Score: 1,240   Best: 3,100"). Kept as a field so _set_challenge_chrome can show/hide
-## the row as a unit. The separate "Next tier" target LINE was removed entirely — that info folded into
-## the progress bar's own label (see _update_challenge_progress).
+## the row as a unit. The separate "Next tier" target LINE was removed entirely; the tier standing now
+## reads from the large tier display below the row (see _update_challenge_tier).
 var _challenge_score_row: Control
 ## The CHALLENGE end view — shown when a run ends (DONE/Back) INSTEAD of closing straight away, so the
 ## tier-credit feedback has somewhere to land (Challenge Mode Phase 2). A dedicated view, deliberately
@@ -270,31 +270,16 @@ var _challenge_timer_low: StyleBoxFlat
 ## warning (Plans/Challenge_Mode.md §1).
 const CHALLENGE_TIMER_LOW_SECONDS := 2.0
 
-## The GLOBAL progress-to-next-tier bar (Challenge Mode, ALL games — Tim, 2026-07-21). A large
-## horizontal bar beside the Score/Best/next-tier text that fills with the run's LIVE progress from the
-## player's current best-tier boundary toward the next UNREACHED tier. It COEXISTS with the "Next tier"
-## text. When the next tier pays out, the bar is tinted by track (green = income, gold = Legacy) and
-## labelled with the reward, so the goal reads at a glance; it pops with a white flash when a tier is
-## crossed (best rises). For Balance this doubles as the "in-zone time building to a payout" readout,
-## for free, because Balance's get_score is cumulative in-zone seconds. Shown for every challenge game,
-## self-ending ones included (unlike the keep-alive timer bar).
-##   `_challenge_progress_fill`        — the 0..1 fill drawn this frame.
-##   `_challenge_progress_is_payout`   — the next tier is a payout tier (tint + reward label).
-##   `_challenge_progress_payout_track`— "income" | "legacy", picks the tinted fill box.
-##   `_challenge_progress_flash`       — decaying [0,1] white pop, set to 1 when a tier is crossed.
-##   `_challenge_progress_best_tier`   — the best tier last seen, to fire the pop once per crossing.
-var _challenge_progress_margin: MarginContainer
-var _challenge_progress_bar: Control
-var _challenge_progress_label: Label
-var _challenge_progress_track: StyleBoxFlat
-var _challenge_progress_fill_normal: StyleBoxFlat
-var _challenge_progress_fill_income: StyleBoxFlat
-var _challenge_progress_fill_legacy: StyleBoxFlat
-var _challenge_progress_fill: float = 0.0
-var _challenge_progress_is_payout: bool = false
-var _challenge_progress_payout_track: String = ""
-var _challenge_progress_flash: float = 0.0
-var _challenge_progress_best_tier: int = 0
+## The large TIER display (Challenge Mode, ALL games — Tim, 2026-07-22). REPLACES the old tier-progress
+## bar, which read as empty at high tiers and only echoed information the tier numbers already carry. A
+## big bold "TIER 3 / 7" readout (current tier over best tier reached), centered in the chrome column,
+## that PULSES with a brief scale-up + gold brighten every time the CURRENT tier climbs a rung. Shown for
+## every challenge game (self-ending ones included, unlike the keep-alive timer bar).
+##   `_challenge_tier_pulse` — decaying [0,1] pop, set to 1 when the current tier rises, eased to 0 in ~0.4s.
+##   `_challenge_shown_tier` — the current tier last shown, so the pop fires once per crossing.
+var _challenge_tier_label: Label
+var _challenge_tier_pulse: float = 0.0
+var _challenge_shown_tier: int = 0
 
 ## The Get Ready gate's stakes and hint lines, kept as fields so start_game / start_challenge can
 ## set the wording per mode (reward stakes vs. "play as long as you like").
@@ -569,41 +554,18 @@ func _build_play_view() -> Control:
 	_highscore_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_challenge_score_row.add_child(_highscore_label)
 
-	# The GLOBAL progress-to-next-tier bar (Challenge Mode, all games): a large horizontal bar that
-	# fills with live progress from the player's best-tier boundary toward the next tier, tinted +
-	# labelled with the reward when the next tier pays out (see _update_challenge_progress). Inside a
-	# MarginContainer so its sides line up with the rest of the chrome. Hidden until _set_challenge_chrome
-	# shows it. It COEXISTS with the "Next tier" text above — the text names the target, the bar shows
-	# how close you are.
-	var progress_margin := MarginContainer.new()
-	progress_margin.add_theme_constant_override("margin_left", CHROME_MARGIN)
-	progress_margin.add_theme_constant_override("margin_right", CHROME_MARGIN)
-	progress_margin.add_theme_constant_override("margin_top", 6)  # trimmed 10 -> 6 to reclaim board height
-	progress_margin.visible = false
-	column.add_child(progress_margin)
-	_challenge_progress_margin = progress_margin
-
-	_challenge_progress_bar = Control.new()
-	# 60 -> 54: modestly shorter to give the board more room; still large and legible (low-vision rule),
-	# and it now carries the folded-in target score in its label, so the info density earns its height.
-	_challenge_progress_bar.custom_minimum_size = Vector2(0, 54)
-	_challenge_progress_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_challenge_progress_bar.draw.connect(_draw_challenge_progress_bar)
-	progress_margin.add_child(_challenge_progress_bar)
-	_build_challenge_progress_styleboxes()
-
-	# The goal readout, centered OVER the bar (full-rect child): the reward the next tier pays, the
-	# tier being climbed toward, or MASTERED. Cream with an ink outline so it stays legible over both
-	# the dark track and the dark fill.
-	_challenge_progress_label = _make_label("", UiPalette.FONT_LABEL, UiPalette.CREAM)
-	_challenge_progress_label.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_challenge_progress_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_challenge_progress_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_challenge_progress_label.add_theme_font_override("font", UiPalette.make_bold_font())
-	_challenge_progress_label.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
-	_challenge_progress_label.add_theme_constant_override("outline_size", 5)
-	_challenge_progress_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_challenge_progress_bar.add_child(_challenge_progress_label)
+	# The large TIER display (Tim, 2026-07-22): REPLACES the tier-progress bar, which looked empty at high
+	# tiers and only echoed the tier numbers. A big bold "TIER 3 / 7" readout (current over best), centered
+	# in the chrome column, that PULSES each time the current tier climbs (see _update_challenge_tier). It
+	# sits a size ABOVE the Score label (FONT_PAGE_TITLE vs FONT_DISPLAY) so the tier is the clear focal
+	# point (low-vision rule). SHRINK_CENTER keeps it only as wide as its text so the pulse scales from its
+	# true center. Hidden until _set_challenge_chrome shows it.
+	_challenge_tier_label = _make_label("", UiPalette.FONT_PAGE_TITLE, UiPalette.DARK_GOLD)
+	_challenge_tier_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_challenge_tier_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_challenge_tier_label.add_theme_font_override("font", UiPalette.make_bold_font())
+	_challenge_tier_label.visible = false
+	column.add_child(_challenge_tier_label)
 
 	# The keep-alive TIMER bar (Challenge Mode only): a horizontal bar that empties as the clock runs
 	# down, the seconds remaining printed over it. It replaces the reward timer + spectrum bar in
@@ -1309,11 +1271,13 @@ func start_challenge(type_script: Script) -> void:
 	_challenge_low_pulse = 0.0
 	_refresh_challenge_timer_bar()
 
-	# Seed the progress bar to the player's current best tier so a fresh run doesn't flash on frame one,
-	# and clear any leftover pop from a previous run.
-	_challenge_progress_best_tier = ChallengeGoals.tier_for_score(_active_type_key, _challenge_high)
-	_challenge_progress_flash = 0.0
-	_update_challenge_progress()
+	# Seed the tier display's pulse tracker to the run's OPENING tier so a fresh run doesn't pop on frame
+	# one, and clear any leftover pulse from a previous run. Seeding from the opening score (not the best)
+	# means every tier climbed THIS run pops, including re-climbing already-banked tiers.
+	var opening_score := _active_minigame.get_score() if _active_minigame != null else 0
+	_challenge_shown_tier = ChallengeGoals.tier_for_score(_active_type_key, opening_score)
+	_challenge_tier_pulse = 0.0
+	_update_challenge_tier()
 
 	_play_view.visible = false
 	_play_view.modulate = Color.WHITE
@@ -1347,9 +1311,9 @@ func _set_challenge_chrome(on: bool) -> void:
 	# (no leftover empty line). The "Next tier" target line was removed; its info lives on the bar below.
 	if _challenge_score_row != null:
 		_challenge_score_row.visible = on
-	# The global progress-to-next-tier bar shows for EVERY challenge game (self-ending included).
-	if _challenge_progress_margin != null:
-		_challenge_progress_margin.visible = on
+	# The large tier display shows for EVERY challenge game (self-ending included).
+	if _challenge_tier_label != null:
+		_challenge_tier_label.visible = on
 	# The keep-alive timer bar takes the reward chrome's place in a challenge run. start_challenge
 	# overrides it OFF for a self-ending game (which has no keep-alive timer).
 	if _challenge_timer_margin != null:
@@ -1427,104 +1391,42 @@ func _update_challenge_score() -> void:
 	if score > _challenge_high:
 		_challenge_high = score
 	_highscore_label.text = "Best: %s" % _group_thousands(_challenge_high)
-	# The "next tier" target readout is no longer a separate line — its target score is folded into the
-	# progress bar's own label (see _update_challenge_progress), so one call keeps everything current.
-	_update_challenge_progress()
+	# Keep the large tier display current too — one call refreshes the current/best readout and advances
+	# any tier-up pulse (see _update_challenge_tier).
+	_update_challenge_tier()
 
 
-## Refresh the GLOBAL progress-to-next-tier bar (Tim, 2026-07-21). The fill is the run's LIVE progress
-## from the player's current best-tier boundary toward the next UNREACHED tier: the tier baseline comes
-## from the player's BEST score (`_challenge_high`) so the bar always tracks the next tier they have NOT
-## yet banked, while the fill uses the live get_score(). When the next tier pays out the bar is tinted
-## by track and labelled with the reward; at the top of the ladder it reads MASTERED (full gold). It
-## pops with a white flash whenever a tier is crossed (best rises). Called every frame from
-## _update_challenge_score, and once at seed in start_challenge.
-func _update_challenge_progress() -> void:
-	if _challenge_progress_bar == null:
+## Refresh the large TIER display (Tim, 2026-07-22). Shows the CURRENT tier (from the live score) over
+## the BEST tier reached (from `_challenge_high`), or "TIER MAX" at the summit. Fires a pulse — a brief
+## scale-up + gold brighten — the instant the current tier climbs a rung, so a tier-up is unmissable
+## (low-vision rule). Called every frame from _update_challenge_score, and once at seed in start_challenge.
+func _update_challenge_tier() -> void:
+	if _challenge_tier_label == null:
 		return
 	var gk := _active_type_key
-	var step := ChallengeGoals.score_step(gk)
-	var best_tier := ChallengeGoals.tier_for_score(gk, _challenge_high)
-	# Pop the bar the moment the player crosses a new tier (best rose past a rung this run).
-	if best_tier > _challenge_progress_best_tier:
-		_challenge_progress_flash = 1.0
-	_challenge_progress_best_tier = best_tier
-	# Decay the pop each frame. Uses the Control's own frame delta so no delta needs threading here.
-	_challenge_progress_flash = maxf(0.0, _challenge_progress_flash - get_process_delta_time() * 2.5)
-
 	var score := _active_minigame.get_score() if _active_minigame != null else 0
-	if best_tier >= ChallengeGoals.MAX_TIER:
-		# Mastered: a full gold bar so the summit reads as a completed reward, not a dead "next: —".
-		_challenge_progress_fill = 1.0
-		_challenge_progress_is_payout = true
-		_challenge_progress_payout_track = "legacy"
-		_challenge_progress_label.text = "MASTERED"
+	var current := ChallengeGoals.tier_for_score(gk, score)
+	var best := ChallengeGoals.tier_for_score(gk, _challenge_high)
+	# Pop the display the moment the current tier rises past the last one we showed (once per crossing).
+	if current > _challenge_shown_tier:
+		_challenge_tier_pulse = 1.0
+	_challenge_shown_tier = current
+	# Decay the pulse toward 0 over ~0.4s (rate 2.5/sec). Uses the Control's own frame delta so no delta
+	# needs threading in here, mirroring the timer bar's decay pattern.
+	_challenge_tier_pulse = maxf(0.0, _challenge_tier_pulse - get_process_delta_time() * 2.5)
+
+	# The text: current over best, or MASTERED-style "TIER MAX" at the top of the ladder.
+	if current >= ChallengeGoals.MAX_TIER:
+		_challenge_tier_label.text = "TIER MAX"
 	else:
-		var lo := float(best_tier) * step
-		var hi := float(best_tier + 1) * step
-		var span := maxf(0.0001, hi - lo)
-		_challenge_progress_fill = clampf((float(score) - lo) / span, 0.0, 1.0)
-		var next_tier := best_tier + 1
-		var payout := ChallengeGoals.payout_at_tier(next_tier)
-		# The target SCORE for the next tier is this tier's upper boundary — folded into the bar's label
-		# (Tim, 2026-07-21) now that the separate "Next tier" text line was removed, so the goal score
-		# still shows, just on the bar itself.
-		var target := int(round(hi))
-		if not payout.is_empty():
-			# The next tier pays out — tint by track and name the target score AND the reward, so the
-			# goal reads in one line: "NEXT: 1,240 → +5% INCOME".
-			_challenge_progress_is_payout = true
-			_challenge_progress_payout_track = String(payout["type"])
-			_challenge_progress_label.text = "NEXT: %s  →  +%d%% %s" % [_group_thousands(target), int(payout["pct"]), String(payout["type"]).to_upper()]
-		else:
-			# A progress-only tier — name the tier being climbed toward AND its target score.
-			_challenge_progress_is_payout = false
-			_challenge_progress_payout_track = ""
-			_challenge_progress_label.text = "TIER %d AT %s" % [next_tier, _group_thousands(target)]
-	_challenge_progress_bar.queue_redraw()
+		_challenge_tier_label.text = "TIER %d / %d" % [current, best]
 
-
-## Build the progress bar's styleboxes once (reused every frame, minigame-lag rule): a dark ink track,
-## a normal (progress-only) dark-green fill, and the two payout-tinted fills — green for an income
-## payout, gold for a Legacy payout — so a payout tier's bar reads its reward's track by color. All
-## dark enough that the cream, ink-outlined label stays legible over the fill.
-func _build_challenge_progress_styleboxes() -> void:
-	_challenge_progress_track = StyleBoxFlat.new()
-	_challenge_progress_track.bg_color = UiPalette.INK_NAVY
-	_challenge_progress_track.set_corner_radius_all(14)
-	_challenge_progress_track.border_color = UiPalette.NAVY
-	_challenge_progress_track.set_border_width_all(2)
-	_challenge_progress_fill_normal = StyleBoxFlat.new()
-	_challenge_progress_fill_normal.bg_color = UiPalette.MONEY_GREEN.darkened(0.25)
-	_challenge_progress_fill_normal.set_corner_radius_all(10)
-	_challenge_progress_fill_income = StyleBoxFlat.new()
-	_challenge_progress_fill_income.bg_color = UiPalette.MONEY_GREEN.darkened(0.05)
-	_challenge_progress_fill_income.set_corner_radius_all(10)
-	_challenge_progress_fill_legacy = StyleBoxFlat.new()
-	_challenge_progress_fill_legacy.bg_color = UiPalette.DARK_GOLD
-	_challenge_progress_fill_legacy.set_corner_radius_all(10)
-
-
-## Draw the progress bar: the dark track, a fill inset inside it whose width is the current progress
-## fraction (tinted by track when the next tier pays out), then a decaying white wash for the
-## tier-cross pop. Mirrors the keep-alive timer bar's inset-fill technique.
-func _draw_challenge_progress_bar() -> void:
-	var w := _challenge_progress_bar.size.x
-	var h := _challenge_progress_bar.size.y
-	if w <= 0.0 or h <= 0.0 or _challenge_progress_track == null:
-		return
-	_challenge_progress_bar.draw_style_box(_challenge_progress_track, Rect2(0, 0, w, h))
-	var pad := 4.0
-	var fill_w := _challenge_progress_fill * (w - 2.0 * pad)
-	if fill_w > 1.0:
-		var box := _challenge_progress_fill_normal
-		if _challenge_progress_is_payout:
-			box = _challenge_progress_fill_legacy if _challenge_progress_payout_track == "legacy" \
-					else _challenge_progress_fill_income
-		_challenge_progress_bar.draw_style_box(box, Rect2(pad, pad, fill_w, h - 2.0 * pad))
-	# The tier-cross pop: a decaying white wash over the whole bar (drawn on the bar's own canvas item).
-	if _challenge_progress_flash > 0.001:
-		_challenge_progress_bar.draw_rect(Rect2(0, 0, w, h), Color(1, 1, 1, _challenge_progress_flash * 0.6))
+	# Apply the pulse as a brief scale-up + gold brighten, pivoting on the label's center so it grows
+	# from the middle rather than the top-left. At rest (pulse 0) it sits at scale 1.0 / full color.
+	_challenge_tier_label.pivot_offset = _challenge_tier_label.size * 0.5
+	_challenge_tier_label.scale = Vector2.ONE * (1.0 + 0.35 * _challenge_tier_pulse)
+	# modulate > 1.0 over-brightens (a flash toward light gold), easing back to WHITE (no tint) at rest.
+	_challenge_tier_label.modulate = Color.WHITE.lerp(Color(1.6, 1.45, 1.0), _challenge_tier_pulse)
 
 
 ## Advance the keep-alive run timer one frame (Wave 2, Plans/Challenge_Mode.md §1). Only called from

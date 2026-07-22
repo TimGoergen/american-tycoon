@@ -65,33 +65,48 @@ const PAYOUT_SCHEDULE := {
 }
 
 
-# ── Per-game STEP (score per tier) ────────────────────────────────────────────
-# ALL FIRST-PASS, DEVICE-TUNE. A game's tier is floor(get_score() / STEP), so STEP is the round score
-# a single rung is worth. Sized off each game's get_score() scale so tier 30 (the +4/+4 summit) is a
-# real but reachable mastery target. Rationale, read off each game's get_score():
+# ── Two costing models: FLAT STEP vs. ESCALATING per-tier cost ────────────────
+# Four of the six games use a FLAT per-tier STEP (this table): tier = floor(get_score() / STEP). The
+# two LOW-CEILING games (Micro Basketball, Memory Match) use an ESCALATING cost instead (see the next
+# block) — their get_score() tops out at a small count, so a flat cost is a bad fit: either the early
+# tiers are unreachable or the summit is trivial. game_keys() lists ALL SIX in a stable order (it is no
+# longer just STEP.keys(), since the escalating games are absent from STEP).
+
+# ── The full roster, in a stable display order (used by the CHALLENGES screen + the total_* sums) ──
+const GAME_KEYS := [MATCH_THREE, TIMING_BAR, MEMORY_MATCH, BASKETBALL, CATCH_MONEY, BALANCE_BOOKS]
+
+# ── Per-game FLAT STEP (score per tier) — the four non-escalating games ────────
+# ALL FIRST-PASS, DEVICE-TUNE. A game's tier is floor(get_score() / STEP), so STEP is the round score a
+# single rung is worth. Sized off each game's get_score() scale so tier 30 (the +4/+4 summit) is a real
+# but reachable mastery target. Rationale, read off each game's get_score():
 #   Match Three       — get_score() = cumulative points (POINTS_PER_GEM = 10, a 3-match ≈ 30+); climbs
 #                       into the thousands, so STEP = 1000 (tier 30 = 30,000 points — a long climb).
 #   Timing Bar        — get_score() = successful lock count; STEP = 1 (one tier per lock).
-#   Memory Match      — get_score() = rounds recalled. LOW-CEILING game: a small round count, so a
-#                       STEP of 1 put the summit far out of reach. STEP = 0.2 (five rungs per whole
-#                       round) so the ladder is reachable. NOTE: this pairs with Wave B, which makes
-#                       Memory's get_score() = completed 1→6 CLIMBS — so 0.2 means one climb clears one
-#                       PAYOUT tier (every 5th rung), and 6 climbs = tier 30 mastered. If Wave B changes
-#                       Memory's scoring, re-check this. See Plans §"Low-ceiling games".
-#   Micro Basketball  — get_score() = baskets sunk; ~6 a strong round, so a STEP of 1 put the summit out
-#                       of reach. STEP = 0.25 (four rungs per basket) so ~8 baskets reach the top tier —
-#                       a reachable mastery target for a slow-to-line-up game.
 #   Catch the Money   — get_score() = coins caught; a steady stream, STEP = 2 (tier 30 = 60 coins).
 #   Balance the Books — get_score() = whole seconds in the gold zone; STEP = 2 (tier 30 = 60 seconds).
+# Micro Basketball and Memory Match are DELIBERATELY ABSENT — they cost by the escalating model below.
 const STEP := {
 	MATCH_THREE:   1000.0,
 	TIMING_BAR:    1.0,
-	MEMORY_MATCH:  0.2,   # low-ceiling: 5 rungs per round; pairs with Wave B's 1→6-climb Memory scoring
-	BASKETBALL:    2.0,   # ~2 baskets per tier (Tim 2026-07-22: a basket shouldn't jump tiers); its low
-	                      # score ceiling then caps it at low tiers — intended, not a bug
 	CATCH_MONEY:   2.0,
 	BALANCE_BOOKS: 2.0,
 }
+
+
+# ── ESCALATING per-tier cost — the two low-ceiling games (Basketball, Memory) ──
+# Tim's low-ceiling fix (Plans/Challenge_Mode.md): these two games' get_score() is a small count, so a
+# flat STEP fails. Instead the cost of ONE tier starts cheap and climbs every 5 tiers, capped:
+#
+#     tier_cost(game, tier) = min(base + floor((tier-1)/5) * increment, cap)      [for tier >= 1]
+#     score_to_reach_tier(game, tier) = cumulative_cost = sum of tier_cost(1..tier)
+#
+# So early tiers (and the first payouts) are reachable, and mastery is a real climb. The base/increment/
+# cap are CONFIGURABLE from tuning (basketball_tier_* / memory_tier_* knobs) — pushed in by configure()
+# — so the whole curve is live-tunable. Defaults (device-tune):
+#   Micro Basketball  base 1, increment 1, cap 5 → tier 5 = 5 baskets, tier 10 = 15, tier 15 = 30.
+#   Memory Match      base 0.2, increment 0.2, cap 1.0 → tier 5 ≈ 1 climb, tier 10 ≈ 3, tier 15 = 6.
+# The defaults live in the static config below (escalating_cost); tuning.tres mirrors them so a headless
+# call that skips configure() still behaves.
 
 
 # ── Per-game keep-alive TIMER seconds-per-point (Wave 2 reads this) ───────────
@@ -121,9 +136,10 @@ const TIMER_START := {
 }
 
 
-## Every game key, in a stable order (used by the CHALLENGES screen and by the total_* sums).
+## Every game key, in a stable order (used by the CHALLENGES screen and by the total_* sums). Returns
+## the full six-game roster — NOT STEP.keys(), which now omits the two escalating games.
 static func game_keys() -> Array:
-	return STEP.keys()
+	return GAME_KEYS
 
 
 # ── Configurable knobs (pushed in from TuningConfig) ──────────────────────────
@@ -139,6 +155,20 @@ static func game_keys() -> Array:
 static var bonus_scale := 1.0    # global x on every payout (tuning.challenge_bonus_scale)
 static var timer_start := 6.0    # keep-alive timer's starting seconds (tuning.challenge_timer_start_seconds)
 static var timer_cap := 15.0     # keep-alive timer's max seconds (tuning.challenge_timer_cap_seconds)
+
+## The escalating games' per-tier cost curve (base / increment / cap, in that game's score units),
+## keyed by game. Pushed in from tuning (basketball_tier_* / memory_tier_* knobs) by configure(); the
+## defaults here mirror tuning.tres so a headless call that skips configure() still behaves. See
+## tier_cost() for how these are read.
+static var escalating_cost := {
+	BASKETBALL:   {"base": 1.0, "increment": 1.0, "cap": 5.0},
+	MEMORY_MATCH: {"base": 0.2, "increment": 0.2, "cap": 1.0},
+}
+
+## The keep-alive top-up seconds a Balance point grants — the ONLY seconds_per_point that is tuned
+## (tuning.balance_keepalive_seconds_per_point); every other game keeps its hardcoded SECONDS_PER_POINT
+## table value. Pushed in by configure(); default mirrors tuning.tres / the old table entry (2.0).
+static var balance_keepalive_seconds_per_point := 2.0
 # The fraction of a hit's time-gain a MISS costs the keep-alive timer (tuning.challenge_miss_penalty_ratio).
 # The backing var is `miss_penalty`, read through the miss_penalty_ratio() accessor below — a var and a
 # func cannot share a name in GDScript, so this follows the same var/accessor split as timer_start /
@@ -147,30 +177,88 @@ static var miss_penalty := 0.5
 
 
 ## Push the knobs in from tuning. Called by DynastyState wherever the other stateless tables are
-## configured, so every bonus/timer query sees the tuned values.
-static func configure(p_bonus_scale: float, p_timer_start: float, p_timer_cap: float, p_miss_penalty_ratio: float) -> void:
+## configured, so every bonus/timer/cost query sees the tuned values. The escalating-cost and
+## balance-keepalive params are APPENDED with defaults so existing 4-arg callers (older sim harnesses)
+## keep working — they simply reset the escalating curve to its defaults, which is what they want.
+static func configure(
+		p_bonus_scale: float, p_timer_start: float, p_timer_cap: float, p_miss_penalty_ratio: float,
+		p_bball_base := 1.0, p_bball_increment := 1.0, p_bball_cap := 5.0,
+		p_memory_base := 0.2, p_memory_increment := 0.2, p_memory_cap := 1.0,
+		p_balance_keepalive := 2.0) -> void:
 	bonus_scale = p_bonus_scale
 	timer_start = p_timer_start
 	timer_cap = p_timer_cap
 	miss_penalty = p_miss_penalty_ratio
+	escalating_cost[BASKETBALL] = {"base": p_bball_base, "increment": p_bball_increment, "cap": p_bball_cap}
+	escalating_cost[MEMORY_MATCH] = {"base": p_memory_base, "increment": p_memory_increment, "cap": p_memory_cap}
+	balance_keepalive_seconds_per_point = p_balance_keepalive
 
 
 # ── The math ──────────────────────────────────────────────────────────────────
 
-## The round score one tier is worth for a game (STEP). Returns INF for an unknown key so no score can
-## ever clear a tier of a game that isn't in the table (floor(score / INF) == 0).
+## True when a game costs by the ESCALATING model (Basketball, Memory) rather than the flat STEP.
+static func is_escalating(game_key: String) -> bool:
+	return escalating_cost.has(game_key)
+
+
+## The round score one FLAT tier is worth for a game (STEP). Returns INF for an unknown/escalating key
+## so the flat path can never clear a tier of a game that isn't in the STEP table (floor(score/INF)==0).
+## Escalating games are priced by tier_cost()/cumulative_cost(), not this.
 static func score_step(game_key: String) -> float:
 	return float(STEP.get(game_key, INF))
 
 
-## The tier a given get_score() reaches for a game: floor(score / STEP), clamped to [0, MAX_TIER].
-## Simple round checkpoints — no growth curve. Unknown game key or non-positive score → 0.
+## The cost (in that game's score units) of the SINGLE escalating tier `tier`, for an escalating game:
+##     min(base + floor((tier-1)/5) * increment, cap)
+## Cheap for tiers 1-5, then increment more expensive every 5 tiers, capped. 0 for tier < 1 or a
+## non-escalating/unknown game (the flat games never call this).
+static func tier_cost(game_key: String, tier: int) -> float:
+	if tier < 1 or not is_escalating(game_key):
+		return 0.0
+	var cfg: Dictionary = escalating_cost[game_key]
+	var bands_climbed: float = floorf(float(tier - 1) / float(PAYOUT_INTERVAL))  # +1 band every 5 tiers
+	var cost: float = float(cfg["base"]) + bands_climbed * float(cfg["increment"])
+	return minf(cost, float(cfg["cap"]))
+
+
+## The cumulative escalating cost to REACH `tier` — the sum of tier_cost(1..tier). This is the score an
+## escalating game needs to sit at exactly `tier`. 0 for tier <= 0. The loop runs to at most MAX_TIER,
+## so it is cheap.
+static func cumulative_cost(game_key: String, tier: int) -> float:
+	var total := 0.0
+	for t in range(1, tier + 1):
+		total += tier_cost(game_key, t)
+	return total
+
+
+## The tier a given get_score() reaches for a game, clamped to [0, MAX_TIER]. Unknown key or negative
+## score → 0. ESCALATING games count tiers while the cumulative cost is still covered by the score;
+## FLAT games use floor(score / STEP) — simple round checkpoints, no growth curve.
 static func tier_for_score(game_key: String, score: float) -> int:
-	var step := score_step(game_key)
-	if step <= 0.0 or score < 0.0:
+	if score < 0.0:
 		return 0
-	var tier := int(floor(score / step))
-	return clampi(tier, 0, MAX_TIER)
+	if is_escalating(game_key):
+		var tier := 0
+		# Walk up while the score still covers the cost of the NEXT tier. The loop to MAX_TIER is cheap.
+		while tier < MAX_TIER and cumulative_cost(game_key, tier + 1) <= score:
+			tier += 1
+		return tier
+	var step := score_step(game_key)
+	if step <= 0.0:
+		return 0
+	return clampi(int(floor(score / step)), 0, MAX_TIER)
+
+
+## The score needed to REACH tier N — the number the UI should show as "reach X (tier N)". ESCALATING
+## games → the cumulative escalating cost; FLAT games → tier * STEP. 0 for tier <= 0. This is the single
+## helper both the CHALLENGES screen and any goal readout should use (never tier * score_step, which is
+## wrong for the escalating games).
+static func score_to_reach_tier(game_key: String, tier: int) -> float:
+	if tier <= 0:
+		return 0.0
+	if is_escalating(game_key):
+		return cumulative_cost(game_key, tier)
+	return float(tier) * score_step(game_key)
 
 
 ## The payout that lands AT a given tier: {"pct": whole-percent float, "type": "income"|"legacy"}.
@@ -234,8 +322,12 @@ static func total_legacy_bonus(highest_tiers: Dictionary) -> float:
 # ── Keep-alive run timer params (Wave 2 reads these) ──────────────────────────
 
 ## Seconds the keep-alive timer tops up per POINT of get_score() gained, for a game. 0 for an unknown
-## key (an unrecognised game grants no time).
+## key (an unrecognised game grants no time). Balance the Books is the ONE tuned entry — it returns the
+## live `balance_keepalive_seconds_per_point` knob so the Balance challenge feel is dialable; every
+## other game keeps its hardcoded SECONDS_PER_POINT value.
 static func seconds_per_point(game_key: String) -> float:
+	if game_key == BALANCE_BOOKS:
+		return balance_keepalive_seconds_per_point
 	return float(SECONDS_PER_POINT.get(game_key, 0.0))
 
 

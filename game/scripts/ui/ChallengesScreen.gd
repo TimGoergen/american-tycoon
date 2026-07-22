@@ -212,7 +212,10 @@ func _make_game_row(game_key: String, type_script: Script) -> Control:
 		next_text = "MASTERED — all rewards earned"
 	else:
 		var payout := ChallengeGoals.payout_at_tier(next_tier)
-		var reach := int(round(ChallengeGoals.score_step(game_key) * float(next_tier)))
+		# The score to reach the next payout tier. score_to_reach_tier handles BOTH costing models —
+		# tier * STEP for the flat games, the escalating cumulative cost for Basketball/Memory — so this
+		# shows the correct (escalating) target. NEVER score_step * tier here (wrong for the low-ceiling games).
+		var reach := int(round(ChallengeGoals.score_to_reach_tier(game_key, next_tier)))
 		var track := String(payout.get("type", "")).to_upper()
 		var pct := float(payout.get("pct", 0.0))
 		next_text = "Next: reach %s (tier %d)  →  +%d%% %s" % [_round_score(reach), next_tier, int(round(pct)), track]

@@ -7,6 +7,10 @@ extends SceneTree
 #
 # Proves, without any rendering:
 #   1. tier_for_score = floor(score / STEP), clamped to MAX_TIER, monotonic, unknown key -> 0.
+#   1b. ESCALATING tier cost for the two low-ceiling games (Basketball, Memory): tier_cost /
+#      cumulative_cost / score_to_reach_tier follow min(base + floor((tier-1)/5) x inc, cap), the
+#      cumulative cost is strictly increasing, tier_for_score inverts score_to_reach_tier at every
+#      boundary, and the four FLAT games (tier x STEP) are unchanged.
 #   2. payout_at_tier returns the authored schedule (income/legacy alternation, escalating values) on
 #      every 5th tier and {} elsewhere; next_payout_tier walks the schedule and reports -1 when maxed.
 #   3. income_bonus_for / legacy_bonus_for are the summed same-track payouts x bonus_scale (a mastered
@@ -36,6 +40,7 @@ func _initialize() -> void:
 		return
 
 	_test_tier_for_score()
+	_test_escalating_tiers(tuning)
 	_test_payout_schedule()
 	_test_bonus_sums()
 	_test_dynasty_record_and_roundtrip(tuning)
@@ -97,6 +102,102 @@ func _test_tier_for_score() -> void:
 	_check("cleared-tier count never decreases as score rises (monotonic)", monotone)
 
 	_check("an unknown game key clears 0 tiers", ChallengeGoals.tier_for_score("Not A Game", 1e9) == 0)
+
+
+# ---------------------------------------------------------------------------
+# 1b. ESCALATING tier cost (Basketball + Memory) vs. the four unchanged flat games
+# ---------------------------------------------------------------------------
+func _test_escalating_tiers(tuning: TuningConfig) -> void:
+	print("-- escalating tier cost for Basketball & Memory; the four flat games unchanged --")
+	# Configure via the TUNING fields (the GOTCHA): set the fields, then build a dynasty to push them
+	# into the static config. Poking the statics directly would be overwritten by this construction.
+	tuning.basketball_tier_base_cost = 1.0
+	tuning.basketball_tier_cost_increment = 1.0
+	tuning.basketball_tier_cost_cap = 5.0
+	tuning.memory_tier_base_cost = 0.2
+	tuning.memory_tier_cost_increment = 0.2
+	tuning.memory_tier_cost_cap = 1.0
+	var _dynasty := DynastyState.new(ConfigLoader.load_property_configs(), tuning)
+
+	var bball := ChallengeGoals.BASKETBALL
+	var memory := ChallengeGoals.MEMORY_MATCH
+
+	# is_escalating flags the two low-ceiling games and NOT the four flat ones.
+	_check("Basketball + Memory are escalating; Timing/Match/Catch/Balance are not",
+		ChallengeGoals.is_escalating(bball) and ChallengeGoals.is_escalating(memory)
+		and not ChallengeGoals.is_escalating(ChallengeGoals.TIMING_BAR)
+		and not ChallengeGoals.is_escalating(ChallengeGoals.MATCH_THREE)
+		and not ChallengeGoals.is_escalating(ChallengeGoals.CATCH_MONEY)
+		and not ChallengeGoals.is_escalating(ChallengeGoals.BALANCE_BOOKS))
+
+	# game_keys() still lists all six (it is no longer STEP.keys(), which now omits the escalating two).
+	_check("game_keys() still lists all six games including the escalating pair",
+		ChallengeGoals.game_keys().size() == 6
+		and ChallengeGoals.game_keys().has(bball) and ChallengeGoals.game_keys().has(memory))
+
+	# tier_cost = min(base + floor((tier-1)/5) x increment, cap): cheap early, +increment every 5, capped.
+	_check("Basketball tier 1 costs base (1)", is_equal_approx(ChallengeGoals.tier_cost(bball, 1), 1.0))
+	_check("Basketball tier 5 still costs 1 (first band)", is_equal_approx(ChallengeGoals.tier_cost(bball, 5), 1.0))
+	_check("Basketball tier 6 costs base+increment (2)", is_equal_approx(ChallengeGoals.tier_cost(bball, 6), 2.0))
+	_check("Basketball tier 11 costs 3", is_equal_approx(ChallengeGoals.tier_cost(bball, 11), 3.0))
+	_check("Basketball tier cost caps at 5", is_equal_approx(ChallengeGoals.tier_cost(bball, 30), 5.0))
+
+	# The headline cumulative costs (score_to_reach_tier = cumulative_cost). Basketball: 5 / 15 / 30.
+	_check("Basketball reach tier 5 = 5 baskets", is_equal_approx(ChallengeGoals.score_to_reach_tier(bball, 5), 5.0))
+	_check("Basketball reach tier 10 = 15 baskets", is_equal_approx(ChallengeGoals.score_to_reach_tier(bball, 10), 15.0))
+	_check("Basketball reach tier 15 = 30 baskets", is_equal_approx(ChallengeGoals.score_to_reach_tier(bball, 15), 30.0))
+	# Memory: 1 / 3 / 6 climbs.
+	_check("Memory reach tier 5 = 1 climb", is_equal_approx(ChallengeGoals.score_to_reach_tier(memory, 5), 1.0))
+	_check("Memory reach tier 10 = 3 climbs", is_equal_approx(ChallengeGoals.score_to_reach_tier(memory, 10), 3.0))
+	_check("Memory reach tier 15 = 6 climbs", is_equal_approx(ChallengeGoals.score_to_reach_tier(memory, 15), 6.0))
+
+	# cumulative_cost is strictly increasing (a deeper tier always costs strictly more score to reach).
+	var monotone := true
+	var prev := 0.0
+	for t in range(1, ChallengeGoals.MAX_TIER + 1):
+		var c := ChallengeGoals.cumulative_cost(bball, t)
+		if c <= prev:
+			monotone = false
+		prev = c
+	_check("Basketball cumulative_cost strictly increases with tier", monotone)
+
+	# tier_for_score INVERTS score_to_reach_tier at every boundary: exactly the reach score sits at tier N,
+	# a hair under sits at N-1. Proven for BOTH escalating games across the whole ladder.
+	var bball_inverts := true
+	var memory_inverts := true
+	for t in range(1, ChallengeGoals.MAX_TIER + 1):
+		var reach_b := ChallengeGoals.score_to_reach_tier(bball, t)
+		if ChallengeGoals.tier_for_score(bball, reach_b) != t or ChallengeGoals.tier_for_score(bball, reach_b - 0.001) != t - 1:
+			bball_inverts = false
+		var reach_m := ChallengeGoals.score_to_reach_tier(memory, t)
+		if ChallengeGoals.tier_for_score(memory, reach_m) != t or ChallengeGoals.tier_for_score(memory, reach_m - 0.001) != t - 1:
+			memory_inverts = false
+	_check("Basketball tier_for_score inverts score_to_reach_tier at every boundary", bball_inverts)
+	_check("Memory tier_for_score inverts score_to_reach_tier at every boundary", memory_inverts)
+
+	# Escalating games still clamp to the finite summit — a huge score never exceeds MAX_TIER.
+	_check("a huge Basketball score clamps to MAX_TIER",
+		ChallengeGoals.tier_for_score(bball, 1e9) == ChallengeGoals.MAX_TIER)
+
+	# The FOUR flat games are UNCHANGED: score_to_reach_tier = tier x STEP, tier_for_score = floor(score/STEP).
+	_check("Match Three (flat) reach tier 5 is still 5000 (5 x 1000)",
+		is_equal_approx(ChallengeGoals.score_to_reach_tier(ChallengeGoals.MATCH_THREE, 5), 5000.0))
+	_check("Timing Bar (flat) reach tier 10 is still 10 (10 x 1)",
+		is_equal_approx(ChallengeGoals.score_to_reach_tier(ChallengeGoals.TIMING_BAR, 10), 10.0))
+	_check("Catch the Money (flat) reach tier 30 is still 60 (30 x 2)",
+		is_equal_approx(ChallengeGoals.score_to_reach_tier(ChallengeGoals.CATCH_MONEY, 30), 60.0))
+	_check("Balance the Books (flat) reach tier 30 is still 60 (30 x 2)",
+		is_equal_approx(ChallengeGoals.score_to_reach_tier(ChallengeGoals.BALANCE_BOOKS, 30), 60.0))
+	_check("Timing Bar (flat) tier_for_score is still floor(score/STEP)",
+		ChallengeGoals.tier_for_score(ChallengeGoals.TIMING_BAR, 7.5) == 7)
+
+	# Balance's seconds_per_point is the ONE tuned timer entry; the others keep their table values.
+	tuning.balance_keepalive_seconds_per_point = 3.3
+	var _dynasty2 := DynastyState.new(ConfigLoader.load_property_configs(), tuning)
+	_check("seconds_per_point(Balance) returns the tuned keep-alive value",
+		is_equal_approx(ChallengeGoals.seconds_per_point(ChallengeGoals.BALANCE_BOOKS), 3.3))
+	_check("seconds_per_point(other game) stays the hardcoded table value (Timing Bar = 3.0)",
+		is_equal_approx(ChallengeGoals.seconds_per_point(ChallengeGoals.TIMING_BAR), 3.0))
 
 
 # ---------------------------------------------------------------------------

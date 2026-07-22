@@ -496,6 +496,40 @@ extends Resource
 ## have added, so missing hurts proportionally to the hit it replaced. Plans/Challenge_Mode.md.
 @export var challenge_miss_penalty_ratio: float = 0.5  # feel-tune
 
+# --- Challenge Mode: the two low-ceiling games' ESCALATING per-tier cost (Plans/Challenge_Mode.md) ---
+# Micro Basketball (baskets sunk) and Memory Match (climbs completed) have a small get_score() ceiling,
+# so a flat STEP is a bad fit. Instead each tier costs min(base + floor((tier-1)/5) x increment, cap) in
+# that game's score units — cheap early, pricier every 5 tiers, capped. ChallengeGoals reads these.
+# ALL FIRST-PASS, DEVICE-TUNE.
+
+## Micro Basketball: cost (baskets) of each tier for tiers 1-5. At 1, tier 5 = 5 baskets (first payout).
+@export var basketball_tier_base_cost: float = 1.0  # feel-tune
+## Micro Basketball: added to the per-tier basket cost every 5 tiers (tier 6-10 cost base+this, etc.).
+@export var basketball_tier_cost_increment: float = 1.0  # feel-tune
+## Micro Basketball: the most a single tier can cost (baskets) — the escalation caps here.
+@export var basketball_tier_cost_cap: float = 5.0  # feel-tune
+
+## Memory Match: cost (climbs) of each tier for tiers 1-5. At 0.2, tier 5 ≈ 1 climb (first payout).
+@export var memory_tier_base_cost: float = 0.2  # feel-tune
+## Memory Match: added to the per-tier climb cost every 5 tiers.
+@export var memory_tier_cost_increment: float = 0.2  # feel-tune
+## Memory Match: the most a single tier can cost (climbs) — the escalation caps here.
+@export var memory_tier_cost_cap: float = 1.0  # feel-tune
+
+# --- Balance the Books CHALLENGE-mode knobs (Plans/Challenge_Mode.md) ---
+# Balance's challenge round scores by time-in-zone. These four knobs shape the challenge feel and are
+# read by BalanceMinigame ONLY in challenge mode (the prestige/reward round keeps its own constants).
+# ALL FIRST-PASS, DEVICE-TUNE.
+
+## In-zone seconds needed to earn ONE Balance challenge point (get_score = time_in_zone / this).
+@export var balance_seconds_per_point: float = 1.0  # feel-tune
+## Keep-alive seconds each Balance challenge point adds to the run clock (ChallengeGoals.seconds_per_point).
+@export var balance_keepalive_seconds_per_point: float = 2.0  # feel-tune
+## Seconds between the Balance gold-zone re-rolling a new target center (challenge mode).
+@export var balance_zone_reroll_seconds: float = 1.3  # feel-tune
+## How fast the Balance gold-zone eases toward its target center, per second (challenge mode).
+@export var balance_zone_ease: float = 1.6  # feel-tune
+
 # --- Prestige minigame (GDD §5.5, Spec §9.3) ---
 # At prestige the player plays a minigame whose performance sets how much of the run's base
 # Legacy they KEEP: legacy_awarded = floor(base_legacy × mult). Reward curve reshaped (Tim,

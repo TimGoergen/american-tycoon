@@ -86,6 +86,17 @@ var _pulse_phase: float = 0.0
 # behind it and the marker stays easy to follow as it moves.
 var _prev_pos: float = 0.25
 
+# --- Challenge-mode knobs (captured from tuning in begin(); USED ONLY in challenge mode) ------
+# The prestige/reward round keeps the module constants above (ZONE_TARGET_CHANGE / ZONE_EASE, one
+# point per whole second); these live-tunable values shape only the CHALLENGE round's feel, so the
+# reward round stays byte-for-byte unchanged. Defaults mirror the constants / tuning.tres.
+## In-zone seconds to earn one challenge point (get_score = time-in-zone / this).
+var _challenge_seconds_per_point: float = 1.0
+## Seconds between the gold zone re-rolling a new target center (challenge mode).
+var _challenge_zone_reroll_seconds: float = ZONE_TARGET_CHANGE
+## How fast the gold zone eases toward its target center, per second (challenge mode).
+var _challenge_zone_ease: float = ZONE_EASE
+
 # --- Legacy gem state ---------------------------------------------------------
 ## The spawn chance captured from tuning in begin() (0..1). Rolled once per round.
 var _gem_chance: float = 0.0
@@ -136,6 +147,13 @@ func begin(tuning: TuningConfig) -> void:
 
 	# Success-feedback bookkeeping, fresh each round.
 	_milestones_shown = 0
+
+	# Capture the CHALLENGE-mode knobs. Read even in reward mode (harmless — they're gated on
+	# challenge_mode where used), so the fields are always populated for a challenge run started next.
+	# seconds_per_point is floored so a zero/negative tuning value can't divide-by-zero the score/gauge.
+	_challenge_seconds_per_point = maxf(0.01, tuning.balance_seconds_per_point)
+	_challenge_zone_reroll_seconds = tuning.balance_zone_reroll_seconds
+	_challenge_zone_ease = tuning.balance_zone_ease
 
 	var intro := Label.new()
 	intro.text = how_to_play()
@@ -202,9 +220,12 @@ func get_performance() -> float:
 
 
 func get_score() -> int:
-	# Challenge Mode's raw score: total whole seconds spent IN the gold zone this run.
-	# _time_in_zone only ever grows, so this is cumulative and non-decreasing as the
-	# host samples it live; in an endless run it just keeps climbing.
+	# Challenge Mode's raw score: one point per _challenge_seconds_per_point whole seconds spent IN the
+	# gold zone this run (the knob lets Tim slow or speed the point rate on device). _time_in_zone only
+	# ever grows, so this is cumulative and non-decreasing as the host samples it live. Reward mode never
+	# reads get_score(), but keep it on the plain 1-point-per-second form there so nothing changes.
+	if challenge_mode:
+		return int(_time_in_zone / _challenge_seconds_per_point)
 	return int(_time_in_zone)
 
 
@@ -222,11 +243,15 @@ func _process(delta: float) -> void:
 	# Slide the gold zone: re-roll a new target center now and then, and ease the live
 	# center toward it each frame so the zone glides smoothly instead of snapping.
 	# Targets stay fully on the track so the whole zone is always reachable.
+	# Challenge mode uses the live-tuned wander (reroll cadence + ease); reward mode keeps the module
+	# constants, so the prestige round is unchanged.
+	var reroll_seconds := _challenge_zone_reroll_seconds if challenge_mode else ZONE_TARGET_CHANGE
+	var zone_ease := _challenge_zone_ease if challenge_mode else ZONE_EASE
 	_zone_timer -= delta
 	if _zone_timer <= 0.0:
 		_zone_target = _rng.randf_range(ZONE_HALF, 1.0 - ZONE_HALF)
-		_zone_timer = ZONE_TARGET_CHANGE
-	_zone_center += (_zone_target - _zone_center) * minf(1.0, ZONE_EASE * delta)
+		_zone_timer = reroll_seconds
+	_zone_center += (_zone_target - _zone_center) * minf(1.0, zone_ease * delta)
 	_zone_center = clampf(_zone_center, ZONE_HALF, 1.0 - ZONE_HALF)
 
 	# The bobber physics: lift while held, gravity always, damped so it stays readable.
@@ -339,7 +364,10 @@ func _draw_track() -> void:
 	# in-zone time to the next point," matching the monotonic score. Drawn before the edges/marker so
 	# they stay on top.
 	if challenge_mode:
-		var point_progress: float = _time_in_zone - floorf(_time_in_zone)
+		# Fraction toward the next point: get_score() banks one point per _challenge_seconds_per_point
+		# in-zone seconds, so the gauge fills over that same span (frac of time_in_zone / seconds_per_point).
+		var scaled_progress: float = _time_in_zone / _challenge_seconds_per_point
+		var point_progress: float = scaled_progress - floorf(scaled_progress)
 		var charge_w := w * point_progress
 		# A THIN gauge inside the zone — ~20% of the zone height, sitting ~20% up from the zone's bottom
 		# (Tim, 2026-07-22) — so it reads without covering the whole target.

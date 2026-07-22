@@ -256,7 +256,16 @@ func _configure_retention_pricing() -> void:
 		tuning.challenge_bonus_scale,
 		tuning.challenge_timer_start_seconds,
 		tuning.challenge_timer_cap_seconds,
-		tuning.challenge_miss_penalty_ratio
+		tuning.challenge_miss_penalty_ratio,
+		# The two low-ceiling games' escalating per-tier cost (base / increment / cap) …
+		tuning.basketball_tier_base_cost,
+		tuning.basketball_tier_cost_increment,
+		tuning.basketball_tier_cost_cap,
+		tuning.memory_tier_base_cost,
+		tuning.memory_tier_cost_increment,
+		tuning.memory_tier_cost_cap,
+		# … and Balance's keep-alive seconds-per-point (its one tuned timer entry).
+		tuning.balance_keepalive_seconds_per_point
 	)
 
 

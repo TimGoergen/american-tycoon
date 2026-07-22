@@ -51,11 +51,10 @@ const ZONE_GHOST_TIME := 0.5
 ## Everything below is gated on challenge_mode; normal (reward/prestige) play is untouched.
 ## ALL VALUES FIRST-PASS — DEVICE-TUNE (feel is device-only).
 
-## Marker speed in Challenge Mode: it slowly RISES AND FALLS over many LOCKS (a lock-based wave) around
-## a lively centre — quick enough to feel alive (Tim, 2026-07-21: the earlier per-lock creep was too
-## slow). Sampled once per lock, so the speed is steady within each sweep (no fast wobble).
-const CHALLENGE_SPEED_MID := BASE_SPEED * 1.5        # centre of the speed wave (lively baseline)
-const CHALLENGE_SPEED_AMP := BASE_SPEED * 0.45       # how far the speed rises/falls from the centre
+## Marker speed in Challenge Mode: it slowly RISES AND FALLS over many LOCKS (a lock-based wave) across
+## the SAME speed range regular mode sweeps — from BASE_SPEED up to its top speed after TARGET_LOCKS of
+## SPEED_RAMP (Tim, 2026-07-22: it needs to reach regular mode's fast end, not just creep slowly). The
+## range is computed in _challenge_marker_speed. Sampled once per lock, so speed is steady per sweep.
 const CHALLENGE_SPEED_PERIOD_LOCKS := 14.0           # locks for one slow fast -> slow -> fast cycle
 
 ## Zone half-width in Challenge Mode: a slow grow/shrink between these modest bounds, waving over many
@@ -160,13 +159,13 @@ func begin(tuning: TuningConfig) -> void:
 	_rng.randomize()
 	_marker_pos = 0.0
 	_marker_dir = 1.0
-	# Challenge Mode's sweep speed rides a slow lock-based wave (starts at the wave's centre); normal
-	# mode starts at BASE_SPEED and multiplies by SPEED_RAMP per lock.
-	_marker_speed = CHALLENGE_SPEED_MID if challenge_mode else BASE_SPEED
+	_success_count = 0
+	# Challenge Mode's sweep speed rides a slow lock-based wave across regular mode's speed range
+	# (starts at the wave's centre); normal mode starts at BASE_SPEED and ×SPEED_RAMP per lock.
+	_marker_speed = _challenge_marker_speed() if challenge_mode else BASE_SPEED
 	_zone_drift_dir = 1.0
 	_locks_until_flip = _rng.randi_range(CHALLENGE_ZONE_FLIP_LOCKS_MIN, CHALLENGE_ZONE_FLIP_LOCKS_MAX)
 	_locks = 0
-	_success_count = 0
 	_accuracy_sum = 0.0
 	_running = true
 	# Live legacy-gem spawn chance so Balance Tuning edits take effect next round. No gem is
@@ -426,10 +425,14 @@ func _current_zone_half() -> float:
 
 
 ## Challenge Mode: the sweep speed for the current successful-lock count — a slow wave that rises and
-## falls over many locks (period CHALLENGE_SPEED_PERIOD_LOCKS) around a lively centre. Sampled once per
-## lock so the speed is steady within each sweep.
+## falls over many locks (period CHALLENGE_SPEED_PERIOD_LOCKS), spanning the SAME range regular mode
+## sweeps: from BASE_SPEED (its opening) up to BASE_SPEED × SPEED_RAMP^(TARGET_LOCKS-1) (its top after a
+## full run). Sampled once per lock so the speed is steady within each sweep.
 func _challenge_marker_speed() -> float:
-	return CHALLENGE_SPEED_MID + CHALLENGE_SPEED_AMP * sin(TAU * float(_success_count) / CHALLENGE_SPEED_PERIOD_LOCKS)
+	var fast := BASE_SPEED * pow(SPEED_RAMP, float(TARGET_LOCKS - 1))
+	var mid := (BASE_SPEED + fast) * 0.5
+	var amp := (fast - BASE_SPEED) * 0.5
+	return mid + amp * sin(TAU * float(_success_count) / CHALLENGE_SPEED_PERIOD_LOCKS)
 
 
 ## Challenge Mode only: the zone half-width for the current LOCK count — a slow cosine wave between

@@ -82,8 +82,15 @@ const PREMIUM_SCORE_VALUE := 3
 # Challenge coins drift horizontally as they fall (a left-right sway) instead of dropping straight
 # down, so catching them takes tracking. Each coin sways around its own spawn column (base_x) with a
 # random phase, off the shared _challenge_time clock. Reward-mode coins never sway.
-const CHALLENGE_SWAY_AMPLITUDE := 90.0  # peak horizontal drift, px, to each side of the spawn column
-const CHALLENGE_SWAY_PERIOD := 1.6      # seconds for one full left-right sway
+const CHALLENGE_SWAY_AMPLITUDE := 45.0  # peak horizontal drift, px, to each side (Tim 2026-07-22: halved)
+## Each coin sways at its OWN random speed (period drawn per coin from this range), so the drifts no
+## longer share one rhythm (Tim, 2026-07-22).
+const CHALLENGE_SWAY_PERIOD_MIN := 1.0  # seconds for one full left-right sway — fastest sway
+const CHALLENGE_SWAY_PERIOD_MAX := 2.8  # slowest sway
+## Per-coin random multiplier on the wave/archetype fall speed, so no two coins fall at quite the same
+## rate (Tim, 2026-07-22).
+const CHALLENGE_FALL_JITTER_MIN := 0.75
+const CHALLENGE_FALL_JITTER_MAX := 1.35
 
 var _caught: int = 0
 var _missed: int = 0
@@ -218,7 +225,8 @@ func _process(delta: float) -> void:
 		if sway_amp > 0.0:
 			var base_x: float = coin.get_meta("base_x", coin.position.x)
 			var sway_phase: float = coin.get_meta("sway_phase", 0.0)
-			coin.position.x = base_x + sway_amp * sin(_challenge_time * TAU / CHALLENGE_SWAY_PERIOD + sway_phase)
+			var sway_period: float = coin.get_meta("sway_period", CHALLENGE_SWAY_PERIOD_MAX)
+			coin.position.x = base_x + sway_amp * sin(_challenge_time * TAU / sway_period + sway_phase)
 		if coin.position.y > area_size.y:
 			_missed += 1
 			var drop_center := Vector2(coin.position.x + coin.size.x / 2.0, area_size.y)
@@ -260,6 +268,9 @@ func _challenge_coin_params() -> Dictionary:
 			size *= ARCHETYPE_SMALL_SIZE_MULT
 			speed *= ARCHETYPE_SMALL_SPEED_MULT
 
+	# A per-coin random jitter on the fall speed so coins don't fall in lockstep (Tim, 2026-07-22).
+	speed *= _rng.randf_range(CHALLENGE_FALL_JITTER_MIN, CHALLENGE_FALL_JITTER_MAX)
+
 	# Keep the size within the readable floor (low-vision, §1b) and a sane ceiling.
 	size = clampf(size, MIN_COIN_SIZE, START_COIN_SIZE)
 	return {
@@ -283,6 +294,7 @@ func _spawn_coin(area_width: float) -> void:
 	var size := _spawn_size
 	var fall_speed := FALL_SPEED
 	var sway_amp := 0.0
+	var sway_period := 0.0
 	var value := 1
 	var is_premium := false
 	if challenge_mode:
@@ -293,6 +305,7 @@ func _spawn_coin(area_width: float) -> void:
 		value = int(params["value"])
 		# A gentle per-coin variation in sway width so the drifts don't all look identical.
 		sway_amp = CHALLENGE_SWAY_AMPLITUDE * _rng.randf_range(0.6, 1.0)
+		sway_period = _rng.randf_range(CHALLENGE_SWAY_PERIOD_MIN, CHALLENGE_SWAY_PERIOD_MAX)
 
 	var coin := Button.new()
 	coin.text = "$"
@@ -363,6 +376,7 @@ func _spawn_coin(area_width: float) -> void:
 		coin.set_meta("sway_amp", sway_amp)
 		coin.set_meta("base_x", spawn_x)
 		coin.set_meta("sway_phase", _rng.randf_range(0.0, TAU))
+		coin.set_meta("sway_period", sway_period)
 	else:
 		var max_x: float = maxf(0.0, area_width - size)
 		spawn_x = _rng.randf_range(0.0, max_x)

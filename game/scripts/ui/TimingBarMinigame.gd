@@ -355,6 +355,11 @@ func _on_lock() -> void:
 		# subtract a lock, but the count yo-yoing up and down read as a treadmill; Tim, 2026-07-11.)
 		_miss_flash = 1.0
 		_freeze_success = false  # draw the gray drop-shadow "miss" burst during the freeze
+		# CHALLENGE mode only: a missed lock costs keep-alive time. A successful lock earns 1 point, so
+		# we emit 1.0 and the host drains miss_penalty_ratio x 1 x seconds_per_point. Reward mode never
+		# emits, so its "a miss just wastes time" behavior is unchanged.
+		if challenge_mode:
+			challenge_time_penalty.emit(1.0)
 		# Red "MISS!" chip at the marker so a wasted lock reads like every other game's feedback
 		# (Tim, 2026-07-11). Red = failure, never a success.
 		if _bar != null:

@@ -165,13 +165,11 @@ func get_performance() -> float:
 	return clampf(net / float(TARGET_COINS), 0.0, 1.0)
 
 
-## Challenge Mode's running high score = coins CAUGHT this run. It only ever increases (a miss
-## never subtracts here — see the class note), so the host can sample it live for a high-score bar.
+## Challenge Mode's running high score = coins CAUGHT this run. MONOTONIC — a miss never subtracts here,
+## so the host can sample it live for a non-decreasing high-score bar. A missed coin's time cost is
+## delivered separately through the host's challenge_time_penalty channel (see _process), NOT by dropping
+## the score.
 func get_score() -> int:
-	if challenge_mode:
-		# Missed coins count against you (Tim, 2026-07-22): each drop subtracts from the score, and the
-		# host's keep-alive timer drains on the drop. Floored at 0 so tiers/readouts never go negative.
-		return maxi(0, _caught - _missed)
 	return _caught
 
 
@@ -239,6 +237,13 @@ func _process(delta: float) -> void:
 			coin.position.x = base_x + sway_amp * sin(_challenge_time * TAU / sway_period + sway_phase)
 		if coin.position.y > area_size.y:
 			_missed += 1
+			# CHALLENGE mode only: a dropped coin costs keep-alive time proportional to what catching it
+			# would have added. Emit the coin's OWN value (a premium coin is worth 3), so missing a premium
+			# costs proportionally more — exactly miss_penalty_ratio x that value at the host. Reward mode
+			# never emits, so its scoring/timing is unchanged.
+			if challenge_mode:
+				var dropped_value := int(coin.get_meta("value", 1))
+				challenge_time_penalty.emit(float(dropped_value))
 			var drop_center := Vector2(coin.position.x + coin.size.x / 2.0, area_size.y)
 			_coins.remove_at(i)
 			coin.queue_free()

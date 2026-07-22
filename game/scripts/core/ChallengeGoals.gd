@@ -138,14 +138,20 @@ static func game_keys() -> Array:
 static var bonus_scale := 1.0    # global x on every payout (tuning.challenge_bonus_scale)
 static var timer_start := 6.0    # keep-alive timer's starting seconds (tuning.challenge_timer_start_seconds)
 static var timer_cap := 15.0     # keep-alive timer's max seconds (tuning.challenge_timer_cap_seconds)
+# The fraction of a hit's time-gain a MISS costs the keep-alive timer (tuning.challenge_miss_penalty_ratio).
+# The backing var is `miss_penalty`, read through the miss_penalty_ratio() accessor below — a var and a
+# func cannot share a name in GDScript, so this follows the same var/accessor split as timer_start /
+# timer_start_seconds().
+static var miss_penalty := 0.5
 
 
 ## Push the knobs in from tuning. Called by DynastyState wherever the other stateless tables are
 ## configured, so every bonus/timer query sees the tuned values.
-static func configure(p_bonus_scale: float, p_timer_start: float, p_timer_cap: float) -> void:
+static func configure(p_bonus_scale: float, p_timer_start: float, p_timer_cap: float, p_miss_penalty_ratio: float) -> void:
 	bonus_scale = p_bonus_scale
 	timer_start = p_timer_start
 	timer_cap = p_timer_cap
+	miss_penalty = p_miss_penalty_ratio
 
 
 # ── The math ──────────────────────────────────────────────────────────────────
@@ -242,3 +248,10 @@ static func timer_start_seconds(game_key := "") -> float:
 ## The keep-alive timer's maximum seconds — top-ups never bank past this (tuning knob).
 static func timer_cap_seconds() -> float:
 	return timer_cap
+
+
+## The fraction of a hit's time-gain that a MISS costs the keep-alive timer (0.5 = half). When a
+## challenge minigame emits Minigame.challenge_time_penalty(points), the host drains the timer by
+## miss_penalty_ratio() x points x seconds_per_point (tuning.challenge_miss_penalty_ratio).
+static func miss_penalty_ratio() -> float:
+	return miss_penalty

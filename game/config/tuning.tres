@@ -49,3 +49,4 @@ autosave_cadence = 10.0
 challenge_bonus_scale = 1.0
 challenge_timer_start_seconds = 6.0
 challenge_timer_cap_seconds = 15.0
+challenge_miss_penalty_ratio = 0.5

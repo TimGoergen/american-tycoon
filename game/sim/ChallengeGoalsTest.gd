@@ -64,7 +64,7 @@ func _check(label: String, condition: bool) -> void:
 # ---------------------------------------------------------------------------
 func _test_tier_for_score() -> void:
 	print("-- tier_for_score = floor(score/STEP), clamped to MAX_TIER, monotonic --")
-	ChallengeGoals.configure(1.0, 6.0, 15.0)  # scale 1.0 for a clean read
+	ChallengeGoals.configure(1.0, 6.0, 15.0, 0.5)  # scale 1.0 for a clean read
 	var game := ChallengeGoals.TIMING_BAR       # STEP = 1.0
 	var step := ChallengeGoals.score_step(game)
 
@@ -140,7 +140,7 @@ func _test_payout_schedule() -> void:
 # ---------------------------------------------------------------------------
 func _test_bonus_sums() -> void:
 	print("-- income_bonus_for / legacy_bonus_for sum same-track payouts x bonus_scale --")
-	ChallengeGoals.configure(1.0, 6.0, 15.0)
+	ChallengeGoals.configure(1.0, 6.0, 15.0, 0.5)
 
 	# Nothing cleared -> both bonuses 0.
 	_check("income_bonus_for(0) is 0", is_zero_approx(ChallengeGoals.income_bonus_for(0)))
@@ -159,12 +159,12 @@ func _test_bonus_sums() -> void:
 	_check("a mastered game gives +4% Legacy (1+2+1)", is_equal_approx(ChallengeGoals.legacy_bonus_for(30), 0.04))
 
 	# The bonus_scale knob scales BOTH tracks.
-	ChallengeGoals.configure(0.5, 6.0, 15.0)
+	ChallengeGoals.configure(0.5, 6.0, 15.0, 0.5)
 	_check("bonus_scale 0.5 halves the income bonus (+2% at tier 30)",
 		is_equal_approx(ChallengeGoals.income_bonus_for(30), 0.02))
 	_check("bonus_scale 0.5 halves the Legacy bonus (+2% at tier 30)",
 		is_equal_approx(ChallengeGoals.legacy_bonus_for(30), 0.02))
-	ChallengeGoals.configure(1.0, 6.0, 15.0)
+	ChallengeGoals.configure(1.0, 6.0, 15.0, 0.5)
 
 	# Whole-mode totals sum across games. Two mastered games -> +8% each track.
 	var tiers := {ChallengeGoals.TIMING_BAR: 30, ChallengeGoals.MATCH_THREE: 30}
@@ -364,10 +364,11 @@ func _test_configure_from_tuning_gotcha(tuning: TuningConfig) -> void:
 	# Poke the statics with bogus values, set DIFFERENT values on the tuning fields, then build a
 	# dynasty. Construction must overwrite the bogus statics with the tuning fields' values — which is
 	# exactly why a sim must set the TUNING field, not the static (setting the static is futile).
-	ChallengeGoals.configure(99.0, 99.0, 99.0)
+	ChallengeGoals.configure(99.0, 99.0, 99.0, 99.0)
 	tuning.challenge_bonus_scale = 0.75
 	tuning.challenge_timer_start_seconds = 5.0
 	tuning.challenge_timer_cap_seconds = 12.0
+	tuning.challenge_miss_penalty_ratio = 0.6
 	var _dynasty := DynastyState.new(ConfigLoader.load_property_configs(), tuning)
 	_check("building a dynasty overwrote the static bonus_scale from tuning",
 		is_equal_approx(ChallengeGoals.bonus_scale, 0.75))
@@ -375,3 +376,5 @@ func _test_configure_from_tuning_gotcha(tuning: TuningConfig) -> void:
 		is_equal_approx(ChallengeGoals.timer_start_seconds(), 5.0))
 	_check("building a dynasty overwrote the static timer_cap from tuning",
 		is_equal_approx(ChallengeGoals.timer_cap_seconds(), 12.0))
+	_check("building a dynasty overwrote the static miss_penalty_ratio from tuning",
+		is_equal_approx(ChallengeGoals.miss_penalty_ratio(), 0.6))

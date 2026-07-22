@@ -20,6 +20,11 @@ signal completed(performance: float)
 ## nothing happen. `after` may be an empty Callable.
 signal banner_requested(text: String, color: Color, after: Callable)
 
+## Emitted in challenge mode when the player MISSES; `points` is what a matching HIT would have earned.
+## The host drains the keep-alive timer by miss_penalty_ratio x points x seconds_per_point. A type only
+## emits it in challenge mode (reward/prestige rounds never do); the host owns the actual drain + gating.
+signal challenge_time_penalty(points: float)
+
 ## The host's outcome curve, set by the host BEFORE begin() so a type that wants to align its
 ## internal scoring to where the shared "full" (1.0x) line falls can read it. `keep_floor` is
 ## the multiplier at performance 0; `bonus_max` is the extra-high bonus above 1.0x at

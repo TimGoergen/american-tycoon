@@ -1247,6 +1247,11 @@ func start_challenge(type_script: Script) -> void:
 	# A type shouldn't self-complete in Challenge Mode, but connect anyway — a stray completion is
 	# simply ignored (see _on_minigame_completed).
 	_active_minigame.completed.connect(_on_minigame_completed)
+	# A MISS drains the keep-alive timer (Catch's dropped coin, Timing's failed lock). The type emits
+	# challenge_time_penalty(points) — what a matching HIT would have earned — and the host drains the
+	# clock (see _on_challenge_time_penalty). Connected here on the FRESH per-run instance, so it can
+	# never double-connect across runs.
+	_active_minigame.challenge_time_penalty.connect(_on_challenge_time_penalty)
 
 	_active_type_key = _active_minigame.display_name()
 	_challenge_high = ChallengeScores.get_high_score(_active_type_key)
@@ -1452,9 +1457,12 @@ func _tick_challenge_timer(delta: float) -> void:
 		_challenge_time_left -= delta
 		var score := _active_minigame.get_score() if _active_minigame != null else 0
 		var gained := score - _challenge_last_score
-		# A negative gain DRAINS the timer — only Catch Money can produce one (a missed coin drops its
-		# score, so missed coins count against you; Tim 2026-07-22). Every other game's score only rises.
-		_challenge_time_left += float(gained) * ChallengeGoals.seconds_per_point(_active_type_key)
+		# Every game's get_score() is MONOTONIC (catches / locks / points only ever rise), so a top-up
+		# only ever ADDS time — the `gained > 0` guard skips the no-op zero-gain frames. A MISS never
+		# shows up here; its time cost arrives through the explicit challenge_time_penalty channel
+		# (see _on_challenge_time_penalty), which drains the timer directly.
+		if gained > 0:
+			_challenge_time_left += float(gained) * ChallengeGoals.seconds_per_point(_active_type_key)
 		_challenge_last_score = score
 		_challenge_time_left = clampf(_challenge_time_left, 0.0, ChallengeGoals.timer_cap_seconds())
 	# Advance the low-time pulse phase and refresh the readout every frame — even while busy, so a
@@ -1466,6 +1474,19 @@ func _tick_challenge_timer(delta: float) -> void:
 		# it can't re-trigger while the end view is up.
 		_challenge_ended = true
 		_end_challenge()
+
+
+## A MISS in a challenge run drains the keep-alive timer (Plans/Challenge_Mode.md). The active minigame
+## emits Minigame.challenge_time_penalty(points), where `points` is what a matching HIT would have earned
+## (Catch: the dropped coin's value; Timing: 1 for a failed lock). We drain by the SAME rate a hit tops
+## up (seconds_per_point), scaled by the tunable miss-penalty ratio — so a miss costs miss_penalty_ratio x
+## what the hit was worth. Floored at 0. Gated to an ACTIVE run so a stray emit never drains a dead clock.
+func _on_challenge_time_penalty(points: float) -> void:
+	if not _challenge_mode or _challenge_ended:
+		return
+	var drain := ChallengeGoals.miss_penalty_ratio() * points * ChallengeGoals.seconds_per_point(_active_type_key)
+	_challenge_time_left = maxf(0.0, _challenge_time_left - drain)
+	_refresh_challenge_timer_bar()
 
 
 ## Update the keep-alive timer bar: the seconds readout, the low-time red-pulse, and a redraw so the

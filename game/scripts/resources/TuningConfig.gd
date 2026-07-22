@@ -491,6 +491,11 @@ extends Resource
 ## strong streak can't stockpile a huge cushion (Wave 2 mechanic). Plans/Challenge_Mode.md.
 @export var challenge_timer_cap_seconds: float = 15.0  # feel-tune
 
+## Fraction of a hit's time-gain that a MISS costs the keep-alive timer, in challenge minigames (0.5 =
+## half). A dropped Catch coin / a failed Timing lock drains this ratio x what catching/landing it would
+## have added, so missing hurts proportionally to the hit it replaced. Plans/Challenge_Mode.md.
+@export var challenge_miss_penalty_ratio: float = 0.5  # feel-tune
+
 # --- Prestige minigame (GDD §5.5, Spec §9.3) ---
 # At prestige the player plays a minigame whose performance sets how much of the run's base
 # Legacy they KEEP: legacy_awarded = floor(base_legacy × mult). Reward curve reshaped (Tim,

@@ -169,6 +169,7 @@ const DESCRIPTIONS := {
 	"challenge_bonus_scale": "Global x on every Challenge tier payout, both tracks (1.0 = authored ~24% income + 24% Legacy across all six games maxed).",
 	"challenge_timer_start_seconds": "Challenge keep-alive run timer's starting seconds — a run begins with this on the clock and drains until scoring tops it up (Wave 2).",
 	"challenge_timer_cap_seconds": "Challenge keep-alive run timer's max seconds — top-ups never bank the clock past this (Wave 2).",
+	"challenge_miss_penalty_ratio": "Fraction of a hit's time-gain a MISS costs the keep-alive timer (0.5 = half): a dropped Catch coin / failed Timing lock drains this x what the hit would have added.",
 	"crash_multiplier": "Income multiplier during a Market Crash event.",
 	"crash_duration_minutes": "Market Crash length (active minutes).",
 	"audit_settle_rate": "Audit settlement cost as a fraction of net worth.",

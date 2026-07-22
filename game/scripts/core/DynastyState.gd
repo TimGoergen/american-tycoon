@@ -255,7 +255,8 @@ func _configure_retention_pricing() -> void:
 	ChallengeGoals.configure(
 		tuning.challenge_bonus_scale,
 		tuning.challenge_timer_start_seconds,
-		tuning.challenge_timer_cap_seconds
+		tuning.challenge_timer_cap_seconds,
+		tuning.challenge_miss_penalty_ratio
 	)
 
 

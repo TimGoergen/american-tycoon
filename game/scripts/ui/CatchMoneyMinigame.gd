@@ -20,6 +20,10 @@ const TARGET_COINS := 18
 ## flat (plan §2.3, "Harder"). Both values are first-pass and UN-PLAYTESTED — confirm on-device.
 const SPAWN_INTERVAL_START := 0.55
 const SPAWN_INTERVAL_END := 0.38
+## Challenge Mode uses a slower, fixed spawn interval than the reward-round rush, so the board isn't
+## crowded — challenge difficulty comes from coin speed + the keep-alive timer, not clutter (Tim,
+## 2026-07-22: "too many coins on screen").
+const CHALLENGE_SPAWN_INTERVAL := 0.66
 ## How fast a coin falls (px/sec in the 1080-wide space).
 const FALL_SPEED := 340.0
 const COIN_SIZE := 96
@@ -57,7 +61,7 @@ const CHALLENGE_WAVE_PERIOD := 9.0
 # they are small and fast. SIZE and SPEED move together (in phase), so "hard" means small AND fast.
 const CHALLENGE_SIZE_EASY := COIN_SIZE * 1.35
 const CHALLENGE_SIZE_HARD := COIN_SIZE * 0.60
-const CHALLENGE_SPEED_SLOW := FALL_SPEED * 0.80
+const CHALLENGE_SPEED_SLOW := FALL_SPEED * 0.96     # Tim 2026-07-22: raised ~20% so no coin is too slow
 const CHALLENGE_SPEED_FAST := FALL_SPEED * 1.65
 
 # --- CHALLENGE MODE coin archetypes -----------------------------------------------------------
@@ -75,7 +79,7 @@ const ARCHETYPE_SMALL_CHANCE := 0.30
 # A PREMIUM coin: rarer, visually distinct (emerald with a gold rim, labelled with its worth), and
 # worth PREMIUM_SCORE_VALUE catches instead of 1 toward the cumulative challenge score. Premium
 # coins are never legacy coins (kept visually separate to avoid clutter). First-pass; device-tune.
-const PREMIUM_COIN_CHANCE := 0.12
+const PREMIUM_COIN_CHANCE := 0.06     # Tim 2026-07-22: halved — green premium coins were too common
 const PREMIUM_SCORE_VALUE := 3
 
 # --- CHALLENGE MODE curving falls -------------------------------------------------------------
@@ -174,6 +178,8 @@ func result_summary() -> String:
 ## Seconds to wait before the next spawn, ramping from START down to END as the batch empties so
 ## the round speeds up toward the end (the late-round "rush").
 func _current_spawn_interval() -> float:
+	if challenge_mode:
+		return CHALLENGE_SPAWN_INTERVAL
 	var progress := float(_spawned) / float(TARGET_COINS)
 	return lerpf(SPAWN_INTERVAL_START, SPAWN_INTERVAL_END, clampf(progress, 0.0, 1.0))
 

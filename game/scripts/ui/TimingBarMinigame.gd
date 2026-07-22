@@ -64,10 +64,13 @@ const CHALLENGE_ZONE_WIDE := ZONE_HALF               # widest (easiest) the chal
 const CHALLENGE_ZONE_NARROW := ZONE_HALF * 0.7       # narrowest (hardest) — a modest shrink, not tiny
 const CHALLENGE_ZONE_PERIOD_LOCKS := 16.0            # locks for one slow wide -> narrow -> wide cycle
 
-## Zone drift in Challenge Mode: the gold zone glides slowly along the bar. It reverses at the ends (a
-## clean edge bounce) AND flips direction every few locks (Tim, 2026-07-21), so the target keeps
-## changing course without being random or fast.
-const CHALLENGE_ZONE_DRIFT_SPEED := 0.035            # bar-fractions per second (slow, steady glide)
+## Zone drift in Challenge Mode: the gold zone glides along the bar. It reverses at the ends (a clean
+## edge bounce) AND flips direction every few locks (Tim, 2026-07-21). Its glide SPEED also rises and
+## falls over locks (Tim, 2026-07-22) — a gentler swing than the marker's, so it speeds up and slows a
+## little rather than gliding at one static rate. See _challenge_zone_drift_speed.
+const CHALLENGE_ZONE_DRIFT_MID := 0.045              # centre glide speed (bar-fractions per second)
+const CHALLENGE_ZONE_DRIFT_AMP := 0.015              # modest rise/fall — much less swing than the marker
+const CHALLENGE_ZONE_DRIFT_PERIOD_LOCKS := 11.0      # locks for one slow -> fast -> slow drift cycle
 const CHALLENGE_ZONE_FLIP_LOCKS_MIN := 3             # fewest locks before the drift direction flips
 const CHALLENGE_ZONE_FLIP_LOCKS_MAX := 5             # most locks before the drift direction flips
 
@@ -277,7 +280,7 @@ func _process(delta: float) -> void:
 		# Slowly slide the zone, cleanly bouncing off the ends so the whole zone stays on the bar (center
 		# kept within one half-width of either edge, the same safe range _move_zone uses when it jumps).
 		# The direction only ever flips at an edge — a steady, predictable glide, never a random re-roll.
-		_zone_center += _zone_drift_dir * CHALLENGE_ZONE_DRIFT_SPEED * delta
+		_zone_center += _zone_drift_dir * _challenge_zone_drift_speed() * delta
 		var min_center := _zone_half
 		var max_center := 1.0 - _zone_half
 		if _zone_center <= min_center:
@@ -433,6 +436,13 @@ func _challenge_marker_speed() -> float:
 	var mid := (BASE_SPEED + fast) * 0.5
 	var amp := (fast - BASE_SPEED) * 0.5
 	return mid + amp * sin(TAU * float(_success_count) / CHALLENGE_SPEED_PERIOD_LOCKS)
+
+
+## Challenge Mode: the zone's current glide speed — a gentle lock-based wave around CHALLENGE_ZONE_DRIFT_MID
+## (a much smaller swing than the marker's, per Tim 2026-07-22), so the target speeds up and slows a
+## little as it travels rather than gliding at one static rate.
+func _challenge_zone_drift_speed() -> float:
+	return CHALLENGE_ZONE_DRIFT_MID + CHALLENGE_ZONE_DRIFT_AMP * sin(TAU * float(_success_count) / CHALLENGE_ZONE_DRIFT_PERIOD_LOCKS)
 
 
 ## Challenge Mode only: the zone half-width for the current LOCK count — a slow cosine wave between

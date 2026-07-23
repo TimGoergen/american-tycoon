@@ -1333,9 +1333,9 @@ func _format_cycle_duration(seconds: float) -> String:
 ##   0 owned (normal)   — cream panel, per-cycle payout in bold black.
 ##   1 unowned          — drab gray "locked" panel, dark-gray single-unit preview.
 ##   2 overheat-frozen  — the panel KEEPS its owned cream (the player still owns it; only the
-##     machine is down), but the income readout dims to the same dark gray the unowned preview
-##     uses: the figure still shows what the machine would pay, and the dim says it is paying
-##     nothing right now. Reuses the row's existing dim vocabulary rather than inventing one.
+##     machine is down). The income readout is NOT restyled: the full-cell OVERHEATED countdown
+##     plate is drawn over the bar and covers it, so the plate + timer carries the "down right now"
+##     message on its own (Tim, 2026-07-22 — chose the plate over also revealing a dimmed $0).
 ## Only rebuilds the styleboxes when the state actually flips, not every frame. (The portrait
 ## button's own look is set live by ManagerCircle.)
 func _apply_ownership_styling(owned: bool, frozen: bool) -> void:
@@ -1362,10 +1362,12 @@ func _apply_ownership_styling(owned: bool, frozen: bool) -> void:
 		_income_label.add_theme_color_override("font_color", UiPalette.DARK_GRAY)
 		_income_icon.modulate = Color(1, 1, 1, 0.5)
 	else:
-		# Frozen: owned panel, dimmed readout (see the function comment above).
+		# Frozen: still the owned cream panel (it shows through the plate's rounded corners). The
+		# income readout and icon are left as-is on purpose — the OVERHEATED countdown plate is drawn
+		# full over the bar cell and fully occludes them, so dimming them here was dead work that only
+		# made the code look like a $0 readout stays visible during a freeze; it does not. When the row
+		# thaws, want==0 restores the black readout (see the function comment above; Tim, 2026-07-22).
 		add_theme_stylebox_override("panel", UiPalette.make_panel_style())
-		_income_label.add_theme_color_override("font_color", UiPalette.DARK_GRAY)
-		_income_icon.modulate = Color(1, 1, 1, 0.5)
 
 
 ## The staff button's `pressed` handler. One action only — buy the next ladder rung —

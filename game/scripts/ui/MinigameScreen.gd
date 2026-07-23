@@ -1202,11 +1202,13 @@ func start_game(
 	_begin_title.text = _active_minigame.display_name()
 	_begin_howto.text = _active_minigame.how_to_play()
 	# Reward stakes on the gate (Challenge Mode replaces this in start_challenge). Upside-only sites
-	# frame it as pure upside; the amount-scaling sites warn that a weak round keeps less.
+	# frame it as pure upside; the amount-scaling sites warn that coming up short keeps less. Wording
+	# tracks the result screen's "CAME UP SHORT" verdict — the old "weak round" phrasing was left
+	# behind when that copy changed (Tim, 2026-07-22).
 	if _upside_only:
-		_begin_stakes.text = "Play well to earn a BONUS on this business — more income, faster cycles. A weak round or Skip just opens it at its base income. No penalty."
+		_begin_stakes.text = "Play well to earn a BONUS on this business — more income, faster cycles. Coming up short or a Skip just opens it at its base income. No penalty."
 	else:
-		_begin_stakes.text = "Play well to earn a BONUS on top of your inheritance. Skip to keep it as-is — a weak round keeps less."
+		_begin_stakes.text = "Play well to earn a BONUS on top of your inheritance. Skip to keep it as-is — coming up short keeps less."
 	_begin_stakes.visible = true
 	# A timed game warns the clock is about to start; a no-timer game (Memory) invites the player to
 	# take their time instead, so the hint never promises a clock that won't appear.
@@ -1936,7 +1938,10 @@ func _fill_amount_statement(mult: float) -> void:
 
 	if mult > 1.0 + 0.001:
 		_result_verdict_label.text = "GREAT ROUND"
-		_result_verdict_label.add_theme_color_override("font_color", Color("#2E6FD6"))
+		# Darkened from the original mid-blue so the celebratory verdict still reads over the
+		# translucent result card + themed backdrop (Tim, 2026-07-22 contrast pass, completing the
+		# 07-20 teal/shortfall darkening) — still clearly blue, just deep enough to hold contrast.
+		_result_verdict_label.add_theme_color_override("font_color", Color("#2E6FD6").darkened(0.25))
 		_stat_impact_key.text = "Minigame bonus  (+%d%%)" % int(round((mult - 1.0) * 100.0))
 		_stat_impact_val.text = "+%s" % _format_amount(delta)
 		_stat_impact_val.add_theme_color_override("font_color", UiPalette.DARK_MONEY_GREEN)
@@ -1947,10 +1952,11 @@ func _fill_amount_statement(mult: float) -> void:
 		# We now name the SHORTFALL itself ("−10%"), which is both honest about the loss and
 		# self-scaling: a small miss reads small. No math changed.
 		_result_verdict_label.text = "CAME UP SHORT"
-		# Darkened a touch so the pale (near-full) top of the keep gradient still reads on the
-		# translucent result card (Tim, 2026-07-20 contrast pass). _keep_color is shared with the
-		# in-round bar, so darken only here at the result call site.
-		_result_verdict_label.add_theme_color_override("font_color", _keep_color(mult).darkened(0.2))
+		# Any shortfall now gives up real reward (the keep floor is 0.9, so even a small miss costs
+		# income), so the verdict always reads as one flat alarm red instead of the keep gradient's
+		# gold-for-a-near-miss — a loss should never look celebratory (Tim, 2026-07-22). Darkened a
+		# touch so it reads on the translucent result card (2026-07-20 contrast pass).
+		_result_verdict_label.add_theme_color_override("font_color", UiPalette.KETCHUP_RED.darkened(0.2))
 		_stat_impact_key.text = "Short of full  (−%d%%)" % int(round((1.0 - mult) * 100.0))
 		_stat_impact_val.text = "−%s" % _format_amount(-delta)
 		_stat_impact_val.add_theme_color_override("font_color", UiPalette.KETCHUP_RED)

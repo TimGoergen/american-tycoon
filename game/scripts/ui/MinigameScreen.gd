@@ -79,6 +79,11 @@ const SKIP_GAP_BELOW_PANEL := 16.0
 ## card edges (Tim, 2026-07-09) — beyond the card's own content margin. The play board still fills.
 const CHROME_MARGIN := 28
 
+## The "best" sub-lines in the two-corner Challenge header read in a darker gray beneath the black
+## Score / Tier primaries (Tim, 2026-07-22), so the current value dominates and the record sits quietly
+## under it. Darker than UiPalette.DARK_GRAY (#6E6E6E) so it still reads on the translucent cream card.
+const CHALLENGE_BEST_GRAY := Color("#4A4A4A")
+
 ## How fast the spectrum bar's fill glides toward its true value (per-second lerp weight). The
 ## bar tracks a smoothed `_display_mult` rather than the raw live multiplier so it reads as a
 ## sweep, not a jitter — the single most-visible shared element, smoothed once here for all six
@@ -562,7 +567,7 @@ func _build_play_view() -> Control:
 	_score_label.add_theme_font_override("font", UiPalette.make_bold_font())
 	score_column.add_child(_score_label)
 
-	_highscore_label = _make_label("", UiPalette.FONT_SUBHEAD, Color.BLACK)
+	_highscore_label = _make_label("", UiPalette.FONT_SUBHEAD, CHALLENGE_BEST_GRAY)
 	_highscore_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	score_column.add_child(_highscore_label)
 
@@ -577,13 +582,13 @@ func _build_play_view() -> Control:
 	tier_column.add_theme_constant_override("separation", 2)
 	challenge_header_row.add_child(tier_column)
 
-	_challenge_tier_label = _make_label("", UiPalette.FONT_DISPLAY, UiPalette.DARK_GRAY)
+	_challenge_tier_label = _make_label("", UiPalette.FONT_DISPLAY, Color.BLACK)
 	_challenge_tier_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_challenge_tier_label.size_flags_horizontal = Control.SIZE_SHRINK_END
 	_challenge_tier_label.add_theme_font_override("font", UiPalette.make_bold_font())
 	tier_column.add_child(_challenge_tier_label)
 
-	_best_tier_label = _make_label("", UiPalette.FONT_SUBHEAD, UiPalette.DARK_GRAY)
+	_best_tier_label = _make_label("", UiPalette.FONT_SUBHEAD, CHALLENGE_BEST_GRAY)
 	_best_tier_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_best_tier_label.size_flags_horizontal = Control.SIZE_SHRINK_END
 	tier_column.add_child(_best_tier_label)
@@ -1447,12 +1452,15 @@ func _update_challenge_tier() -> void:
 	if _best_tier_label != null:
 		_best_tier_label.text = "Best: MAX" if best >= ChallengeGoals.MAX_TIER else "Best: %d" % best
 
-	# Apply the pulse as a brief scale-up + gold brighten, pivoting on the label's center so it grows
-	# from the middle rather than the top-left. At rest (pulse 0) it sits at scale 1.0 / full color.
+	# Apply the pulse as a brief scale-up + gold color flash, pivoting on the label's center so it grows
+	# from the middle rather than the top-left. At rest (pulse 0) it sits at scale 1.0 and its resting
+	# black. The flash uses the FONT COLOR, not modulate: modulate multiplies the glyph color, and the
+	# tier text is now black (0 × anything = 0), so a modulate brighten would be invisible — the color
+	# lerp flashes it toward gold on a tier-up and eases back to black (Tim, 2026-07-22).
 	_challenge_tier_label.pivot_offset = _challenge_tier_label.size * 0.5
 	_challenge_tier_label.scale = Vector2.ONE * (1.0 + 0.35 * _challenge_tier_pulse)
-	# modulate > 1.0 over-brightens (a flash toward light gold), easing back to WHITE (no tint) at rest.
-	_challenge_tier_label.modulate = Color.WHITE.lerp(Color(1.6, 1.45, 1.0), _challenge_tier_pulse)
+	_challenge_tier_label.add_theme_color_override(
+		"font_color", Color.BLACK.lerp(UiPalette.MUSTARD_GOLD, _challenge_tier_pulse))
 
 
 ## Advance the keep-alive run timer one frame (Wave 2, Plans/Challenge_Mode.md §1). Only called from

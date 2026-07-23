@@ -616,7 +616,12 @@ Headless balance simulator is built during M1–M2, not after.
 These are needed soon and run independently of the M-milestone narrative; schedule them
 against current work rather than a specific plateau:
 
-- **Start screen** — the app's entry/landing screen.
+- **Start screen** — the app's entry/landing screen. *(BUILT — realized as the welcome /
+  welcome-back screen (`WelcomeBackOverlay.gd`). The game ALWAYS opens to this overlay, never
+  straight into Main (Tim, 2026-06-24): `show_welcome()` shows a plain welcome when no offline
+  pile accrued, `show_pile(...)` shows the offline-return welcome-back when it did. So the app
+  always lands on a framed entry beat. Fully exists; may want a polish pass with the M3 art, but
+  no longer an open task — Tim, 2026-07-23.)*
 - **Settings screen** — player-facing options. *(Now folds into the proposed bottom tab
   bar as the Settings tab — UI Notes §7.)*
 - **Balance config screen** — a dev-facing tuning panel that reads/writes the `/config`

@@ -3,11 +3,13 @@
 **Date:** 2026-07-23. **Tooling:** `game/sim/PaybackStudy.gd` (new, payback-vs-units) +
 `game/sim/PaceStudy.gd` (existing, progression/feedback clocks).
 
-**DECISION (Tim, 2026-07-23): Option 2 — global `r0` 1.09 → 1.12 on the 12 Earth tiers
-(`config/properties/01–12`), pending an on-device feel-check of the opening grind.** The 40
-alien property configs (13–52) stay at 1.09: their band-0 floors are already large (they are
-all high-tier), so the "trivially self-funding" concern doesn't apply — but this does leave a
-split (Earth 1.12 / alien 1.09) that could be unified later if uniformity is preferred.
+**DECISION (Tim, 2026-07-23): global `r0` → 1.15 on the 12 Earth tiers
+(`config/properties/01–12`).** First applied at 1.12 (Option 2); device feel-check found the
+opening does NOT feel grindy when actively rushing, so bumped to 1.15 (Option 3). Dip depth now
+2.87× and the ATM band-0 floor ~2.07s. The 40 alien property configs (13–52) stay at 1.09:
+their band-0 floors are already large (all high-tier), so the "trivially self-funding" concern
+doesn't apply — but this leaves a split (Earth 1.15 / alien 1.09) that could be unified later if
+uniformity is preferred.
 
 ## The question
 

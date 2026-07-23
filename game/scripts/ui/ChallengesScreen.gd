@@ -27,9 +27,8 @@ signal closed
 ## unchanged. Main connects here to credit the tier and hand feedback back (show_challenge_credit).
 signal challenge_finished(game_key: String, final_score: int)
 
-# --- Art. The green money plate behind every game panel, and the per-game icons. basketball / green
-# gem reuse the games' own art; the other four are dedicated Challenge icons (Tim, 2026-07-22). ---
-const PANEL_PLATE := preload("res://art/ui/minigame_button.png")
+# --- Per-game icons. basketball / green gem reuse the games' own art; the other four are dedicated
+# Challenge icons (Tim, 2026-07-22). ---
 const ICON_BASKETBALL := preload("res://art/icons/basketball.svg")
 const ICON_MATCH_THREE := preload("res://art/icons/gem_green.svg")
 const ICON_CATCH := preload("res://art/icons/coin.svg")
@@ -37,23 +36,23 @@ const ICON_MEMORY := preload("res://art/icons/memory_pads.svg")
 const ICON_BALANCE := preload("res://art/icons/book.svg")
 const ICON_TIMING := preload("res://art/icons/lock.svg")
 
-## Height reserved for one game panel. Tall enough for the name + earned + next lines to sit inside the
-## plate's gold frame with breathing room (low-vision rule). Six of these scroll if the card is short.
-const PANEL_HEIGHT := 210
+## Height reserved for one game panel. Tall enough for the name + tier line beside the icon with
+## breathing room (low-vision rule). Six of these scroll if the card is short.
+const PANEL_HEIGHT := 180
 
-## The game icon's square size on the left of each panel.
-const ICON_SIZE := 132
+## The game icon's square size on the left of each panel (was 132; 15% smaller per Tim, 2026-07-22).
+const ICON_SIZE := 112
 
-## 9-slice insets for the green plate (in the 1574×454 texture's own pixels): the gold frame + rounded
-## corners stay crisp at these borders while the green centre stretches to the panel size. The bottom
-## carries the plate's baked drop shadow, so it gets a little extra.
-const PLATE_MARGIN_SIDE := 52
-const PLATE_MARGIN_TOP := 48
-const PLATE_MARGIN_BOTTOM := 60
+## The panel look (Tim, 2026-07-22): a rounded rectangle with a thick bright-gold outline over a light
+## green fill matching the main green of the old money-plate image. The pressed fill darkens on tap.
+const PANEL_GREEN := Color("#6FB85E")
+const PANEL_GREEN_PRESSED := Color("#5CA34C")
+const PANEL_BORDER_WIDTH := 8
+const PANEL_CORNER_RADIUS := 26
 
-## Inner padding between the plate's gold frame and the panel content, so nothing touches the bevel.
-const CONTENT_PAD_SIDE := 46
-const CONTENT_PAD_VERTICAL := 34
+## Inner padding between the gold border and the panel content, so nothing touches the outline.
+const CONTENT_PAD_SIDE := 34
+const CONTENT_PAD_VERTICAL := 22
 
 ## The bloodline whose cleared tiers + income bonus are shown. Threaded in from Main (setup) before
 ## the first open(); read fresh on every refresh so the screen is never stale.
@@ -285,40 +284,14 @@ func _refresh() -> void:
 ## Build one large, tappable game PANEL: the whole panel is the button (no separate PLAY). It wears the
 ## green plate, carries the game's icon on the left, and shows the name + earned tier/bonus + next goal.
 func _make_game_panel(game_key: String, type_script: Script) -> Control:
-	# The bloodline's cleared tier for this game, and its earned contribution to EACH reward track.
+	# The bloodline's cleared tier for this game. "MAX TIER" once there is no higher tier to reach;
+	# otherwise "TIER N" (Tim, 2026-07-22). The running income/Legacy totals live in the header, so the
+	# panel just names the tier — no per-game bonus breakdown or next-goal line.
 	var cleared_tier := int(_dynasty.challenge_highest_tiers.get(game_key, 0))
-	var earned_income := ChallengeGoals.income_bonus_for(cleared_tier) * 100.0
-	var earned_legacy := ChallengeGoals.legacy_bonus_for(cleared_tier) * 100.0
+	var tier_text := "MAX TIER" if cleared_tier >= ChallengeGoals.MAX_TIER else "TIER %d" % cleared_tier
 
-	# "Tier N cleared" plus whichever track contributions are nonzero (a fresh game shows tier 0 alone).
-	var earned_text := "Tier %d cleared" % cleared_tier
-	var earned_parts: Array = []
-	if earned_income > 0.001:
-		earned_parts.append("+%.1f%% income" % earned_income)
-	if earned_legacy > 0.001:
-		earned_parts.append("+%.1f%% legacy" % earned_legacy)
-	if not earned_parts.is_empty():
-		earned_text += "   " + "  ·  ".join(earned_parts)
-
-	# The next reward: the next tier that actually pays out (every 5th), the score to reach it, and
-	# which track it pays. -1 once the ladder is mastered (all six payouts earned).
-	var next_tier := ChallengeGoals.next_payout_tier(cleared_tier)
-	var next_text := ""
-	var mastered := next_tier == -1
-	if mastered:
-		next_text = "MASTERED — all rewards earned"
-	else:
-		var payout := ChallengeGoals.payout_at_tier(next_tier)
-		# The score to reach the next payout tier. score_to_reach_tier handles BOTH costing models —
-		# tier * STEP for the flat games, the escalating cumulative cost for Basketball/Memory — so this
-		# shows the correct target. NEVER score_step * tier here (wrong for the low-ceiling games).
-		var reach := int(round(ChallengeGoals.score_to_reach_tier(game_key, next_tier)))
-		var track := String(payout.get("type", "")).to_upper()
-		var pct := float(payout.get("pct", 0.0))
-		next_text = "Next: reach %s (tier %d)  →  +%d%% %s" % [_round_score(reach), next_tier, int(round(pct)), track]
-
-	# The whole panel is one Button wearing the green plate (Tim, 2026-07-22 — no separate PLAY). Its
-	# content is overlaid as mouse-ignoring children so every tap on the panel lands on the button.
+	# The whole panel is one Button (Tim, 2026-07-22 — no separate PLAY). Its content is overlaid as
+	# mouse-ignoring children so every tap on the panel lands on the button.
 	var panel := Button.new()
 	panel.focus_mode = Control.FOCUS_NONE
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -367,27 +340,19 @@ func _make_game_panel(game_key: String, type_script: Script) -> Control:
 	row.add_child(info)
 
 	info.add_child(_make_info_label(game_key, UiPalette.FONT_SUBHEAD, UiPalette.CREAM, true))
-	info.add_child(_make_info_label(earned_text, UiPalette.FONT_BODY, UiPalette.MUSTARD_GOLD, false))
-	# The next-reward line reads as an earned summit when mastered (bright gold, bold), a goal otherwise.
-	if mastered:
-		info.add_child(_make_info_label(next_text, UiPalette.FONT_LABEL, UiPalette.MUSTARD_GOLD, true))
-	else:
-		info.add_child(_make_info_label(next_text, UiPalette.FONT_LABEL, UiPalette.CREAM, false))
+	info.add_child(_make_info_label(tier_text, UiPalette.FONT_BODY, UiPalette.MUSTARD_GOLD, true))
 
 	return panel
 
 
-## The green money plate as a 9-sliced StyleBoxTexture: the gold frame + rounded corners stay crisp
-## while the green centre stretches to the panel. `pressed` darkens it slightly for tap feedback.
-func _make_plate_style(pressed: bool) -> StyleBoxTexture:
-	var style := StyleBoxTexture.new()
-	style.texture = PANEL_PLATE
-	style.texture_margin_left = PLATE_MARGIN_SIDE
-	style.texture_margin_right = PLATE_MARGIN_SIDE
-	style.texture_margin_top = PLATE_MARGIN_TOP
-	style.texture_margin_bottom = PLATE_MARGIN_BOTTOM
-	if pressed:
-		style.modulate_color = Color(0.88, 0.88, 0.88)
+## The panel look: a rounded rectangle with a thick bright-gold outline over a light green fill.
+## `pressed` darkens the green slightly for tap feedback.
+func _make_plate_style(pressed: bool) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = PANEL_GREEN_PRESSED if pressed else PANEL_GREEN
+	style.set_corner_radius_all(PANEL_CORNER_RADIUS)
+	style.set_border_width_all(PANEL_BORDER_WIDTH)
+	style.border_color = UiPalette.MUSTARD_GOLD
 	return style
 
 
@@ -437,20 +402,6 @@ func _update_edge_fade() -> void:
 			# Visible share above the viewport's bottom edge.
 			alpha = minf(alpha, clampf((view_height - panel_top) / panel.size.y, 0.0, 1.0))
 		panel.modulate.a = alpha
-
-
-## Format a whole score with thousands separators ("30,000"), so the higher-scale games (Match Three
-## reaches into the tens of thousands) read cleanly in the "Next: reach …" line.
-func _round_score(value: int) -> String:
-	var digits := str(absi(value))
-	var grouped := ""
-	var count := 0
-	for i in range(digits.length() - 1, -1, -1):
-		grouped = digits[i] + grouped
-		count += 1
-		if count % 3 == 0 and i > 0:
-			grouped = "," + grouped
-	return grouped
 
 
 ## One text line inside a game panel. `emphasize` faux-bolds it (used for the game name). A dark navy

@@ -12,6 +12,9 @@ signal dismissed
 ## The card's fixed column width (1080-wide design space) — wide enough to read, narrow enough to
 ## sit beside the control it points at.
 const CARD_WIDTH := 720.0
+## The card's inner content margin per side (matches UiPalette.make_panel_style's 12px plate
+## padding). The wrapped text width is the card width minus both margins.
+const CARD_PADDING := 12.0
 ## Gap between the card and the control it points at, and the minimum gap to any screen edge.
 const GAP_FROM_TARGET := 16.0
 const EDGE_MARGIN := 24.0
@@ -41,6 +44,12 @@ func _build_card() -> void:
 	_card.mouse_filter = Control.MOUSE_FILTER_STOP
 	_card.gui_input.connect(_on_card_input)
 
+	# Wrapped-text width = card width minus both content-margin sides. Pinning each label to this
+	# width is what makes AUTOWRAP actually wrap: without a fixed width a Label reports its FULL
+	# unwrapped text as its minimum width, which would balloon the card far past the screen (and
+	# then the on-screen clamp collapses it into a corner).
+	var text_width := CARD_WIDTH - CARD_PADDING * 2.0
+
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 12)
 	_card.add_child(column)
@@ -50,12 +59,14 @@ func _build_card() -> void:
 	_title_label.add_theme_font_size_override("font_size", UiPalette.FONT_CARD_BODY)
 	_title_label.add_theme_color_override("font_color", UiPalette.NAVY)
 	_title_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_title_label.custom_minimum_size.x = text_width
 	column.add_child(_title_label)
 
 	_body_label = Label.new()
 	_body_label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
 	_body_label.add_theme_color_override("font_color", UiPalette.NAVY)
 	_body_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_body_label.custom_minimum_size.x = text_width
 	column.add_child(_body_label)
 
 	var got_it := Button.new()

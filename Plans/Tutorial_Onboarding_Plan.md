@@ -136,7 +136,30 @@ Build proceeds by the §7 phases regardless — Phase 1 (framework + one anchore
 the on/off setting) ships first for a device look at the card feel/anchoring before the other 11
 hooks are wired, since anchoring is the part most worth validating once before replicating.
 
-## 9. Follow-up — progressive tab unlocking + attention cards (PLANNED, Tim 2026-07-23)
+## 9. Progressive tab unlocking + attention cards (BUILT, Tim 2026-07-23)
+
+**Corrected from the first draft below (chicken-and-egg caught by Tim):** you PRESTIGE from the
+Estate Planning tab ("Plan the Estate" lives there), and you normally only earn your first Legacy
+gem BY prestiging — so gating Estate behind "first gem / first prestige" would soft-lock the
+player out of prestige (bonus gems are only a chance). Fixed by gating Estate on when prestige
+first becomes AVAILABLE, which is exactly when that tab becomes useful:
+
+- **Estate tab** unlocks on `dynasty.can_perform_succession() or dynasty.upgrades.earned_lifetime
+  > 0` — the same "prestige is available" signal the "Plan the Estate" button already uses
+  (`Main._update_plan_button`). Before that it is grayed/disabled in place (no reflow). The
+  `prestige` card fires the frame it unlocks, anchored to the Estate tab button, directing the
+  first prestige.
+- **Family Ledger tab** unlocks on `dynasty.ancestors.size() > 0` (first prestige done). The new
+  `family_ledger` card fires anchored to the Ledger tab button.
+
+Both are effectively monotonic, so a tab never re-locks once shown. Locked look = a grayed
+`LIGHT_GRAY`/`MID_GRAY` plate (`_style_tab_button` disabled override), icon auto-dimmed by the
+Button's disabled state, honoring [[feedback-no-moving-ui]]. Superseded the old `prestige` trigger
+(which fired on first Estate-tab *open*). Original draft kept below for history.
+
+---
+
+### Original draft — progressive tab unlocking + attention cards (Tim 2026-07-23)
 
 Adjacent to the tutorial cards: **don't show a system before it's relevant, and make the tab
 *becoming available* the attention beat.** New players currently meet all four tabs at once, two

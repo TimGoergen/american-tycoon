@@ -283,6 +283,17 @@ func _process(delta: float) -> void:
 	if _tip_armed.get("minigames", false) and _minigame_played_once:
 		_fire_polled_tip("minigames", null)
 
+	# Progressive tab unlocking (Plans/Tutorial_Onboarding_Plan.md §9): the Estate tab unlocks when
+	# the player can FIRST prestige (you prestige FROM that tab, so it must open before the first
+	# prestige, not after); the Family Ledger after the first prestige (it has ancestors to show
+	# only then). Keep the locked/enabled state fresh, and fire an attention card at each tab the
+	# frame it goes live.
+	_refresh_locked_tabs()
+	if _tip_armed.get("prestige", false) and _estate_unlocked():
+		_fire_polled_tip("prestige", _tab_buttons[TAB_ESTATE])
+	if _tip_armed.get("family_ledger", false) and _ledger_unlocked():
+		_fire_polled_tip("family_ledger", _tab_buttons[TAB_LEDGER])
+
 	# Nudge the player toward an unopened tab the moment its first venture becomes affordable.
 	_venture_check_timer += delta
 	if _venture_check_timer >= VENTURE_CHECK_INTERVAL:
@@ -587,7 +598,7 @@ func _build_ui() -> void:
 	# the fact (Tim, 2026-07-23).
 	var tips_on := TutorialProgress.is_enabled()
 	for tip_id in ["getting_started", "first_property", "first_rush", "buy_mode", "first_hire",
-			"turbo_ready", "overdrive", "epochs", "minigames"]:
+			"turbo_ready", "overdrive", "epochs", "minigames", "prestige", "family_ledger"]:
 		_tip_armed[tip_id] = tips_on and not TutorialProgress.has_seen(tip_id)
 	# Signal-driven tip: the vent gesture, fired during an overdrive rush. (The offline-earnings
 	# concept is NOT a card — it is taught as a permanent line ON the welcome-back screen itself,
@@ -1412,8 +1423,6 @@ func _show_tab(index: int) -> void:
 	if index == TAB_ESTATE:
 		_legacy_screen.set_retention_entries(_build_retention_entries())
 		_legacy_screen.refresh()
-		# First time opening the Estate Office: teach the prestige / Legacy loop.
-		_maybe_show_tip("prestige", null)
 	elif index == TAB_LEDGER:
 		_ledger_screen.refresh(dynasty.ancestors, dynasty.lifetime_cash_earned)
 	elif index == TAB_SETTINGS and _minigame_check != null:
@@ -1440,6 +1449,14 @@ func _style_tab_button(button: Button, active: bool, index: int) -> void:
 	button.add_theme_stylebox_override("hover", box)
 	button.add_theme_stylebox_override("pressed", box)
 	button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	# A locked tab (Estate before you can prestige, Ledger before your first prestige) reads as an
+	# intentional grayed plate — not the default theme gray — keeping the same 12px frame + corners.
+	# Its icon auto-dims via the Button's disabled state. Progressive disclosure (Plans §9); the tab
+	# stays in place (no reflow), honoring the no-moving-UI rule.
+	var locked_box := box.duplicate() as StyleBoxFlat
+	locked_box.bg_color = UiPalette.LIGHT_GRAY
+	locked_box.border_color = UiPalette.MID_GRAY
+	button.add_theme_stylebox_override("disabled", locked_box)
 
 
 # ---------------------------------------------------------------------------
@@ -1586,6 +1603,25 @@ func _rush_control_of(row: PropertyRow) -> Control:
 
 func _hire_control_of(row: PropertyRow) -> Control:
 	return row.get_hire_button() if row != null else null
+
+
+## Keep the two gated nav tabs enabled/disabled to match their unlock state. Disabling a tab button
+## grays it (the locked stylebox) and blocks clicks — the tab stays in place, no reflow.
+func _refresh_locked_tabs() -> void:
+	_tab_buttons[TAB_ESTATE].disabled = not _estate_unlocked()
+	_tab_buttons[TAB_LEDGER].disabled = not _ledger_unlocked()
+
+
+## The Estate tab is available once the player can prestige (so "Plan the Estate", which lives in
+## that tab, is reachable) — or has ever prestiged (keeps it open forever after). Both are
+## effectively monotonic, so the tab never re-locks once shown.
+func _estate_unlocked() -> bool:
+	return dynasty.can_perform_succession() or dynasty.upgrades.earned_lifetime > 0
+
+
+## The Family Ledger is available once the first prestige has produced an ancestor to show.
+func _ledger_unlocked() -> bool:
+	return dynasty.ancestors.size() > 0
 
 
 func _on_tap_requested(prop_index: int) -> void:

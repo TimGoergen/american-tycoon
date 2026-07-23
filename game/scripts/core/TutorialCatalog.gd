@@ -56,8 +56,12 @@ const TIPS := {
 		"body": "You've earned an entire economy. A new civilization opens a market — and a new tier of staff — orders of magnitude larger.",
 	},
 	"prestige": {
-		"title": "The estate lives on",
-		"body": "When a tycoon dies, a lifetime of earnings becomes Legacy. Spend it in the Estate Office on permanent upgrades your heirs inherit.",
+		"title": "Plan your estate",
+		"body": "You've built enough to pass it on. Open the Estate tab to hand your fortune to an heir — it becomes Legacy to spend on permanent upgrades the whole dynasty keeps.",
+	},
+	"family_ledger": {
+		"title": "Your family history",
+		"body": "Every tycoon before you is recorded here — the fortune they built and how their run came to an end.",
 	},
 	"welcome_back": {
 		"title": "While you were out",

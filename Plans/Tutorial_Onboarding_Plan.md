@@ -135,3 +135,37 @@ Each phase is independently shippable and device-checkable.
 Build proceeds by the §7 phases regardless — Phase 1 (framework + one anchored card end-to-end +
 the on/off setting) ships first for a device look at the card feel/anchoring before the other 11
 hooks are wired, since anchoring is the part most worth validating once before replicating.
+
+## 9. Follow-up — progressive tab unlocking + attention cards (PLANNED, Tim 2026-07-23)
+
+Adjacent to the tutorial cards: **don't show a system before it's relevant, and make the tab
+*becoming available* the attention beat.** New players currently meet all four tabs at once, two
+of which do nothing early on.
+
+- **Estate Planning tab** — locked until the player first **earns a Legacy gem**. Nothing to do
+  in the Estate Office before you have Legacy to spend.
+- **Family Ledger tab** — locked until the player's **first prestige** (first death), since the
+  Ledger has no ancestor to show until then.
+- **Attention card on unlock** — the moment each tab first unlocks, fire a tutorial card (the
+  availability model from §4/§8: direct, don't narrate) pointing at the newly-live tab to
+  introduce the system. This **supersedes the current `prestige` tip trigger** (which today fires
+  on first Estate-tab *open*) — it should instead fire when the Estate tab *unlocks*. Adds a new
+  `family_ledger` tip on the Ledger unlock.
+
+**Reconcile with the standing no-moving-UI rule ([[feedback-no-moving-ui]]):** that rule says keep
+controls always visible with a gray disabled state rather than hiding/reflowing them. So the
+recommended implementation is **all four tabs always present in the bar, the two gated ones
+grayed/disabled until their unlock condition, then enabled (with the attention card)** — not tabs
+that appear/disappear and reflow the bar. Confirm with Tim whether he wants disabled-in-place
+(on-rule, stable layout, and a visible "locked, something's coming" teaser) or fully hidden.
+
+**Open question — what exactly is "first Legacy gem"?** Resolve whether the Estate unlock triggers
+on the first Legacy *awarded at death* (making it ≈ first prestige, nearly simultaneous with the
+Ledger unlock) or on a *bonus* gem earned earlier via a welcome-back / first-contact minigame
+(`Plans/Legacy_Bonus_System.md`), which would unlock Estate before the first death. Likely the
+former; confirm at implementation.
+
+**Implementation sketch:** tab enable/disable state in `_build_tab_bar` / the tab-unlock path;
+unlock conditions from dynasty state (`upgrades.earned_lifetime` / the Legacy wallet for the gem
+gate; `dynasty.ancestors` non-empty for the prestige gate); the two new/retargeted tips
+(`prestige` on Estate unlock, `family_ledger` on Ledger unlock) fired the frame the gate opens.

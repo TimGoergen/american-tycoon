@@ -546,7 +546,7 @@ extends Resource
 ## Match Three: keep-alive seconds each point adds to the run clock (points arrive in bulk, so tiny).
 @export var match3_keepalive_seconds_per_point: float = 0.012  # feel-tune
 ## Timing Bar: keep-alive seconds each successful lock adds to the run clock.
-@export var timing_keepalive_seconds_per_point: float = 3.0  # feel-tune
+@export var timing_keepalive_seconds_per_point: float = 0.9  # feel-tuned on device (Tim, 2026-07-22)
 ## Catch the Money: keep-alive seconds each caught coin adds to the run clock.
 @export var catch_keepalive_seconds_per_point: float = 1.5  # feel-tune
 

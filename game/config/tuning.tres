@@ -63,5 +63,5 @@ balance_keepalive_seconds_per_point = 2.0
 balance_zone_reroll_seconds = 1.3
 balance_zone_ease = 1.6
 match3_keepalive_seconds_per_point = 0.012
-timing_keepalive_seconds_per_point = 3.0
+timing_keepalive_seconds_per_point = 0.9
 catch_keepalive_seconds_per_point = 1.5

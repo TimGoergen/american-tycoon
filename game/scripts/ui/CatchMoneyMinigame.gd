@@ -23,7 +23,7 @@ const SPAWN_INTERVAL_END := 0.38
 ## Challenge Mode uses a slower, fixed spawn interval than the reward-round rush, so the board isn't
 ## crowded — challenge difficulty comes from coin speed + the keep-alive timer, not clutter (Tim,
 ## 2026-07-22: "too many coins on screen").
-const CHALLENGE_SPAWN_INTERVAL := 0.66
+const CHALLENGE_SPAWN_INTERVAL := 0.60  # Tim 2026-07-22: +10% spawn rate (was 0.66 -> 0.66/1.1)
 ## How fast a coin falls (px/sec in the 1080-wide space).
 const FALL_SPEED := 340.0
 const COIN_SIZE := 96
@@ -61,7 +61,7 @@ const CHALLENGE_WAVE_PERIOD := 9.0
 # they are small and fast. SIZE and SPEED move together (in phase), so "hard" means small AND fast.
 const CHALLENGE_SIZE_EASY := COIN_SIZE * 1.35
 const CHALLENGE_SIZE_HARD := COIN_SIZE * 0.60
-const CHALLENGE_SPEED_SLOW := FALL_SPEED * 0.96     # Tim 2026-07-22: raised ~20% so no coin is too slow
+const CHALLENGE_SPEED_SLOW := FALL_SPEED * 1.25     # Tim 2026-07-22: +30% minimum fall speed (was 0.96)
 const CHALLENGE_SPEED_FAST := FALL_SPEED * 1.65
 
 # --- CHALLENGE MODE coin archetypes -----------------------------------------------------------

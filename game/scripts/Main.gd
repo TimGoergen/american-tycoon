@@ -45,6 +45,7 @@ var _ledger_screen: FamilyLedgerScreen
 var _dev_panel: DevTuningPanel
 var _minigame_screen: MinigameScreen
 var _minigame_review_screen: MinigameReviewScreen
+var _challenges_screen: ChallengesScreen
 var _buy_mode_button: Button
 var _plan_button: Button
 ## Rich-text content overlaid on the plan button so the "(+x [gem])" parenthetical can show the
@@ -185,7 +186,7 @@ func _process(delta: float) -> void:
 	# it neither covers the game nor needs the freeze — Apply saves and reloads anyway.)
 	var modal_up := _will_screen.visible or _first_contact_overlay.visible \
 			or _minigame_screen.visible or _minigame_review_screen.visible \
-			or _venture_overlay.visible
+			or _challenges_screen.visible or _venture_overlay.visible
 	var overlay_up := modal_up or _welcome_overlay.visible
 	SecondaryTapButton.enabled = _active_tab == TAB_PROPERTY and not overlay_up
 
@@ -555,7 +556,27 @@ func _build_ui() -> void:
 	_minigame_review_screen = MinigameReviewScreen.new()
 	_minigame_review_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_minigame_review_screen.setup(tuning)
+	# A finished CHALLENGE run reports here so the dynasty can bank any newly-cleared tier
+	# (Plans/Challenge_Mode.md §5 step 2). The challenge runs on the review screen's own host, so the
+	# result bubbles up through it — Main holds the dynasty, credits, saves, and hands feedback back.
+	# BOTH the review screen (dev shortcut) and the player-facing ChallengesScreen host challenge runs,
+	# so we bind the source screen onto each connection: _on_challenge_finished renders the credit
+	# feedback back to whichever screen launched the run (see that handler).
+	_minigame_review_screen.challenge_finished.connect(
+		_on_challenge_finished.bind(_minigame_review_screen))
 	add_child(_minigame_review_screen)
+
+	# The player-facing CHALLENGES screen (Plans/Challenge_Mode.md §3.4, Phase 3): the real home for
+	# Challenge Mode, opened from the Settings CHALLENGES button. Like the review screen it owns its
+	# own minigame host and freezes the economy while up; its finished runs credit through the same
+	# source-bound handler so its own end view + row list refresh (not the review screen's).
+	_challenges_screen = ChallengesScreen.new()
+	_challenges_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_challenges_screen.setup(dynasty, MinigameScreen.MINIGAME_TYPES, tuning)
+	_challenges_screen.challenge_finished.connect(
+		_on_challenge_finished.bind(_challenges_screen))
+	_challenges_screen.closed.connect(_on_challenges_closed)
+	add_child(_challenges_screen)
 
 	_show_tab(TAB_PROPERTY)
 
@@ -1169,6 +1190,17 @@ func _build_settings_tab() -> Control:
 	stats_button.pressed.connect(_on_stats_pressed)
 	bottom_buttons.add_child(stats_button)
 
+	# Challenges: opens the player-facing CHALLENGES screen (Plans/Challenge_Mode.md §3.4) — beat your
+	# best in each minigame for a permanent global income bonus. This is the real home for Challenge
+	# Mode; the CHALLENGE toggle under Minigame Tuning above is now only a developer shortcut.
+	var challenges_button := Button.new()
+	challenges_button.custom_minimum_size = Vector2(0, tuning_button_height)
+	challenges_button.add_theme_font_size_override("font_size", TUNING_BUTTON_FONT)
+	UiPalette.style_button(challenges_button, false)
+	challenges_button.text = "CHALLENGES"
+	challenges_button.pressed.connect(_on_challenges_pressed)
+	bottom_buttons.add_child(challenges_button)
+
 	# About: opens the modal with the logo, name, version, and credits (Tim, 2026-07-09).
 	var about_button := Button.new()
 	about_button.custom_minimum_size = Vector2(0, tuning_button_height)
@@ -1426,6 +1458,18 @@ func _on_stats_closed() -> void:
 	pass
 
 
+## Challenges pressed: open the player-facing CHALLENGES screen. It reads the bloodline's cleared
+## tiers on open; the economy freezes while it (or a challenge run inside it) is up — see _process.
+func _on_challenges_pressed() -> void:
+	_challenges_screen.open()
+
+
+## The CHALLENGES screen's Back button was pressed. Nothing to restore — the screen self-hides and
+## the economy resumes (it was frozen only while the screen was up).
+func _on_challenges_closed() -> void:
+	pass
+
+
 ## Apply tuning edits: persist the overrides, save the run so no progress is lost,
 ## then reload the scene. Startup re-loads tuning with the new overrides layered
 ## over the baked defaults — the same proven reload path used after a succession.
@@ -1446,6 +1490,9 @@ func _on_dev_defaults_requested() -> void:
 ## reload, which re-runs startup with no save present and so begins a fresh run.
 func _on_dev_reset_dynasty_requested() -> void:
 	SaveManager.delete_save_file()
+	# Challenge Mode high scores (highest tier) live in their own user:// file, not the dynasty save,
+	# so wipe them too or they survive the reset (Tim, 2026-07-22).
+	ChallengeScores.clear()
 	get_tree().reload_current_scene()
 
 
@@ -1728,6 +1775,20 @@ func _on_legacy_bonus_earned(amount: int) -> void:
 		return
 	dynasty.upgrades.grant_bonus(amount)
 	SaveManager.save_dict_to_file(dynasty.to_save_dict())
+
+
+## A CHALLENGE run finished (Plans/Challenge_Mode.md §5 step 2). Credit the score into the dynasty:
+## if it cleared a higher tier than the bloodline had banked, the tier is recorded and the living
+## generation's global income bonus is refreshed immediately (inside credit_challenge_score). Persist
+## only when something actually changed, then hand the credit report back to the screen that LAUNCHED
+## the run so it can show the "NEW TIER" feedback on its end view (and, for the CHALLENGES screen,
+## refresh its row list). `screen` is bound onto the connection (see _build_ui) — either the dev
+## MinigameReviewScreen or the player-facing ChallengesScreen; both expose show_challenge_credit.
+func _on_challenge_finished(game_key: String, final_score: int, screen: Object) -> void:
+	var result := dynasty.credit_challenge_score(game_key, float(final_score))
+	if result["improved"]:
+		SaveManager.save_dict_to_file(dynasty.to_save_dict())
+	screen.show_challenge_credit(result)
 
 
 ## The minigame ended: persist the player's "skip future minigames" choice, then apply its

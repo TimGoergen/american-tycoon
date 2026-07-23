@@ -472,6 +472,84 @@ extends Resource
 # Legacy became a spendable upgrade currency. Per-level upgrade magnitudes and
 # costs now live in LegacyUpgradeCatalog.gd, not here.
 
+# --- Challenge Mode tier ladders (Plans/Challenge_Mode.md) ---
+# Each minigame climbs a FINITE authored ladder (tier = floor(score / per-game STEP), capped at tier
+# 30); a payout lands every 5th tier on a single schedule shared by all games, alternating income and
+# Legacy-yield and escalating in value, so each game maxes at +4% income + +4% Legacy (~24/24 across
+# all six — Tim's ~25/25 target). The payout schedule and per-game STEP live in ChallengeGoals; these
+# three knobs are the live-tunable global levers. All FIRST-PASS, device-tune.
+
+## Global multiplier on every Challenge tier payout, both tracks. 1.0 = the authored schedule (~24/24
+## across all six games). Raise to make mastery pay more, lower to soften it. Plans/Challenge_Mode.md.
+@export var challenge_bonus_scale: float = 1.0  # feel-tune
+
+## The Challenge keep-alive run TIMER's starting seconds — a run begins with this little on the clock
+## and drains until scoring tops it up (Wave 2 mechanic; ChallengeGoals reads it). Plans/Challenge_Mode.md.
+@export var challenge_timer_start_seconds: float = 6.0  # feel-tune
+
+## The Challenge keep-alive run TIMER's maximum seconds — top-ups never bank the clock past this, so a
+## strong streak can't stockpile a huge cushion (Wave 2 mechanic). Plans/Challenge_Mode.md.
+@export var challenge_timer_cap_seconds: float = 15.0  # feel-tune
+
+## Fraction of a hit's time-gain that a MISS costs the keep-alive timer, in challenge minigames (0.5 =
+## half). A dropped Catch coin / a failed Timing lock drains this ratio x what catching/landing it would
+## have added, so missing hurts proportionally to the hit it replaced. Plans/Challenge_Mode.md.
+@export var challenge_miss_penalty_ratio: float = 0.5  # feel-tune
+
+# --- Challenge Mode: the two low-ceiling games' ESCALATING per-tier cost (Plans/Challenge_Mode.md) ---
+# Micro Basketball (baskets sunk) and Memory Match (climbs completed) have a small get_score() ceiling,
+# so a flat STEP is a bad fit. Instead each tier costs min(base + floor((tier-1)/5) x increment, cap) in
+# that game's score units — cheap early, pricier every 5 tiers, capped. ChallengeGoals reads these.
+# ALL FIRST-PASS, DEVICE-TUNE.
+
+## Micro Basketball: cost (baskets) of each tier for tiers 1-5. At 1, tier 5 = 5 baskets (first payout).
+@export var basketball_tier_base_cost: float = 1.0  # feel-tune
+## Micro Basketball: added to the per-tier basket cost every 5 tiers (tier 6-10 cost base+this, etc.).
+@export var basketball_tier_cost_increment: float = 1.0  # feel-tune
+## Micro Basketball: the most a single tier can cost (baskets) — the escalation caps here.
+@export var basketball_tier_cost_cap: float = 5.0  # feel-tune
+## Micro Basketball: keep-alive seconds each sunk basket adds to the run clock (baskets are slow to
+## line up, so a fat top-up). One of six per-game keep-alive knobs (each game has one);
+## ChallengeGoals.seconds_per_point reads them.
+@export var basketball_keepalive_seconds_per_point: float = 3.5  # feel-tuned on device (Tim, 2026-07-22)
+
+## Memory Match: cost (climbs) of each tier for tiers 1-5. At 0.2, tier 5 ≈ 1 climb (first payout).
+@export var memory_tier_base_cost: float = 0.2  # feel-tune
+## Memory Match: added to the per-tier climb cost every 5 tiers.
+@export var memory_tier_cost_increment: float = 0.2  # feel-tune
+## Memory Match: the most a single tier can cost (climbs) — the escalation caps here.
+@export var memory_tier_cost_cap: float = 1.0  # feel-tune
+## Memory Match: keep-alive seconds each completed climb adds to the run clock (a climb is a big beat).
+@export var memory_keepalive_seconds_per_point: float = 4.0  # feel-tune
+
+# --- Balance the Books CHALLENGE-mode knobs (Plans/Challenge_Mode.md) ---
+# Balance's challenge round scores by time-in-zone. These four knobs shape the challenge feel and are
+# read by BalanceMinigame ONLY in challenge mode (the prestige/reward round keeps its own constants).
+# ALL FIRST-PASS, DEVICE-TUNE.
+
+## In-zone seconds needed to earn ONE Balance challenge point (get_score = time_in_zone / this).
+@export var balance_seconds_per_point: float = 1.0  # feel-tune
+## Keep-alive seconds each Balance challenge point adds to the run clock (ChallengeGoals.seconds_per_point).
+@export var balance_keepalive_seconds_per_point: float = 2.0  # feel-tune
+## Seconds between the Balance gold-zone re-rolling a new target center (challenge mode).
+@export var balance_zone_reroll_seconds: float = 1.3  # feel-tune
+## How fast the Balance gold-zone eases toward its target center, per second (challenge mode).
+@export var balance_zone_ease: float = 1.6  # feel-tune
+
+# --- Challenge Mode: the three FLAT games' keep-alive seconds-per-point (Plans/Challenge_Mode.md) ---
+# Match Three, Timing Bar and Catch the Money score on a flat STEP (no per-game tier knobs), but their
+# keep-alive top-up per point is still worth dialing. Sized inversely to how fast each scores so a
+# top-up feels comparable — Match Three racks up points in bulk (tiny per-point top-up), the slower
+# games grant a fat second or more. Defaults mirror ChallengeGoals' old SECONDS_PER_POINT table.
+# ALL FIRST-PASS, DEVICE-TUNE.
+
+## Match Three: keep-alive seconds each point adds to the run clock (points arrive in bulk, so tiny).
+@export var match3_keepalive_seconds_per_point: float = 0.012  # feel-tune
+## Timing Bar: keep-alive seconds each successful lock adds to the run clock.
+@export var timing_keepalive_seconds_per_point: float = 0.9  # feel-tuned on device (Tim, 2026-07-22)
+## Catch the Money: keep-alive seconds each caught coin adds to the run clock.
+@export var catch_keepalive_seconds_per_point: float = 1.5  # feel-tune
+
 # --- Prestige minigame (GDD §5.5, Spec §9.3) ---
 # At prestige the player plays a minigame whose performance sets how much of the run's base
 # Legacy they KEEP: legacy_awarded = floor(base_legacy × mult). Reward curve reshaped (Tim,

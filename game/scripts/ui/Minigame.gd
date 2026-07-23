@@ -20,6 +20,11 @@ signal completed(performance: float)
 ## nothing happen. `after` may be an empty Callable.
 signal banner_requested(text: String, color: Color, after: Callable)
 
+## Emitted in challenge mode when the player MISSES; `points` is what a matching HIT would have earned.
+## The host drains the keep-alive timer by miss_penalty_ratio x points x seconds_per_point. A type only
+## emits it in challenge mode (reward/prestige rounds never do); the host owns the actual drain + gating.
+signal challenge_time_penalty(points: float)
+
 ## The host's outcome curve, set by the host BEFORE begin() so a type that wants to align its
 ## internal scoring to where the shared "full" (1.0x) line falls can read it. `keep_floor` is
 ## the multiplier at performance 0; `bonus_max` is the extra-high bonus above 1.0x at
@@ -98,6 +103,13 @@ func is_busy() -> bool:
 ## `completed` itself when play is over (on a win, a miss, or its own bonus round).
 func uses_timer() -> bool:
 	return true
+
+## CHALLENGE MODE self-ending hook (Plans/Challenge_Mode.md, Wave A). Override to TRUE if this game
+## ends its OWN challenge run (via the `completed` signal — e.g. a wrong tap) instead of the shared
+## keep-alive timer. The host then skips the timer for it and treats `completed` as the run end.
+## (Memory will override this in Wave B.) Default false: the run is governed by the keep-alive timer.
+func challenge_self_ends() -> bool:
+	return false
 
 ## A short, human-readable name for this minigame type. The random prestige draw doesn't
 ## need it, but the Minigame Tuning review screen (Settings) lists every type by name so

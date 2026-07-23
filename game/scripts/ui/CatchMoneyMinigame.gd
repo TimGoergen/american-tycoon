@@ -20,6 +20,10 @@ const TARGET_COINS := 18
 ## flat (plan §2.3, "Harder"). Both values are first-pass and UN-PLAYTESTED — confirm on-device.
 const SPAWN_INTERVAL_START := 0.55
 const SPAWN_INTERVAL_END := 0.38
+## Challenge Mode uses a slower, fixed spawn interval than the reward-round rush, so the board isn't
+## crowded — challenge difficulty comes from coin speed + the keep-alive timer, not clutter (Tim,
+## 2026-07-22: "too many coins on screen").
+const CHALLENGE_SPAWN_INTERVAL := 0.60  # Tim 2026-07-22: +10% spawn rate (was 0.66 -> 0.66/1.1)
 ## How fast a coin falls (px/sec in the 1080-wide space).
 const FALL_SPEED := 340.0
 const COIN_SIZE := 96
@@ -44,6 +48,54 @@ const GLINT_PULSE_AMOUNT := 0.25
 ## instantly (Plans/Legacy_Bonus_System.md — "catch that coin earns the gem in addition").
 const LEGACY_GEM_TEXTURE := preload("res://art/icons/legacy_gem.svg")
 
+# --- CHALLENGE MODE difficulty waves (Tim playtest, 2026-07-20) --------------------------------
+# In CHALLENGE mode only, difficulty does NOT ramp once to max-speed/min-size and then flatline
+# (the old grind of chasing tiny fast coins forever). Instead coin SIZE and FALL SPEED breathe in
+# slow WAVES: stretches of bigger/slower coins, then smaller/faster, then back. The wave is driven
+# off a sine of accumulated challenge time (_challenge_time), NOT randomness, so it's smooth and
+# repeatable. All values here are FIRST-PASS and UN-PLAYTESTED — device-tune.
+#
+# One easy->hard->easy cycle takes this many seconds. Longer = the round changes texture more slowly.
+const CHALLENGE_WAVE_PERIOD := 9.0
+# The wave's easy and hard extremes. At the easy trough coins are big and slow; at the hard crest
+# they are small and fast. SIZE and SPEED move together (in phase), so "hard" means small AND fast.
+const CHALLENGE_SIZE_EASY := COIN_SIZE * 1.35
+const CHALLENGE_SIZE_HARD := COIN_SIZE * 0.60
+const CHALLENGE_SPEED_SLOW := FALL_SPEED * 1.25     # Tim 2026-07-22: +30% minimum fall speed (was 0.96)
+const CHALLENGE_SPEED_FAST := FALL_SPEED * 1.65
+
+# --- CHALLENGE MODE coin archetypes -----------------------------------------------------------
+# Alongside the wave baseline, each challenge coin also picks an archetype so a MIX falls together:
+# ordinary, a bigger/slower "lob", or a smaller/faster "dart". These multiply the wave's size/speed.
+const ARCHETYPE_BIG_SIZE_MULT := 1.25
+const ARCHETYPE_BIG_SPEED_MULT := 0.75
+const ARCHETYPE_SMALL_SIZE_MULT := 0.70
+const ARCHETYPE_SMALL_SPEED_MULT := 1.45
+# Roughly one third ordinary / big / small. Rolls below BIG_CHANCE are big-slow; below
+# BIG_CHANCE+SMALL_CHANCE are small-fast; the rest are ordinary.
+const ARCHETYPE_BIG_CHANCE := 0.30
+const ARCHETYPE_SMALL_CHANCE := 0.30
+
+# A PREMIUM coin: rarer, visually distinct (emerald with a gold rim, labelled with its worth), and
+# worth PREMIUM_SCORE_VALUE catches instead of 1 toward the cumulative challenge score. Premium
+# coins are never legacy coins (kept visually separate to avoid clutter). First-pass; device-tune.
+const PREMIUM_COIN_CHANCE := 0.06     # Tim 2026-07-22: halved — green premium coins were too common
+const PREMIUM_SCORE_VALUE := 3
+
+# --- CHALLENGE MODE curving falls -------------------------------------------------------------
+# Challenge coins drift horizontally as they fall (a left-right sway) instead of dropping straight
+# down, so catching them takes tracking. Each coin sways around its own spawn column (base_x) with a
+# random phase, off the shared _challenge_time clock. Reward-mode coins never sway.
+const CHALLENGE_SWAY_AMPLITUDE := 45.0  # peak horizontal drift, px, to each side (Tim 2026-07-22: halved)
+## Each coin sways at its OWN random speed (period drawn per coin from this range), so the drifts no
+## longer share one rhythm (Tim, 2026-07-22).
+const CHALLENGE_SWAY_PERIOD_MIN := 1.0  # seconds for one full left-right sway — fastest sway
+const CHALLENGE_SWAY_PERIOD_MAX := 2.8  # slowest sway
+## Per-coin random multiplier on the wave/archetype fall speed, so no two coins fall at quite the same
+## rate (Tim, 2026-07-22).
+const CHALLENGE_FALL_JITTER_MIN := 0.75
+const CHALLENGE_FALL_JITTER_MAX := 1.35
+
 var _caught: int = 0
 var _missed: int = 0
 var _spawned: int = 0
@@ -55,6 +107,9 @@ var _coins: Array = []  # live coin Buttons
 var _spawn_size: float = START_COIN_SIZE
 ## Accumulated time driving the shared coin-glint pulse (see GLINT_PULSE_SPEED).
 var _shine_phase: float = 0.0
+## Accumulated CHALLENGE-mode play time. Drives both the difficulty wave (size/speed) and the
+## horizontal sway of curving falls. Only advances in challenge mode; unused in reward mode.
+var _challenge_time: float = 0.0
 var _rng := RandomNumberGenerator.new()
 var _area: Control
 ## Chance any single spawned coin is a "legacy coin" carrying a bonus Legacy gem (from
@@ -110,8 +165,10 @@ func get_performance() -> float:
 	return clampf(net / float(TARGET_COINS), 0.0, 1.0)
 
 
-## Challenge Mode's running high score = coins CAUGHT this run. It only ever increases (a miss
-## never subtracts here — see the class note), so the host can sample it live for a high-score bar.
+## Challenge Mode's running high score = coins CAUGHT this run. MONOTONIC — a miss never subtracts here,
+## so the host can sample it live for a non-decreasing high-score bar. A missed coin's time cost is
+## delivered separately through the host's challenge_time_penalty channel (see _process), NOT by dropping
+## the score.
 func get_score() -> int:
 	return _caught
 
@@ -123,6 +180,8 @@ func result_summary() -> String:
 ## Seconds to wait before the next spawn, ramping from START down to END as the batch empties so
 ## the round speeds up toward the end (the late-round "rush").
 func _current_spawn_interval() -> float:
+	if challenge_mode:
+		return CHALLENGE_SPAWN_INTERVAL
 	var progress := float(_spawned) / float(TARGET_COINS)
 	return lerpf(SPAWN_INTERVAL_START, SPAWN_INTERVAL_END, clampf(progress, 0.0, 1.0))
 
@@ -147,6 +206,10 @@ func _process(delta: float) -> void:
 	# SPAWN_INTERVAL_END because _current_spawn_interval() clamps its progress to 1.0, so the
 	# late-round "rush" speed becomes the sustained speed rather than accelerating without bound —
 	# fast but still playable indefinitely.
+	# Advance the challenge clock that drives the difficulty wave and the curving-fall sway.
+	if challenge_mode:
+		_challenge_time += delta
+
 	if challenge_mode or _spawned < TARGET_COINS:
 		_spawn_timer += delta
 		if _spawn_timer >= _current_spawn_interval():
@@ -159,9 +222,28 @@ func _process(delta: float) -> void:
 	# (minigame lag pass, Tim 2026-07-06).
 	for i in range(_coins.size() - 1, -1, -1):
 		var coin: Control = _coins[i]
-		coin.position.y += FALL_SPEED * delta
+		# Each coin falls at its OWN speed (reward-mode coins all carry FALL_SPEED, so their motion is
+		# unchanged; challenge coins carry a wave/archetype speed set at spawn).
+		var fall_speed: float = coin.get_meta("fall_speed", FALL_SPEED)
+		coin.position.y += fall_speed * delta
+		# Challenge coins also sway horizontally around their spawn column (curving falls). A coin with
+		# zero sway amplitude — every reward-mode coin — keeps its straight-down x, so reward play is
+		# untouched.
+		var sway_amp: float = coin.get_meta("sway_amp", 0.0)
+		if sway_amp > 0.0:
+			var base_x: float = coin.get_meta("base_x", coin.position.x)
+			var sway_phase: float = coin.get_meta("sway_phase", 0.0)
+			var sway_period: float = coin.get_meta("sway_period", CHALLENGE_SWAY_PERIOD_MAX)
+			coin.position.x = base_x + sway_amp * sin(_challenge_time * TAU / sway_period + sway_phase)
 		if coin.position.y > area_size.y:
 			_missed += 1
+			# CHALLENGE mode only: a dropped coin costs keep-alive time proportional to what catching it
+			# would have added. Emit the coin's OWN value (a premium coin is worth 3), so missing a premium
+			# costs proportionally more — exactly miss_penalty_ratio x that value at the host. Reward mode
+			# never emits, so its scoring/timing is unchanged.
+			if challenge_mode:
+				var dropped_value := int(coin.get_meta("value", 1))
+				challenge_time_penalty.emit(float(dropped_value))
 			var drop_center := Vector2(coin.position.x + coin.size.x / 2.0, area_size.y)
 			_coins.remove_at(i)
 			coin.queue_free()
@@ -174,36 +256,118 @@ func _process(delta: float) -> void:
 		completed.emit(get_performance())
 
 
+## CHALLENGE-mode wave difficulty, 0 (easiest: big + slow) to 1 (hardest: small + fast). A cosine
+## remapped to [0,1] so the round OPENS at the easy trough (t=0 -> 0) and breathes up and down from
+## there — this is what gives the round its changing texture instead of a one-way ramp.
+func _challenge_difficulty() -> float:
+	return 0.5 - 0.5 * cos(_challenge_time * TAU / CHALLENGE_WAVE_PERIOD)
+
+
+## The size / fall speed / worth / premium flag for the NEXT challenge coin, combining the current
+## wave difficulty with a per-coin archetype (ordinary, big-slow, small-fast) and a premium roll.
+## Returns a dictionary so the spawn code stays readable. Challenge mode only.
+func _challenge_coin_params() -> Dictionary:
+	var difficulty := _challenge_difficulty()
+	var size := lerpf(CHALLENGE_SIZE_EASY, CHALLENGE_SIZE_HARD, difficulty)
+	var speed := lerpf(CHALLENGE_SPEED_SLOW, CHALLENGE_SPEED_FAST, difficulty)
+
+	# A premium coin ignores the archetype tweaks (it stays a clean, ordinary-shaped target) but is
+	# worth several catches. Never also a legacy coin — we keep the two special coins visually apart.
+	var is_premium := _rng.randf() < PREMIUM_COIN_CHANCE
+	if not is_premium:
+		var roll := _rng.randf()
+		if roll < ARCHETYPE_BIG_CHANCE:
+			size *= ARCHETYPE_BIG_SIZE_MULT
+			speed *= ARCHETYPE_BIG_SPEED_MULT
+		elif roll < ARCHETYPE_BIG_CHANCE + ARCHETYPE_SMALL_CHANCE:
+			size *= ARCHETYPE_SMALL_SIZE_MULT
+			speed *= ARCHETYPE_SMALL_SPEED_MULT
+
+	# A per-coin random jitter on the fall speed so coins don't fall in lockstep (Tim, 2026-07-22).
+	speed *= _rng.randf_range(CHALLENGE_FALL_JITTER_MIN, CHALLENGE_FALL_JITTER_MAX)
+
+	# Keep the size within the readable floor (low-vision, §1b) and a sane ceiling.
+	size = clampf(size, MIN_COIN_SIZE, START_COIN_SIZE)
+	return {
+		"size": size,
+		"fall_speed": speed,
+		"is_premium": is_premium,
+		"value": PREMIUM_SCORE_VALUE if is_premium else 1,
+	}
+
+
 ## The round coin: a mustard disc with a thick navy rim (so it reads against the cream card) and a
 ## white glint in the upper-left (so it looks like a shiny coin, not a flat button).
+##
+## In CHALLENGE mode the size/speed come from the difficulty wave + archetype (see
+## _challenge_coin_params), the coin sways as it falls, and some coins are premium (worth more). In
+## REWARD mode none of that applies: the coin uses the shrinking _spawn_size, FALL_SPEED, no sway,
+## and is worth 1 — exactly as before.
 func _spawn_coin(area_width: float) -> void:
 	_spawned += 1
+
+	var size := _spawn_size
+	var fall_speed := FALL_SPEED
+	var sway_amp := 0.0
+	var sway_period := 0.0
+	var value := 1
+	var is_premium := false
+	if challenge_mode:
+		var params := _challenge_coin_params()
+		size = float(params["size"])
+		fall_speed = float(params["fall_speed"])
+		is_premium = bool(params["is_premium"])
+		value = int(params["value"])
+		# A gentle per-coin variation in sway width so the drifts don't all look identical.
+		sway_amp = CHALLENGE_SWAY_AMPLITUDE * _rng.randf_range(0.6, 1.0)
+		sway_period = _rng.randf_range(CHALLENGE_SWAY_PERIOD_MIN, CHALLENGE_SWAY_PERIOD_MAX)
+
 	var coin := Button.new()
 	coin.text = "$"
-	coin.custom_minimum_size = Vector2(_spawn_size, _spawn_size)
-	coin.size = Vector2(_spawn_size, _spawn_size)
+	coin.custom_minimum_size = Vector2(size, size)
+	coin.size = Vector2(size, size)
 	# Scale the glyph with the coin so the "$" keeps filling it as the coin shrinks.
-	coin.add_theme_font_size_override("font_size", int(UiPalette.FONT_HEADLINE * _spawn_size / COIN_SIZE))
-	_style_coin(coin, _spawn_size)
+	coin.add_theme_font_size_override("font_size", int(UiPalette.FONT_HEADLINE * size / COIN_SIZE))
+	coin.set_meta("fall_speed", fall_speed)
+	coin.set_meta("value", value)
+	_style_coin(coin, size, is_premium)
 
 	# A small white highlight, ignored by the mouse so it never eats a tap. _process pulses its
 	# alpha for the living-glint shine.
 	var glint := Panel.new()
 	glint.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	glint.size = Vector2(_spawn_size * 0.30, _spawn_size * 0.22)
-	glint.position = Vector2(_spawn_size * 0.22, _spawn_size * 0.18)
+	glint.size = Vector2(size * 0.30, size * 0.22)
+	glint.position = Vector2(size * 0.22, size * 0.18)
 	var glint_style := StyleBoxFlat.new()
 	glint_style.bg_color = Color(1, 1, 1, 0.7)
-	glint_style.set_corner_radius_all(int(_spawn_size * 0.22))  # round the highlight into an oval
+	glint_style.set_corner_radius_all(int(size * 0.22))  # round the highlight into an oval
 	glint.add_theme_stylebox_override("panel", glint_style)
 	coin.add_child(glint)
 	coin.set_meta("glint", glint)
 
+	# A premium coin shows its worth ("x3") in a bold gold badge so the player reads instantly that
+	# it's worth chasing. Premium coins are never legacy coins (see _challenge_coin_params).
+	if is_premium:
+		var badge := Label.new()
+		badge.text = "x%d" % value
+		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		badge.size = Vector2(size, size * 0.5)
+		badge.position = Vector2(0.0, size * 0.5)
+		badge.add_theme_font_size_override("font_size", int(UiPalette.FONT_LABEL * size / COIN_SIZE))
+		badge.add_theme_font_override("font", UiPalette.make_bold_font())
+		badge.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD)
+		badge.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
+		badge.add_theme_constant_override("outline_size", 4)
+		coin.add_child(badge)
+
 	# With a small chance this is a "legacy coin": catching it collects a bonus Legacy gem on top of
 	# the normal catch. We flag it (read in _on_coin_caught) and overlay the gem art so it stands out
 	# as special and worth catching. A missed legacy coin just falls away like any other coin.
-	# Stop spawning legacy coins once the bonus is already earned (design rule 3 — no noise).
-	var is_legacy := not legacy_bonus_secured() and _rng.randf() < _legacy_coin_chance
+	# Stop spawning legacy coins once the bonus is already earned (design rule 3 — no noise). A
+	# premium coin is never also a legacy coin, so the two special looks never collide.
+	var is_legacy := not is_premium and not legacy_bonus_secured() and _rng.randf() < _legacy_coin_chance
 	coin.set_meta("legacy", is_legacy)
 	if is_legacy:
 		# The gem sits centered on the coin (mouse-ignored so it never eats the tap), sized to a
@@ -213,18 +377,31 @@ func _spawn_coin(area_width: float) -> void:
 		gem.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		gem.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		gem.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		gem.size = Vector2(_spawn_size * 0.62, _spawn_size * 0.62)
-		gem.position = (Vector2(_spawn_size, _spawn_size) - gem.size) / 2.0
+		gem.size = Vector2(size * 0.62, size * 0.62)
+		gem.position = (Vector2(size, size) - gem.size) / 2.0
 		coin.add_child(gem)
 
-	var max_x: float = maxf(0.0, area_width - _spawn_size)
-	coin.position = Vector2(_rng.randf_range(0.0, max_x), -_spawn_size)
+	# The spawn column. In challenge mode we inset it by the sway amplitude and record it as base_x
+	# so the coin sways left/right around it (see _process) without drifting off the card edges.
+	var spawn_x: float
+	if sway_amp > 0.0:
+		var lo: float = sway_amp
+		var hi: float = maxf(lo, area_width - size - sway_amp)
+		spawn_x = _rng.randf_range(lo, hi)
+		coin.set_meta("sway_amp", sway_amp)
+		coin.set_meta("base_x", spawn_x)
+		coin.set_meta("sway_phase", _rng.randf_range(0.0, TAU))
+		coin.set_meta("sway_period", sway_period)
+	else:
+		var max_x: float = maxf(0.0, area_width - size)
+		spawn_x = _rng.randf_range(0.0, max_x)
+	coin.position = Vector2(spawn_x, -size)
 	coin.pressed.connect(_on_coin_caught.bind(coin))
 	_area.add_child(coin)
 	_coins.append(coin)
 
 	# Spawn entrance: pop the coin up from small as it enters, so a new coin announces itself.
-	coin.pivot_offset = Vector2(_spawn_size / 2.0, _spawn_size / 2.0)
+	coin.pivot_offset = Vector2(size / 2.0, size / 2.0)
 	coin.scale = Vector2(0.3, 0.3)
 	var entrance := create_tween()
 	entrance.tween_property(coin, "scale", Vector2.ONE, 0.22) \
@@ -233,11 +410,13 @@ func _spawn_coin(area_width: float) -> void:
 
 ## A coin's look in every interaction state (catches free the coin instantly, so the pressed look
 ## barely shows — but keeping all states identical means a tap never flips it to a button skin).
-func _style_coin(coin: Button, size: float) -> void:
+## A PREMIUM coin (challenge mode only) reverses the palette — an emerald face with a bold gold rim
+## — so it reads at a glance as the special, higher-value coin. Ordinary coins are unchanged.
+func _style_coin(coin: Button, size: float, is_premium: bool = false) -> void:
 	var style := StyleBoxFlat.new()
-	style.bg_color = UiPalette.MUSTARD_GOLD
-	style.border_color = UiPalette.INK_NAVY
-	style.set_border_width_all(int(maxf(4.0, size * 0.07)))
+	style.bg_color = UiPalette.MONEY_GREEN if is_premium else UiPalette.MUSTARD_GOLD
+	style.border_color = UiPalette.MUSTARD_GOLD if is_premium else UiPalette.INK_NAVY
+	style.set_border_width_all(int(maxf(4.0, size * (0.10 if is_premium else 0.07))))
 	style.set_corner_radius_all(int(size / 2.0))  # full radius = a round coin
 	for state in ["normal", "hover", "pressed", "focus"]:
 		coin.add_theme_stylebox_override(state, style)
@@ -248,32 +427,42 @@ func _style_coin(coin: Button, size: float) -> void:
 func _on_coin_caught(coin: Button) -> void:
 	if not _running or not _coins.has(coin):
 		return
-	_caught += 1
-	# Every catch makes the NEXT spawn 5% smaller (compounding), down to the readable floor.
-	_spawn_size = maxf(MIN_COIN_SIZE, _spawn_size * SHRINK_FACTOR)
+	# A premium challenge coin is worth several catches toward the cumulative score; every other coin
+	# is worth 1 (reward-mode coins always carry value 1, so scoring there is unchanged).
+	var value := int(coin.get_meta("value", 1))
+	_caught += value
+	# REWARD mode only: every catch makes the NEXT spawn 5% smaller (compounding), down to the
+	# readable floor. Challenge mode drives coin size from the difficulty wave instead, so it must NOT
+	# shrink here — that per-catch shrink was exactly the old "race to tiny and flatline" grind.
+	if not challenge_mode:
+		_spawn_size = maxf(MIN_COIN_SIZE, _spawn_size * SHRINK_FACTOR)
 	var center := coin.position + coin.size / 2.0
 	# A legacy coin collects a bonus Legacy gem in addition to the normal catch (scoring below is
 	# unchanged). The host gates the actual payout by the round result; in Challenge Mode it just
 	# won't grant. We give an extra gem-earned cue on top of the normal catch juice.
 	var was_legacy := bool(coin.get_meta("legacy", false))
+	var was_premium := value > 1
 	_coins.erase(coin)
 	coin.queue_free()
-	_spawn_catch_effect(center, coin.size.x)
+	_spawn_catch_effect(center, coin.size.x, value)
 	# A context-specific result chip on every catch, matching how Match-3 badges a good action
 	# (Tim, 2026-07-11 — every minigame shows success feedback like Match-3). A legacy coin is the
-	# exceptional/bonus catch, so it gets a gold "JACKPOT!" chip; an ordinary catch gets a green
-	# "CAUGHT!". This stacks on top of the existing +1 pop and the legacy gem cue by design.
+	# exceptional/bonus catch, so it gets a gold "JACKPOT!" chip; a premium coin gets a green
+	# "+N PREMIUM!"; an ordinary catch gets a green "CAUGHT!". This stacks on top of the "+N" pop
+	# (and, for legacy, the gem cue) by design.
 	if was_legacy:
 		FloatingChip.spawn(_area, center, "JACKPOT!", UiPalette.MUSTARD_GOLD)
 		collect_legacy_gem()
 		_spawn_legacy_catch_effect(center, coin.size.x)
+	elif was_premium:
+		FloatingChip.spawn(_area, center, "+%d PREMIUM!" % value, UiPalette.MONEY_GREEN)
 	else:
 		FloatingChip.spawn(_area, center, "CAUGHT!", UiPalette.MONEY_GREEN)
 
 
 ## Catch reward: a white bloom that swells and fades where the coin was, plus a green "+1" that
 ## floats up — the host's juice vocabulary (white-flash + pop) applied to a catch.
-func _spawn_catch_effect(center: Vector2, coin_size: float) -> void:
+func _spawn_catch_effect(center: Vector2, coin_size: float, value: int = 1) -> void:
 	var bloom := Panel.new()
 	bloom.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bloom.size = Vector2(coin_size, coin_size)
@@ -291,7 +480,8 @@ func _spawn_catch_effect(center: Vector2, coin_size: float) -> void:
 	bloom_tween.chain().tween_callback(bloom.queue_free)
 
 	var pop := Label.new()
-	pop.text = "+1"
+	# Shows how many catches this coin was worth ("+1" for an ordinary coin, "+3" for a premium).
+	pop.text = "+%d" % value
 	pop.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
 	pop.add_theme_color_override("font_color", UiPalette.MONEY_GREEN)
 	pop.add_theme_font_override("font", UiPalette.make_bold_font())

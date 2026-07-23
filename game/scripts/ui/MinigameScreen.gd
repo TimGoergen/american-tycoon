@@ -29,6 +29,13 @@ signal back_pressed
 ## System.md). Main banks it to the dynasty wallet. Never emitted in review/Challenge or on Skip.
 signal legacy_bonus_earned(amount: int)
 
+## Emitted when a CHALLENGE run ends (DONE or Back), carrying the game's key (its display_name()) and
+## the final Minigame.get_score() (Plans/Challenge_Mode.md §5 step 2). The host has NO dynasty, so it
+## only reports the raw result — Main credits any newly-cleared tiers into the dynasty bonus and hands
+## the outcome back via show_challenge_credit for the "NEW TIER" feedback. This is separate from the
+## arcade high-score store (ChallengeScores), which _end_challenge still updates directly.
+signal challenge_finished(game_key: String, final_score: int)
+
 # The minigame library — the host draws one at random each round so the player doesn't know
 # which they'll get. Add new types here (Phase 2).
 const MINIGAME_TYPES := [
@@ -211,11 +218,68 @@ var _baked_backdrop_px: Vector2i = Vector2i.ZERO
 var _challenge_mode: bool = false
 var _score_label: Label
 var _highscore_label: Label
+## The one-row container holding Score + Best SIDE BY SIDE (Tim, 2026-07-21). The two used to stack as
+## separate centered lines, which ate a whole line of card height and shrank the game board; they now
+## share one row ("Score: 1,240   Best: 3,100"). Kept as a field so _set_challenge_chrome can show/hide
+## the row as a unit. The separate "Next tier" target LINE was removed entirely; the tier standing now
+## reads from the large tier display below the row (see _update_challenge_tier).
+var _challenge_score_row: Control
+## The CHALLENGE end view — shown when a run ends (DONE/Back) INSTEAD of closing straight away, so the
+## tier-credit feedback has somewhere to land (Challenge Mode Phase 2). A dedicated view, deliberately
+## separate from the reward `_result_view` (the reward statement must not carry challenge feedback).
+## `_challenge_score_label` shows the final score; `_challenge_credit_label` is filled by
+## show_challenge_credit with the "NEW TIER" line once Main reports the credit back.
+var _challenge_end_view: Control
+var _challenge_score_label: Label
+var _challenge_credit_label: Label
 ## The best score to beat this run — starts at the saved high score and rises live as the player
 ## passes it, so the "Best" readout ticks up in real time.
 var _challenge_high: int = 0
 ## The active type's display name — the key under which its Challenge high score is saved.
 var _active_type_key: String = ""
+
+## The keep-alive run timer (Wave 2, Plans/Challenge_Mode.md §1). A challenge run is NOT endless: the
+## clock starts low, drains in real time, and is topped up by every point scored. When it hits 0 the
+## run ends and the best tier is banked. These fields are CHALLENGE-ONLY — a reward round (start_game)
+## never touches them, so the keep-alive tension never leaks into a prestige/welcome-back round.
+##   `_challenge_time_left`  — seconds remaining on the clock right now.
+##   `_challenge_last_score` — the run's get_score() at the last top-up, so a frame's gain is the
+##                             difference (each gained point buys seconds_per_point seconds).
+##   `_challenge_ended`      — fire-once guard so the timer-death end path runs exactly once and never
+##                             re-triggers while the end view is up.
+##   `_challenge_low_pulse`  — a phase accumulator driving the low-time (<2s) warning pulse.
+var _challenge_time_left: float = 0.0
+var _challenge_last_score: int = 0
+var _challenge_ended: bool = false
+var _challenge_low_pulse: float = 0.0
+
+## The keep-alive timer's prominent readout: a horizontal bar that empties as the clock runs down,
+## with the seconds remaining printed over it. Shown only in challenge mode (in place of the reward
+## timer + spectrum bar). Turns red and pulses under CHALLENGE_TIMER_LOW_SECONDS — it is the core
+## tension of a run, so it is large and unmissable (low-vision rule).
+var _challenge_timer_margin: MarginContainer
+var _challenge_timer_bar: Control
+var _challenge_timer_seconds_label: Label
+## The timer bar's styleboxes, built once and reused so no StyleBoxFlat is allocated per frame
+## (minigame-lag rule): a dark track, the normal fill, and the low-time red fill.
+var _challenge_timer_track: StyleBoxFlat
+var _challenge_timer_fill: StyleBoxFlat
+var _challenge_timer_low: StyleBoxFlat
+
+## Below this many seconds left the keep-alive bar turns red and pulses — the "you're about to die"
+## warning (Plans/Challenge_Mode.md §1).
+const CHALLENGE_TIMER_LOW_SECONDS := 2.0
+
+## The large TIER display (Challenge Mode, ALL games — Tim, 2026-07-22). REPLACES the old tier-progress
+## bar, which read as empty at high tiers and only echoed information the tier numbers already carry. A
+## big bold "TIER 3 / 7" readout (current tier over best tier reached), centered in the chrome column,
+## that PULSES with a brief scale-up + gold brighten every time the CURRENT tier climbs a rung. Shown for
+## every challenge game (self-ending ones included, unlike the keep-alive timer bar).
+##   `_challenge_tier_pulse` — decaying [0,1] pop, set to 1 when the current tier rises, eased to 0 in ~0.4s.
+##   `_challenge_shown_tier` — the current tier last shown, so the pop fires once per crossing.
+var _challenge_tier_label: Label
+var _challenge_tier_pulse: float = 0.0
+var _challenge_shown_tier: int = 0
 
 ## The Get Ready gate's stakes and hint lines, kept as fields so start_game / start_challenge can
 ## set the wording per mode (reward stakes vs. "play as long as you like").
@@ -300,6 +364,10 @@ func _ready() -> void:
 	slot.add_child(_play_view)
 	_result_view = _build_result_view()
 	slot.add_child(_result_view)
+	# The Challenge end view shares the same slot (only one view is ever visible at a time), so the
+	# tier-credit feedback shows on the same card the run played on.
+	_challenge_end_view = _build_challenge_end_view()
+	slot.add_child(_challenge_end_view)
 
 	# The Begin gate floats on top of the card, covering the play/result views until the player
 	# presses Begin. Added to the panel after the slot so it draws over everything inside the card.
@@ -438,7 +506,9 @@ static func _clear_image_corners(image: Image, radius: int) -> void:
 
 func _build_play_view() -> Control:
 	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 12)
+	# Tightened 12 -> 10 (Tim, 2026-07-21) as part of reclaiming challenge-chrome height for the board;
+	# still a clear gap between the stacked rows.
+	column.add_theme_constant_override("separation", 10)
 
 	# The first row carries two things side by side: the Back button (review mode only) on the left,
 	# and the round timer right-aligned. It sits inside a MarginContainer so the Back button and timer
@@ -463,19 +533,72 @@ func _build_play_view() -> Control:
 	_purpose_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(_purpose_label)
 
-	# Challenge Mode readouts (hidden in normal reward rounds): the live score, big and central like
-	# the timer it replaces, with the best-to-beat under it. start_challenge shows them; start_game
-	# hides them.
+	# Challenge Mode readouts (hidden in normal reward rounds): the live score and the best-to-beat, now
+	# SIDE BY SIDE on ONE row (Tim, 2026-07-21) instead of two stacked centered lines. The score keeps the
+	# big display font it had (it replaces the timer as the focal point); Best sits a size down beside it.
+	# Reclaiming that stacked line — plus folding the old "Next tier" line into the progress bar below —
+	# gives the game board noticeably more height (the play area expands to fill whatever the chrome
+	# leaves). start_challenge fills them; _set_challenge_chrome shows/hides the whole row.
+	_challenge_score_row = HBoxContainer.new()
+	_challenge_score_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_challenge_score_row.add_theme_constant_override("separation", 28)
+	_challenge_score_row.visible = false
+	column.add_child(_challenge_score_row)
+
 	_score_label = _make_label("", UiPalette.FONT_DISPLAY, UiPalette.MONEY_GREEN)
-	_score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_score_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_score_label.add_theme_font_override("font", UiPalette.make_bold_font())
-	_score_label.visible = false
-	column.add_child(_score_label)
+	_challenge_score_row.add_child(_score_label)
 
 	_highscore_label = _make_label("", UiPalette.FONT_SUBHEAD, UiPalette.DARK_GOLD)
-	_highscore_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_highscore_label.visible = false
-	column.add_child(_highscore_label)
+	_highscore_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_challenge_score_row.add_child(_highscore_label)
+
+	# The large TIER display (Tim, 2026-07-22): REPLACES the tier-progress bar, which looked empty at high
+	# tiers and only echoed the tier numbers. A big bold "TIER 3 / 7" readout (current over best), centered
+	# in the chrome column, that PULSES each time the current tier climbs (see _update_challenge_tier). It
+	# sits a size ABOVE the Score label (FONT_PAGE_TITLE vs FONT_DISPLAY) so the tier is the clear focal
+	# point (low-vision rule). SHRINK_CENTER keeps it only as wide as its text so the pulse scales from its
+	# true center. Hidden until _set_challenge_chrome shows it.
+	_challenge_tier_label = _make_label("", UiPalette.FONT_PAGE_TITLE, UiPalette.DARK_GOLD)
+	_challenge_tier_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_challenge_tier_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_challenge_tier_label.add_theme_font_override("font", UiPalette.make_bold_font())
+	_challenge_tier_label.visible = false
+	column.add_child(_challenge_tier_label)
+
+	# The keep-alive TIMER bar (Challenge Mode only): a horizontal bar that empties as the clock runs
+	# down, the seconds remaining printed over it. It replaces the reward timer + spectrum bar in
+	# challenge play. Inside a MarginContainer so its sides line up with the rest of the chrome. Hidden
+	# until start_challenge shows it via _set_challenge_chrome.
+	var challenge_timer_margin := MarginContainer.new()
+	challenge_timer_margin.add_theme_constant_override("margin_left", CHROME_MARGIN)
+	challenge_timer_margin.add_theme_constant_override("margin_right", CHROME_MARGIN)
+	challenge_timer_margin.add_theme_constant_override("margin_top", 8)  # trimmed 14 -> 8 to reclaim board height
+	challenge_timer_margin.visible = false
+	column.add_child(challenge_timer_margin)
+	_challenge_timer_margin = challenge_timer_margin
+
+	_challenge_timer_bar = Control.new()
+	# 68 -> 62: modestly shorter to reclaim board height; still large and unmissable (low-vision rule) —
+	# it stays the tallest chrome bar because the keep-alive clock is the core tension of a run.
+	_challenge_timer_bar.custom_minimum_size = Vector2(0, 62)
+	_challenge_timer_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_challenge_timer_bar.draw.connect(_draw_challenge_timer_bar)
+	challenge_timer_margin.add_child(_challenge_timer_bar)
+	_build_challenge_timer_styleboxes()
+
+	# The seconds-remaining readout, centered OVER the bar (full-rect child), cream with an ink
+	# outline so it stays legible over both the dark track and the fill.
+	_challenge_timer_seconds_label = _make_label("", UiPalette.FONT_SUBHEAD, UiPalette.CREAM)
+	_challenge_timer_seconds_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_challenge_timer_seconds_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_challenge_timer_seconds_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_challenge_timer_seconds_label.add_theme_font_override("font", UiPalette.make_bold_font())
+	_challenge_timer_seconds_label.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
+	_challenge_timer_seconds_label.add_theme_constant_override("outline_size", 5)
+	_challenge_timer_seconds_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_challenge_timer_bar.add_child(_challenge_timer_seconds_label)
 
 	# The universal outcome bar — identical for every minigame type; it reads the active type's live
 	# performance. Two rounded SEGMENTS side by side (Tim, 2026-07-09): a green LEFT segment that fills
@@ -653,6 +776,78 @@ func _build_result_view() -> Control:
 	var continue_bottom := Control.new()
 	continue_bottom.custom_minimum_size = Vector2(0, CHROME_MARGIN)
 	column.add_child(continue_bottom)
+
+	return column
+
+
+## The CHALLENGE end view (Challenge Mode Phase 2): shown when a run ends (DONE/Back) instead of
+## closing straight away, so the tier-credit "NEW TIER" feedback has somewhere to land. Deliberately
+## separate from the reward `_result_view` — a challenge run banks no Legacy, so it shows the final
+## score and the credit line only, then a BACK TO LIST button that actually leaves.
+func _build_challenge_end_view() -> Control:
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 24)
+	column.visible = false
+
+	# An expanding spacer above the text block (mirrored below the button) centers the text vertically.
+	var top_spacer := Control.new()
+	top_spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	column.add_child(top_spacer)
+
+	var heading := _make_label("CHALLENGE COMPLETE", UiPalette.FONT_HEADLINE, UiPalette.NAVY)
+	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	column.add_child(heading)
+
+	# The final score (filled by _show_challenge_end from the run's get_score()).
+	_challenge_score_label = _make_label("", UiPalette.FONT_SUBHEAD, UiPalette.NAVY)
+	_challenge_score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	column.add_child(_challenge_score_label)
+
+	# The tier-credit line, filled by show_challenge_credit once Main reports the credit back. DARK_GOLD
+	# with a navy outline so the "NEW TIER" reward reads as a positive windfall AND stays legible over
+	# the translucent cream card + themed backdrop (same treatment as the reward-screen Legacy line, so
+	# it never washes out — a light color would). Large headline font for the low-vision rule.
+	_challenge_credit_label = _make_label("", UiPalette.FONT_HEADLINE, UiPalette.DARK_GOLD)
+	_challenge_credit_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_challenge_credit_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_challenge_credit_label.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
+	_challenge_credit_label.add_theme_constant_override("outline_size", 4)
+	_challenge_credit_label.visible = false
+	column.add_child(_challenge_credit_label)
+
+	# Push the exit button to the bottom of the card, mirroring the reward view's CONTINUE placement.
+	var bottom_spacer := Control.new()
+	bottom_spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	column.add_child(bottom_spacer)
+
+	# BACK TO LIST: an 8×-ratio button centered at 80% width (10 / 80 / 10 pads), matching CONTINUE. It
+	# is the ONLY control that actually leaves the run now — connected to _exit_challenge, NOT the play
+	# view's Back (which re-enters _end_challenge), so pressing it can't loop back into the end view.
+	var exit_row := HBoxContainer.new()
+	var left_pad := Control.new()
+	left_pad.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left_pad.size_flags_stretch_ratio = 1.0
+	exit_row.add_child(left_pad)
+
+	var exit_button := Button.new()
+	exit_button.custom_minimum_size = Vector2(0, 112)  # matches CONTINUE (80 * 1.4)
+	exit_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	exit_button.size_flags_stretch_ratio = 8.0
+	UiPalette.style_button(exit_button, true)
+	exit_button.text = "BACK TO LIST"
+	exit_button.pressed.connect(_exit_challenge)
+	exit_row.add_child(exit_button)
+
+	var right_pad := Control.new()
+	right_pad.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right_pad.size_flags_stretch_ratio = 1.0
+	exit_row.add_child(right_pad)
+
+	column.add_child(exit_row)
+
+	var exit_bottom := Control.new()
+	exit_bottom.custom_minimum_size = Vector2(0, CHROME_MARGIN)
+	column.add_child(exit_bottom)
 
 	return column
 
@@ -973,6 +1168,8 @@ func start_game(
 	_play_view.visible = false
 	_play_view.modulate = Color.WHITE
 	_result_view.visible = false
+	if _challenge_end_view != null:
+		_challenge_end_view.visible = false  # a reward round never shows the Challenge end view
 	_playing = false
 	_skip_button.visible = false  # revealed on Begin (see _start_active_round)
 	if _gem_badge != null:
@@ -1050,6 +1247,11 @@ func start_challenge(type_script: Script) -> void:
 	# A type shouldn't self-complete in Challenge Mode, but connect anyway — a stray completion is
 	# simply ignored (see _on_minigame_completed).
 	_active_minigame.completed.connect(_on_minigame_completed)
+	# A MISS drains the keep-alive timer (Catch's dropped coin, Timing's failed lock). The type emits
+	# challenge_time_penalty(points) — what a matching HIT would have earned — and the host drains the
+	# clock (see _on_challenge_time_penalty). Connected here on the FRESH per-run instance, so it can
+	# never double-connect across runs.
+	_active_minigame.challenge_time_penalty.connect(_on_challenge_time_penalty)
 
 	_active_type_key = _active_minigame.display_name()
 	_challenge_high = ChallengeScores.get_high_score(_active_type_key)
@@ -1058,9 +1260,35 @@ func start_challenge(type_script: Script) -> void:
 	# The skip control becomes the "I'm done" control in Challenge Mode.
 	_skip_button.text = "DONE"
 
+	# A SELF-ENDING game (Memory, Wave B) ends its own run via `completed` and uses NO keep-alive timer,
+	# so hide the timer bar for it (the progress bar + score/best/next-tier still show). A timer-driven
+	# game keeps the timer bar that _set_challenge_chrome already turned on.
+	if _challenge_timer_margin != null:
+		_challenge_timer_margin.visible = not _active_minigame.challenge_self_ends()
+
+	# Seed the keep-alive run timer (Wave 2): a small starting budget (a per-game override for a game
+	# that needs a longer runway, else the global knob), the run's opening score captured so the first
+	# top-up measures from it, and the fire-once guard cleared. The clock does not drain until the player
+	# presses Begin (the round isn't _playing yet), so this is just the initial state.
+	_challenge_time_left = ChallengeGoals.timer_start_seconds(_active_type_key)
+	_challenge_last_score = _active_minigame.get_score()
+	_challenge_ended = false
+	_challenge_low_pulse = 0.0
+	_refresh_challenge_timer_bar()
+
+	# Seed the tier display's pulse tracker to the run's OPENING tier so a fresh run doesn't pop on frame
+	# one, and clear any leftover pulse from a previous run. Seeding from the opening score (not the best)
+	# means every tier climbed THIS run pops, including re-climbing already-banked tiers.
+	var opening_score := _active_minigame.get_score() if _active_minigame != null else 0
+	_challenge_shown_tier = ChallengeGoals.tier_for_score(_active_type_key, opening_score)
+	_challenge_tier_pulse = 0.0
+	_update_challenge_tier()
+
 	_play_view.visible = false
 	_play_view.modulate = Color.WHITE
 	_result_view.visible = false
+	if _challenge_end_view != null:
+		_challenge_end_view.visible = false  # a fresh run starts on the gate, not the end view
 	_playing = false
 	_skip_button.visible = false  # revealed on Begin (see _start_active_round)
 	if _gem_badge != null:
@@ -1069,9 +1297,10 @@ func start_challenge(type_script: Script) -> void:
 	_begin_title.text = _active_minigame.display_name()
 	_begin_howto.text = _active_minigame.how_to_play()
 	_begin_framing.visible = false  # free play has no story to frame
-	_begin_stakes.text = "Challenge Mode — no timer, play as long as you like. Beat your best score!"
+	_begin_stakes.text = "Keep-alive challenge — the clock drains, and every point you score adds time. Bank your best tier before it runs out!"
 	_begin_stakes.visible = true
-	_begin_hint.visible = false
+	_begin_hint.text = "The clock starts when you press Begin."
+	_begin_hint.visible = true
 
 	_begin_overlay.modulate = Color.WHITE
 	_begin_overlay.visible = true
@@ -1083,8 +1312,17 @@ func start_challenge(type_script: Script) -> void:
 func _set_challenge_chrome(on: bool) -> void:
 	_timer_label.visible = not on
 	_keep_bar.visible = not on
-	_score_label.visible = on
-	_highscore_label.visible = on
+	# Score + Best now share one row — toggle the row as a unit so it vanishes cleanly in reward mode
+	# (no leftover empty line). The "Next tier" target line was removed; its info lives on the bar below.
+	if _challenge_score_row != null:
+		_challenge_score_row.visible = on
+	# The large tier display shows for EVERY challenge game (self-ending included).
+	if _challenge_tier_label != null:
+		_challenge_tier_label.visible = on
+	# The keep-alive timer bar takes the reward chrome's place in a challenge run. start_challenge
+	# overrides it OFF for a self-ending game (which has no keep-alive timer).
+	if _challenge_timer_margin != null:
+		_challenge_timer_margin.visible = on
 
 
 ## Begin pressed on the Get Ready gate: hide it, start the chosen type, and unpause the clock — the
@@ -1120,9 +1358,12 @@ func _process(delta: float) -> void:
 	if _gem_badge != null and _active_minigame != null \
 			and _active_minigame.get_legacy_gems_collected() > 0:
 		_gem_badge.visible = true
-	# Challenge Mode has no countdown and no win/loss — just keep the live score readout current.
+	# Challenge Mode: keep the live score readout current, then run the keep-alive timer (drain, top up
+	# by points scored, cap, and end the run at 0). Both are challenge-only — a reward round never
+	# reaches this branch, so the keep-alive clock never touches a prestige/welcome-back round.
 	if _challenge_mode:
 		_update_challenge_score()
+		_tick_challenge_timer(delta)
 		return
 	# A no-timer game (Memory) owns its own ending: no countdown and no max-early-out. Just keep the
 	# outcome bar gliding and wait for the game to emit `completed` on its own (a clear, a miss, or
@@ -1155,13 +1396,163 @@ func _update_challenge_score() -> void:
 	if score > _challenge_high:
 		_challenge_high = score
 	_highscore_label.text = "Best: %s" % _group_thousands(_challenge_high)
+	# Keep the large tier display current too — one call refreshes the current/best readout and advances
+	# any tier-up pulse (see _update_challenge_tier).
+	_update_challenge_tier()
 
 
-## A type finished on its own (e.g. the timing bar's last lock) — end with its result. Ignored in
-## Challenge Mode, which never ends on its own (the player taps DONE).
+## Refresh the large TIER display (Tim, 2026-07-22). Shows the CURRENT tier (from the live score) over
+## the BEST tier reached (from `_challenge_high`), or "TIER MAX" at the summit. Fires a pulse — a brief
+## scale-up + gold brighten — the instant the current tier climbs a rung, so a tier-up is unmissable
+## (low-vision rule). Called every frame from _update_challenge_score, and once at seed in start_challenge.
+func _update_challenge_tier() -> void:
+	if _challenge_tier_label == null:
+		return
+	var gk := _active_type_key
+	var score := _active_minigame.get_score() if _active_minigame != null else 0
+	var current := ChallengeGoals.tier_for_score(gk, score)
+	var best := ChallengeGoals.tier_for_score(gk, _challenge_high)
+	# Pop the display the moment the current tier rises past the last one we showed (once per crossing).
+	if current > _challenge_shown_tier:
+		_challenge_tier_pulse = 1.0
+	_challenge_shown_tier = current
+	# Decay the pulse toward 0 over ~0.4s (rate 2.5/sec). Uses the Control's own frame delta so no delta
+	# needs threading in here, mirroring the timer bar's decay pattern.
+	_challenge_tier_pulse = maxf(0.0, _challenge_tier_pulse - get_process_delta_time() * 2.5)
+
+	# The text: current over best, or MASTERED-style "TIER MAX" at the top of the ladder.
+	if current >= ChallengeGoals.MAX_TIER:
+		_challenge_tier_label.text = "TIER MAX"
+	else:
+		_challenge_tier_label.text = "TIER %d / %d" % [current, best]
+
+	# Apply the pulse as a brief scale-up + gold brighten, pivoting on the label's center so it grows
+	# from the middle rather than the top-left. At rest (pulse 0) it sits at scale 1.0 / full color.
+	_challenge_tier_label.pivot_offset = _challenge_tier_label.size * 0.5
+	_challenge_tier_label.scale = Vector2.ONE * (1.0 + 0.35 * _challenge_tier_pulse)
+	# modulate > 1.0 over-brightens (a flash toward light gold), easing back to WHITE (no tint) at rest.
+	_challenge_tier_label.modulate = Color.WHITE.lerp(Color(1.6, 1.45, 1.0), _challenge_tier_pulse)
+
+
+## Advance the keep-alive run timer one frame (Wave 2, Plans/Challenge_Mode.md §1). Only called from
+## _process while a challenge round is live (_playing true, _challenge_mode true):
+##   • PAUSE while the game is busy — Memory's playback, Match-3 cascades, Timing's freeze — so the
+##     player is never drained by time they can't act in. No drain, no top-up, and the last-score
+##     anchor is left alone (so points scored DURING the pause are credited when it ends).
+##   • Otherwise drain 1s per second, then top up by the points just gained (each point buys
+##     seconds_per_point seconds for this game), and clamp to [0, cap] — a hot streak can't stockpile
+##     an unlimited cushion.
+##   • At 0 the run ENDS, exactly once, through the same _end_challenge path DONE/Back use (records the
+##     arcade score, shows the end view + credit feedback, emits challenge_finished).
+func _tick_challenge_timer(delta: float) -> void:
+	if _challenge_ended:
+		return
+	# A SELF-ENDING game (Memory, Wave B) does not use the keep-alive timer at all — it ends its own run
+	# via `completed` (routed in _on_minigame_completed). Skip the whole drain/top-up for it; its timer
+	# bar is already hidden (see start_challenge).
+	if _active_minigame != null and _active_minigame.challenge_self_ends():
+		return
+	var busy := _active_minigame != null and _active_minigame.is_busy()
+	if not busy:
+		_challenge_time_left -= delta
+		var score := _active_minigame.get_score() if _active_minigame != null else 0
+		var gained := score - _challenge_last_score
+		# Every game's get_score() is MONOTONIC (catches / locks / points only ever rise), so a top-up
+		# only ever ADDS time — the `gained > 0` guard skips the no-op zero-gain frames. A MISS never
+		# shows up here; its time cost arrives through the explicit challenge_time_penalty channel
+		# (see _on_challenge_time_penalty), which drains the timer directly.
+		if gained > 0:
+			_challenge_time_left += float(gained) * ChallengeGoals.seconds_per_point(_active_type_key)
+		_challenge_last_score = score
+		_challenge_time_left = clampf(_challenge_time_left, 0.0, ChallengeGoals.timer_cap_seconds())
+	# Advance the low-time pulse phase and refresh the readout every frame — even while busy, so a
+	# paused clock still shows its held value.
+	_challenge_low_pulse += delta
+	_refresh_challenge_timer_bar()
+	if _challenge_time_left <= 0.0:
+		# Fire the end path exactly once. The guard (plus _end_challenge clearing _playing) makes sure
+		# it can't re-trigger while the end view is up.
+		_challenge_ended = true
+		_end_challenge()
+
+
+## A MISS in a challenge run drains the keep-alive timer (Plans/Challenge_Mode.md). The active minigame
+## emits Minigame.challenge_time_penalty(points), where `points` is what a matching HIT would have earned
+## (Catch: the dropped coin's value; Timing: 1 for a failed lock). We drain by the SAME rate a hit tops
+## up (seconds_per_point), scaled by the tunable miss-penalty ratio — so a miss costs miss_penalty_ratio x
+## what the hit was worth. Floored at 0. Gated to an ACTIVE run so a stray emit never drains a dead clock.
+func _on_challenge_time_penalty(points: float) -> void:
+	if not _challenge_mode or _challenge_ended:
+		return
+	var drain := ChallengeGoals.miss_penalty_ratio() * points * ChallengeGoals.seconds_per_point(_active_type_key)
+	_challenge_time_left = maxf(0.0, _challenge_time_left - drain)
+	_refresh_challenge_timer_bar()
+
+
+## Update the keep-alive timer bar: the seconds readout, the low-time red-pulse, and a redraw so the
+## fill tracks the clock. Called each frame during a run and once at seed (start_challenge).
+func _refresh_challenge_timer_bar() -> void:
+	if _challenge_timer_seconds_label == null or _challenge_timer_bar == null:
+		return
+	_challenge_timer_seconds_label.text = "%.1fs" % maxf(0.0, _challenge_time_left)
+	# Under the low threshold the whole bar pulses (~2 Hz) so a run about to die is unmissable.
+	if _challenge_time_left <= CHALLENGE_TIMER_LOW_SECONDS:
+		var pulse := 0.55 + 0.45 * absf(sin(_challenge_low_pulse * TAU * 2.0))
+		_challenge_timer_bar.modulate = Color(1, 1, 1, pulse)
+	else:
+		_challenge_timer_bar.modulate = Color.WHITE
+	_challenge_timer_bar.queue_redraw()
+
+
+## Build the keep-alive timer bar's styleboxes once (reused every frame, minigame-lag rule): a dark
+## ink track, a green normal fill, and a red low-time fill. Dark/legible, not washed out (house style).
+func _build_challenge_timer_styleboxes() -> void:
+	_challenge_timer_track = StyleBoxFlat.new()
+	_challenge_timer_track.bg_color = UiPalette.INK_NAVY
+	_challenge_timer_track.set_corner_radius_all(16)
+	_challenge_timer_track.border_color = UiPalette.NAVY
+	_challenge_timer_track.set_border_width_all(2)
+	_challenge_timer_fill = StyleBoxFlat.new()
+	_challenge_timer_fill.bg_color = UiPalette.MONEY_GREEN
+	_challenge_timer_fill.set_corner_radius_all(12)
+	_challenge_timer_low = StyleBoxFlat.new()
+	_challenge_timer_low.bg_color = UiPalette.KETCHUP_RED
+	_challenge_timer_low.set_corner_radius_all(12)
+
+
+## Draw the keep-alive timer bar: the dark track, then a fill inset inside it whose width is the
+## fraction of the clock still left (time_left / cap). Red under the low threshold, green above.
+func _draw_challenge_timer_bar() -> void:
+	var w := _challenge_timer_bar.size.x
+	var h := _challenge_timer_bar.size.y
+	if w <= 0.0 or h <= 0.0 or _challenge_timer_track == null:
+		return
+	var cap := ChallengeGoals.timer_cap_seconds()
+	var frac := clampf(_challenge_time_left / maxf(0.0001, cap), 0.0, 1.0)
+	_challenge_timer_bar.draw_style_box(_challenge_timer_track, Rect2(0, 0, w, h))
+	if frac > 0.0:
+		var pad := 4.0
+		var fill_w := frac * (w - 2.0 * pad)
+		if fill_w > 1.0:
+			var low := _challenge_time_left <= CHALLENGE_TIMER_LOW_SECONDS
+			var box := _challenge_timer_low if low else _challenge_timer_fill
+			_challenge_timer_bar.draw_style_box(box, Rect2(pad, pad, fill_w, h - 2.0 * pad))
+
+
+## A type finished on its own (e.g. the timing bar's last lock) — end with its result. In a normal
+## round this ends the round. In Challenge Mode it is ignored for a timer-driven game (the run ends on
+## the keep-alive clock or DONE) — EXCEPT for a SELF-ENDING game (Memory, Wave B), whose own `completed`
+## IS the run end: route it to the same _end_challenge path DONE/timer-death use, fire-once via the
+## shared _challenge_ended guard.
 func _on_minigame_completed(_performance: float) -> void:
-	if _playing and not _challenge_mode:
-		_end_round()
+	if not _playing:
+		return
+	if _challenge_mode:
+		if _active_minigame != null and _active_minigame.challenge_self_ends() and not _challenge_ended:
+			_challenge_ended = true
+			_end_challenge()
+		return
+	_end_round()
 
 
 ## Format an integer with thousands separators ("1,240"), for the Challenge score readouts.
@@ -1177,13 +1568,83 @@ func _group_thousands(value: int) -> String:
 	return ("-" if value < 0 else "") + grouped
 
 
-## End a Challenge run: record the final score (updates the saved high score if beaten) and return
-## to the Minigame Tuning list. Called by DONE and by Back.
+## End a Challenge run: record the final score, show the Challenge end view (with any tier-credit
+## feedback), and wait there for BACK TO LIST. Called by DONE and by Back. No longer closes the
+## screen itself — _exit_challenge does that once the player has seen the result.
 func _end_challenge() -> void:
 	_playing = false
 	var score := _active_minigame.get_score() if _active_minigame != null else 0
+	# Keep driving the arcade "Best" store (unchanged) — that still powers the tuning list's Best
+	# label. The dynasty tier credit is a SEPARATE path, reported via challenge_finished below.
 	ChallengeScores.record_score(_active_type_key, score)
+	# Swap to the end view showing the final score; the credit line stays blank until Main reports.
+	_show_challenge_end(score)
+	# Report the finished run so Main can credit any newly-cleared tiers into the dynasty bonus and
+	# hand the outcome back to show_challenge_credit. Signals are synchronous, so by the time this
+	# returns the credit line is already filled (when routed through Main).
+	challenge_finished.emit(_active_type_key, score)
+
+
+## Reveal the Challenge end view: hide the play chrome and result view, show the final score, and
+## clear the credit line so it is blank until show_challenge_credit fills it (a run credited through
+## Main fills it synchronously during the challenge_finished emit).
+func _show_challenge_end(score: int) -> void:
+	_skip_button.visible = false
+	_play_view.visible = false
+	_result_view.visible = false
+	if _challenge_score_label != null:
+		_challenge_score_label.text = "Final score: %s" % _group_thousands(score)
+	if _challenge_credit_label != null:
+		_challenge_credit_label.text = ""
+		_challenge_credit_label.visible = false
+	if _challenge_end_view != null:
+		_challenge_end_view.visible = true
+	visible = true
+
+
+## Fill the Challenge end view's tier-credit line from Main's credit report (see
+## DynastyState.credit_challenge_score). Called by Main (via MinigameReviewScreen) after crediting.
+##   improved → the "NEW TIER" windfall: the tier just cleared, and which TRACK the newly-cleared
+##              payout paid — the income the tier JUST added (income_after − income_before) and/or the
+##              Legacy it added (legacy_after − legacy_before). A payout tier only ever pays ONE track,
+##              but a run that vaults several payout tiers at once can raise both, so both are handled.
+##              A tier gained with no payout crossed reads as progress toward the next reward.
+##   not improved → a quiet neutral line naming the best tier still held (or an invitation to reach
+##                  the first goal if none is cleared yet).
+func show_challenge_credit(result: Dictionary) -> void:
+	if _challenge_credit_label == null:
+		return
+	if bool(result.get("improved", false)):
+		var new_tier := int(result.get("new_tier", 0))
+		var income_gain := (float(result.get("income_after", 0.0)) - float(result.get("income_before", 0.0))) * 100.0
+		var legacy_gain := (float(result.get("legacy_after", 0.0)) - float(result.get("legacy_before", 0.0))) * 100.0
+		var text := "NEW TIER %d" % new_tier
+		if income_gain > 0.001:
+			text += "\n+%.1f%% INCOME" % income_gain
+		if legacy_gain > 0.001:
+			text += "\n+%.1f%% LEGACY" % legacy_gain
+		# A tier cleared that wasn't a payout tier still counts — it's a step toward the next reward.
+		if income_gain <= 0.001 and legacy_gain <= 0.001:
+			text += "\ntier banked — next reward ahead"
+		_challenge_credit_label.text = text
+		_challenge_credit_label.add_theme_color_override("font_color", UiPalette.DARK_GOLD)
+	else:
+		var best := int(result.get("old_tier", 0))
+		if best > 0:
+			_challenge_credit_label.text = "No new tier — best is tier %d" % best
+		else:
+			_challenge_credit_label.text = "No tier cleared yet — reach the first goal to earn a bonus"
+		# A quiet navy for the neutral line, so a non-improving run doesn't read as a reward.
+		_challenge_credit_label.add_theme_color_override("font_color", UiPalette.NAVY)
+	_challenge_credit_label.visible = true
+
+
+## Leave the Challenge run for good: only reached from the end view's BACK TO LIST button. Clears
+## Challenge Mode, hides the screen, and returns to the Minigame Tuning list (back_pressed).
+func _exit_challenge() -> void:
 	_challenge_mode = false
+	if _challenge_end_view != null:
+		_challenge_end_view.visible = false
 	visible = false
 	back_pressed.emit()
 

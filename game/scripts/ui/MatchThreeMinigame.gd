@@ -60,6 +60,12 @@ const SIZE_BONUS := 0.5
 const CLEAN_MATCH_FACTOR := 1.15
 ## A match group that INCLUDES the avoid gem is docked this much (−60%).
 const AVOID_MATCH_FACTOR := 0.40
+## CHALLENGE MODE only: a Legacy gem is a premium 5th gem type (not a currency collectible). A group
+## of matched Legacy gems scores this multiple of a same-size clean match — a rare, high-value line
+## (spawned only by a 5+ match) worth chasing to keep the keep-alive timer alive (Tim, 2026-07-21).
+## First-pass; tune on device. In reward rounds Legacy matches still score 0 and collect a Legacy
+## bonus instead (see _score_steps).
+const LEGACY_SCORE_MULT := 2.5
 
 # The score-to-performance thresholds are LIVE tuning knobs (Balance Tuning), captured from
 # TuningConfig in begin() so Tim can dial the ceiling on device without a rebuild. Defaults live in
@@ -749,8 +755,18 @@ func _score_steps(steps: Array) -> Dictionary:
 			var group_color: int = color_of_cell[first_cell[0] * GRID_WIDTH + first_cell[1]]
 
 			if group_color == LEGACY_COLOR:
-				# Matching 3+ Legacy gems collects a Legacy bonus and scores NO points ("by
-				# themselves they do nothing"). The host gates the payout by the round result.
+				if challenge_mode:
+					# CHALLENGE mode: Legacy gems are a PREMIUM 5th gem type, not a currency
+					# collectible. We never count them as a collection here, so the board's spawn
+					# shutoff never trips and every 5+ match keeps planting new Legacy gems
+					# (Tim, 2026-07-21). Matching a group scores a premium over a same-size clean
+					# match — a rare, high-value line that helps sustain the keep-alive timer.
+					var legacy_points := POINTS_PER_GEM * float(n) * (1.0 + SIZE_BONUS * float(n - 3)) * LEGACY_SCORE_MULT
+					step_raw += legacy_points
+					group_details.append({"points": legacy_points, "is_avoid": false, "is_legacy": true})
+					continue
+				# Reward rounds: matching 3+ Legacy gems collects a Legacy bonus and scores NO points
+				# ("by themselves they do nothing"). The host gates the payout by the round result.
 				legacy_matches += 1
 				group_details.append({"points": 0.0, "is_avoid": false, "is_legacy": true})
 				continue
@@ -875,7 +891,9 @@ func _spawn_match_badge(group: Array, is_avoid: bool, is_legacy: bool = false) -
 	var chip_text := "%d" % group.size()  # merged L/T/+ shapes count as one big match
 	if is_legacy:
 		chip_color = UiPalette.MUSTARD_GOLD
-		chip_text = "LEGACY GEM!"
+		# In challenge mode a Legacy match is a scored PREMIUM, not a collected gem — show a gold
+		# star + the match size instead of the "LEGACY GEM!" collection chip (Tim, 2026-07-21).
+		chip_text = ("★%d" % group.size()) if challenge_mode else "LEGACY GEM!"
 	elif is_avoid:
 		chip_color = UiPalette.KETCHUP_RED
 	FloatingChip.spawn(_board_area, center, chip_text, chip_color)

@@ -166,6 +166,25 @@ const DESCRIPTIONS := {
 	"k_legacy": "Legacy payout scale on the power curve (K × (net/floor) ^ alpha).",
 	"alpha_legacy": "Legacy curve exponent; lower = flatter yield, tames the prestige runaway.",
 	"legacy_upgrade_cost_multiplier": "Global x on every Legacy upgrade cost — the prestige-power brake (higher = a prestige buys fewer levels).",
+	"challenge_bonus_scale": "Global x on every Challenge tier payout, both tracks (1.0 = authored ~24% income + 24% Legacy across all six games maxed).",
+	"challenge_timer_start_seconds": "Challenge keep-alive run timer's starting seconds — a run begins with this on the clock and drains until scoring tops it up (Wave 2).",
+	"challenge_timer_cap_seconds": "Challenge keep-alive run timer's max seconds — top-ups never bank the clock past this (Wave 2).",
+	"challenge_miss_penalty_ratio": "Fraction of a hit's time-gain a MISS costs the keep-alive timer (0.5 = half): a dropped Catch coin / failed Timing lock drains this x what the hit would have added.",
+	"basketball_tier_base_cost": "Micro Basketball Challenge: baskets each tier costs for tiers 1-5 (the escalating cost's base). At 1, tier 5 = 5 baskets.",
+	"basketball_tier_cost_increment": "Micro Basketball Challenge: baskets added to each tier's cost every 5 tiers (escalating cost climbs).",
+	"basketball_tier_cost_cap": "Micro Basketball Challenge: the most baskets a single tier can cost (escalation caps here).",
+	"basketball_keepalive_seconds_per_point": "Micro Basketball Challenge: keep-alive seconds each sunk basket adds to the run clock.",
+	"memory_tier_base_cost": "Memory Match Challenge: climbs each tier costs for tiers 1-5 (the escalating cost's base). At 0.2, tier 5 ≈ 1 climb.",
+	"memory_tier_cost_increment": "Memory Match Challenge: climbs added to each tier's cost every 5 tiers (escalating cost climbs).",
+	"memory_tier_cost_cap": "Memory Match Challenge: the most climbs a single tier can cost (escalation caps here).",
+	"memory_keepalive_seconds_per_point": "Memory Match Challenge: keep-alive seconds each completed climb adds to the run clock.",
+	"match3_keepalive_seconds_per_point": "Match Three Challenge: keep-alive seconds each point adds to the run clock (points arrive in bulk, so small).",
+	"timing_keepalive_seconds_per_point": "Timing Bar Challenge: keep-alive seconds each successful lock adds to the run clock.",
+	"catch_keepalive_seconds_per_point": "Catch the Money Challenge: keep-alive seconds each caught coin adds to the run clock.",
+	"balance_seconds_per_point": "Balance the Books Challenge: in-zone seconds to earn one point (score = time-in-zone / this).",
+	"balance_keepalive_seconds_per_point": "Balance the Books Challenge: keep-alive seconds each point adds to the run clock.",
+	"balance_zone_reroll_seconds": "Balance the Books Challenge: seconds between the gold zone re-rolling a new target center.",
+	"balance_zone_ease": "Balance the Books Challenge: how fast the gold zone eases toward its target center, per second.",
 	"crash_multiplier": "Income multiplier during a Market Crash event.",
 	"crash_duration_minutes": "Market Crash length (active minutes).",
 	"audit_settle_rate": "Audit settlement cost as a fraction of net worth.",
@@ -241,31 +260,46 @@ const DISPLAY_NAMES := {
 ## categories. Each section owns a set of knobs matched by NAME PREFIX (a plain "starts-with"
 ## test), so adding a new knob to TuningConfig usually lands in the right section with no UI
 ## change. The order here is the order the sections appear. A knob is placed in the FIRST
-## section whose prefix list matches it; anything unmatched falls into the "Other" section
-## appended at the end. Each entry is { "title": String, "prefixes": Array[String] } — a
-## prefix that is a full knob name (e.g. "logic_hz") simply matches only that one knob.
+## section whose prefix list matches it; anything unmatched falls into the catch-all section
+## (CATCH_ALL_SECTION_TITLE) appended at the end. Each entry is { "title": String, "prefixes":
+## Array[String] } — a prefix that is a full knob name (e.g. "logic_hz") matches only that knob.
 const SECTIONS := [
+	# Core Loop is the general "base economy" bucket. It also absorbs the input-repeat holds
+	# (buy_hold_ / hire_hold_), the offline pacing (offline_), and the carbonation bubble visuals
+	# (carb_) — each was its own header, but they are all facets of the core loop and its feedback,
+	# so folding them here trims the panel from 14 section headers to 10 (Tim, 2026-07-22 — the
+	# collapsed headers had grown to fill the whole tab).
 	{"title": "Core Loop", "prefixes": [
 		"logic_hz", "m1_starting_cash", "band_step", "cycle_floor", "rush_pct",
 		"hold_rush_per_second", "earth_economy_target", "autosave_cadence",
+		"buy_hold_", "hire_hold_", "offline_", "carb_",
 	]},
 	{"title": "Wage", "prefixes": ["wage_"]},
 	{"title": "Frenzy", "prefixes": ["frenzy_"]},
 	{"title": "Rush Momentum", "prefixes": ["rush_momentum_"]},
-	{"title": "Buy & Hire Holds", "prefixes": ["buy_hold_", "hire_hold_"]},
-	{"title": "Staff", "prefixes": ["staff_"]},
-	{"title": "Retention", "prefixes": ["retention_"]},
-	{"title": "Carbonation", "prefixes": ["carb_"]},
-	{"title": "Minigames", "prefixes": ["minigame_", "match3_", "basketball_"]},
+	# Staff absorbs the retention pricing knobs (retention_*) — retention is just staff-level pricing.
+	{"title": "Staff", "prefixes": ["staff_", "retention_"]},
+	# NOTE: this section holds the non-challenge minigame knobs (physics / features) ONLY. The
+	# per-game challenge dials — basketball_tier_*, the *_keepalive_seconds_per_point knobs, etc. —
+	# belong to the "Challenge Mode" catch-all (Tim, 2026-07-22). So the basketball and match3 prefixes
+	# are SPECIFIC (basketball_launch_, match3_full_score, …) rather than broad "basketball_" / "match3_",
+	# which would otherwise scoop challenge knobs like basketball_keepalive_* / match3_keepalive_* back in.
+	{"title": "Minigames", "prefixes": [
+		"minigame_", "match3_full_score", "match3_max_score", "match3_legacy_match_size",
+		"basketball_launch_", "basketball_max_", "memory_gem_",
+	]},
 	{"title": "Legacy Bonus", "prefixes": ["legacy_bonus_", "legacy_gem_chance_"]},
-	{"title": "Offline", "prefixes": ["offline_"]},
 	{"title": "Estate & Legacy", "prefixes": ["estate_", "loophole_", "k_legacy", "alpha_legacy", "legacy_upgrade_cost_multiplier"]},
 	{"title": "Events", "prefixes": ["crash_", "audit_"]},
 ]
 
-## The catch-all section title for knobs no SECTIONS prefix matched (so a newly added knob
-## always appears somewhere, even before it is sorted into a real section).
-const OTHER_SECTION_TITLE := "Other"
+## The catch-all section title for knobs no SECTIONS prefix matched (so a newly added knob always
+## appears somewhere, even before it is sorted into a real section). It is titled "Challenge Mode"
+## (Tim, 2026-07-22) because every knob that currently falls through is a Challenge Mode dial — the
+## per-game tier costs (basketball_tier_*, memory_tier_*), the Balance challenge knobs (balance_*),
+## and the shared challenge_* levers. If a future NON-challenge knob is ever added without a matching
+## section, it would land here too; sort it into a real section (or add one) when that happens.
+const CATCH_ALL_SECTION_TITLE := "Challenge Mode"
 
 ## Vertical breathing room (px) above the first section and below the last, between the scroll
 ## content and the scroll frame's edges (Tim, 2026-07-09 — the list felt cramped against the frame).
@@ -281,6 +315,11 @@ const SECTION_MARKER_WIDTH := 48
 ## disc reads at arm's length regardless of the font's glyph coverage.
 const SECTION_DOT_DIAMETER := 26
 
+## Vertical travel (px) a touch/drag must cross before it counts as a SCROLL rather than a tap, so a
+## drag that pans the list does not also toggle the section header it started on (Tim, 2026-07-22 — the
+## collapsed headers tile the whole tab, leaving nowhere else to grab).
+const DRAG_TOGGLE_THRESHOLD := 12.0
+
 
 # One LineEdit per constant, keyed by constant name, read back on Apply.
 var _value_edits: Dictionary = {}
@@ -294,6 +333,14 @@ var _baked: Dictionary = {}
 var _section_of_knob: Dictionary = {}
 
 var _list: VBoxContainer
+# The scroll frame that holds the section list — kept so the drag-to-scroll handler can pan it.
+var _scroll: ScrollContainer
+# Drag-to-scroll state (Tim, 2026-07-22): the section headers are full-width buttons that tile the
+# viewport when collapsed, so a touch landing on a header has nowhere neutral to grab. _pan_scroll_on_drag
+# pans the list on any drag over a header or row; _drag_accum tracks the current gesture's travel and
+# _drag_moved records once it has passed DRAG_TOGGLE_THRESHOLD, so that gesture's header tap is skipped.
+var _drag_accum := 0.0
+var _drag_moved := false
 # Each collapsible section, keyed by its title → { "button": Button header, "body": VBoxContainer,
 # "expanded": bool, "marker": Panel }. All sections start collapsed; the header-row arrow buttons
 # drive them all. "marker" is the white dot shown when the section holds a modified value.
@@ -362,6 +409,7 @@ func _build_chrome() -> void:
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_RESERVE
 	column.add_child(scroll)
+	_scroll = scroll  # kept for the drag-to-scroll handler (see _pan_scroll_on_drag)
 
 	# Right margin keeps every row clear of the overlaid scrollbar (see SCROLLBAR_GAP); the
 	# top/bottom margins give the section list breathing room off the scroll frame's edges.
@@ -438,7 +486,12 @@ func _add_collapsible_section(title: String) -> VBoxContainer:
 	header.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
 		header.add_theme_color_override(state, UiPalette.CREAM)
-	header.pressed.connect(_toggle_section.bind(title))
+	# A TAP toggles the section; a DRAG over the header pans the scroll list instead (the header would
+	# otherwise be a dead zone for scrolling — see _pan_scroll_on_drag). button_down starts a fresh
+	# gesture; pressed toggles ONLY if the gesture never crossed the drag threshold.
+	header.button_down.connect(_begin_drag_gesture)
+	header.gui_input.connect(_pan_scroll_on_drag)
+	header.pressed.connect(_on_section_header_pressed.bind(title))
 	_list.add_child(header)
 
 	# The "section contains modified values" asterisk, overlaid on the header's right end rather
@@ -578,6 +631,48 @@ func _toggle_section(title: String) -> void:
 	_update_section_header(title)
 
 
+# ---------------------------------------------------------------------------
+# Drag-to-scroll (Tim, 2026-07-22)
+# ---------------------------------------------------------------------------
+# The section headers are full-width buttons, so when they are all collapsed they tile the whole tab and
+# a touch that lands on one has nowhere neutral to grab — the list can't be scrolled. Rather than fight
+# Godot's mouse_filter propagation (a header's STOP swallows the touch before the ScrollContainer sees
+# it), we pan the scroll ourselves from a drag over any header or row, the same tactic Main.gd uses for
+# the epoch-swipe gesture. A short press still registers as a tap (toggles the section); once a gesture's
+# travel passes DRAG_TOGGLE_THRESHOLD it is treated as a scroll and that header's tap is suppressed.
+
+## Start tracking a fresh press gesture (a header's button_down, before any drag).
+func _begin_drag_gesture() -> void:
+	_drag_accum = 0.0
+	_drag_moved = false
+
+
+## Pan the scroll list when a touch/left-drag crosses a header or row. Never consumes the event, so the
+## button's own tap and any text field still work. Accumulates travel so _on_section_header_pressed can
+## tell a scroll from a tap. Handles both touch (InputEventScreenDrag) and desktop mouse-drag.
+func _pan_scroll_on_drag(event: InputEvent) -> void:
+	var delta_y := 0.0
+	if event is InputEventScreenDrag:
+		delta_y = event.relative.y
+	elif event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT):
+		delta_y = event.relative.y
+	else:
+		return
+	# Drag DOWN (finger moves down, delta_y > 0) reveals earlier rows → scroll_vertical decreases.
+	_scroll.scroll_vertical -= int(delta_y)
+	_drag_accum += absf(delta_y)
+	if _drag_accum >= DRAG_TOGGLE_THRESHOLD:
+		_drag_moved = true
+
+
+## A header was released: toggle it ONLY when the gesture was a genuine tap. If the press turned into a
+## scroll (travel past the threshold), swallow the toggle so scrolling never flips sections open/closed.
+func _on_section_header_pressed(title: String) -> void:
+	if _drag_moved:
+		return
+	_toggle_section(title)
+
+
 ## Expand or collapse every section at once (the header-row Collapse-All / Expand-All arrows).
 func set_all_collapsed(collapsed: bool) -> void:
 	for title in _sections:
@@ -675,12 +770,12 @@ func open(effective_tuning: TuningConfig, baked_tuning: TuningConfig) -> void:
 			knobs_by_section[section_title] = []
 		knobs_by_section[section_title].append([name, type])
 
-	# Render the sections in the fixed SECTIONS order, then the catch-all "Other" last. Only a
-	# section that actually owns at least one knob gets a header (empty sections are skipped).
+	# Render the sections in the fixed SECTIONS order, then the catch-all ("Challenge Mode") last. Only
+	# a section that actually owns at least one knob gets a header (empty sections are skipped).
 	var ordered_titles: Array = []
 	for section in SECTIONS:
 		ordered_titles.append(String(section["title"]))
-	ordered_titles.append(OTHER_SECTION_TITLE)
+	ordered_titles.append(CATCH_ALL_SECTION_TITLE)
 
 	for title in ordered_titles:
 		if not knobs_by_section.has(title):
@@ -699,14 +794,14 @@ func open(effective_tuning: TuningConfig, baked_tuning: TuningConfig) -> void:
 
 
 ## The title of the section a knob belongs to: the first SECTIONS entry with a prefix the knob
-## name starts with, or the catch-all "Other" when nothing matches. A prefix that is a full knob
-## name simply matches only that knob.
+## name starts with, or the catch-all ("Challenge Mode") when nothing matches. A prefix that is a
+## full knob name simply matches only that knob.
 func _section_title_for(name: String) -> String:
 	for section in SECTIONS:
 		for prefix in section["prefixes"]:
 			if name.begins_with(String(prefix)):
 				return String(section["title"])
-	return OTHER_SECTION_TITLE
+	return CATCH_ALL_SECTION_TITLE
 
 
 ## One constant row, added to `parent` (its collapsible section's body): the name and a concise
@@ -721,6 +816,10 @@ func _add_constant_row(parent: VBoxContainer, name: String, type: int, current_v
 
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
+	# A drag over the row's TEXT area (not the value field) pans the scroll list, so an expanded
+	# section is scrollable too (Tim, 2026-07-22). The row keeps STOP and receives the drag because its
+	# text column + labels are set IGNORE below; the LineEdit stays interactive for editing.
+	row.gui_input.connect(_pan_scroll_on_drag)
 	parent.add_child(row)
 
 	# Name (top) + description (beneath) share the left column; the editor sits to
@@ -729,6 +828,9 @@ func _add_constant_row(parent: VBoxContainer, name: String, type: int, current_v
 	text_column.add_theme_constant_override("separation", 2)
 	text_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	text_column.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	# Transparent to input so a drag falls through to the row (which pans the scroll); the labels
+	# below are IGNORE for the same reason. Only the LineEdit stays interactive.
+	text_column.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(text_column)
 
 	var label := Label.new()
@@ -744,6 +846,7 @@ func _add_constant_row(parent: VBoxContainer, name: String, type: int, current_v
 	label.add_theme_font_size_override("font_size", ROW_LABEL_SIZE)
 	# Wrap a long name instead of forcing the whole row wider than the panel (Tim, 2026-07-09).
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE  # let a drag fall through to the row (scroll)
 	text_column.add_child(label)
 
 	var description: String = DESCRIPTIONS.get(name, "")
@@ -754,6 +857,7 @@ func _add_constant_row(parent: VBoxContainer, name: String, type: int, current_v
 		# Muted navy so the description reads as secondary to the constant's name.
 		desc_label.add_theme_color_override("font_color", Color(UiPalette.NAVY, 0.7))
 		desc_label.add_theme_font_size_override("font_size", ROW_DESC_SIZE)
+		desc_label.mouse_filter = Control.MOUSE_FILTER_IGNORE  # let a drag fall through to the row (scroll)
 		text_column.add_child(desc_label)
 
 	var edit := LineEdit.new()

@@ -278,16 +278,36 @@ list sits on a card that matches the Get Ready panel exactly** (same size/shape,
 The reward MATH is unchanged: every type still only reports a [0,1] performance and the host maps
 it to the universal multiplier.
 
-**Challenge Mode (Tim, 2026-06-30).** The Minigame Tuning screen has a large toggle switching
-between **Minigame Mode** (default — normal reward-style review play) and **Challenge Mode**: a
-free-play arcade layer with **no time limit and no win/loss** where a chosen type runs endlessly
-until the player taps DONE. Each type reports a raw cumulative **score** (points / locks / catches
-/ rounds recalled / seconds balanced / baskets) instead of the [0,1] reward metric; mistakes never
-end a run (Timing misses don't stop, Memory soft-resets the round on a wrong tap, etc.). A
-**per-game high score is saved across sessions** (`ChallengeScores` → `user://challenge_scores.json`);
-the play view shows a live Score + Best (Best ticks up as you pass it), and the tuning list shows
-each game's best. Currently a Tuning-screen (dev/settings) feature; could be promoted player-facing
-later.
+**Challenge Mode (feature complete on `feature/challenge-mode-phase1`; device-confirmed 2026-07-22;
+pending merge).** A discoverable, player-facing progression laid over the six minigames, reached from
+**Settings → CHALLENGES** (its own screen — the old "free-play arcade toggle on the Minigame Tuning
+screen" is retired; see the history note below). Each game climbs its own **finite tier ladder** (30
+tiers, a real "mastered" summit), and clearing tiers grants small, **permanent, dynasty-wide bonuses**
+that **survive prestige** on two tracks: **property income** and **Legacy yield**.
+
+- **A run is a keep-alive push, not endless.** The clock starts with just a few seconds (6s, though
+  Micro Basketball opens with 10s), drains in real time, and each point you score tops it back up;
+  when it hits zero the run ends and the best tier you reached is banked (banking is raise-only — a
+  bad run never lowers a tier you already earned). The whole stake is your time; there is no currency
+  wager. *(Memory Match is the exception — it has no timer and instead ends on a completed climb or a
+  wrong tap.)*
+- **Payouts land every 5th tier**, on one schedule shared by every game, alternating income and Legacy
+  and escalating +1%/+1%/+2%/+2%/+1%/+1% per track — so **one mastered game is worth +4% income and +4%
+  Legacy**, and all six mastered land near Tim's **~25/25%** target. Most tiers are progress-only; the
+  screen shows how close the next reward is and which track it pays.
+- **Each game reports a raw cumulative score** (points / locks / coins / climbs / seconds in zone /
+  baskets) rather than the [0,1] reward metric. Four games earn a tier per fixed score step; the two
+  low-ceiling games (Micro Basketball, Memory Match) use a gentle escalating per-tier cost so their
+  early tiers are reachable and mastery is still a climb.
+- **Each game plays harder in Challenge Mode** (an oscillating coin field in Catch, a drifting gold
+  zone and waving marker in Timing, premium legacy gems in Match Three, a Simon climb in Memory), and
+  a missed hit drains the keep-alive clock — but the reward/prestige version of every game is
+  untouched. The run display is a large pulsing **TIER {current}/{best}**.
+
+*(History: Challenge Mode began 2026-06-30 as a dev/settings "free-play arcade" toggle — endless play,
+no timer, no reward, just a saved high score. It was reworked into the tiered, timed, dynasty-rewarding
+progression above; the free-play toggle is gone. The per-game best score is still saved, but now feeds
+the best-tier readout rather than a standalone Score/Best view.)*
 
 **Basketball specifics (Tim, 2026-06-30).** The aim guide is a **force wedge**: a triangle whose
 point sits at the ball's launch spot and fans out wide in the direction of travel, its size + a

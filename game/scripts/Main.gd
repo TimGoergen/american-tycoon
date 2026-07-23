@@ -273,6 +273,9 @@ func _process(delta: float) -> void:
 			_fire_polled_tip("first_hire", _hire_control_of(hireable))
 	if _tip_armed.get("turbo_ready", false) and game.frenzy.can_pop():
 		_fire_polled_tip("turbo_ready", _frenzy_bar)
+	# Reaching cruise enables the OVERDRIVE button — teach it the first frame it lights up.
+	if _tip_armed.get("overdrive", false) and not _momentum_bar.get_overdrive_button().disabled:
+		_fire_polled_tip("overdrive", _momentum_bar.get_overdrive_button())
 	if _tip_armed.get("epochs", false) and game.epoch.current_tier >= 2:
 		_fire_polled_tip("epochs", _epoch_pager_box)
 	if _tip_armed.get("minigames", false) and _minigame_played_once:
@@ -575,7 +578,7 @@ func _build_ui() -> void:
 	# the fact (Tim, 2026-07-23).
 	var tips_on := TutorialProgress.is_enabled()
 	for tip_id in ["getting_started", "first_property", "first_rush", "buy_mode", "first_hire",
-			"turbo_ready", "epochs", "minigames"]:
+			"turbo_ready", "overdrive", "epochs", "minigames"]:
 		_tip_armed[tip_id] = tips_on and not TutorialProgress.has_seen(tip_id)
 	# Signal-driven tip: the vent gesture, fired during an overdrive rush. (The offline-earnings
 	# concept is NOT a card — it is taught as a permanent line ON the welcome-back screen itself,

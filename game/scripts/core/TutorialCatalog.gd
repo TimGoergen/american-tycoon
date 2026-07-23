@@ -39,6 +39,10 @@ const TIPS := {
 		"title": "TURBO is charged",
 		"body": "Tap TURBO to burn the meter for a temporary income multiplier across every business at once.",
 	},
+	"overdrive": {
+		"title": "Push into Overdrive",
+		"body": "You've reached cruise — safe and steady. Tap OVR to push past it for escalating bonuses. Careful: overdrive runs hot and always ends in an overheat.",
+	},
 	"vent_window": {
 		"title": "Vent the overdrive",
 		"body": "When the vent window opens, lift and re-press on the beat to bleed off heat — or Rush Momentum overheats and shuts the rush down.",

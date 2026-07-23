@@ -270,8 +270,13 @@ const BUTTON_LABEL_FONT_SIZE := 37
 const NAME_FONT_SIZE := 51
 ## Shared height of the second row's two elements — the cycle progress bar and the outlined
 ## "owned / next-threshold" count chip — kept equal so they read as one aligned band.
-## Raised 52 → 60 (2026-07-05 taller-panel pass), then +50% → 90 (Tim, same day).
-const SECOND_ROW_HEIGHT := 90
+## Raised 52 → 60 (2026-07-05 taller-panel pass), then +50% → 90 (Tim, same day), then
+## trimmed 90 → 70 (Tim, 2026-07-23) to condense each property panel: at the unchanged
+## 41px band font (~49px line height) the old 90 left ~40px of dead vertical air, so the
+## band shortens without crowding the text or squashing the progress bar. Shrinking this
+## also shrinks the whole panel and the portrait disc with it (see the row-constants note
+## above), which is the point — a more compact rung.
+const SECOND_ROW_HEIGHT := 70
 ## Font for the count-panel text and the per-cycle income readout above the bar.
 ## FONT_BODY (32) → 41 with the 50%-taller band, +25% to 51 in the all-panel-text pass,
 ## then −20% back to 41 for this band specifically (Tim, 2026-07-05).

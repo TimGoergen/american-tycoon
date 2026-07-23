@@ -393,6 +393,20 @@ theme + targeted pass.**
 >   raise the STANDARD phone keyboard (the numeric pad has no arrow keys). The economy
 >   no longer freezes while tuning is open — Apply saves and reloads anyway.
 
+> **PLANNED — Tab icon active/inactive treatment (Tim, 2026-07-23; full spec in
+> `Plans/Tab_Bar_Icon_Treatment.md`).** Make all four tab icons share one visual language:
+> **silhouette when inactive, full-color when active** — the same icon "lighting up," not a
+> swap. This fixes the current inconsistency where only the Estate gem is colored (which reads
+> as a false "something important here" signal and competes with the red-dot badge). Codifies a
+> signal-separation rule to protect going forward: **icon color = "you are here"; red dot =
+> "something new"** — the two must never cross. Also codifies in-content icon rules (currency
+> icons stay full-color; object/count glyphs like the property `+5` icon match the surrounding
+> flat UI — silhouette OK). Asset work: new silhouette for the gem + new colored actives for
+> Properties / Family History / Settings (candidates for the AI art pipeline, using existing
+> silhouettes as structural reference). **Rides with the M3 art pass** (needs the colored icons);
+> in scope beyond art: the state-swap wiring in `_build_tab_bar` / `_style_tab_button` + a
+> ~100-150ms crossfade + red-dot contrast stroke.
+
 Replace the single stacked Main screen with a **bottom tab bar** (pinned to the screen
 bottom, thumb-reachable) switching between four tabs. Reason: more real estate per screen
 and far better readability — each surface does one job instead of cramming the ladder,

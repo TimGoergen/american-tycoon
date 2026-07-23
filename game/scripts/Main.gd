@@ -49,6 +49,13 @@ var _challenges_screen: ChallengesScreen
 ## The tutorial coach card (Plans/Tutorial_Onboarding_Plan.md) — one instance, fired by
 ## _maybe_show_tip the first time a system becomes relevant, anchored near the relevant control.
 var _tutorial_tip: TutorialTip
+## Poll-driven tutorial tips {tip_id -> armed}: tips that can't hang off a single verb (TURBO
+## becoming poppable, reaching a new epoch, having played a minigame) are watched each frame in
+## _process. Armed once at build (a disk read) so the per-frame check only touches memory.
+var _tip_armed := {}
+## Set true the first time a real minigame finishes, so the "minigames" tip can fire once the
+## player is back with no modal up. Resets on scene reload — harmless, the tip is once-ever.
+var _minigame_played_once := false
 var _buy_mode_button: Button
 var _plan_button: Button
 ## Rich-text content overlaid on the plan button so the "(+x [gem])" parenthetical can show the
@@ -238,6 +245,15 @@ func _process(delta: float) -> void:
 	# Cash keeps updating every frame so the balance still counts up smoothly.
 	_hero_stat.set_cash(game.economy.cash)
 	_hero_stat.set_frenzy_glow(game.frenzy.get_multiplier() > 1.0)
+
+	# Poll-driven tutorial tips: fire the first time each condition is met. This runs only AFTER
+	# the modal-freeze return above, so a card never lands on top of a full-screen beat.
+	if _tip_armed.get("turbo_ready", false) and game.frenzy.can_pop():
+		_fire_polled_tip("turbo_ready", _frenzy_bar)
+	if _tip_armed.get("epochs", false) and game.epoch.current_tier >= 2:
+		_fire_polled_tip("epochs", _epoch_pager_box)
+	if _tip_armed.get("minigames", false) and _minigame_played_once:
+		_fire_polled_tip("minigames", null)
 
 	# Nudge the player toward an unopened tab the moment its first venture becomes affordable.
 	_venture_check_timer += delta
@@ -530,6 +546,13 @@ func _build_ui() -> void:
 	# tip fires. It is non-blocking — taps outside the card pass through to the game.
 	_tutorial_tip = TutorialTip.new()
 	add_child(_tutorial_tip)
+	# Arm the poll-driven tips once (disk read here; the per-frame poll then only reads memory).
+	for tip_id in ["turbo_ready", "epochs", "minigames"]:
+		_tip_armed[tip_id] = not TutorialProgress.has_seen(tip_id)
+	# Signal-driven tips: the vent gesture (fires during an overdrive rush) and the offline
+	# explainer (fires when the welcome-back beat closes, so it never lands over the beat).
+	game.rush_momentum.vent_window_opened.connect(_on_vent_window_opened)
+	_welcome_overlay.dismissed.connect(func() -> void: _maybe_show_tip("welcome_back", null))
 	game.epoch.contact_made.connect(_on_contact_made)
 	# When the player answers the contact, the trade-deal minigame negotiates their head start
 	# on the new alien property (GDD §5.5 site 2), so the negotiation follows the narration.
@@ -1339,6 +1362,8 @@ func _show_tab(index: int) -> void:
 	if index == TAB_ESTATE:
 		_legacy_screen.set_retention_entries(_build_retention_entries())
 		_legacy_screen.refresh()
+		# First time opening the Estate Office: teach the prestige / Legacy loop.
+		_maybe_show_tip("prestige", null)
 	elif index == TAB_LEDGER:
 		_ledger_screen.refresh(dynasty.ancestors, dynasty.lifetime_cash_earned)
 	elif index == TAB_SETTINGS and _minigame_check != null:
@@ -1394,23 +1419,42 @@ func _on_buy_requested(prop_index: int, mode: PropertyRow.BuyMode) -> void:
 	if count <= 0:
 		return
 
+	var band_before := prop.get_milestone_band()
 	if game.try_buy(prop_index, count):
 		_hero_stat.flash_purchase()
 		# First purchase ever: teach what a business does, anchored to the row just bought.
 		_maybe_show_tip("first_property", _row_for_index(prop_index))
+		# If that purchase crossed a milestone, teach what milestones do.
+		if prop.get_milestone_band() > band_before:
+			_maybe_show_tip("first_milestone", _row_for_index(prop_index))
 
 
 ## Show the one-time tutorial card for `tip_id`, anchored near `target` (null = screen-centered),
 ## unless tips are turned off or this one has already been seen. Marking it seen persists
 ## immediately so it never repeats (TutorialProgress lives outside the dynasty save).
-func _maybe_show_tip(tip_id: String, target: Control) -> void:
+func _maybe_show_tip(tip_id: String, target: Control) -> bool:
 	if not TutorialProgress.is_enabled() or TutorialProgress.has_seen(tip_id):
-		return
+		return false
 	var tip := TutorialCatalog.get_tip(tip_id)
 	if tip.is_empty():
-		return
+		return false
 	TutorialProgress.mark_seen(tip_id)
 	_tutorial_tip.show_tip(tip["title"], tip["body"], target)
+	return true
+
+
+## Fire a poll-driven tip (turbo/epochs/minigames) and disarm it so the per-frame poll stops
+## checking. Disarms unconditionally (even if tips are off / already seen) so the poll reads disk
+## at most once per tip.
+func _fire_polled_tip(tip_id: String, target: Control) -> void:
+	_tip_armed[tip_id] = false
+	_maybe_show_tip(tip_id, target)
+
+
+## A vent window opened during an overdrive rush — teach the vent gesture, anchored to the Rush
+## Momentum bar (fired from RushMomentumState.vent_window_opened).
+func _on_vent_window_opened() -> void:
+	_maybe_show_tip("vent_window", _momentum_bar)
 
 
 ## The visible PropertyRow for a property index, or null if that rung isn't currently on screen
@@ -1428,6 +1472,7 @@ func _on_tap_requested(prop_index: int) -> void:
 
 func _on_hold_rush_requested(prop_index: int) -> void:
 	game.hold_rush_property(prop_index)
+	_maybe_show_tip("first_rush", _row_for_index(prop_index))
 
 
 ## A rush hold ended: stop Rush Momentum building right away rather than letting the
@@ -1452,7 +1497,8 @@ func _on_rush_released(prop_index: int) -> void:
 ## staff ladder (hiring IS level 1 of each block — GDD §6.1, epoch-depth redesign). The
 ## row re-reads game state every frame, so a purchase shows on the next _process refresh.
 func _on_hire_requested(prop_index: int) -> void:
-	game.try_buy_staff_level(prop_index)
+	if game.try_buy_staff_level(prop_index):
+		_maybe_show_tip("first_hire", _row_for_index(prop_index))
 
 
 func _on_wage_tapped() -> void:
@@ -1746,6 +1792,7 @@ func _on_retain_requested(property_index: int) -> void:
 		_legacy_screen.refresh()
 		_legacy_screen.update_retention_entries(_build_retention_entries())
 		SaveManager.save_dict_to_file(dynasty.to_save_dict())
+		_maybe_show_tip("staff_retention", null)
 
 
 ## An upgrade was just bought in the shop. Apply its effect to the living
@@ -1845,6 +1892,9 @@ func _on_challenge_finished(game_key: String, final_score: int, screen: Object) 
 ## multiplier at whichever site launched it (GDD §5.5). One host serves both sites, so we
 ## read _minigame_site to decide; clearing it first keeps a stray re-entry from double-firing.
 func _on_minigame_finished(multiplier: float, opt_out: bool) -> void:
+	# A real minigame just played — arm the "minigames" tip (the _process poll fires it once the
+	# player is back with no modal up, so the card never lands over the minigame result screen).
+	_minigame_played_once = true
 	game.ui_minigame_enabled = not opt_out
 	var site := _minigame_site
 	_minigame_site = MinigameSite.NONE
@@ -1933,6 +1983,7 @@ func _on_buy_mode_toggled() -> void:
 	_buy_mode_button.text = "BUY: " + _buy_mode_caption(_buy_mode)
 	for row in _rows:
 		(row as PropertyRow).set_buy_mode(_buy_mode)
+	_maybe_show_tip("buy_mode", _buy_mode_button)
 
 
 func _buy_mode_caption(mode: PropertyRow.BuyMode) -> String:

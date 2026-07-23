@@ -43,10 +43,10 @@ const PANEL_HEIGHT := 180
 ## The game icon's square size on the left of each panel (was 132; 15% smaller per Tim, 2026-07-22).
 const ICON_SIZE := 112
 
-## The panel look (Tim, 2026-07-22): a rounded rectangle with a thick bright-gold outline over a light
-## green fill matching the main green of the old money-plate image. The pressed fill darkens on tap.
-const PANEL_GREEN := Color("#6FB85E")
-const PANEL_GREEN_PRESSED := Color("#5CA34C")
+## The panel look (Tim, 2026-07-22): a rounded rectangle with a thick bright-gold outline over a deep
+## green fill (darkened from the old money-plate green per Tim). The pressed fill darkens further on tap.
+const PANEL_GREEN := Color("#3F8A37")
+const PANEL_GREEN_PRESSED := Color("#33702C")
 const PANEL_BORDER_WIDTH := 8
 const PANEL_CORNER_RADIUS := 26
 

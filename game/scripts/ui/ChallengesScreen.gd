@@ -86,14 +86,16 @@ var _rows_column: VBoxContainer
 var _list_view: Control
 
 
-## Hand the screen its data. Called once by Main at build time, after add_child (so _ready has built
-## the frame). Also builds the minigame host, which needs the shared tuning to run a challenge.
+## Hand the screen its data. Called once by Main at build time. Main calls this BEFORE add_child, so
+## _player is added to this node before _ready runs and adds the backdrop + card — i.e. _player is NOT
+## guaranteed to be the topmost child. We therefore never rely on draw order: play mode hides the
+## backdrop AND the card (see _show_list_chrome), leaving the player as the only visible layer.
 func setup(dynasty: DynastyState, type_scripts: Array, tuning: TuningConfig) -> void:
 	_dynasty = dynasty
 	_type_scripts = type_scripts
 
-	# Our own minigame host, set up exactly like MinigameReviewScreen's: added after the card so it
-	# draws on top when a game is open; we toggle the card's visibility to swap between them.
+	# Our own minigame host, set up exactly like MinigameReviewScreen's. Whether it lands above or
+	# below the backdrop/card depends on setup-vs-_ready ordering, so we swap by visibility, not z-order.
 	_player = MinigameScreen.new()
 	_player.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_player.setup(tuning)
@@ -133,8 +135,18 @@ func open() -> void:
 	_refresh()
 	if _player != null:
 		_player.visible = false
-	_list_view.visible = true
+	_show_list_chrome(true)
 	visible = true
+
+
+## Show or hide the list-mode layers (the themed backdrop AND the card) together. Both are hidden
+## while a challenge run is up so the player host — which may sit below them in child order (see
+## setup) — is the only visible layer and is never covered by the always-on backdrop.
+func _show_list_chrome(show_it: bool) -> void:
+	if _backdrop != null:
+		_backdrop.visible = show_it
+	if _list_view != null:
+		_list_view.visible = show_it
 
 
 ## Forward Main's tier-credit report to the challenge host so its end view shows the "NEW TIER"
@@ -462,7 +474,11 @@ func _make_info_label(text: String, font_size: int, color: Color, emphasize: boo
 
 ## A game panel tapped: hide the list and launch its endless challenge run on our own host.
 func _on_play_pressed(type_script: Script) -> void:
-	_list_view.visible = false  # stop the covered list drawing behind the opaque player
+	# Hide BOTH list-mode layers (backdrop + card). The backdrop is always-on and can sit ABOVE the
+	# player in child order, so leaving it visible covered the whole run with just the background
+	# image (Tim, 2026-07-22). With both hidden, the player host is the only visible layer.
+	_show_list_chrome(false)
+	_player.visible = true
 	_player.start_challenge(type_script)
 
 
@@ -473,7 +489,7 @@ func _return_to_list() -> void:
 	if _player != null:
 		_player.visible = false
 	_refresh()
-	_list_view.visible = true
+	_show_list_chrome(true)
 	visible = true
 
 

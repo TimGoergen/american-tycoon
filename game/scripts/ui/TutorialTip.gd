@@ -94,7 +94,16 @@ func show_tip(title: String, body: String, target: Control) -> void:
 
 
 func _place_near(target: Control) -> void:
+	# Use the VIEWPORT rect for the screen bounds, not this control's own size: the tip node
+	# starts hidden, and a hidden full-rect Control isn't laid out yet, so self.size reads ~0 and
+	# would collapse the clamp below into the top-left corner. The viewport rect is always valid
+	# and is in the same coordinate space as the target's global rect.
+	var screen := get_viewport_rect().size
+	# The card's size after a layout pass; fall back to its computed minimum if not yet laid out.
 	var card_size := _card.size
+	if card_size.x < 1.0 or card_size.y < 1.0:
+		card_size = _card.get_combined_minimum_size()
+
 	var pos := Vector2.ZERO
 	if target != null and target.is_inside_tree():
 		var t := target.get_global_rect()
@@ -103,7 +112,7 @@ func _place_near(target: Control) -> void:
 		# Prefer just BELOW the target; fall back to above; else clamp on-screen.
 		var below := t.end.y + GAP_FROM_TARGET
 		var above := t.position.y - GAP_FROM_TARGET - card_size.y
-		if below + card_size.y <= size.y - EDGE_MARGIN:
+		if below + card_size.y <= screen.y - EDGE_MARGIN:
 			pos.y = below
 		elif above >= EDGE_MARGIN:
 			pos.y = above
@@ -111,10 +120,10 @@ func _place_near(target: Control) -> void:
 			pos.y = t.position.y
 	else:
 		# No anchor control — center on screen.
-		pos = (size - card_size) * 0.5
+		pos = (screen - card_size) * 0.5
 	# Never let the card touch a screen edge.
-	pos.x = clampf(pos.x, EDGE_MARGIN, maxf(EDGE_MARGIN, size.x - card_size.x - EDGE_MARGIN))
-	pos.y = clampf(pos.y, EDGE_MARGIN, maxf(EDGE_MARGIN, size.y - card_size.y - EDGE_MARGIN))
+	pos.x = clampf(pos.x, EDGE_MARGIN, maxf(EDGE_MARGIN, screen.x - card_size.x - EDGE_MARGIN))
+	pos.y = clampf(pos.y, EDGE_MARGIN, maxf(EDGE_MARGIN, screen.y - card_size.y - EDGE_MARGIN))
 	_card.position = pos
 
 

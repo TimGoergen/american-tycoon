@@ -140,17 +140,22 @@ static func apply_screen_bezel(control: Control) -> void:
 	control.offset_bottom = -SCREEN_BEZEL_TOP_BOTTOM
 
 
-## The app-wide Theme: a chunky default font size plus per-control-type defaults, so
-## any control that does NOT override its own size still reads large (the §1b
-## readability bar). Assigned on the Main root (see Main._build_ui) so it cascades to
-## every descendant, including the overlays. Per-element sizes still win where a
-## control sets a specific tier via the FONT_* constants above.
+## The app-wide Theme: the default font sizes only, so any control that does NOT
+## override its own size still reads large (the §1b readability bar). Assigned on the
+## Main root (see Main._build_ui) so it cascades to every descendant, including the
+## overlays. Per-element sizes still win where a control sets a specific tier via the
+## FONT_* constants above.
+##
+## The sizes live in a small Theme RESOURCE (ui/theme/american_tycoon.tres) rather than
+## being built here in code, so they can be tuned in Godot's Theme editor and are the
+## single source of truth for the size cascade. The resource's three sizes mirror
+## FONT_BODY / FONT_BUTTON above — keep them in sync. Styling (button plates, panels,
+## colors) is deliberately NOT in the theme: every control styles itself explicitly via
+## the helpers below, which keeps each control's look readable at its call site instead
+## of hidden in a global cascade. load() returns the shared cached resource; this theme
+## is only read (assigned on the root), never mutated, so sharing one instance is safe.
 static func make_app_theme() -> Theme:
-	var theme := Theme.new()
-	theme.default_font_size = FONT_BODY            # backstop for anything un-themed
-	theme.set_font_size("font_size", "Button", FONT_BUTTON)
-	theme.set_font_size("font_size", "Label", FONT_BODY)
-	return theme
+	return load("res://ui/theme/american_tycoon.tres")
 
 
 ## A faux-bold version of the app's default font, for the few labels that need to read heavier

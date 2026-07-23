@@ -258,15 +258,55 @@ Tuning screen render over a themed backdrop (`art/backgrounds/minigame_backgroun
 CPU-rounded to the frame) with a semi-transparent (70% cream), smaller card; the Tuning list sits
 on a card matching the Get Ready panel exactly.
 
-**Challenge Mode (2026-06-30).** A toggle on the Minigame Tuning screen switches every game launch
-between normal Minigame Mode and **Challenge Mode**: endless free play, no countdown, no reward
-multiplier. The host sets `Minigame.challenge_mode = true` before `begin()`; a type then runs
-forever (never emits `completed`, mistakes don't stop play) and reports a raw cumulative score via
-`Minigame.get_score() -> int` (points / successful locks / coins caught / rounds cleared / seconds
-in zone / baskets). The host hides the reward chrome, shows a live Score + Best, and DONE records
-the score. High scores are per-type, saved across sessions in `ChallengeScores`
-(`user://challenge_scores.json`), independent of the dynasty save. `get_performance()` is untouched
-and simply unused in Challenge Mode.
+**Challenge Mode (SHIPPED on `feature/challenge-mode-phase1`; device-confirmed 2026-07-22; pending
+merge).** A tiered, timed progression layered over every minigame, reached from a standalone
+CHALLENGES screen (Settings → CHALLENGES), NOT the old Minigame-Tuning toggle (retired — see the
+note below). The host sets `Minigame.challenge_mode = true` before `begin()`; a type then reports a
+raw cumulative score via `Minigame.get_score()` (points / locks / coins / climbs / seconds in zone /
+baskets). `get_performance()` is untouched and unused here. The math lives in
+`ChallengeGoals.gd` (static, stateless, configured from tuning by `DynastyState`).
+
+*Tier cost — two models, both capped at `MAX_TIER = 30`.* Four games use a **flat STEP**:
+`tier = floor(get_score() / STEP)`, STEP = {Match Three 1000, Timing Bar 1, Catch the Money 2,
+Balance the Books 2}. The two low-ceiling games use an **escalating per-tier cost** —
+`tier_cost(tier) = min(base + floor((tier−1)/5) × increment, cap)`, and the score to REACH tier N is
+the cumulative sum `tier_cost(1..N)`. Micro Basketball = base 1 / inc 1 / cap 5; Memory Match = base
+0.2 / inc 0.2 / cap 1.0. `score_to_reach_tier()` is the single helper the UI uses (never `tier × STEP`,
+which is wrong for the escalating games).
+
+*Payout schedule (one schedule, shared by all six games).* A percent payout lands on every 5th tier,
+alternating tracks and escalating: tier 5 +1% INCOME, 10 +1% LEGACY, 15 +2% INCOME, 20 +2% LEGACY,
+25 +1% INCOME, 30 +1% LEGACY. So a mastered game = +4% income + +4% Legacy; six mastered ≈ 24/24%
+(Tim's ~25/25 target). A global `challenge_bonus_scale` (1.0) scales both tracks. The bonus is a
+FRACTION = summed whole-percent payouts ≤ cleared tier × bonus_scale ÷ 100.
+
+*The two folds.* `total_income_bonus(highest_tiers)` and `total_legacy_bonus(highest_tiers)` sum each
+game's cleared-tier payouts across `DynastyState.challenge_highest_tiers` ({game_key → int, raise-only,
+in the dynasty save at `SAVE_VERSION 11`, so it survives prestige). Income folds into
+`DynastyState.get_legacy_income_multiplier()` as `Family Fortune × (1 + total_income_bonus)` (once per
+property); Legacy folds into `get_legacy_yield_multiplier()` as `Estate Lawyers × (1 + total_legacy_bonus)`
+at the single `get_draft_will` site.
+
+*Keep-alive run timer (built in `MinigameScreen`).* A run starts with `challenge_timer_start_seconds`
+(6.0s; per-game override — Basketball 10.0s), drains 1 s/s, pauses while the game is busy, and each
+point of `get_score()` gained tops it up by that game's `seconds_per_point`
+(Match Three 0.012, Timing Bar 0.9, Memory 4.0, Basketball 3.5, Catch 1.5, Balance 2.0 — each a live
+knob), capped at `challenge_timer_cap_seconds` (15.0s). Clock → 0 ends the run and credits the highest
+tier reached (raise-only). This is the fail state (Memory Match is the exception: no timer — it ends on
+a completed climb or a wrong tap).
+
+*Miss penalty.* When a challenge game emits `Minigame.challenge_time_penalty(points)`, the host drains
+the timer by `challenge_miss_penalty_ratio` (0.5) × points × `seconds_per_point`. Catch emits a dropped
+coin's value; Timing emits 1.0 on a failed lock.
+
+*Configuration.* `ChallengeGoals.configure(tuning: TuningConfig)` takes the whole config object and is
+re-pushed on every dynasty construction/load; every challenge knob (`challenge_*`, the two games'
+`*_tier_*` escalating-cost knobs, all six `*_keepalive_seconds_per_point`, and the four Balance
+challenge knobs) is a `TuningConfig` export in `tuning.tres`, editable from the Balance-Tuning screen.
+
+*(History: Challenge Mode began 2026-06-30 as a Minigame-Tuning toggle for endless, reward-free
+free-play with a per-type high score saved to `user://challenge_scores.json`. That toggle and that file
+are retired; scores now credit the dynasty's `challenge_highest_tiers` instead.)*
 
 The same minigame host (`MinigameScreen`) serves **three sites** (GDD §5.5), each reusing the
 universal multiplier for a different reward: this prestige round (scales Legacy), the welcome-back

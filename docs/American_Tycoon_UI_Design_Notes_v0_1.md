@@ -467,12 +467,23 @@ The shared minigame host (`MinigameScreen`) and the Minigame Tuning review scree
   difficulty *direction* (Timing Bar / Catch Money harder; Match Three / Memory / Balance made
   clearer; Basketball held). All difficulty constants are **first-pass — on-device re-tune owed**
   (use Settings → Minigame Tuning to preview each type).
-- **Challenge Mode toggle (2026-06-30).** A large toggle on the Tuning list switches every game
-  launch between Minigame Mode (default) and **Challenge Mode** — endless free play, no timer, no
-  win/loss, per-game high scores saved across sessions. The toggle turns red when Challenge is
-  active; the subtitle changes; each game button shows "Best: N". In a Challenge round the reward
-  chrome (timer/spectrum/skip/opt-out) is swapped for a big live **Score** + **Best**, and DONE
-  ends the run and saves the high score.
+- **Challenge Mode — standalone CHALLENGES screen (reworked; device-confirmed 2026-07-22).** No
+  longer a toggle on the Minigame Tuning list. Challenge Mode is now its own **CHALLENGES screen**
+  reached from a **Settings** button, listing the six games with each one's **best tier**. Launching a
+  game from here runs it in Challenge Mode: the reward chrome (spectrum bar / skip / opt-out) is gone,
+  and the run is driven by a **keep-alive timer** — the clock starts with a few seconds, drains, and
+  each point you score tops it up (capped); when it hits zero the run ends and your best tier is banked.
+  The focal readout is a large **PULSING `TIER {current}/{best}`** (the old tier-progress bar was
+  removed). Credit routing is source-aware — a challenge run raises the dynasty's saved tier, while the
+  same host launched for a reward/prestige round behaves exactly as before.
+  *(History: 2026-06-30 → 2026-07 this was a large toggle on the Tuning list — Minigame vs. endless
+  reward-free free-play, the toggle turning red, each button showing "Best: N", a live Score + Best,
+  DONE saving a high score. That whole UI is retired in favor of the tiered CHALLENGES screen above.)*
+- **Balance-Tuning "Challenge Mode" section.** All challenge knobs (the shared timer/bonus/miss knobs,
+  the two low-ceiling games' escalating per-tier cost, every game's keep-alive seconds-per-point, and
+  the Balance challenge knobs) sit in one **"Challenge Mode"** section of the DevTuningPanel (its
+  catch-all section). Adding it was folded into a panel cleanup that trimmed the header count from
+  **14 to 10** and gave the whole panel **drag-to-scroll**.
 - **Basketball board (2026-06-30).** Generous margin around the board, a **thick black rounded
   outline**, and a gym backdrop (`art/backgrounds/basketball_court.png`) inside the rounded
   corners. The aim guide is a **force wedge** — point at the ball, fanning out toward the shot

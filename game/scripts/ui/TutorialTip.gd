@@ -18,6 +18,16 @@ const CARD_PADDING := 12.0
 ## Gap between the card and the control it points at, and the minimum gap to any screen edge.
 const GAP_FROM_TARGET := 16.0
 const EDGE_MARGIN := 24.0
+## Pointer-arrow (tail) dimensions, and the pulsing target-highlight ring.
+const ARROW_WIDTH := 46.0
+const ARROW_HEIGHT := 24.0
+const HIGHLIGHT_MARGIN := 8.0
+const HIGHLIGHT_BORDER := 6
+const HIGHLIGHT_CORNER := 12
+const HIGHLIGHT_PULSE_HZ := 1.4
+## How far, toward screen centre, the card starts before sliding out to its anchor — extra travel
+## to catch the eye that also leads it toward the target.
+const SLIDE_DISTANCE := 190.0
 
 var _card: PanelContainer
 var _title_label: Label
@@ -26,6 +36,19 @@ var _body_label: Label
 ## dismiss / re-show so a stale tween can never keep scaling a hidden or reused card.
 var _entrance_tween: Tween
 var _pulse_tween: Tween
+## The control this card points at (drives the arrow + highlight); null = a centered, undirected card.
+var _target: Control
+## The card's resting position: the entrance slides TO this from an offset, and the decorations
+## (pointer arrow, target ring) are drawn relative to it.
+var _final_pos := Vector2.ZERO
+## Whether the arrow + ring are currently painted — revealed only once the slide-in settles, so a
+## static decoration can never lag the moving card.
+var _show_decorations := false
+var _arrow_points_up := true
+var _arrow_center_x := 0.0
+## The pulsing ring drawn around the target; its border alpha is animated from _highlight_time.
+var _highlight_style: StyleBoxFlat
+var _highlight_time := 0.0
 
 
 func _ready() -> void:
@@ -35,6 +58,7 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	visible = false
 	_build_card()
+	_build_highlight_style()
 
 
 func _build_card() -> void:
@@ -91,6 +115,7 @@ func _build_card() -> void:
 
 ## Reveal the card with this copy, anchored near `target` (or screen-centered if target is null).
 func show_tip(title: String, body: String, target: Control) -> void:
+	_target = target
 	_title_label.text = title
 	_body_label.text = body
 	# The card's height depends on how the wrapped text lays out, which isn't known until after a
@@ -135,7 +160,17 @@ func _place_near(target: Control) -> void:
 	# Never let the card touch a screen edge.
 	pos.x = clampf(pos.x, EDGE_MARGIN, maxf(EDGE_MARGIN, screen.x - card_size.x - EDGE_MARGIN))
 	pos.y = clampf(pos.y, EDGE_MARGIN, maxf(EDGE_MARGIN, screen.y - card_size.y - EDGE_MARGIN))
+	_final_pos = pos
 	_card.position = pos
+
+	# Pointer-arrow geometry, revealed once the entrance settles (see _on_entrance_finished): a tail
+	# on the card's near edge, centred on the target and pointing at it.
+	_show_decorations = false
+	if target != null and target.is_inside_tree():
+		var t := target.get_global_rect()
+		_arrow_points_up = pos.y >= t.end.y  # card sits below the target -> the tail points up at it
+		_arrow_center_x = clampf(t.position.x + t.size.x * 0.5, \
+				pos.x + ARROW_WIDTH, pos.x + card_size.x - ARROW_WIDTH)
 
 
 ## Pop the card in — a scale + fade with a slight overshoot — then hand off to the pulse. Movement
@@ -145,12 +180,69 @@ func _animate_in() -> void:
 	_card.pivot_offset = _card.size * 0.5  # scale/pulse around the card's center, not its corner
 	_card.scale = Vector2(0.85, 0.85)
 	_card.modulate.a = 0.0
+	# Start the card off toward screen centre and slide it out to its anchor: travel across the
+	# screen is extra motion to catch the eye, and moving TO the target also leads the eye there.
+	var screen := get_viewport_rect().size
+	var toward_centre := signf(screen.x * 0.5 - (_final_pos.x + _card.size.x * 0.5))
+	if toward_centre == 0.0:
+		toward_centre = 1.0
+	_card.position = _final_pos + Vector2(toward_centre * SLIDE_DISTANCE, 0.0)
 	_entrance_tween = create_tween()
 	_entrance_tween.set_parallel(true)
+	_entrance_tween.tween_property(_card, "position", _final_pos, 0.4) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	_entrance_tween.tween_property(_card, "scale", Vector2.ONE, 0.35) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	_entrance_tween.tween_property(_card, "modulate:a", 1.0, 0.2)
-	_entrance_tween.finished.connect(_start_pulse, CONNECT_ONE_SHOT)
+	_entrance_tween.finished.connect(_on_entrance_finished, CONNECT_ONE_SHOT)
+
+
+## Entrance done: settle the card exactly at its anchor, reveal the pointer arrow + target ring,
+## and start the gentle breathing pulse.
+func _on_entrance_finished() -> void:
+	_card.position = _final_pos
+	_show_decorations = true
+	queue_redraw()
+	_start_pulse()
+
+
+## The pulsing ring drawn around the target control (built once; its border alpha is animated).
+func _build_highlight_style() -> void:
+	_highlight_style = StyleBoxFlat.new()
+	_highlight_style.bg_color = Color.TRANSPARENT
+	_highlight_style.set_border_width_all(HIGHLIGHT_BORDER)
+	_highlight_style.set_corner_radius_all(HIGHLIGHT_CORNER)
+
+
+func _process(delta: float) -> void:
+	# Repaint the pulsing target ring while a directed card is up (the arrow is static; the ring
+	# breathes). Cheap, and skipped entirely when no card is showing.
+	if visible and _show_decorations:
+		_highlight_time += delta
+		queue_redraw()
+
+
+func _draw() -> void:
+	if not _show_decorations or _target == null or not _target.is_inside_tree():
+		return
+
+	# Pointer arrow (tail): cream fill with navy slanted edges, on the card's near edge and pointing
+	# at the target. Drawn behind the card (a Control's _draw sits under its children); the triangle
+	# extends AWAY from the card into the gap, so it reads as a tail off the card toward the control.
+	var base_y := _final_pos.y if _arrow_points_up else _final_pos.y + _card.size.y
+	var tip_y := base_y - ARROW_HEIGHT if _arrow_points_up else base_y + ARROW_HEIGHT
+	var a := Vector2(_arrow_center_x - ARROW_WIDTH * 0.5, base_y)
+	var b := Vector2(_arrow_center_x + ARROW_WIDTH * 0.5, base_y)
+	var tip := Vector2(_arrow_center_x, tip_y)
+	draw_colored_polygon(PackedVector2Array([a, b, tip]), UiPalette.CREAM)
+	draw_line(a, tip, UiPalette.NAVY, 3.0)
+	draw_line(b, tip, UiPalette.NAVY, 3.0)
+
+	# Target highlight: a mustard ring around the control, its alpha breathing so the actionable
+	# element itself draws the eye ("do this").
+	var pulse := 0.5 + 0.5 * sin(_highlight_time * TAU * HIGHLIGHT_PULSE_HZ)
+	_highlight_style.border_color = Color(UiPalette.MUSTARD_GOLD, 0.4 + 0.5 * pulse)
+	draw_style_box(_highlight_style, _target.get_global_rect().grow(HIGHLIGHT_MARGIN))
 
 
 ## A subtle, continuous "breathe" (tiny scale in/out) that keeps the card noticeable until it is
@@ -185,5 +277,8 @@ func _dismiss() -> void:
 		return
 	_kill_tweens()
 	_card.scale = Vector2.ONE  # leave the card at rest for its next use
+	_show_decorations = false
+	_target = null
+	queue_redraw()
 	visible = false
 	dismissed.emit()

@@ -546,9 +546,10 @@ Today's Legacy upgrades (§8.4 Estate Office; the `LegacyUpgradeCatalog`) are mo
 
 ## 9. Rare Events (added v0.2)
 
-> **SHELVED — uncertain (Tim, 2026-06-22).** Tim isn't sure he wants this idea at all, so it
-> is parked: not in current scope and not to be proactively recommended. The design below is
-> kept for reference if he decides to revisit it. Nothing is built.
+> **SHELVED (Tim, 2026-06-22; reaffirmed 2026-07-23).** Parked: not in current scope and not
+> to be proactively recommended. On 2026-07-23 Tim reconsidered it and again shelved it — "it
+> doesn't sound very interesting right now" — but may revisit if inspiration strikes. The
+> design below is kept for reference. Nothing is built.
 
 **Cadence: roughly once per generation or two** — events function as *dynastic memory* (the Crash of '52 that gutted Bartholomew III's estate). Hard rule: **events hit capital, never the player's verbs.** The tap always works; the purr is preserved; events reprice the world occasionally.
 

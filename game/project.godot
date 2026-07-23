@@ -36,6 +36,7 @@ project/assembly_name="American Tycoon"
 [gui]
 
 common/default_scroll_deadzone=30
+theme/custom="res://ui/theme/american_tycoon.tres"
 
 [rendering]
 

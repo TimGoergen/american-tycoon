@@ -1,0 +1,101 @@
+[gd_resource type="Theme" load_steps=5 format=3]
+
+; American Tycoon central UI Theme (Global UI Theme pass, 2026-07-23).
+;
+; Single-file home for the game's default Control sizing/chrome. The values here
+; mirror the constants and style builders in scripts/ui/UiPalette.gd so this
+; resource and the code stay in agreement:
+;   - Fonts: default 32 (FONT_BODY), Button 34 (FONT_BUTTON), Label 32 (FONT_BODY)
+;            — identical to UiPalette.make_app_theme().
+;   - Panel / PanelContainer: cream plate, navy 3px border, 4px corners, 12px pad
+;            — matches UiPalette.make_panel_style() / _make_plate(CREAM, NAVY).
+;   - Button default look: navy-on-mustard plate (the standard, non-action button
+;            from UiPalette.style_button(is_action=false)), 12px content padding.
+;
+; NOTE: Godot Themes cannot set a Control's minimum SIZE directly; button height
+; is still pinned per-control via custom_minimum_size = STANDARD_BUTTON_HEIGHT (99).
+; The 12px content margins below are the padding half of that story.
+;
+; Registered as the project default theme (project.godot [gui] gui/theme/custom).
+; The running game currently still assigns UiPalette.make_app_theme() on the Main
+; root, which shadows this default for the in-game tree; see the theme-pass report.
+
+[sub_resource type="StyleBoxFlat" id="panel_plate"]
+content_margin_left = 12.0
+content_margin_top = 12.0
+content_margin_right = 12.0
+content_margin_bottom = 12.0
+bg_color = Color(0.956863, 0.925490, 0.847059, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.113725, 0.176471, 0.313725, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="button_normal"]
+content_margin_left = 12.0
+content_margin_top = 12.0
+content_margin_right = 12.0
+content_margin_bottom = 12.0
+bg_color = Color(0.890196, 0.698039, 0.235294, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.113725, 0.176471, 0.313725, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="button_pressed"]
+content_margin_left = 12.0
+content_margin_top = 12.0
+content_margin_right = 12.0
+content_margin_bottom = 12.0
+bg_color = Color(0.941176, 0.831373, 0.603922, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.113725, 0.176471, 0.313725, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="button_disabled"]
+content_margin_left = 12.0
+content_margin_top = 12.0
+content_margin_right = 12.0
+content_margin_bottom = 12.0
+bg_color = Color(0.956863, 0.925490, 0.847059, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.113725, 0.176471, 0.313725, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[resource]
+default_font_size = 32
+Button/colors/font_color = Color(0.113725, 0.176471, 0.313725, 1)
+Button/colors/font_pressed_color = Color(0.113725, 0.176471, 0.313725, 1)
+Button/colors/font_hover_color = Color(0.113725, 0.176471, 0.313725, 1)
+Button/colors/font_disabled_color = Color(0.113725, 0.176471, 0.313725, 0.45)
+Button/font_sizes/font_size = 34
+Button/styles/normal = SubResource("button_normal")
+Button/styles/hover = SubResource("button_normal")
+Button/styles/pressed = SubResource("button_pressed")
+Button/styles/disabled = SubResource("button_disabled")
+Label/colors/font_color = Color(0.113725, 0.176471, 0.313725, 1)
+Label/font_sizes/font_size = 32
+Panel/styles/panel = SubResource("panel_plate")
+PanelContainer/styles/panel = SubResource("panel_plate")

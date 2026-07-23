@@ -122,20 +122,35 @@ The designer's peak dopamine moment is the **return spike**: spending offline-ba
 
 From the original `AmericanTycoon_PropertyTypeConfig.xlsx`, Sheet2. **Not one rung of honest work on it** — gag → grift → crime → respectable-grift → purchasing the United States government. The endgame tiers being deadpan accounting terms for owning politicians is the punchline and is protected.
 
-| # | Property Type | Cost | Income/sec | Cycle (sec) | Income/Cycle |
+| # | Property Type | Cost† | Income/sec† | Cycle (sec)‡ | Income/Cycle† |
 |---|---|---|---|---|---|
-| 1 | ATM | $50 | $12.50 | 0.4 | $5 |
-| 2 | Money Tree | $550 | $25 | 2 | $50 |
-| 3 | NFTs | $6,050 | $50 | 4 | $200 |
-| 4 | Tax Increment Financing | $66,550 | $100 | 8 | $800 |
-| 5 | Cross Border Distribution | $732,050 | $200 | 16 | $3,200 |
-| 6 | Money Laundering | $8,052,550 | $400 | 32 | $12,800 |
-| 7 | Day Trading | $88,578,050 | $800 | 64 | $51,200 |
-| 8 | Flipping Houses | $974,358,550 | $1,600 | 128 | $204,800 |
-| 9 | Multi Level Marketing | $10.72B | $3,200 | 256 | $819,200 |
-| 10 | Hedge Fund | $117.9B | $6,400 | 512 | $3.28M |
-| 11 | Legislative Assets | $1.30T | $12,800 | 1,024 | $13.1M |
-| 12 | Executive Assets | $14.27T | $25,600 | 2,048 | $52.4M |
+| 1 | ATM | $50 | $12.50 | 0.54 | $5 |
+| 2 | Money Tree | $550 | $25 | 1.765 | $50 |
+| 3 | NFTs | $6,050 | $50 | 3.077 | $200 |
+| 4 | Tax Increment Financing | $66,550 | $100 | 4.47 | $800 |
+| 5 | Cross Border Distribution | $732,050 | $200 | 6.233 | $3,200 |
+| 6 | Money Laundering | $8,052,550 | $400 | 8.15 | $12,800 |
+| 7 | Day Trading | $88,578,050 | $800 | 11.401 | $51,200 |
+| 8 | Flipping Houses | $974,358,550 | $1,600 | 15.67 | $204,800 |
+| 9 | Multi Level Marketing | $10.72B | $3,200 | 21.986 | $819,200 |
+| 10 | Hedge Fund | $117.9B | $6,400 | 30.778 | $3.28M |
+| 11 | Legislative Assets | $1.30T | $12,800 | 43.023 | $13.1M |
+| 12 | Executive Assets | $14.27T | $25,600 | 60.0 | $52.4M |
+
+> **‡ Cycle (sec) — synced to the live `.tres` configs (2026-07-23 doc pass).** These are the
+> real `base_cycle_length` values shipped in `game/config/properties/01..12_*.tres`, replacing
+> the original doubling curve (0.4s → 2048s) that never shipped. The curve is a gentle geometric
+> taper — tier 1 ≈ 0.54s up to the tier-12 **top of 60.0s (1 min)**, per the 2026-07-03 pace-pass
+> compression (see the rework notes below). **Note the top tier is 60s, *not* the 3–5 min base the
+> earlier roadmap called for** — the 2026-06-25 stretch did reach ~272s (~4.5 min), but the
+> 2026-07-03 core-pace reversal deliberately compressed it back down to 60s (income-neutral), so
+> "top tier ≈ 3–5 min base" is superseded design intent, not the live state.
+>
+> **† Cost / Income/sec / Income/Cycle** columns are the *original xlsx design-intent* figures and
+> are illustrative only — the live configs have since been reworked several times (income-neutral
+> cycle changes, `r0` steepening, ~×5/tier income steps), so the live per-unit cost and income no
+> longer match these cells. Only the Cycle column above is synced to code. See the `.tres` files
+> for live cost/income.
 
 > **Cycle-time rework — IMPLEMENTED 2026-06-22 (moderate stretch, back half only).** The
 > table's cycle column above is the *original intent* (doubling 0.4s → 2048s) and never shipped;
@@ -151,8 +166,9 @@ From the original `AmericanTycoon_PropertyTypeConfig.xlsx`, Sheet2. **Not one ru
 > same factor as its cycle, so base income/sec is unchanged — only the *rhythm* changes (longer
 > waits → bigger lump-sum payouts, and more visible speed-up beats as the longer cycle halves
 > more times before the 1s floor). Milestones + staffing compress it the way AdCap's long top
-> business collapses once maxed. (`.tres` values updated; this table's cycle column is now
-> historical — see the configs for live values.)
+> business collapses once maxed. (`.tres` values updated; the table's Cycle column above has since
+> been re-synced to the live configs — the numbers narrated in this note are the 2026-06-25 stretch,
+> which the 2026-07-03 pace pass below then reversed.)
 >
 > **Core pace pass — REVERSED the stretch 2026-07-03.** Device feel-test verdict: the game
 > *progresses* too fast but *cycles* feel too slow — the two clocks were inverted vs. Tim's

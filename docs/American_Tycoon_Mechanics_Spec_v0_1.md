@@ -71,7 +71,8 @@ the ratio rose to ~1.6×, concentrating the change at the top (tier 7 24→26, t
 stretched tier's `base_income_per_unit` was scaled up by the same factor as its `base_cycle_length`,
 so base income/sec (= income_per_cycle / cycle_length) is unchanged — only the cadence changes
 (longer waits, bigger lump sums, more speed-up halvings before the 1s floor). The fix is purely in
-`game/config/properties/07..12*.tres`; no formula change. (GDD §4's cycle column is now historical.)
+`game/config/properties/07..12*.tres`; no formula change. (GDD §4's cycle column is now re-synced to
+the live configs; the numbers in this paragraph are the 2026-06-25 stretch, reversed on 2026-07-03 below.)
 
 **Core pace pass — REVERSED the stretch 2026-07-03.** Device verdict: progression too fast,
 cycles too slow (the two clocks inverted vs. the mid-game Idle Slayer target). Cycles compressed
@@ -83,6 +84,22 @@ candidate C of the pace study (`game/sim/PaceStudy.gd`, `Plans/Core_Pace_Study.m
 cost steepening widens purchase cadence but cannot slow the macro arc (income is self-funding
 exponential; the epoch wall is earnings-gated) — a still-too-fast macro arc needs an income-side
 lever, not more `r0`.
+
+**Live base cycle lengths (current, per `game/config/properties/01..12_*.tres`, 2026-07-23):** the
+shipped curve is a gentle geometric taper from tier 1 to a **60.0s (1 min) top**, *not* the 3–5 min
+base the earlier roadmap targeted — the 2026-07-03 pace pass compressed the 272s stretch back to 60s.
+
+| Tier | Property | Base cycle (s) | | Tier | Property | Base cycle (s) |
+|---|---|---|---|---|---|---|
+| 1 | ATM | 0.54 | | 7 | Day Trading | 11.401 |
+| 2 | Money Tree | 1.765 | | 8 | Flipping Houses | 15.67 |
+| 3 | NFTs | 3.077 | | 9 | Multi Level Marketing | 21.986 |
+| 4 | Tax Increment Financing | 4.47 | | 10 | Hedge Fund | 30.778 |
+| 5 | Cross Border Distribution | 6.233 | | 11 | Legislative Assets | 43.023 |
+| 6 | Money Laundering | 8.15 | | 12 | Executive Assets | 60.0 |
+
+Alien property tiers (13–52) all carry a flat `base_cycle_length = 60.0`; per-rung cadence beyond
+Earth comes from the epoch cohort structure (§ epoch catalog), not distinct base cycles.
 
 ### 3.4 Income
 ```

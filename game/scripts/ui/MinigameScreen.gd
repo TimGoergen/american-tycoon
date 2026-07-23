@@ -79,6 +79,11 @@ const SKIP_GAP_BELOW_PANEL := 16.0
 ## card edges (Tim, 2026-07-09) — beyond the card's own content margin. The play board still fills.
 const CHROME_MARGIN := 28
 
+## The "best" sub-lines in the two-corner Challenge header read in a darker gray beneath the black
+## Score / Tier primaries (Tim, 2026-07-22), so the current value dominates and the record sits quietly
+## under it. Darker than UiPalette.DARK_GRAY (#6E6E6E) so it still reads on the translucent cream card.
+const CHALLENGE_BEST_GRAY := Color("#4A4A4A")
+
 ## How fast the spectrum bar's fill glides toward its true value (per-second lerp weight). The
 ## bar tracks a smoothed `_display_mult` rather than the raw live multiplier so it reads as a
 ## sweep, not a jitter — the single most-visible shared element, smoothed once here for all six
@@ -218,12 +223,11 @@ var _baked_backdrop_px: Vector2i = Vector2i.ZERO
 var _challenge_mode: bool = false
 var _score_label: Label
 var _highscore_label: Label
-## The one-row container holding Score + Best SIDE BY SIDE (Tim, 2026-07-21). The two used to stack as
-## separate centered lines, which ate a whole line of card height and shrank the game board; they now
-## share one row ("Score: 1,240   Best: 3,100"). Kept as a field so _set_challenge_chrome can show/hide
-## the row as a unit. The separate "Next tier" target LINE was removed entirely; the tier standing now
-## reads from the large tier display below the row (see _update_challenge_tier).
-var _challenge_score_row: Control
+## The two-corner Challenge Mode header (Tim, 2026-07-22): a MarginContainer holding two equal-width
+## columns — Score over Best score (top-left, black) and current Tier over Best tier (top-right, dark
+## gray). REPLACES the earlier centered "Score  Best" row and the centered "TIER x / y" line. Kept as a
+## field so _set_challenge_chrome can show/hide the whole header as one unit.
+var _challenge_header: Control
 ## The CHALLENGE end view — shown when a run ends (DONE/Back) INSTEAD of closing straight away, so the
 ## tier-credit feedback has somewhere to land (Challenge Mode Phase 2). A dedicated view, deliberately
 ## separate from the reward `_result_view` (the reward statement must not carry challenge feedback).
@@ -270,14 +274,15 @@ var _challenge_timer_low: StyleBoxFlat
 ## warning (Plans/Challenge_Mode.md §1).
 const CHALLENGE_TIMER_LOW_SECONDS := 2.0
 
-## The large TIER display (Challenge Mode, ALL games — Tim, 2026-07-22). REPLACES the old tier-progress
-## bar, which read as empty at high tiers and only echoed information the tier numbers already carry. A
-## big bold "TIER 3 / 7" readout (current tier over best tier reached), centered in the chrome column,
-## that PULSES with a brief scale-up + gold brighten every time the CURRENT tier climbs a rung. Shown for
-## every challenge game (self-ending ones included, unlike the keep-alive timer bar).
+## The current-TIER display (Challenge Mode, ALL games — Tim, 2026-07-22): the primary value in the
+## header's top-right corner ("TIER 3"), dark gray, with `_best_tier_label` nestled underneath it. It
+## PULSES with a brief scale-up + brighten every time the CURRENT tier climbs a rung. Shown for every
+## challenge game (self-ending ones included, unlike the keep-alive timer bar).
 ##   `_challenge_tier_pulse` — decaying [0,1] pop, set to 1 when the current tier rises, eased to 0 in ~0.4s.
 ##   `_challenge_shown_tier` — the current tier last shown, so the pop fires once per crossing.
 var _challenge_tier_label: Label
+## The best tier reached, nestled under the current-tier primary ("Best: 7"), dark gray a size down.
+var _best_tier_label: Label
 var _challenge_tier_pulse: float = 0.0
 var _challenge_shown_tier: int = 0
 
@@ -533,39 +538,60 @@ func _build_play_view() -> Control:
 	_purpose_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(_purpose_label)
 
-	# Challenge Mode readouts (hidden in normal reward rounds): the live score and the best-to-beat, now
-	# SIDE BY SIDE on ONE row (Tim, 2026-07-21) instead of two stacked centered lines. The score keeps the
-	# big display font it had (it replaces the timer as the focal point); Best sits a size down beside it.
-	# Reclaiming that stacked line — plus folding the old "Next tier" line into the progress bar below —
-	# gives the game board noticeably more height (the play area expands to fill whatever the chrome
-	# leaves). start_challenge fills them; _set_challenge_chrome shows/hides the whole row.
-	_challenge_score_row = HBoxContainer.new()
-	_challenge_score_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	_challenge_score_row.add_theme_constant_override("separation", 28)
-	_challenge_score_row.visible = false
-	column.add_child(_challenge_score_row)
+	# Challenge Mode header (hidden in normal reward rounds): a two-corner readout (Tim, 2026-07-22) that
+	# REPLACES the earlier centered "Score  Best" row and the centered "TIER x / y" line. Top-LEFT is the
+	# live Score (primary) with the Best score nestled directly underneath it, both black. Top-RIGHT is the
+	# current Tier (primary) with the Best tier underneath, both dark gray. Two equal-width columns hug the
+	# card's left and right edges (CHROME_MARGIN inset, matching the timer bar below). start_challenge
+	# fills the four labels; _set_challenge_chrome shows/hides the whole header as one unit.
+	var challenge_header_margin := MarginContainer.new()
+	challenge_header_margin.add_theme_constant_override("margin_left", CHROME_MARGIN)
+	challenge_header_margin.add_theme_constant_override("margin_right", CHROME_MARGIN)
+	challenge_header_margin.visible = false
+	column.add_child(challenge_header_margin)
+	_challenge_header = challenge_header_margin
 
-	_score_label = _make_label("", UiPalette.FONT_DISPLAY, UiPalette.MONEY_GREEN)
-	_score_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	var challenge_header_row := HBoxContainer.new()
+	challenge_header_row.add_theme_constant_override("separation", 20)
+	challenge_header_margin.add_child(challenge_header_row)
+
+	# LEFT column: Score (primary, big display font — it replaces the timer as the focal point) over the
+	# Best score, both black, hugging the left edge. A tight 2px separation keeps Best "nestled" under it.
+	var score_column := VBoxContainer.new()
+	score_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	score_column.add_theme_constant_override("separation", 2)
+	challenge_header_row.add_child(score_column)
+
+	_score_label = _make_label("", UiPalette.FONT_DISPLAY, Color.BLACK)
+	_score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	_score_label.add_theme_font_override("font", UiPalette.make_bold_font())
-	_challenge_score_row.add_child(_score_label)
+	score_column.add_child(_score_label)
 
-	_highscore_label = _make_label("", UiPalette.FONT_SUBHEAD, UiPalette.DARK_GOLD)
-	_highscore_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_challenge_score_row.add_child(_highscore_label)
+	_highscore_label = _make_label("", UiPalette.FONT_SUBHEAD, CHALLENGE_BEST_GRAY)
+	_highscore_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	score_column.add_child(_highscore_label)
 
-	# The large TIER display (Tim, 2026-07-22): REPLACES the tier-progress bar, which looked empty at high
-	# tiers and only echoed the tier numbers. A big bold "TIER 3 / 7" readout (current over best), centered
-	# in the chrome column, that PULSES each time the current tier climbs (see _update_challenge_tier). It
-	# sits a size ABOVE the Score label (FONT_PAGE_TITLE vs FONT_DISPLAY) so the tier is the clear focal
-	# point (low-vision rule). SHRINK_CENTER keeps it only as wide as its text so the pulse scales from its
-	# true center. Hidden until _set_challenge_chrome shows it.
-	_challenge_tier_label = _make_label("", UiPalette.FONT_PAGE_TITLE, UiPalette.DARK_GOLD)
-	_challenge_tier_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_challenge_tier_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	# RIGHT column: current Tier (primary) over Best tier, both dark gray, hugging the right edge. The tier
+	# primary keeps its tier-up PULSE (see _update_challenge_tier); SHRINK_END sizes it to its own text so
+	# the pulse still scales from the text's true center and the right edge stays pinned as the text width
+	# changes ("TIER 3" -> "TIER MAX").
+	# The tier text is short ("TIER 3" .. "TIER MAX"), so this column takes only the width it needs and
+	# pins right, leaving the whole rest of the row to the score so a long score number has room.
+	var tier_column := VBoxContainer.new()
+	tier_column.size_flags_horizontal = Control.SIZE_SHRINK_END
+	tier_column.add_theme_constant_override("separation", 2)
+	challenge_header_row.add_child(tier_column)
+
+	_challenge_tier_label = _make_label("", UiPalette.FONT_DISPLAY, Color.BLACK)
+	_challenge_tier_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_challenge_tier_label.size_flags_horizontal = Control.SIZE_SHRINK_END
 	_challenge_tier_label.add_theme_font_override("font", UiPalette.make_bold_font())
-	_challenge_tier_label.visible = false
-	column.add_child(_challenge_tier_label)
+	tier_column.add_child(_challenge_tier_label)
+
+	_best_tier_label = _make_label("", UiPalette.FONT_SUBHEAD, CHALLENGE_BEST_GRAY)
+	_best_tier_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_best_tier_label.size_flags_horizontal = Control.SIZE_SHRINK_END
+	tier_column.add_child(_best_tier_label)
 
 	# The keep-alive TIMER bar (Challenge Mode only): a horizontal bar that empties as the clock runs
 	# down, the seconds remaining printed over it. It replaces the reward timer + spectrum bar in
@@ -1202,11 +1228,13 @@ func start_game(
 	_begin_title.text = _active_minigame.display_name()
 	_begin_howto.text = _active_minigame.how_to_play()
 	# Reward stakes on the gate (Challenge Mode replaces this in start_challenge). Upside-only sites
-	# frame it as pure upside; the amount-scaling sites warn that a weak round keeps less.
+	# frame it as pure upside; the amount-scaling sites warn that coming up short keeps less. Wording
+	# tracks the result screen's "CAME UP SHORT" verdict — the old "weak round" phrasing was left
+	# behind when that copy changed (Tim, 2026-07-22).
 	if _upside_only:
-		_begin_stakes.text = "Play well to earn a BONUS on this business — more income, faster cycles. A weak round or Skip just opens it at its base income. No penalty."
+		_begin_stakes.text = "Play well to earn a BONUS on this business — more income, faster cycles. Coming up short or a Skip just opens it at its base income. No penalty."
 	else:
-		_begin_stakes.text = "Play well to earn a BONUS on top of your inheritance. Skip to keep it as-is — a weak round keeps less."
+		_begin_stakes.text = "Play well to earn a BONUS on top of your inheritance. Skip to keep it as-is — coming up short keeps less."
 	_begin_stakes.visible = true
 	# A timed game warns the clock is about to start; a no-timer game (Memory) invites the player to
 	# take their time instead, so the hint never promises a clock that won't appear.
@@ -1312,13 +1340,11 @@ func start_challenge(type_script: Script) -> void:
 func _set_challenge_chrome(on: bool) -> void:
 	_timer_label.visible = not on
 	_keep_bar.visible = not on
-	# Score + Best now share one row — toggle the row as a unit so it vanishes cleanly in reward mode
-	# (no leftover empty line). The "Next tier" target line was removed; its info lives on the bar below.
-	if _challenge_score_row != null:
-		_challenge_score_row.visible = on
-	# The large tier display shows for EVERY challenge game (self-ending included).
-	if _challenge_tier_label != null:
-		_challenge_tier_label.visible = on
+	# The whole two-corner header (Score/Best on the left, Tier/Best on the right) toggles as one unit so
+	# it vanishes cleanly in reward mode with no leftover empty line. Shown for EVERY challenge game
+	# (self-ending ones included, unlike the keep-alive timer bar).
+	if _challenge_header != null:
+		_challenge_header.visible = on
 	# The keep-alive timer bar takes the reward chrome's place in a challenge run. start_challenge
 	# overrides it OFF for a self-ending game (which has no keep-alive timer).
 	if _challenge_timer_margin != null:
@@ -1420,18 +1446,21 @@ func _update_challenge_tier() -> void:
 	# needs threading in here, mirroring the timer bar's decay pattern.
 	_challenge_tier_pulse = maxf(0.0, _challenge_tier_pulse - get_process_delta_time() * 2.5)
 
-	# The text: current over best, or MASTERED-style "TIER MAX" at the top of the ladder.
-	if current >= ChallengeGoals.MAX_TIER:
-		_challenge_tier_label.text = "TIER MAX"
-	else:
-		_challenge_tier_label.text = "TIER %d / %d" % [current, best]
+	# The primary reads the CURRENT tier ("TIER 3", or "TIER MAX" at the summit); the best tier reached
+	# nestles underneath ("Best: 7" / "Best: MAX"), mirroring the Score/Best pairing on the left.
+	_challenge_tier_label.text = "TIER MAX" if current >= ChallengeGoals.MAX_TIER else "TIER %d" % current
+	if _best_tier_label != null:
+		_best_tier_label.text = "Best: MAX" if best >= ChallengeGoals.MAX_TIER else "Best: %d" % best
 
-	# Apply the pulse as a brief scale-up + gold brighten, pivoting on the label's center so it grows
-	# from the middle rather than the top-left. At rest (pulse 0) it sits at scale 1.0 / full color.
+	# Apply the pulse as a brief scale-up + gold color flash, pivoting on the label's center so it grows
+	# from the middle rather than the top-left. At rest (pulse 0) it sits at scale 1.0 and its resting
+	# black. The flash uses the FONT COLOR, not modulate: modulate multiplies the glyph color, and the
+	# tier text is now black (0 × anything = 0), so a modulate brighten would be invisible — the color
+	# lerp flashes it toward gold on a tier-up and eases back to black (Tim, 2026-07-22).
 	_challenge_tier_label.pivot_offset = _challenge_tier_label.size * 0.5
 	_challenge_tier_label.scale = Vector2.ONE * (1.0 + 0.35 * _challenge_tier_pulse)
-	# modulate > 1.0 over-brightens (a flash toward light gold), easing back to WHITE (no tint) at rest.
-	_challenge_tier_label.modulate = Color.WHITE.lerp(Color(1.6, 1.45, 1.0), _challenge_tier_pulse)
+	_challenge_tier_label.add_theme_color_override(
+		"font_color", Color.BLACK.lerp(UiPalette.MUSTARD_GOLD, _challenge_tier_pulse))
 
 
 ## Advance the keep-alive run timer one frame (Wave 2, Plans/Challenge_Mode.md §1). Only called from
@@ -1936,7 +1965,10 @@ func _fill_amount_statement(mult: float) -> void:
 
 	if mult > 1.0 + 0.001:
 		_result_verdict_label.text = "GREAT ROUND"
-		_result_verdict_label.add_theme_color_override("font_color", Color("#2E6FD6"))
+		# Darkened from the original mid-blue so the celebratory verdict still reads over the
+		# translucent result card + themed backdrop (Tim, 2026-07-22 contrast pass, completing the
+		# 07-20 teal/shortfall darkening) — still clearly blue, just deep enough to hold contrast.
+		_result_verdict_label.add_theme_color_override("font_color", Color("#2E6FD6").darkened(0.25))
 		_stat_impact_key.text = "Minigame bonus  (+%d%%)" % int(round((mult - 1.0) * 100.0))
 		_stat_impact_val.text = "+%s" % _format_amount(delta)
 		_stat_impact_val.add_theme_color_override("font_color", UiPalette.DARK_MONEY_GREEN)
@@ -1947,10 +1979,11 @@ func _fill_amount_statement(mult: float) -> void:
 		# We now name the SHORTFALL itself ("−10%"), which is both honest about the loss and
 		# self-scaling: a small miss reads small. No math changed.
 		_result_verdict_label.text = "CAME UP SHORT"
-		# Darkened a touch so the pale (near-full) top of the keep gradient still reads on the
-		# translucent result card (Tim, 2026-07-20 contrast pass). _keep_color is shared with the
-		# in-round bar, so darken only here at the result call site.
-		_result_verdict_label.add_theme_color_override("font_color", _keep_color(mult).darkened(0.2))
+		# Any shortfall now gives up real reward (the keep floor is 0.9, so even a small miss costs
+		# income), so the verdict always reads as one flat alarm red instead of the keep gradient's
+		# gold-for-a-near-miss — a loss should never look celebratory (Tim, 2026-07-22). Darkened a
+		# touch so it reads on the translucent result card (2026-07-20 contrast pass).
+		_result_verdict_label.add_theme_color_override("font_color", UiPalette.KETCHUP_RED.darkened(0.2))
 		_stat_impact_key.text = "Short of full  (−%d%%)" % int(round((1.0 - mult) * 100.0))
 		_stat_impact_val.text = "−%s" % _format_amount(-delta)
 		_stat_impact_val.add_theme_color_override("font_color", UiPalette.KETCHUP_RED)

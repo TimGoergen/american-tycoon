@@ -120,15 +120,18 @@ a narrator-voice copy pass (§8, open).
 
 Each phase is independently shippable and device-checkable.
 
-## 8. Open questions for Tim
+## 8. Decisions (resolved by Tim, 2026-07-23)
 
-1. **Card vs pause:** OK with lightweight *non-blocking* coach cards for the minor/medium tips
-   (my recommendation), reserving pauses for the major beats that already pause? Or do you want
-   first-time tips to briefly freeze the game so they're unmissable?
-2. **Copy voice:** tip text should be in the narrator voice (GDD §1.2). I can draft all of it for
-   you to edit — confirm you want me to draft, or you'd rather write the copy yourself.
-3. **Dev reset wipes tutorial progress?** Recommend yes (re-testable). Confirm.
-4. **v1 scope:** is the §4 list right — anything to add, or cut from v1 (e.g. defer minigames /
-   retention to a later pass)?
-5. **Placement:** should cards point at the relevant control (anchored near it) or just appear in
-   a consistent spot (e.g. bottom-center)? Anchored is clearer but more layout work per tip.
+1. **Card vs pause:** ✅ Lightweight, **easily-dismissed non-blocking cards** for the tips;
+   major concepts still woven into the beats that already pause. No hard freeze.
+2. **Copy voice:** ✅ Claude drafts all tip copy (narrator voice); Tim tweaks later. Copy lives
+   in `scripts/core/TutorialCatalog.gd` so it is reviewable/editable in one place.
+3. **Dev reset wipes tutorial progress:** ✅ Yes — `TutorialProgress.clear()` next to the
+   `ChallengeScores.clear()` call in the dev reset, so onboarding is re-testable.
+4. **v1 scope:** ✅ **All 12** teachable moments in §4 are in v1 — nothing deferred.
+5. **Placement:** ✅ Cards are **anchored to the relevant control** (positioned from the target's
+   global rect, clamped to the viewport).
+
+Build proceeds by the §7 phases regardless — Phase 1 (framework + one anchored card end-to-end +
+the on/off setting) ships first for a device look at the card feel/anchoring before the other 11
+hooks are wired, since anchoring is the part most worth validating once before replicating.

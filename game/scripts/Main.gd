@@ -46,6 +46,9 @@ var _dev_panel: DevTuningPanel
 var _minigame_screen: MinigameScreen
 var _minigame_review_screen: MinigameReviewScreen
 var _challenges_screen: ChallengesScreen
+## The tutorial coach card (Plans/Tutorial_Onboarding_Plan.md) — one instance, fired by
+## _maybe_show_tip the first time a system becomes relevant, anchored near the relevant control.
+var _tutorial_tip: TutorialTip
 var _buy_mode_button: Button
 var _plan_button: Button
 ## Rich-text content overlaid on the plan button so the "(+x [gem])" parenthetical can show the
@@ -522,6 +525,11 @@ func _build_ui() -> void:
 	_first_contact_overlay = FirstContactOverlay.new()
 	_first_contact_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_first_contact_overlay)
+
+	# The tutorial coach card sits on top of everything (added last), hidden until a first-time
+	# tip fires. It is non-blocking — taps outside the card pass through to the game.
+	_tutorial_tip = TutorialTip.new()
+	add_child(_tutorial_tip)
 	game.epoch.contact_made.connect(_on_contact_made)
 	# When the player answers the contact, the trade-deal minigame negotiates their head start
 	# on the new alien property (GDD §5.5 site 2), so the negotiation follows the narration.
@@ -1149,6 +1157,21 @@ func _build_settings_tab() -> Control:
 	_minigame_check.toggled.connect(func(on: bool) -> void: game.ui_minigame_enabled = on)
 	v.add_child(_minigame_check)
 
+	# Tutorial-tips toggle — the master on/off for the one-time coach cards. Persisted in
+	# TutorialProgress (its own user:// file), so the choice survives prestige and restarts. Styled
+	# to match the minigame checkbox above (large navy label + big custom check glyphs).
+	var tutorial_check := CheckBox.new()
+	tutorial_check.text = "Show tutorial tips"
+	tutorial_check.add_theme_font_size_override("font_size", 45)
+	for state in ["font_color", "font_pressed_color", "font_hover_color",
+			"font_focus_color", "font_hover_pressed_color", "font_disabled_color"]:
+		tutorial_check.add_theme_color_override(state, UiPalette.NAVY)
+	tutorial_check.add_theme_icon_override("checked", load("res://art/icons/checkbox_checked.svg"))
+	tutorial_check.add_theme_icon_override("unchecked", load("res://art/icons/checkbox_unchecked.svg"))
+	tutorial_check.button_pressed = TutorialProgress.is_enabled()
+	tutorial_check.toggled.connect(func(on: bool) -> void: TutorialProgress.set_enabled(on))
+	v.add_child(tutorial_check)
+
 	# A spacer pushes the two tuning buttons to the bottom of the panel, clear of the options above.
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -1373,6 +1396,30 @@ func _on_buy_requested(prop_index: int, mode: PropertyRow.BuyMode) -> void:
 
 	if game.try_buy(prop_index, count):
 		_hero_stat.flash_purchase()
+		# First purchase ever: teach what a business does, anchored to the row just bought.
+		_maybe_show_tip("first_property", _row_for_index(prop_index))
+
+
+## Show the one-time tutorial card for `tip_id`, anchored near `target` (null = screen-centered),
+## unless tips are turned off or this one has already been seen. Marking it seen persists
+## immediately so it never repeats (TutorialProgress lives outside the dynasty save).
+func _maybe_show_tip(tip_id: String, target: Control) -> void:
+	if not TutorialProgress.is_enabled() or TutorialProgress.has_seen(tip_id):
+		return
+	var tip := TutorialCatalog.get_tip(tip_id)
+	if tip.is_empty():
+		return
+	TutorialProgress.mark_seen(tip_id)
+	_tutorial_tip.show_tip(tip["title"], tip["body"], target)
+
+
+## The visible PropertyRow for a property index, or null if that rung isn't currently on screen
+## (the epoch pager only builds the current tab's rows). Used to anchor a tip to the right row.
+func _row_for_index(prop_index: int) -> PropertyRow:
+	for row in _rows:
+		if (row as PropertyRow).prop_index == prop_index:
+			return row as PropertyRow
+	return null
 
 
 func _on_tap_requested(prop_index: int) -> void:
@@ -1493,6 +1540,9 @@ func _on_dev_reset_dynasty_requested() -> void:
 	# Challenge Mode high scores (highest tier) live in their own user:// file, not the dynasty save,
 	# so wipe them too or they survive the reset (Tim, 2026-07-22).
 	ChallengeScores.clear()
+	# Tutorial progress also lives in its own user:// file (prestige-independent), so wipe it too
+	# to make onboarding re-testable from a clean state (Tim, 2026-07-23).
+	TutorialProgress.clear()
 	get_tree().reload_current_scene()
 
 

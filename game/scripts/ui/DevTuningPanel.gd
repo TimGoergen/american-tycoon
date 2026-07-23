@@ -173,9 +173,14 @@ const DESCRIPTIONS := {
 	"basketball_tier_base_cost": "Micro Basketball Challenge: baskets each tier costs for tiers 1-5 (the escalating cost's base). At 1, tier 5 = 5 baskets.",
 	"basketball_tier_cost_increment": "Micro Basketball Challenge: baskets added to each tier's cost every 5 tiers (escalating cost climbs).",
 	"basketball_tier_cost_cap": "Micro Basketball Challenge: the most baskets a single tier can cost (escalation caps here).",
+	"basketball_keepalive_seconds_per_point": "Micro Basketball Challenge: keep-alive seconds each sunk basket adds to the run clock.",
 	"memory_tier_base_cost": "Memory Match Challenge: climbs each tier costs for tiers 1-5 (the escalating cost's base). At 0.2, tier 5 ≈ 1 climb.",
 	"memory_tier_cost_increment": "Memory Match Challenge: climbs added to each tier's cost every 5 tiers (escalating cost climbs).",
 	"memory_tier_cost_cap": "Memory Match Challenge: the most climbs a single tier can cost (escalation caps here).",
+	"memory_keepalive_seconds_per_point": "Memory Match Challenge: keep-alive seconds each completed climb adds to the run clock.",
+	"match3_keepalive_seconds_per_point": "Match Three Challenge: keep-alive seconds each point adds to the run clock (points arrive in bulk, so small).",
+	"timing_keepalive_seconds_per_point": "Timing Bar Challenge: keep-alive seconds each successful lock adds to the run clock.",
+	"catch_keepalive_seconds_per_point": "Catch the Money Challenge: keep-alive seconds each caught coin adds to the run clock.",
 	"balance_seconds_per_point": "Balance the Books Challenge: in-zone seconds to earn one point (score = time-in-zone / this).",
 	"balance_keepalive_seconds_per_point": "Balance the Books Challenge: keep-alive seconds each point adds to the run clock.",
 	"balance_zone_reroll_seconds": "Balance the Books Challenge: seconds between the gold zone re-rolling a new target center.",
@@ -270,11 +275,15 @@ const SECTIONS := [
 	{"title": "Staff", "prefixes": ["staff_"]},
 	{"title": "Retention", "prefixes": ["retention_"]},
 	{"title": "Carbonation", "prefixes": ["carb_"]},
-	# NOTE: the challenge tier-cost dials (basketball_tier_*) are deliberately NOT caught here — they
-	# belong to the "Challenge Mode" catch-all with the rest of the challenge dials (Tim, 2026-07-22).
-	# So this lists the SPECIFIC basketball physics prefixes rather than a broad "basketball_", which
-	# would otherwise scoop the tier-cost knobs back in.
-	{"title": "Minigames", "prefixes": ["minigame_", "match3_", "basketball_launch_", "basketball_max_", "memory_gem_"]},
+	# NOTE: this section holds the non-challenge minigame knobs (physics / features) ONLY. The
+	# per-game challenge dials — basketball_tier_*, the *_keepalive_seconds_per_point knobs, etc. —
+	# belong to the "Challenge Mode" catch-all (Tim, 2026-07-22). So the basketball and match3 prefixes
+	# are SPECIFIC (basketball_launch_, match3_full_score, …) rather than broad "basketball_" / "match3_",
+	# which would otherwise scoop challenge knobs like basketball_keepalive_* / match3_keepalive_* back in.
+	{"title": "Minigames", "prefixes": [
+		"minigame_", "match3_full_score", "match3_max_score", "match3_legacy_match_size",
+		"basketball_launch_", "basketball_max_", "memory_gem_",
+	]},
 	{"title": "Legacy Bonus", "prefixes": ["legacy_bonus_", "legacy_gem_chance_"]},
 	{"title": "Offline", "prefixes": ["offline_"]},
 	{"title": "Estate & Legacy", "prefixes": ["estate_", "loophole_", "k_legacy", "alpha_legacy", "legacy_upgrade_cost_multiplier"]},

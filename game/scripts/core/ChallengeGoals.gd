@@ -113,8 +113,12 @@ const STEP := {
 # The challenge run's keep-alive timer tops up by this many seconds for each POINT the run's
 # get_score() gains (Plans §"Keep-alive run timer"; the mechanic itself is Wave 2). Sized inversely to
 # how fast each game scores so a top-up feels comparable across games — Match Three racks up points in
-# bulk (tiny per-point top-up), the slower games grant a fat second or more per point. ALL FIRST-PASS,
-# DEVICE-TUNE.
+# bulk (tiny per-point top-up), the slower games grant a fat second or more per point.
+#
+# These are the baked DEFAULTS. Every game's value is now live-tunable from a matching
+# *_keepalive_seconds_per_point knob (Tim, 2026-07-22 — was Balance-only): configure() copies the six
+# tuning knobs into the seconds_per_point_by_game override table below, which seconds_per_point() reads.
+# A headless call that skips configure() falls back to exactly these defaults. ALL FIRST-PASS, DEVICE-TUNE.
 const SECONDS_PER_POINT := {
 	MATCH_THREE:   0.012,  # less clock per match → a harder push (Tim, 2026-07-21; was 0.02)
 	TIMING_BAR:    3.0,
@@ -165,10 +169,11 @@ static var escalating_cost := {
 	MEMORY_MATCH: {"base": 0.2, "increment": 0.2, "cap": 1.0},
 }
 
-## The keep-alive top-up seconds a Balance point grants — the ONLY seconds_per_point that is tuned
-## (tuning.balance_keepalive_seconds_per_point); every other game keeps its hardcoded SECONDS_PER_POINT
-## table value. Pushed in by configure(); default mirrors tuning.tres / the old table entry (2.0).
-static var balance_keepalive_seconds_per_point := 2.0
+## The live per-game keep-alive seconds-per-point, {game_key -> seconds}. Starts as a mutable copy of
+## the SECONDS_PER_POINT defaults; configure() overwrites every entry from the six *_keepalive tuning
+## knobs, so all six games are dialable (Tim, 2026-07-22 — was Balance-only). seconds_per_point() reads
+## this table. A headless call that skips configure() sees the untouched defaults.
+static var seconds_per_point_by_game: Dictionary = SECONDS_PER_POINT.duplicate()
 # The fraction of a hit's time-gain a MISS costs the keep-alive timer (tuning.challenge_miss_penalty_ratio).
 # The backing var is `miss_penalty`, read through the miss_penalty_ratio() accessor below — a var and a
 # func cannot share a name in GDScript, so this follows the same var/accessor split as timer_start /
@@ -177,21 +182,32 @@ static var miss_penalty := 0.5
 
 
 ## Push the knobs in from tuning. Called by DynastyState wherever the other stateless tables are
-## configured, so every bonus/timer/cost query sees the tuned values. The escalating-cost and
-## balance-keepalive params are APPENDED with defaults so existing 4-arg callers (older sim harnesses)
-## keep working — they simply reset the escalating curve to its defaults, which is what they want.
-static func configure(
-		p_bonus_scale: float, p_timer_start: float, p_timer_cap: float, p_miss_penalty_ratio: float,
-		p_bball_base := 1.0, p_bball_increment := 1.0, p_bball_cap := 5.0,
-		p_memory_base := 0.2, p_memory_increment := 0.2, p_memory_cap := 1.0,
-		p_balance_keepalive := 2.0) -> void:
-	bonus_scale = p_bonus_scale
-	timer_start = p_timer_start
-	timer_cap = p_timer_cap
-	miss_penalty = p_miss_penalty_ratio
-	escalating_cost[BASKETBALL] = {"base": p_bball_base, "increment": p_bball_increment, "cap": p_bball_cap}
-	escalating_cost[MEMORY_MATCH] = {"base": p_memory_base, "increment": p_memory_increment, "cap": p_memory_cap}
-	balance_keepalive_seconds_per_point = p_balance_keepalive
+## configured, so every bonus/timer/cost query sees the tuned values. Takes the whole TuningConfig
+## rather than a long positional list (Tim, 2026-07-22 — the per-game keep-alive knobs grew it past
+## readable): a new challenge knob is wired by reading one more field here, never by growing a call site.
+static func configure(tuning: TuningConfig) -> void:
+	bonus_scale = tuning.challenge_bonus_scale
+	timer_start = tuning.challenge_timer_start_seconds
+	timer_cap = tuning.challenge_timer_cap_seconds
+	miss_penalty = tuning.challenge_miss_penalty_ratio
+	# The two low-ceiling games' escalating per-tier cost (base / increment / cap).
+	escalating_cost[BASKETBALL] = {
+		"base": tuning.basketball_tier_base_cost,
+		"increment": tuning.basketball_tier_cost_increment,
+		"cap": tuning.basketball_tier_cost_cap,
+	}
+	escalating_cost[MEMORY_MATCH] = {
+		"base": tuning.memory_tier_base_cost,
+		"increment": tuning.memory_tier_cost_increment,
+		"cap": tuning.memory_tier_cost_cap,
+	}
+	# All six games' keep-alive seconds-per-point, each from its own knob (overwrites the defaults).
+	seconds_per_point_by_game[MATCH_THREE]   = tuning.match3_keepalive_seconds_per_point
+	seconds_per_point_by_game[TIMING_BAR]    = tuning.timing_keepalive_seconds_per_point
+	seconds_per_point_by_game[MEMORY_MATCH]  = tuning.memory_keepalive_seconds_per_point
+	seconds_per_point_by_game[BASKETBALL]    = tuning.basketball_keepalive_seconds_per_point
+	seconds_per_point_by_game[CATCH_MONEY]   = tuning.catch_keepalive_seconds_per_point
+	seconds_per_point_by_game[BALANCE_BOOKS] = tuning.balance_keepalive_seconds_per_point
 
 
 # ── The math ──────────────────────────────────────────────────────────────────
@@ -322,13 +338,10 @@ static func total_legacy_bonus(highest_tiers: Dictionary) -> float:
 # ── Keep-alive run timer params (Wave 2 reads these) ──────────────────────────
 
 ## Seconds the keep-alive timer tops up per POINT of get_score() gained, for a game. 0 for an unknown
-## key (an unrecognised game grants no time). Balance the Books is the ONE tuned entry — it returns the
-## live `balance_keepalive_seconds_per_point` knob so the Balance challenge feel is dialable; every
-## other game keeps its hardcoded SECONDS_PER_POINT value.
+## key (an unrecognised game grants no time). Reads the live seconds_per_point_by_game table, which
+## configure() fills from all six per-game *_keepalive tuning knobs (defaults until configured).
 static func seconds_per_point(game_key: String) -> float:
-	if game_key == BALANCE_BOOKS:
-		return balance_keepalive_seconds_per_point
-	return float(SECONDS_PER_POINT.get(game_key, 0.0))
+	return float(seconds_per_point_by_game.get(game_key, 0.0))
 
 
 ## The keep-alive timer's starting seconds for a game: the per-game TIMER_START override if the game

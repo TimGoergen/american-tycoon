@@ -248,25 +248,11 @@ func _configure_retention_pricing() -> void:
 	# Push the global Legacy-upgrade cost multiplier into the (stateless) catalog too, so every
 	# upgrade price reflects the tuning knob (Tim 2026-07-14 — the prestige-runaway brake).
 	LegacyUpgradeCatalog.cost_multiplier = tuning.legacy_upgrade_cost_multiplier
-	# Same pattern for the (stateless) Challenge-goal tables: push the bonus-scale + keep-alive timer
-	# knobs in from tuning so every payout and timer query sees the tuned values. Re-pushed on every
+	# Same pattern for the (stateless) Challenge-goal tables: push the whole tuning object in so every
+	# payout, escalating-cost, and per-game keep-alive query sees the tuned values. Re-pushed on every
 	# construction/load — see the GOTCHA in ChallengeGoals (a sim sets the TUNING field, not the
 	# static, or this would overwrite it).
-	ChallengeGoals.configure(
-		tuning.challenge_bonus_scale,
-		tuning.challenge_timer_start_seconds,
-		tuning.challenge_timer_cap_seconds,
-		tuning.challenge_miss_penalty_ratio,
-		# The two low-ceiling games' escalating per-tier cost (base / increment / cap) …
-		tuning.basketball_tier_base_cost,
-		tuning.basketball_tier_cost_increment,
-		tuning.basketball_tier_cost_cap,
-		tuning.memory_tier_base_cost,
-		tuning.memory_tier_cost_increment,
-		tuning.memory_tier_cost_cap,
-		# … and Balance's keep-alive seconds-per-point (its one tuned timer entry).
-		tuning.balance_keepalive_seconds_per_point
-	)
+	ChallengeGoals.configure(tuning)
 
 
 # ---------------------------------------------------------------------------

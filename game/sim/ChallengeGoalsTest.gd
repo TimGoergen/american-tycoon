@@ -64,12 +64,25 @@ func _check(label: String, condition: bool) -> void:
 		_failures += 1
 
 
+## Push the four global challenge levers into ChallengeGoals via a minimal TuningConfig — the unit-test
+## stand-in for DynastyState's push, for the pure-math tests that only care about bonus_scale / timers.
+## configure() now takes a whole TuningConfig (not a positional list); a fresh TuningConfig carries the
+## baked @export defaults for everything else (escalating cost, per-game keep-alive).
+func _configure_challenge(bonus_scale: float, timer_start: float, timer_cap: float, miss_ratio: float) -> void:
+	var t := TuningConfig.new()
+	t.challenge_bonus_scale = bonus_scale
+	t.challenge_timer_start_seconds = timer_start
+	t.challenge_timer_cap_seconds = timer_cap
+	t.challenge_miss_penalty_ratio = miss_ratio
+	ChallengeGoals.configure(t)
+
+
 # ---------------------------------------------------------------------------
 # 1. tier_for_score = floor(score / STEP), clamped, monotonic
 # ---------------------------------------------------------------------------
 func _test_tier_for_score() -> void:
 	print("-- tier_for_score = floor(score/STEP), clamped to MAX_TIER, monotonic --")
-	ChallengeGoals.configure(1.0, 6.0, 15.0, 0.5)  # scale 1.0 for a clean read
+	_configure_challenge(1.0, 6.0, 15.0, 0.5)  # scale 1.0 for a clean read
 	var game := ChallengeGoals.TIMING_BAR       # STEP = 1.0
 	var step := ChallengeGoals.score_step(game)
 
@@ -191,12 +204,16 @@ func _test_escalating_tiers(tuning: TuningConfig) -> void:
 	_check("Timing Bar (flat) tier_for_score is still floor(score/STEP)",
 		ChallengeGoals.tier_for_score(ChallengeGoals.TIMING_BAR, 7.5) == 7)
 
-	# Balance's seconds_per_point is the ONE tuned timer entry; the others keep their table values.
+	# Every game's keep-alive seconds-per-point is now tunable from its own knob (was Balance-only).
+	# Set two different games' knobs and confirm each flows through independently after a dynasty build.
 	tuning.balance_keepalive_seconds_per_point = 3.3
+	tuning.basketball_keepalive_seconds_per_point = 7.7
 	var _dynasty2 := DynastyState.new(ConfigLoader.load_property_configs(), tuning)
 	_check("seconds_per_point(Balance) returns the tuned keep-alive value",
 		is_equal_approx(ChallengeGoals.seconds_per_point(ChallengeGoals.BALANCE_BOOKS), 3.3))
-	_check("seconds_per_point(other game) stays the hardcoded table value (Timing Bar = 3.0)",
+	_check("seconds_per_point(Basketball) returns its own tuned keep-alive value",
+		is_equal_approx(ChallengeGoals.seconds_per_point(ChallengeGoals.BASKETBALL), 7.7))
+	_check("seconds_per_point(an untouched game) keeps its baked default (Timing Bar = 3.0)",
 		is_equal_approx(ChallengeGoals.seconds_per_point(ChallengeGoals.TIMING_BAR), 3.0))
 
 
@@ -241,7 +258,7 @@ func _test_payout_schedule() -> void:
 # ---------------------------------------------------------------------------
 func _test_bonus_sums() -> void:
 	print("-- income_bonus_for / legacy_bonus_for sum same-track payouts x bonus_scale --")
-	ChallengeGoals.configure(1.0, 6.0, 15.0, 0.5)
+	_configure_challenge(1.0, 6.0, 15.0, 0.5)
 
 	# Nothing cleared -> both bonuses 0.
 	_check("income_bonus_for(0) is 0", is_zero_approx(ChallengeGoals.income_bonus_for(0)))
@@ -260,12 +277,12 @@ func _test_bonus_sums() -> void:
 	_check("a mastered game gives +4% Legacy (1+2+1)", is_equal_approx(ChallengeGoals.legacy_bonus_for(30), 0.04))
 
 	# The bonus_scale knob scales BOTH tracks.
-	ChallengeGoals.configure(0.5, 6.0, 15.0, 0.5)
+	_configure_challenge(0.5, 6.0, 15.0, 0.5)
 	_check("bonus_scale 0.5 halves the income bonus (+2% at tier 30)",
 		is_equal_approx(ChallengeGoals.income_bonus_for(30), 0.02))
 	_check("bonus_scale 0.5 halves the Legacy bonus (+2% at tier 30)",
 		is_equal_approx(ChallengeGoals.legacy_bonus_for(30), 0.02))
-	ChallengeGoals.configure(1.0, 6.0, 15.0, 0.5)
+	_configure_challenge(1.0, 6.0, 15.0, 0.5)
 
 	# Whole-mode totals sum across games. Two mastered games -> +8% each track.
 	var tiers := {ChallengeGoals.TIMING_BAR: 30, ChallengeGoals.MATCH_THREE: 30}
@@ -465,7 +482,7 @@ func _test_configure_from_tuning_gotcha(tuning: TuningConfig) -> void:
 	# Poke the statics with bogus values, set DIFFERENT values on the tuning fields, then build a
 	# dynasty. Construction must overwrite the bogus statics with the tuning fields' values — which is
 	# exactly why a sim must set the TUNING field, not the static (setting the static is futile).
-	ChallengeGoals.configure(99.0, 99.0, 99.0, 99.0)
+	_configure_challenge(99.0, 99.0, 99.0, 99.0)
 	tuning.challenge_bonus_scale = 0.75
 	tuning.challenge_timer_start_seconds = 5.0
 	tuning.challenge_timer_cap_seconds = 12.0

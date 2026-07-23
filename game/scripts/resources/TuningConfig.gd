@@ -508,6 +508,10 @@ extends Resource
 @export var basketball_tier_cost_increment: float = 1.0  # feel-tune
 ## Micro Basketball: the most a single tier can cost (baskets) — the escalation caps here.
 @export var basketball_tier_cost_cap: float = 5.0  # feel-tune
+## Micro Basketball: keep-alive seconds each sunk basket adds to the run clock (baskets are slow to
+## line up, so a fat top-up). One of six per-game keep-alive knobs (each game has one);
+## ChallengeGoals.seconds_per_point reads them.
+@export var basketball_keepalive_seconds_per_point: float = 5.0  # feel-tune
 
 ## Memory Match: cost (climbs) of each tier for tiers 1-5. At 0.2, tier 5 ≈ 1 climb (first payout).
 @export var memory_tier_base_cost: float = 0.2  # feel-tune
@@ -515,6 +519,8 @@ extends Resource
 @export var memory_tier_cost_increment: float = 0.2  # feel-tune
 ## Memory Match: the most a single tier can cost (climbs) — the escalation caps here.
 @export var memory_tier_cost_cap: float = 1.0  # feel-tune
+## Memory Match: keep-alive seconds each completed climb adds to the run clock (a climb is a big beat).
+@export var memory_keepalive_seconds_per_point: float = 4.0  # feel-tune
 
 # --- Balance the Books CHALLENGE-mode knobs (Plans/Challenge_Mode.md) ---
 # Balance's challenge round scores by time-in-zone. These four knobs shape the challenge feel and are
@@ -529,6 +535,20 @@ extends Resource
 @export var balance_zone_reroll_seconds: float = 1.3  # feel-tune
 ## How fast the Balance gold-zone eases toward its target center, per second (challenge mode).
 @export var balance_zone_ease: float = 1.6  # feel-tune
+
+# --- Challenge Mode: the three FLAT games' keep-alive seconds-per-point (Plans/Challenge_Mode.md) ---
+# Match Three, Timing Bar and Catch the Money score on a flat STEP (no per-game tier knobs), but their
+# keep-alive top-up per point is still worth dialing. Sized inversely to how fast each scores so a
+# top-up feels comparable — Match Three racks up points in bulk (tiny per-point top-up), the slower
+# games grant a fat second or more. Defaults mirror ChallengeGoals' old SECONDS_PER_POINT table.
+# ALL FIRST-PASS, DEVICE-TUNE.
+
+## Match Three: keep-alive seconds each point adds to the run clock (points arrive in bulk, so tiny).
+@export var match3_keepalive_seconds_per_point: float = 0.012  # feel-tune
+## Timing Bar: keep-alive seconds each successful lock adds to the run clock.
+@export var timing_keepalive_seconds_per_point: float = 3.0  # feel-tune
+## Catch the Money: keep-alive seconds each caught coin adds to the run clock.
+@export var catch_keepalive_seconds_per_point: float = 1.5  # feel-tune
 
 # --- Prestige minigame (GDD §5.5, Spec §9.3) ---
 # At prestige the player plays a minigame whose performance sets how much of the run's base

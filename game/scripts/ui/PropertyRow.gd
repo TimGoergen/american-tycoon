@@ -363,6 +363,21 @@ func setup(p_index: int, prop: PropertyState, economy: EconomyState, frenzy: Fre
 	_rush_momentum = rush_momentum
 
 
+## Accessors so a tutorial coach card can anchor to a SPECIFIC control on this row (its buy button,
+## its hire button, or the portrait/rush control) instead of the whole row — so the pointer arrow
+## and highlight land on the exact thing the tip is directing the player to press.
+func get_buy_button() -> Button:
+	return _buy_button
+
+
+func get_hire_button() -> Button:
+	return _hire_button
+
+
+func get_rush_control() -> Control:
+	return _manager_circle
+
+
 func _ready() -> void:
 	add_theme_stylebox_override("panel", UiPalette.make_panel_style())
 

@@ -254,14 +254,15 @@ func _process(delta: float) -> void:
 	if _tip_armed.get("getting_started", false) and not _welcome_overlay.visible \
 			and not _owns_any_property():
 		_fire_polled_tip("getting_started", _wage_panel)
-	# First business becomes affordable — direct the buy BEFORE they have to discover it.
+	# First business becomes affordable — direct the buy BEFORE they have to discover it. Points at
+	# the buy button itself, not the whole row.
 	if _tip_armed.get("first_property", false) and not _welcome_overlay.visible \
 			and not _owns_any_property() \
 			and game.economy.properties[0].get_next_cost() <= game.economy.cash:
-		_fire_polled_tip("first_property", _row_for_index(0))
-	# Owning a business makes rushing possible — point it out now, not after they try it.
+		_fire_polled_tip("first_property", _buy_control_of(_row_for_index(0)))
+	# Owning a business makes rushing possible — point at the portrait/rush control now, not after.
 	if _tip_armed.get("first_rush", false) and _owns_any_property():
-		_fire_polled_tip("first_rush", _first_owned_row())
+		_fire_polled_tip("first_rush", _rush_control_of(_first_owned_row()))
 	# Stacking up units is when the bulk-buy modes start to matter.
 	if _tip_armed.get("buy_mode", false) and _owns_multiple_units():
 		_fire_polled_tip("buy_mode", _buy_mode_button)
@@ -269,7 +270,7 @@ func _process(delta: float) -> void:
 	if _tip_armed.get("first_hire", false):
 		var hireable := _first_hireable_row()
 		if hireable != null:
-			_fire_polled_tip("first_hire", hireable)
+			_fire_polled_tip("first_hire", _hire_control_of(hireable))
 	if _tip_armed.get("turbo_ready", false) and game.frenzy.can_pop():
 		_fire_polled_tip("turbo_ready", _frenzy_bar)
 	if _tip_armed.get("epochs", false) and game.epoch.current_tier >= 2:
@@ -1531,6 +1532,20 @@ func _first_hireable_row() -> PropertyRow:
 		if prop.units_owned > 0 and not prop.is_staffed and prop.get_staff_cost() <= game.economy.cash:
 			return _row_for_index(i)
 	return null
+
+
+## The specific control on a row that a tutorial card should anchor to (or null if the row isn't
+## on screen), so the pointer arrow + highlight land on the exact button, not the whole row.
+func _buy_control_of(row: PropertyRow) -> Control:
+	return row.get_buy_button() if row != null else null
+
+
+func _rush_control_of(row: PropertyRow) -> Control:
+	return row.get_rush_control() if row != null else null
+
+
+func _hire_control_of(row: PropertyRow) -> Control:
+	return row.get_hire_button() if row != null else null
 
 
 func _on_tap_requested(prop_index: int) -> void:

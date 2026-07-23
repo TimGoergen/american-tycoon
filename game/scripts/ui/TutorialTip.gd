@@ -25,9 +25,6 @@ const HIGHLIGHT_MARGIN := 8.0
 const HIGHLIGHT_BORDER := 6
 const HIGHLIGHT_CORNER := 12
 const HIGHLIGHT_PULSE_HZ := 1.4
-## How far, toward screen centre, the card starts before sliding out to its anchor — extra travel
-## to catch the eye that also leads it toward the target.
-const SLIDE_DISTANCE := 190.0
 
 var _card: PanelContainer
 var _title_label: Label
@@ -180,17 +177,16 @@ func _animate_in() -> void:
 	_card.pivot_offset = _card.size * 0.5  # scale/pulse around the card's center, not its corner
 	_card.scale = Vector2(0.85, 0.85)
 	_card.modulate.a = 0.0
-	# Start the card off toward screen centre and slide it out to its anchor: travel across the
-	# screen is extra motion to catch the eye, and moving TO the target also leads the eye there.
+	# Start CENTRED on screen (where the eye tends to rest) and glide the FULL distance out to the
+	# anchor — a long, eye-leading travel toward the target, far more motion than a small nudge.
+	# Cubic ease-out on the position (a smooth decelerating glide, no overshoot that could briefly
+	# cover the target); the pop-scale keeps its springy Back ease.
 	var screen := get_viewport_rect().size
-	var toward_centre := signf(screen.x * 0.5 - (_final_pos.x + _card.size.x * 0.5))
-	if toward_centre == 0.0:
-		toward_centre = 1.0
-	_card.position = _final_pos + Vector2(toward_centre * SLIDE_DISTANCE, 0.0)
+	_card.position = (screen - _card.size) * 0.5
 	_entrance_tween = create_tween()
 	_entrance_tween.set_parallel(true)
-	_entrance_tween.tween_property(_card, "position", _final_pos, 0.4) \
-			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_entrance_tween.tween_property(_card, "position", _final_pos, 0.5) \
+			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	_entrance_tween.tween_property(_card, "scale", Vector2.ONE, 0.35) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	_entrance_tween.tween_property(_card, "modulate:a", 1.0, 0.2)

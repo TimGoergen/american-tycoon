@@ -3,19 +3,21 @@ extends ColorRect
 
 # The player-facing CHALLENGES screen (Plans/Challenge_Mode.md §3.4, Phase 3): the real home for
 # Challenge Mode, opened from a CHALLENGES button on the Settings tab (the dev mode-toggle inside
-# Minigame Tuning stays only as a developer shortcut). A full-screen modal built on the same
-# black-bezel frame + top-left ◀ BACK pattern as AboutScreen and StatsScreen.
+# Minigame Tuning stays only as a developer shortcut).
 #
-# It lists the six minigames; each row shows the highest tier the bloodline has cleared, that tier's
-# earned contribution to BOTH reward tracks (income + Legacy), and the next payout goal to reach.
-# Tapping a game's PLAY button launches a keep-alive CHALLENGE run (the clock drains, scoring tops it
-# up, and the best tier reached is banked when it hits zero).
+# Styled like the Minigame Tuning screen (Tim, 2026-07-22): the themed minigame backdrop fills the
+# black-bezel frame, and all content sits on a SMALLER centered 70%-translucent cream card, so the
+# backdrop reads around it. It lists the six minigames; each game is one big tappable PANEL (there is
+# no separate PLAY button — the whole panel is the button) showing the highest tier the bloodline has
+# cleared, that tier's earned contribution to BOTH reward tracks (income + Legacy), and the next
+# payout goal. Each panel wears the green minigame_button plate and carries the game's own icon on the
+# left. Tapping a panel launches a keep-alive CHALLENGE run.
 #
-# Like MinigameReviewScreen, this screen owns its OWN MinigameScreen host (_player) so a challenge
-# run never touches the real prestige flow. When a run ends, _player emits challenge_finished; we
-# bubble it up to Main (which holds the dynasty, credits the tier, saves, and hands feedback back
-# via show_challenge_credit). All display numbers are read LIVE from the dynasty + ChallengeGoals
-# on every open() and after every credited run, so returning from a run shows the new tier at once.
+# Like MinigameReviewScreen, this screen owns its OWN MinigameScreen host (_player) so a challenge run
+# never touches the real prestige flow. When a run ends, _player emits challenge_finished; we bubble
+# it up to Main (which holds the dynasty, credits the tier, saves, and hands feedback back via
+# show_challenge_credit). All display numbers are read LIVE from the dynasty + ChallengeGoals on every
+# open() and after every credited run, so returning from a run shows the new tier at once.
 
 ## Emitted when the player closes the whole screen (◀ BACK). Main hides it (the game runs behind it).
 signal closed
@@ -24,6 +26,34 @@ signal closed
 ## MinigameReviewScreen does. Carries the game's key (its display_name()) and its final score,
 ## unchanged. Main connects here to credit the tier and hand feedback back (show_challenge_credit).
 signal challenge_finished(game_key: String, final_score: int)
+
+# --- Art. The green money plate behind every game panel, and the per-game icons. basketball / green
+# gem reuse the games' own art; the other four are dedicated Challenge icons (Tim, 2026-07-22). ---
+const PANEL_PLATE := preload("res://art/ui/minigame_button.png")
+const ICON_BASKETBALL := preload("res://art/icons/basketball.svg")
+const ICON_MATCH_THREE := preload("res://art/icons/gem_green.svg")
+const ICON_CATCH := preload("res://art/icons/coin.svg")
+const ICON_MEMORY := preload("res://art/icons/memory_pads.svg")
+const ICON_BALANCE := preload("res://art/icons/book.svg")
+const ICON_TIMING := preload("res://art/icons/lock.svg")
+
+## Height reserved for one game panel. Tall enough for the name + earned + next lines to sit inside the
+## plate's gold frame with breathing room (low-vision rule). Six of these scroll if the card is short.
+const PANEL_HEIGHT := 210
+
+## The game icon's square size on the left of each panel.
+const ICON_SIZE := 132
+
+## 9-slice insets for the green plate (in the 1574×454 texture's own pixels): the gold frame + rounded
+## corners stay crisp at these borders while the green centre stretches to the panel size. The bottom
+## carries the plate's baked drop shadow, so it gets a little extra.
+const PLATE_MARGIN_SIDE := 52
+const PLATE_MARGIN_TOP := 48
+const PLATE_MARGIN_BOTTOM := 60
+
+## Inner padding between the plate's gold frame and the panel content, so nothing touches the bevel.
+const CONTENT_PAD_SIDE := 46
+const CONTENT_PAD_VERTICAL := 34
 
 ## The bloodline whose cleared tiers + income bonus are shown. Threaded in from Main (setup) before
 ## the first open(); read fresh on every refresh so the screen is never stale.
@@ -38,15 +68,21 @@ var _type_scripts: Array = []
 ## child so a run never interferes with Main's prestige host. Built in setup (it needs the tuning).
 var _player: MinigameScreen
 
+## The themed minigame backdrop behind the card, with CPU-baked rounded corners (shared with
+## MinigameScreen), exactly as MinigameReviewScreen does it.
+var _backdrop: TextureRect
+var _baked_backdrop_size: Vector2 = Vector2.ZERO
+
 ## The prominent total-bonus readout in the header, refreshed with the rows so it always matches.
 var _total_bonus_label: Label
 
-## The column the per-game rows live in — cleared and rebuilt on each refresh so every tier/bonus
-## is current (the same rebuild-the-value-column idiom StatsScreen uses).
+## The scroll holding the game panels, and the column inside it (rebuilt on each refresh so every
+## tier/bonus is current). The scroll is kept so the edge fade can measure what it is clipping.
+var _scroll: ScrollContainer
 var _rows_column: VBoxContainer
 
-## The whole list frame (title + header + rows). Hidden while a challenge run is up and shown again
-## on return, so the covered list doesn't keep drawing behind the opaque player (as in the review screen).
+## The whole centered card (backdrop stays behind it). Hidden while a challenge run is up and shown
+## again on return, so the covered list doesn't keep drawing behind the opaque player.
 var _list_view: Control
 
 
@@ -56,8 +92,8 @@ func setup(dynasty: DynastyState, type_scripts: Array, tuning: TuningConfig) -> 
 	_dynasty = dynasty
 	_type_scripts = type_scripts
 
-	# Our own minigame host, set up exactly like MinigameReviewScreen's: added after the frame so it
-	# draws on top when a game is open; we toggle the frame's visibility to swap between them.
+	# Our own minigame host, set up exactly like MinigameReviewScreen's: added after the card so it
+	# draws on top when a game is open; we toggle the card's visibility to swap between them.
 	_player = MinigameScreen.new()
 	_player.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_player.setup(tuning)
@@ -75,72 +111,24 @@ func _ready() -> void:
 	color = Color.BLACK
 	visible = false
 
-	var viewing_area := PanelContainer.new()
-	UiPalette.apply_screen_bezel(viewing_area)
-	viewing_area.add_theme_stylebox_override("panel", UiPalette.make_screen_panel_style())
-	add_child(viewing_area)
-	_list_view = viewing_area
+	# The same themed backdrop the live minigame + tuning screens use, drawn full-bleed inside the
+	# black bezel BEHIND the card, so the 70%-alpha cream card reads over it. CPU-baked with rounded
+	# corners (shared with MinigameScreen) so the bright bottom-corner art doesn't square off past the
+	# rounded frame (see MinigameReviewScreen for the full note).
+	_backdrop = TextureRect.new()
+	UiPalette.apply_screen_bezel(_backdrop)
+	_backdrop.stretch_mode = TextureRect.STRETCH_SCALE
+	_backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_backdrop)
+	_backdrop.resized.connect(_rebake_backdrop)
+	_rebake_backdrop.call_deferred()
 
-	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 16)
-	viewing_area.add_child(column)
-
-	# Back button, pinned top-left with a generous margin (matches every other modal's Back).
-	var back_margin := MarginContainer.new()
-	back_margin.add_theme_constant_override("margin_top", 28)
-	back_margin.add_theme_constant_override("margin_left", 28)
-	column.add_child(back_margin)
-	var back_row := HBoxContainer.new()
-	back_margin.add_child(back_row)
-	var back := Button.new()
-	back.text = "◀  BACK"
-	back.custom_minimum_size = Vector2(340, 108)
-	back.add_theme_font_size_override("font_size", int(UiPalette.FONT_BUTTON * 1.5))
-	back.add_theme_font_override("font", UiPalette.make_bold_font())
-	back.focus_mode = Control.FOCUS_NONE
-	UiPalette.style_button(back, false)
-	back.pressed.connect(_on_back_pressed)
-	back_row.add_child(back)
-	var back_spacer := Control.new()
-	back_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	back_row.add_child(back_spacer)
-
-	# --- Header: title, the running total bonus, and a one-line explainer of the mode. ---
-	column.add_child(UiPalette.make_tab_title("CHALLENGES"))
-
-	# The prominent running-totals readout — BOTH reward tracks, on two lines (e.g.
-	# "INCOME  +3.2%" / "LEGACY  +2.0%"), large and gold so they read as the headline reward.
-	# Filled in _refresh.
-	_total_bonus_label = Label.new()
-	_total_bonus_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_total_bonus_label.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
-	_total_bonus_label.add_theme_font_override("font", UiPalette.make_bold_font())
-	_total_bonus_label.add_theme_color_override("font_color", UiPalette.DARK_GOLD)
-	column.add_child(_total_bonus_label)
-
-	var explainer := Label.new()
-	explainer.text = "Beat your best in each game to climb its tier ladder. Every 5th tier pays a permanent bonus — income or Legacy."
-	explainer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	explainer.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	explainer.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
-	explainer.add_theme_color_override("font_color", UiPalette.NAVY)
-	column.add_child(explainer)
-
-	# --- The scrollable list of the six games. Six rows fit most screens, but scroll so the tall
-	# rows can never overflow the frame on a shorter device. The rows column is rebuilt on refresh. ---
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	column.add_child(scroll)
-
-	_rows_column = VBoxContainer.new()
-	_rows_column.add_theme_constant_override("separation", 18)
-	_rows_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(_rows_column)
+	_list_view = _build_card()
+	add_child(_list_view)
 
 
 ## Open the screen on its list (called by Main when the Settings CHALLENGES button is tapped).
-## Refreshes first so the tiers/bonus are current, then shows the list (not the player).
+## Refreshes first so the tiers/bonus are current, then shows the card (not the player).
 func open() -> void:
 	_refresh()
 	if _player != null:
@@ -158,11 +146,105 @@ func show_challenge_credit(result: Dictionary) -> void:
 	_refresh()
 
 
+## Bake the backdrop to its current size with rounded corners (shared with MinigameScreen). Re-runs
+## only on a real size change.
+func _rebake_backdrop() -> void:
+	if _backdrop == null:
+		return
+	var target := Vector2i(int(_backdrop.size.x), int(_backdrop.size.y))
+	if target.x < 1 or target.y < 1 or _baked_backdrop_size == _backdrop.size:
+		return
+	_baked_backdrop_size = _backdrop.size
+	var texture := MinigameScreen.bake_rounded_backdrop(target, UiPalette.SCREEN_CORNER_RADIUS)
+	if texture != null:
+		_backdrop.texture = texture
+
+
+# ---------------------------------------------------------------------------
+# The centered card + header
+# ---------------------------------------------------------------------------
+
+## Build the centered translucent card and everything on it: Back, the title/total/explainer header,
+## and the scrolling list of game panels. Matches the Tuning screen's card size + 70%-cream plate.
+func _build_card() -> Control:
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", MinigameScreen.make_card_style())
+	var half_w := MinigameScreen.PANEL_WIDTH_FRACTION / 2.0
+	var half_h := MinigameScreen.PANEL_HEIGHT_FRACTION / 2.0
+	card.anchor_left = 0.5 - half_w
+	card.anchor_right = 0.5 + half_w
+	card.anchor_top = 0.5 - half_h
+	card.anchor_bottom = 0.5 + half_h
+	card.offset_left = 0.0
+	card.offset_right = 0.0
+	card.offset_top = 0.0
+	card.offset_bottom = 0.0
+
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 14)
+	card.add_child(column)
+
+	# Back button, pinned top-left inside the card (matches every other modal's Back).
+	var back_row := HBoxContainer.new()
+	column.add_child(back_row)
+	var back := Button.new()
+	back.text = "◀  BACK"
+	back.custom_minimum_size = Vector2(300, 96)
+	back.add_theme_font_size_override("font_size", int(UiPalette.FONT_BUTTON * 1.4))
+	back.add_theme_font_override("font", UiPalette.make_bold_font())
+	back.focus_mode = Control.FOCUS_NONE
+	UiPalette.style_button(back, false)
+	back.pressed.connect(_on_back_pressed)
+	back_row.add_child(back)
+	var back_spacer := Control.new()
+	back_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	back_row.add_child(back_spacer)
+
+	# --- Header: title, the running total bonus, and a one-line explainer of the mode. These sit on
+	# the cream card, so they keep the dark (navy/gold) text that reads on cream. ---
+	column.add_child(UiPalette.make_tab_title("CHALLENGES"))
+
+	# The prominent running-totals readout — BOTH reward tracks, on two lines (e.g.
+	# "INCOME  +3.2%" / "LEGACY  +2.0%"), large and gold so they read as the headline reward.
+	_total_bonus_label = Label.new()
+	_total_bonus_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_total_bonus_label.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
+	_total_bonus_label.add_theme_font_override("font", UiPalette.make_bold_font())
+	_total_bonus_label.add_theme_color_override("font_color", UiPalette.DARK_GOLD)
+	column.add_child(_total_bonus_label)
+
+	var explainer := Label.new()
+	explainer.text = "Tap a game to play. Beat your best to climb its tier ladder — every 5th tier pays a permanent bonus, income or Legacy."
+	explainer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	explainer.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	explainer.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
+	explainer.add_theme_color_override("font_color", UiPalette.NAVY)
+	column.add_child(explainer)
+
+	# --- The scrollable list of the six game panels. Six fit most screens, but the list scrolls so
+	# the tall panels can never overflow the card on a shorter device. A panel the scroll is clipping
+	# fades by its visible fraction (see _update_edge_fade), the same "partial transparency = more
+	# content" cue the property ladder uses. The rows column is rebuilt on refresh. ---
+	_scroll = ScrollContainer.new()
+	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_scroll.get_v_scroll_bar().value_changed.connect(func(_v: float) -> void: _update_edge_fade())
+	_scroll.resized.connect(_update_edge_fade)
+	column.add_child(_scroll)
+
+	_rows_column = VBoxContainer.new()
+	_rows_column.add_theme_constant_override("separation", 18)
+	_rows_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_scroll.add_child(_rows_column)
+
+	return card
+
+
 # ---------------------------------------------------------------------------
 # The per-game list
 # ---------------------------------------------------------------------------
 
-## Rebuild the total-bonus header and every game row from the dynasty's current cleared tiers. All
+## Rebuild the total-bonus header and every game panel from the dynasty's current cleared tiers. All
 ## numbers are read live here — no cached copies — so open() and post-run refreshes are always true.
 func _refresh() -> void:
 	if _dynasty == null:
@@ -176,18 +258,21 @@ func _refresh() -> void:
 	for child in _rows_column.get_children():
 		child.queue_free()
 
-	# One row per game, keyed by the type's display_name() — the exact string ChallengeGoals and
-	# DynastyState use, so the row's tier/bonus lookups line up with the catalog and the save.
+	# One panel per game, keyed by the type's display_name() — the exact string ChallengeGoals and
+	# DynastyState use, so the panel's tier/bonus lookups line up with the catalog and the save.
 	for type_script in _type_scripts:
 		var probe := type_script.new() as Minigame
 		var game_key := probe.display_name()
 		probe.free()
-		_rows_column.add_child(_make_game_row(game_key, type_script))
+		_rows_column.add_child(_make_game_panel(game_key, type_script))
+
+	# Positions aren't known until the list lays out, so update the edge fade on the next frame.
+	_update_edge_fade.call_deferred()
 
 
-## Build one large, tappable game row: the game name and its earned tier/bonus on the left, the next
-## goal beneath, and a big PLAY button on the right that launches this game's challenge run.
-func _make_game_row(game_key: String, type_script: Script) -> Control:
+## Build one large, tappable game PANEL: the whole panel is the button (no separate PLAY). It wears the
+## green plate, carries the game's icon on the left, and shows the name + earned tier/bonus + next goal.
+func _make_game_panel(game_key: String, type_script: Script) -> Control:
 	# The bloodline's cleared tier for this game, and its earned contribution to EACH reward track.
 	var cleared_tier := int(_dynasty.challenge_highest_tiers.get(game_key, 0))
 	var earned_income := ChallengeGoals.income_bonus_for(cleared_tier) * 100.0
@@ -214,49 +299,132 @@ func _make_game_row(game_key: String, type_script: Script) -> Control:
 		var payout := ChallengeGoals.payout_at_tier(next_tier)
 		# The score to reach the next payout tier. score_to_reach_tier handles BOTH costing models —
 		# tier * STEP for the flat games, the escalating cumulative cost for Basketball/Memory — so this
-		# shows the correct (escalating) target. NEVER score_step * tier here (wrong for the low-ceiling games).
+		# shows the correct target. NEVER score_step * tier here (wrong for the low-ceiling games).
 		var reach := int(round(ChallengeGoals.score_to_reach_tier(game_key, next_tier)))
 		var track := String(payout.get("type", "")).to_upper()
 		var pct := float(payout.get("pct", 0.0))
 		next_text = "Next: reach %s (tier %d)  →  +%d%% %s" % [_round_score(reach), next_tier, int(round(pct)), track]
 
-	# The row sits on the cream card plate so it reads as a distinct, tappable block on the frame.
-	var card := PanelContainer.new()
-	card.add_theme_stylebox_override("panel", MinigameScreen.make_card_style())
-	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# The whole panel is one Button wearing the green plate (Tim, 2026-07-22 — no separate PLAY). Its
+	# content is overlaid as mouse-ignoring children so every tap on the panel lands on the button.
+	var panel := Button.new()
+	panel.focus_mode = Control.FOCUS_NONE
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.custom_minimum_size = Vector2(0, PANEL_HEIGHT)
+	panel.add_theme_stylebox_override("normal", _make_plate_style(false))
+	panel.add_theme_stylebox_override("hover", _make_plate_style(false))
+	panel.add_theme_stylebox_override("focus", _make_plate_style(false))
+	panel.add_theme_stylebox_override("disabled", _make_plate_style(false))
+	panel.add_theme_stylebox_override("pressed", _make_plate_style(true))  # a touch darker on press
+	panel.pressed.connect(_on_play_pressed.bind(type_script))
+
+	# Content overlay: a full-rect margin (clearing the gold frame) holding the icon + text row. All
+	# of it ignores the mouse so the underlying button receives every tap.
+	var pad := MarginContainer.new()
+	pad.set_anchors_preset(Control.PRESET_FULL_RECT)
+	pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pad.add_theme_constant_override("margin_left", CONTENT_PAD_SIDE)
+	pad.add_theme_constant_override("margin_right", CONTENT_PAD_SIDE)
+	pad.add_theme_constant_override("margin_top", CONTENT_PAD_VERTICAL)
+	pad.add_theme_constant_override("margin_bottom", CONTENT_PAD_VERTICAL)
+	panel.add_child(pad)
 
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 20)
-	card.add_child(row)
+	row.add_theme_constant_override("separation", 26)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pad.add_child(row)
 
-	# Left: the game's name, its cleared tier + earned contribution, and the next goal. In its own
-	# EXPAND_FILL column so the PLAY button is pushed to the right edge.
+	# Left: the game's own icon, a fixed square, vertically centered against the text.
+	var icon := TextureRect.new()
+	icon.texture = _icon_for(game_key)
+	icon.custom_minimum_size = Vector2(ICON_SIZE, ICON_SIZE)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(icon)
+
+	# Right: name, cleared tier + earned contribution, and the next goal. In its own EXPAND_FILL column
+	# so the text fills the panel width beside the icon. Colors are cream/gold with a dark outline so
+	# they read over the green plate (Tim, 2026-07-22 contrast).
 	var info := VBoxContainer.new()
 	info.add_theme_constant_override("separation", 6)
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	info.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(info)
 
-	info.add_child(_make_info_label(game_key, UiPalette.FONT_SUBHEAD, UiPalette.NAVY, true))
-	info.add_child(_make_info_label(earned_text, UiPalette.FONT_BODY, UiPalette.DARK_GOLD, false))
-	# The next-reward line reads as an earned summit when mastered (green, bold), a goal otherwise.
+	info.add_child(_make_info_label(game_key, UiPalette.FONT_SUBHEAD, UiPalette.CREAM, true))
+	info.add_child(_make_info_label(earned_text, UiPalette.FONT_BODY, UiPalette.MUSTARD_GOLD, false))
+	# The next-reward line reads as an earned summit when mastered (bright gold, bold), a goal otherwise.
 	if mastered:
-		info.add_child(_make_info_label(next_text, UiPalette.FONT_LABEL, UiPalette.DARK_MONEY_GREEN, true))
+		info.add_child(_make_info_label(next_text, UiPalette.FONT_LABEL, UiPalette.MUSTARD_GOLD, true))
 	else:
-		info.add_child(_make_info_label(next_text, UiPalette.FONT_LABEL, UiPalette.NAVY, false))
+		info.add_child(_make_info_label(next_text, UiPalette.FONT_LABEL, UiPalette.CREAM, false))
 
-	# Right: a big PLAY button. Large tappable target (Tim's low-vision rule).
-	var play := Button.new()
-	play.text = "PLAY"
-	play.custom_minimum_size = Vector2(240, UiPalette.STANDARD_BUTTON_HEIGHT)
-	play.add_theme_font_size_override("font_size", UiPalette.FONT_BUTTON)
-	play.focus_mode = Control.FOCUS_NONE
-	UiPalette.style_button(play, true)  # gold action button: start a run
-	play.pressed.connect(_on_play_pressed.bind(type_script))
-	var play_center := CenterContainer.new()  # keep PLAY vertically centered against the info stack
-	play_center.add_child(play)
-	row.add_child(play_center)
+	return panel
 
-	return card
+
+## The green money plate as a 9-sliced StyleBoxTexture: the gold frame + rounded corners stay crisp
+## while the green centre stretches to the panel. `pressed` darkens it slightly for tap feedback.
+func _make_plate_style(pressed: bool) -> StyleBoxTexture:
+	var style := StyleBoxTexture.new()
+	style.texture = PANEL_PLATE
+	style.texture_margin_left = PLATE_MARGIN_SIDE
+	style.texture_margin_right = PLATE_MARGIN_SIDE
+	style.texture_margin_top = PLATE_MARGIN_TOP
+	style.texture_margin_bottom = PLATE_MARGIN_BOTTOM
+	if pressed:
+		style.modulate_color = Color(0.88, 0.88, 0.88)
+	return style
+
+
+## Map a game's display_name() key to its Challenge icon. Basketball and Match Three reuse the games'
+## own art; the other four are the dedicated Challenge icons.
+func _icon_for(game_key: String) -> Texture2D:
+	match game_key:
+		"Micro Basketball":
+			return ICON_BASKETBALL
+		"Match Three":
+			return ICON_MATCH_THREE
+		"Catch the Money":
+			return ICON_CATCH
+		"Memory Match":
+			return ICON_MEMORY
+		"Balance the Books":
+			return ICON_BALANCE
+		"Timing Bar":
+			return ICON_TIMING
+	return null
+
+
+## Fade each game panel by its visible fraction when the scroll is clipping it, but only on an edge
+## that actually has more content beyond it — the same "partial transparency = the list continues" cue
+## the property ladder uses (Main._update_ladder_edge_fade). Called on scroll, on resize, and after a
+## refresh once the panels have laid out.
+func _update_edge_fade() -> void:
+	if _scroll == null:
+		return
+	var view_height := _scroll.size.y
+	var scroll_bar := _scroll.get_v_scroll_bar()
+	var more_above := _scroll.scroll_vertical > 0
+	# The furthest scroll_vertical can go is the content height minus one page; anything less than that
+	# (with 1px slack for rounding) means content is still clipped below.
+	var more_below := float(_scroll.scroll_vertical) < scroll_bar.max_value - scroll_bar.page - 1.0
+	for child in _rows_column.get_children():
+		var panel := child as Control
+		if panel == null or panel.size.y <= 0.0:
+			continue
+		# The panel's top edge in viewport space: its position in the column, shifted up by the scroll.
+		var panel_top := panel.position.y - float(_scroll.scroll_vertical)
+		var alpha := 1.0
+		if more_above:
+			# Visible share below the viewport's top edge.
+			alpha = minf(alpha, clampf((panel_top + panel.size.y) / panel.size.y, 0.0, 1.0))
+		if more_below:
+			# Visible share above the viewport's bottom edge.
+			alpha = minf(alpha, clampf((view_height - panel_top) / panel.size.y, 0.0, 1.0))
+		panel.modulate.a = alpha
 
 
 ## Format a whole score with thousands separators ("30,000"), so the higher-scale games (Match Three
@@ -273,12 +441,16 @@ func _round_score(value: int) -> String:
 	return grouped
 
 
-## One text line inside a game row. `emphasize` faux-bolds it (used for the game name).
+## One text line inside a game panel. `emphasize` faux-bolds it (used for the game name). A dark navy
+## outline is always applied so the light text reads over the patterned green plate (low-vision rule).
 func _make_info_label(text: String, font_size: int, color: Color, emphasize: bool) -> Label:
 	var label := Label.new()
 	label.text = text
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.add_theme_font_size_override("font_size", font_size)
 	label.add_theme_color_override("font_color", color)
+	label.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
+	label.add_theme_constant_override("outline_size", 5)
 	if emphasize:
 		label.add_theme_font_override("font", UiPalette.make_bold_font())
 	return label
@@ -288,7 +460,7 @@ func _make_info_label(text: String, font_size: int, color: Color, emphasize: boo
 # Navigation
 # ---------------------------------------------------------------------------
 
-## PLAY tapped for a game: hide the list and launch its endless challenge run on our own host.
+## A game panel tapped: hide the list and launch its endless challenge run on our own host.
 func _on_play_pressed(type_script: Script) -> void:
 	_list_view.visible = false  # stop the covered list drawing behind the opaque player
 	_player.start_challenge(type_script)

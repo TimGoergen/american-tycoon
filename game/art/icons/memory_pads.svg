@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="padRed" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#E06A63"/>
+      <stop offset="100%" stop-color="#C6413A"/>
+    </linearGradient>
+    <linearGradient id="padGold" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#F1CB6B"/>
+      <stop offset="100%" stop-color="#E3B23C"/>
+    </linearGradient>
+    <linearGradient id="padTeal" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#69CDC5"/>
+      <stop offset="100%" stop-color="#3FB6AD"/>
+    </linearGradient>
+    <linearGradient id="padGreen" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#72BB6E"/>
+      <stop offset="100%" stop-color="#4E9E4A"/>
+    </linearGradient>
+  </defs>
+  <!-- Top-left RED -->
+  <rect x="16" y="16" width="44" height="44" rx="10" fill="url(#padRed)" stroke="#1E1E1E" stroke-width="4"/>
+  <!-- Top-right GOLD -->
+  <rect x="68" y="16" width="44" height="44" rx="10" fill="url(#padGold)" stroke="#1E1E1E" stroke-width="4"/>
+  <!-- Bottom-left TEAL -->
+  <rect x="16" y="68" width="44" height="44" rx="10" fill="url(#padTeal)" stroke="#1E1E1E" stroke-width="4"/>
+  <!-- Bottom-right GREEN -->
+  <rect x="68" y="68" width="44" height="44" rx="10" fill="url(#padGreen)" stroke="#1E1E1E" stroke-width="4"/>
+</svg>

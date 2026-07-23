@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="lockShackle" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#D8DCE2"/>
+      <stop offset="100%" stop-color="#9AA1AC"/>
+    </linearGradient>
+    <linearGradient id="lockBody" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#E3B23C"/>
+      <stop offset="100%" stop-color="#B8801F"/>
+    </linearGradient>
+  </defs>
+  <!-- U-shaped steel shackle -->
+  <path d="M42 62 L42 44 A22 22 0 0 1 86 44 L86 62"
+        fill="none" stroke="#4A4E55" stroke-width="20" stroke-linecap="round"/>
+  <path d="M42 62 L42 44 A22 22 0 0 1 86 44 L86 62"
+        fill="none" stroke="url(#lockShackle)" stroke-width="12" stroke-linecap="round"/>
+  <!-- Brass lock body -->
+  <rect x="30" y="58" width="68" height="56" rx="10" fill="url(#lockBody)" stroke="#5A3E10" stroke-width="4"/>
+  <!-- Keyhole: circle + tapered slot -->
+  <circle cx="64" cy="80" r="9" fill="#5A3E10"/>
+  <polygon points="60,80 68,80 71,102 57,102" fill="#5A3E10"/>
+</svg>

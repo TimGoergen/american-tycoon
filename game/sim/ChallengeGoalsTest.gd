@@ -213,8 +213,11 @@ func _test_escalating_tiers(tuning: TuningConfig) -> void:
 		is_equal_approx(ChallengeGoals.seconds_per_point(ChallengeGoals.BALANCE_BOOKS), 3.3))
 	_check("seconds_per_point(Basketball) returns its own tuned keep-alive value",
 		is_equal_approx(ChallengeGoals.seconds_per_point(ChallengeGoals.BASKETBALL), 7.7))
-	_check("seconds_per_point(an untouched game) keeps its baked default (Timing Bar = 3.0)",
-		is_equal_approx(ChallengeGoals.seconds_per_point(ChallengeGoals.TIMING_BAR), 3.0))
+	# Timing's knob was left at its baked value here, so seconds_per_point should equal that baked value.
+	# Compare against the tuning field (not a magic number) so a later device-retune of Timing's keep-alive
+	# can't make this assertion stale — which is exactly what bit the 3.0 literal when Timing became 0.9.
+	_check("seconds_per_point(an untouched game) keeps its baked default (Timing Bar)",
+		is_equal_approx(ChallengeGoals.seconds_per_point(ChallengeGoals.TIMING_BAR), tuning.timing_keepalive_seconds_per_point))
 
 
 # ---------------------------------------------------------------------------

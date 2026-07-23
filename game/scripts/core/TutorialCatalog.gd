@@ -8,18 +8,24 @@ class_name TutorialCatalog
 # (GDD §1.2). First-draft copy by Claude (2026-07-23) — Tim to tweak. Ids never start with "_"
 # (that prefix is reserved for TutorialProgress's own flags).
 #
-# A few of these (epochs / prestige / welcome_back) are ALSO woven into the existing full-screen
-# beats rather than shown as a floating card; their copy still lives here so it stays in one place
-# and can feed the Settings glossary.
+# A few concepts are taught in their own beat rather than as a floating card, so their entry here
+# feeds the Settings glossary but is NOT fired by _maybe_show_tip: welcome_back is a permanent line
+# ON the welcome-back screen (WelcomeBackOverlay); epochs/prestige may follow (Tim, 2026-07-23).
 
 const TIPS := {
+	# The very first beat: on a fresh launch the only thing to do is Clock In until the first
+	# business is affordable, so this points at the wage button before anything else fires.
+	"getting_started": {
+		"title": "Clock in for cash",
+		"body": "Tap CLOCK IN to earn a wage. Bank enough and you can buy your first business.",
+	},
 	"first_property": {
-		"title": "Your first venture",
-		"body": "It runs a cycle, then pays out. Tap it to collect and kick off the next one.",
+		"title": "Buy your first business",
+		"body": "You've banked enough! Tap a business's price to buy it — it runs a cycle, then pays out.",
 	},
 	"first_rush": {
-		"title": "Rush it",
-		"body": "Press and hold a business to RUSH — its cycles finish faster for a burst of income. Your thumb is the engine.",
+		"title": "Rush for a boost",
+		"body": "Press and hold a business to RUSH it — its cycles finish faster for a burst of income. Your thumb is the engine.",
 	},
 	"first_milestone": {
 		"title": "Milestone bonus",
@@ -27,7 +33,7 @@ const TIPS := {
 	},
 	"buy_mode": {
 		"title": "Buy in bulk",
-		"body": "Switch between ×1, ×10, NEXT (exactly up to the next milestone), and MAX to buy more at once.",
+		"body": "Switch between ×1, ×10, NEXT (exactly up to the next milestone), and MAX to buy several at once.",
 	},
 	"turbo_ready": {
 		"title": "TURBO is charged",
@@ -39,7 +45,7 @@ const TIPS := {
 	},
 	"first_hire": {
 		"title": "Hire a manager",
-		"body": "A staffer runs this business hands-free — it keeps earning even while the app is closed.",
+		"body": "You can afford a manager now — hire one and this business runs itself, even while the app is closed.",
 	},
 	"epochs": {
 		"title": "First contact",

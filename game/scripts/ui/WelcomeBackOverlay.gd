@@ -179,6 +179,19 @@ func _build_pile_content() -> VBoxContainer:
 	_pile_label.add_theme_font_size_override("font_size", 64)
 	content.add_child(_pile_label)
 
+	# A permanent one-line explainer for what the pile IS — the offline-earnings teaching lives
+	# here, on the screen, rather than as a one-time card (a fresh launch has no "out", and this is
+	# the natural place to explain the green number). Autowrap needs a fixed width or the Label
+	# demands its full unwrapped width as a minimum and widens the whole column.
+	var explainer := Label.new()
+	explainer.text = "Your staffed businesses earned this while you were away."
+	explainer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	explainer.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	explainer.custom_minimum_size.x = CONTENT_COLUMN_WIDTH
+	explainer.add_theme_color_override("font_color", UiPalette.NAVY)
+	explainer.add_theme_font_size_override("font_size", 28)
+	content.add_child(explainer)
+
 	_away_label = Label.new()
 	_away_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_away_label.add_theme_color_override("font_color", UiPalette.NAVY)

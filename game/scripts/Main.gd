@@ -248,6 +248,28 @@ func _process(delta: float) -> void:
 
 	# Poll-driven tutorial tips: fire the first time each condition is met. This runs only AFTER
 	# the modal-freeze return above, so a card never lands on top of a full-screen beat.
+	# The opening beat: on a fresh run the only action is Clock In, and nothing else fires until a
+	# property is owned. Wait for the welcome screen to clear (it is NOT in modal_up, so guard it
+	# explicitly) and only while the player still owns nothing, then point at the wage button.
+	if _tip_armed.get("getting_started", false) and not _welcome_overlay.visible \
+			and not _owns_any_property():
+		_fire_polled_tip("getting_started", _wage_panel)
+	# First business becomes affordable — direct the buy BEFORE they have to discover it.
+	if _tip_armed.get("first_property", false) and not _welcome_overlay.visible \
+			and not _owns_any_property() \
+			and game.economy.properties[0].get_next_cost() <= game.economy.cash:
+		_fire_polled_tip("first_property", _row_for_index(0))
+	# Owning a business makes rushing possible — point it out now, not after they try it.
+	if _tip_armed.get("first_rush", false) and _owns_any_property():
+		_fire_polled_tip("first_rush", _first_owned_row())
+	# Stacking up units is when the bulk-buy modes start to matter.
+	if _tip_armed.get("buy_mode", false) and _owns_multiple_units():
+		_fire_polled_tip("buy_mode", _buy_mode_button)
+	# A staffer is affordable somewhere — direct the hire before they stumble on it.
+	if _tip_armed.get("first_hire", false):
+		var hireable := _first_hireable_row()
+		if hireable != null:
+			_fire_polled_tip("first_hire", hireable)
 	if _tip_armed.get("turbo_ready", false) and game.frenzy.can_pop():
 		_fire_polled_tip("turbo_ready", _frenzy_bar)
 	if _tip_armed.get("epochs", false) and game.epoch.current_tier >= 2:
@@ -547,12 +569,18 @@ func _build_ui() -> void:
 	_tutorial_tip = TutorialTip.new()
 	add_child(_tutorial_tip)
 	# Arm the poll-driven tips once (disk read here; the per-frame poll then only reads memory).
-	for tip_id in ["turbo_ready", "epochs", "minigames"]:
-		_tip_armed[tip_id] = not TutorialProgress.has_seen(tip_id)
-	# Signal-driven tips: the vent gesture (fires during an overdrive rush) and the offline
-	# explainer (fires when the welcome-back beat closes, so it never lands over the beat).
+	# Armed only when tips are ON, so a disabled tutorial does zero per-frame disk work. These fire
+	# on AVAILABILITY (the action just became possible) so they DIRECT the player, rather than after
+	# the fact (Tim, 2026-07-23).
+	var tips_on := TutorialProgress.is_enabled()
+	for tip_id in ["getting_started", "first_property", "first_rush", "buy_mode", "first_hire",
+			"turbo_ready", "epochs", "minigames"]:
+		_tip_armed[tip_id] = tips_on and not TutorialProgress.has_seen(tip_id)
+	# Signal-driven tip: the vent gesture, fired during an overdrive rush. (The offline-earnings
+	# concept is NOT a card — it is taught as a permanent line ON the welcome-back screen itself,
+	# see WelcomeBackOverlay: a fresh launch has no "out", and that screen is the natural home for
+	# the explanation. Tim, 2026-07-23.)
 	game.rush_momentum.vent_window_opened.connect(_on_vent_window_opened)
-	_welcome_overlay.dismissed.connect(func() -> void: _maybe_show_tip("welcome_back", null))
 	game.epoch.contact_made.connect(_on_contact_made)
 	# When the player answers the contact, the trade-deal minigame negotiates their head start
 	# on the new alien property (GDD §5.5 site 2), so the negotiation follows the narration.
@@ -1422,9 +1450,8 @@ func _on_buy_requested(prop_index: int, mode: PropertyRow.BuyMode) -> void:
 	var band_before := prop.get_milestone_band()
 	if game.try_buy(prop_index, count):
 		_hero_stat.flash_purchase()
-		# First purchase ever: teach what a business does, anchored to the row just bought.
-		_maybe_show_tip("first_property", _row_for_index(prop_index))
-		# If that purchase crossed a milestone, teach what milestones do.
+		# Milestone reward: fire on the crossing (not before) — a milestone is an automatic reward,
+		# not an action to direct, so a just-happened notification is the right shape.
 		if prop.get_milestone_band() > band_before:
 			_maybe_show_tip("first_milestone", _row_for_index(prop_index))
 
@@ -1433,6 +1460,11 @@ func _on_buy_requested(prop_index: int, mode: PropertyRow.BuyMode) -> void:
 ## unless tips are turned off or this one has already been seen. Marking it seen persists
 ## immediately so it never repeats (TutorialProgress lives outside the dynasty save).
 func _maybe_show_tip(tip_id: String, target: Control) -> bool:
+	# Never stack cards: if one is already up, decline. A poll-driven tip stays armed and retries a
+	# later frame; a verb-driven tip simply skips. Checked FIRST so nothing below (including the
+	# disk reads) runs while a card is visible.
+	if _tutorial_tip.visible:
+		return false
 	if not TutorialProgress.is_enabled() or TutorialProgress.has_seen(tip_id):
 		return false
 	var tip := TutorialCatalog.get_tip(tip_id)
@@ -1443,12 +1475,12 @@ func _maybe_show_tip(tip_id: String, target: Control) -> bool:
 	return true
 
 
-## Fire a poll-driven tip (turbo/epochs/minigames) and disarm it so the per-frame poll stops
-## checking. Disarms unconditionally (even if tips are off / already seen) so the poll reads disk
-## at most once per tip.
+## Fire a poll-driven availability tip. Disarms ONLY once the card actually shows, so a tip whose
+## turn is blocked by another card still on screen stays armed and retries on a later frame (the
+## natural queue for availability tips that come due together).
 func _fire_polled_tip(tip_id: String, target: Control) -> void:
-	_tip_armed[tip_id] = false
-	_maybe_show_tip(tip_id, target)
+	if _maybe_show_tip(tip_id, target):
+		_tip_armed[tip_id] = false
 
 
 ## A vent window opened during an overdrive rush — teach the vent gesture, anchored to the Rush
@@ -1466,13 +1498,47 @@ func _row_for_index(prop_index: int) -> PropertyRow:
 	return null
 
 
+## True once the player owns at least one unit of any property. Drives the opening tips
+## (Clock In / buy first business) which only make sense before anything is owned.
+func _owns_any_property() -> bool:
+	for prop in game.economy.properties:
+		if (prop as PropertyState).units_owned > 0:
+			return true
+	return false
+
+
+## The on-screen row of the first property the player owns any of (or null if none is on screen).
+func _first_owned_row() -> PropertyRow:
+	for i in range(game.economy.properties.size()):
+		if (game.economy.properties[i] as PropertyState).units_owned > 0:
+			return _row_for_index(i)
+	return null
+
+
+## True once any property has enough units that the bulk-buy modes are worth explaining.
+func _owns_multiple_units() -> bool:
+	for prop in game.economy.properties:
+		if (prop as PropertyState).units_owned >= 3:
+			return true
+	return false
+
+
+## The on-screen row of the first property where hiring a manager is affordable and not yet done
+## (or null). Used to direct the first hire the moment it becomes possible, not after it's done.
+func _first_hireable_row() -> PropertyRow:
+	for i in range(game.economy.properties.size()):
+		var prop := game.economy.properties[i] as PropertyState
+		if prop.units_owned > 0 and not prop.is_staffed and prop.get_staff_cost() <= game.economy.cash:
+			return _row_for_index(i)
+	return null
+
+
 func _on_tap_requested(prop_index: int) -> void:
 	game.tap_property(prop_index)
 
 
 func _on_hold_rush_requested(prop_index: int) -> void:
 	game.hold_rush_property(prop_index)
-	_maybe_show_tip("first_rush", _row_for_index(prop_index))
 
 
 ## A rush hold ended: stop Rush Momentum building right away rather than letting the
@@ -1497,8 +1563,7 @@ func _on_rush_released(prop_index: int) -> void:
 ## staff ladder (hiring IS level 1 of each block — GDD §6.1, epoch-depth redesign). The
 ## row re-reads game state every frame, so a purchase shows on the next _process refresh.
 func _on_hire_requested(prop_index: int) -> void:
-	if game.try_buy_staff_level(prop_index):
-		_maybe_show_tip("first_hire", _row_for_index(prop_index))
+	game.try_buy_staff_level(prop_index)
 
 
 func _on_wage_tapped() -> void:
@@ -1983,7 +2048,6 @@ func _on_buy_mode_toggled() -> void:
 	_buy_mode_button.text = "BUY: " + _buy_mode_caption(_buy_mode)
 	for row in _rows:
 		(row as PropertyRow).set_buy_mode(_buy_mode)
-	_maybe_show_tip("buy_mode", _buy_mode_button)
 
 
 func _buy_mode_caption(mode: PropertyRow.BuyMode) -> String:

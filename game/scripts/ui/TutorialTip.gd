@@ -22,6 +22,10 @@ const EDGE_MARGIN := 24.0
 var _card: PanelContainer
 var _title_label: Label
 var _body_label: Label
+## The entrance pop-in and the looping attention "breathe" that follows it. Both are killed on
+## dismiss / re-show so a stale tween can never keep scaling a hidden or reused card.
+var _entrance_tween: Tween
+var _pulse_tween: Tween
 
 
 func _ready() -> void:
@@ -35,7 +39,13 @@ func _ready() -> void:
 
 func _build_card() -> void:
 	_card = PanelContainer.new()
-	_card.add_theme_stylebox_override("panel", UiPalette.make_panel_style())
+	# The standard cream card, lifted off the busy game background with a soft drop shadow so it
+	# reads as a distinct "pay attention" surface instead of blending into the UI behind it.
+	var card_style := UiPalette.make_panel_style()
+	card_style.shadow_size = 14
+	card_style.shadow_color = Color(0.0, 0.0, 0.0, 0.35)
+	card_style.shadow_offset = Vector2(0.0, 6.0)
+	_card.add_theme_stylebox_override("panel", card_style)
 	# The card is positioned by hand (see _place_near), so it anchors top-left and we set its
 	# position directly rather than letting a container lay it out.
 	_card.set_anchors_preset(Control.PRESET_TOP_LEFT)
@@ -91,6 +101,7 @@ func show_tip(title: String, body: String, target: Control) -> void:
 	await get_tree().process_frame
 	_place_near(target)
 	_card.visible = true
+	_animate_in()
 
 
 func _place_near(target: Control) -> void:
@@ -127,6 +138,40 @@ func _place_near(target: Control) -> void:
 	_card.position = pos
 
 
+## Pop the card in — a scale + fade with a slight overshoot — then hand off to the pulse. Movement
+## is what the eye catches, so the card announces itself rather than quietly appearing.
+func _animate_in() -> void:
+	_kill_tweens()
+	_card.pivot_offset = _card.size * 0.5  # scale/pulse around the card's center, not its corner
+	_card.scale = Vector2(0.85, 0.85)
+	_card.modulate.a = 0.0
+	_entrance_tween = create_tween()
+	_entrance_tween.set_parallel(true)
+	_entrance_tween.tween_property(_card, "scale", Vector2.ONE, 0.35) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_entrance_tween.tween_property(_card, "modulate:a", 1.0, 0.2)
+	_entrance_tween.finished.connect(_start_pulse, CONNECT_ONE_SHOT)
+
+
+## A subtle, continuous "breathe" (tiny scale in/out) that keeps the card noticeable until it is
+## dismissed — small enough not to nag, enough to catch a wandering eye that missed the pop-in.
+func _start_pulse() -> void:
+	if not visible:
+		return
+	_pulse_tween = create_tween().set_loops()
+	_pulse_tween.tween_property(_card, "scale", Vector2(1.03, 1.03), 0.9) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_pulse_tween.tween_property(_card, "scale", Vector2.ONE, 0.9) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+
+func _kill_tweens() -> void:
+	if _entrance_tween != null and _entrance_tween.is_valid():
+		_entrance_tween.kill()
+	if _pulse_tween != null and _pulse_tween.is_valid():
+		_pulse_tween.kill()
+
+
 func _on_card_input(event: InputEvent) -> void:
 	# A tap anywhere on the card dismisses it (as well as the GOT IT button).
 	var pressed_mouse := event is InputEventMouseButton and (event as InputEventMouseButton).pressed
@@ -138,5 +183,7 @@ func _on_card_input(event: InputEvent) -> void:
 func _dismiss() -> void:
 	if not visible:
 		return
+	_kill_tweens()
+	_card.scale = Vector2.ONE  # leave the card at rest for its next use
 	visible = false
 	dismissed.emit()

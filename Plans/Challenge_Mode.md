@@ -106,9 +106,15 @@ whole system live.
    `DynastyState.get_legacy_yield_multiplier()` as `Estate Lawyers × (1 + total Legacy bonus)`, the
    single site the estate-to-Legacy conversion (`get_draft_will`) uses — so the bonus lands exactly once.
 
-The authoritative state is **per-game highest-tier-cleared** (`DynastyState.challenge_highest_tiers`,
-`{game_key → int}`), persisted in the dynasty save (**`SAVE_VERSION 11`**, so it survives prestige) and
-defaulted-empty on old saves. Crediting is raise-only.
+The authoritative state for the **bonuses** is **per-game highest-tier-cleared**
+(`DynastyState.challenge_highest_tiers`, `{game_key → int}`), persisted in the dynasty save
+(**`SAVE_VERSION 11`**, so it survives prestige) and defaulted-empty on old saves. Crediting is raise-only.
+
+Separately, each game's **best raw score** is kept in `ChallengeScores` (`user://challenge_scores.json`),
+independent of the dynasty save — the CHALLENGES screen and the in-run `TIER {current}/{best}` readout
+convert it to the game's best tier for display, and the dev **Reset** wipes it alongside the dynasty save.
+(So there are two stores: the dynasty's cleared-tier record that drives the bonuses, and this raw-score
+file that drives the best-tier readout.)
 
 ---
 

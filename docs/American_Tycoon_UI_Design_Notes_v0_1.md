@@ -478,7 +478,9 @@ The shared minigame host (`MinigameScreen`) and the Minigame Tuning review scree
   same host launched for a reward/prestige round behaves exactly as before.
   *(History: 2026-06-30 → 2026-07 this was a large toggle on the Tuning list — Minigame vs. endless
   reward-free free-play, the toggle turning red, each button showing "Best: N", a live Score + Best,
-  DONE saving a high score. That whole UI is retired in favor of the tiered CHALLENGES screen above.)*
+  DONE saving a high score. That toggle UI is retired in favor of the tiered CHALLENGES screen above —
+  though the per-game best score is still saved (now shown as your best tier), and the Minigame-Tuning
+  review screen still lists each game's "Best".)*
 - **Balance-Tuning "Challenge Mode" section.** All challenge knobs (the shared timer/bonus/miss knobs,
   the two low-ceiling games' escalating per-tier cost, every game's keep-alive seconds-per-point, and
   the Balance challenge knobs) sit in one **"Challenge Mode"** section of the DevTuningPanel (its

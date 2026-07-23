@@ -306,7 +306,8 @@ that **survive prestige** on two tracks: **property income** and **Legacy yield*
 
 *(History: Challenge Mode began 2026-06-30 as a dev/settings "free-play arcade" toggle — endless play,
 no timer, no reward, just a saved high score. It was reworked into the tiered, timed, dynasty-rewarding
-progression above; the toggle and the separate high-score file are gone.)*
+progression above; the free-play toggle is gone. The per-game best score is still saved, but now feeds
+the best-tier readout rather than a standalone Score/Best view.)*
 
 **Basketball specifics (Tim, 2026-06-30).** The aim guide is a **force wedge**: a triangle whose
 point sits at the ball's launch spot and fans out wide in the direction of travel, its size + a

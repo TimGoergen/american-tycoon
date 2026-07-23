@@ -299,14 +299,21 @@ a completed climb or a wrong tap).
 the timer by `challenge_miss_penalty_ratio` (0.5) × points × `seconds_per_point`. Catch emits a dropped
 coin's value; Timing emits 1.0 on a failed lock.
 
+*Two persisted stores.* The **bonuses** read `DynastyState.challenge_highest_tiers` (cleared tier per
+game, in the dynasty save). Separately, `ChallengeScores` still keeps each game's **best raw score** in
+`user://challenge_scores.json` (independent of the dynasty save); `MinigameScreen` records it on run end
+and converts it to the best tier for the `TIER {current}/{best}` readout (and the Minigame-Tuning review
+screen's "Best: N"). The dev Reset wipes both.
+
 *Configuration.* `ChallengeGoals.configure(tuning: TuningConfig)` takes the whole config object and is
 re-pushed on every dynasty construction/load; every challenge knob (`challenge_*`, the two games'
 `*_tier_*` escalating-cost knobs, all six `*_keepalive_seconds_per_point`, and the four Balance
 challenge knobs) is a `TuningConfig` export in `tuning.tres`, editable from the Balance-Tuning screen.
 
 *(History: Challenge Mode began 2026-06-30 as a Minigame-Tuning toggle for endless, reward-free
-free-play with a per-type high score saved to `user://challenge_scores.json`. That toggle and that file
-are retired; scores now credit the dynasty's `challenge_highest_tiers` instead.)*
+free-play with a per-type high score saved to `user://challenge_scores.json`. The free-play toggle is
+retired; a run now also credits the dynasty's `challenge_highest_tiers` (the permanent bonuses). The
+`challenge_scores.json` best-score store is still in use — see "Two persisted stores" above.)*
 
 The same minigame host (`MinigameScreen`) serves **three sites** (GDD §5.5), each reusing the
 universal multiplier for a different reward: this prestige round (scales Legacy), the welcome-back

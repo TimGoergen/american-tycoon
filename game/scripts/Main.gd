@@ -39,6 +39,7 @@ var _wage_panel: WagePanel
 var _welcome_overlay: WelcomeBackOverlay
 var _about_screen: AboutScreen
 var _stats_screen: StatsScreen
+var _help_screen: HelpScreen
 var _will_screen: WillScreen
 var _legacy_screen: LegacyScreen
 var _ledger_screen: FamilyLedgerScreen
@@ -121,6 +122,7 @@ var _tab_panels: Array = []   # the four content Controls, indexed by TAB_*
 var _tab_buttons: Array = []  # the four bottom icon Buttons, indexed by TAB_*
 var _active_tab: int = TAB_PROPERTY
 var _minigame_check: CheckBox  # the Settings-tab "play the minigame" toggle
+var _tutorial_check: CheckBox  # the Settings-tab "show tutorial tips" toggle
 ## The Settings tab's normal page — hidden while the embedded Balance Tuning panel
 ## (_dev_panel) is swapped into the tab's slot, restored on its Close.
 var _settings_page: Control
@@ -544,6 +546,13 @@ func _build_ui() -> void:
 	_about_screen = AboutScreen.new()
 	_about_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_about_screen)
+
+	# The Help / Glossary modal (Settings → Help): a reference of every tutorial concept plus a
+	# "Replay tutorial" action that re-arms the one-time cards.
+	_help_screen = HelpScreen.new()
+	_help_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_help_screen.replay_requested.connect(_on_replay_tutorial)
+	add_child(_help_screen)
 
 	# The Statistics modal (Settings → Stats), hidden until opened. Reads the bloodline for its
 	# stat rows; its own Back button closes it (nothing to restore — the game runs behind it).
@@ -1215,17 +1224,17 @@ func _build_settings_tab() -> Control:
 	# Tutorial-tips toggle — the master on/off for the one-time coach cards. Persisted in
 	# TutorialProgress (its own user:// file), so the choice survives prestige and restarts. Styled
 	# to match the minigame checkbox above (large navy label + big custom check glyphs).
-	var tutorial_check := CheckBox.new()
-	tutorial_check.text = "Show tutorial tips"
-	tutorial_check.add_theme_font_size_override("font_size", 45)
+	_tutorial_check = CheckBox.new()
+	_tutorial_check.text = "Show tutorial tips"
+	_tutorial_check.add_theme_font_size_override("font_size", 45)
 	for state in ["font_color", "font_pressed_color", "font_hover_color",
 			"font_focus_color", "font_hover_pressed_color", "font_disabled_color"]:
-		tutorial_check.add_theme_color_override(state, UiPalette.NAVY)
-	tutorial_check.add_theme_icon_override("checked", load("res://art/icons/checkbox_checked.svg"))
-	tutorial_check.add_theme_icon_override("unchecked", load("res://art/icons/checkbox_unchecked.svg"))
-	tutorial_check.button_pressed = TutorialProgress.is_enabled()
-	tutorial_check.toggled.connect(func(on: bool) -> void: TutorialProgress.set_enabled(on))
-	v.add_child(tutorial_check)
+		_tutorial_check.add_theme_color_override(state, UiPalette.NAVY)
+	_tutorial_check.add_theme_icon_override("checked", load("res://art/icons/checkbox_checked.svg"))
+	_tutorial_check.add_theme_icon_override("unchecked", load("res://art/icons/checkbox_unchecked.svg"))
+	_tutorial_check.button_pressed = TutorialProgress.is_enabled()
+	_tutorial_check.toggled.connect(func(on: bool) -> void: TutorialProgress.set_enabled(on))
+	v.add_child(_tutorial_check)
 
 	# A spacer pushes the two tuning buttons to the bottom of the panel, clear of the options above.
 	var spacer := Control.new()
@@ -1287,6 +1296,15 @@ func _build_settings_tab() -> Control:
 	about_button.text = "ABOUT"
 	about_button.pressed.connect(_on_about_pressed)
 	bottom_buttons.add_child(about_button)
+
+	# Help: opens the tutorial glossary + Replay action (Plans/Tutorial_Onboarding_Plan.md).
+	var help_button := Button.new()
+	help_button.custom_minimum_size = Vector2(0, tuning_button_height)
+	help_button.add_theme_font_size_override("font_size", TUNING_BUTTON_FONT)
+	UiPalette.style_button(help_button, false)
+	help_button.text = "HELP"
+	help_button.pressed.connect(_on_help_pressed)
+	bottom_buttons.add_child(help_button)
 
 	stack.add_child(v)
 	_settings_page = v
@@ -1400,6 +1418,8 @@ func _show_tab(index: int) -> void:
 		_ledger_screen.refresh(dynasty.ancestors, dynasty.lifetime_cash_earned)
 	elif index == TAB_SETTINGS and _minigame_check != null:
 		_minigame_check.button_pressed = game.ui_minigame_enabled
+		if _tutorial_check != null:
+			_tutorial_check.button_pressed = TutorialProgress.is_enabled()
 
 
 ## The active tab button reads as a mustard plate; the rest as plain cream plates. The
@@ -1491,6 +1511,23 @@ func _fire_polled_tip(tip_id: String, target: Control) -> void:
 ## Momentum bar (fired from RushMomentumState.vent_window_opened).
 func _on_vent_window_opened() -> void:
 	_maybe_show_tip("vent_window", _momentum_bar)
+
+
+## Settings → Help: open the glossary modal.
+func _on_help_pressed() -> void:
+	_help_screen.open()
+
+
+## Replay the tutorial (from the Help screen's REPLAY button): clear the seen-tips record and
+## re-arm every poll tip, so the cards fire again as their moments recur. clear() also resets the
+## on/off flag to its default (ON) — replaying implies the player wants to see the tips again.
+func _on_replay_tutorial() -> void:
+	TutorialProgress.clear()
+	var tips_on := TutorialProgress.is_enabled()
+	for tip_id in _tip_armed.keys():
+		_tip_armed[tip_id] = tips_on and not TutorialProgress.has_seen(tip_id)
+	if _tutorial_check != null:
+		_tutorial_check.button_pressed = tips_on
 
 
 ## The visible PropertyRow for a property index, or null if that rung isn't currently on screen

@@ -264,17 +264,21 @@ const DISPLAY_NAMES := {
 ## (CATCH_ALL_SECTION_TITLE) appended at the end. Each entry is { "title": String, "prefixes":
 ## Array[String] } — a prefix that is a full knob name (e.g. "logic_hz") matches only that knob.
 const SECTIONS := [
+	# Core Loop is the general "base economy" bucket. It also absorbs the input-repeat holds
+	# (buy_hold_ / hire_hold_), the offline pacing (offline_), and the carbonation bubble visuals
+	# (carb_) — each was its own header, but they are all facets of the core loop and its feedback,
+	# so folding them here trims the panel from 14 section headers to 10 (Tim, 2026-07-22 — the
+	# collapsed headers had grown to fill the whole tab).
 	{"title": "Core Loop", "prefixes": [
 		"logic_hz", "m1_starting_cash", "band_step", "cycle_floor", "rush_pct",
 		"hold_rush_per_second", "earth_economy_target", "autosave_cadence",
+		"buy_hold_", "hire_hold_", "offline_", "carb_",
 	]},
 	{"title": "Wage", "prefixes": ["wage_"]},
 	{"title": "Frenzy", "prefixes": ["frenzy_"]},
 	{"title": "Rush Momentum", "prefixes": ["rush_momentum_"]},
-	{"title": "Buy & Hire Holds", "prefixes": ["buy_hold_", "hire_hold_"]},
-	{"title": "Staff", "prefixes": ["staff_"]},
-	{"title": "Retention", "prefixes": ["retention_"]},
-	{"title": "Carbonation", "prefixes": ["carb_"]},
+	# Staff absorbs the retention pricing knobs (retention_*) — retention is just staff-level pricing.
+	{"title": "Staff", "prefixes": ["staff_", "retention_"]},
 	# NOTE: this section holds the non-challenge minigame knobs (physics / features) ONLY. The
 	# per-game challenge dials — basketball_tier_*, the *_keepalive_seconds_per_point knobs, etc. —
 	# belong to the "Challenge Mode" catch-all (Tim, 2026-07-22). So the basketball and match3 prefixes
@@ -285,7 +289,6 @@ const SECTIONS := [
 		"basketball_launch_", "basketball_max_", "memory_gem_",
 	]},
 	{"title": "Legacy Bonus", "prefixes": ["legacy_bonus_", "legacy_gem_chance_"]},
-	{"title": "Offline", "prefixes": ["offline_"]},
 	{"title": "Estate & Legacy", "prefixes": ["estate_", "loophole_", "k_legacy", "alpha_legacy", "legacy_upgrade_cost_multiplier"]},
 	{"title": "Events", "prefixes": ["crash_", "audit_"]},
 ]

@@ -268,6 +268,18 @@ func _on_card_input(event: InputEvent) -> void:
 		_dismiss()
 
 
+## Second-finger dismiss. gui_input above only sees the PRIMARY finger (Godot emulates the mouse
+## from the first touch), so while one finger holds a rush, a SECOND finger tapping the card is
+## invisible to gui_input — the card couldn't be dismissed without letting go of the rush. Reading
+## raw touches here (the same reason PropertyRow / SecondaryTapButton do) lets any finger dismiss it.
+func _input(event: InputEvent) -> void:
+	if not visible or not _card.visible:
+		return
+	if event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed:
+		if _card.get_global_rect().has_point((event as InputEventScreenTouch).position):
+			_dismiss()
+
+
 func _dismiss() -> void:
 	if not visible:
 		return

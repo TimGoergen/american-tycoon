@@ -511,7 +511,7 @@ extends Resource
 ## Micro Basketball: keep-alive seconds each sunk basket adds to the run clock (baskets are slow to
 ## line up, so a fat top-up). One of six per-game keep-alive knobs (each game has one);
 ## ChallengeGoals.seconds_per_point reads them.
-@export var basketball_keepalive_seconds_per_point: float = 5.0  # feel-tune
+@export var basketball_keepalive_seconds_per_point: float = 3.5  # feel-tuned on device (Tim, 2026-07-22)
 
 ## Memory Match: cost (climbs) of each tier for tiers 1-5. At 0.2, tier 5 ≈ 1 climb (first payout).
 @export var memory_tier_base_cost: float = 0.2  # feel-tune

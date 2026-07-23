@@ -312,6 +312,11 @@ const SECTION_MARKER_WIDTH := 48
 ## disc reads at arm's length regardless of the font's glyph coverage.
 const SECTION_DOT_DIAMETER := 26
 
+## Vertical travel (px) a touch/drag must cross before it counts as a SCROLL rather than a tap, so a
+## drag that pans the list does not also toggle the section header it started on (Tim, 2026-07-22 — the
+## collapsed headers tile the whole tab, leaving nowhere else to grab).
+const DRAG_TOGGLE_THRESHOLD := 12.0
+
 
 # One LineEdit per constant, keyed by constant name, read back on Apply.
 var _value_edits: Dictionary = {}
@@ -325,6 +330,14 @@ var _baked: Dictionary = {}
 var _section_of_knob: Dictionary = {}
 
 var _list: VBoxContainer
+# The scroll frame that holds the section list — kept so the drag-to-scroll handler can pan it.
+var _scroll: ScrollContainer
+# Drag-to-scroll state (Tim, 2026-07-22): the section headers are full-width buttons that tile the
+# viewport when collapsed, so a touch landing on a header has nowhere neutral to grab. _pan_scroll_on_drag
+# pans the list on any drag over a header or row; _drag_accum tracks the current gesture's travel and
+# _drag_moved records once it has passed DRAG_TOGGLE_THRESHOLD, so that gesture's header tap is skipped.
+var _drag_accum := 0.0
+var _drag_moved := false
 # Each collapsible section, keyed by its title → { "button": Button header, "body": VBoxContainer,
 # "expanded": bool, "marker": Panel }. All sections start collapsed; the header-row arrow buttons
 # drive them all. "marker" is the white dot shown when the section holds a modified value.
@@ -393,6 +406,7 @@ func _build_chrome() -> void:
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_RESERVE
 	column.add_child(scroll)
+	_scroll = scroll  # kept for the drag-to-scroll handler (see _pan_scroll_on_drag)
 
 	# Right margin keeps every row clear of the overlaid scrollbar (see SCROLLBAR_GAP); the
 	# top/bottom margins give the section list breathing room off the scroll frame's edges.
@@ -469,7 +483,12 @@ func _add_collapsible_section(title: String) -> VBoxContainer:
 	header.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
 		header.add_theme_color_override(state, UiPalette.CREAM)
-	header.pressed.connect(_toggle_section.bind(title))
+	# A TAP toggles the section; a DRAG over the header pans the scroll list instead (the header would
+	# otherwise be a dead zone for scrolling — see _pan_scroll_on_drag). button_down starts a fresh
+	# gesture; pressed toggles ONLY if the gesture never crossed the drag threshold.
+	header.button_down.connect(_begin_drag_gesture)
+	header.gui_input.connect(_pan_scroll_on_drag)
+	header.pressed.connect(_on_section_header_pressed.bind(title))
 	_list.add_child(header)
 
 	# The "section contains modified values" asterisk, overlaid on the header's right end rather
@@ -607,6 +626,48 @@ func _toggle_section(title: String) -> void:
 	section["expanded"] = not bool(section["expanded"])
 	(section["body"] as Control).visible = bool(section["expanded"])
 	_update_section_header(title)
+
+
+# ---------------------------------------------------------------------------
+# Drag-to-scroll (Tim, 2026-07-22)
+# ---------------------------------------------------------------------------
+# The section headers are full-width buttons, so when they are all collapsed they tile the whole tab and
+# a touch that lands on one has nowhere neutral to grab — the list can't be scrolled. Rather than fight
+# Godot's mouse_filter propagation (a header's STOP swallows the touch before the ScrollContainer sees
+# it), we pan the scroll ourselves from a drag over any header or row, the same tactic Main.gd uses for
+# the epoch-swipe gesture. A short press still registers as a tap (toggles the section); once a gesture's
+# travel passes DRAG_TOGGLE_THRESHOLD it is treated as a scroll and that header's tap is suppressed.
+
+## Start tracking a fresh press gesture (a header's button_down, before any drag).
+func _begin_drag_gesture() -> void:
+	_drag_accum = 0.0
+	_drag_moved = false
+
+
+## Pan the scroll list when a touch/left-drag crosses a header or row. Never consumes the event, so the
+## button's own tap and any text field still work. Accumulates travel so _on_section_header_pressed can
+## tell a scroll from a tap. Handles both touch (InputEventScreenDrag) and desktop mouse-drag.
+func _pan_scroll_on_drag(event: InputEvent) -> void:
+	var delta_y := 0.0
+	if event is InputEventScreenDrag:
+		delta_y = event.relative.y
+	elif event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT):
+		delta_y = event.relative.y
+	else:
+		return
+	# Drag DOWN (finger moves down, delta_y > 0) reveals earlier rows → scroll_vertical decreases.
+	_scroll.scroll_vertical -= int(delta_y)
+	_drag_accum += absf(delta_y)
+	if _drag_accum >= DRAG_TOGGLE_THRESHOLD:
+		_drag_moved = true
+
+
+## A header was released: toggle it ONLY when the gesture was a genuine tap. If the press turned into a
+## scroll (travel past the threshold), swallow the toggle so scrolling never flips sections open/closed.
+func _on_section_header_pressed(title: String) -> void:
+	if _drag_moved:
+		return
+	_toggle_section(title)
 
 
 ## Expand or collapse every section at once (the header-row Collapse-All / Expand-All arrows).
@@ -752,6 +813,10 @@ func _add_constant_row(parent: VBoxContainer, name: String, type: int, current_v
 
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
+	# A drag over the row's TEXT area (not the value field) pans the scroll list, so an expanded
+	# section is scrollable too (Tim, 2026-07-22). The row keeps STOP and receives the drag because its
+	# text column + labels are set IGNORE below; the LineEdit stays interactive for editing.
+	row.gui_input.connect(_pan_scroll_on_drag)
 	parent.add_child(row)
 
 	# Name (top) + description (beneath) share the left column; the editor sits to
@@ -760,6 +825,9 @@ func _add_constant_row(parent: VBoxContainer, name: String, type: int, current_v
 	text_column.add_theme_constant_override("separation", 2)
 	text_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	text_column.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	# Transparent to input so a drag falls through to the row (which pans the scroll); the labels
+	# below are IGNORE for the same reason. Only the LineEdit stays interactive.
+	text_column.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(text_column)
 
 	var label := Label.new()
@@ -775,6 +843,7 @@ func _add_constant_row(parent: VBoxContainer, name: String, type: int, current_v
 	label.add_theme_font_size_override("font_size", ROW_LABEL_SIZE)
 	# Wrap a long name instead of forcing the whole row wider than the panel (Tim, 2026-07-09).
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE  # let a drag fall through to the row (scroll)
 	text_column.add_child(label)
 
 	var description: String = DESCRIPTIONS.get(name, "")
@@ -785,6 +854,7 @@ func _add_constant_row(parent: VBoxContainer, name: String, type: int, current_v
 		# Muted navy so the description reads as secondary to the constant's name.
 		desc_label.add_theme_color_override("font_color", Color(UiPalette.NAVY, 0.7))
 		desc_label.add_theme_font_size_override("font_size", ROW_DESC_SIZE)
+		desc_label.mouse_filter = Control.MOUSE_FILTER_IGNORE  # let a drag fall through to the row (scroll)
 		text_column.add_child(desc_label)
 
 	var edit := LineEdit.new()

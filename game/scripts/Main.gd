@@ -1506,6 +1506,13 @@ func _maybe_show_tip(tip_id: String, target: Control) -> bool:
 	# disk reads) runs while a card is visible.
 	if _tutorial_tip.visible:
 		return false
+	# Never fire over a full-screen overlay — a card belongs on the MAIN game screen, not on top of
+	# the welcome/launch screen, the succession ceremony, a minigame, or a Settings modal. The polls
+	# already skip the MODAL overlays (the _process freeze-return), but the welcome/launch screen and
+	# the Settings modals are NOT modal, so guard them here too (Tim, 2026-07-23: the family_ledger
+	# card popped over the post-prestige welcome screen). Checked before the disk reads below.
+	if _any_fullscreen_overlay_visible():
+		return false
 	if not TutorialProgress.is_enabled() or TutorialProgress.has_seen(tip_id):
 		return false
 	var tip := TutorialCatalog.get_tip(tip_id)
@@ -1514,6 +1521,16 @@ func _maybe_show_tip(tip_id: String, target: Control) -> bool:
 	TutorialProgress.mark_seen(tip_id)
 	_tutorial_tip.show_tip(tip["title"], tip["body"], target)
 	return true
+
+
+## True while any full-screen overlay is up (the welcome/launch screen, the succession ceremony, a
+## minigame, the epoch nudge, or a Settings modal). Tutorial cards suppress themselves while one is
+## showing, so a card never lands on a beat instead of the main game screen.
+func _any_fullscreen_overlay_visible() -> bool:
+	return _welcome_overlay.visible or _will_screen.visible or _first_contact_overlay.visible \
+			or _minigame_screen.visible or _minigame_review_screen.visible \
+			or _challenges_screen.visible or _about_screen.visible or _stats_screen.visible \
+			or _help_screen.visible or _venture_overlay.visible
 
 
 ## Fire a poll-driven availability tip. Disarms ONLY once the card actually shows, so a tip whose

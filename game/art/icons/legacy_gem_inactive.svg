@@ -22,21 +22,17 @@
      inkscape:deskcolor="#d1d1d1"
      inkscape:zoom="2.2644253"
      inkscape:cx="79.048754"
-     inkscape:cy="123.43088"
+     inkscape:cy="132.70475"
      inkscape:window-width="1920"
      inkscape:window-height="1009"
      inkscape:window-x="-8"
      inkscape:window-y="-8"
      inkscape:window-maximized="1"
      inkscape:current-layer="svg22" />
-  <!-- "Legacy gem" — INACTIVE (black-and-white) tab version: the same faceted crystal as the
-       colored active gem, but every facet is forced white via a style="fill:#ffffff" override so
-       only the black facet borders read, giving a line-art silhouette. The purple gradient <defs>
-       below are inert leftovers from the colored version (kept so the two files stay diff-able);
-       nothing references them anymore. Note: the two side facets set fill="#ffffff" DIRECTLY rather
-       than via style override, because Godot's thorvg importer renders a fill="url(#gradient)"
-       presentation attribute instead of honoring the style override (which strict SVG says wins) —
-       that mismatch was what left purple panels on the sides. No SVG filters (thorvg ignores them). -->
+  <!-- "Legacy gem" — a vertical faceted crystal with a glowing magenta core, vectorized from the
+       concept art (art concepts/legacy_gem_firstdraft.png). Built as cleanly-tiling facet polygons
+       (left/right split top-mid-bottom, plus a central glowing column) over a black silhouette.
+       No SVG filters (the Godot/thorvg importer doesn't render them) — the glow is gradient ellipses. -->
   <defs
      id="defs10">
     <radialGradient
@@ -169,7 +165,7 @@
      stroke-linejoin="round"
      id="polygon11"
      transform="matrix(-1.4884682,0,0,-0.99553719,253.93983,253.44019)"
-     style="stroke-width:0.8;stroke-dasharray:none;stroke:#000000;stroke-opacity:1;fill:#ffffff;fill-opacity:1" />
+     style="stroke-width:0.8831038;stroke-dasharray:none;stroke:#000000;stroke-opacity:1;fill:#000000;fill-opacity:1" />
   <!-- Facets: tile the gem, each with a dark border stroke (the borders between facets) -->
   <g
      stroke="#1c0a28"
@@ -177,42 +173,43 @@
      stroke-linejoin="round"
      id="g18"
      transform="matrix(-1.4884682,0,0,-0.99553719,256.1257,254.99456)"
-     style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:5.1;stroke-dasharray:none;stroke-opacity:1">
+     style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:5.62978588;stroke-dasharray:none;stroke-opacity:1">
     <polygon
        points="90,24 72,70 30,84 70,24 "
        fill="#491d63"
        id="polygon12"
-       style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:5.1;stroke-dasharray:none;stroke-opacity:1" />
+       style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:8.66916789;stroke-dasharray:none;stroke-opacity:1" />
     <!-- left top -->
     <polygon
        points="72,70 72,180 38,172 30,84 "
        fill="#ffffff"
        id="polygon13"
-       style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:5.1;stroke-dasharray:none;stroke-opacity:1" />
+       style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:9.16206097;stroke-dasharray:none;stroke-opacity:1" />
     <!-- left mid -->
     <polygon
        points="72,180 90,230 72,230 38,172 "
        fill="#391450"
        id="polygon14"
-       style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:5.1;stroke-dasharray:none;stroke-opacity:1" />
+       style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:8.75131673;stroke-dasharray:none;stroke-opacity:1" />
     <!-- left bottom -->
     <polygon
-       points="110,24 150,84 108,70 90,24 "
+       points="150,84 108,70 90,24 110,24 "
        fill="#491d63"
        id="polygon15"
-       style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:5.1;stroke-dasharray:none;stroke-opacity:1" />
+       style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:6.94404183;stroke-dasharray:none;stroke-opacity:1"
+       transform="translate(-0.89006903,-0.88718564)" />
     <!-- right top -->
     <polygon
        points="150,84 142,172 108,180 108,70 "
        fill="#ffffff"
        id="polygon16"
-       style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:5.1;stroke-dasharray:none;stroke-opacity:1" />
+       style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:6.07901472;stroke-dasharray:none;stroke-opacity:1" />
     <!-- right mid -->
     <polygon
        points="108,230 90,230 108,180 142,172 "
        fill="#391450"
        id="polygon17"
-       style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:5.1;stroke-dasharray:none;stroke-opacity:1"
+       style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:7.43693517;stroke-dasharray:none;stroke-opacity:1"
        transform="translate(-1.0489564,0.31366749)" />
     <!-- right bottom -->
     <!-- center -->

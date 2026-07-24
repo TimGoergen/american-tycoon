@@ -1,9 +1,10 @@
 # Tab Bar Icon Treatment — Design Spec
 
-**Status:** Planned (rides with the M3 art pass — needs the AI art pipeline for the colored
-active-state icons). **Author:** Tim (reasoned out in a separate Claude chat), captured here
-2026-07-23. **Scope:** Main interface bottom tab bar (Properties, Estate, Family History,
-Settings) and related in-content icon usage.
+**Status:** IMPLEMENTED 2026-07-24 (`main` @ d0c06dd) — active/inactive icon swap wired up
+in `Main.gd` (`_style_tab_button`) once Tim supplied the colored art. Deferred polish: the
+~100–150 ms crossfade (Implementation Notes) is currently an instant swap. **Author:** Tim
+(reasoned out in a separate Claude chat), captured here 2026-07-23. **Scope:** Main interface
+bottom tab bar (Properties, Estate, Family History, Settings) and related in-content icon usage.
 
 ---
 
@@ -86,13 +87,13 @@ indicate active state.
 
 | Icon | Silhouette (inactive) | Full color (active) |
 |---|---|---|
-| Properties | ✅ Exists | 🔨 Create |
-| Estate (gem) | 🔨 Create | ✅ Exists |
-| Family History | ✅ Exists | 🔨 Create |
-| Settings | ✅ Exists | 🔨 Create |
+| Properties | ✅ `tab_property.svg` | ✅ `tab_property_active.svg` |
+| Estate (gem) | ✅ `legacy_gem_inactive.svg` | ✅ `legacy_gem.svg` |
+| Family History | ✅ `tab_ledger.svg` | ✅ `tab_ledger_active.svg` |
+| Settings | ✅ `tab_settings.svg` | ✅ `tab_settings_active.svg` |
 
-Colored active-state icons are a candidate for the AI art pipeline, using the existing
-silhouettes as structural reference.
+All eight assets are in `game/art/icons/` and wired up. (`.svg.import` files are
+gitignored and regenerate on import — only the `.svg` sources are committed.)
 
 ---
 

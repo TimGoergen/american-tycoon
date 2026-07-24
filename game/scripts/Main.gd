@@ -54,9 +54,6 @@ var _tutorial_tip: TutorialTip
 ## becoming poppable, reaching a new epoch, having played a minigame) are watched each frame in
 ## _process. Armed once at build (a disk read) so the per-frame check only touches memory.
 var _tip_armed := {}
-## Set true the first time a real minigame finishes, so the "minigames" tip can fire once the
-## player is back with no modal up. Resets on scene reload — harmless, the tip is once-ever.
-var _minigame_played_once := false
 var _buy_mode_button: Button
 var _plan_button: Button
 ## Rich-text content overlaid on the plan button so the "(+x [gem])" parenthetical can show the
@@ -280,8 +277,6 @@ func _process(delta: float) -> void:
 		_fire_polled_tip("overdrive", _momentum_bar.get_overdrive_button())
 	if _tip_armed.get("epochs", false) and game.epoch.current_tier >= 2:
 		_fire_polled_tip("epochs", _epoch_pager_box)
-	if _tip_armed.get("minigames", false) and _minigame_played_once:
-		_fire_polled_tip("minigames", null)
 
 	# Progressive tab unlocking (Plans/Tutorial_Onboarding_Plan.md §9): the Estate tab unlocks when
 	# the player can FIRST prestige (you prestige FROM that tab, so it must open before the first
@@ -598,7 +593,7 @@ func _build_ui() -> void:
 	# the fact (Tim, 2026-07-23).
 	var tips_on := TutorialProgress.is_enabled()
 	for tip_id in ["getting_started", "first_property", "first_rush", "buy_mode", "first_hire",
-			"turbo_ready", "overdrive", "epochs", "minigames", "prestige", "family_ledger"]:
+			"turbo_ready", "overdrive", "epochs", "prestige", "family_ledger"]:
 		_tip_armed[tip_id] = tips_on and not TutorialProgress.has_seen(tip_id)
 	# Signal-driven tip: the vent gesture, fired during an overdrive rush. (The offline-earnings
 	# concept is NOT a card — it is taught as a permanent line ON the welcome-back screen itself,
@@ -2065,9 +2060,6 @@ func _on_challenge_finished(game_key: String, final_score: int, screen: Object) 
 ## multiplier at whichever site launched it (GDD §5.5). One host serves both sites, so we
 ## read _minigame_site to decide; clearing it first keeps a stray re-entry from double-firing.
 func _on_minigame_finished(multiplier: float, opt_out: bool) -> void:
-	# A real minigame just played — arm the "minigames" tip (the _process poll fires it once the
-	# player is back with no modal up, so the card never lands over the minigame result screen).
-	_minigame_played_once = true
 	game.ui_minigame_enabled = not opt_out
 	var site := _minigame_site
 	_minigame_site = MinigameSite.NONE

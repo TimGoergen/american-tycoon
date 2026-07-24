@@ -10,7 +10,9 @@ class_name TutorialCatalog
 #
 # A few concepts are taught in their own beat rather than as a floating card, so their entry here
 # feeds the Settings glossary but is NOT fired by _maybe_show_tip: welcome_back is a permanent line
-# ON the welcome-back screen (WelcomeBackOverlay); epochs/prestige may follow (Tim, 2026-07-23).
+# ON the welcome-back screen (WelcomeBackOverlay), and minigames is the Get Ready gate's own stakes
+# line (MinigameScreen — "Play well to earn a BONUS…", exactly where the player is about to play,
+# so a game-screen card afterward was redundant; Tim, 2026-07-23).
 
 const TIPS := {
 	# The very first beat: on a fresh launch the only thing to do is Clock In until the first

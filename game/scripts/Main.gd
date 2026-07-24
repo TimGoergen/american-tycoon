@@ -120,6 +120,12 @@ const TAB_ICON_SIZE := 113
 var _tab_content: Control
 var _tab_panels: Array = []   # the four content Controls, indexed by TAB_*
 var _tab_buttons: Array = []  # the four bottom icon Buttons, indexed by TAB_*
+# Each tab has two art versions (Plans/Tab_Bar_Icon_Treatment.md): a black-and-white
+# silhouette for the INACTIVE state and a full-color version for the ACTIVE ("you are
+# here") state. Same outline/size/anchor in both, so the swap reads as the icon lighting
+# up, not a replacement. Cached once at build; the live swap happens in _style_tab_button.
+var _tab_icon_inactive: Array = []  # silhouette Textures, indexed by TAB_*
+var _tab_icon_active: Array = []    # full-color Textures, indexed by TAB_*
 var _active_tab: int = TAB_PROPERTY
 var _minigame_check: CheckBox  # the Settings-tab "play the minigame" toggle
 var _tutorial_check: CheckBox  # the Settings-tab "show tutorial tips" toggle
@@ -1386,35 +1392,45 @@ func _build_tab_bar(column: VBoxContainer) -> void:
 	bar.add_theme_constant_override("separation", 6)
 	column.add_child(bar)
 
-	var icons := [
+	# Inactive (silhouette) and active (full-color) art for each tab, in TAB_* order. The
+	# Estate tab's active icon is the legacy gem — the same art as the wallet and the
+	# Pass-the-Torch button (Tim, 2026-07-08) — with a silhouette gem for its inactive state.
+	var inactive_icons := [
 		"res://art/icons/tab_property.svg",
-		# The legacy gem IS the Estate tab's identity — the same art as the wallet and
-		# the Pass-the-Torch button, replacing the placeholder glyph (Tim, 2026-07-08).
-		"res://art/icons/legacy_gem.svg",
+		"res://art/icons/legacy_gem_inactive.svg",
 		"res://art/icons/tab_ledger.svg",
 		"res://art/icons/tab_settings.svg",
 	]
+	var active_icons := [
+		"res://art/icons/tab_property_active.svg",
+		"res://art/icons/legacy_gem.svg",
+		"res://art/icons/tab_ledger_active.svg",
+		"res://art/icons/tab_settings_active.svg",
+	]
 	_tab_buttons = []
-	for i in range(icons.size()):
+	_tab_icon_inactive = []
+	_tab_icon_active = []
+	for i in range(inactive_icons.size()):
+		_tab_icon_inactive.append(load(inactive_icons[i]))
+		_tab_icon_active.append(load(active_icons[i]))
 		var b := Button.new()
 		b.custom_minimum_size = Vector2(0, 185)  # 25% taller again (148 -> 185, Tim 2026-06-23)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.icon = load(icons[i])
+		b.icon = _tab_icon_inactive[i]  # start inactive; _style_tab_button lights up the active tab
 		# Let the icon scale up from its 81px native size and cap it at TAB_ICON_SIZE (40%
 		# larger). expand_icon grows it to fill the button; icon_max_width holds it at the target.
 		b.expand_icon = true
 		b.add_theme_constant_override("icon_max_width", TAB_ICON_SIZE)
 		b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		# The full-color active icons are high-res art that DOWNSCALES into the 113px slot, so
+		# every tab needs the mipmapped filter to avoid aliasing — the fix the gem already used.
+		b.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 		b.pressed.connect(_show_tab.bind(i))
 		bar.add_child(b)
 		_tab_buttons.append(b)
-		# The Estate tab carries the "you have Legacy to claim" red-dot badge. Its gem
-		# icon also DOWNSCALES (252px art → 113px slot, unlike the 81px placeholder
-		# glyphs that scale up), so it needs the mipmapped filter to avoid aliasing —
-		# the same fix every other gem render uses.
+		# The Estate tab carries the "you have Legacy to claim" red-dot badge.
 		if i == TAB_ESTATE:
 			_estate_badge = _make_estate_badge(b)
-			b.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 
 
 ## Build the Estate tab's red-dot badge: a small red circle pinned to the button's top-right
@@ -1478,6 +1494,10 @@ func _show_tab(index: int) -> void:
 ## leftmost and rightmost tabs round their OUTER bottom corner to nest inside the phone's
 ## bottom screen corners (the Property tab's bottom-left, the Settings tab's bottom-right).
 func _style_tab_button(button: Button, active: bool, index: int) -> void:
+	# Light up the active tab's icon (full color) and dim the rest back to silhouette. Icon
+	# color means "you are here" and nothing else — the red dot alone signals "something new"
+	# (Plans/Tab_Bar_Icon_Treatment.md, signal separation).
+	button.icon = _tab_icon_active[index] if active else _tab_icon_inactive[index]
 	var box := StyleBoxFlat.new()
 	box.bg_color = UiPalette.MUSTARD_GOLD if active else UiPalette.CREAM
 	box.border_color = UiPalette.NAVY

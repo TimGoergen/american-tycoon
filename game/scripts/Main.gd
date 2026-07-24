@@ -864,7 +864,10 @@ func _update_tab_unlocks() -> void:
 		elif tab >= 2:
 			should_open = game.epoch.current_tier >= tab  # alien: First Contact opens it
 		else:
-			should_open = _tab_affordable_or_owned(tab)   # White Collar: first affordable
+			# White Collar (tab 1): also require owning at least one of every Blue Collar property
+			# before it opens — engage the whole first tab before the next (Tim, 2026-07-23), the
+			# same rule the alien epochs get. Affordability is the money half.
+			should_open = _owns_all_blue_collar() and _tab_affordable_or_owned(tab)
 		if should_open:
 			_tab_unlocked[tab] = true
 			changed = true
@@ -884,6 +887,13 @@ func _tab_affordable_or_owned(tab: int) -> bool:
 			return true
 		cheapest = minf(cheapest, prop.get_bulk_cost(1))
 	return game.economy.cash >= cheapest
+
+
+## True once the player owns at least one of every Blue Collar property (tab 0 = indices 0-5, per
+## _epoch_tab_of) — the ownership gate on the White Collar tab (Tim, 2026-07-23), matching the
+## epoch-advance rule so every tab is engaged before the next opens.
+func _owns_all_blue_collar() -> bool:
+	return game.economy.owns_at_least_one_of_each([0, 1, 2, 3, 4, 5])
 
 
 ## The big label for a tab: "EARTH" for the two Earth tabs, else the civilization's name.

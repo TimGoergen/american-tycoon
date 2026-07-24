@@ -273,8 +273,27 @@ func _run_return_spike_phase(game: GameState) -> void:
 ## Spend cash on whichever single unit adds the best income/sec per dollar,
 ## repeating until nothing is affordable. Returns the number of units bought.
 ## (Capped to avoid a pathological loop on a degenerate config.)
+## Buy one unit of every UNLOCKED, not-yet-owned, affordable property — so the sim satisfies the
+## epoch-advance ownership gate (Tim 2026-07-23) the way a real player now must. Without this, the
+## income-per-dollar policies below perma-skip a cheap property, so the epoch never advances and the
+## playout stalls. Returns how many it bought.
+func _buy_breadth(game: GameState, reached_tier: int) -> int:
+	var bought := 0
+	for i in range(game.economy.properties.size()):
+		var prop := game.economy.properties[i] as PropertyState
+		if prop.units_owned > 0 or not game.economy.is_property_unlocked(i, reached_tier):
+			continue
+		var cost := prop.get_next_cost()
+		if cost > 0.0 and game.economy.cash >= cost:
+			game.try_buy(i, 1)
+			bought += 1
+	return bought
+
+
 func _greedy_buy_spree(game: GameState) -> int:
-	var units_bought := 0
+	# Own one of every unlocked property first (the epoch-advance gate needs it, and so does a real
+	# player), then optimize the rest by income per dollar.
+	var units_bought := _buy_breadth(game, game.epoch.current_tier)
 	while units_bought < 1000:
 		var best_index := -1
 		var best_value := 0.0  # marginal income/sec per dollar
@@ -315,6 +334,9 @@ func _greedy_buy_spree(game: GameState) -> int:
 ## pile mid-epoch can't spin the loop forever; leftover cash simply carries to the next tick.
 func _greedy_build_out(game: GameState) -> void:
 	var reached := game.epoch.current_tier
+	# Own one of every unlocked property first — the epoch-advance ownership gate (Tim 2026-07-23)
+	# requires it before the next epoch opens, and it keeps this playout from stalling at a gate.
+	_buy_breadth(game, reached)
 	var actions := 0
 	while actions < 400:
 		actions += 1

@@ -46,12 +46,12 @@ const RAPID_RESTART    := "rapid_restart"
 
 # ── The catalog ───────────────────────────────────────────────────────────────
 # Cost note: Legacy Gems are on a SMALL scale so each gem feels hard-won. The estate→Legacy curve
-# (k_legacy × estate_net ^ alpha — see tuning.tres / EstateWaterfall) keeps yields modest. The
-# 2026-07-14 "Option C" runaway fix flattened that curve (alpha 0.30→0.22) and added the ×2 cost
-# multiplier, so an early first prestige now yields only ~2 Legacy — much less than the ~10–16 the
-# original costs were matched to. Trust Fund's first level was lowered to 2 Legacy (Tim, 2026-07-23)
-# so that early ~2-gem prestige can still buy the first upgrade; the rest of the ladder is a
-# candidate for the still-open prestige/cost re-tuning pass. Numbers are for on-device feel-tuning.
+# (k_legacy × estate_net ^ alpha — see tuning.tres / EstateWaterfall) is the "reward for pushing"
+# dial. The 2026-07-23 re-tune STEEPENED it (alpha 0.35, k 0.16) so a full Earth run mints ~830
+# gems and out-earning clearly pays, and raised the global cost multiplier to 3.0 to keep the
+# richer yields from buying out the shop (see sim/PrestigeStudy.gd for the yield-vs-cost tables).
+# With that, first-level costs run ~3 (Trust Fund) to ~30, comfortably bought by a decent run,
+# while the max-level compounders cost billions — the never-reached "endless chase" top end.
 #
 # Effect model (set 2026-06-15, modeled on Idle Slayer): the three core accelerators —
 # Family Fortune (income), Efficiency (cycle speed), Connections (wage) — COMPOUND, so
@@ -71,12 +71,10 @@ const UPGRADES := [
 		"category": "Wealth",
 		"description": "Every heir is born into more money.",
 		"max_level": 10,
-		# The cheapest upgrade, and the intended FIRST buy: base 1 → 2 Legacy after the ×2 cost
-		# multiplier, so an early ~2-gem first prestige can actually afford something (Tim,
-		# 2026-07-23 — the old base 4 → 8 Legacy left a dead window where prestige bought nothing
-		# once the 2026-07-14 Option-C pass flattened early yields). Safe to cheapen: Trust Fund is
-		# a flat, capped, ADDITIVE bonus, not a compounding runaway vector, so lowering it can't
-		# reignite the runaway the cost multiplier guards against.
+		# The cheapest upgrade and the intended FIRST buy: base 1 → 3 Legacy after the ×3 cost
+		# multiplier, so even a modest first prestige can afford something (Tim, 2026-07-23). Safe to
+		# keep this low: Trust Fund is a flat, capped, ADDITIVE bonus, not a compounding runaway
+		# vector, so its price doesn't affect the runaway the cost multiplier guards against.
 		"base_cost": 1,
 		"cost_growth": 1.8,
 		"effect_per_level": 5000.0,   # +$5,000 starting cash per level

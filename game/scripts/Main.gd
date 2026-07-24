@@ -39,6 +39,7 @@ var _wage_panel: WagePanel
 var _welcome_overlay: WelcomeBackOverlay
 var _about_screen: AboutScreen
 var _stats_screen: StatsScreen
+var _help_screen: HelpScreen
 var _will_screen: WillScreen
 var _legacy_screen: LegacyScreen
 var _ledger_screen: FamilyLedgerScreen
@@ -46,6 +47,16 @@ var _dev_panel: DevTuningPanel
 var _minigame_screen: MinigameScreen
 var _minigame_review_screen: MinigameReviewScreen
 var _challenges_screen: ChallengesScreen
+## The tutorial coach card (Plans/Tutorial_Onboarding_Plan.md) — one instance, fired by
+## _maybe_show_tip the first time a system becomes relevant, anchored near the relevant control.
+var _tutorial_tip: TutorialTip
+## Poll-driven tutorial tips {tip_id -> armed}: tips that can't hang off a single verb (TURBO
+## becoming poppable, reaching a new epoch, having played a minigame) are watched each frame in
+## _process. Armed once at build (a disk read) so the per-frame check only touches memory.
+var _tip_armed := {}
+## Set true the first time a real minigame finishes, so the "minigames" tip can fire once the
+## player is back with no modal up. Resets on scene reload — harmless, the tip is once-ever.
+var _minigame_played_once := false
 var _buy_mode_button: Button
 var _plan_button: Button
 ## Rich-text content overlaid on the plan button so the "(+x [gem])" parenthetical can show the
@@ -111,6 +122,7 @@ var _tab_panels: Array = []   # the four content Controls, indexed by TAB_*
 var _tab_buttons: Array = []  # the four bottom icon Buttons, indexed by TAB_*
 var _active_tab: int = TAB_PROPERTY
 var _minigame_check: CheckBox  # the Settings-tab "play the minigame" toggle
+var _tutorial_check: CheckBox  # the Settings-tab "show tutorial tips" toggle
 ## The Settings tab's normal page — hidden while the embedded Balance Tuning panel
 ## (_dev_panel) is swapped into the tab's slot, restored on its Close.
 var _settings_page: Control
@@ -235,6 +247,52 @@ func _process(delta: float) -> void:
 	# Cash keeps updating every frame so the balance still counts up smoothly.
 	_hero_stat.set_cash(game.economy.cash)
 	_hero_stat.set_frenzy_glow(game.frenzy.get_multiplier() > 1.0)
+
+	# Poll-driven tutorial tips: fire the first time each condition is met. This runs only AFTER
+	# the modal-freeze return above, so a card never lands on top of a full-screen beat.
+	# The opening beat: on a fresh run the only action is Clock In, and nothing else fires until a
+	# property is owned. Wait for the welcome screen to clear (it is NOT in modal_up, so guard it
+	# explicitly) and only while the player still owns nothing, then point at the wage button.
+	if _tip_armed.get("getting_started", false) and not _welcome_overlay.visible \
+			and not _owns_any_property():
+		_fire_polled_tip("getting_started", _wage_panel)
+	# First business becomes affordable — direct the buy BEFORE they have to discover it. Points at
+	# the buy button itself, not the whole row.
+	if _tip_armed.get("first_property", false) and not _welcome_overlay.visible \
+			and not _owns_any_property() \
+			and game.economy.properties[0].get_next_cost() <= game.economy.cash:
+		_fire_polled_tip("first_property", _buy_control_of(_row_for_index(0)))
+	# Owning a business makes rushing possible — point at the portrait/rush control now, not after.
+	if _tip_armed.get("first_rush", false) and _owns_any_property():
+		_fire_polled_tip("first_rush", _rush_control_of(_first_owned_row()))
+	# Stacking up units is when the bulk-buy modes start to matter.
+	if _tip_armed.get("buy_mode", false) and _owns_multiple_units():
+		_fire_polled_tip("buy_mode", _buy_mode_button)
+	# A staffer is affordable somewhere — direct the hire before they stumble on it.
+	if _tip_armed.get("first_hire", false):
+		var hireable := _first_hireable_row()
+		if hireable != null:
+			_fire_polled_tip("first_hire", _hire_control_of(hireable))
+	if _tip_armed.get("turbo_ready", false) and game.frenzy.can_pop():
+		_fire_polled_tip("turbo_ready", _frenzy_bar)
+	# Reaching cruise enables the OVERDRIVE button — teach it the first frame it lights up.
+	if _tip_armed.get("overdrive", false) and not _momentum_bar.get_overdrive_button().disabled:
+		_fire_polled_tip("overdrive", _momentum_bar.get_overdrive_button())
+	if _tip_armed.get("epochs", false) and game.epoch.current_tier >= 2:
+		_fire_polled_tip("epochs", _epoch_pager_box)
+	if _tip_armed.get("minigames", false) and _minigame_played_once:
+		_fire_polled_tip("minigames", null)
+
+	# Progressive tab unlocking (Plans/Tutorial_Onboarding_Plan.md §9): the Estate tab unlocks when
+	# the player can FIRST prestige (you prestige FROM that tab, so it must open before the first
+	# prestige, not after); the Family Ledger after the first prestige (it has ancestors to show
+	# only then). Keep the locked/enabled state fresh, and fire an attention card at each tab the
+	# frame it goes live.
+	_refresh_locked_tabs()
+	if _tip_armed.get("prestige", false) and _estate_unlocked():
+		_fire_polled_tip("prestige", _tab_buttons[TAB_ESTATE])
+	if _tip_armed.get("family_ledger", false) and _ledger_unlocked():
+		_fire_polled_tip("family_ledger", _tab_buttons[TAB_LEDGER])
 
 	# Nudge the player toward an unopened tab the moment its first venture becomes affordable.
 	_venture_check_timer += delta
@@ -500,6 +558,13 @@ func _build_ui() -> void:
 	_about_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_about_screen)
 
+	# The Help / Glossary modal (Settings → Help): a reference of every tutorial concept plus a
+	# "Replay tutorial" action that re-arms the one-time cards.
+	_help_screen = HelpScreen.new()
+	_help_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_help_screen.replay_requested.connect(_on_replay_tutorial)
+	add_child(_help_screen)
+
 	# The Statistics modal (Settings → Stats), hidden until opened. Reads the bloodline for its
 	# stat rows; its own Back button closes it (nothing to restore — the game runs behind it).
 	_stats_screen = StatsScreen.new()
@@ -522,6 +587,24 @@ func _build_ui() -> void:
 	_first_contact_overlay = FirstContactOverlay.new()
 	_first_contact_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_first_contact_overlay)
+
+	# The tutorial coach card sits on top of everything (added last), hidden until a first-time
+	# tip fires. It is non-blocking — taps outside the card pass through to the game.
+	_tutorial_tip = TutorialTip.new()
+	add_child(_tutorial_tip)
+	# Arm the poll-driven tips once (disk read here; the per-frame poll then only reads memory).
+	# Armed only when tips are ON, so a disabled tutorial does zero per-frame disk work. These fire
+	# on AVAILABILITY (the action just became possible) so they DIRECT the player, rather than after
+	# the fact (Tim, 2026-07-23).
+	var tips_on := TutorialProgress.is_enabled()
+	for tip_id in ["getting_started", "first_property", "first_rush", "buy_mode", "first_hire",
+			"turbo_ready", "overdrive", "epochs", "minigames", "prestige", "family_ledger"]:
+		_tip_armed[tip_id] = tips_on and not TutorialProgress.has_seen(tip_id)
+	# Signal-driven tip: the vent gesture, fired during an overdrive rush. (The offline-earnings
+	# concept is NOT a card — it is taught as a permanent line ON the welcome-back screen itself,
+	# see WelcomeBackOverlay: a fresh launch has no "out", and that screen is the natural home for
+	# the explanation. Tim, 2026-07-23.)
+	game.rush_momentum.vent_window_opened.connect(_on_vent_window_opened)
 	game.epoch.contact_made.connect(_on_contact_made)
 	# When the player answers the contact, the trade-deal minigame negotiates their head start
 	# on the new alien property (GDD §5.5 site 2), so the negotiation follows the narration.
@@ -1149,6 +1232,21 @@ func _build_settings_tab() -> Control:
 	_minigame_check.toggled.connect(func(on: bool) -> void: game.ui_minigame_enabled = on)
 	v.add_child(_minigame_check)
 
+	# Tutorial-tips toggle — the master on/off for the one-time coach cards. Persisted in
+	# TutorialProgress (its own user:// file), so the choice survives prestige and restarts. Styled
+	# to match the minigame checkbox above (large navy label + big custom check glyphs).
+	_tutorial_check = CheckBox.new()
+	_tutorial_check.text = "Show tutorial tips"
+	_tutorial_check.add_theme_font_size_override("font_size", 45)
+	for state in ["font_color", "font_pressed_color", "font_hover_color",
+			"font_focus_color", "font_hover_pressed_color", "font_disabled_color"]:
+		_tutorial_check.add_theme_color_override(state, UiPalette.NAVY)
+	_tutorial_check.add_theme_icon_override("checked", load("res://art/icons/checkbox_checked.svg"))
+	_tutorial_check.add_theme_icon_override("unchecked", load("res://art/icons/checkbox_unchecked.svg"))
+	_tutorial_check.button_pressed = TutorialProgress.is_enabled()
+	_tutorial_check.toggled.connect(func(on: bool) -> void: TutorialProgress.set_enabled(on))
+	v.add_child(_tutorial_check)
+
 	# A spacer pushes the two tuning buttons to the bottom of the panel, clear of the options above.
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -1209,6 +1307,15 @@ func _build_settings_tab() -> Control:
 	about_button.text = "ABOUT"
 	about_button.pressed.connect(_on_about_pressed)
 	bottom_buttons.add_child(about_button)
+
+	# Help: opens the tutorial glossary + Replay action (Plans/Tutorial_Onboarding_Plan.md).
+	var help_button := Button.new()
+	help_button.custom_minimum_size = Vector2(0, tuning_button_height)
+	help_button.add_theme_font_size_override("font_size", TUNING_BUTTON_FONT)
+	UiPalette.style_button(help_button, false)
+	help_button.text = "HELP"
+	help_button.pressed.connect(_on_help_pressed)
+	bottom_buttons.add_child(help_button)
 
 	stack.add_child(v)
 	_settings_page = v
@@ -1320,6 +1427,8 @@ func _show_tab(index: int) -> void:
 		_ledger_screen.refresh(dynasty.ancestors, dynasty.lifetime_cash_earned)
 	elif index == TAB_SETTINGS and _minigame_check != null:
 		_minigame_check.button_pressed = game.ui_minigame_enabled
+		if _tutorial_check != null:
+			_tutorial_check.button_pressed = TutorialProgress.is_enabled()
 
 
 ## The active tab button reads as a mustard plate; the rest as plain cream plates. The
@@ -1340,6 +1449,14 @@ func _style_tab_button(button: Button, active: bool, index: int) -> void:
 	button.add_theme_stylebox_override("hover", box)
 	button.add_theme_stylebox_override("pressed", box)
 	button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	# A locked tab (Estate before you can prestige, Ledger before your first prestige) reads as an
+	# intentional grayed plate — not the default theme gray — keeping the same 12px frame + corners.
+	# Its icon auto-dims via the Button's disabled state. Progressive disclosure (Plans §9); the tab
+	# stays in place (no reflow), honoring the no-moving-UI rule.
+	var locked_box := box.duplicate() as StyleBoxFlat
+	locked_box.bg_color = UiPalette.LIGHT_GRAY
+	locked_box.border_color = UiPalette.MID_GRAY
+	button.add_theme_stylebox_override("disabled", locked_box)
 
 
 # ---------------------------------------------------------------------------
@@ -1371,8 +1488,140 @@ func _on_buy_requested(prop_index: int, mode: PropertyRow.BuyMode) -> void:
 	if count <= 0:
 		return
 
+	var band_before := prop.get_milestone_band()
 	if game.try_buy(prop_index, count):
 		_hero_stat.flash_purchase()
+		# Milestone reward: fire on the crossing (not before) — a milestone is an automatic reward,
+		# not an action to direct, so a just-happened notification is the right shape.
+		if prop.get_milestone_band() > band_before:
+			_maybe_show_tip("first_milestone", _row_for_index(prop_index))
+
+
+## Show the one-time tutorial card for `tip_id`, anchored near `target` (null = screen-centered),
+## unless tips are turned off or this one has already been seen. Marking it seen persists
+## immediately so it never repeats (TutorialProgress lives outside the dynasty save).
+func _maybe_show_tip(tip_id: String, target: Control) -> bool:
+	# Never stack cards: if one is already up, decline. A poll-driven tip stays armed and retries a
+	# later frame; a verb-driven tip simply skips. Checked FIRST so nothing below (including the
+	# disk reads) runs while a card is visible.
+	if _tutorial_tip.visible:
+		return false
+	if not TutorialProgress.is_enabled() or TutorialProgress.has_seen(tip_id):
+		return false
+	var tip := TutorialCatalog.get_tip(tip_id)
+	if tip.is_empty():
+		return false
+	TutorialProgress.mark_seen(tip_id)
+	_tutorial_tip.show_tip(tip["title"], tip["body"], target)
+	return true
+
+
+## Fire a poll-driven availability tip. Disarms ONLY once the card actually shows, so a tip whose
+## turn is blocked by another card still on screen stays armed and retries on a later frame (the
+## natural queue for availability tips that come due together).
+func _fire_polled_tip(tip_id: String, target: Control) -> void:
+	if _maybe_show_tip(tip_id, target):
+		_tip_armed[tip_id] = false
+
+
+## A vent window opened during an overdrive rush — teach the vent gesture, anchored to the Rush
+## Momentum bar (fired from RushMomentumState.vent_window_opened).
+func _on_vent_window_opened() -> void:
+	_maybe_show_tip("vent_window", _momentum_bar)
+
+
+## Settings → Help: open the glossary modal.
+func _on_help_pressed() -> void:
+	_help_screen.open()
+
+
+## Replay the tutorial (from the Help screen's REPLAY button): clear the seen-tips record and
+## re-arm every poll tip, so the cards fire again as their moments recur. clear() also resets the
+## on/off flag to its default (ON) — replaying implies the player wants to see the tips again.
+func _on_replay_tutorial() -> void:
+	TutorialProgress.clear()
+	var tips_on := TutorialProgress.is_enabled()
+	for tip_id in _tip_armed.keys():
+		_tip_armed[tip_id] = tips_on and not TutorialProgress.has_seen(tip_id)
+	if _tutorial_check != null:
+		_tutorial_check.button_pressed = tips_on
+
+
+## The visible PropertyRow for a property index, or null if that rung isn't currently on screen
+## (the epoch pager only builds the current tab's rows). Used to anchor a tip to the right row.
+func _row_for_index(prop_index: int) -> PropertyRow:
+	for row in _rows:
+		if (row as PropertyRow).prop_index == prop_index:
+			return row as PropertyRow
+	return null
+
+
+## True once the player owns at least one unit of any property. Drives the opening tips
+## (Clock In / buy first business) which only make sense before anything is owned.
+func _owns_any_property() -> bool:
+	for prop in game.economy.properties:
+		if (prop as PropertyState).units_owned > 0:
+			return true
+	return false
+
+
+## The on-screen row of the first property the player owns any of (or null if none is on screen).
+func _first_owned_row() -> PropertyRow:
+	for i in range(game.economy.properties.size()):
+		if (game.economy.properties[i] as PropertyState).units_owned > 0:
+			return _row_for_index(i)
+	return null
+
+
+## True once any property has enough units that the bulk-buy modes are worth explaining.
+func _owns_multiple_units() -> bool:
+	for prop in game.economy.properties:
+		if (prop as PropertyState).units_owned >= 3:
+			return true
+	return false
+
+
+## The on-screen row of the first property where hiring a manager is affordable and not yet done
+## (or null). Used to direct the first hire the moment it becomes possible, not after it's done.
+func _first_hireable_row() -> PropertyRow:
+	for i in range(game.economy.properties.size()):
+		var prop := game.economy.properties[i] as PropertyState
+		if prop.units_owned > 0 and not prop.is_staffed and prop.get_staff_cost() <= game.economy.cash:
+			return _row_for_index(i)
+	return null
+
+
+## The specific control on a row that a tutorial card should anchor to (or null if the row isn't
+## on screen), so the pointer arrow + highlight land on the exact button, not the whole row.
+func _buy_control_of(row: PropertyRow) -> Control:
+	return row.get_buy_button() if row != null else null
+
+
+func _rush_control_of(row: PropertyRow) -> Control:
+	return row.get_rush_control() if row != null else null
+
+
+func _hire_control_of(row: PropertyRow) -> Control:
+	return row.get_hire_button() if row != null else null
+
+
+## Keep the two gated nav tabs enabled/disabled to match their unlock state. Disabling a tab button
+## grays it (the locked stylebox) and blocks clicks — the tab stays in place, no reflow.
+func _refresh_locked_tabs() -> void:
+	_tab_buttons[TAB_ESTATE].disabled = not _estate_unlocked()
+	_tab_buttons[TAB_LEDGER].disabled = not _ledger_unlocked()
+
+
+## The Estate tab is available once the player can prestige (so "Plan the Estate", which lives in
+## that tab, is reachable) — or has ever prestiged (keeps it open forever after). Both are
+## effectively monotonic, so the tab never re-locks once shown.
+func _estate_unlocked() -> bool:
+	return dynasty.can_perform_succession() or dynasty.upgrades.earned_lifetime > 0
+
+
+## The Family Ledger is available once the first prestige has produced an ancestor to show.
+func _ledger_unlocked() -> bool:
+	return dynasty.ancestors.size() > 0
 
 
 func _on_tap_requested(prop_index: int) -> void:
@@ -1493,6 +1742,9 @@ func _on_dev_reset_dynasty_requested() -> void:
 	# Challenge Mode high scores (highest tier) live in their own user:// file, not the dynasty save,
 	# so wipe them too or they survive the reset (Tim, 2026-07-22).
 	ChallengeScores.clear()
+	# Tutorial progress also lives in its own user:// file (prestige-independent), so wipe it too
+	# to make onboarding re-testable from a clean state (Tim, 2026-07-23).
+	TutorialProgress.clear()
 	get_tree().reload_current_scene()
 
 
@@ -1696,6 +1948,7 @@ func _on_retain_requested(property_index: int) -> void:
 		_legacy_screen.refresh()
 		_legacy_screen.update_retention_entries(_build_retention_entries())
 		SaveManager.save_dict_to_file(dynasty.to_save_dict())
+		_maybe_show_tip("staff_retention", null)
 
 
 ## An upgrade was just bought in the shop. Apply its effect to the living
@@ -1795,6 +2048,9 @@ func _on_challenge_finished(game_key: String, final_score: int, screen: Object) 
 ## multiplier at whichever site launched it (GDD §5.5). One host serves both sites, so we
 ## read _minigame_site to decide; clearing it first keeps a stray re-entry from double-firing.
 func _on_minigame_finished(multiplier: float, opt_out: bool) -> void:
+	# A real minigame just played — arm the "minigames" tip (the _process poll fires it once the
+	# player is back with no modal up, so the card never lands over the minigame result screen).
+	_minigame_played_once = true
 	game.ui_minigame_enabled = not opt_out
 	var site := _minigame_site
 	_minigame_site = MinigameSite.NONE

@@ -220,6 +220,13 @@ func set_dynasty(dynasty: DynastyState) -> void:
 	_dynasty = dynasty
 
 
+## The OVERDRIVE (OVR) button, so a tutorial card can anchor to it. It stays disabled until the
+## player reaches the cruise clamp, so `not get_overdrive_button().disabled` is exactly the
+## "rush has met cruise control" moment the overdrive tip fires on.
+func get_overdrive_button() -> Button:
+	return _overdrive_button
+
+
 func _ready() -> void:
 	add_theme_constant_override("separation", 8)  # match the TURBO row's button/meter gap
 

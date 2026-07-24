@@ -45,11 +45,13 @@ const RAPID_RESTART    := "rapid_restart"
 
 
 # ── The catalog ───────────────────────────────────────────────────────────────
-# Cost note: Legacy Gems are on a SMALL scale so each gem feels hard-won. The estate→Legacy
-# curve (k_legacy × estate_net ^ alpha — see tuning.tres / EstateWaterfall, tuned
-# 2026-06-15 so a first prestige yields ~10–16 Legacy) keeps yields modest, and the
-# single-digit first-level costs below are matched to it so a first prestige buys ~1–2
-# upgrades the player can feel.
+# Cost note: Legacy Gems are on a SMALL scale so each gem feels hard-won. The estate→Legacy curve
+# (k_legacy × estate_net ^ alpha — see tuning.tres / EstateWaterfall) keeps yields modest. The
+# 2026-07-14 "Option C" runaway fix flattened that curve (alpha 0.30→0.22) and added the ×2 cost
+# multiplier, so an early first prestige now yields only ~2 Legacy — much less than the ~10–16 the
+# original costs were matched to. Trust Fund's first level was lowered to 2 Legacy (Tim, 2026-07-23)
+# so that early ~2-gem prestige can still buy the first upgrade; the rest of the ladder is a
+# candidate for the still-open prestige/cost re-tuning pass. Numbers are for on-device feel-tuning.
 #
 # Effect model (set 2026-06-15, modeled on Idle Slayer): the three core accelerators —
 # Family Fortune (income), Efficiency (cycle speed), Connections (wage) — COMPOUND, so
@@ -69,7 +71,13 @@ const UPGRADES := [
 		"category": "Wealth",
 		"description": "Every heir is born into more money.",
 		"max_level": 10,
-		"base_cost": 4,
+		# The cheapest upgrade, and the intended FIRST buy: base 1 → 2 Legacy after the ×2 cost
+		# multiplier, so an early ~2-gem first prestige can actually afford something (Tim,
+		# 2026-07-23 — the old base 4 → 8 Legacy left a dead window where prestige bought nothing
+		# once the 2026-07-14 Option-C pass flattened early yields). Safe to cheapen: Trust Fund is
+		# a flat, capped, ADDITIVE bonus, not a compounding runaway vector, so lowering it can't
+		# reignite the runaway the cost multiplier guards against.
+		"base_cost": 1,
 		"cost_growth": 1.8,
 		"effect_per_level": 5000.0,   # +$5,000 starting cash per level
 	},

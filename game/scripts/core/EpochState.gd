@@ -4,9 +4,11 @@ class_name EpochState
 # (see Plans/Epoch_Staffing_System.md). Headless and scene-tree-free like the rest
 # of the core, so the simulator and the scene layer drive the exact same logic.
 #
-# The rule (Tim 2026-06-16): a generation advances to the next epoch once it has
-# EARNED the current epoch's entire economic value — it has "consumed the economy",
-# so the next civilization makes contact and a larger market opens. Earth is tier 1;
+# The rule (Tim 2026-06-16, extended 2026-07-23): a generation advances to the next epoch once it
+# has EARNED the current epoch's entire economic value — "consumed the economy" — AND has bought at
+# least one unit of every property in that epoch. Only then does the next civilization make contact
+# and a larger market open. The ownership half makes the player engage the whole ladder rather than
+# rush contact on a couple of high earners (see update's owns_all_in_tier). Earth is tier 1;
 # the climb resets each generation (a fresh EpochState is built with each GameState),
 # and prestige/Legacy is what lets a later heir punch deeper into the ladder than the last.
 
@@ -25,14 +27,20 @@ func _init(p_tuning: TuningConfig) -> void:
 	_tuning = p_tuning
 
 
-## Advance the epoch as far as the generation's lifetime earnings allow. Called each
-## tick with economy.cash_earned_this_gen (the monotonic "value extracted from the
-## economy"). May cross several thresholds at once if a tick is large; emits one
-## contact signal per epoch crossed. Caps at the last defined epoch.
-func update(cash_earned_this_gen: float) -> void:
+## Advance the epoch as far as the generation's lifetime earnings allow AND as far as it has
+## ENGAGED the ladder. A generation advances OUT of an epoch only once it has BOTH (a) earned that
+## epoch's entire economic value and (b) bought at least one unit of every property in it (Tim,
+## 2026-07-23 — contact is earned by playing the whole epoch, not by rushing a couple of high
+## earners). `owns_all_in_tier` is an optional Callable taking a 1-based tier and returning bool;
+## when omitted (e.g. isolated money-mechanic tests) only the money gate applies. The ownership
+## check is per-tier INSIDE the loop, so a single large tick can never skip past an un-owned epoch.
+## Emits one contact signal per epoch crossed. Caps at the last defined epoch.
+func update(cash_earned_this_gen: float, owns_all_in_tier: Callable = Callable()) -> void:
 	while current_tier < EpochCatalog.tier_count():
 		var threshold := EpochCatalog.consume_threshold(current_tier, _tuning.earth_economy_target)
 		if cash_earned_this_gen < threshold:
+			break
+		if owns_all_in_tier.is_valid() and not owns_all_in_tier.call(current_tier):
 			break
 		current_tier += 1
 		contact_made.emit(current_tier)

@@ -177,6 +177,16 @@ func get_property_indices_for_unlock_tier(tier: int) -> Array[int]:
 	return indices
 
 
+## True if AT LEAST ONE unit is owned of EVERY property in `indices` — the "engaged the whole
+## epoch" test for the epoch-advance / White-Collar gate (Tim, 2026-07-23). An empty list is
+## vacuously true.
+func owns_at_least_one_of_each(indices: Array) -> bool:
+	for i in indices:
+		if (properties[int(i)] as PropertyState).units_owned <= 0:
+			return false
+	return true
+
+
 # ---------------------------------------------------------------------------
 # The staff ladder — costs and the single buy verb (GDD §6.1, epoch-depth redesign)
 # ---------------------------------------------------------------------------

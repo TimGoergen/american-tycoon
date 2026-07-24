@@ -166,9 +166,10 @@ func tick(delta: float, extra_property_multiplier: float = 1.0) -> void:
 	var tier_before := epoch.current_tier
 	economy.tick(delta, frenzy.get_multiplier() * extra_property_multiplier)
 	peak_net_worth = maxf(peak_net_worth, economy.get_net_worth())
-	# Advance the alien epoch if this generation has now earned enough to consume the
-	# current economy. Reads the same lifetime-earned tally the estate waterfall uses.
-	epoch.update(economy.cash_earned_this_gen)
+	# Advance the alien epoch if this generation has now earned enough to consume the current
+	# economy AND owns at least one of every property in it. Reads the same lifetime-earned tally
+	# the estate waterfall uses; the ownership predicate is checked per-tier inside epoch.update.
+	epoch.update(economy.cash_earned_this_gen, _owns_all_in_epoch)
 	# Reaching a new epoch (First Contact) wipes momentum — each epoch builds its own from scratch,
 	# which is what keeps Rush Momentum a per-epoch pinch instead of a run-long snowball. The
 	# reset also ends any lockout, so every frozen property comes back up with it (a freeze may
@@ -202,6 +203,13 @@ func _update_displayed_income() -> void:
 # ---------------------------------------------------------------------------
 
 ## Layer 1: tap the wage button. Pays the current level's wage immediately (and may level up).
+## True if this generation owns at least one unit of every property in an epoch (unlock tier) —
+## the ownership half of the epoch-advance gate (Tim, 2026-07-23). Passed to epoch.update as the
+## per-tier predicate.
+func _owns_all_in_epoch(tier: int) -> bool:
+	return economy.owns_at_least_one_of_each(economy.get_property_indices_for_unlock_tier(tier))
+
+
 func tap_wage() -> void:
 	frenzy.on_tap()
 	var earned := wage.tap_wage(frenzy.get_multiplier())

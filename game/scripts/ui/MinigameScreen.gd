@@ -1720,7 +1720,10 @@ func _keep_color(mult: float) -> Color:
 func _format_amount(amount: float) -> String:
 	if _format_as_money:
 		return Money.of(amount).display()
-	return "%d %s" % [int(floor(amount)), _reward_noun]
+	# A plain count (Legacy) still gets the common large-number abbreviation — "14.9M Legacy", not
+	# "14863217 Legacy" (Tim, 2026-07-23). Money.abbrev is the money display minus the "$", so small
+	# counts read in full ("12 Legacy") and large ones abbreviate, matching every other big number.
+	return "%s %s" % [Money.abbrev(floorf(amount)), _reward_noun]
 
 
 ## Update the focal timer each frame: for the last TIMER_PULSE_SECONDS it pops once per second

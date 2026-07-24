@@ -58,14 +58,16 @@ const LEGACY_BASE := 1_000.0
 ##
 ## legacy_gain = floor(K_LEGACY × (estate_net / LEGACY_BASE) ^ ALPHA).
 ##
-## GENTLE POWER CURVE (Tim, 2026-07-02). The previous log² curve — floor(k × log10(net/base)²)
-## — was so flat that doubling a run's earnings added only ~3 Legacy, so out-earning a past run
-## felt unrewarded (it broke the core "better run → more prestige currency" loop). This restores
-## a power curve, but a DELIBERATELY GENTLE one: ALPHA ≈ 0.30 means gems roughly DOUBLE per 10×
-## of earnings (K solved from a $10T→45 anchor via sim/Sim.gd's conversion study). That is far
-## below the old runaway exponent — a genuine endgame run (a fully-consumed 6th epoch, ~$2.5
-## sextillion) mints ~15–20k gems, and the Legacy shop's geometric ×2 costs mean even that only
-## buys a few levels of one upgrade track, so it never "buys out the shop." Legacy accumulates.
+## POWER CURVE (Tim, 2026-07-02; "reward pushing a run" re-tune 2026-07-23). The old log² curve
+## barely rewarded out-earning a past run, breaking the core "better run → more prestige currency"
+## loop. A power curve fixes that; the exponent sets how much pushing pays. The 2026-07-14 Option-C
+## runaway fix over-flattened it to ALPHA 0.22 (a 4-billion-fold run range mapped to only ~1→900
+## gems — pushing felt pointless). The 2026-07-23 re-tune STEEPENED it back — ALPHA 0.35, K 0.16 —
+## so a full Earth run mints ~830 gems (vs ~108) and out-earning is clearly rewarded, WITHOUT the
+## runaway returning: the Legacy shop's geometric ×2/level costs (× the 3.0 cost multiplier) are
+## the real brake — even the ~320k gems an endgame run mints buy only ~14 levels of one track, and
+## the deepest levels cost billions, so it never "buys out the shop." Balance found via
+## sim/PrestigeStudy.gd (device-scale gem-yield + shop-cost tables). Legacy accumulates.
 static func legacy_gain(estate_net: float, k_legacy: float, alpha: float) -> int:
 	if estate_net <= LEGACY_BASE:
 		return 0

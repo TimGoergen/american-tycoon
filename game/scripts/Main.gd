@@ -75,6 +75,9 @@ var _epoch_pager_label: Label       # the big civilization / "EARTH" name
 var _epoch_pager_sub: Label         # the "Blue Collar" / "White Collar" subtitle (blank for aliens)
 var _epoch_prev_button: Button
 var _epoch_next_button: Button
+## Red dot on the pager's NEXT button, shown when the player has earned enough to advance but hasn't
+## bought all of the current era's properties (the ownership gate is blocking; Tim, 2026-07-23).
+var _epoch_next_badge: Panel
 var _epoch_pager_dots: EpochPagerDots
 var _epoch_pager_box: Control       # the pager header (label + arrows + dots)
 var _ladder_area: Control           # the property-list region; swipes over either change tabs
@@ -277,6 +280,18 @@ func _process(delta: float) -> void:
 		_fire_polled_tip("overdrive", _momentum_bar.get_overdrive_button())
 	if _tip_armed.get("epochs", false) and game.epoch.current_tier >= 2:
 		_fire_polled_tip("epochs", _epoch_pager_box)
+	# Epoch progress gate (Tim, 2026-07-23): when the player has earned enough to advance but hasn't
+	# bought all of the era's properties, (1) show a red dot on the pager's NEXT button, and (2) once,
+	# a card pointing at the lowest still-missing property. Both key off the same blocking property.
+	var blocking_prop := _property_blocking_epoch_progress()
+	if _epoch_next_badge != null:
+		_epoch_next_badge.visible = blocking_prop >= 0
+	if blocking_prop >= 0 and _tip_armed.get("epoch_blocked", false) \
+			and not _tutorial_tip.visible and not _any_fullscreen_overlay_visible():
+		# Switch to the blocking property's tab so the card's anchor is visible, then teach the rule.
+		if _epoch_tab != _epoch_tab_of(blocking_prop):
+			_set_epoch_tab(_epoch_tab_of(blocking_prop))
+		_fire_polled_tip("epoch_blocked", _row_for_index(blocking_prop))
 
 	# Progressive tab unlocking (Plans/Tutorial_Onboarding_Plan.md §9): the Estate tab unlocks when
 	# the player can FIRST prestige (you prestige FROM that tab, so it must open before the first
@@ -593,7 +608,7 @@ func _build_ui() -> void:
 	# the fact (Tim, 2026-07-23).
 	var tips_on := TutorialProgress.is_enabled()
 	for tip_id in ["getting_started", "first_property", "first_rush", "buy_mode", "first_hire",
-			"turbo_ready", "overdrive", "epochs", "prestige", "family_ledger"]:
+			"turbo_ready", "overdrive", "epochs", "epoch_blocked", "prestige", "family_ledger"]:
 		_tip_armed[tip_id] = tips_on and not TutorialProgress.has_seen(tip_id)
 	# Signal-driven tip: the vent gesture, fired during an overdrive rush. (The offline-earnings
 	# concept is NOT a card — it is taught as a permanent line ON the welcome-back screen itself,
@@ -896,6 +911,26 @@ func _owns_all_blue_collar() -> bool:
 	return game.economy.owns_at_least_one_of_each([0, 1, 2, 3, 4, 5])
 
 
+## The lowest-index property the player must still own before they can progress past the current
+## era, or -1 if not blocked. Covers BOTH gates: an alien epoch (earned this tier's money threshold
+## but not all its properties owned) and Earth White Collar (can afford it but hasn't owned all Blue
+## Collar). Drives the epoch-blocked card AND the pager's red-dot indicator (Tim, 2026-07-23).
+func _property_blocking_epoch_progress() -> int:
+	var tier := game.epoch.current_tier
+	if tier < EpochCatalog.tier_count() and game.economy.cash_earned_this_gen \
+			>= EpochCatalog.consume_threshold(tier, tuning.earth_economy_target):
+		for i in game.economy.get_property_indices_for_unlock_tier(tier):
+			if (game.economy.properties[i] as PropertyState).units_owned <= 0:
+				return i
+	# Earth White Collar (tab 1): affordable, but not all Blue Collar owned yet.
+	if _tab_unlocked.size() > 1 and not bool(_tab_unlocked[1]) \
+			and _tab_affordable_or_owned(1) and not _owns_all_blue_collar():
+		for i in [0, 1, 2, 3, 4, 5]:
+			if (game.economy.properties[i] as PropertyState).units_owned <= 0:
+				return i
+	return -1
+
+
 ## The big label for a tab: "EARTH" for the two Earth tabs, else the civilization's name.
 func _epoch_tab_name(tab: int) -> String:
 	if tab <= 1:
@@ -956,6 +991,9 @@ func _build_epoch_pager() -> Control:
 	_epoch_next_button = _make_pager_arrow("›")
 	_epoch_next_button.pressed.connect(func() -> void: _step_epoch_tab(1))
 	row.add_child(_epoch_next_button)
+	# Red-dot badge (same style as the Estate tab's): lit while the ownership gate blocks epoch
+	# progress, driven each frame from _property_blocking_epoch_progress in _process.
+	_epoch_next_badge = _make_estate_badge(_epoch_next_button)
 
 	_epoch_pager_dots = EpochPagerDots.new()
 	box.add_child(_epoch_pager_dots)

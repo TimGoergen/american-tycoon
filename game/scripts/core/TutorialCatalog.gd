@@ -57,6 +57,10 @@ const TIPS := {
 		"title": "First contact",
 		"body": "You've earned an entire economy. A new civilization opens a market — and a new tier of staff — orders of magnitude larger.",
 	},
+	"epoch_blocked": {
+		"title": "Own the whole era first",
+		"body": "You've earned enough to reach the next civilization — but first you need at least one of every business in this era. Grab this one to keep climbing.",
+	},
 	"prestige": {
 		"title": "Plan your estate",
 		"body": "You've built enough to pass it on. Open the Estate tab to hand your fortune to an heir — it becomes Legacy to spend on permanent upgrades the whole dynasty keeps.",

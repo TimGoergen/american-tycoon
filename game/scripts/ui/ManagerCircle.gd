@@ -55,6 +55,11 @@ enum PortraitMode { LOCKED, UNSTAFFED, STAFFED }
 var _mode: int = PortraitMode.LOCKED
 var _accent: Color = UiPalette.MONEY_GREEN
 var _portrait: Texture2D
+## The role this circle's staffer fills — property rung + epoch tier — used to seed a procedural
+## face (StafferFace) when no authored portrait is supplied. -1/0 means "unknown", which falls
+## back to the headshot icon.
+var _face_property_index: int = -1
+var _face_tier: int = 0
 ## True while the player is actively rushing this property (button held on an interactive
 ## portrait): the state icon becomes the infinity symbol regardless of staffed/unstaffed.
 var _show_rush_icon := false
@@ -93,13 +98,17 @@ func set_state(
 		portrait: Texture2D,
 		show_rush_icon: bool,
 		interactive: bool,
-		staff_level: int
+		staff_level: int,
+		face_property_index: int = -1,
+		face_tier: int = 0
 ) -> void:
 	_mode = mode
 	_accent = accent
 	_portrait = portrait
 	_show_rush_icon = show_rush_icon
 	_staff_level = staff_level
+	_face_property_index = face_property_index
+	_face_tier = face_tier
 	# A non-interactive portrait (locked, or an automated non-top property) must not eat
 	# taps OR scroll drags, so disable it AND let pointer events pass through to the ladder.
 	_button.disabled = not interactive
@@ -145,17 +154,22 @@ func _draw() -> void:
 	if _show_rush_icon:
 		_draw_icon(INFINITY_TEX, UiPalette.NAVY, radius * icon_fraction, icon_center)
 	elif _mode == PortraitMode.STAFFED:
+		# An authored portrait (rare hero override) fills the whole disc; a level shows makes the
+		# art shrink-and-raise the same way the icons do (at its own, larger fraction — portrait art
+		# is composed to be seen full-bleed, unlike the padded glyph icons).
+		var portrait_frac := LEVELED_PORTRAIT_DIAMETER_FRACTION if show_level else 1.0
 		if _portrait != null:
-			# An authored portrait fills the whole disc normally; when the level shows it
-			# follows the same shrink-and-raise as the icons (at its own, larger fraction —
-			# portrait art is composed to be seen full-bleed, unlike the padded glyph icons).
-			var portrait_side := radius * 2.0 \
-					* (LEVELED_PORTRAIT_DIAMETER_FRACTION if show_level else 1.0)
+			var portrait_side := radius * 2.0 * portrait_frac
 			var box := Rect2(icon_center - Vector2(portrait_side, portrait_side) / 2.0,
 					Vector2(portrait_side, portrait_side))
 			draw_texture_rect(_portrait, box, false)
 		else:
-			_draw_icon(HEADSHOT_TEX, UiPalette.DARK_GRAY, radius * icon_fraction, icon_center)
+			# No authored art: draw the seeded procedural staffer face (StafferFace). Its bounding
+			# radius sits just inside the accent disc so the navy ring frames it. If the role's tier
+			# has no face yet (alien epochs, not built), fall back to the gray headshot icon.
+			var face_radius := (radius - OUTLINE_WIDTH) * portrait_frac
+			if not StafferFace.draw_face(self, _face_property_index, _face_tier, icon_center, face_radius):
+				_draw_icon(HEADSHOT_TEX, UiPalette.DARK_GRAY, radius * icon_fraction, icon_center)
 	else:
 		_draw_icon(RESTART_TEX, UiPalette.NAVY, radius * icon_fraction, icon_center)
 

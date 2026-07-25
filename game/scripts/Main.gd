@@ -207,6 +207,10 @@ func _process(delta: float) -> void:
 	# below) so it always reflects the current screen, including while an overlay is up.
 	# (The Balance Tuning panel is no longer in this list: embedded in the Settings tab,
 	# it neither covers the game nor needs the freeze — Apply saves and reloads anyway.)
+	# Keep procedural staffer faces seeded to the living generation — a plain assignment that does
+	# no work when unchanged, so each new dynasty's staff looks fresh (StafferFace).
+	StafferFace.generation = dynasty.generation
+
 	var modal_up := _will_screen.visible or _first_contact_overlay.visible \
 			or _minigame_screen.visible or _minigame_review_screen.visible \
 			or _challenges_screen.visible or _venture_overlay.visible

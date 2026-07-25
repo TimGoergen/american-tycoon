@@ -972,7 +972,10 @@ func _refresh(delta: float) -> void:
 					or _vent_presentation_hold())
 	_manager_circle.set_state(
 		portrait_mode, config.accent_color, config.manager_portrait, show_rush_icon,
-		interactive, _prop.staff_level
+		interactive, _prop.staff_level,
+		# The staffer's role — property rung + the epoch tier currently running it — seeds a
+		# procedural face when no portrait is authored (StafferFace).
+		prop_index, _prop.staff_tier
 	)
 	# Income readout. For an OWNED rung: the cash paid each time the bar fills (per cycle),
 	# lit by the live frenzy multiplier so it matches what the player actually receives.

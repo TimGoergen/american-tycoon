@@ -179,25 +179,28 @@ static func _draw_ears(canvas: CanvasItem, c: Vector2, r: float, skin: Color) ->
 
 # --- hair -------------------------------------------------------------------------------------
 
-## The mass of hair BEHIND the head (framing the sides / back) — drawn before the head so the face
-## sits on top of it. Bald/buzz have none; bob/curly/long have a fuller mass.
+## The mass of hair BEHIND the head (framing the top / sides) — drawn before the head so the face
+## sits on top of it. Bald/buzz have none. CRUCIAL: the mass sits high and its bottom stays above
+## the jaw, so hair never rims the chin — a full-perimeter hair rim boxes the skin in and makes the
+## face read as a mask, especially next to a same-colored beard (Tim, 2026-07-25). It frames the
+## crown and temples and fades out by ear level (bob/long reach a little lower down the sides).
 static func _draw_hair_back(canvas: CanvasItem, c: Vector2, r: float, hair: Color, style: int) -> void:
 	var hc := Vector2(c.x + HEAD_CX * r, c.y + HEAD_CY * r)
 	match style:
 		0, 1:
 			return  # bald / buzz: no mass behind
 		5:
-			# Curly/afro: a big rounded mass.
-			canvas.draw_colored_polygon(_ellipse(hc + Vector2(0, -0.06 * r), HEAD_HW * r * 1.28, HEAD_HH * r * 1.22, 26), hair)
+			# Curly/afro: a big rounded mass sitting high on the crown.
+			canvas.draw_colored_polygon(_ellipse(hc + Vector2(0, -0.22 * r), 0.62 * r, 0.52 * r, 26), hair)
 		6:
-			# Bob: frames down past the ears.
-			canvas.draw_colored_polygon(_ellipse(hc + Vector2(0, 0.06 * r), HEAD_HW * r * 1.22, HEAD_HH * r * 1.16, 26), hair)
+			# Bob: frames the temples down toward (not past) the jaw.
+			canvas.draw_colored_polygon(_ellipse(hc + Vector2(0, -0.08 * r), 0.60 * r, 0.56 * r, 26), hair)
 		7:
-			# Long: a taller, longer mass down the sides.
-			canvas.draw_colored_polygon(_ellipse(hc + Vector2(0, 0.12 * r), HEAD_HW * r * 1.18, HEAD_HH * r * 1.24, 26), hair)
+			# Long: a little longer down the sides, still clear of the chin.
+			canvas.draw_colored_polygon(_ellipse(hc + Vector2(0, -0.04 * r), 0.58 * r, 0.58 * r, 26), hair)
 		_:
-			# Short / side-part / pompadour: a modest mass so the sides aren't bald.
-			canvas.draw_colored_polygon(_ellipse(hc + Vector2(0, -0.04 * r), HEAD_HW * r * 1.08, HEAD_HH * r * 1.06, 26), hair)
+			# Short / side-part / pompadour: crown + temples, faded out by ear level.
+			canvas.draw_colored_polygon(_ellipse(hc + Vector2(0, -0.26 * r), 0.55 * r, 0.44 * r, 26), hair)
 
 
 ## The forehead cap in FRONT of the head — its lower edge is the hairline, whose shape is the

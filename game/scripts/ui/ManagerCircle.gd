@@ -39,16 +39,17 @@ const RUSH_OUTLINE_WIDTH := 6.0
 ## centered and a little inside the outline ring.
 const ICON_DIAMETER_FRACTION := 0.58
 
-# The staff LEVEL readout lives inside the disc (Tim, 2026-07-05: the portrait shows the
-# CURRENT level; the hire button beside it is a pure buy action). When a level shows, the
-# staffer art shrinks a touch and rises to make room, and "LVL n" draws in black beneath
-# it. The disc's SIZE never changes — it is also the start/rush tap target — only the art
-# inside rearranges. All fractions are of the circle's radius/diameter.
-const LEVELED_ICON_DIAMETER_FRACTION := 0.50      # slightly smaller icon when the level shows
-const LEVELED_PORTRAIT_DIAMETER_FRACTION := 0.78  # authored portraits fill the disc normally; less when leveled
-const LEVELED_ICON_RAISE_FRACTION := 0.18         # how far (× radius) the art rises
-const LEVEL_TEXT_BASELINE_FRACTION := 0.62        # text baseline below center (× radius)
-const LEVEL_FONT_FRACTION := 0.375                # font size (× radius); +25% (Tim, 2026-07-05)
+# The staff LEVEL readout lives inside the disc (Tim, 2026-07-05: the portrait shows the CURRENT
+# level; the hire button beside it is a pure buy action). When a level shows, the staffer art
+# shrinks and rises to open a clean band at the bottom, where "LVL n" draws on a NAVY PILL with
+# cream text — a solid plate so it stays readable over any accent color or face (Tim, 2026-07-25;
+# plain black text on the collar was hard to read). The disc's SIZE never changes — it is also the
+# start/rush tap target — only the art inside rearranges. All fractions are of the radius/diameter.
+const LEVELED_ICON_DIAMETER_FRACTION := 0.48      # slightly smaller icon when the level shows
+const LEVELED_PORTRAIT_DIAMETER_FRACTION := 0.74  # authored/procedural faces fill the disc normally; less when leveled
+const LEVELED_ICON_RAISE_FRACTION := 0.22         # how far (× radius) the art rises
+const LEVEL_PILL_CENTER_FRACTION := 0.66          # the pill's vertical center below the disc center (× radius)
+const LEVEL_FONT_FRACTION := 0.30                 # font size (× radius)
 
 enum PortraitMode { LOCKED, UNSTAFFED, STAFFED }
 
@@ -69,6 +70,9 @@ var _staff_level := 0
 ## The bold face the level text draws in (all property-panel text is bold, Tim
 ## 2026-07-05) — cached: building a FontVariation per frame in _draw would be wasteful.
 static var _level_font: FontVariation
+## The navy pill behind the level text, cached and reused (its corner radius is set per-draw to
+## match the pill height). Shared across every circle — it holds no per-instance state.
+static var _level_pill: StyleBoxFlat
 
 ## The transparent button overlaying the circle — the actual tap/hold target.
 var _button: Button
@@ -174,12 +178,7 @@ func _draw() -> void:
 		_draw_icon(RESTART_TEX, UiPalette.NAVY, radius * icon_fraction, icon_center)
 
 	if show_level:
-		if _level_font == null:
-			_level_font = UiPalette.make_bold_font()
-		var font_size := maxi(14, int(radius * LEVEL_FONT_FRACTION))
-		var baseline_y := center.y + radius * LEVEL_TEXT_BASELINE_FRACTION
-		draw_string(_level_font, Vector2(0.0, baseline_y), "LVL %d" % _staff_level,
-				HORIZONTAL_ALIGNMENT_CENTER, size.x, font_size, Color.BLACK)
+		_draw_level_pill(center, radius)
 
 	# Navy outline ring on top, so the edge stays crisp over any fill or icon. The ring thickens
 	# while the portrait is held for a rush (_show_rush_icon), so the circle reads as "charging".
@@ -193,3 +192,33 @@ func _draw_icon(texture: Texture2D, color: Color, half_side: float, center: Vect
 	var box_side := half_side * 2.0
 	var box := Rect2(center - Vector2(box_side, box_side) / 2.0, Vector2(box_side, box_side))
 	draw_texture_rect(texture, box, false, color)
+
+
+## Draw the "LVL n" readout as a navy pill with cream text, centered in the clean band at the
+## bottom of the disc. The pill is sized to the text and its corners are fully rounded, so it
+## reads on any accent color or face beneath it.
+func _draw_level_pill(center: Vector2, radius: float) -> void:
+	if _level_font == null:
+		_level_font = UiPalette.make_bold_font()
+	if _level_pill == null:
+		_level_pill = StyleBoxFlat.new()
+		_level_pill.bg_color = UiPalette.NAVY
+		_level_pill.border_color = UiPalette.CREAM
+		_level_pill.set_border_width_all(2)
+
+	var text := "LVL %d" % _staff_level
+	var font_size := maxi(12, int(radius * LEVEL_FONT_FRACTION))
+	var text_size := _level_font.get_string_size(text, HORIZONTAL_ALIGNMENT_CENTER, -1, font_size)
+	var pad_x := radius * 0.16
+	var pad_y := radius * 0.07
+	var pill_w := minf(text_size.x + pad_x * 2.0, radius * 1.8)  # never wider than the disc
+	var pill_h := text_size.y + pad_y * 2.0
+	var pill_center_y := center.y + radius * LEVEL_PILL_CENTER_FRACTION
+	var pill := Rect2(center.x - pill_w / 2.0, pill_center_y - pill_h / 2.0, pill_w, pill_h)
+	_level_pill.set_corner_radius_all(int(pill_h / 2.0))
+	draw_style_box(_level_pill, pill)
+
+	# Vertically center the text on the pill (draw_string's y is the baseline).
+	var baseline_y := pill_center_y + text_size.y * 0.34
+	draw_string(_level_font, Vector2(pill.position.x, baseline_y), text,
+			HORIZONTAL_ALIGNMENT_CENTER, pill_w, font_size, UiPalette.CREAM)

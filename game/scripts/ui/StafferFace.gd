@@ -13,9 +13,11 @@ class_name StafferFace
 # redraws every frame, so there is nothing to pre-bake or cache — and the face stays crisp at any
 # size (the row disc, or a larger Will-screen portrait) with no rescaling.
 #
-# Only Earth (tier 1, human) faces exist so far. draw_face() returns false for any other tier, so
-# the caller can fall back to the old headshot icon until the abstract alien treatments are built
-# (the plan's phase 2).
+# EACH facial feature has its own small set of variants (eye shapes, brows, noses, mouths,
+# hairstyles), picked independently from the seed, so faces read as distinct individuals rather
+# than one template with different hair (Tim, 2026-07-25). Only Earth (tier 1, human) faces exist
+# so far; draw_face() returns false for any other tier so the caller can fall back to the old
+# headshot icon until the abstract alien treatments are built (the plan's phase 2).
 
 ## The living generation, pushed here by Main every frame (a plain assignment; no work when
 ## unchanged). Folded into every seed so faces refresh per dynasty. 1-based, like DynastyState.
@@ -44,6 +46,10 @@ const HEAD_HH := 0.60      # head half-height
 const COLLAR_CUT := 0.40   # everything below this y (× R) is shoulders/clothing
 const NECK_HW := 0.15
 
+const EYE_DX := 0.205      # eye spacing from center (× R)
+const EYE_DY := 0.06       # eye line, below the head center (× R)
+const INK := Color("#1B2436")
+
 
 ## Draw the seeded face for `property_index` at epoch `tier` onto `canvas`, centered at `center`
 ## and sized to bounding radius `radius`. Returns true if a face was drawn, false if this tier has
@@ -55,36 +61,39 @@ static func draw_face(canvas: CanvasItem, property_index: int, tier: int, center
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_for(property_index, tier)
 
-	# Pull every variant up front, in a FIXED order, so adding a future layer appends new draws
+	# Pull every variant up front, in a FIXED order, so adding a future feature appends new draws
 	# from the seed without shifting the ones already chosen (faces stay stable across updates).
 	var skin: Color = SKIN_TONES[rng.randi() % SKIN_TONES.size()]
 	var hair: Color = HAIR_TONES[rng.randi() % HAIR_TONES.size()]
-	var hair_style := rng.randi() % 5          # 0 bald · 1 short · 2 side-part · 3 swept · 4 bob
-	var brow := rng.randi() % 2                 # 0 flat · 1 raised
+	var hair_style := rng.randi() % 8      # 0 bald·1 buzz·2 short·3 side-part·4 pompadour·5 curly·6 bob·7 long
+	var eye_shape := rng.randi() % 5        # 0 round·1 oval·2 almond·3 highlight·4 sleepy
+	var brow_style := rng.randi() % 4       # 0 flat·1 raised·2 stern·3 arched
+	var nose_style := rng.randi() % 4       # 0 soft·1 button·2 side·3 triangle
+	var mouth_style := rng.randi() % 4      # 0 neutral·1 smile·2 slight frown·3 small
 	var facial_hair := 0
-	if rng.randf() < 0.28:                       # most faces are clean-shaven
-		facial_hair = 1 + rng.randi() % 2       # 1 mustache · 2 short beard
-	if hair_style == 4:
-		facial_hair = 0                          # keep the "bob" read feminine-neutral, no beard
-	var clothing := rng.randi() % 3             # 0 suit+tie · 1 lab coat · 2 turtleneck
+	if rng.randf() < 0.30 and hair_style != 6:   # no beard on the bob; most faces clean-shaven
+		facial_hair = 1 + rng.randi() % 3        # 1 mustache·2 beard·3 goatee
+	var clothing := rng.randi() % 4         # 0 suit+tie·1 lab coat·2 turtleneck·3 open collar
 	var cloth_color: Color = _CLOTH_COLORS[rng.randi() % _CLOTH_COLORS.size()]
 	var tie_color: Color = _TIE_COLORS[rng.randi() % _TIE_COLORS.size()]
 	var glasses := rng.randf() < 0.33
+	var glasses_square := rng.randi() % 2 == 0
 
 	# --- draw back-to-front ---------------------------------------------------------------------
-	_draw_collar(canvas, center, radius, clothing, cloth_color, tie_color, skin)
+	_draw_collar(canvas, center, radius, clothing, cloth_color, tie_color)
 	_draw_neck(canvas, center, radius, skin)
-	if hair_style == 4:
-		_draw_back_hair(canvas, center, radius, hair)   # the bob frames the face, so it goes behind
+	_draw_hair_back(canvas, center, radius, hair, hair_style)
 	_draw_head(canvas, center, radius, skin)
 	_draw_ears(canvas, center, radius, skin)
-	if hair_style != 0:
-		_draw_top_hair(canvas, center, radius, hair, hair_style)
-	_draw_features(canvas, center, radius, brow, hair)
+	_draw_hair_front(canvas, center, radius, hair, hair_style)
+	_draw_brows(canvas, center, radius, brow_style, hair)
+	_draw_eyes(canvas, center, radius, eye_shape)
+	_draw_nose(canvas, center, radius, nose_style, skin)
+	_draw_mouth(canvas, center, radius, mouth_style)
 	if facial_hair != 0:
 		_draw_facial_hair(canvas, center, radius, facial_hair, hair)
 	if glasses:
-		_draw_glasses(canvas, center, radius)
+		_draw_glasses(canvas, center, radius, glasses_square)
 	return true
 
 
@@ -104,11 +113,11 @@ const _TIE_COLORS: Array[Color] = [
 ]
 
 
-# --- layer draws --------------------------------------------------------------------------------
+# --- clothing / head layers ---------------------------------------------------------------------
 
 ## The shoulders: the circular segment of the disc below COLLAR_CUT, filled in the clothing color,
-## then a per-style collar detail (a shirt V + optional tie, a lab-coat lapel, or a plain turtle).
-static func _draw_collar(canvas: CanvasItem, c: Vector2, r: float, style: int, cloth: Color, tie: Color, skin: Color) -> void:
+## then a per-style collar detail (suit + tie, lab-coat lapels, turtleneck, or an open collar).
+static func _draw_collar(canvas: CanvasItem, c: Vector2, r: float, style: int, cloth: Color, tie: Color) -> void:
 	var cut_y := c.y + COLLAR_CUT * r
 	canvas.draw_colored_polygon(_disc_segment_below(c, r, COLLAR_CUT), cloth)
 
@@ -117,26 +126,35 @@ static func _draw_collar(canvas: CanvasItem, c: Vector2, r: float, style: int, c
 		canvas.draw_circle(Vector2(c.x, cut_y), NECK_HW * r * 1.7, cloth)
 		return
 
-	# Suit / lab coat both open into a V of shirt below the neck.
+	# Suit / lab coat / open collar all open into a V of shirt below the neck.
 	var v_top := Vector2(c.x, cut_y - 0.02 * r)
 	var v_w := 0.20 * r
 	var v_bottom := c.y + 0.9 * r
-	var shirt := UiPalette.CREAM
 	canvas.draw_colored_polygon(PackedVector2Array([
 		v_top, Vector2(c.x - v_w, v_bottom), Vector2(c.x + v_w, v_bottom),
-	]), shirt)
+	]), UiPalette.CREAM)
 
-	if style == 0:
-		# Suit: a tie stripe down the shirt V.
-		var t_w := 0.06 * r
-		canvas.draw_colored_polygon(PackedVector2Array([
-			Vector2(c.x, cut_y + 0.04 * r),
-			Vector2(c.x - t_w, v_bottom), Vector2(c.x + t_w, v_bottom),
-		]), tie)
-	else:
-		# Lab coat: a thin collar line where the coat meets the shirt.
-		canvas.draw_line(Vector2(c.x - 0.30 * r, cut_y), v_top, cloth.darkened(0.15), maxf(1.5, 0.03 * r))
-		canvas.draw_line(Vector2(c.x + 0.30 * r, cut_y), v_top, cloth.darkened(0.15), maxf(1.5, 0.03 * r))
+	match style:
+		0:
+			# Suit: a tie stripe down the shirt V.
+			var t_w := 0.06 * r
+			canvas.draw_colored_polygon(PackedVector2Array([
+				Vector2(c.x, cut_y + 0.04 * r),
+				Vector2(c.x - t_w, v_bottom), Vector2(c.x + t_w, v_bottom),
+			]), tie)
+		1:
+			# Lab coat: thin collar lines where the coat meets the shirt.
+			var edge := cloth.darkened(0.15)
+			canvas.draw_line(Vector2(c.x - 0.30 * r, cut_y), v_top, edge, maxf(1.5, 0.03 * r))
+			canvas.draw_line(Vector2(c.x + 0.30 * r, cut_y), v_top, edge, maxf(1.5, 0.03 * r))
+		3:
+			# Open collar: two shirt-colored lapels flaring off the V.
+			canvas.draw_colored_polygon(PackedVector2Array([
+				v_top, Vector2(c.x - 0.14 * r, cut_y + 0.02 * r), Vector2(c.x - 0.02 * r, v_top.y + 0.16 * r),
+			]), UiPalette.CREAM.darkened(0.06))
+			canvas.draw_colored_polygon(PackedVector2Array([
+				v_top, Vector2(c.x + 0.14 * r, cut_y + 0.02 * r), Vector2(c.x + 0.02 * r, v_top.y + 0.16 * r),
+			]), UiPalette.CREAM.darkened(0.06))
 
 
 static func _draw_neck(canvas: CanvasItem, c: Vector2, r: float, skin: Color) -> void:
@@ -159,101 +177,187 @@ static func _draw_ears(canvas: CanvasItem, c: Vector2, r: float, skin: Color) ->
 	canvas.draw_circle(Vector2(c.x + HEAD_HW * r, ey), 0.09 * r, skin)
 
 
-## The crown/hairline cap over the top of the head. The hairline shape sets the style.
-static func _draw_top_hair(canvas: CanvasItem, c: Vector2, r: float, hair: Color, style: int) -> void:
+# --- hair -------------------------------------------------------------------------------------
+
+## The mass of hair BEHIND the head (framing the sides / back) — drawn before the head so the face
+## sits on top of it. Bald/buzz have none; bob/curly/long have a fuller mass.
+static func _draw_hair_back(canvas: CanvasItem, c: Vector2, r: float, hair: Color, style: int) -> void:
 	var hc := Vector2(c.x + HEAD_CX * r, c.y + HEAD_CY * r)
-	# A hair cap slightly larger than the head, clipped to a hairline that varies by style.
-	var cap_hw := HEAD_HW * r * 1.06
-	var cap_hh := HEAD_HH * r * 1.06
+	match style:
+		0, 1:
+			return  # bald / buzz: no mass behind
+		5:
+			# Curly/afro: a big rounded mass.
+			canvas.draw_colored_polygon(_ellipse(hc + Vector2(0, -0.06 * r), HEAD_HW * r * 1.28, HEAD_HH * r * 1.22, 26), hair)
+		6:
+			# Bob: frames down past the ears.
+			canvas.draw_colored_polygon(_ellipse(hc + Vector2(0, 0.06 * r), HEAD_HW * r * 1.22, HEAD_HH * r * 1.16, 26), hair)
+		7:
+			# Long: a taller, longer mass down the sides.
+			canvas.draw_colored_polygon(_ellipse(hc + Vector2(0, 0.12 * r), HEAD_HW * r * 1.18, HEAD_HH * r * 1.24, 26), hair)
+		_:
+			# Short / side-part / pompadour: a modest mass so the sides aren't bald.
+			canvas.draw_colored_polygon(_ellipse(hc + Vector2(0, -0.04 * r), HEAD_HW * r * 1.08, HEAD_HH * r * 1.06, 26), hair)
+
+
+## The forehead cap in FRONT of the head — its lower edge is the hairline, whose shape is the
+## style. Drawn after the head so it reads as hair lying over the brow.
+static func _draw_hair_front(canvas: CanvasItem, c: Vector2, r: float, hair: Color, style: int) -> void:
+	if style == 0:
+		return  # bald: nothing on the crown
+	var hc := Vector2(c.x + HEAD_CX * r, c.y + HEAD_CY * r)
+	var cap_hw := HEAD_HW * r * 1.02
+	var cap_hh := HEAD_HH * r * 1.02
 	var top := _ellipse(hc, cap_hw, cap_hh, 28)
 
-	# Hairline y (below hc.y): how far down the forehead the hair reaches. Higher style index → more.
+	# Hairline height below the crown, per style (bigger = more forehead covered).
 	var line_y := hc.y - 0.30 * r
 	match style:
-		1: line_y = hc.y - 0.30 * r   # short
-		2: line_y = hc.y - 0.32 * r   # side part (with a notch, below)
-		3: line_y = hc.y - 0.26 * r   # swept, a little lower
-		4: line_y = hc.y - 0.10 * r   # bob, frames further down
-	# Build the cap: the upper ellipse arc down to the hairline, closed by the hairline edge.
+		1: line_y = hc.y - 0.40 * r   # buzz: sits high, thin
+		2: line_y = hc.y - 0.30 * r   # short
+		3: line_y = hc.y - 0.32 * r   # side part
+		4: line_y = hc.y - 0.40 * r   # pompadour: high hairline, tall bump added below
+		5: line_y = hc.y - 0.24 * r   # curly: low, rounded
+		6: line_y = hc.y - 0.16 * r   # bob: frames the brow
+		7: line_y = hc.y - 0.20 * r   # long: center part
+
 	var pts := PackedVector2Array()
 	for p in top:
 		if p.y <= line_y:
 			pts.append(p)
 	if pts.size() < 3:
 		return
-	# Close along the hairline. A side part lifts the hairline on one side for a parted look.
 	var right_x := hc.x + cap_hw
 	var left_x := hc.x - cap_hw
-	if style == 2:
-		pts.append(Vector2(right_x, line_y))
-		pts.append(Vector2(hc.x + 0.10 * r, line_y - 0.05 * r))  # the part notch
-		pts.append(Vector2(left_x, line_y - 0.02 * r))
-	else:
-		pts.append(Vector2(right_x, line_y))
-		pts.append(Vector2(left_x, line_y))
+	match style:
+		3:
+			# Side part: lift the hairline on one side into a parted notch.
+			pts.append(Vector2(right_x, line_y))
+			pts.append(Vector2(hc.x + 0.10 * r, line_y - 0.05 * r))
+			pts.append(Vector2(left_x, line_y - 0.02 * r))
+		7:
+			# Center part: a small dip at the middle of the hairline.
+			pts.append(Vector2(right_x, line_y))
+			pts.append(Vector2(hc.x + 0.04 * r, line_y - 0.03 * r))
+			pts.append(Vector2(hc.x - 0.04 * r, line_y - 0.03 * r))
+			pts.append(Vector2(left_x, line_y))
+		_:
+			pts.append(Vector2(right_x, line_y))
+			pts.append(Vector2(left_x, line_y))
 	canvas.draw_colored_polygon(pts, hair)
 
-
-## Hair that frames the face from behind (the bob) — a wider, taller ellipse drawn before the head.
-static func _draw_back_hair(canvas: CanvasItem, c: Vector2, r: float, hair: Color) -> void:
-	var hc := Vector2(c.x + HEAD_CX * r, c.y + HEAD_CY * r + 0.05 * r)
-	canvas.draw_colored_polygon(_ellipse(hc, HEAD_HW * r * 1.20, HEAD_HH * r * 1.14, 28), hair)
+	if style == 4:
+		# Pompadour: a raised hair bump above the forehead.
+		canvas.draw_colored_polygon(_ellipse(Vector2(hc.x, line_y), 0.34 * r, 0.16 * r, 18), hair)
 
 
-static func _draw_features(canvas: CanvasItem, c: Vector2, r: float, brow: int, hair: Color) -> void:
-	var eye_y := c.y + HEAD_CY * r + 0.10 * r
-	var eye_dx := 0.19 * r
-	var eye_r := 0.052 * r
-	var ink := UiPalette.INK_NAVY
-	# Eyes: a dark oval each (a hair taller than wide reads more like an eye than a dot).
+# --- facial features (each with variants so faces read as individuals) --------------------------
+
+static func _draw_eyes(canvas: CanvasItem, c: Vector2, r: float, shape: int) -> void:
+	var eye_y := c.y + HEAD_CY * r + EYE_DY * r
 	for sx in [-1.0, 1.0]:
-		canvas.draw_colored_polygon(_ellipse(Vector2(c.x + sx * eye_dx, eye_y), eye_r, eye_r * 1.25, 12), ink)
-	# Brows: short strokes above the eyes, in the hair color. "Raised" tilts the inner ends up.
-	var brow_y := eye_y - 0.13 * r
-	var bw := 0.10 * r
-	var tilt := (0.03 * r) if brow == 1 else 0.0
-	var thick := maxf(2.0, 0.035 * r)
+		var e := Vector2(c.x + sx * EYE_DX * r, eye_y)
+		match shape:
+			0:  # round
+				canvas.draw_circle(e, 0.088 * r, INK)
+			1:  # tall oval
+				canvas.draw_colored_polygon(_ellipse(e, 0.072 * r, 0.10 * r, 16), INK)
+			2:  # wide almond
+				canvas.draw_colored_polygon(_ellipse(e, 0.10 * r, 0.072 * r, 16), INK)
+			3:  # round with a catch-light
+				canvas.draw_circle(e, 0.092 * r, INK)
+				canvas.draw_circle(e + Vector2(0.03 * r, -0.03 * r), 0.028 * r, UiPalette.CREAM)
+			4:  # sleepy: a thick relaxed lid line
+				canvas.draw_line(e - Vector2(0.085 * r, 0), e + Vector2(0.085 * r, 0), INK, maxf(3.0, 0.055 * r))
+
+
+static func _draw_brows(canvas: CanvasItem, c: Vector2, r: float, style: int, hair: Color) -> void:
+	var by := c.y + HEAD_CY * r + (EYE_DY - 0.15) * r
+	var col := hair.darkened(0.12)
+	var th := maxf(2.5, 0.042 * r)
+	var half := 0.085 * r
 	for sx in [-1.0, 1.0]:
-		var inner := Vector2(c.x + sx * (eye_dx - bw), brow_y - tilt)
-		var outer := Vector2(c.x + sx * (eye_dx + bw), brow_y)
-		canvas.draw_line(inner, outer, hair.darkened(0.1), thick)
-	# Nose: a soft shadow line down to a small base.
-	var nose_top := Vector2(c.x, eye_y + 0.05 * r)
-	var nose_bot := Vector2(c.x + 0.03 * r, eye_y + 0.20 * r)
-	canvas.draw_line(nose_top, nose_bot, UiPalette.INK_NAVY.lerp(Color.TRANSPARENT, 0.55), maxf(1.5, 0.025 * r))
-	# Mouth: a short, calm line.
-	var mouth_y := c.y + HEAD_CY * r + 0.36 * r
-	canvas.draw_line(Vector2(c.x - 0.10 * r, mouth_y), Vector2(c.x + 0.10 * r, mouth_y),
-		Color("#8A4A3A"), maxf(2.0, 0.035 * r))
+		var inner := Vector2(c.x + sx * (EYE_DX * r - half), by)
+		var outer := Vector2(c.x + sx * (EYE_DX * r + half), by)
+		match style:
+			0:  # flat
+				canvas.draw_line(inner, outer, col, th)
+			1:  # raised: inner ends lifted
+				canvas.draw_line(inner - Vector2(0, 0.04 * r), outer, col, th)
+			2:  # stern: inner ends dropped
+				canvas.draw_line(inner + Vector2(0, 0.035 * r), outer, col, th)
+			3:  # arched: a shallow curve over the eye
+				var mid := Vector2((inner.x + outer.x) / 2.0, by - 0.045 * r)
+				canvas.draw_polyline(PackedVector2Array([inner, mid, outer]), col, th)
+
+
+static func _draw_nose(canvas: CanvasItem, c: Vector2, r: float, style: int, skin: Color) -> void:
+	var nx := c.x
+	var ny := c.y + HEAD_CY * r + EYE_DY * r
+	var col := skin.darkened(0.18)
+	match style:
+		0:  # soft: a short shadow under the tip
+			canvas.draw_line(Vector2(nx - 0.035 * r, ny + 0.15 * r), Vector2(nx + 0.035 * r, ny + 0.15 * r), col, maxf(2.0, 0.03 * r))
+		1:  # button: a small rounded tip
+			canvas.draw_circle(Vector2(nx, ny + 0.13 * r), 0.034 * r, col)
+		2:  # side line: a short bridge line, one side
+			canvas.draw_line(Vector2(nx + 0.015 * r, ny + 0.02 * r), Vector2(nx + 0.02 * r, ny + 0.15 * r), col, maxf(2.0, 0.028 * r))
+		3:  # small triangle
+			canvas.draw_colored_polygon(PackedVector2Array([
+				Vector2(nx - 0.035 * r, ny + 0.14 * r), Vector2(nx + 0.035 * r, ny + 0.14 * r), Vector2(nx, ny + 0.19 * r),
+			]), col)
+
+
+static func _draw_mouth(canvas: CanvasItem, c: Vector2, r: float, style: int) -> void:
+	var mx := c.x
+	var my := c.y + HEAD_CY * r + 0.35 * r
+	var col := Color("#8A4A3A")
+	var th := maxf(2.5, 0.042 * r)
+	match style:
+		0:  # neutral line
+			canvas.draw_line(Vector2(mx - 0.10 * r, my), Vector2(mx + 0.10 * r, my), col, th)
+		1:  # smile: the lower arc of a circle centered just above
+			canvas.draw_arc(Vector2(mx, my - 0.05 * r), 0.12 * r, deg_to_rad(25), deg_to_rad(155), 14, col, th)
+		2:  # slight frown: the upper arc of a circle centered just below
+			canvas.draw_arc(Vector2(mx, my + 0.07 * r), 0.11 * r, deg_to_rad(205), deg_to_rad(335), 14, col, th)
+		3:  # small: a short, softer mark
+			canvas.draw_line(Vector2(mx - 0.055 * r, my), Vector2(mx + 0.055 * r, my), col, maxf(3.0, 0.05 * r))
 
 
 static func _draw_facial_hair(canvas: CanvasItem, c: Vector2, r: float, kind: int, hair: Color) -> void:
-	var mouth_y := c.y + HEAD_CY * r + 0.36 * r
-	if kind == 1:
-		# Mustache: a short bar just above the mouth.
-		canvas.draw_colored_polygon(PackedVector2Array([
-			Vector2(c.x - 0.13 * r, mouth_y - 0.09 * r), Vector2(c.x + 0.13 * r, mouth_y - 0.09 * r),
-			Vector2(c.x + 0.11 * r, mouth_y - 0.02 * r), Vector2(c.x - 0.11 * r, mouth_y - 0.02 * r),
-		]), hair)
-	else:
-		# Short beard: a band hugging the jawline below the mouth.
-		var jaw := c.y + HEAD_CY * r + HEAD_HH * r
-		canvas.draw_colored_polygon(PackedVector2Array([
-			Vector2(c.x - 0.34 * r, mouth_y - 0.02 * r), Vector2(c.x + 0.34 * r, mouth_y - 0.02 * r),
-			Vector2(c.x + 0.20 * r, jaw), Vector2(c.x - 0.20 * r, jaw),
-		]), hair)
+	var my := c.y + HEAD_CY * r + 0.35 * r
+	match kind:
+		1:  # mustache: a short bar just above the mouth
+			canvas.draw_colored_polygon(PackedVector2Array([
+				Vector2(c.x - 0.13 * r, my - 0.10 * r), Vector2(c.x + 0.13 * r, my - 0.10 * r),
+				Vector2(c.x + 0.11 * r, my - 0.02 * r), Vector2(c.x - 0.11 * r, my - 0.02 * r),
+			]), hair)
+		2:  # beard: a band hugging the jawline below the mouth
+			var jaw := c.y + HEAD_CY * r + HEAD_HH * r
+			canvas.draw_colored_polygon(PackedVector2Array([
+				Vector2(c.x - 0.34 * r, my - 0.06 * r), Vector2(c.x + 0.34 * r, my - 0.06 * r),
+				Vector2(c.x + 0.20 * r, jaw), Vector2(c.x - 0.20 * r, jaw),
+			]), hair)
+		3:  # goatee: a small tuft on the chin
+			var chin := c.y + HEAD_CY * r + HEAD_HH * r
+			canvas.draw_colored_polygon(PackedVector2Array([
+				Vector2(c.x - 0.09 * r, my + 0.04 * r), Vector2(c.x + 0.09 * r, my + 0.04 * r),
+				Vector2(c.x + 0.05 * r, chin), Vector2(c.x - 0.05 * r, chin),
+			]), hair)
 
 
-static func _draw_glasses(canvas: CanvasItem, c: Vector2, r: float) -> void:
-	var eye_y := c.y + HEAD_CY * r + 0.10 * r
-	var eye_dx := 0.19 * r
-	var lens := 0.13 * r
-	var frame := UiPalette.INK_NAVY
+static func _draw_glasses(canvas: CanvasItem, c: Vector2, r: float, square: bool) -> void:
+	var eye_y := c.y + HEAD_CY * r + EYE_DY * r
+	var lens := 0.135 * r
 	var w := maxf(2.0, 0.03 * r)
 	for sx in [-1.0, 1.0]:
-		canvas.draw_arc(Vector2(c.x + sx * eye_dx, eye_y), lens, 0.0, TAU, 20, frame, w)
-	# Bridge between the lenses.
-	canvas.draw_line(Vector2(c.x - eye_dx + lens, eye_y), Vector2(c.x + eye_dx - lens, eye_y), frame, w)
+		var e := Vector2(c.x + sx * EYE_DX * r, eye_y)
+		if square:
+			var box := Rect2(e - Vector2(lens, lens * 0.85), Vector2(lens * 2.0, lens * 1.7))
+			canvas.draw_rect(box, INK, false, w)
+		else:
+			canvas.draw_arc(e, lens, 0.0, TAU, 22, INK, w)
+	canvas.draw_line(Vector2(c.x - EYE_DX * r + lens, eye_y), Vector2(c.x + EYE_DX * r - lens, eye_y), INK, w)
 
 
 # --- geometry helpers ---------------------------------------------------------------------------
@@ -271,7 +375,6 @@ static func _ellipse(center: Vector2, hw: float, hh: float, count: int) -> Packe
 ## shoulders so their bottom edge hugs the disc arc and nothing spills outside the circle.
 static func _disc_segment_below(center: Vector2, radius: float, y_frac: float, samples := 24) -> PackedVector2Array:
 	var cut := center.y + y_frac * radius
-	# Angle where the horizontal cut meets the circle (measuring from the +x axis, y-down).
 	var s := clampf(y_frac, -1.0, 1.0)
 	var a0 := asin(s)                     # right-side intersection
 	var a1 := PI - a0                     # left-side intersection

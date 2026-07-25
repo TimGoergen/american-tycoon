@@ -126,6 +126,11 @@ var _tab_buttons: Array = []  # the four bottom icon Buttons, indexed by TAB_*
 # up, not a replacement. Cached once at build; the live swap happens in _style_tab_button.
 var _tab_icon_inactive: Array = []  # silhouette Textures, indexed by TAB_*
 var _tab_icon_active: Array = []    # full-color Textures, indexed by TAB_*
+# The active-tab icon CROSS-FADES in rather than hard-swapping: each button keeps its silhouette
+# as its always-on icon, and a full-color TextureRect overlays it and fades its opacity 0<->1 when
+# the tab gains/loses focus (Plans/Tab_Bar_Icon_Treatment.md). One overlay + one live Tween per tab.
+var _tab_icon_overlay: Array = []   # full-color overlay TextureRects, indexed by TAB_*
+var _tab_icon_tween: Array = []     # the in-flight fade Tween per tab (killed on re-trigger)
 var _active_tab: int = TAB_PROPERTY
 var _minigame_check: CheckBox  # the Settings-tab "play the minigame" toggle
 var _tutorial_check: CheckBox  # the Settings-tab "show tutorial tips" toggle
@@ -1410,6 +1415,8 @@ func _build_tab_bar(column: VBoxContainer) -> void:
 	_tab_buttons = []
 	_tab_icon_inactive = []
 	_tab_icon_active = []
+	_tab_icon_overlay = []
+	_tab_icon_tween = []
 	for i in range(inactive_icons.size()):
 		_tab_icon_inactive.append(load(inactive_icons[i]))
 		_tab_icon_active.append(load(active_icons[i]))
@@ -1428,9 +1435,50 @@ func _build_tab_bar(column: VBoxContainer) -> void:
 		b.pressed.connect(_show_tab.bind(i))
 		bar.add_child(b)
 		_tab_buttons.append(b)
-		# The Estate tab carries the "you have Legacy to claim" red-dot badge.
+		# The full-color overlay that fades in when this tab is active (see _make_tab_icon_overlay).
+		_tab_icon_overlay.append(_make_tab_icon_overlay(b, _tab_icon_active[i]))
+		_tab_icon_tween.append(null)
+		# The Estate tab carries the "you have Legacy to claim" red-dot badge. It is added AFTER the
+		# overlay so the dot renders on top of the icon.
 		if i == TAB_ESTATE:
 			_estate_badge = _make_estate_badge(b)
+
+
+## Build the full-color icon overlay for one tab, layered exactly over the button's silhouette
+## icon and starting fully transparent. _crossfade_tab_icon fades it in when the tab becomes active
+## and out when it leaves, so the icon appears to "light up" instead of hard-swapping. A
+## CenterContainer fills the button and centers a fixed TAB_ICON_SIZE box — the same size and
+## center as the Button's own expand_icon — so the color icon sits precisely on the silhouette.
+func _make_tab_icon_overlay(button: Button, active_texture: Texture2D) -> TextureRect:
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE  # taps must reach the button beneath
+	var overlay := TextureRect.new()
+	overlay.texture = active_texture
+	overlay.custom_minimum_size = Vector2(TAB_ICON_SIZE, TAB_ICON_SIZE)
+	overlay.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	overlay.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	overlay.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.modulate.a = 0.0  # transparent until this tab is the active one
+	center.add_child(overlay)
+	button.add_child(center)
+	return overlay
+
+
+## Fade tab `index`'s color overlay toward opaque (active) or transparent (inactive) over a short
+## beat (~120 ms). Any in-flight fade is killed first so rapid tab-switching can't strand an icon
+## half-lit. The button's silhouette icon stays put underneath the whole time.
+func _crossfade_tab_icon(index: int, active: bool) -> void:
+	if index >= _tab_icon_overlay.size():
+		return
+	var overlay := _tab_icon_overlay[index] as TextureRect
+	var running := _tab_icon_tween[index] as Tween
+	if running != null and running.is_valid():
+		running.kill()
+	var fade := create_tween()
+	fade.tween_property(overlay, "modulate:a", 1.0 if active else 0.0, 0.12)
+	_tab_icon_tween[index] = fade
 
 
 ## Build the Estate tab's red-dot badge: a small red circle pinned to the button's top-right
@@ -1494,10 +1542,10 @@ func _show_tab(index: int) -> void:
 ## leftmost and rightmost tabs round their OUTER bottom corner to nest inside the phone's
 ## bottom screen corners (the Property tab's bottom-left, the Settings tab's bottom-right).
 func _style_tab_button(button: Button, active: bool, index: int) -> void:
-	# Light up the active tab's icon (full color) and dim the rest back to silhouette. Icon
-	# color means "you are here" and nothing else — the red dot alone signals "something new"
-	# (Plans/Tab_Bar_Icon_Treatment.md, signal separation).
-	button.icon = _tab_icon_active[index] if active else _tab_icon_inactive[index]
+	# Light up the active tab's icon (full color) and fade the rest back to silhouette — a short
+	# cross-fade rather than a hard swap. Icon color means "you are here" and nothing else; the red
+	# dot alone signals "something new" (Plans/Tab_Bar_Icon_Treatment.md, signal separation).
+	_crossfade_tab_icon(index, active)
 	var box := StyleBoxFlat.new()
 	box.bg_color = UiPalette.MUSTARD_GOLD if active else UiPalette.CREAM
 	box.border_color = UiPalette.NAVY

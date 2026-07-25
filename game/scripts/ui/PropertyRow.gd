@@ -289,7 +289,7 @@ const SECOND_ROW_FONT_SIZE := 41
 ## Each loads the IMPORTED texture (see _crisp_icon_texture) — the raw .svg source is NOT in
 ## the export, so it must not be read at runtime.
 const DOLLAR_ICON_SVG := "res://art/icons/dollar_bill.svg"
-const PROPERTY_ICON_SVG := "res://art/icons/tab_property.svg"
+const PROPERTY_ICON_SVG := "res://art/icons/tab_property_inactive.svg"
 
 ## The hire button's headshot icon and the buy button's factory (property-tab) icon are sized
 ## so their VISIBLE (opaque) art is the SAME height: 50.6px, the average of their former

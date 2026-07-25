@@ -20,12 +20,12 @@
      inkscape:pageopacity="0.0"
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#d1d1d1"
-     inkscape:zoom="2.2644253"
-     inkscape:cx="79.048754"
-     inkscape:cy="132.70475"
+     inkscape:zoom="1.6011905"
+     inkscape:cx="24.356877"
+     inkscape:cy="146.45353"
      inkscape:window-width="1920"
      inkscape:window-height="1009"
-     inkscape:window-x="-8"
+     inkscape:window-x="1912"
      inkscape:window-y="-8"
      inkscape:window-maximized="1"
      inkscape:current-layer="svg22" />
@@ -157,15 +157,6 @@
     </clipPath>
   </defs>
   <!-- Black crystal silhouette (the thick outline) -->
-  <polygon
-     points="72,230 38,172 30,84 70,24 110,24 150,84 142,172 108,230 "
-     fill="#1a0820"
-     stroke="#0c0410"
-     stroke-width="9"
-     stroke-linejoin="round"
-     id="polygon11"
-     transform="matrix(-1.4884682,0,0,-0.99553719,253.93983,253.44019)"
-     style="stroke-width:0.8831038;stroke-dasharray:none;stroke:#000000;stroke-opacity:1;fill:#000000;fill-opacity:1" />
   <!-- Facets: tile the gem, each with a dark border stroke (the borders between facets) -->
   <g
      stroke="#1c0a28"
@@ -173,57 +164,49 @@
      stroke-linejoin="round"
      id="g18"
      transform="matrix(-1.4884682,0,0,-0.99553719,256.1257,254.99456)"
-     style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:5.62978588;stroke-dasharray:none;stroke-opacity:1">
+     style="display:inline;fill:#1d2d50;fill-opacity:0.33870968;stroke:#1d2d50;stroke-width:5.62979;stroke-dasharray:none;stroke-opacity:1">
     <polygon
-       points="90,24 72,70 30,84 70,24 "
+       points="30,84 70,24 90,24 72,70 "
        fill="#491d63"
        id="polygon12"
-       style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:8.66916789;stroke-dasharray:none;stroke-opacity:1" />
+       style="fill:#1d2d50;fill-opacity:0.33870968;stroke:#1d2d50;stroke-width:8.66917;stroke-dasharray:none;stroke-opacity:1" />
     <!-- left top -->
     <polygon
-       points="72,70 72,180 38,172 30,84 "
+       points="30,84 72,70 72,180 38,172 "
        fill="#ffffff"
        id="polygon13"
-       style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:9.16206097;stroke-dasharray:none;stroke-opacity:1" />
+       style="fill:#1d2d50;fill-opacity:0.33870968;stroke:#1d2d50;stroke-width:9.16206;stroke-dasharray:none;stroke-opacity:1"
+       transform="matrix(0.99371913,0,0,1.0003103,0.46866946,-0.03879291)" />
     <!-- left mid -->
     <polygon
-       points="72,180 90,230 72,230 38,172 "
+       points="72,230 38,172 72,180 90,230 "
        fill="#391450"
        id="polygon14"
-       style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:8.75131673;stroke-dasharray:none;stroke-opacity:1" />
+       style="fill:#1d2d50;fill-opacity:0.33870968;stroke:#1d2d50;stroke-width:8.75132;stroke-dasharray:none;stroke-opacity:1" />
     <!-- left bottom -->
     <polygon
-       points="150,84 108,70 90,24 110,24 "
+       points="90,24 110,24 150,84 108,70 "
        fill="#491d63"
        id="polygon15"
-       style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:6.94404183;stroke-dasharray:none;stroke-opacity:1"
+       style="fill:#1d2d50;fill-opacity:0.33870968;stroke:#1d2d50;stroke-width:6.94404;stroke-dasharray:none;stroke-opacity:1"
        transform="translate(-0.89006903,-0.88718564)" />
     <!-- right top -->
     <polygon
-       points="150,84 142,172 108,180 108,70 "
+       points="108,70 150,84 142,172 108,180 "
        fill="#ffffff"
        id="polygon16"
-       style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:6.07901472;stroke-dasharray:none;stroke-opacity:1" />
+       style="fill:#1d2d50;fill-opacity:0.33870968;stroke:#1d2d50;stroke-width:6.07901;stroke-dasharray:none;stroke-opacity:1"
+       transform="matrix(1.0260857,0,0,0.99914311,-3.9584403,0.10711124)" />
     <!-- right mid -->
     <polygon
-       points="108,230 90,230 108,180 142,172 "
+       points="108,180 142,172 108,230 90,230 "
        fill="#391450"
        id="polygon17"
-       style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:7.43693517;stroke-dasharray:none;stroke-opacity:1"
+       style="fill:#1d2d50;fill-opacity:0.33870968;stroke:#1d2d50;stroke-width:7.43693;stroke-dasharray:none;stroke-opacity:1"
        transform="translate(-1.0489564,0.31366749)" />
     <!-- right bottom -->
     <!-- center -->
   </g>
   <!-- Glowing magenta core, clipped to the central facet -->
-  <g
-     clip-path="url(#lg_centerclip)"
-     id="g19"
-     style="stroke-width:37.4;stroke-dasharray:none;fill:#000000;fill-opacity:1;stroke:#ffffff;stroke-opacity:1"
-     transform="matrix(-1.0200668,0,0,-0.99553719,211.47143,254.06194)" />
   <!-- Beveled highlights: light lavender along the upper inner facet edges where light catches -->
-  <g
-     clip-path="url(#lg_centerclip)"
-     id="g21"
-     style="stroke:#ffffff;stroke-width:0;stroke-linecap:butt;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1;paint-order:markers stroke fill;stroke-dashoffset:0;fill:#000000;fill-opacity:1"
-     transform="matrix(-0.57549711,-0.33206685,0.34224075,-0.59312925,169.47017,253.98408)" />
 </svg>

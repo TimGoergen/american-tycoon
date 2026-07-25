@@ -15,16 +15,16 @@
   <defs
      id="defs8">
     <linearGradient
-       id="linearGradient41"
+       id="linearGradient1"
        inkscape:collect="always">
       <stop
-         style="stop-color:#393939;stop-opacity:1;"
-         offset="0.33386582"
-         id="stop42" />
+         style="stop-color:#000000;stop-opacity:1;"
+         offset="0"
+         id="stop1" />
       <stop
-         style="stop-color:#a7a7a7;stop-opacity:0.91286308;"
-         offset="0.77316296"
-         id="stop43" />
+         style="stop-color:#ffffff;stop-opacity:1;"
+         offset="1"
+         id="stop2" />
     </linearGradient>
     <linearGradient
        id="linearGradient25"
@@ -54,11 +54,11 @@
        id="linearGradient17"
        inkscape:collect="always">
       <stop
-         style="stop-color:#949494;stop-opacity:1;"
+         style="stop-color:#626262;stop-opacity:1;"
          offset="0.00159746"
          id="stop17" />
       <stop
-         style="stop-color:#515151;stop-opacity:1;"
+         style="stop-color:#2a2a2a;stop-opacity:1;"
          offset="1"
          id="stop16" />
     </linearGradient>
@@ -75,10 +75,10 @@
        inkscape:collect="always"
        xlink:href="#linearGradient17"
        id="linearGradient24"
-       x1="10.631877"
-       y1="24"
-       x2="37.368123"
-       y2="24"
+       x1="16.524641"
+       y1="12.917326"
+       x2="31.475355"
+       y2="35.082672"
        gradientUnits="userSpaceOnUse" />
     <linearGradient
        inkscape:collect="always"
@@ -89,15 +89,14 @@
        x2="37.370708"
        y2="24"
        gradientUnits="userSpaceOnUse" />
-    <radialGradient
+    <linearGradient
        inkscape:collect="always"
-       xlink:href="#linearGradient41"
-       id="radialGradient43"
-       cx="24"
-       cy="24"
-       fx="24"
-       fy="24"
-       r="21.485691"
+       xlink:href="#linearGradient1"
+       id="linearGradient2"
+       x1="4.2588692"
+       y1="14.79456"
+       x2="43.741146"
+       y2="33.205448"
        gradientUnits="userSpaceOnUse" />
   </defs>
   <sodipodi:namedview
@@ -121,7 +120,7 @@
   <g
      fill="#1D2D50"
      id="g8"
-     style="stroke:url(#radialGradient43);stroke-width:0.97138111;stroke-dasharray:none;stroke-linejoin:round;stroke-linecap:round;paint-order:normal;fill:url(#linearGradient19);fill-opacity:1">
+     style="stroke:url(#linearGradient2);stroke-width:1.56385193;stroke-dasharray:none;stroke-linejoin:round;stroke-linecap:round;paint-order:normal;fill:url(#linearGradient19);fill-opacity:1;stroke-opacity:1">
     <rect
        x="21"
        y="3"
@@ -129,7 +128,7 @@
        height="9"
        rx="1"
        id="rect1"
-       style="stroke:url(#radialGradient43);stroke-width:0.97138111;stroke-dasharray:none;stroke-linejoin:round;stroke-linecap:round;paint-order:normal;fill:url(#linearGradient19);fill-opacity:1" />
+       style="stroke:url(#linearGradient2);stroke-width:1.56385193;stroke-dasharray:none;stroke-linejoin:round;stroke-linecap:round;paint-order:normal;fill:url(#linearGradient19);fill-opacity:1;stroke-opacity:1" />
     <rect
        x="21"
        y="3"
@@ -138,7 +137,7 @@
        rx="1"
        transform="rotate(45 24 24)"
        id="rect2"
-       style="stroke:url(#radialGradient43);stroke-width:0.97138111;stroke-dasharray:none;stroke-linejoin:round;stroke-linecap:round;paint-order:normal;fill:url(#linearGradient19);fill-opacity:1" />
+       style="stroke:url(#linearGradient2);stroke-width:1.56385193;stroke-dasharray:none;stroke-linejoin:round;stroke-linecap:round;paint-order:normal;fill:url(#linearGradient19);fill-opacity:1;stroke-opacity:1" />
     <rect
        x="21"
        y="3"
@@ -147,7 +146,7 @@
        rx="1"
        transform="rotate(90 24 24)"
        id="rect3"
-       style="stroke:url(#radialGradient43);stroke-width:0.97138111;stroke-dasharray:none;stroke-linejoin:round;stroke-linecap:round;paint-order:normal;fill:url(#linearGradient19);fill-opacity:1" />
+       style="stroke:url(#linearGradient2);stroke-width:1.56385193;stroke-dasharray:none;stroke-linejoin:round;stroke-linecap:round;paint-order:normal;fill:url(#linearGradient19);fill-opacity:1;stroke-opacity:1" />
     <rect
        x="21"
        y="3"
@@ -156,7 +155,7 @@
        rx="1"
        transform="rotate(135 24 24)"
        id="rect4"
-       style="stroke:url(#radialGradient43);stroke-width:0.97138111;stroke-dasharray:none;stroke-linejoin:round;stroke-linecap:round;paint-order:normal;fill:url(#linearGradient19);fill-opacity:1" />
+       style="stroke:url(#linearGradient2);stroke-width:1.56385193;stroke-dasharray:none;stroke-linejoin:round;stroke-linecap:round;paint-order:normal;fill:url(#linearGradient19);fill-opacity:1;stroke-opacity:1" />
     <rect
        x="21"
        y="3"
@@ -165,7 +164,7 @@
        rx="1"
        transform="rotate(180 24 24)"
        id="rect5"
-       style="stroke:url(#radialGradient43);stroke-width:0.97138111;stroke-dasharray:none;stroke-linejoin:round;stroke-linecap:round;paint-order:normal;fill:url(#linearGradient19);fill-opacity:1" />
+       style="stroke:url(#linearGradient2);stroke-width:1.56385193;stroke-dasharray:none;stroke-linejoin:round;stroke-linecap:round;paint-order:normal;fill:url(#linearGradient19);fill-opacity:1;stroke-opacity:1" />
     <rect
        x="21"
        y="3"
@@ -174,7 +173,7 @@
        rx="1"
        transform="rotate(225 24 24)"
        id="rect6"
-       style="stroke:url(#radialGradient43);stroke-width:0.97138111;stroke-dasharray:none;stroke-linejoin:round;stroke-linecap:round;paint-order:normal;fill:url(#linearGradient19);fill-opacity:1" />
+       style="stroke:url(#linearGradient2);stroke-width:1.56385193;stroke-dasharray:none;stroke-linejoin:round;stroke-linecap:round;paint-order:normal;fill:url(#linearGradient19);fill-opacity:1;stroke-opacity:1" />
     <rect
        x="21"
        y="3"
@@ -183,7 +182,7 @@
        rx="1"
        transform="rotate(270 24 24)"
        id="rect7"
-       style="stroke:url(#radialGradient43);stroke-width:0.97138111;stroke-dasharray:none;stroke-linejoin:round;stroke-linecap:round;paint-order:normal;fill:url(#linearGradient19);fill-opacity:1" />
+       style="stroke:url(#linearGradient2);stroke-width:1.56385193;stroke-dasharray:none;stroke-linejoin:round;stroke-linecap:round;paint-order:normal;fill:url(#linearGradient19);fill-opacity:1;stroke-opacity:1" />
     <rect
        x="21"
        y="3"
@@ -192,12 +191,12 @@
        rx="1"
        transform="rotate(315 24 24)"
        id="rect8"
-       style="stroke:url(#radialGradient43);stroke-width:0.97138111;stroke-dasharray:none;stroke-linejoin:round;stroke-linecap:round;paint-order:normal;fill:url(#linearGradient19);fill-opacity:1" />
+       style="stroke:url(#linearGradient2);stroke-width:1.56385193;stroke-dasharray:none;stroke-linejoin:round;stroke-linecap:round;paint-order:normal;fill:url(#linearGradient19);fill-opacity:1;stroke-opacity:1" />
   </g>
   <path
      fill="#1D2D50"
      fill-rule="evenodd"
      d="m 11,24 a 13,13 0 1 0 26,0 13,13 0 1 0 -26,0 z m 7.5,0 a 5.5,5.5 0 1 0 11,0 5.5,5.5 0 1 0 -11,0 z"
      id="path8"
-     style="display:inline;fill:url(#linearGradient26);fill-opacity:1;stroke:url(#linearGradient24);stroke-width:0.741416;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1;paint-order:normal" />
+     style="display:inline;fill:url(#linearGradient26);fill-opacity:1;stroke:url(#linearGradient24);stroke-width:1.74874074;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1;paint-order:normal" />
 </svg>

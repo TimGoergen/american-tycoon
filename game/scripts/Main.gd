@@ -1396,10 +1396,10 @@ func _build_tab_bar(column: VBoxContainer) -> void:
 	# Estate tab's active icon is the legacy gem — the same art as the wallet and the
 	# Pass-the-Torch button (Tim, 2026-07-08) — with a silhouette gem for its inactive state.
 	var inactive_icons := [
-		"res://art/icons/tab_property.svg",
+		"res://art/icons/tab_property_inactive.svg",
 		"res://art/icons/legacy_gem_inactive.svg",
-		"res://art/icons/tab_ledger.svg",
-		"res://art/icons/tab_settings.svg",
+		"res://art/icons/tab_ledger_inactive.svg",
+		"res://art/icons/tab_settings_inactive.svg",
 	]
 	var active_icons := [
 		"res://art/icons/tab_property_active.svg",

@@ -1,10 +1,11 @@
 # Tab Bar Icon Treatment — Design Spec
 
-**Status:** IMPLEMENTED 2026-07-24 (`main` @ d0c06dd) — active/inactive icon swap wired up
-in `Main.gd` (`_style_tab_button`) once Tim supplied the colored art. Deferred polish: the
-~100–150 ms crossfade (Implementation Notes) is currently an instant swap. **Author:** Tim
-(reasoned out in a separate Claude chat), captured here 2026-07-23. **Scope:** Main interface
-bottom tab bar (Properties, Estate, Family History, Settings) and related in-content icon usage.
+**Status:** COMPLETE 2026-07-24 — active/inactive icon treatment wired up in `Main.gd`
+(`_style_tab_button`) once Tim supplied the colored art, and the ~120 ms crossfade
+(`_crossfade_tab_icon`, Implementation Notes) is now in as well. All spec items shipped.
+**Author:** Tim (reasoned out in a separate Claude chat), captured here 2026-07-23. **Scope:**
+Main interface bottom tab bar (Properties, Estate, Family History, Settings) and related
+in-content icon usage.
 
 ---
 

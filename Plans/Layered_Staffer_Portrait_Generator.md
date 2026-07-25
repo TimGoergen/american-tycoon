@@ -1,8 +1,20 @@
 # Layered Staffer Portrait Generator
 
-**Status:** PROPOSED — design only, no code. **M3-milestone territory** (the art pass, §13);
-this is "plan now, build later," not something to land on the current UI branch. Raised by Tim
-2026-07-01.
+**Status:** PHASE 1 BUILT 2026-07-25 (`main` @ 926b814) — the Earth (tier 1) human vertical slice
+ships. Raised by Tim 2026-07-01; decisions made 2026-07-25 (below). Phase 2 (alien tiers 2–6) and
+phase 3 (polish / hero overrides) remain.
+
+**Decisions made (Tim, 2026-07-25):** (1) faces are **procedural, code-drawn** — no authored art
+files; (2) **Earth vertical slice first**; (3) seed = **per role + generation** (a manager is
+stable within a run, each dynasty reshuffles).
+
+**Architecture note — built differently than §4.2 proposed.** Because the faces are procedural
+VECTOR shapes (not raster layers), they are drawn **directly** in `ManagerCircle._draw` via
+`StafferFace.draw_face()`, NOT baked through a SubViewport. A dozen cheap primitives cost the same
+as the disc/ring the circle already redraws each frame, so there is no bake / cache / autoload to
+maintain, and faces stay crisp at any size. The §4.2 SubViewport paper-doll bake would only be
+needed if we later switch to raster authored layers. `StafferFace.generation` (static) is pushed
+by `Main` each frame; the seed folds it in. Tier ≠ 1 returns false → the old headshot fallback.
 
 **GDD reference:** §6.5 (Staffer portraits — the layered generator), §12 (asset bill).
 **Related plans:** `Epoch_Staffing_System.md` (the tier system these portraits reskin),

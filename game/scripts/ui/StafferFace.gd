@@ -56,7 +56,9 @@ const INK := Color("#1B2436")
 ## no face yet (caller should fall back to the headshot icon).
 static func draw_face(canvas: CanvasItem, property_index: int, tier: int, center: Vector2, radius: float) -> bool:
 	if tier != 1:
-		return false  # only Earth humans exist yet; alien tiers fall back to the headshot
+		# Alien epochs: each civilization has its own bespoke procedural "being" (Phase 2). Tiers
+		# without one built yet return false so the caller falls back to the headshot.
+		return _draw_alien(canvas, property_index, tier, center, radius)
 
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_for(property_index, tier)
@@ -451,6 +453,88 @@ static func _draw_glasses(canvas: CanvasItem, c: Vector2, r: float, square: bool
 		else:
 			canvas.draw_arc(e, lens, 0.0, TAU, 22, INK, w)
 	canvas.draw_line(Vector2(c.x - EYE_DX * r + lens, eye_y), Vector2(c.x + EYE_DX * r - lens, eye_y), INK, w)
+
+
+# --- alien staffers (Phase 2: a bespoke procedural being per civilization) ----------------------
+
+## Dispatch an alien portrait by epoch tier. Each civ has its own hand-tuned design + palette,
+## seeded per role so staffers within one civ vary. Returns false for tiers not built yet (the
+## caller then falls back to the gray headshot). Built so far: Vashti Deep-Court (tier 7).
+static func _draw_alien(canvas: CanvasItem, property_index: int, tier: int, center: Vector2, radius: float) -> bool:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_for(property_index, tier)
+	match tier:
+		7:
+			_draw_vashti(canvas, center, radius, rng)
+			return true
+		_:
+			return false
+
+
+# Vashti Deep-Court (tier 7) — a bioluminescent deep-sea anglerfish being: a dark bulbous body, big
+# glowing eyes, a toothy grin, and a glowing lure on a stalk (the signature). Everything is kept
+# inside the bounding radius so no glow spills past the disc.
+const _VASHTI_BODY := Color("#123039")
+const _VASHTI_HI := Color("#1d4a56")
+const _VASHTI_GLOW := Color(0.56, 0.93, 0.86)      # bioluminescent cyan
+const _VASHTI_EYE := Color("#dff6f0")
+const _VASHTI_PUPIL := Color("#0a1c22")
+const _VASHTI_TEETH := Color("#f2ead2")
+const _VASHTI_MOUTH := Color("#07161b")
+
+static func _draw_vashti(canvas: CanvasItem, c: Vector2, r: float, rng: RandomNumberGenerator) -> void:
+	# Per-role variation (fixed pull order).
+	var eye_r := (0.10 + rng.randf() * 0.035) * r
+	var teeth_count := 3 + rng.randi() % 3
+	var lure_side := -1.0 if rng.randf() < 0.5 else 1.0
+	var spots := 2 + rng.randi() % 3
+	var spot_seeds: Array[float] = []
+	for _i in range(spots):
+		spot_seeds.append(rng.randf())
+		spot_seeds.append(rng.randf())
+
+	var hc := Vector2(c.x, c.y - 0.05 * r)
+	# Body/mantle: the disc's lower segment (hugs the arc, no spill), then the bulbous head.
+	canvas.draw_colored_polygon(_disc_segment_below(c, r, 0.30), _VASHTI_BODY)
+	canvas.draw_colored_polygon(_ellipse(hc, 0.54 * r, 0.55 * r, 28), _VASHTI_HI)
+	# Bioluminescent freckles on the head.
+	for i in range(spots):
+		var a := spot_seeds[i * 2] * TAU
+		var rad := (0.18 + spot_seeds[i * 2 + 1] * 0.20) * r
+		canvas.draw_circle(hc + Vector2(cos(a) * rad, sin(a) * rad * 0.9), 0.028 * r,
+			_VASHTI_GLOW.lerp(_VASHTI_HI, 0.25))
+	# Eyes: big, faintly glowing, dark pupils.
+	for sx in [-1.0, 1.0]:
+		var e := Vector2(hc.x + sx * 0.21 * r, hc.y - 0.02 * r)
+		canvas.draw_circle(e, eye_r * 1.3, Color(_VASHTI_GLOW.r, _VASHTI_GLOW.g, _VASHTI_GLOW.b, 0.30))
+		canvas.draw_circle(e, eye_r, _VASHTI_EYE)
+		canvas.draw_circle(e + Vector2(sx * 0.012 * r, 0.012 * r), eye_r * 0.5, _VASHTI_PUPIL)
+	# Toothy grin: a wide dark mouth with cream fangs.
+	var my := hc.y + 0.30 * r
+	var mw := 0.30 * r
+	canvas.draw_colored_polygon(PackedVector2Array([
+		Vector2(c.x - mw, my - 0.05 * r), Vector2(c.x + mw, my - 0.05 * r),
+		Vector2(c.x + mw * 0.7, my + 0.10 * r), Vector2(c.x - mw * 0.7, my + 0.10 * r)]), _VASHTI_MOUTH)
+	var tw := (mw * 2.0) / float(teeth_count)
+	for i in range(teeth_count):
+		var tx := c.x - mw + tw * (float(i) + 0.5)
+		canvas.draw_colored_polygon(PackedVector2Array([
+			Vector2(tx - tw * 0.28, my - 0.05 * r), Vector2(tx + tw * 0.28, my - 0.05 * r),
+			Vector2(tx, my + 0.06 * r)]), _VASHTI_TEETH)
+	# The lure: a stalk curving up-and-forward from the crown to a glowing bulb.
+	var base := Vector2(hc.x + lure_side * 0.05 * r, hc.y - 0.50 * r)
+	var mid := Vector2(hc.x + lure_side * 0.02 * r, hc.y - 0.66 * r)
+	var tip := Vector2(hc.x + lure_side * 0.26 * r, hc.y - 0.70 * r)
+	canvas.draw_polyline(PackedVector2Array([base, mid, tip]),
+		_VASHTI_HI.lerp(_VASHTI_GLOW, 0.35), maxf(2.0, 0.03 * r))
+	_glow(canvas, tip, 0.09 * r)
+
+
+## A soft bioluminescent bulb: a translucent halo, a bright body, a hot core.
+static func _glow(canvas: CanvasItem, center: Vector2, radius: float) -> void:
+	canvas.draw_circle(center, radius * 1.7, Color(0.56, 0.93, 0.86, 0.30))
+	canvas.draw_circle(center, radius, Color(0.56, 0.93, 0.86, 0.92))
+	canvas.draw_circle(center, radius * 0.5, Color(0.93, 1.0, 0.98, 1.0))
 
 
 # --- geometry helpers ---------------------------------------------------------------------------

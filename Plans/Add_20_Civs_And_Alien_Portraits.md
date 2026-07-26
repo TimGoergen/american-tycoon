@@ -1,0 +1,213 @@
+# Add 20 More Civilizations + Alien Staffer Portraits
+
+**Status:** PLAN — awaiting Tim's decisions (§3, §9). Raised by Tim 2026-07-25.
+**Goal:** grow the epoch frontier from **6 tiers (Earth + 5 aliens)** to **26 tiers (Earth + 25 aliens)**,
+and extend the procedural staffer-portrait generator so every one of the new civilizations has a
+distinct staffer look.
+**Related:** `EpochCatalog.gd`, `docs/civilizations_v2_draft.json`, `claude/civ_v2_regen/assemble.py`,
+`Plans/Escalating_Ladder.md`, `Plans/Layered_Staffer_Portrait_Generator.md`, GDD §6.2.
+
+---
+
+## 1. The good news — the content already exists
+
+The 20 new civs are **already authored** in `docs/civilizations_v2_draft.json` (tiers 7–26). That file
+is a superset of the shipped game: tiers 1–6 are Earth + the 5 live civs (synced from the game), and
+tiers 7–26 are 20 brand-new civilizations:
+
+> Vashti Deep-Court · Ssethraki Coil-Banks · Melissar Hive-Court · Norrvane Frostholm · The Resonant
+> Octave · Umbrafex Syndicate · Karr'ghan Warhoard · The Politesse Ascendancy · Oneiroi Drift · The
+> Glossolalia Lyceum · Ferrovore Guilds · The Vantablack Salon · Fortuna Cartel · Mirror Meridian ·
+> Ossuary Compact · Spectacle Prime · Vek-Tor Kollektiv · Atlas Concordat · The Null Ledger · The
+> Proprietors Absolute
+
+Each draft civ carries: `civilization`, `home_planet`, `currency`, `economy_scale`, `hail`,
+`contact_line`, `accent_color`, and a full `staffer_roster_all_properties`. Every field
+`EpochCatalog.gd` needs is present **except** `staff_income_multiplier` (which is a flat `1.0` for
+every tier — a constant to inject, not content to author).
+
+So the creative writing is done. What's left is a wiring decision, a mechanical transform, some UI/art
+scaling, and the alien portraits.
+
+---
+
+## 2. Current state (what we're extending)
+
+- **6 epochs, 52 property slots.** Earth = 12 properties (tiers... indices 0–11); epochs 2–6 add
+  cohorts of 6/7/8/9/10 = 40 alien properties (indices 12–51). All defined as `.tres` files in
+  `ConfigLoader.PROPERTY_PATHS`. By epoch 6 every one of the 52 is unlocked.
+- **`EpochCatalog.EPOCHS`** holds one dictionary per epoch; its `staffer_names` array re-skins **all
+  52 properties** with that civ's flavor (a property staffed in the Luminari epoch shows a Luminari
+  title, etc.). Adding a civ = appending one EPOCHS entry.
+- **Scaling:** `economy_scale = 16807^(tier−1)`; consuming `earth_target × economy_scale` lifetime
+  dollars advances to the next epoch. Tier 26 ≈ 1.6e105 — comfortably inside float64 (ceiling
+  ~epoch 70), so no number-overflow work is needed for this range.
+- **Portraits:** `StafferFace.draw_face()` returns `false` for any `tier != 1`, so alien staffers
+  currently fall back to the gray `headshot.svg`.
+
+---
+
+## 3. THE KEY DECISION — what does a new epoch DO? (Tim's call)
+
+The draft is built for a **326-property, 26-epoch** ladder (each epoch introduces its own new property
+cohort). The live game is **52 properties / 6 epochs**. Two ways to spend the draft:
+
+### Path A — Flavor + scale (re-skin the existing 52). **Recommended for this pass.**
+Each new epoch is a **first-contact beat + a re-skin of the 52 staffers + a ×16807 economy climb**. No
+new properties, no new `.tres`, no economy re-tuning. Purely a mechanical transform of the draft's
+first-52 roster slice into `EpochCatalog` (§4).
+- **Pro:** deliverable now; low risk; append-only (old saves safe); gives 20 new civ identities,
+  hails, accent colors, and — with §6 — 20 distinct alien staffer looks.
+- **Con (be honest):** after epoch 6 all 52 properties are already owned, and staff income is flat, so
+  epochs 7–26 add **no new thing to buy** — they're a long earn-toward-the-next-contact stretch with a
+  flavor payoff. This matches the GDD's accepted "the frontier is allowed to slowly stagnate," but it
+  is thin as *gameplay*. Mitigation lives in a **follow-on** (Path B properties, or the per-epoch
+  modifier/upgrade track in Future Features — the real "engagement half").
+
+### Path B — Full new-property epochs (the 326-property ladder).
+Each new epoch introduces its own cohort (~6–9 new properties, capped ~12–14 rungs/epoch). The draft
+already computes the costs/incomes, but this additionally requires **~274 new `.tres` property
+resources**, extending every roster to 326, the staff-price-rank re-anchor at scale, and a full sim
+re-tune.
+- **Pro:** every epoch has genuinely new properties to unlock — real progression to epoch 26.
+- **Con:** very large content + tuning effort; a project in its own right, not a "wire up the civs"
+  task.
+
+**Recommendation:** ship **Path A now** (20 civs as contact/flavor/scale/portraits), and treat
+per-epoch gameplay depth (Path B properties *or* the modifier track) as a **separate, later
+decision**. The rest of this plan assumes Path A; §8 notes what Path B would add.
+
+---
+
+## 4. Content transform (Path A) — draft JSON → EpochCatalog
+
+A one-time, scriptable transform (or a careful hand-port) of draft tiers 7–26 into 20 new
+`EpochCatalog.EPOCHS` dictionaries:
+
+| EpochCatalog field | Source in draft | Transform |
+|---|---|---|
+| `tier` | `tier` | copy |
+| `civilization` | `civilization` | copy |
+| `home_planet` | `home_planet` | copy |
+| `currency_flavor` | `currency` | rename |
+| `economy_scale` | `economy_scale` | copy (verify == `16807^(tier−1)`) |
+| `staff_income_multiplier` | — | inject constant `1.0` |
+| `hail` | `hail` | copy |
+| `contact_line` | `contact_line` | copy |
+| `accent_color` | `accent_color` (bare hex) | `Color("#" + hex)` |
+| `staffer_names[52]` | `staffer_roster_all_properties` | take the `staffer` string for the first 52 properties, in ladder order |
+
+Do it as a small generator step (extend `assemble.py`, or a one-off script) that emits the GDScript
+dictionaries, so it's reproducible if the draft is re-authored — rather than hand-copying 20 × 52
+strings. Validate that each produced roster is exactly 52 long and every economy_scale is monotonic.
+
+---
+
+## 5. Scaling & save safety (Path A)
+
+- **Append-only:** new epochs are tiers 7–26; existing tiers, property indices, and saves are
+  untouched. The epoch gate is forward-only (a run already past a gate isn't retro-locked).
+- **Float headroom:** fine through tier 26 (§2).
+- **Consumption/contact:** `EpochCatalog.consume_threshold` and the first-contact flow are already
+  data-driven off `economy_scale` — they extend for free.
+- **Sim:** `EpochTest.gd` content-integrity must accept 26 epochs (still 52 properties, rosters length
+  52, monotonic scale, non-empty hails/contact lines for tiers ≥2). A full `Sim.gd` dynasty playout
+  should be run to confirm it can advance across 26 epochs without stalling (watch the ownership gate
+  and run time; may need a longer protocol or a cap).
+
+---
+
+## 6. Face generator — Phase 2: alien staffer portraits (the heart of Tim's ask)
+
+Goal: a **distinct, recognizable staffer look for each of the 25 alien civs**, procedurally (no
+hand-authoring 25 × N portraits), building on the proven `StafferFace` pipeline.
+
+### 6.1 Approach — abstract emblem, keyed to civ + role
+For `tier >= 2`, `draw_face` dispatches to an **alien portrait** routine instead of returning false.
+Each alien staffer is an abstract, flat-cartoon "being/emblem" composed from:
+1. **The civ's `accent_color`** (from `EpochCatalog.accent_color`) → a per-civ palette (base + a
+   lighter/darker shade), so every civilization reads as its own color world (Luminari amber vs.
+   Vashti deep-teal, etc.). This alone differentiates 25 civs at a glance.
+2. **An `archetype`** — a small set (~8) of abstract silhouette families, each its own draw routine:
+   e.g. `orb/light`, `machine/visor`, `fungal/cap`, `crystal/cluster`, `chrono/hourglass`,
+   `gas/cloud`, `deep/tentacled`, `void/mask`. The archetype sets the head silhouette + feature style
+   (eye count, surface pattern); the accent color paints it.
+3. **A per-role seed** `(property_index, tier, generation)` — the same determinism the human faces
+   use — varying the individual details (eye arrangement, pattern, small features) so staffers within
+   one civ still differ, and a role stays stable within a run.
+
+25 civs across ~8 archetypes = ~3 civs per archetype, each in a different accent color and with
+seeded variation — distinct enough without a bespoke design per civ. (If any flagship civ deserves a
+one-off look later, the authored-`manager_portrait` override already exists.)
+
+### 6.2 Data: add an `archetype` tag per alien epoch
+`EpochCatalog` gains an `archetype` string per alien epoch (Earth stays human). The 20 draft civs are
+freshly authored (not from the 10-category `alien_civilizations.md` taxonomy), so each needs an
+archetype assigned — a small authoring step driven by name/currency/lore (e.g. Vashti Deep-Court
+"Lures/anglerlight" → `deep/tentacled`; Vek-Tor Kollektiv → `machine`; Ossuary Compact → `void/mask`).
+Store it in the draft too so the pipeline carries it.
+
+### 6.3 Build & integration
+- Extend `StafferFace.draw_face(property_index, tier, ...)`: `tier == 1` → human (done); `tier >= 2`
+  → `_draw_alien(archetype, accent, seed, ...)`. It needs the civ's accent + archetype; simplest is to
+  look them up from `EpochCatalog` by tier inside `StafferFace` (or pass them through `set_state` like
+  the role is today).
+- Build the ~8 archetype draw routines as flat vector shapes (same primitive style as the human
+  faces), each: a head silhouette, 1–3 eyes, a surface treatment (facets / circuitry / spores / glow),
+  in the civ palette. Reuse `ManagerCircle`'s disc + ring + level pill unchanged.
+- **Iterate visually** — like the human faces, expect several rounds (windowed render → review). Build
+  one archetype end-to-end first (prove the pipeline), then the rest.
+
+### 6.4 Phasing within Phase 2
+1. Alien dispatch + one archetype (e.g. `crystal`) wired for its civs; confirm on device.
+2. The remaining archetypes, one at a time.
+3. Polish: extra variation, optional hero overrides for flagship roles.
+
+---
+
+## 7. UI / art dependencies (surfaced by 26 epochs)
+
+- **Epoch pager dots (`EpochPagerDots`).** A 26-dot strip won't fit. Replace with a compact indicator
+  for large tab counts — e.g. an "Epoch 7 / 26" readout, or a windowed dot row (show a few around the
+  current). UI task; honor the no-moving-UI and readability rules.
+- **Planet watermark (`HeroStat.PLANET_IMAGE_PATHS`).** Currently 6 authored world SVGs (Earth →
+  Chronophage), indexed by tier. Tiers 7–26 have no art → add a **bounds guard + fallback** (a generic
+  "frontier world," or a procedural planet tinted by the civ accent color) so it never indexes out of
+  range. Per-civ world art can come later as an art-pass item.
+- **Pager label / contact screen.** Already data-driven off `EpochCatalog` (civilization name, hail,
+  accent) — extends for free.
+
+---
+
+## 8. What Path B would add later (not this pass)
+
+If/when new-property epochs are wanted: author ~274 `.tres` from the draft's computed
+costs/incomes, extend every roster to 326, apply the staff-price-rank re-anchor
+(`Plans/Escalating_Ladder.md` §"Staff-cost re-anchor") at scale, cap cohorts ~12–14 rungs, and re-run
+the full pacing sim. The draft + `assemble.py` already produce the numbers; the game-side resources
+and roster-length expansion are the work. Alternatively, deliver per-epoch engagement via the
+**per-epoch modifier/upgrade track** (Future Features) instead of new properties.
+
+---
+
+## 9. Open decisions for Tim
+
+1. **Path A vs Path B** (§3) — recommend A now (flavor + scale + portraits), B/modifiers later.
+2. **Alien portrait style** (§6.1) — abstract archetype-emblem (recommended, scalable) vs. a richer
+   per-civ authored look (expensive). Recommend abstract.
+3. **How many of the 20 to enable first** — all 20 at once, or a first batch (e.g. tiers 7–11) to
+   validate the pipeline + portraits on device before the rest.
+4. **Planet watermark** — generic/procedural fallback for tiers 7–26 (recommended) vs. commissioning
+   20 world images now.
+
+---
+
+## 10. Suggested phasing (assuming Path A)
+
+- **P0 — decisions** (§9).
+- **P1 — wire the civs:** transform draft → 20 `EpochCatalog` entries; extend `EpochTest` + run
+  `Sim.gd`; fix the pager dots + planet-watermark fallback; boot + device pass. *(20 civs playable as
+  contact/flavor/scale, staffers on the headshot fallback.)*
+- **P2 — alien portraits:** add `archetype` tags; build `StafferFace` alien dispatch + archetypes;
+  iterate on device. *(The face generator now supports all 26 tiers.)*
+- **P3 — (optional, separate) per-epoch depth:** Path B properties or the modifier track.

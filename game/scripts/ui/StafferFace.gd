@@ -467,6 +467,18 @@ static func _draw_alien(canvas: CanvasItem, property_index: int, tier: int, cent
 		7:
 			_draw_vashti(canvas, center, radius, rng)
 			return true
+		8:
+			_draw_ssethraki(canvas, center, radius, rng)
+			return true
+		9:
+			_draw_melissar(canvas, center, radius, rng)
+			return true
+		10:
+			_draw_norrvane(canvas, center, radius, rng)
+			return true
+		11:
+			_draw_octave(canvas, center, radius, rng)
+			return true
 		_:
 			return false
 
@@ -535,6 +547,138 @@ static func _glow(canvas: CanvasItem, center: Vector2, radius: float) -> void:
 	canvas.draw_circle(center, radius * 1.7, Color(0.56, 0.93, 0.86, 0.30))
 	canvas.draw_circle(center, radius, Color(0.56, 0.93, 0.86, 0.92))
 	canvas.draw_circle(center, radius * 0.5, Color(0.93, 1.0, 0.98, 1.0))
+
+
+# Ssethraki Coil-Banks (tier 8) — a serpent: wedge head, slit-pupil eyes, forked tongue, coils.
+const _SSE_SCALE := Color("#4f7942")
+const _SSE_HI := Color("#6a9a54")
+const _SSE_DARK := Color("#2b4228")
+const _SSE_EYE := Color("#e6c24a")
+const _SSE_TONGUE := Color("#b5402a")
+const _SSE_PUPIL := Color("#12200f")
+
+static func _draw_ssethraki(canvas: CanvasItem, c: Vector2, r: float, rng: RandomNumberGenerator) -> void:
+	var slit_w := (0.018 + rng.randf() * 0.014) * r
+	var tongue := (0.12 + rng.randf() * 0.10) * r
+	var chevrons := 2 + rng.randi() % 3
+	var hc := Vector2(c.x, c.y - 0.06 * r)
+	canvas.draw_colored_polygon(_disc_segment_below(c, r, 0.34), _SSE_DARK)
+	for i in range(2):
+		canvas.draw_arc(Vector2(c.x, c.y + (0.52 + i * 0.16) * r), (0.40 - i * 0.10) * r,
+			PI, TAU, 20, _SSE_SCALE, maxf(3.0, 0.055 * r))
+	canvas.draw_colored_polygon(PackedVector2Array([
+		Vector2(hc.x - 0.50 * r, hc.y - 0.30 * r), Vector2(hc.x - 0.38 * r, hc.y - 0.52 * r),
+		Vector2(hc.x + 0.38 * r, hc.y - 0.52 * r), Vector2(hc.x + 0.50 * r, hc.y - 0.30 * r),
+		Vector2(hc.x + 0.28 * r, hc.y + 0.20 * r), Vector2(hc.x, hc.y + 0.44 * r),
+		Vector2(hc.x - 0.28 * r, hc.y + 0.20 * r)]), _SSE_SCALE)
+	for i in range(chevrons):
+		var yy := hc.y - 0.16 * r + i * 0.13 * r
+		canvas.draw_polyline(PackedVector2Array([Vector2(hc.x - 0.13 * r, yy),
+			Vector2(hc.x, yy + 0.06 * r), Vector2(hc.x + 0.13 * r, yy)]), _SSE_HI, maxf(2.0, 0.02 * r))
+	for sx in [-1.0, 1.0]:
+		var e := Vector2(hc.x + sx * 0.26 * r, hc.y - 0.30 * r)
+		canvas.draw_colored_polygon(_ellipse(e, 0.09 * r, 0.07 * r, 14), _SSE_EYE)
+		canvas.draw_rect(Rect2(e.x - slit_w / 2.0, e.y - 0.055 * r, slit_w, 0.11 * r), _SSE_PUPIL)
+	var sn := Vector2(hc.x, hc.y + 0.44 * r)
+	var f := sn + Vector2(0, tongue * 0.6)
+	canvas.draw_line(sn, f, _SSE_TONGUE, maxf(2.0, 0.02 * r))
+	canvas.draw_line(f, f + Vector2(-0.05 * r, tongue * 0.4), _SSE_TONGUE, maxf(2.0, 0.02 * r))
+	canvas.draw_line(f, f + Vector2(0.05 * r, tongue * 0.4), _SSE_TONGUE, maxf(2.0, 0.02 * r))
+
+
+# Melissar Hive-Court (tier 9) — a bee: fuzzy striped body, compound eyes, antennae, sometimes a crown.
+const _BEE_GOLD := Color("#d3a52a")
+const _BEE_HI := Color("#e8c24a")
+const _BEE_DARK := Color("#3a2a0e")
+const _BEE_EYE := Color("#1a1408")
+
+static func _draw_melissar(canvas: CanvasItem, c: Vector2, r: float, rng: RandomNumberGenerator) -> void:
+	var ant_curl := (0.04 + rng.randf() * 0.07) * r
+	var eye_h := (0.13 + rng.randf() * 0.05) * r
+	var crown := rng.randf() < 0.4
+	var hc := Vector2(c.x, c.y - 0.04 * r)
+	# striped body via layered disc segments (each hugs the arc — no overflow)
+	canvas.draw_colored_polygon(_disc_segment_below(c, r, 0.30), _BEE_GOLD)
+	canvas.draw_colored_polygon(_disc_segment_below(c, r, 0.44), _BEE_DARK)
+	canvas.draw_colored_polygon(_disc_segment_below(c, r, 0.58), _BEE_GOLD)
+	canvas.draw_colored_polygon(_disc_segment_below(c, r, 0.72), _BEE_DARK)
+	# antennae
+	for sx in [-1.0, 1.0]:
+		var a0 := Vector2(hc.x + sx * 0.12 * r, hc.y - 0.38 * r)
+		var a1 := Vector2(hc.x + sx * 0.26 * r + sx * ant_curl, hc.y - 0.62 * r)
+		canvas.draw_line(a0, a1, _BEE_DARK, maxf(2.0, 0.025 * r))
+		canvas.draw_circle(a1, 0.04 * r, _BEE_DARK)
+	# head
+	canvas.draw_colored_polygon(_ellipse(hc, 0.42 * r, 0.42 * r, 24), _BEE_HI)
+	# compound eyes
+	for sx in [-1.0, 1.0]:
+		canvas.draw_colored_polygon(_ellipse(Vector2(hc.x + sx * 0.21 * r, hc.y - 0.02 * r),
+			0.11 * r, eye_h, 16), _BEE_EYE)
+	canvas.draw_line(Vector2(hc.x - 0.08 * r, hc.y + 0.22 * r),
+		Vector2(hc.x + 0.08 * r, hc.y + 0.22 * r), _BEE_DARK, maxf(2.0, 0.03 * r))
+	if crown:
+		canvas.draw_colored_polygon(PackedVector2Array([
+			Vector2(hc.x - 0.13 * r, hc.y - 0.40 * r), Vector2(hc.x - 0.13 * r, hc.y - 0.52 * r),
+			Vector2(hc.x - 0.06 * r, hc.y - 0.46 * r), Vector2(hc.x, hc.y - 0.56 * r),
+			Vector2(hc.x + 0.06 * r, hc.y - 0.46 * r), Vector2(hc.x + 0.13 * r, hc.y - 0.52 * r),
+			Vector2(hc.x + 0.13 * r, hc.y - 0.40 * r)]), _BEE_HI)
+
+
+# Norrvane Frostholm (tier 10) — an ice giant: broad angular head, glowing cold eyes, an icicle beard.
+const _ICE := Color("#bcd8e6")
+const _ICE_HI := Color("#e6f2f8")
+const _ICE_DARK := Color("#5f7f8f")
+const _ICE_EYE := Color("#9fe8ff")
+
+static func _draw_norrvane(canvas: CanvasItem, c: Vector2, r: float, rng: RandomNumberGenerator) -> void:
+	var icicles := 4 + rng.randi() % 3
+	var rune := rng.randf() < 0.5
+	var hc := Vector2(c.x, c.y - 0.06 * r)
+	canvas.draw_colored_polygon(_disc_segment_below(c, r, 0.34), _ICE_DARK)
+	canvas.draw_colored_polygon(PackedVector2Array([
+		Vector2(hc.x - 0.46 * r, hc.y - 0.32 * r), Vector2(hc.x - 0.32 * r, hc.y - 0.54 * r),
+		Vector2(hc.x + 0.32 * r, hc.y - 0.54 * r), Vector2(hc.x + 0.46 * r, hc.y - 0.32 * r),
+		Vector2(hc.x + 0.38 * r, hc.y + 0.14 * r), Vector2(hc.x, hc.y + 0.34 * r),
+		Vector2(hc.x - 0.38 * r, hc.y + 0.14 * r)]), _ICE)
+	canvas.draw_colored_polygon(PackedVector2Array([
+		Vector2(hc.x - 0.40 * r, hc.y - 0.18 * r), Vector2(hc.x + 0.40 * r, hc.y - 0.18 * r),
+		Vector2(hc.x + 0.32 * r, hc.y - 0.06 * r), Vector2(hc.x - 0.32 * r, hc.y - 0.06 * r)]), _ICE_DARK)
+	for sx in [-1.0, 1.0]:
+		var e := Vector2(hc.x + sx * 0.19 * r, hc.y)
+		canvas.draw_circle(e, 0.06 * r, Color(0.62, 0.91, 1.0, 0.4))
+		canvas.draw_circle(e, 0.033 * r, _ICE_EYE)
+	var jaw := hc.y + 0.28 * r
+	for i in range(icicles):
+		var ix := hc.x - 0.26 * r + (0.52 * r) * (float(i) / float(maxi(1, icicles - 1)))
+		canvas.draw_colored_polygon(PackedVector2Array([Vector2(ix - 0.05 * r, jaw),
+			Vector2(ix + 0.05 * r, jaw), Vector2(ix, jaw + (0.12 + 0.06 * float(i % 2)) * r)]), _ICE_HI)
+	if rune:
+		canvas.draw_line(Vector2(hc.x, hc.y - 0.44 * r), Vector2(hc.x, hc.y - 0.28 * r), _ICE_EYE, maxf(2.0, 0.02 * r))
+		canvas.draw_line(Vector2(hc.x, hc.y - 0.40 * r), Vector2(hc.x + 0.06 * r, hc.y - 0.33 * r), _ICE_EYE, maxf(2.0, 0.02 * r))
+
+
+# The Resonant Octave (tier 11) — a living sound-being: soundwave rings, glowing eyes, equalizer voice.
+const _OCT := Color("#5a52a8")
+const _OCT_HI := Color("#8a80e0")
+const _OCT_GLOW := Color("#c8c0f5")
+
+static func _draw_octave(canvas: CanvasItem, c: Vector2, r: float, rng: RandomNumberGenerator) -> void:
+	var bars := 4 + rng.randi() % 3
+	var rings := 2 + rng.randi() % 2
+	var hc := Vector2(c.x, c.y - 0.04 * r)
+	for i in range(rings):
+		var rr := (0.52 + float(i) * 0.16) * r
+		canvas.draw_arc(hc, rr, deg_to_rad(205), deg_to_rad(335), 24,
+			Color(_OCT_GLOW.r, _OCT_GLOW.g, _OCT_GLOW.b, 0.5 - float(i) * 0.14), maxf(2.0, 0.02 * r))
+	canvas.draw_colored_polygon(_disc_segment_below(c, r, 0.34), _OCT)
+	canvas.draw_colored_polygon(_ellipse(hc, 0.44 * r, 0.46 * r, 24), _OCT_HI)
+	for sx in [-1.0, 1.0]:
+		canvas.draw_circle(Vector2(hc.x + sx * 0.17 * r, hc.y - 0.08 * r), 0.05 * r, _OCT_GLOW)
+	var bw := (0.5 * r) / float(bars)
+	for i in range(bars):
+		var bx := hc.x - 0.25 * r + bw * (float(i) + 0.5)
+		var bh := (0.06 + absf(sin(float(i) * 1.5 + rng.randf() * 2.0)) * 0.14) * r
+		canvas.draw_rect(Rect2(bx - bw * 0.3, hc.y + 0.24 * r - bh, bw * 0.6, bh), _OCT_GLOW)
 
 
 # --- geometry helpers ---------------------------------------------------------------------------

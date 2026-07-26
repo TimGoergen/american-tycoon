@@ -88,9 +88,11 @@ static func draw_face(canvas: CanvasItem, property_index: int, tier: int, center
 	_draw_brows(canvas, center, radius, brow_style, hair)
 	_draw_eyes(canvas, center, radius, eye_shape)
 	_draw_nose(canvas, center, radius, nose_style, skin)
-	_draw_mouth(canvas, center, radius, mouth_style)
+	# Facial hair goes on BEFORE the mouth so the mouth/lips draw on top of a beard (a beard that
+	# hides the mouth reads as a mask over the lower face, not as hair — Tim, 2026-07-25).
 	if facial_hair != 0:
 		_draw_facial_hair(canvas, center, radius, facial_hair, hair)
+	_draw_mouth(canvas, center, radius, mouth_style)
 	if glasses:
 		_draw_glasses(canvas, center, radius, glasses_square)
 	return true
@@ -311,21 +313,37 @@ static func _draw_mouth(canvas: CanvasItem, c: Vector2, r: float, style: int) ->
 
 
 static func _draw_facial_hair(canvas: CanvasItem, c: Vector2, r: float, kind: int, hair: Color) -> void:
-	var my := c.y + HEAD_CY * r + 0.35 * r
+	var hc := Vector2(c.x + HEAD_CX * r, c.y + HEAD_CY * r)  # head center
+	var my := hc.y + 0.35 * r                                # mouth line
 	match kind:
 		1:  # mustache: a short bar just above the mouth
 			canvas.draw_colored_polygon(PackedVector2Array([
 				Vector2(c.x - 0.13 * r, my - 0.10 * r), Vector2(c.x + 0.13 * r, my - 0.10 * r),
 				Vector2(c.x + 0.11 * r, my - 0.02 * r), Vector2(c.x - 0.11 * r, my - 0.02 * r),
 			]), hair)
-		2:  # beard: a band hugging the jawline below the mouth
-			var jaw := c.y + HEAD_CY * r + HEAD_HH * r
+		2:
+			# Full beard: hugs the jaw from sideburn to sideburn (so it reads as facial hair CONNECTED
+			# to the head, not a floating band) with a top edge that follows below the nose. The mouth
+			# is drawn on top afterward, so the lips show through. Points: down the left jaw to the
+			# chin, up the right jaw to the right sideburn, then back across the upper beard line.
 			canvas.draw_colored_polygon(PackedVector2Array([
-				Vector2(c.x - 0.34 * r, my - 0.06 * r), Vector2(c.x + 0.34 * r, my - 0.06 * r),
-				Vector2(c.x + 0.20 * r, jaw), Vector2(c.x - 0.20 * r, jaw),
+				Vector2(hc.x - 0.50 * r, hc.y + 0.04 * r),  # left sideburn (at the ear)
+				Vector2(hc.x - 0.45 * r, hc.y + 0.28 * r),  # left cheek
+				Vector2(hc.x - 0.36 * r, hc.y + 0.42 * r),  # left jaw
+				Vector2(hc.x - 0.22 * r, hc.y + 0.54 * r),
+				Vector2(hc.x + 0.00 * r, hc.y + 0.60 * r),  # chin
+				Vector2(hc.x + 0.22 * r, hc.y + 0.54 * r),
+				Vector2(hc.x + 0.36 * r, hc.y + 0.42 * r),  # right jaw
+				Vector2(hc.x + 0.45 * r, hc.y + 0.28 * r),  # right cheek
+				Vector2(hc.x + 0.50 * r, hc.y + 0.04 * r),  # right sideburn
+				Vector2(hc.x + 0.30 * r, hc.y + 0.20 * r),  # upper beard line, back across
+				Vector2(hc.x + 0.12 * r, hc.y + 0.27 * r),
+				Vector2(hc.x + 0.00 * r, hc.y + 0.28 * r),  # dips just below the nose
+				Vector2(hc.x - 0.12 * r, hc.y + 0.27 * r),
+				Vector2(hc.x - 0.30 * r, hc.y + 0.20 * r),
 			]), hair)
-		3:  # goatee: a small tuft on the chin
-			var chin := c.y + HEAD_CY * r + HEAD_HH * r
+		3:  # goatee: a small tuft on the chin, below the mouth
+			var chin := hc.y + HEAD_HH * r
 			canvas.draw_colored_polygon(PackedVector2Array([
 				Vector2(c.x - 0.09 * r, my + 0.04 * r), Vector2(c.x + 0.09 * r, my + 0.04 * r),
 				Vector2(c.x + 0.05 * r, chin), Vector2(c.x - 0.05 * r, chin),

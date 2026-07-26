@@ -223,10 +223,11 @@ func tap_wage() -> void:
 ## (Spec §7). The pulse rate lives in the UI (WagePanel), upgrade-scalable later.
 func hold_tap_wage() -> void:
 	frenzy.on_tap(tuning.frenzy_fill_hold_factor)
-	# The auto-clicker's "amount" Legacy upgrade makes each HELD tap earn extra, on top of
-	# the normal per-tap wage (manual taps don't get this bonus).
-	var earned := floorf(wage.tap_wage(frenzy.get_multiplier()) * wage.auto_tap_power_multiplier)
-	# Held auto-tap earns the wage in full, so it counts as earned money too.
+	# Every tap — manual or held — earns the full per-tap wage (the Auto-Click Power bonus is now
+	# inside tap_wage), so the clock-in button's amount is exactly what each tap pays (Tim,
+	# 2026-07-26). Holding still fills frenzy at the reduced hold factor above, so deliberate manual
+	# tapping keeps its frenzy-charge edge — that, not a bigger payout, is holding's trade-off.
+	var earned := wage.tap_wage(frenzy.get_multiplier())
 	economy.award_earned(earned)
 
 

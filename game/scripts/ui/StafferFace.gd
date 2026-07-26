@@ -71,9 +71,11 @@ static func draw_face(canvas: CanvasItem, property_index: int, tier: int, center
 	var nose_style := rng.randi() % 4       # 0 soft·1 button·2 side·3 triangle
 	var mouth_style := rng.randi() % 4      # 0 neutral·1 smile·2 slight frown·3 small
 	var facial_hair := 0
-	if rng.randf() < 0.26 and hair_style < 6:    # most clean-shaven; no beard under the big curly/mop
-		facial_hair = 1 + rng.randi() % 3        # 1 mustache·2 beard·3 goatee
-	var clothing := rng.randi() % 4         # 0 suit+tie·1 lab coat·2 turtleneck·3 open collar
+	if rng.randf() < 0.30:                       # most faces clean-shaven
+		facial_hair = 1 + rng.randi() % 6        # 1 'stache·2 handlebar·3 full beard·4 goatee·5 van dyke·6 stubble
+		if hair_style >= 6 and facial_hair == 3: # a full beard under the big curly/mop can look enclosing
+			facial_hair = 4                      # → a goatee instead
+	var clothing := rng.randi() % 7         # 0 suit·1 lab coat·2 turtleneck·3 open collar·4 bow tie·5 sweater vest·6 crew tee
 	var cloth_color: Color = _CLOTH_COLORS[rng.randi() % _CLOTH_COLORS.size()]
 	var tie_color: Color = _TIE_COLORS[rng.randi() % _TIE_COLORS.size()]
 	var glasses := rng.randf() < 0.33
@@ -91,7 +93,7 @@ static func draw_face(canvas: CanvasItem, property_index: int, tier: int, center
 	# Facial hair goes on BEFORE the mouth so the mouth/lips draw on top of a beard (a beard that
 	# hides the mouth reads as a mask over the lower face, not as hair — Tim, 2026-07-25).
 	if facial_hair != 0:
-		_draw_facial_hair(canvas, center, radius, facial_hair, hair)
+		_draw_facial_hair(canvas, center, radius, facial_hair, hair, skin)
 	_draw_mouth(canvas, center, radius, mouth_style)
 	if glasses:
 		_draw_glasses(canvas, center, radius, glasses_square)
@@ -116,18 +118,25 @@ const _TIE_COLORS: Array[Color] = [
 
 # --- clothing / head layers ---------------------------------------------------------------------
 
-## The shoulders: the circular segment of the disc below COLLAR_CUT, filled in the clothing color,
-## then a per-style collar detail (suit + tie, lab-coat lapels, turtleneck, or an open collar).
+## The shoulders: the circular segment of the disc below COLLAR_CUT in the clothing color, then a
+## per-style collar detail (suit + tie, lab coat, turtleneck, open collar, bow tie, sweater vest, or
+## a crew-neck tee).
 static func _draw_collar(canvas: CanvasItem, c: Vector2, r: float, style: int, cloth: Color, tie: Color) -> void:
 	var cut_y := c.y + COLLAR_CUT * r
 	canvas.draw_colored_polygon(_disc_segment_below(c, r, COLLAR_CUT), cloth)
 
+	# Styles with a SOLID neckline (no shirt V showing).
 	if style == 2:
-		# Turtleneck: a rounded clothing collar rising to the chin — just a filled circle cap.
+		# Turtleneck: a rounded clothing collar rising to the chin.
 		canvas.draw_circle(Vector2(c.x, cut_y), NECK_HW * r * 1.7, cloth)
 		return
+	if style == 6:
+		# Crew-neck tee: a ribbed round neckline arc, no shirt beneath.
+		canvas.draw_arc(Vector2(c.x, cut_y - 0.04 * r), 0.24 * r, deg_to_rad(200), deg_to_rad(340),
+				16, cloth.darkened(0.20), maxf(2.0, 0.035 * r))
+		return
 
-	# Suit / lab coat / open collar all open into a V of shirt below the neck.
+	# The rest open into a V of shirt below the neck.
 	var v_top := Vector2(c.x, cut_y - 0.02 * r)
 	var v_w := 0.20 * r
 	var v_bottom := c.y + 0.9 * r
@@ -156,6 +165,26 @@ static func _draw_collar(canvas: CanvasItem, c: Vector2, r: float, style: int, c
 			canvas.draw_colored_polygon(PackedVector2Array([
 				v_top, Vector2(c.x + 0.14 * r, cut_y + 0.02 * r), Vector2(c.x + 0.02 * r, v_top.y + 0.16 * r),
 			]), UiPalette.CREAM.darkened(0.06))
+		4:
+			# Bow tie: two triangles meeting at a knot, at the base of the neck.
+			var by := cut_y + 0.03 * r
+			var bw := 0.15 * r
+			var bh := 0.08 * r
+			canvas.draw_colored_polygon(PackedVector2Array([
+				Vector2(c.x, by), Vector2(c.x - bw, by - bh), Vector2(c.x - bw, by + bh)]), tie)
+			canvas.draw_colored_polygon(PackedVector2Array([
+				Vector2(c.x, by), Vector2(c.x + bw, by - bh), Vector2(c.x + bw, by + bh)]), tie)
+			canvas.draw_circle(Vector2(c.x, by), 0.04 * r, tie.darkened(0.2))
+		5:
+			# Sweater vest: a V-neck ribbing over the shirt, plus a tie.
+			var rib := cloth.darkened(0.18)
+			canvas.draw_line(Vector2(c.x - v_w, v_bottom), v_top, rib, maxf(2.0, 0.045 * r))
+			canvas.draw_line(Vector2(c.x + v_w, v_bottom), v_top, rib, maxf(2.0, 0.045 * r))
+			var t_w := 0.05 * r
+			canvas.draw_colored_polygon(PackedVector2Array([
+				Vector2(c.x, cut_y + 0.04 * r),
+				Vector2(c.x - t_w, v_bottom), Vector2(c.x + t_w, v_bottom),
+			]), tie)
 
 
 static func _draw_neck(canvas: CanvasItem, c: Vector2, r: float, skin: Color) -> void:
@@ -324,42 +353,59 @@ static func _draw_mouth(canvas: CanvasItem, c: Vector2, r: float, style: int) ->
 			canvas.draw_line(Vector2(mx - 0.055 * r, my), Vector2(mx + 0.055 * r, my), col, maxf(3.0, 0.05 * r))
 
 
-static func _draw_facial_hair(canvas: CanvasItem, c: Vector2, r: float, kind: int, hair: Color) -> void:
+static func _draw_facial_hair(canvas: CanvasItem, c: Vector2, r: float, kind: int, hair: Color, skin: Color) -> void:
 	var hc := Vector2(c.x + HEAD_CX * r, c.y + HEAD_CY * r)  # head center
 	var my := hc.y + 0.35 * r                                # mouth line
 	match kind:
-		1:  # mustache: a short bar just above the mouth
+		1:  # thin mustache: a short bar just above the mouth
 			canvas.draw_colored_polygon(PackedVector2Array([
 				Vector2(c.x - 0.13 * r, my - 0.10 * r), Vector2(c.x + 0.13 * r, my - 0.10 * r),
 				Vector2(c.x + 0.11 * r, my - 0.02 * r), Vector2(c.x - 0.11 * r, my - 0.02 * r),
 			]), hair)
-		2:
-			# Full beard: hugs the jaw from sideburn to sideburn (so it reads as facial hair CONNECTED
-			# to the head, not a floating band) with a top edge that follows below the nose. The mouth
-			# is drawn on top afterward, so the lips show through. Points: down the left jaw to the
-			# chin, up the right jaw to the right sideburn, then back across the upper beard line.
+		2:  # handlebar mustache: wider, with the ends curling up
 			canvas.draw_colored_polygon(PackedVector2Array([
-				Vector2(hc.x - 0.50 * r, hc.y + 0.04 * r),  # left sideburn (at the ear)
-				Vector2(hc.x - 0.45 * r, hc.y + 0.28 * r),  # left cheek
-				Vector2(hc.x - 0.36 * r, hc.y + 0.42 * r),  # left jaw
-				Vector2(hc.x - 0.22 * r, hc.y + 0.54 * r),
-				Vector2(hc.x + 0.00 * r, hc.y + 0.60 * r),  # chin
-				Vector2(hc.x + 0.22 * r, hc.y + 0.54 * r),
-				Vector2(hc.x + 0.36 * r, hc.y + 0.42 * r),  # right jaw
-				Vector2(hc.x + 0.45 * r, hc.y + 0.28 * r),  # right cheek
-				Vector2(hc.x + 0.50 * r, hc.y + 0.04 * r),  # right sideburn
-				Vector2(hc.x + 0.30 * r, hc.y + 0.20 * r),  # upper beard line, back across
-				Vector2(hc.x + 0.12 * r, hc.y + 0.27 * r),
-				Vector2(hc.x + 0.00 * r, hc.y + 0.28 * r),  # dips just below the nose
-				Vector2(hc.x - 0.12 * r, hc.y + 0.27 * r),
-				Vector2(hc.x - 0.30 * r, hc.y + 0.20 * r),
+				Vector2(c.x - 0.18 * r, my - 0.17 * r), Vector2(c.x - 0.08 * r, my - 0.10 * r),
+				Vector2(c.x, my - 0.06 * r), Vector2(c.x + 0.08 * r, my - 0.10 * r),
+				Vector2(c.x + 0.18 * r, my - 0.17 * r), Vector2(c.x + 0.12 * r, my - 0.04 * r),
+				Vector2(c.x, my - 0.05 * r), Vector2(c.x - 0.12 * r, my - 0.04 * r),
 			]), hair)
-		3:  # goatee: a small tuft on the chin, below the mouth
-			var chin := hc.y + HEAD_HH * r
+		3:  # full beard: hugs the jaw from sideburn to sideburn (connected to the head, not a
+			# floating band). The mouth is drawn on top afterward, so the lips show through.
+			canvas.draw_colored_polygon(_pts(hc, r, _beard_points()), hair)
+		4:  # goatee: a small tuft on the chin, below the mouth
+			_draw_goatee(canvas, c, r, hair)
+		5:  # van dyke: a goatee plus a separate mustache
+			_draw_goatee(canvas, c, r, hair)
 			canvas.draw_colored_polygon(PackedVector2Array([
-				Vector2(c.x - 0.09 * r, my + 0.04 * r), Vector2(c.x + 0.09 * r, my + 0.04 * r),
-				Vector2(c.x + 0.05 * r, chin), Vector2(c.x - 0.05 * r, chin),
+				Vector2(c.x - 0.12 * r, my - 0.10 * r), Vector2(c.x + 0.12 * r, my - 0.10 * r),
+				Vector2(c.x + 0.10 * r, my - 0.03 * r), Vector2(c.x - 0.10 * r, my - 0.03 * r),
 			]), hair)
+		6:  # stubble: the beard region in a faint skin-shadow tone (a five-o'clock shadow)
+			var stub := skin.darkened(0.34)
+			stub.a = 0.5
+			canvas.draw_colored_polygon(_pts(hc, r, _beard_points()), stub)
+
+
+## The jaw-hugging full-beard outline, as head-radius fractions (shared by the full beard and the
+## stubble shadow). Down the left jaw to the chin, up the right jaw to the sideburn, then back across
+## the upper beard line, which dips just below the nose.
+static func _beard_points() -> Array:
+	return [
+		Vector2(-0.50, 0.04), Vector2(-0.45, 0.28), Vector2(-0.36, 0.42), Vector2(-0.22, 0.54),
+		Vector2(0.00, 0.60), Vector2(0.22, 0.54), Vector2(0.36, 0.42), Vector2(0.45, 0.28),
+		Vector2(0.50, 0.04), Vector2(0.30, 0.20), Vector2(0.12, 0.27), Vector2(0.00, 0.28),
+		Vector2(-0.12, 0.27), Vector2(-0.30, 0.20),
+	]
+
+
+static func _draw_goatee(canvas: CanvasItem, c: Vector2, r: float, hair: Color) -> void:
+	var hc := Vector2(c.x + HEAD_CX * r, c.y + HEAD_CY * r)
+	var my := hc.y + 0.35 * r
+	var chin := hc.y + HEAD_HH * r
+	canvas.draw_colored_polygon(PackedVector2Array([
+		Vector2(c.x - 0.09 * r, my + 0.04 * r), Vector2(c.x + 0.09 * r, my + 0.04 * r),
+		Vector2(c.x + 0.05 * r, chin), Vector2(c.x - 0.05 * r, chin),
+	]), hair)
 
 
 static func _draw_glasses(canvas: CanvasItem, c: Vector2, r: float, square: bool) -> void:

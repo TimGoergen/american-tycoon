@@ -35,7 +35,6 @@ const LOYAL_STAFF     := "loyal_staff"
 const CONNECTIONS     := "connections"
 const ESTATE_LAWYERS  := "estate_lawyers"
 const AUTO_CLICK_SPEED := "auto_click_speed"
-const AUTO_CLICK_POWER := "auto_click_power"
 const RUSH_POWER       := "rush_power"
 const MINIGAME_BONUS   := "minigame_bonus"
 const FRENZY_INTENSITY := "frenzy_intensity"
@@ -150,16 +149,6 @@ const UPGRADES := [
 		"base_cost": 5,
 		"cost_growth": 1.9,
 		"effect_per_level": 0.15,     # COMPOUNDING: ×1.15 held auto-tap/rush rate per level
-	},
-	{
-		"id": AUTO_CLICK_POWER,
-		"name": "Piecework Bonus",
-		"category": "Labor",
-		"description": "Every held auto-tap of Clock In pays out more.",
-		"max_level": 30,              # effectively endless: geometric cost is the real brake
-		"base_cost": 5,
-		"cost_growth": 1.9,
-		"effect_per_level": 0.25,     # COMPOUNDING: ×1.25 wage per HELD auto-tap per level
 	},
 	{
 		"id": RUSH_POWER,
@@ -294,8 +283,6 @@ static func describe_effect(id: String, level: int) -> String:
 			return "up to +%d%% inheritance bonus" % int(round(25.0 + per_level * 100.0 * float(shown_level)))
 		AUTO_CLICK_SPEED:
 			return "×%s auto-tap / auto-rush speed" % Money.trim(pow(1.0 + per_level, float(shown_level)), 2)
-		AUTO_CLICK_POWER:
-			return "×%s wage per held auto-tap" % Money.trim(pow(1.0 + per_level, float(shown_level)), 2)
 		RUSH_POWER:
 			return "×%s rush advance" % Money.trim(pow(1.0 + per_level, float(shown_level)), 2)
 		FRENZY_INTENSITY:

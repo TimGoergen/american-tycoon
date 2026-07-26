@@ -57,11 +57,6 @@ var wage_multiplier: float = 1.0
 ## WagePanel multiplies the held "clock in" auto-tap RATE by this. Set by DynastyState.
 var auto_tap_speed_multiplier: float = 1.0
 
-## Dynasty-wide auto-tap POWER multiplier from the Legacy auto-click upgrade (1.0 = base).
-## Each HELD auto-tap (not a manual tap) earns this much extra, on top of wage_multiplier.
-## Applied in GameState.hold_tap_wage. Set by DynastyState.
-var auto_tap_power_multiplier: float = 1.0
-
 ## The "executive compensation" floor: a fraction of a second of the empire's passive
 ## income (tuning.wage_passive_fraction × passive income/sec), refreshed by GameState
 ## every tick. A tap pays this whenever it beats the ladder wage, so clocking in stays a
@@ -82,7 +77,7 @@ var executive_floor_bonus_per_level: float = 0.0
 ## tap earns at the new, higher level.
 func tap_wage(income_multiplier: float = 1.0) -> float:
 	lifetime_taps += 1
-	var earned := floorf(current_wage_per_tap() * income_multiplier * wage_multiplier)
+	var earned := peek_wage(income_multiplier)
 	taps_into_level += 1
 	# Level up as many times as the banked clicks allow (an early run of cheap levels could
 	# clear more than one at once), carrying the remainder forward each time.
@@ -90,6 +85,15 @@ func tap_wage(income_multiplier: float = 1.0) -> float:
 		taps_into_level -= clicks_required_for_next_level()
 		level += 1
 	return earned
+
+
+## The EXACT wage a single tap earns right now — manual or held — and the number the clock-in
+## button previews. Folds in frenzy (income_multiplier) and Old-Money Connections (wage_multiplier,
+## the "how much it pays" lever), floored ONCE. Does not mutate state, so the button's "+$x" and the
+## payment always agree, for a tap OR a hold (Tim, 2026-07-26). Auto-tap SPEED (Restless Hands) is
+## the separate "how fast holding works" lever; there is no per-held-tap payout bonus.
+func peek_wage(income_multiplier: float = 1.0) -> float:
+	return floorf(current_wage_per_tap() * income_multiplier * wage_multiplier)
 
 
 ## The base wage one tap earns right now, before frenzy / Legacy multipliers: the

@@ -302,14 +302,11 @@ func _process(delta: float) -> void:
 	_pump_auto_tap(delta)
 	_update_plate_glow(delta)
 
-	# The per-tap rate always reflects BOTH wage Legacy upgrades — Old-Money Connections
-	# (wage_multiplier) and the auto-click POWER bonus (auto_tap_power_multiplier) — on top of
-	# the live frenzy multiplier (Spec §7). The power bonus used to be folded in only while the
-	# button was held, so at rest the amount read as if that Legacy upgrade weren't owned (Tim,
-	# 2026-06-22). The clock-in's primary mode is holding it (auto-tapping), so this full
-	# held/auto-tap rate is the canonical figure; a single manual tap still pays the base rate.
-	var wage_per_tap := _wage.current_wage_per_tap() * _frenzy.get_multiplier() \
-			* _wage.wage_multiplier * _wage.auto_tap_power_multiplier
+	# The clock-in amount is the EXACT wage each tap pays. peek_wage folds in the live frenzy
+	# multiplier and both wage Legacy upgrades (Old-Money Connections + Auto-Click Power) with the
+	# same single flooring the payment uses, so the button and the reward can never disagree — for
+	# a manual tap OR a held one (Tim, 2026-07-26).
+	var wage_per_tap := _wage.peek_wage(_frenzy.get_multiplier())
 	_wage_amount_label.text = "+%s" % Money.of(wage_per_tap).display()
 
 	# Right-side readout: the current clock-in level (just the number, in its dark-blue plate).
@@ -394,11 +391,10 @@ func _pump_auto_tap(delta: float) -> void:
 	while _hold_accumulator >= pulse_interval:
 		_hold_accumulator -= pulse_interval
 		wage_hold_tapped.emit()
-		# No per-tap blink here: the gliding highlight (see _update_plate_glow) is
-		# the held-state cue. But each held pulse still earns income, so it gets the
-		# same floating "+income" indicator a manual tap does — including the auto-click
-		# POWER bonus, which only held taps receive.
-		_spawn_income_float(_current_tap_income() * _wage.auto_tap_power_multiplier)
+		# No per-tap blink here: the gliding highlight (see _update_plate_glow) is the held-state
+		# cue. Each held pulse earns the same per-tap wage a manual tap does (Power is in it now),
+		# so it gets the same floating "+income" indicator — the exact amount the button previews.
+		_spawn_income_float(_current_tap_income())
 
 
 ## Arm a single brief manual-tap blink. The color itself is applied on the plate by
@@ -486,7 +482,9 @@ func _draw_sweep() -> void:
 ## pays (base wage × frenzy × the Old-Money Connections wage multiplier), floored.
 ## Used to label the floating "+income" indicators.
 func _current_tap_income() -> float:
-	return floorf(_wage.current_wage_per_tap() * _frenzy.get_multiplier() * _wage.wage_multiplier)
+	# The exact wage a tap pays — the same value the button previews and the payment awards, so the
+	# floating "+$x" flourish agrees with both, for a manual tap or a held one (Tim, 2026-07-26).
+	return _wage.peek_wage(_frenzy.get_multiplier())
 
 
 ## Spawn a small black "+income" label that rises from a slightly random spot and

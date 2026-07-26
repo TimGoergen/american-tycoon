@@ -9,7 +9,8 @@ extends Control
 # GoldBubbles), so they never spill past the progress into the empty track. Cheap: a few line segments.
 
 ## How many shots exist at once, spread across the bar. Kept small so it reads as a sparse volley.
-const SHOT_COUNT := 6
+## +50% (6 -> 9) for the purple cruise-control streaks (Tim, 2026-07-26).
+const SHOT_COUNT := 9
 ## Each shot's length as a fraction of the (full) bar width. 4x longer than the original 10% for
 ## bigger, more visible bolts (Tim 2026-07-14).
 const SHOT_LEN_FRAC := 0.40

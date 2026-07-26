@@ -312,8 +312,9 @@ var _income_label: Label
 var _income_icon: TextureRect
 var _cycle_bar: ProgressBar
 var _cycle_bubbles: GoldBubbles
-## Fast neon-salmon streaks shown ONLY while THIS property is being rushed at max Rush Momentum —
-## tiny dots flying in a straight line, contrasting the swaying gold carbonation (Tim, 2026-07-14).
+## Fast PURPLE streaks shown ONLY while THIS property is being rushed at max Rush Momentum —
+## tiny dots flying in a straight line, contrasting the swaying gold carbonation (Tim, 2026-07-14;
+## recolored purple 2026-07-26 to read distinct from the red frenzy-burn fill).
 var _cycle_momentum_streaks: MomentumStreaks
 ## Diagnosis readout over the bar, shown when tuning.carb_debug_overlay = 1.
 var _carb_debug_label: Label
@@ -475,10 +476,11 @@ func _ready() -> void:
 	_cycle_bubbles = GoldBubbles.new()
 	_cycle_bar.add_child(_cycle_bubbles)
 
-	# Fast neon-salmon streaks over the gold, hidden until this property is rushed at max Rush
-	# Momentum (see _process). They fly straight and fast to contrast the swaying gold carbonation.
+	# Fast PURPLE streaks over the gold, hidden until this property is rushed at max Rush Momentum
+	# (see _process). They fly straight and fast to contrast the swaying gold carbonation — purple
+	# so the cruise-control rush reads distinct from the RED frenzy-burn fill (Tim, 2026-07-26).
 	_cycle_momentum_streaks = MomentumStreaks.new()
-	_cycle_momentum_streaks.color = UiPalette.NEON_SALMON
+	_cycle_momentum_streaks.color = UiPalette.BRIGHT_PURPLE
 	_cycle_momentum_streaks.visible = false
 	_cycle_bar.add_child(_cycle_momentum_streaks)
 

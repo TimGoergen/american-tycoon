@@ -483,7 +483,7 @@ func _draw_sweep() -> void:
 ## Used to label the floating "+income" indicators.
 func _current_tap_income() -> float:
 	# The exact wage a tap pays — the same value the button previews and the payment awards, so the
-	# floating "+$x" flourish agrees with both (Tim, 2026-07-26). Includes the Auto-Click Power bonus.
+	# floating "+$x" flourish agrees with both, for a manual tap or a held one (Tim, 2026-07-26).
 	return _wage.peek_wage(_frenzy.get_multiplier())
 
 

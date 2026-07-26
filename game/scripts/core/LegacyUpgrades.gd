@@ -151,14 +151,6 @@ func auto_click_speed_multiplier() -> float:
 	return pow(1.0 + per_level, float(level))
 
 
-## Multiplier on the wage earned per HELD auto-tap (Piecework Bonus). Compounding. 1.0
-## with nothing bought. Applied only to held auto-taps, not manual taps (GameState).
-func auto_click_power_multiplier() -> float:
-	var per_level := _per_level(LegacyUpgradeCatalog.AUTO_CLICK_POWER)
-	var level := get_level(LegacyUpgradeCatalog.AUTO_CLICK_POWER)
-	return pow(1.0 + per_level, float(level))
-
-
 ## Multiplier on how far one rush-tap advances a cycle (Strong-Arm Tactics). Compounding.
 ## 1.0 with nothing bought. PropertyState scales rush_pct by this.
 func rush_power_multiplier() -> float:

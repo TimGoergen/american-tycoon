@@ -1,7 +1,13 @@
 # Layered Staffer Portrait Generator
 
-**Status:** PHASE 1 BUILT 2026-07-25 (`main` @ 926b814) — the Earth (tier 1) human vertical slice
-ships. Raised by Tim 2026-07-01; decisions made 2026-07-25 (below). Phase 2 (alien tiers 2–6) and
+**Status:** PHASE 1 COMPLETE & APPROVED 2026-07-25 — the Earth (tier 1) human portraits ship and
+Tim signed off ("I like where the earth staffers are"). Raised by Tim 2026-07-01; decisions made
+2026-07-25 (below). Iterated through several rounds of feedback: fixed a hood/mask read (hair is a
+top-shape, never a face-tracing hood) and a lower-face mask read (beards connect to the sideburns
+with the mouth on top); added per-feature variety (eye/brow/nose/mouth shapes), distinct cartoon
+hairstyles (short, side-sweep, pompadour, flat-top, spiky, curly, mop), 8 facial-hair styles
+(incl. long/bushy/ducktail beards; NO handlebar — Tim disliked it), and 7 clothing styles (suit,
+lab coat, turtleneck, open collar, bow tie, sweater vest, crew tee). Phase 2 (alien tiers 2–6) and
 phase 3 (polish / hero overrides) remain.
 
 **Decisions made (Tim, 2026-07-25):** (1) faces are **procedural, code-drawn** — no authored art

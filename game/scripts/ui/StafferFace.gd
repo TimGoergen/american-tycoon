@@ -71,10 +71,10 @@ static func draw_face(canvas: CanvasItem, property_index: int, tier: int, center
 	var nose_style := rng.randi() % 4       # 0 soft·1 button·2 side·3 triangle
 	var mouth_style := rng.randi() % 4      # 0 neutral·1 smile·2 slight frown·3 small
 	var facial_hair := 0
-	if rng.randf() < 0.30:                       # most faces clean-shaven
-		facial_hair = 1 + rng.randi() % 6        # 1 'stache·2 handlebar·3 full beard·4 goatee·5 van dyke·6 stubble
-		if hair_style >= 6 and facial_hair == 3: # a full beard under the big curly/mop can look enclosing
-			facial_hair = 4                      # → a goatee instead
+	if rng.randf() < 0.32:                       # most faces clean-shaven
+		facial_hair = 1 + rng.randi() % 8        # 1 'stache·2 beard·3 long·4 bushy·5 ducktail·6 goatee·7 van dyke·8 stubble
+		if hair_style >= 6 and facial_hair >= 2 and facial_hair <= 5:  # a big beard under curly/mop can look enclosing
+			facial_hair = 6                      # → a goatee instead
 	var clothing := rng.randi() % 7         # 0 suit·1 lab coat·2 turtleneck·3 open collar·4 bow tie·5 sweater vest·6 crew tee
 	var cloth_color: Color = _CLOTH_COLORS[rng.randi() % _CLOTH_COLORS.size()]
 	var tie_color: Color = _TIE_COLORS[rng.randi() % _TIE_COLORS.size()]
@@ -362,25 +362,24 @@ static func _draw_facial_hair(canvas: CanvasItem, c: Vector2, r: float, kind: in
 				Vector2(c.x - 0.13 * r, my - 0.10 * r), Vector2(c.x + 0.13 * r, my - 0.10 * r),
 				Vector2(c.x + 0.11 * r, my - 0.02 * r), Vector2(c.x - 0.11 * r, my - 0.02 * r),
 			]), hair)
-		2:  # handlebar mustache: wider, with the ends curling up
-			canvas.draw_colored_polygon(PackedVector2Array([
-				Vector2(c.x - 0.18 * r, my - 0.17 * r), Vector2(c.x - 0.08 * r, my - 0.10 * r),
-				Vector2(c.x, my - 0.06 * r), Vector2(c.x + 0.08 * r, my - 0.10 * r),
-				Vector2(c.x + 0.18 * r, my - 0.17 * r), Vector2(c.x + 0.12 * r, my - 0.04 * r),
-				Vector2(c.x, my - 0.05 * r), Vector2(c.x - 0.12 * r, my - 0.04 * r),
-			]), hair)
-		3:  # full beard: hugs the jaw from sideburn to sideburn (connected to the head, not a
+		2:  # full beard: hugs the jaw from sideburn to sideburn (connected to the head, not a
 			# floating band). The mouth is drawn on top afterward, so the lips show through.
 			canvas.draw_colored_polygon(_pts(hc, r, _beard_points()), hair)
-		4:  # goatee: a small tuft on the chin, below the mouth
+		3:  # long beard: the full beard extended into a longer hang below the chin
+			canvas.draw_colored_polygon(_pts(hc, r, _beard_long_points()), hair)
+		4:  # bushy beard: wider and fuller, puffing past the jaw with a rounded bottom
+			canvas.draw_colored_polygon(_pts(hc, r, _beard_bushy_points()), hair)
+		5:  # ducktail beard: full on the sides, tapering to a point at the bottom
+			canvas.draw_colored_polygon(_pts(hc, r, _beard_ducktail_points()), hair)
+		6:  # goatee: a small tuft on the chin, below the mouth
 			_draw_goatee(canvas, c, r, hair)
-		5:  # van dyke: a goatee plus a separate mustache
+		7:  # van dyke: a goatee plus a separate mustache
 			_draw_goatee(canvas, c, r, hair)
 			canvas.draw_colored_polygon(PackedVector2Array([
 				Vector2(c.x - 0.12 * r, my - 0.10 * r), Vector2(c.x + 0.12 * r, my - 0.10 * r),
 				Vector2(c.x + 0.10 * r, my - 0.03 * r), Vector2(c.x - 0.10 * r, my - 0.03 * r),
 			]), hair)
-		6:  # stubble: the beard region in a faint skin-shadow tone (a five-o'clock shadow)
+		8:  # stubble: the beard region in a faint skin-shadow tone (a five-o'clock shadow)
 			var stub := skin.darkened(0.34)
 			stub.a = 0.5
 			canvas.draw_colored_polygon(_pts(hc, r, _beard_points()), stub)
@@ -388,13 +387,45 @@ static func _draw_facial_hair(canvas: CanvasItem, c: Vector2, r: float, kind: in
 
 ## The jaw-hugging full-beard outline, as head-radius fractions (shared by the full beard and the
 ## stubble shadow). Down the left jaw to the chin, up the right jaw to the sideburn, then back across
-## the upper beard line, which dips just below the nose.
+## the upper beard line, which dips just below the nose. The longer/bushier/ducktail beards below
+## share that same upper-beard line and only change the outer (lower) silhouette.
 static func _beard_points() -> Array:
 	return [
 		Vector2(-0.50, 0.04), Vector2(-0.45, 0.28), Vector2(-0.36, 0.42), Vector2(-0.22, 0.54),
 		Vector2(0.00, 0.60), Vector2(0.22, 0.54), Vector2(0.36, 0.42), Vector2(0.45, 0.28),
 		Vector2(0.50, 0.04), Vector2(0.30, 0.20), Vector2(0.12, 0.27), Vector2(0.00, 0.28),
 		Vector2(-0.12, 0.27), Vector2(-0.30, 0.20),
+	]
+
+
+## Long beard — the sides run further down and the bottom hangs into a long rounded point below the
+## chin (it laps over the top of the collar, as a real long beard would).
+static func _beard_long_points() -> Array:
+	return [
+		Vector2(-0.50, 0.02), Vector2(-0.46, 0.32), Vector2(-0.40, 0.52), Vector2(-0.26, 0.68),
+		Vector2(-0.12, 0.80), Vector2(0.00, 0.84), Vector2(0.12, 0.80), Vector2(0.26, 0.68),
+		Vector2(0.40, 0.52), Vector2(0.46, 0.32), Vector2(0.50, 0.02),
+		Vector2(0.30, 0.18), Vector2(0.12, 0.26), Vector2(0.00, 0.27), Vector2(-0.12, 0.26), Vector2(-0.30, 0.18),
+	]
+
+
+## Bushy beard — wider than the jaw and rounded, the full lumberjack read.
+static func _beard_bushy_points() -> Array:
+	return [
+		Vector2(-0.56, 0.02), Vector2(-0.55, 0.30), Vector2(-0.46, 0.54), Vector2(-0.26, 0.68),
+		Vector2(0.00, 0.72), Vector2(0.26, 0.68), Vector2(0.46, 0.54), Vector2(0.55, 0.30),
+		Vector2(0.56, 0.02),
+		Vector2(0.32, 0.16), Vector2(0.12, 0.24), Vector2(0.00, 0.25), Vector2(-0.12, 0.24), Vector2(-0.32, 0.16),
+	]
+
+
+## Ducktail beard — full on the sides, tapering to a single point at the bottom.
+static func _beard_ducktail_points() -> Array:
+	return [
+		Vector2(-0.48, 0.04), Vector2(-0.44, 0.32), Vector2(-0.34, 0.48), Vector2(-0.16, 0.60),
+		Vector2(0.00, 0.84), Vector2(0.16, 0.60), Vector2(0.34, 0.48), Vector2(0.44, 0.32),
+		Vector2(0.48, 0.04),
+		Vector2(0.30, 0.20), Vector2(0.12, 0.27), Vector2(0.00, 0.28), Vector2(-0.12, 0.27), Vector2(-0.30, 0.20),
 	]
 
 

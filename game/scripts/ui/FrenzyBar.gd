@@ -19,8 +19,11 @@ const TURBO_TEX := preload("res://art/icons/turbo.svg")
 const TURBO_ICON_SIZE := 90
 
 ## Bubble crowd size while CHARGING, as a fraction of the full crowd —
-## the full crowd read as too busy there (Tim, 2026-07-06). Burning uses the full crowd.
+## the full crowd read as too busy there (Tim, 2026-07-06). Burning uses a denser crowd.
 const CHARGING_BUBBLE_DENSITY := 0.5
+## Bubble crowd size while BURNING — 50% denser than the normal full crowd so the red draining
+## frenzy fill fizzes harder (Tim, 2026-07-26; paired with the faster, more agitated RUSHED tier).
+const BURN_BUBBLE_DENSITY := 1.5
 
 var _frenzy: FrenzyState
 var _tuning: TuningConfig
@@ -190,7 +193,7 @@ func _set_burn_style(burning: bool) -> void:
 	# full crowd; charging fills left-to-right with the reduced crowd (Tim, 2026-07-06).
 	# The bright-gold bubble color reads on both fills, so it no longer swaps here.
 	_bubbles.flow_reversed = burning
-	_bubbles.density_scale = 1.0 if burning else CHARGING_BUBBLE_DENSITY
+	_bubbles.density_scale = BURN_BUBBLE_DENSITY if burning else CHARGING_BUBBLE_DENSITY
 	# Carbonation TIER (Tim, 2026-07-10): burning discharges the multiplier — a livelier RUSHED
 	# flow; charging is the steady FLOWING accrual. Speeds are per-tier static values.
 	_bubbles.tier = GoldBubbles.Tier.RUSHED if burning else GoldBubbles.Tier.FLOWING

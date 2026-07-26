@@ -47,16 +47,17 @@ enum Tier { IDLE, FLOWING, RUSHED, FRENZY }
 ## (not const) so Main can overwrite it from the carb_tier_* tuning knobs once at startup, letting
 ## the ladder be tuned live (the panel reloads the scene on Apply, re-running that setup). Every
 ## GoldBubbles instance shares this one global ladder. Defaults are the first-pass feel values.
-static var tier_speed_px: Array[float] = [20.0, 50.0, 150.0, 200.0]
+static var tier_speed_px: Array[float] = [20.0, 50.0, 240.0, 200.0]
 
 ## The STATIC agitation level (0–1) for each tier: how busy the liquid looks (bubble count boost,
 ## churn wobble, faster sway, comet-tail suppression). IDLE is calm; FRENZY is fully whipped up.
-const TIER_AGITATION := [0.0, 0.15, 0.55, 1.0]
+## RUSHED (the frenzy-burn fill) bumped 0.55 -> 0.85 for a more chaotic burn (Tim, 2026-07-26).
+const TIER_AGITATION := [0.0, 0.15, 0.85, 1.0]
 
 ## The position pool: bubbles spread across the WHOLE bar. Sized to cover the widest bar at the
 ## densest (agitated) setting — track_width / BUBBLE_SPACING_PX × (1 + EXCITED_DENSITY_BOOST). Only
 ## the ones under the fill are drawn, so the actual drawn count still scales with the FILL.
-const MAX_BUBBLE_COUNT := 64
+const MAX_BUBBLE_COUNT := 96
 ## One bubble per this many pixels of BAR width — the constant density. (Was per filled-width; now
 ## the crowd is laid across the whole bar and clipped to the fill, so density stays constant.)
 const BUBBLE_SPACING_PX := 16.0

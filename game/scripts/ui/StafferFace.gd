@@ -65,13 +65,13 @@ static func draw_face(canvas: CanvasItem, property_index: int, tier: int, center
 	# from the seed without shifting the ones already chosen (faces stay stable across updates).
 	var skin: Color = SKIN_TONES[rng.randi() % SKIN_TONES.size()]
 	var hair: Color = HAIR_TONES[rng.randi() % HAIR_TONES.size()]
-	var hair_style := rng.randi() % 8      # 0 bald·1 buzz·2 short·3 side-part·4 pompadour·5 widow's-peak·6 receding·7 wavy
+	var hair_style := rng.randi() % 8      # 0 bald·1 short·2 side-sweep·3 pompadour·4 flat-top·5 spiky·6 curly·7 mop
 	var eye_shape := rng.randi() % 5        # 0 round·1 oval·2 almond·3 highlight·4 sleepy
 	var brow_style := rng.randi() % 4       # 0 flat·1 raised·2 stern·3 arched
 	var nose_style := rng.randi() % 4       # 0 soft·1 button·2 side·3 triangle
 	var mouth_style := rng.randi() % 4      # 0 neutral·1 smile·2 slight frown·3 small
 	var facial_hair := 0
-	if rng.randf() < 0.26:                       # most faces clean-shaven
+	if rng.randf() < 0.26 and hair_style < 6:    # most clean-shaven; no beard under the big curly/mop
 		facial_hair = 1 + rng.randi() % 3        # 1 mustache·2 beard·3 goatee
 	var clothing := rng.randi() % 4         # 0 suit+tie·1 lab coat·2 turtleneck·3 open collar
 	var cloth_color: Color = _CLOTH_COLORS[rng.randi() % _CLOTH_COLORS.size()]
@@ -180,63 +180,75 @@ static func _draw_ears(canvas: CanvasItem, c: Vector2, r: float, skin: Color) ->
 
 # --- hair -------------------------------------------------------------------------------------
 
-## Hair as a CAP on top of the head — the crown down to a hairline whose SHAPE is the style. It
-## deliberately never masses down the SIDES of the head: a smooth hair-ellipse wrapped around the
-## face reads as a hood with a face-hole — i.e. a mask — especially in gray (Tim, 2026-07-25). Every
-## style is a top cap, so the cheeks and jaw are always skin; variety comes from the hairline.
+## Hair as a distinct CARTOON SHAPE with its own silhouette — not a dome clipped to the skull. Some
+## styles rise well above the head (pompadour, flat-top, spiky), one is a wide puff (curly), one is
+## a mop with real volume down to ear level. The one hard rule learned the hard way: hair must not
+## trace the face all the way to the jaw, or it reads as a hood/mask (Tim, 2026-07-25). All shapes
+## stop at or above ear level, so the cheeks and jaw stay skin. Points are head-radius fractions.
 static func _draw_hair(canvas: CanvasItem, c: Vector2, r: float, hair: Color, style: int) -> void:
 	if style == 0:
 		return  # bald
 	var hc := Vector2(c.x + HEAD_CX * r, c.y + HEAD_CY * r)
-	var cap_hw := HEAD_HW * r * 1.03
-	var cap_hh := HEAD_HH * r * 1.03
-	var top := _ellipse(hc, cap_hw, cap_hh, 32)
-
-	# The hairline height below the crown; a higher line (more negative) shows more forehead.
-	var line_y := hc.y - 0.28 * r
+	var shine := hair.lightened(0.18)  # a soft cartoon sheen streak on the crown
 	match style:
-		1: line_y = hc.y - 0.42 * r   # buzz: high and thin
-		2: line_y = hc.y - 0.28 * r   # short
-		3: line_y = hc.y - 0.30 * r   # side part
-		4: line_y = hc.y - 0.40 * r   # pompadour (bump added below)
-		5: line_y = hc.y - 0.26 * r   # widow's peak
-		6: line_y = hc.y - 0.44 * r   # receding (high)
-		7: line_y = hc.y - 0.22 * r   # wavy / full
+		1:  # short back-and-sides with a small forehead dip and sideburns
+			canvas.draw_colored_polygon(_pts(hc, r, [
+				Vector2(-0.49, -0.02), Vector2(-0.52, -0.38), Vector2(-0.30, -0.62), Vector2(0, -0.68),
+				Vector2(0.30, -0.62), Vector2(0.52, -0.38), Vector2(0.49, -0.02),
+				Vector2(0.30, -0.30), Vector2(0, -0.36), Vector2(-0.30, -0.30)]), hair)
+			_hair_shine(canvas, hc, r, shine, -0.22, -0.46)
+		2:  # side sweep: piled higher on the left, a diagonal fringe across the brow
+			canvas.draw_colored_polygon(_pts(hc, r, [
+				Vector2(-0.50, -0.06), Vector2(-0.54, -0.46), Vector2(-0.22, -0.74), Vector2(0.22, -0.66),
+				Vector2(0.50, -0.42), Vector2(0.47, -0.12),
+				Vector2(0.34, -0.36), Vector2(-0.05, -0.26), Vector2(-0.30, -0.40), Vector2(-0.46, -0.30)]), hair)
+			_hair_shine(canvas, hc, r, shine, -0.18, -0.52)
+		3:  # pompadour: a tall rounded wave rising above the front of the head
+			canvas.draw_colored_polygon(_pts(hc, r, [
+				Vector2(-0.46, -0.06), Vector2(-0.50, -0.40), Vector2(-0.30, -0.74), Vector2(-0.02, -0.92),
+				Vector2(0.24, -0.84), Vector2(0.44, -0.56), Vector2(0.45, -0.06),
+				Vector2(0.30, -0.34), Vector2(0, -0.40), Vector2(-0.28, -0.36)]), hair)
+			_hair_shine(canvas, hc, r, shine, -0.10, -0.66)
+		4:  # flat top: a boxy, squared-off crown
+			canvas.draw_colored_polygon(_pts(hc, r, [
+				Vector2(-0.45, -0.04), Vector2(-0.47, -0.72), Vector2(-0.34, -0.80), Vector2(0.34, -0.80),
+				Vector2(0.47, -0.72), Vector2(0.45, -0.04),
+				Vector2(0.30, -0.32), Vector2(0, -0.34), Vector2(-0.30, -0.32)]), hair)
+			_hair_shine(canvas, hc, r, shine, -0.22, -0.66)
+		5:  # spiky: alternating tall/short points across the crown
+			canvas.draw_colored_polygon(_pts(hc, r, [
+				Vector2(-0.48, -0.04), Vector2(-0.50, -0.36),
+				Vector2(-0.44, -0.80), Vector2(-0.30, -0.46), Vector2(-0.16, -0.88), Vector2(-0.02, -0.50),
+				Vector2(0.14, -0.90), Vector2(0.28, -0.48), Vector2(0.44, -0.80),
+				Vector2(0.50, -0.36), Vector2(0.48, -0.04),
+				Vector2(0.30, -0.32), Vector2(0, -0.34), Vector2(-0.30, -0.32)]), hair)
+		6:  # curly / afro: a wide puff built from overlapping lobes
+			canvas.draw_colored_polygon(_pts(hc, r, [
+				Vector2(-0.52, -0.04), Vector2(-0.56, -0.42), Vector2(0, -0.72), Vector2(0.56, -0.42),
+				Vector2(0.52, -0.04), Vector2(0.30, -0.24), Vector2(0, -0.28), Vector2(-0.30, -0.24)]), hair)
+			for lobe in [Vector2(0, -0.66), Vector2(-0.32, -0.60), Vector2(0.32, -0.60),
+					Vector2(-0.52, -0.34), Vector2(0.52, -0.34), Vector2(-0.48, -0.04), Vector2(0.48, -0.04)]:
+				canvas.draw_circle(Vector2(hc.x + lobe.x * r, hc.y + lobe.y * r), 0.20 * r, hair)
+		7:  # mop / bowl: full, rounded, wider than the skull, ending in a bowl line at the brow
+			canvas.draw_colored_polygon(_pts(hc, r, [
+				Vector2(-0.52, 0.00), Vector2(-0.56, -0.42), Vector2(-0.28, -0.68), Vector2(0, -0.72),
+				Vector2(0.28, -0.68), Vector2(0.56, -0.42), Vector2(0.52, 0.00),
+				Vector2(0.34, -0.16), Vector2(0.12, -0.24), Vector2(-0.12, -0.24), Vector2(-0.34, -0.16)]), hair)
+			_hair_shine(canvas, hc, r, shine, -0.20, -0.52)
 
-	# Keep the crown points (above the hairline), then close along the hairline edge.
-	var pts := PackedVector2Array()
-	for p in top:
-		if p.y <= line_y:
-			pts.append(p)
-	if pts.size() < 3:
-		return
-	var right_x := hc.x + cap_hw
-	var left_x := hc.x - cap_hw
-	match style:
-		3:  # side part: a raised notch toward one side
-			pts.append(Vector2(right_x, line_y))
-			pts.append(Vector2(hc.x + 0.10 * r, line_y - 0.05 * r))
-			pts.append(Vector2(left_x, line_y - 0.02 * r))
-		5:  # widow's peak: the hairline dips to a point in the middle
-			pts.append(Vector2(right_x, line_y))
-			pts.append(Vector2(hc.x + 0.12 * r, line_y))
-			pts.append(Vector2(hc.x, line_y + 0.08 * r))
-			pts.append(Vector2(hc.x - 0.12 * r, line_y))
-			pts.append(Vector2(left_x, line_y))
-		7:  # wavy: a gently scalloped hairline
-			pts.append(Vector2(right_x, line_y))
-			pts.append(Vector2(hc.x + 0.22 * r, line_y + 0.05 * r))
-			pts.append(Vector2(hc.x, line_y - 0.03 * r))
-			pts.append(Vector2(hc.x - 0.22 * r, line_y + 0.05 * r))
-			pts.append(Vector2(left_x, line_y))
-		_:  # short / buzz / pompadour / receding: a straight hairline
-			pts.append(Vector2(right_x, line_y))
-			pts.append(Vector2(left_x, line_y))
-	canvas.draw_colored_polygon(pts, hair)
 
-	if style == 4:
-		# Pompadour: a raised hair bump above the forehead.
-		canvas.draw_colored_polygon(_ellipse(Vector2(hc.x, line_y), 0.34 * r, 0.16 * r, 18), hair)
+## Map an array of head-radius-fraction points to canvas coordinates for a hair polygon.
+static func _pts(hc: Vector2, r: float, local: Array) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	for v in local:
+		out.append(Vector2(hc.x + v.x * r, hc.y + v.y * r))
+	return out
+
+
+## A small soft highlight streak on the crown, centered at the given fraction offset — the flat
+## cartoon "sheen" that keeps the hair from reading as one solid blob.
+static func _hair_shine(canvas: CanvasItem, hc: Vector2, r: float, color: Color, fx: float, fy: float) -> void:
+	canvas.draw_colored_polygon(_ellipse(Vector2(hc.x + fx * r, hc.y + fy * r), 0.16 * r, 0.07 * r, 14), color)
 
 
 # --- facial features (each with variants so faces read as individuals) --------------------------

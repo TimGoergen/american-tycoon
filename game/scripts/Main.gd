@@ -308,6 +308,12 @@ func _process(delta: float) -> void:
 			_set_epoch_tab(_epoch_tab_of(blocking_prop))
 		_fire_polled_tip("epoch_blocked", _row_for_index(blocking_prop))
 
+	# The first time the player is viewing Earth White Collar (the second pager tab), point out the
+	# LEFT arrow so they learn the pager pages back and forth between eras (Tim, 2026-07-25).
+	# _maybe_show_tip already holds the card until no overlay is up, so it lands on the game screen.
+	if _tip_armed.get("epoch_navigation", false) and _epoch_tab == 1:
+		_fire_polled_tip("epoch_navigation", _epoch_prev_button)
+
 	# Progressive tab unlocking (Plans/Tutorial_Onboarding_Plan.md §9): the Estate tab unlocks when
 	# the player can FIRST prestige (you prestige FROM that tab, so it must open before the first
 	# prestige, not after); the Family Ledger after the first prestige (it has ancestors to show
@@ -623,7 +629,8 @@ func _build_ui() -> void:
 	# the fact (Tim, 2026-07-23).
 	var tips_on := TutorialProgress.is_enabled()
 	for tip_id in ["getting_started", "first_property", "first_rush", "buy_mode", "first_hire",
-			"turbo_ready", "overdrive", "epochs", "epoch_blocked", "prestige", "family_ledger"]:
+			"turbo_ready", "overdrive", "epochs", "epoch_blocked", "epoch_navigation",
+			"prestige", "family_ledger"]:
 		_tip_armed[tip_id] = tips_on and not TutorialProgress.has_seen(tip_id)
 	# Signal-driven tip: the vent gesture, fired during an overdrive rush. (The offline-earnings
 	# concept is NOT a card — it is taught as a permanent line ON the welcome-back screen itself,

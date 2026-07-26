@@ -61,6 +61,10 @@ const TIPS := {
 		"title": "Own the whole era first",
 		"body": "You've earned enough to reach the next civilization — but first you need at least one of every business in this era. Grab this one to keep climbing.",
 	},
+	"epoch_navigation": {
+		"title": "Page between eras",
+		"body": "These arrows move you between the eras you've opened — the left arrow steps back, the right steps forward. Your earlier markets are always a tap away.",
+	},
 	"prestige": {
 		"title": "Plan your estate",
 		"body": "You've built enough to pass it on. Open the Estate tab to hand your fortune to an heir — it becomes Legacy to spend on permanent upgrades the whole dynasty keeps.",

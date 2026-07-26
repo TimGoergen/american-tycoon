@@ -160,8 +160,11 @@ func _process(delta: float) -> void:
 	else:
 		_set_burn_style(false)
 		if _frenzy.can_pop():
-			# Live preview of what a pop right now would lock in.
-			var preview_mult := 1.0 + (_tuning.frenzy_max_multiplier - 1.0) * _frenzy.meter
+			# Live preview of what a pop right now would lock in. Must include the Frenzy
+			# Intensity (Killer Instinct) upgrade's intensity_multiplier — the SAME factor
+			# FrenzyState.pop() applies to the bonus — or the preview understates the real pop
+			# by that multiplier (Tim, 2026-07-26: charged read 5.6× but the pop locked 6.3×).
+			var preview_mult := 1.0 + (_tuning.frenzy_max_multiplier - 1.0) * _frenzy.intensity_multiplier * _frenzy.meter
 			# Same Second Wind scaling as the burn readout above — the promise the preview
 			# makes must be the one the burn keeps.
 			var preview_secs := _frenzy.meter * _tuning.frenzy_burn_duration * _frenzy.duration_multiplier

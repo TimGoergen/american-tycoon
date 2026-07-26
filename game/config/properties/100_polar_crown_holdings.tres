@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 100
+display_name = "Polar Crown Holdings"
+unlock_tier = 10
+base_cost = 1.378e+50
+r0 = 1.09
+base_income_per_unit = 2.513e+48
+base_cycle_length = 60.0
+staffer_name = "Polar Crown Hoard-Keeper"
+accent_color = Color(0.4275, 0.5569, 0.6275, 1)

@@ -81,6 +81,71 @@ const PROPERTY_PATHS := [
 	"res://config/properties/50_timeline_repossessions.tres",   # epoch 6
 	"res://config/properties/51_millennium_mortgage.tres",      # epoch 6
 	"res://config/properties/52_big_bang_buyback.tres",         # epoch 6
+	# --- New civilizations, first batch (tiers 7-11) — Plans/Add_20_Civs_And_Alien_Portraits.md ---
+	"res://config/properties/53_anglerlight_storefronts.tres",  # epoch 7 — Vashti Deep-Court
+	"res://config/properties/54_pressure_vaults.tres",  # epoch 7 — Vashti Deep-Court
+	"res://config/properties/55_trench_tollway.tres",  # epoch 7 — Vashti Deep-Court
+	"res://config/properties/56_leviathan_charter_fleet.tres",  # epoch 7 — Vashti Deep-Court
+	"res://config/properties/57_whalefall_estates.tres",  # epoch 7 — Vashti Deep-Court
+	"res://config/properties/58_ventworks_utility.tres",  # epoch 7 — Vashti Deep-Court
+	"res://config/properties/59_siren_bond_market.tres",  # epoch 7 — Vashti Deep-Court
+	"res://config/properties/60_hadal_mint.tres",  # epoch 7 — Vashti Deep-Court
+	"res://config/properties/61_drowned_cathedral_exchange.tres",  # epoch 7 — Vashti Deep-Court
+	"res://config/properties/62_midnight_zone_trust.tres",  # epoch 7 — Vashti Deep-Court
+	"res://config/properties/63_abyssal_sovereignty.tres",  # epoch 7 — Vashti Deep-Court
+	"res://config/properties/64_venom_underwriting.tres",  # epoch 8 — Ssethraki Coil-Banks
+	"res://config/properties/65_molt_reinsurance.tres",  # epoch 8 — Ssethraki Coil-Banks
+	"res://config/properties/66_coilfold_annuities.tres",  # epoch 8 — Ssethraki Coil-Banks
+	"res://config/properties/67_actuarial_temple.tres",  # epoch 8 — Ssethraki Coil-Banks
+	"res://config/properties/68_fang_liability_consortium.tres",  # epoch 8 — Ssethraki Coil-Banks
+	"res://config/properties/69_hatchling_whole_life.tres",  # epoch 8 — Ssethraki Coil-Banks
+	"res://config/properties/70_brumation_escrow_vaults.tres",  # epoch 8 — Ssethraki Coil-Banks
+	"res://config/properties/71_constriction_claims_tribunal.tres",  # epoch 8 — Ssethraki Coil-Banks
+	"res://config/properties/72_planetary_coverage_coils.tres",  # epoch 8 — Ssethraki Coil-Banks
+	"res://config/properties/73_extinction_rider_exchange.tres",  # epoch 8 — Ssethraki Coil-Banks
+	"res://config/properties/74_stellar_collapse_indemnity.tres",  # epoch 8 — Ssethraki Coil-Banks
+	"res://config/properties/75_the_ouroboros_perpetuity.tres",  # epoch 8 — Ssethraki Coil-Banks
+	"res://config/properties/76_wax_works_combine.tres",  # epoch 9 — Melissar Hive-Court
+	"res://config/properties/77_nectar_commodities.tres",  # epoch 9 — Melissar Hive-Court
+	"res://config/properties/78_drone_placement_agency.tres",  # epoch 9 — Melissar Hive-Court
+	"res://config/properties/79_honeycomb_estates.tres",  # epoch 9 — Melissar Hive-Court
+	"res://config/properties/80_propolis_patent_office.tres",  # epoch 9 — Melissar Hive-Court
+	"res://config/properties/81_royal_mead_distillery.tres",  # epoch 9 — Melissar Hive-Court
+	"res://config/properties/82_the_waggle_bourse.tres",  # epoch 9 — Melissar Hive-Court
+	"res://config/properties/83_swarm_assurance_society.tres",  # epoch 9 — Melissar Hive-Court
+	"res://config/properties/84_pheromone_broadcasting_guild.tres",  # epoch 9 — Melissar Hive-Court
+	"res://config/properties/85_meadow_annexation_bureau.tres",  # epoch 9 — Melissar Hive-Court
+	"res://config/properties/86_ministry_of_lesser_hives.tres",  # epoch 9 — Melissar Hive-Court
+	"res://config/properties/87_the_queen_s_mint.tres",  # epoch 9 — Melissar Hive-Court
+	"res://config/properties/88_the_royal_jelly_reserve.tres",  # epoch 9 — Melissar Hive-Court
+	"res://config/properties/89_permafrost_ledgers.tres",  # epoch 10 — Norrvane Frostholm
+	"res://config/properties/90_cold_storage_monopoly.tres",  # epoch 10 — Norrvane Frostholm
+	"res://config/properties/91_glacier_calving_yards.tres",  # epoch 10 — Norrvane Frostholm
+	"res://config/properties/92_avalanche_derivatives.tres",  # epoch 10 — Norrvane Frostholm
+	"res://config/properties/93_thaw_debt_collections.tres",  # epoch 10 — Norrvane Frostholm
+	"res://config/properties/94_frostbite_annuities.tres",  # epoch 10 — Norrvane Frostholm
+	"res://config/properties/95_blizzard_claims_hall.tres",  # epoch 10 — Norrvane Frostholm
+	"res://config/properties/96_fjord_toll_dominion.tres",  # epoch 10 — Norrvane Frostholm
+	"res://config/properties/97_winterlong_bond_vaults.tres",  # epoch 10 — Norrvane Frostholm
+	"res://config/properties/98_frozen_sea_exchange.tres",  # epoch 10 — Norrvane Frostholm
+	"res://config/properties/99_moraine_mineral_rights.tres",  # epoch 10 — Norrvane Frostholm
+	"res://config/properties/100_polar_crown_holdings.tres",  # epoch 10 — Norrvane Frostholm
+	"res://config/properties/101_ice_age_futures.tres",  # epoch 10 — Norrvane Frostholm
+	"res://config/properties/102_the_deep_ice_endowment.tres",  # epoch 10 — Norrvane Frostholm
+	"res://config/properties/103_jingle_licensing.tres",  # epoch 11 — The Resonant Octave
+	"res://config/properties/104_chord_cartel.tres",  # epoch 11 — The Resonant Octave
+	"res://config/properties/105_anthem_rights_bureau.tres",  # epoch 11 — The Resonant Octave
+	"res://config/properties/106_symphony_futures.tres",  # epoch 11 — The Resonant Octave
+	"res://config/properties/107_reverb_royalties.tres",  # epoch 11 — The Resonant Octave
+	"res://config/properties/108_encore_futures.tres",  # epoch 11 — The Resonant Octave
+	"res://config/properties/109_key_change_patents.tres",  # epoch 11 — The Resonant Octave
+	"res://config/properties/110_silence_easements.tres",  # epoch 11 — The Resonant Octave
+	"res://config/properties/111_octave_monopoly.tres",  # epoch 11 — The Resonant Octave
+	"res://config/properties/112_planetary_reverb_chamber.tres",  # epoch 11 — The Resonant Octave
+	"res://config/properties/113_orbital_amphitheater.tres",  # epoch 11 — The Resonant Octave
+	"res://config/properties/114_spheres_music_exchange.tres",  # epoch 11 — The Resonant Octave
+	"res://config/properties/115_cosmic_hum_licensing.tres",  # epoch 11 — The Resonant Octave
+	"res://config/properties/116_the_final_movement.tres",  # epoch 11 — The Resonant Octave
 ]
 
 ## Returns null (with an error pushed) if the tuning file is missing.

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 76
+display_name = "Wax Works Combine"
+unlock_tier = 9
+base_cost = 3.925e+42
+r0 = 1.09
+base_income_per_unit = 7.159e+40
+base_cycle_length = 60.0
+staffer_name = "Master Wax Sculptress"
+accent_color = Color(0.7569, 0.6039, 0.149, 1)

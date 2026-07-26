@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 94
+display_name = "Frostbite Annuities"
+unlock_tier = 10
+base_cost = 2.13e+48
+r0 = 1.09
+base_income_per_unit = 3.885e+46
+base_cycle_length = 60.0
+staffer_name = "Slow-Drip Annuity Skald"
+accent_color = Color(0.4275, 0.5569, 0.6275, 1)

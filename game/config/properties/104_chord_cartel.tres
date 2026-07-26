@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 104
+display_name = "Chord Cartel"
+unlock_tier = 11
+base_cost = 2.222e+51
+r0 = 1.09
+base_income_per_unit = 4.053e+49
+base_cycle_length = 60.0
+staffer_name = "Power Chord Enforcer"
+accent_color = Color(0.3294, 0.3059, 0.6196, 1)

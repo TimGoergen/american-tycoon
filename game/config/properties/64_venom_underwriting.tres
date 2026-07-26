@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 64
+display_name = "Venom Underwriting"
+unlock_tier = 8
+base_cost = 2.335e+38
+r0 = 1.09
+base_income_per_unit = 4.259e+36
+base_cycle_length = 60.0
+staffer_name = "Chief Venom Underwriter"
+accent_color = Color(0.3098, 0.4745, 0.2588, 1)

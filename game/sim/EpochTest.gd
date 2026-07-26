@@ -425,7 +425,7 @@ func _test_first_contact_grant(configs: Array, tuning: TuningConfig) -> void:
 		var cohort := game_for_lookup.economy.get_property_indices_for_unlock_tier(tier)
 		if cohort.is_empty():
 			continue  # flavor-only epoch (Path A): re-skins the ladder, adds no new properties
-		var expected_size := tier + 4  # escalating cohorts: epoch 2 → 6 rungs … epoch 6 → 10
+		var expected_size := mini(tier + 4, 14)  # escalating cohorts, capped at 14 rungs (~epoch 10+)
 		expected_total += expected_size
 		var gated := 0
 		for cfg in configs:

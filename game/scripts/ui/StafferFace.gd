@@ -464,6 +464,21 @@ static func _draw_alien(canvas: CanvasItem, property_index: int, tier: int, cent
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_for(property_index, tier)
 	match tier:
+		2:
+			_draw_luminari(canvas, center, radius, rng)
+			return true
+		3:
+			_draw_geth(canvas, center, radius, rng)
+			return true
+		4:
+			_draw_mycelium(canvas, center, radius, rng)
+			return true
+		5:
+			_draw_quartzite(canvas, center, radius, rng)
+			return true
+		6:
+			_draw_chronophage(canvas, center, radius, rng)
+			return true
 		7:
 			_draw_vashti(canvas, center, radius, rng)
 			return true
@@ -679,6 +694,140 @@ static func _draw_octave(canvas: CanvasItem, c: Vector2, r: float, rng: RandomNu
 		var bx := hc.x - 0.25 * r + bw * (float(i) + 0.5)
 		var bh := (0.06 + absf(sin(float(i) * 1.5 + rng.randf() * 2.0)) * 0.14) * r
 		canvas.draw_rect(Rect2(bx - bw * 0.3, hc.y + 0.24 * r - bh, bw * 0.6, bh), _OCT_GLOW)
+
+
+# Luminari Collective (tier 2) — a radiant light-being: an orb head with rays, a bright core, calm.
+const _LUM_BODY := Color("#c96a12")
+const _LUM_RAY := Color("#ffdf8a")
+const _LUM_EYE := Color("#3a1e05")
+
+static func _draw_luminari(canvas: CanvasItem, c: Vector2, r: float, rng: RandomNumberGenerator) -> void:
+	var rays := 7 + rng.randi() % 4
+	var calm := rng.randf() < 0.5
+	for i in range(rays):
+		var a := TAU * float(i) / float(rays)
+		canvas.draw_line(c + Vector2(cos(a), sin(a)) * 0.50 * r,
+			c + Vector2(cos(a), sin(a)) * 0.82 * r, _LUM_RAY, maxf(2.0, 0.03 * r))
+	canvas.draw_circle(c, 0.56 * r, Color(1.0, 0.94, 0.7, 0.35))
+	canvas.draw_circle(c, 0.46 * r, _LUM_BODY)
+	canvas.draw_circle(c, 0.22 * r, Color(1.0, 0.97, 0.82, 0.5))
+	for sx in [-1.0, 1.0]:
+		var e := Vector2(c.x + sx * 0.17 * r, c.y - 0.04 * r)
+		if calm:
+			canvas.draw_arc(e, 0.07 * r, deg_to_rad(20), deg_to_rad(160), 10, _LUM_EYE, maxf(2.0, 0.03 * r))
+		else:
+			canvas.draw_circle(e, 0.05 * r, _LUM_EYE)
+	canvas.draw_arc(Vector2(c.x, c.y + 0.14 * r), 0.10 * r, deg_to_rad(20), deg_to_rad(160), 10, _LUM_EYE, maxf(2.0, 0.025 * r))
+
+
+# Geth-Sentinel Grid (tier 3) — a machine: angular metal head, a scanning optic, status lights.
+const _GETH_METAL := Color("#2e3742")
+const _GETH_HI := Color("#4a5764")
+const _GETH_OPTIC := Color("#4de8ff")
+
+static func _draw_geth(canvas: CanvasItem, c: Vector2, r: float, rng: RandomNumberGenerator) -> void:
+	var scan := (rng.randf() - 0.5) * 0.5 * r
+	var dots := 3 + rng.randi() % 3
+	var hc := Vector2(c.x, c.y - 0.03 * r)
+	canvas.draw_line(Vector2(hc.x, hc.y - 0.44 * r), Vector2(hc.x, hc.y - 0.58 * r), _GETH_HI, maxf(2.0, 0.025 * r))
+	canvas.draw_circle(Vector2(hc.x, hc.y - 0.58 * r), 0.04 * r, _GETH_OPTIC)
+	canvas.draw_colored_polygon(_disc_segment_below(c, r, 0.32), _GETH_METAL)
+	canvas.draw_colored_polygon(PackedVector2Array([
+		Vector2(hc.x - 0.42 * r, hc.y - 0.28 * r), Vector2(hc.x - 0.34 * r, hc.y - 0.46 * r),
+		Vector2(hc.x + 0.34 * r, hc.y - 0.46 * r), Vector2(hc.x + 0.42 * r, hc.y - 0.28 * r),
+		Vector2(hc.x + 0.42 * r, hc.y + 0.22 * r), Vector2(hc.x - 0.42 * r, hc.y + 0.22 * r)]), _GETH_HI)
+	canvas.draw_rect(Rect2(hc.x - 0.40 * r, hc.y - 0.14 * r, 0.80 * r, 0.20 * r), _GETH_METAL)
+	var ox := clampf(hc.x + scan, hc.x - 0.32 * r, hc.x + 0.32 * r)
+	canvas.draw_circle(Vector2(ox, hc.y - 0.04 * r), 0.09 * r, Color(_GETH_OPTIC.r, _GETH_OPTIC.g, _GETH_OPTIC.b, 0.4))
+	canvas.draw_circle(Vector2(ox, hc.y - 0.04 * r), 0.05 * r, _GETH_OPTIC)
+	for i in range(dots):
+		canvas.draw_circle(Vector2(hc.x - 0.24 * r + float(i) * 0.16 * r, hc.y + 0.13 * r), 0.02 * r, _GETH_OPTIC)
+
+
+# Mycelium Unity (tier 4) — a fungal being: a spotted cap over a pale face, dot eyes, drifting spores.
+const _MYC_CAP := Color("#a94f38")
+const _MYC_SPOT := Color("#ecd9b0")
+const _MYC_STALK := Color("#e3d6bb")
+const _MYC_EYE := Color("#3a2a1a")
+
+static func _draw_mycelium(canvas: CanvasItem, c: Vector2, r: float, rng: RandomNumberGenerator) -> void:
+	var spots := 3 + rng.randi() % 3
+	var spot_a: Array[float] = []
+	for _i in range(spots):
+		spot_a.append(rng.randf())
+	var spores := 2 + rng.randi() % 3
+	var spore_x: Array[float] = []
+	for _i in range(spores):
+		spore_x.append(rng.randf())
+	var hc := Vector2(c.x, c.y + 0.02 * r)
+	canvas.draw_colored_polygon(_disc_segment_below(c, r, 0.30), _MYC_STALK)
+	canvas.draw_colored_polygon(_ellipse(hc, 0.34 * r, 0.36 * r, 22), _MYC_STALK)
+	var cap := PackedVector2Array()
+	for i in range(17):
+		var a := PI + PI * float(i) / 16.0
+		cap.append(Vector2(hc.x + cos(a) * 0.50 * r, hc.y - 0.06 * r + sin(a) * 0.40 * r))
+	canvas.draw_colored_polygon(cap, _MYC_CAP)
+	for i in range(spots):
+		var a := PI + PI * (0.15 + 0.7 * spot_a[i])
+		canvas.draw_circle(Vector2(hc.x + cos(a) * 0.30 * r, hc.y - 0.06 * r + sin(a) * 0.24 * r), 0.04 * r, _MYC_SPOT)
+	for sx in [-1.0, 1.0]:
+		canvas.draw_circle(Vector2(hc.x + sx * 0.13 * r, hc.y + 0.10 * r), 0.035 * r, _MYC_EYE)
+	for i in range(spores):
+		canvas.draw_circle(Vector2(hc.x + (spore_x[i] - 0.5) * 0.9 * r, hc.y - 0.44 * r), 0.02 * r, _MYC_SPOT)
+
+
+# Quartzite Conglomerate (tier 5) — a crystalloid: a faceted angular head, gem eyes, glints.
+const _QZ_BODY := Color("#6f9fd0")
+const _QZ_FACET := Color("#a7cbe8")
+const _QZ_DARK := Color("#4a6f9a")
+const _QZ_EYE := Color("#e6f7ff")
+
+static func _draw_quartzite(canvas: CanvasItem, c: Vector2, r: float, rng: RandomNumberGenerator) -> void:
+	var glints := 2 + rng.randi() % 3
+	var glint_p: Array[float] = []
+	for _i in range(glints * 2):
+		glint_p.append(rng.randf())
+	var hc := Vector2(c.x, c.y - 0.04 * r)
+	canvas.draw_colored_polygon(PackedVector2Array([
+		Vector2(hc.x, hc.y - 0.56 * r), Vector2(hc.x + 0.44 * r, hc.y - 0.24 * r),
+		Vector2(hc.x + 0.36 * r, hc.y + 0.30 * r), Vector2(hc.x, hc.y + 0.52 * r),
+		Vector2(hc.x - 0.36 * r, hc.y + 0.30 * r), Vector2(hc.x - 0.44 * r, hc.y - 0.24 * r)]), _QZ_BODY)
+	canvas.draw_colored_polygon(PackedVector2Array([Vector2(hc.x, hc.y - 0.56 * r),
+		Vector2(hc.x + 0.44 * r, hc.y - 0.24 * r), Vector2(hc.x, hc.y - 0.05 * r)]), _QZ_FACET)
+	canvas.draw_colored_polygon(PackedVector2Array([Vector2(hc.x, hc.y - 0.05 * r),
+		Vector2(hc.x - 0.44 * r, hc.y - 0.24 * r), Vector2(hc.x, hc.y - 0.56 * r)]), _QZ_DARK)
+	canvas.draw_colored_polygon(PackedVector2Array([Vector2(hc.x, hc.y + 0.52 * r),
+		Vector2(hc.x + 0.36 * r, hc.y + 0.30 * r), Vector2(hc.x, hc.y - 0.05 * r)]), _QZ_DARK)
+	for sx in [-1.0, 1.0]:
+		var e := Vector2(hc.x + sx * 0.15 * r, hc.y - 0.06 * r)
+		canvas.draw_colored_polygon(PackedVector2Array([Vector2(e.x, e.y - 0.06 * r),
+			Vector2(e.x + 0.05 * r, e.y), Vector2(e.x, e.y + 0.06 * r), Vector2(e.x - 0.05 * r, e.y)]), _QZ_EYE)
+	for i in range(glints):
+		var gx := hc.x + (glint_p[i * 2] - 0.5) * 0.6 * r
+		var gy := hc.y + (glint_p[i * 2 + 1] - 0.5) * 0.6 * r
+		canvas.draw_line(Vector2(gx - 0.03 * r, gy), Vector2(gx + 0.03 * r, gy), _QZ_EYE, maxf(1.5, 0.015 * r))
+		canvas.draw_line(Vector2(gx, gy - 0.03 * r), Vector2(gx, gy + 0.03 * r), _QZ_EYE, maxf(1.5, 0.015 * r))
+
+
+# Chronophage Enclave (tier 6) — a time-eater: a dark head with a glowing clock face and small eyes.
+const _CHR_HI := Color("#7a3548")
+const _CHR_BODY := Color("#5a2535")
+const _CHR_GLOW := Color("#e8b04a")
+
+static func _draw_chronophage(canvas: CanvasItem, c: Vector2, r: float, rng: RandomNumberGenerator) -> void:
+	var hour := rng.randf() * TAU
+	var minute := rng.randf() * TAU
+	var hc := Vector2(c.x, c.y - 0.03 * r)
+	canvas.draw_colored_polygon(_disc_segment_below(c, r, 0.32), _CHR_BODY)
+	canvas.draw_colored_polygon(_ellipse(hc, 0.48 * r, 0.50 * r, 24), _CHR_HI)
+	for sx in [-1.0, 1.0]:
+		canvas.draw_circle(Vector2(hc.x + sx * 0.16 * r, hc.y - 0.28 * r), 0.04 * r, _CHR_GLOW)
+	var cc := Vector2(hc.x, hc.y + 0.10 * r)
+	var cr := 0.22 * r
+	canvas.draw_arc(cc, cr, 0.0, TAU, 28, _CHR_GLOW, maxf(2.0, 0.025 * r))
+	canvas.draw_line(cc, cc + Vector2(cos(hour - PI / 2.0), sin(hour - PI / 2.0)) * cr * 0.5, _CHR_GLOW, maxf(2.0, 0.03 * r))
+	canvas.draw_line(cc, cc + Vector2(cos(minute - PI / 2.0), sin(minute - PI / 2.0)) * cr * 0.85, _CHR_GLOW, maxf(2.0, 0.02 * r))
+	canvas.draw_circle(cc, 0.03 * r, _CHR_GLOW)
 
 
 # --- geometry helpers ---------------------------------------------------------------------------

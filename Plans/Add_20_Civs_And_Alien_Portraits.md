@@ -3,8 +3,12 @@
 **Status:** APPROVED — decisions made by Tim 2026-07-25 (below); executing. Raised by Tim 2026-07-25.
 
 **Decisions (Tim, 2026-07-25):**
-1. **Path A now, B/modifiers later** — epochs 7–26 re-skin the existing 52 properties (flavor + scale
-   + contact + portraits); per-epoch gameplay depth is a separate follow-on.
+1. ~~Path A now, B later~~ **→ PATH B (reversed after the Sim).** Path A was wired first, but the Sim
+   proved the new epochs are *unreachable* with no new income: epoch 7 took 31 days, epoch 10 took
+   169 **billion** years, because property count stayed at 52 while the threshold jumps ×16807/epoch.
+   Tim chose Path B — each new epoch gets its own property cohort (like epochs 2–6). **DONE for the
+   first batch (tiers 7–11):** 64 new properties generated from the draft's computed costs/incomes;
+   Sim pacing restored (props 52→116, ~3–4 min/epoch, ~1.2 h total). Batch is fully playable.
 2. **Richer per-civ portraits** — each alien civ gets its OWN bespoke design (still procedural /
    code-drawn, no art files) tuned to its identity, rather than a shared ~8-archetype system. §6 is
    revised accordingly: hand-craft a distinct procedural alien per civ, seeded per role for

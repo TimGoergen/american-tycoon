@@ -726,7 +726,7 @@ static func _draw_luminari(canvas: CanvasItem, c: Vector2, r: float, rng: Random
 	var ray_style := rng.randi() % 3          # straight · wavy · spike
 	var eye_shape := rng.randi() % 5
 	var mouth_shape := rng.randi() % 4
-	var core := (0.16 + rng.randf() * 0.10) * r
+	var core := (0.24 + rng.randf() * 0.12) * r
 	var ray_col := _LUM_RAY.lerp(body, rng.randf() * 0.3)
 	for i in range(rays):
 		var a := TAU * float(i) / float(rays)
@@ -734,18 +734,18 @@ static func _draw_luminari(canvas: CanvasItem, c: Vector2, r: float, rng: Random
 		var perp := Vector2(-d.y, d.x)
 		match ray_style:
 			0:
-				canvas.draw_line(c + d * 0.50 * r, c + d * 0.82 * r, ray_col, maxf(2.0, 0.03 * r))
+				canvas.draw_line(c + d * 0.60 * r, c + d * 0.92 * r, ray_col, maxf(2.0, 0.035 * r))
 			1:
-				canvas.draw_polyline(PackedVector2Array([c + d * 0.50 * r,
-					c + d * 0.66 * r + perp * 0.05 * r, c + d * 0.82 * r]), ray_col, maxf(2.0, 0.025 * r))
+				canvas.draw_polyline(PackedVector2Array([c + d * 0.60 * r,
+					c + d * 0.76 * r + perp * 0.05 * r, c + d * 0.92 * r]), ray_col, maxf(2.0, 0.03 * r))
 			2:
-				canvas.draw_colored_polygon(PackedVector2Array([c + d * 0.48 * r + perp * 0.05 * r,
-					c + d * 0.48 * r - perp * 0.05 * r, c + d * 0.84 * r]), ray_col)
-	canvas.draw_circle(c, 0.56 * r, Color(1.0, 0.94, 0.7, 0.32))
-	canvas.draw_circle(c, 0.46 * r, body)
+				canvas.draw_colored_polygon(PackedVector2Array([c + d * 0.58 * r + perp * 0.06 * r,
+					c + d * 0.58 * r - perp * 0.06 * r, c + d * 0.94 * r]), ray_col)
+	canvas.draw_circle(c, 0.66 * r, Color(1.0, 0.94, 0.7, 0.32))
+	canvas.draw_circle(c, 0.58 * r, body)
 	canvas.draw_circle(c, core, Color(1.0, 0.97, 0.82, 0.45))
-	_alien_eyes(canvas, c.x, c.y - 0.04 * r, 0.16 * r, 0.06 * r, Color("#fff2cf"), _LUM_INK, eye_shape)
-	_alien_mouth(canvas, c.x, c.y + 0.17 * r, 0.20 * r, _LUM_INK, mouth_shape)
+	_alien_eyes(canvas, c.x, c.y - 0.06 * r, 0.21 * r, 0.09 * r, Color("#fff2cf"), _LUM_INK, eye_shape)
+	_alien_mouth(canvas, c.x, c.y + 0.24 * r, 0.28 * r, _LUM_INK, mouth_shape)
 
 
 # Geth-Sentinel Grid (tier 3) — a machine: angular metal head, glowing optic(s), status lights.

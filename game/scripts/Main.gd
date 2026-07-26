@@ -2314,12 +2314,21 @@ class EpochPagerDots extends Control:
 	func _draw() -> void:
 		if _count <= 0:
 			return
-		var span := float(_count - 1) * DOT_SPACING
+		# Auto-fit: with many epochs the default spacing would overflow the pager, so shrink the
+		# gap (and, once tight, the dots) to fit the available width. Keeps the whole strip on
+		# screen through the first batch and degrades gracefully toward the full 26 epochs; a
+		# dedicated compact/windowed indicator is a follow-on for the full rollout.
+		var spacing := DOT_SPACING
+		if _count > 1 and size.x > 0.0:
+			var usable := size.x - DOT_RADIUS * 2.0
+			spacing = minf(DOT_SPACING, usable / float(_count - 1))
+		var dot_r := minf(DOT_RADIUS, spacing * 0.42)
+		var span := float(_count - 1) * spacing
 		var start_x := (size.x - span) * 0.5
 		var y := size.y * 0.5
 		for i in range(_count):
-			var pos := Vector2(start_x + float(i) * DOT_SPACING, y)
+			var pos := Vector2(start_x + float(i) * spacing, y)
 			if i == _current:
-				draw_circle(pos, DOT_RADIUS, UiPalette.MUSTARD_GOLD)
+				draw_circle(pos, dot_r, UiPalette.MUSTARD_GOLD)
 			else:
-				draw_circle(pos, DOT_RADIUS * 0.6, UiPalette.INK_NAVY)
+				draw_circle(pos, dot_r * 0.6, UiPalette.INK_NAVY)

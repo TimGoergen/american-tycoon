@@ -1,6 +1,15 @@
 # Add 20 More Civilizations + Alien Staffer Portraits
 
-**Status:** PLAN — awaiting Tim's decisions (§3, §9). Raised by Tim 2026-07-25.
+**Status:** APPROVED — decisions made by Tim 2026-07-25 (below); executing. Raised by Tim 2026-07-25.
+
+**Decisions (Tim, 2026-07-25):**
+1. **Path A now, B/modifiers later** — epochs 7–26 re-skin the existing 52 properties (flavor + scale
+   + contact + portraits); per-epoch gameplay depth is a separate follow-on.
+2. **Richer per-civ portraits** — each alien civ gets its OWN bespoke design (still procedural /
+   code-drawn, no art files) tuned to its identity, rather than a shared ~8-archetype system. §6 is
+   revised accordingly: hand-craft a distinct procedural alien per civ, seeded per role for
+   individual variation.
+3. **First batch, then the rest** — wire + portrait tiers 7–11 first, device-validate, then 12–26.
 **Goal:** grow the epoch frontier from **6 tiers (Earth + 5 aliens)** to **26 tiers (Earth + 25 aliens)**,
 and extend the procedural staffer-portrait generator so every one of the new civilizations has a
 distinct staffer look.

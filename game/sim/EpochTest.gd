@@ -64,7 +64,9 @@ func _test_thresholds(tuning: TuningConfig) -> void:
 	# (7^5 = 16807x), and staff is now a FLAT modest boost — staff_income_multiplier is 1.0 every tier.
 	_check("Luminari (tier 2) threshold == Earth target x16807 (7^5, continuous ladder)",
 		is_equal_approx(EpochCatalog.consume_threshold(2, earth), earth * 16807.0))
-	_check("There are 6 epochs (Earth + 5 aliens)", EpochCatalog.tier_count() == 6)
+	# 11 epochs after the first batch of new civs (Earth + 5 original aliens + 5 new: tiers 7-11).
+	# Grows to 26 as later batches land (Plans/Add_20_Civs_And_Alien_Portraits.md).
+	_check("There are 11 epochs (Earth + 10 aliens)", EpochCatalog.tier_count() == 11)
 	_check("Staffer multiplier is FLAT 1.0 at every tier (the ladder carries the leap, not staff)",
 		is_equal_approx(EpochCatalog.staff_income_multiplier(1), 1.0) \
 			and is_equal_approx(EpochCatalog.staff_income_multiplier(2), 1.0) \
@@ -84,9 +86,10 @@ func _test_epoch_advances(configs: Array, tuning: TuningConfig) -> void:
 	game.epoch.update(tuning.earth_economy_target)
 	_check("consumed Earth's economy: advanced to epoch 2", game.epoch.current_tier == 2)
 
-	# A huge jump can cross several epochs at once, capped at the last defined epoch.
-	game.epoch.update(tuning.earth_economy_target * 1e30)
-	_check("enormous earnings cap at the last epoch (6)", game.epoch.current_tier == EpochCatalog.tier_count())
+	# A huge jump can cross several epochs at once, capped at the last defined epoch. The factor is
+	# large enough to blow past the top threshold regardless of how many epochs exist.
+	game.epoch.update(tuning.earth_economy_target * 1e120)
+	_check("enormous earnings cap at the last epoch", game.epoch.current_tier == EpochCatalog.tier_count())
 
 
 func _test_staff_ladder_basics(configs: Array, tuning: TuningConfig) -> void:
@@ -226,7 +229,12 @@ func _test_staff_retention(configs: Array, tuning: TuningConfig) -> void:
 	# (rank 12) and an appended cohort sibling can never out-price a later epoch's
 	# flagship the way raw indices did.
 	var flagship_2 := game.economy.get_property_index_for_unlock_tier(2)
-	var flagship_last := game.economy.get_property_index_for_unlock_tier(EpochCatalog.tier_count())
+	# The LAST epoch that actually ships properties (tier 6 today) — not tier_count(): the newest
+	# flavor-only epochs (Path A) add no property cohort, so tier_count() has no flagship.
+	var last_prop_tier := 2
+	for ps in game.economy.properties:
+		last_prop_tier = maxi(last_prop_tier, ((ps as PropertyState).config as PropertyConfig).unlock_tier)
+	var flagship_last := game.economy.get_property_index_for_unlock_tier(last_prop_tier)
 	_check("every epoch's flagship retention prices identically (rank 12)",
 		flagship_2 >= 0 and flagship_last >= 0
 			and dynasty.staff_retention.cost_for_level(flagship_2, 1)
@@ -414,6 +422,9 @@ func _test_first_contact_grant(configs: Array, tuning: TuningConfig) -> void:
 
 	var expected_total := 12
 	for tier in range(2, EpochCatalog.tier_count() + 1):
+		var cohort := game_for_lookup.economy.get_property_indices_for_unlock_tier(tier)
+		if cohort.is_empty():
+			continue  # flavor-only epoch (Path A): re-skins the ladder, adds no new properties
 		var expected_size := tier + 4  # escalating cohorts: epoch 2 → 6 rungs … epoch 6 → 10
 		expected_total += expected_size
 		var gated := 0
@@ -422,11 +433,8 @@ func _test_first_contact_grant(configs: Array, tuning: TuningConfig) -> void:
 				gated += 1
 		_check("epoch %d ships a %d-property cohort" % [tier, expected_size],
 			gated == expected_size)
-		var cohort := game_for_lookup.economy.get_property_indices_for_unlock_tier(tier)
 		_check("epoch %d's cohort lookup returns all %d members" % [tier, expected_size],
 			cohort.size() == expected_size)
-		if cohort.is_empty():
-			continue
 		_check("epoch %d's flagship resolves via the singular tier lookup" % tier,
 			game_for_lookup.economy.get_property_index_for_unlock_tier(tier) == cohort[0])
 

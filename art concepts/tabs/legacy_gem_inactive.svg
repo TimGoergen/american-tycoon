@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="252"
+   height="252"
+   viewBox="0 0 252 252"
+   version="1.1"
+   id="svg22"
+   sodipodi:docname="legacy_gem_inactive.svg"
+   inkscape:version="1.4.4 (dcaf3e7, 2026-05-05)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview22"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="1.6011905"
+     inkscape:cx="24.356877"
+     inkscape:cy="146.45353"
+     inkscape:window-width="1920"
+     inkscape:window-height="1009"
+     inkscape:window-x="1912"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg22" />
+  <!-- "Legacy gem" — a vertical faceted crystal with a glowing magenta core, vectorized from the
+       concept art (art concepts/legacy_gem_firstdraft.png). Built as cleanly-tiling facet polygons
+       (left/right split top-mid-bottom, plus a central glowing column) over a black silhouette.
+       No SVG filters (the Godot/thorvg importer doesn't render them) — the glow is gradient ellipses. -->
+  <defs
+     id="defs10">
+    <radialGradient
+       id="radialGradient14"
+       cx="232.83078"
+       cy="74.563751"
+       r="69.268173"
+       gradientTransform="matrix(-0.35641671,-0.03602327,0.08160575,-1.8049274,166.27058,270.28736)"
+       fx="232.83078"
+       fy="74.563751"
+       gradientUnits="userSpaceOnUse">
+      <stop
+         offset="0"
+         stop-color="#ffd6f6"
+         id="stop11"
+         style="stop-color:#ffffff;stop-opacity:1;" />
+      <stop
+         offset="0.22"
+         stop-color="#ff58e2"
+         id="stop12"
+         style="stop-color:#ffffff;stop-opacity:1;" />
+      <stop
+         offset="0.55000001"
+         stop-color="#cf2fbe"
+         id="stop13"
+         style="stop-color:#ffffff;stop-opacity:1;" />
+      <stop
+         offset="1"
+         stop-color="#7d279a"
+         id="stop14"
+         style="stop-color:#ffffff;stop-opacity:1;" />
+    </radialGradient>
+    <linearGradient
+       id="linearGradient25"
+       x1="0"
+       y1="0"
+       x2="1"
+       y2="0">
+      <stop
+         offset="0"
+         stop-color="#511f78"
+         id="stop25" />
+      <stop
+         offset="1"
+         stop-color="#511f78"
+         id="stop23"
+         style="stop-color:#c72ebb;stop-opacity:1;" />
+    </linearGradient>
+    <radialGradient
+       id="lg_core"
+       cx="232.83078"
+       cy="74.563751"
+       r="69.268173"
+       gradientTransform="matrix(-0.35641671,-0.03602327,0.08160575,-1.8049274,166.27058,270.28736)"
+       fx="232.83078"
+       fy="74.563751"
+       gradientUnits="userSpaceOnUse">
+      <stop
+         offset="0"
+         stop-color="#ffd6f6"
+         id="stop1" />
+      <stop
+         offset="0.22"
+         stop-color="#ff58e2"
+         id="stop2" />
+      <stop
+         offset="0.55"
+         stop-color="#cf2fbe"
+         id="stop3" />
+      <stop
+         offset="1"
+         stop-color="#7d279a"
+         id="stop4" />
+    </radialGradient>
+    <linearGradient
+       id="lg_center"
+       x1="164.64503"
+       y1="9.7760496"
+       x2="164.64503"
+       y2="99.370872"
+       gradientTransform="matrix(-0.28869434,0,0,-2.3375703,170.60481,256.13766)"
+       gradientUnits="userSpaceOnUse">
+      <stop
+         offset="0"
+         stop-color="#8a47b6"
+         id="stop5" />
+      <stop
+         offset="0.5"
+         stop-color="#b478e0"
+         id="stop6" />
+      <stop
+         offset="1"
+         stop-color="#793aa6"
+         id="stop7" />
+    </linearGradient>
+    <linearGradient
+       id="lg_side"
+       x1="0"
+       y1="0"
+       x2="1"
+       y2="0">
+      <stop
+         offset="0"
+         stop-color="#511f78"
+         id="stop8"
+         style="stop-color:#c92ebb;stop-opacity:1;" />
+      <stop
+         offset="0.5"
+         stop-color="#8a44ac"
+         id="stop9"
+         style="stop-color:#da68d7;stop-opacity:1;" />
+      <stop
+         offset="1"
+         stop-color="#511f78"
+         id="stop10" />
+    </linearGradient>
+    <clipPath
+       id="lg_centerclip">
+      <polygon
+         points="108,180 90,230 72,180 72,70 90,24 108,70 "
+         id="polygon10" />
+    </clipPath>
+  </defs>
+  <!-- Black crystal silhouette (the thick outline) -->
+  <!-- Facets: tile the gem, each with a dark border stroke (the borders between facets) -->
+  <g
+     stroke="#1c0a28"
+     stroke-width="2.5"
+     stroke-linejoin="round"
+     id="g18"
+     transform="matrix(-1.4884682,0,0,-0.99553719,256.1257,254.99456)"
+     style="display:inline;fill:#1d2d50;fill-opacity:0.33870968;stroke:#1d2d50;stroke-width:5.62979;stroke-dasharray:none;stroke-opacity:1">
+    <polygon
+       points="30,84 70,24 90,24 72,70 "
+       fill="#491d63"
+       id="polygon12"
+       style="fill:#1d2d50;fill-opacity:0.33870968;stroke:#1d2d50;stroke-width:8.66917;stroke-dasharray:none;stroke-opacity:1" />
+    <!-- left top -->
+    <polygon
+       points="30,84 72,70 72,180 38,172 "
+       fill="#ffffff"
+       id="polygon13"
+       style="fill:#1d2d50;fill-opacity:0.33870968;stroke:#1d2d50;stroke-width:9.16206;stroke-dasharray:none;stroke-opacity:1"
+       transform="matrix(0.99371913,0,0,1.0003103,0.46866946,-0.03879291)" />
+    <!-- left mid -->
+    <polygon
+       points="72,230 38,172 72,180 90,230 "
+       fill="#391450"
+       id="polygon14"
+       style="fill:#1d2d50;fill-opacity:0.33870968;stroke:#1d2d50;stroke-width:8.75132;stroke-dasharray:none;stroke-opacity:1" />
+    <!-- left bottom -->
+    <polygon
+       points="90,24 110,24 150,84 108,70 "
+       fill="#491d63"
+       id="polygon15"
+       style="fill:#1d2d50;fill-opacity:0.33870968;stroke:#1d2d50;stroke-width:6.94404;stroke-dasharray:none;stroke-opacity:1"
+       transform="translate(-0.89006903,-0.88718564)" />
+    <!-- right top -->
+    <polygon
+       points="108,70 150,84 142,172 108,180 "
+       fill="#ffffff"
+       id="polygon16"
+       style="fill:#1d2d50;fill-opacity:0.33870968;stroke:#1d2d50;stroke-width:6.07901;stroke-dasharray:none;stroke-opacity:1"
+       transform="matrix(1.0260857,0,0,0.99914311,-3.9584403,0.10711124)" />
+    <!-- right mid -->
+    <polygon
+       points="108,180 142,172 108,230 90,230 "
+       fill="#391450"
+       id="polygon17"
+       style="fill:#1d2d50;fill-opacity:0.33870968;stroke:#1d2d50;stroke-width:7.43693;stroke-dasharray:none;stroke-opacity:1"
+       transform="translate(-1.0489564,0.31366749)" />
+    <!-- right bottom -->
+    <!-- center -->
+  </g>
+  <!-- Glowing magenta core, clipped to the central facet -->
+  <!-- Beveled highlights: light lavender along the upper inner facet edges where light catches -->
+</svg>

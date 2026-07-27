@@ -11,8 +11,8 @@ config_version=5
 [application]
 
 config/name="American Tycoon"
-config/version="0.0.0.0001"
 config/description="Idle/tycoon — M1 The Slice"
+config/version="0.0.0.0001"
 config/tags=PackedStringArray("game")
 run/main_scene="res://Main.tscn"
 config/features=PackedStringArray("4.5", "Mobile")

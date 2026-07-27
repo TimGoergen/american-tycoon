@@ -18,11 +18,11 @@
        id="linearGradient4"
        inkscape:collect="always">
       <stop
-         style="stop-color:#1c4a18;stop-opacity:1;"
+         style="stop-color:#005a90;stop-opacity:1;"
          offset="0.00159744"
          id="stop4" />
       <stop
-         style="stop-color:#81d47c;stop-opacity:1;"
+         style="stop-color:#2cb5ff;stop-opacity:1;"
          offset="1"
          id="stop5" />
     </linearGradient>
@@ -30,11 +30,11 @@
        id="linearGradient2"
        inkscape:collect="always">
       <stop
-         style="stop-color:#7dce78;stop-opacity:1;"
+         style="stop-color:#2ab8f8;stop-opacity:1;"
          offset="0.00159744"
          id="stop2" />
       <stop
-         style="stop-color:#21511d;stop-opacity:1;"
+         style="stop-color:#05426d;stop-opacity:1;"
          offset="1"
          id="stop3" />
     </linearGradient>
@@ -67,7 +67,7 @@
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#d1d1d1"
      inkscape:zoom="9.962963"
-     inkscape:cx="40.650557"
+     inkscape:cx="40.550186"
      inkscape:cy="40.5"
      inkscape:window-width="1920"
      inkscape:window-height="1009"
@@ -88,36 +88,4 @@
        id="path2"
        style="stroke:url(#linearGradient3);fill:url(#linearGradient5);stroke-width:1.23733333;stroke-dasharray:none" />
   </g>
-  <path
-     style="fill:none;fill-opacity:0.33871;stroke:#064700;stroke-width:1.25576;stroke-linejoin:round;stroke-miterlimit:5.4;stroke-opacity:1;paint-order:fill markers stroke"
-     d="m 10.298157,13.553847 c 0,0 5.42523,-1.23493 8.777899,1.459464"
-     id="path3" />
-  <path
-     style="fill:none;fill-opacity:0.33871;stroke:#064700;stroke-width:1.25576;stroke-linejoin:round;stroke-miterlimit:5.4;stroke-opacity:1;paint-order:fill markers stroke"
-     d="m 10.476596,17.003661 c 0,0 5.42523,-1.23493 8.777899,1.459464"
-     id="path7" />
-  <path
-     style="fill:none;fill-opacity:0.33871;stroke:#064700;stroke-width:1.25576;stroke-linejoin:round;stroke-miterlimit:5.4;stroke-opacity:1;paint-order:fill markers stroke"
-     d="m 10.476596,20.275036 c 0,0 5.42523,-1.23493 8.777899,1.459464"
-     id="path8" />
-  <path
-     style="fill:none;fill-opacity:0.33871;stroke:#064700;stroke-width:1.25576;stroke-linejoin:round;stroke-miterlimit:5.4;stroke-opacity:1;paint-order:fill markers stroke"
-     d="m 10.417116,23.72485 c 0,0 5.42523,-1.23493 8.777899,1.459464"
-     id="path9" />
-  <path
-     style="fill:none;fill-opacity:0.33871;stroke:#064700;stroke-width:1.25576;stroke-linejoin:round;stroke-miterlimit:5.4;stroke-opacity:1;paint-order:fill markers stroke"
-     d="m 37.411806,13.196969 c 0,0 -5.42523,-1.23493 -8.777899,1.459464"
-     id="path10" />
-  <path
-     style="fill:none;fill-opacity:0.33871;stroke:#064700;stroke-width:1.25576;stroke-linejoin:round;stroke-miterlimit:5.4;stroke-opacity:1;paint-order:fill markers stroke"
-     d="m 37.411806,16.646783 c 0,0 -5.42523,-1.23493 -8.777899,1.459464"
-     id="path11" />
-  <path
-     style="fill:none;fill-opacity:0.33871;stroke:#064700;stroke-width:1.25576;stroke-linejoin:round;stroke-miterlimit:5.4;stroke-opacity:1;paint-order:fill markers stroke"
-     d="m 37.233367,20.275036 c 0,0 -5.42523,-1.23493 -8.777899,1.459464"
-     id="path12" />
-  <path
-     style="fill:none;fill-opacity:0.33871;stroke:#064700;stroke-width:1.25576;stroke-linejoin:round;stroke-miterlimit:5.4;stroke-opacity:1;paint-order:fill markers stroke"
-     d="m 37.114408,24.081728 c 0,0 -5.42523,-1.23493 -8.777899,1.459464"
-     id="path13" />
 </svg>

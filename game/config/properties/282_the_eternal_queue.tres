@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 282
+display_name = "The Eternal Queue"
+unlock_tier = 23
+base_cost = 1.177e+105
+r0 = 1.09
+base_income_per_unit = 2.91281e+101
+base_cycle_length = 29.068
+staffer_name = "Warden of Queue 7,441-B"
+accent_color = Color(0.6196, 0.1686, 0.1451, 1)

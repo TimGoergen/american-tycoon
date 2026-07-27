@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 144
+display_name = "The Warhoard Citadel"
+unlock_tier = 13
+base_cost = 2.626e+63
+r0 = 1.09
+base_income_per_unit = 6.81338e+60
+base_cycle_length = 60.0
+staffer_name = "High Custodian of Plunder"
+accent_color = Color(0.5451, 0.2275, 0.1216, 1)

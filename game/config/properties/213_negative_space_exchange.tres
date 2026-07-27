@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 213
+display_name = "Negative Space Exchange"
+unlock_tier = 18
+base_cost = 1.758e+84
+r0 = 1.09
+base_income_per_unit = 1.40881e+81
+base_cycle_length = 41.762
+staffer_name = "Curator of Absence"
+accent_color = Color(0.0784, 0.0784, 0.0784, 1)

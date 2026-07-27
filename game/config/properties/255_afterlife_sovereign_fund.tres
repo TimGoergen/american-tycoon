@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 255
+display_name = "Afterlife Sovereign Fund"
+unlock_tier = 21
+base_cost = 8.348e+96
+r0 = 1.09
+base_income_per_unit = 4.10874e+93
+base_cycle_length = 41.762
+staffer_name = "Sovereign Wealth Wraith"
+accent_color = Color(0.4902, 0.4471, 0.349, 1)

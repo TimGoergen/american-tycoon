@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 133
+display_name = "Mercenary Exchange"
+unlock_tier = 13
+base_cost = 1.257e+60
+r0 = 1.09
+base_income_per_unit = 6.06114e+55
+base_cycle_length = 1.115
+staffer_name = "Sellsword Floor Broker"
+accent_color = Color(0.5451, 0.2275, 0.1216, 1)

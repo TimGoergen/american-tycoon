@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 294
+display_name = "Magnetic Pole Trust"
+unlock_tier = 24
+base_cost = 4.927e+108
+r0 = 1.09
+base_income_per_unit = 5.02104e+104
+base_cycle_length = 14.083
+staffer_name = "True North Custodian"
+accent_color = Color(0.2745, 0.4078, 0.549, 1)

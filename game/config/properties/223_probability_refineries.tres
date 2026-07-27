@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 223
+display_name = "Probability Refineries"
+unlock_tier = 19
+base_cost = 1.833e+87
+r0 = 1.09
+base_income_per_unit = 2.92982e+83
+base_cycle_length = 9.802
+staffer_name = "Chief Odds Distiller"
+accent_color = Color(0.1216, 0.4314, 0.2627, 1)

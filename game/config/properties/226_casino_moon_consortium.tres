@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 226
+display_name = "Casino Moon Consortium"
+unlock_tier = 19
+base_cost = 1.475e+88
+r0 = 1.09
+base_income_per_unit = 6.99129e+84
+base_cycle_length = 29.068
+staffer_name = "Casino Moon Impresario"
+accent_color = Color(0.1216, 0.4314, 0.2627, 1)

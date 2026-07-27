@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 248
+display_name = "Cenotaph Securities"
+unlock_tier = 21
+base_cost = 6.439e+94
+r0 = 1.09
+base_income_per_unit = 2.5065e+90
+base_cycle_length = 3.305
+staffer_name = "Cenotaph Underwriter"
+accent_color = Color(0.4902, 0.4471, 0.349, 1)

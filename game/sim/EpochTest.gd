@@ -64,9 +64,10 @@ func _test_thresholds(tuning: TuningConfig) -> void:
 	# (7^5 = 16807x), and staff is now a FLAT modest boost — staff_income_multiplier is 1.0 every tier.
 	_check("Luminari (tier 2) threshold == Earth target x16807 (7^5, continuous ladder)",
 		is_equal_approx(EpochCatalog.consume_threshold(2, earth), earth * 16807.0))
-	# 11 epochs after the first batch of new civs (Earth + 5 original aliens + 5 new: tiers 7-11).
-	# Grows to 26 as later batches land (Plans/Add_20_Civs_And_Alien_Portraits.md).
-	_check("There are 11 epochs (Earth + 10 aliens)", EpochCatalog.tier_count() == 11)
+	# 26 epochs: Earth + 5 original aliens (tiers 2-6) + 5 first-batch new civs (tiers 7-11)
+	# + the remaining 15 civs (tiers 12-26, added 2026-07-26 per
+	# Plans/Add_20_Civs_And_Alien_Portraits.md). Full 326-property ladder.
+	_check("There are 26 epochs (Earth + 25 aliens)", EpochCatalog.tier_count() == 26)
 	_check("Staffer multiplier is FLAT 1.0 at every tier (the ladder carries the leap, not staff)",
 		is_equal_approx(EpochCatalog.staff_income_multiplier(1), 1.0) \
 			and is_equal_approx(EpochCatalog.staff_income_multiplier(2), 1.0) \

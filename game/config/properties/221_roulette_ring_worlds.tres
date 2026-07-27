@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 221
+display_name = "Roulette Ring Worlds"
+unlock_tier = 19
+base_cost = 4.567e+86
+r0 = 1.09
+base_income_per_unit = 3.53702e+82
+base_cycle_length = 4.749
+staffer_name = "Roulette World Croupier"
+accent_color = Color(0.1216, 0.4314, 0.2627, 1)

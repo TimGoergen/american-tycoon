@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 207
+display_name = "Restoration Ateliers"
+unlock_tier = 18
+base_cost = 2.718e+82
+r0 = 1.09
+base_income_per_unit = 2.47673e+78
+base_cycle_length = 4.749
+staffer_name = "Overzealous Restoration Maestro"
+accent_color = Color(0.0784, 0.0784, 0.0784, 1)

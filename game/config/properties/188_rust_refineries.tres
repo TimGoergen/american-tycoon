@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 188
+display_name = "Rust Refineries"
+unlock_tier = 17
+base_cost = 5.007e+76
+r0 = 1.09
+base_income_per_unit = 8.77055e+71
+base_cycle_length = 0.776
+staffer_name = "Rust-Refinery Foreman"
+accent_color = Color(0.5412, 0.2902, 0.1098, 1)

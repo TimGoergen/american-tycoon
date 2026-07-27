@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 137
+display_name = "Tribute Futures Pit"
+unlock_tier = 13
+base_cost = 2.026e+61
+r0 = 1.09
+base_income_per_unit = 4.15999e+57
+base_cycle_length = 4.749
+staffer_name = "Vassal Yield Broker"
+accent_color = Color(0.5451, 0.2275, 0.1216, 1)

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 161
+display_name = "Nightmare Insurance"
+unlock_tier = 15
+base_cost = 3.551e+68
+r0 = 1.09
+base_income_per_unit = 1.23698e+64
+base_cycle_length = 1.115
+staffer_name = "Nightmare Claims Adjuster"
+accent_color = Color(0.5608, 0.4824, 0.7098, 1)

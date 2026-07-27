@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 155
+display_name = "Faux Pas Tribunal"
+unlock_tier = 14
+base_cost = 5.488e+66
+r0 = 1.09
+base_income_per_unit = 4.0812e+63
+base_cycle_length = 20.233
+staffer_name = "Presiding Manners Magistrate"
+accent_color = Color(0.6196, 0.4196, 0.5412, 1)

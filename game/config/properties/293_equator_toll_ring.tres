@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 293
+display_name = "Equator Toll Ring"
+unlock_tier = 24
+base_cost = 2.459e+108
+r0 = 1.09
+base_income_per_unit = 1.74405e+104
+base_cycle_length = 9.802
+staffer_name = "Zero-Latitude Gatekeeper"
+accent_color = Color(0.2745, 0.4078, 0.549, 1)

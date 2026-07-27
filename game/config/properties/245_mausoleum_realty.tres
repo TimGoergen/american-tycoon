@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 245
+display_name = "Mausoleum Realty"
+unlock_tier = 21
+base_cost = 8.005e+93
+r0 = 1.09
+base_income_per_unit = 1.05161e+89
+base_cycle_length = 1.115
+staffer_name = "Mausoleum Leasing Agent"
+accent_color = Color(0.4902, 0.4471, 0.349, 1)

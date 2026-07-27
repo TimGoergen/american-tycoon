@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 326
+display_name = "The Deed to the Universe"
+unlock_tier = 26
+base_cost = 2.243e+118
+r0 = 1.09
+base_income_per_unit = 7.03562e+114
+base_cycle_length = 60.0
+staffer_name = "The Proprietor Absolute"
+accent_color = Color(0.2275, 0.1804, 0.349, 1)

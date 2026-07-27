@@ -51,30 +51,33 @@ func is_gt(other: Money) -> bool:
 
 # The abbreviation ladder, LARGEST first (display walks it top-down and takes the first
 # threshold the value clears). Real short-scale dollar names, per the GDD §2 convention
-# (real-dollar formatting, never scientific notation) — extended past T on 2026-07-03
-# because deep alien epochs blew past it and rendered as digit-piles like "$25174800T".
-# Two-letter forms so neighbors can't be misread for each other (Qa ≠ Qi, Sx ≠ Sp):
-#   K  thousand      M  million        B  billion       T  trillion
-#   Qa quadrillion   Qi quintillion    Sx sextillion    Sp septillion
-#   Oc octillion     No nonillion      Dc decillion     Ud undecillion
-#   Dd duodecillion (1e39)
-# Each epoch is ~×30 (economy_scale), so this ladder covers roughly epoch 17+ before a
-# value would pile up multipliers on "Dd" the way it used to on "T" — extend it here
-# (one line per rung) if the epoch roadmap ever gets that deep.
+# (real-dollar formatting, never scientific notation) — extended past T on 2026-07-03,
+# and past Dd on 2026-07-26 because the ×16807-per-epoch scaling (NOT the ~×30 an old
+# comment claimed) blew past duodecillion by epoch ~8 and piled digits on "Dd".
+# Two-letter forms so neighbors can't be misread (Qa ≠ Qi, Sx ≠ Sp); the -decillion
+# family carries a trailing "d", the -vigintillion family "Vg", the -trigintillion "Tg".
+# Now runs to 1e120 (novemtrigintillion) — past the whole 26-epoch roadmap's magnitudes.
 const SUFFIXES := [
-	{"scale": 1e39, "suffix": "Dd"},
-	{"scale": 1e36, "suffix": "Ud"},
-	{"scale": 1e33, "suffix": "Dc"},
-	{"scale": 1e30, "suffix": "No"},
-	{"scale": 1e27, "suffix": "Oc"},
-	{"scale": 1e24, "suffix": "Sp"},
-	{"scale": 1e21, "suffix": "Sx"},
-	{"scale": 1e18, "suffix": "Qi"},
-	{"scale": 1e15, "suffix": "Qa"},
-	{"scale": 1e12, "suffix": "T"},
-	{"scale": 1e9, "suffix": "B"},
-	{"scale": 1e6, "suffix": "M"},
-	{"scale": 1e3, "suffix": "K"},
+	{"scale": 1e120, "suffix": "NoTg"}, {"scale": 1e117, "suffix": "OcTg"},
+	{"scale": 1e114, "suffix": "SpTg"}, {"scale": 1e111, "suffix": "SxTg"},
+	{"scale": 1e108, "suffix": "QiTg"}, {"scale": 1e105, "suffix": "QaTg"},
+	{"scale": 1e102, "suffix": "TTg"}, {"scale": 1e99, "suffix": "DTg"},
+	{"scale": 1e96, "suffix": "UTg"}, {"scale": 1e93, "suffix": "Tg"},
+	{"scale": 1e90, "suffix": "NoVg"}, {"scale": 1e87, "suffix": "OcVg"},
+	{"scale": 1e84, "suffix": "SpVg"}, {"scale": 1e81, "suffix": "SxVg"},
+	{"scale": 1e78, "suffix": "QiVg"}, {"scale": 1e75, "suffix": "QaVg"},
+	{"scale": 1e72, "suffix": "TVg"}, {"scale": 1e69, "suffix": "DVg"},
+	{"scale": 1e66, "suffix": "UVg"}, {"scale": 1e63, "suffix": "Vg"},
+	{"scale": 1e60, "suffix": "Nod"}, {"scale": 1e57, "suffix": "Ocd"},
+	{"scale": 1e54, "suffix": "Spd"}, {"scale": 1e51, "suffix": "Sxd"},
+	{"scale": 1e48, "suffix": "Qid"}, {"scale": 1e45, "suffix": "Qad"},
+	{"scale": 1e42, "suffix": "Td"}, {"scale": 1e39, "suffix": "Dd"},
+	{"scale": 1e36, "suffix": "Ud"}, {"scale": 1e33, "suffix": "Dc"},
+	{"scale": 1e30, "suffix": "No"}, {"scale": 1e27, "suffix": "Oc"},
+	{"scale": 1e24, "suffix": "Sp"}, {"scale": 1e21, "suffix": "Sx"},
+	{"scale": 1e18, "suffix": "Qi"}, {"scale": 1e15, "suffix": "Qa"},
+	{"scale": 1e12, "suffix": "T"}, {"scale": 1e9, "suffix": "B"},
+	{"scale": 1e6, "suffix": "M"}, {"scale": 1e3, "suffix": "K"},
 ]
 
 

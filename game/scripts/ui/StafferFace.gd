@@ -56,7 +56,9 @@ const INK := Color("#1B2436")
 ## no face yet (caller should fall back to the headshot icon).
 static func draw_face(canvas: CanvasItem, property_index: int, tier: int, center: Vector2, radius: float) -> bool:
 	if tier != 1:
-		return false  # only Earth humans exist yet; alien tiers fall back to the headshot
+		# Alien epochs: each civilization has its own bespoke procedural "being" (Phase 2). Tiers
+		# without one built yet return false so the caller falls back to the headshot.
+		return _draw_alien(canvas, property_index, tier, center, radius)
 
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_for(property_index, tier)
@@ -451,6 +453,481 @@ static func _draw_glasses(canvas: CanvasItem, c: Vector2, r: float, square: bool
 		else:
 			canvas.draw_arc(e, lens, 0.0, TAU, 22, INK, w)
 	canvas.draw_line(Vector2(c.x - EYE_DX * r + lens, eye_y), Vector2(c.x + EYE_DX * r - lens, eye_y), INK, w)
+
+
+# --- alien staffers (Phase 2: a bespoke procedural being per civilization) ----------------------
+
+## Dispatch an alien portrait by epoch tier. Each civ has its own hand-tuned design + palette,
+## seeded per role so staffers within one civ vary. Returns false for tiers not built yet (the
+## caller then falls back to the gray headshot). Built so far: Vashti Deep-Court (tier 7).
+static func _draw_alien(canvas: CanvasItem, property_index: int, tier: int, center: Vector2, radius: float) -> bool:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_for(property_index, tier)
+	match tier:
+		2:
+			_draw_luminari(canvas, center, radius, rng)
+			return true
+		3:
+			_draw_geth(canvas, center, radius, rng)
+			return true
+		4:
+			_draw_mycelium(canvas, center, radius, rng)
+			return true
+		5:
+			_draw_quartzite(canvas, center, radius, rng)
+			return true
+		6:
+			_draw_chronophage(canvas, center, radius, rng)
+			return true
+		7:
+			_draw_vashti(canvas, center, radius, rng)
+			return true
+		8:
+			_draw_ssethraki(canvas, center, radius, rng)
+			return true
+		9:
+			_draw_melissar(canvas, center, radius, rng)
+			return true
+		10:
+			_draw_norrvane(canvas, center, radius, rng)
+			return true
+		11:
+			_draw_octave(canvas, center, radius, rng)
+			return true
+		_:
+			return false
+
+
+# Vashti Deep-Court (tier 7) — a bioluminescent deep-sea anglerfish being: a dark bulbous body, big
+# glowing eyes, a toothy grin, and a glowing lure on a stalk (the signature). Everything is kept
+# inside the bounding radius so no glow spills past the disc.
+const _VASHTI_BODIES: Array[Color] = [
+	Color("#123039"), Color("#14283a"), Color("#183a3a"), Color("#0f2e3e"), Color("#1a323a")]
+const _VASHTI_GLOWS: Array[Color] = [
+	Color(0.56, 0.93, 0.86), Color(0.5, 0.85, 0.98), Color(0.7, 0.95, 0.6), Color(0.9, 0.8, 0.98)]
+const _VASHTI_EYE := Color("#dff6f0")
+const _VASHTI_PUPIL := Color("#0a1c22")
+const _VASHTI_TEETH := Color("#f2ead2")
+const _VASHTI_MOUTH := Color("#07161b")
+
+static func _draw_vashti(canvas: CanvasItem, c: Vector2, r: float, rng: RandomNumberGenerator) -> void:
+	# Per-role variation (fixed pull order).
+	var body: Color = _VASHTI_BODIES[rng.randi() % _VASHTI_BODIES.size()]
+	var hi := body.lightened(0.22)
+	var glow: Color = _VASHTI_GLOWS[rng.randi() % _VASHTI_GLOWS.size()]
+	var eye_r := (0.10 + rng.randf() * 0.035) * r
+	var teeth_count := 3 + rng.randi() % 3
+	var lure_side := -1.0 if rng.randf() < 0.5 else 1.0
+	var spots := 2 + rng.randi() % 3
+	var spot_seeds: Array[float] = []
+	for _i in range(spots):
+		spot_seeds.append(rng.randf())
+		spot_seeds.append(rng.randf())
+
+	var hc := Vector2(c.x, c.y - 0.05 * r)
+	# Body/mantle: the disc's lower segment (hugs the arc, no spill), then the bulbous head.
+	canvas.draw_colored_polygon(_disc_segment_below(c, r, 0.30), body)
+	canvas.draw_colored_polygon(_ellipse(hc, 0.54 * r, 0.55 * r, 28), hi)
+	# Bioluminescent freckles on the head.
+	for i in range(spots):
+		var a := spot_seeds[i * 2] * TAU
+		var rad := (0.18 + spot_seeds[i * 2 + 1] * 0.20) * r
+		canvas.draw_circle(hc + Vector2(cos(a) * rad, sin(a) * rad * 0.9), 0.028 * r,
+			glow.lerp(hi, 0.25))
+	# Eyes: big, faintly glowing, dark pupils.
+	for sx in [-1.0, 1.0]:
+		var e := Vector2(hc.x + sx * 0.21 * r, hc.y - 0.02 * r)
+		canvas.draw_circle(e, eye_r * 1.3, Color(glow.r, glow.g, glow.b, 0.30))
+		canvas.draw_circle(e, eye_r, _VASHTI_EYE)
+		canvas.draw_circle(e + Vector2(sx * 0.012 * r, 0.012 * r), eye_r * 0.5, _VASHTI_PUPIL)
+	# Toothy grin: a wide dark mouth with cream fangs.
+	var my := hc.y + 0.30 * r
+	var mw := 0.30 * r
+	canvas.draw_colored_polygon(PackedVector2Array([
+		Vector2(c.x - mw, my - 0.05 * r), Vector2(c.x + mw, my - 0.05 * r),
+		Vector2(c.x + mw * 0.7, my + 0.10 * r), Vector2(c.x - mw * 0.7, my + 0.10 * r)]), _VASHTI_MOUTH)
+	var tw := (mw * 2.0) / float(teeth_count)
+	for i in range(teeth_count):
+		var tx := c.x - mw + tw * (float(i) + 0.5)
+		canvas.draw_colored_polygon(PackedVector2Array([
+			Vector2(tx - tw * 0.28, my - 0.05 * r), Vector2(tx + tw * 0.28, my - 0.05 * r),
+			Vector2(tx, my + 0.06 * r)]), _VASHTI_TEETH)
+	# The lure: a stalk curving up-and-forward from the crown to a glowing bulb.
+	var base := Vector2(hc.x + lure_side * 0.05 * r, hc.y - 0.50 * r)
+	var mid := Vector2(hc.x + lure_side * 0.02 * r, hc.y - 0.66 * r)
+	var tip := Vector2(hc.x + lure_side * 0.26 * r, hc.y - 0.70 * r)
+	canvas.draw_polyline(PackedVector2Array([base, mid, tip]),
+		hi.lerp(glow, 0.35), maxf(2.0, 0.03 * r))
+	_glow(canvas, tip, 0.09 * r)
+
+
+## A soft bioluminescent bulb: a translucent halo, a bright body, a hot core.
+static func _glow(canvas: CanvasItem, center: Vector2, radius: float) -> void:
+	canvas.draw_circle(center, radius * 1.7, Color(0.56, 0.93, 0.86, 0.30))
+	canvas.draw_circle(center, radius, Color(0.56, 0.93, 0.86, 0.92))
+	canvas.draw_circle(center, radius * 0.5, Color(0.93, 1.0, 0.98, 1.0))
+
+
+# Ssethraki Coil-Banks (tier 8) — a serpent: wedge head, slit-pupil eyes, forked tongue, coils.
+const _SSE_SCALES: Array[Color] = [
+	Color("#4f7942"), Color("#3f6b6a"), Color("#6a7a3a"), Color("#5a7050"), Color("#7a8a3a")]
+const _SSE_EYES: Array[Color] = [Color("#e6c24a"), Color("#d97a2a"), Color("#9ac84a"), Color("#e05a5a")]
+const _SSE_TONGUE := Color("#b5402a")
+const _SSE_PUPIL := Color("#12200f")
+
+static func _draw_ssethraki(canvas: CanvasItem, c: Vector2, r: float, rng: RandomNumberGenerator) -> void:
+	var scale: Color = _SSE_SCALES[rng.randi() % _SSE_SCALES.size()]
+	var hi := scale.lightened(0.22)
+	var dark := scale.darkened(0.3)
+	var eye_col: Color = _SSE_EYES[rng.randi() % _SSE_EYES.size()]
+	var slit_w := (0.018 + rng.randf() * 0.014) * r
+	var tongue := (0.12 + rng.randf() * 0.10) * r
+	var chevrons := 2 + rng.randi() % 3
+	var hc := Vector2(c.x, c.y - 0.06 * r)
+	canvas.draw_colored_polygon(_disc_segment_below(c, r, 0.34), dark)
+	for i in range(2):
+		canvas.draw_arc(Vector2(c.x, c.y + (0.52 + i * 0.16) * r), (0.40 - i * 0.10) * r,
+			PI, TAU, 20, scale, maxf(3.0, 0.055 * r))
+	canvas.draw_colored_polygon(PackedVector2Array([
+		Vector2(hc.x - 0.50 * r, hc.y - 0.30 * r), Vector2(hc.x - 0.38 * r, hc.y - 0.52 * r),
+		Vector2(hc.x + 0.38 * r, hc.y - 0.52 * r), Vector2(hc.x + 0.50 * r, hc.y - 0.30 * r),
+		Vector2(hc.x + 0.28 * r, hc.y + 0.20 * r), Vector2(hc.x, hc.y + 0.44 * r),
+		Vector2(hc.x - 0.28 * r, hc.y + 0.20 * r)]), scale)
+	for i in range(chevrons):
+		var yy := hc.y - 0.16 * r + i * 0.13 * r
+		canvas.draw_polyline(PackedVector2Array([Vector2(hc.x - 0.13 * r, yy),
+			Vector2(hc.x, yy + 0.06 * r), Vector2(hc.x + 0.13 * r, yy)]), hi, maxf(2.0, 0.02 * r))
+	for sx in [-1.0, 1.0]:
+		var e := Vector2(hc.x + sx * 0.26 * r, hc.y - 0.30 * r)
+		canvas.draw_colored_polygon(_ellipse(e, 0.09 * r, 0.07 * r, 14), eye_col)
+		canvas.draw_rect(Rect2(e.x - slit_w / 2.0, e.y - 0.055 * r, slit_w, 0.11 * r), _SSE_PUPIL)
+	var sn := Vector2(hc.x, hc.y + 0.44 * r)
+	var f := sn + Vector2(0, tongue * 0.6)
+	canvas.draw_line(sn, f, _SSE_TONGUE, maxf(2.0, 0.02 * r))
+	canvas.draw_line(f, f + Vector2(-0.05 * r, tongue * 0.4), _SSE_TONGUE, maxf(2.0, 0.02 * r))
+	canvas.draw_line(f, f + Vector2(0.05 * r, tongue * 0.4), _SSE_TONGUE, maxf(2.0, 0.02 * r))
+
+
+# Melissar Hive-Court (tier 9) — a bee: fuzzy striped body, compound eyes, antennae, sometimes a crown.
+const _BEE_GOLDS: Array[Color] = [
+	Color("#d3a52a"), Color("#c99038"), Color("#d8822a"), Color("#bfa63e"), Color("#caa020")]
+const _BEE_DARK := Color("#3a2a0e")
+const _BEE_EYE := Color("#1a1408")
+
+static func _draw_melissar(canvas: CanvasItem, c: Vector2, r: float, rng: RandomNumberGenerator) -> void:
+	var gold: Color = _BEE_GOLDS[rng.randi() % _BEE_GOLDS.size()]
+	var hi := gold.lightened(0.18)
+	var ant_curl := (0.04 + rng.randf() * 0.07) * r
+	var eye_h := (0.13 + rng.randf() * 0.05) * r
+	var crown := rng.randf() < 0.4
+	var hc := Vector2(c.x, c.y - 0.04 * r)
+	# striped body via layered disc segments (each hugs the arc — no overflow)
+	canvas.draw_colored_polygon(_disc_segment_below(c, r, 0.30), gold)
+	canvas.draw_colored_polygon(_disc_segment_below(c, r, 0.44), _BEE_DARK)
+	canvas.draw_colored_polygon(_disc_segment_below(c, r, 0.58), gold)
+	canvas.draw_colored_polygon(_disc_segment_below(c, r, 0.72), _BEE_DARK)
+	# antennae
+	for sx in [-1.0, 1.0]:
+		var a0 := Vector2(hc.x + sx * 0.12 * r, hc.y - 0.38 * r)
+		var a1 := Vector2(hc.x + sx * 0.26 * r + sx * ant_curl, hc.y - 0.62 * r)
+		canvas.draw_line(a0, a1, _BEE_DARK, maxf(2.0, 0.025 * r))
+		canvas.draw_circle(a1, 0.04 * r, _BEE_DARK)
+	# head
+	canvas.draw_colored_polygon(_ellipse(hc, 0.42 * r, 0.42 * r, 24), hi)
+	# compound eyes
+	for sx in [-1.0, 1.0]:
+		canvas.draw_colored_polygon(_ellipse(Vector2(hc.x + sx * 0.21 * r, hc.y - 0.02 * r),
+			0.11 * r, eye_h, 16), _BEE_EYE)
+	canvas.draw_line(Vector2(hc.x - 0.08 * r, hc.y + 0.22 * r),
+		Vector2(hc.x + 0.08 * r, hc.y + 0.22 * r), _BEE_DARK, maxf(2.0, 0.03 * r))
+	if crown:
+		canvas.draw_colored_polygon(PackedVector2Array([
+			Vector2(hc.x - 0.13 * r, hc.y - 0.40 * r), Vector2(hc.x - 0.13 * r, hc.y - 0.52 * r),
+			Vector2(hc.x - 0.06 * r, hc.y - 0.46 * r), Vector2(hc.x, hc.y - 0.56 * r),
+			Vector2(hc.x + 0.06 * r, hc.y - 0.46 * r), Vector2(hc.x + 0.13 * r, hc.y - 0.52 * r),
+			Vector2(hc.x + 0.13 * r, hc.y - 0.40 * r)]), hi)
+
+
+# Norrvane Frostholm (tier 10) — an ice giant: broad angular head, glowing cold eyes, an icicle beard.
+const _ICE_BODIES: Array[Color] = [
+	Color("#bcd8e6"), Color("#a9c6d8"), Color("#c8d2dc"), Color("#9fb8c8"), Color("#aecbe4")]
+const _ICE_EYES: Array[Color] = [Color("#9fe8ff"), Color("#c0f0ff"), Color("#8fd0ff"), Color("#b8e0d0")]
+
+static func _draw_norrvane(canvas: CanvasItem, c: Vector2, r: float, rng: RandomNumberGenerator) -> void:
+	var ice: Color = _ICE_BODIES[rng.randi() % _ICE_BODIES.size()]
+	var dark := ice.darkened(0.30)
+	var hi := ice.lightened(0.15)
+	var eye_col: Color = _ICE_EYES[rng.randi() % _ICE_EYES.size()]
+	var icicles := 4 + rng.randi() % 4
+	var rune := rng.randf() < 0.5
+	var eye_r := (0.030 + rng.randf() * 0.014) * r
+	var hc := Vector2(c.x, c.y - 0.06 * r)
+	canvas.draw_colored_polygon(_disc_segment_below(c, r, 0.34), dark)
+	canvas.draw_colored_polygon(PackedVector2Array([
+		Vector2(hc.x - 0.46 * r, hc.y - 0.32 * r), Vector2(hc.x - 0.32 * r, hc.y - 0.54 * r),
+		Vector2(hc.x + 0.32 * r, hc.y - 0.54 * r), Vector2(hc.x + 0.46 * r, hc.y - 0.32 * r),
+		Vector2(hc.x + 0.38 * r, hc.y + 0.14 * r), Vector2(hc.x, hc.y + 0.34 * r),
+		Vector2(hc.x - 0.38 * r, hc.y + 0.14 * r)]), ice)
+	canvas.draw_colored_polygon(PackedVector2Array([
+		Vector2(hc.x - 0.40 * r, hc.y - 0.18 * r), Vector2(hc.x + 0.40 * r, hc.y - 0.18 * r),
+		Vector2(hc.x + 0.32 * r, hc.y - 0.06 * r), Vector2(hc.x - 0.32 * r, hc.y - 0.06 * r)]), dark)
+	for sx in [-1.0, 1.0]:
+		var e := Vector2(hc.x + sx * 0.19 * r, hc.y)
+		canvas.draw_circle(e, eye_r * 1.8, Color(eye_col.r, eye_col.g, eye_col.b, 0.4))
+		canvas.draw_circle(e, eye_r, eye_col)
+	var jaw := hc.y + 0.28 * r
+	for i in range(icicles):
+		var ix := hc.x - 0.26 * r + (0.52 * r) * (float(i) / float(maxi(1, icicles - 1)))
+		canvas.draw_colored_polygon(PackedVector2Array([Vector2(ix - 0.05 * r, jaw),
+			Vector2(ix + 0.05 * r, jaw), Vector2(ix, jaw + (0.12 + 0.06 * float(i % 2)) * r)]), hi)
+	if rune:
+		canvas.draw_line(Vector2(hc.x, hc.y - 0.44 * r), Vector2(hc.x, hc.y - 0.28 * r), eye_col, maxf(2.0, 0.02 * r))
+		canvas.draw_line(Vector2(hc.x, hc.y - 0.40 * r), Vector2(hc.x + 0.06 * r, hc.y - 0.33 * r), eye_col, maxf(2.0, 0.02 * r))
+
+
+# The Resonant Octave (tier 11) — a living sound-being: soundwave rings, glowing eyes, equalizer voice.
+const _OCT_BODIES: Array[Color] = [
+	Color("#5a52a8"), Color("#6a4a9e"), Color("#4a5aa8"), Color("#7050a0"), Color("#4e56a4")]
+const _OCT_GLOWS: Array[Color] = [Color("#c8c0f5"), Color("#a8dcf0"), Color("#e0b0ec"), Color("#b8f0d0")]
+
+static func _draw_octave(canvas: CanvasItem, c: Vector2, r: float, rng: RandomNumberGenerator) -> void:
+	var body: Color = _OCT_BODIES[rng.randi() % _OCT_BODIES.size()]
+	var hi := body.lightened(0.28)
+	var glow: Color = _OCT_GLOWS[rng.randi() % _OCT_GLOWS.size()]
+	var bars := 4 + rng.randi() % 3
+	var rings := 2 + rng.randi() % 2
+	var bar_seed: Array[float] = []
+	for _i in range(bars):
+		bar_seed.append(rng.randf())
+	var hc := Vector2(c.x, c.y - 0.04 * r)
+	for i in range(rings):
+		var rr := (0.52 + float(i) * 0.16) * r
+		canvas.draw_arc(hc, rr, deg_to_rad(205), deg_to_rad(335), 24,
+			Color(glow.r, glow.g, glow.b, 0.5 - float(i) * 0.14), maxf(2.0, 0.02 * r))
+	canvas.draw_colored_polygon(_disc_segment_below(c, r, 0.34), body)
+	canvas.draw_colored_polygon(_ellipse(hc, 0.44 * r, 0.46 * r, 24), hi)
+	for sx in [-1.0, 1.0]:
+		canvas.draw_circle(Vector2(hc.x + sx * 0.17 * r, hc.y - 0.08 * r), 0.05 * r, glow)
+	var bw := (0.5 * r) / float(bars)
+	for i in range(bars):
+		var bx := hc.x - 0.25 * r + bw * (float(i) + 0.5)
+		var bh := (0.05 + bar_seed[i] * 0.16) * r
+		canvas.draw_rect(Rect2(bx - bw * 0.3, hc.y + 0.24 * r - bh, bw * 0.6, bh), glow)
+
+
+# Luminari Collective (tier 2) — a radiant light-being: an orb head with rays and a bright core.
+const _LUM_BODIES: Array[Color] = [Color("#c96a12"), Color("#d97a1a"), Color("#b85c0e"), Color("#e08a22")]
+const _LUM_RAY := Color("#ffdf8a")
+const _LUM_INK := Color("#3a1e05")
+
+static func _draw_luminari(canvas: CanvasItem, c: Vector2, r: float, rng: RandomNumberGenerator) -> void:
+	var body: Color = _LUM_BODIES[rng.randi() % _LUM_BODIES.size()]
+	var rays := 6 + rng.randi() % 7
+	var ray_style := rng.randi() % 3          # straight · wavy · spike
+	var eye_shape := rng.randi() % 5
+	var mouth_shape := rng.randi() % 4
+	var core := (0.24 + rng.randf() * 0.12) * r
+	var ray_col := _LUM_RAY.lerp(body, rng.randf() * 0.3)
+	for i in range(rays):
+		var a := TAU * float(i) / float(rays)
+		var d := Vector2(cos(a), sin(a))
+		var perp := Vector2(-d.y, d.x)
+		match ray_style:
+			0:
+				canvas.draw_line(c + d * 0.60 * r, c + d * 0.92 * r, ray_col, maxf(2.0, 0.035 * r))
+			1:
+				canvas.draw_polyline(PackedVector2Array([c + d * 0.60 * r,
+					c + d * 0.76 * r + perp * 0.05 * r, c + d * 0.92 * r]), ray_col, maxf(2.0, 0.03 * r))
+			2:
+				canvas.draw_colored_polygon(PackedVector2Array([c + d * 0.58 * r + perp * 0.06 * r,
+					c + d * 0.58 * r - perp * 0.06 * r, c + d * 0.94 * r]), ray_col)
+	canvas.draw_circle(c, 0.66 * r, Color(1.0, 0.94, 0.7, 0.32))
+	canvas.draw_circle(c, 0.58 * r, body)
+	canvas.draw_circle(c, core, Color(1.0, 0.97, 0.82, 0.45))
+	_alien_eyes(canvas, c.x, c.y - 0.06 * r, 0.21 * r, 0.09 * r, Color("#fff2cf"), _LUM_INK, eye_shape)
+	_alien_mouth(canvas, c.x, c.y + 0.24 * r, 0.28 * r, _LUM_INK, mouth_shape)
+
+
+# Geth-Sentinel Grid (tier 3) — a machine: angular metal head, glowing optic(s), status lights.
+const _GETH_METAL := Color("#2e3742")
+const _GETH_HI := Color("#4a5764")
+const _GETH_OPTICS: Array[Color] = [
+	Color("#4de8ff"), Color("#ff8a3b"), Color("#ff5b5b"), Color("#8cff6b"), Color("#c77dff")]
+
+static func _draw_geth(canvas: CanvasItem, c: Vector2, r: float, rng: RandomNumberGenerator) -> void:
+	var optic: Color = _GETH_OPTICS[rng.randi() % _GETH_OPTICS.size()]
+	var dual := rng.randf() < 0.45              # two eyes vs a single scanning optic
+	var scan := (rng.randf() - 0.5) * 0.5 * r
+	var dots := 2 + rng.randi() % 4
+	var hw := (0.38 + rng.randf() * 0.06) * r    # head width varies
+	var ant := rng.randi() % 3                   # antenna style: center / two / none
+	var hc := Vector2(c.x, c.y - 0.03 * r)
+	if ant == 0:
+		canvas.draw_line(Vector2(hc.x, hc.y - 0.44 * r), Vector2(hc.x, hc.y - 0.58 * r), _GETH_HI, maxf(2.0, 0.025 * r))
+		canvas.draw_circle(Vector2(hc.x, hc.y - 0.58 * r), 0.04 * r, optic)
+	elif ant == 1:
+		for sx in [-1.0, 1.0]:
+			canvas.draw_line(Vector2(hc.x + sx * 0.20 * r, hc.y - 0.44 * r),
+				Vector2(hc.x + sx * 0.28 * r, hc.y - 0.56 * r), _GETH_HI, maxf(2.0, 0.022 * r))
+	canvas.draw_colored_polygon(_disc_segment_below(c, r, 0.32), _GETH_METAL)
+	canvas.draw_colored_polygon(PackedVector2Array([
+		Vector2(hc.x - hw, hc.y - 0.28 * r), Vector2(hc.x - hw + 0.08 * r, hc.y - 0.46 * r),
+		Vector2(hc.x + hw - 0.08 * r, hc.y - 0.46 * r), Vector2(hc.x + hw, hc.y - 0.28 * r),
+		Vector2(hc.x + hw, hc.y + 0.22 * r), Vector2(hc.x - hw, hc.y + 0.22 * r)]), _GETH_HI)
+	canvas.draw_rect(Rect2(hc.x - (hw - 0.02 * r), hc.y - 0.14 * r, (hw - 0.02 * r) * 2.0, 0.20 * r), _GETH_METAL)
+	if dual:
+		for sx in [-1.0, 1.0]:
+			var e := Vector2(hc.x + sx * 0.18 * r, hc.y - 0.04 * r)
+			canvas.draw_circle(e, 0.075 * r, Color(optic.r, optic.g, optic.b, 0.4))
+			canvas.draw_circle(e, 0.045 * r, optic)
+	else:
+		var ox := clampf(hc.x + scan, hc.x - 0.30 * r, hc.x + 0.30 * r)
+		canvas.draw_circle(Vector2(ox, hc.y - 0.04 * r), 0.09 * r, Color(optic.r, optic.g, optic.b, 0.4))
+		canvas.draw_circle(Vector2(ox, hc.y - 0.04 * r), 0.05 * r, optic)
+	for i in range(dots):
+		canvas.draw_circle(Vector2(hc.x - 0.22 * r + float(i) * 0.14 * r, hc.y + 0.13 * r), 0.02 * r, optic)
+
+
+# Mycelium Unity (tier 4) — a fungal being: a spotted cap over a pale face, varied eyes, spores.
+const _MYC_CAPS: Array[Color] = [
+	Color("#a94f38"), Color("#8e6b3f"), Color("#b5723f"), Color("#7a4a6a"), Color("#c0603a")]
+const _MYC_SPOT := Color("#ecd9b0")
+const _MYC_STALK := Color("#e3d6bb")
+const _MYC_INK := Color("#3a2a1a")
+
+static func _draw_mycelium(canvas: CanvasItem, c: Vector2, r: float, rng: RandomNumberGenerator) -> void:
+	var cap_col: Color = _MYC_CAPS[rng.randi() % _MYC_CAPS.size()]
+	var cap_h := (0.36 + rng.randf() * 0.12) * r
+	var spots := 2 + rng.randi() % 4
+	var spot_a: Array[float] = []
+	for _i in range(spots):
+		spot_a.append(rng.randf())
+	var eye_shape := rng.randi() % 5
+	var mouth_shape := rng.randi() % 4
+	var spores := 1 + rng.randi() % 3
+	var spore_x: Array[float] = []
+	for _i in range(spores):
+		spore_x.append(rng.randf())
+	var hc := Vector2(c.x, c.y + 0.02 * r)
+	canvas.draw_colored_polygon(_disc_segment_below(c, r, 0.30), _MYC_STALK)
+	canvas.draw_colored_polygon(_ellipse(hc, 0.34 * r, 0.36 * r, 22), _MYC_STALK)
+	var cap := PackedVector2Array()
+	for i in range(17):
+		var a := PI + PI * float(i) / 16.0
+		cap.append(Vector2(hc.x + cos(a) * 0.52 * r, hc.y - 0.06 * r + sin(a) * cap_h))
+	canvas.draw_colored_polygon(cap, cap_col)
+	for i in range(spots):
+		var a := PI + PI * (0.15 + 0.7 * spot_a[i])
+		canvas.draw_circle(Vector2(hc.x + cos(a) * 0.32 * r, hc.y - 0.06 * r + sin(a) * cap_h * 0.6), 0.04 * r, _MYC_SPOT)
+	_alien_eyes(canvas, hc.x, hc.y + 0.10 * r, 0.13 * r, 0.045 * r, Color("#fffaf0"), _MYC_INK, eye_shape)
+	_alien_mouth(canvas, hc.x, hc.y + 0.26 * r, 0.14 * r, _MYC_INK, mouth_shape)
+	for i in range(spores):
+		canvas.draw_circle(Vector2(hc.x + (spore_x[i] - 0.5) * 0.9 * r, hc.y - 0.44 * r), 0.02 * r, _MYC_SPOT)
+
+
+# Quartzite Conglomerate (tier 5) — a crystalloid: a faceted angular head, gem eyes, glints.
+const _QZ_BODIES: Array[Color] = [
+	Color("#6f9fd0"), Color("#5fb0a4"), Color("#8a7fc4"), Color("#c081a6"), Color("#7ab0d8")]
+const _QZ_EYE := Color("#eef9ff")
+
+static func _draw_quartzite(canvas: CanvasItem, c: Vector2, r: float, rng: RandomNumberGenerator) -> void:
+	var body: Color = _QZ_BODIES[rng.randi() % _QZ_BODIES.size()]
+	var facet := body.lightened(0.28)
+	var dark := body.darkened(0.22)
+	var top := (0.50 + rng.randf() * 0.12) * r      # crown point height varies
+	var eye_sz := (0.05 + rng.randf() * 0.025) * r
+	var glints := 2 + rng.randi() % 3
+	var glint_p: Array[float] = []
+	for _i in range(glints * 2):
+		glint_p.append(rng.randf())
+	var hc := Vector2(c.x, c.y - 0.04 * r)
+	canvas.draw_colored_polygon(PackedVector2Array([
+		Vector2(hc.x, hc.y - top), Vector2(hc.x + 0.44 * r, hc.y - 0.24 * r),
+		Vector2(hc.x + 0.36 * r, hc.y + 0.30 * r), Vector2(hc.x, hc.y + 0.52 * r),
+		Vector2(hc.x - 0.36 * r, hc.y + 0.30 * r), Vector2(hc.x - 0.44 * r, hc.y - 0.24 * r)]), body)
+	canvas.draw_colored_polygon(PackedVector2Array([Vector2(hc.x, hc.y - top),
+		Vector2(hc.x + 0.44 * r, hc.y - 0.24 * r), Vector2(hc.x, hc.y - 0.05 * r)]), facet)
+	canvas.draw_colored_polygon(PackedVector2Array([Vector2(hc.x, hc.y - 0.05 * r),
+		Vector2(hc.x - 0.44 * r, hc.y - 0.24 * r), Vector2(hc.x, hc.y - top)]), dark)
+	canvas.draw_colored_polygon(PackedVector2Array([Vector2(hc.x, hc.y + 0.52 * r),
+		Vector2(hc.x + 0.36 * r, hc.y + 0.30 * r), Vector2(hc.x, hc.y - 0.05 * r)]), dark)
+	for sx in [-1.0, 1.0]:
+		var e := Vector2(hc.x + sx * 0.15 * r, hc.y - 0.06 * r)
+		canvas.draw_colored_polygon(PackedVector2Array([Vector2(e.x, e.y - eye_sz * 1.2),
+			Vector2(e.x + eye_sz, e.y), Vector2(e.x, e.y + eye_sz * 1.2), Vector2(e.x - eye_sz, e.y)]), _QZ_EYE)
+	for i in range(glints):
+		var gx := hc.x + (glint_p[i * 2] - 0.5) * 0.6 * r
+		var gy := hc.y + (glint_p[i * 2 + 1] - 0.5) * 0.6 * r
+		canvas.draw_line(Vector2(gx - 0.03 * r, gy), Vector2(gx + 0.03 * r, gy), _QZ_EYE, maxf(1.5, 0.015 * r))
+		canvas.draw_line(Vector2(gx, gy - 0.03 * r), Vector2(gx, gy + 0.03 * r), _QZ_EYE, maxf(1.5, 0.015 * r))
+
+
+# Chronophage Enclave (tier 6) — a time-eater: a dark head with a glowing clock or hourglass.
+const _CHR_BODIES: Array[Color] = [
+	Color("#5a2535"), Color("#3f2a4a"), Color("#4a2a2a"), Color("#2f3550"), Color("#43304a")]
+const _CHR_GLOWS: Array[Color] = [Color("#e8b04a"), Color("#e8734a"), Color("#c77dff"), Color("#4de8ff")]
+
+static func _draw_chronophage(canvas: CanvasItem, c: Vector2, r: float, rng: RandomNumberGenerator) -> void:
+	var body: Color = _CHR_BODIES[rng.randi() % _CHR_BODIES.size()]
+	var hi := body.lightened(0.18)
+	var glow: Color = _CHR_GLOWS[rng.randi() % _CHR_GLOWS.size()]
+	var eye_shape := rng.randi() % 5
+	var hourglass := rng.randf() < 0.4
+	var hour := rng.randf() * TAU
+	var minute := rng.randf() * TAU
+	var hc := Vector2(c.x, c.y - 0.03 * r)
+	canvas.draw_colored_polygon(_disc_segment_below(c, r, 0.32), body)
+	canvas.draw_colored_polygon(_ellipse(hc, 0.48 * r, 0.50 * r, 24), hi)
+	_alien_eyes(canvas, hc.x, hc.y - 0.26 * r, 0.15 * r, 0.045 * r, glow, body.darkened(0.3), eye_shape)
+	var cc := Vector2(hc.x, hc.y + 0.12 * r)
+	var cr := 0.22 * r
+	if hourglass:
+		canvas.draw_colored_polygon(PackedVector2Array([Vector2(cc.x - cr * 0.7, cc.y - cr),
+			Vector2(cc.x + cr * 0.7, cc.y - cr), Vector2(cc.x, cc.y)]), glow)
+		canvas.draw_colored_polygon(PackedVector2Array([Vector2(cc.x - cr * 0.7, cc.y + cr),
+			Vector2(cc.x + cr * 0.7, cc.y + cr), Vector2(cc.x, cc.y)]), Color(glow.r, glow.g, glow.b, 0.55))
+	else:
+		canvas.draw_arc(cc, cr, 0.0, TAU, 28, glow, maxf(2.0, 0.025 * r))
+		canvas.draw_line(cc, cc + Vector2(cos(hour - PI / 2.0), sin(hour - PI / 2.0)) * cr * 0.5, glow, maxf(2.0, 0.03 * r))
+		canvas.draw_line(cc, cc + Vector2(cos(minute - PI / 2.0), sin(minute - PI / 2.0)) * cr * 0.85, glow, maxf(2.0, 0.02 * r))
+		canvas.draw_circle(cc, 0.03 * r, glow)
+
+
+# --- shared alien expression (so staffers within a civ vary) ------------------------------------
+
+## Two eyes with one of several shapes, at (cx±dx, cy). iris = eye fill, pupil = dark center.
+static func _alien_eyes(canvas: CanvasItem, cx: float, cy: float, dx: float, sz: float,
+		iris: Color, pupil: Color, shape: int) -> void:
+	for sx in [-1.0, 1.0]:
+		var e := Vector2(cx + sx * dx, cy)
+		match shape:
+			0:  # round
+				canvas.draw_circle(e, sz, iris)
+				canvas.draw_circle(e, sz * 0.5, pupil)
+			1:  # tall oval
+				canvas.draw_colored_polygon(_ellipse(e, sz * 0.8, sz * 1.15, 14), iris)
+				canvas.draw_circle(e, sz * 0.45, pupil)
+			2:  # wide
+				canvas.draw_colored_polygon(_ellipse(e, sz * 1.2, sz * 0.72, 14), iris)
+				canvas.draw_circle(e, sz * 0.4, pupil)
+			3:  # happy closed (^)
+				canvas.draw_arc(e, sz, deg_to_rad(200), deg_to_rad(340), 10, pupil, maxf(2.0, sz * 0.45))
+			4:  # surprised (big, offset pupil)
+				canvas.draw_circle(e, sz * 1.15, iris)
+				canvas.draw_circle(e + Vector2(sx * sz * 0.2, -sz * 0.2), sz * 0.5, pupil)
+
+
+## A mouth with one of several shapes, centered at (mx, my). w = width scale.
+static func _alien_mouth(canvas: CanvasItem, mx: float, my: float, w: float, col: Color, shape: int) -> void:
+	match shape:
+		0:  # smile
+			canvas.draw_arc(Vector2(mx, my - 0.3 * w), 0.5 * w, deg_to_rad(25), deg_to_rad(155), 12, col, maxf(2.0, 0.14 * w))
+		1:  # neutral
+			canvas.draw_line(Vector2(mx - 0.4 * w, my), Vector2(mx + 0.4 * w, my), col, maxf(2.0, 0.11 * w))
+		2:  # small o
+			canvas.draw_circle(Vector2(mx, my), 0.22 * w, col)
+		3:  # slight frown
+			canvas.draw_arc(Vector2(mx, my + 0.32 * w), 0.5 * w, deg_to_rad(205), deg_to_rad(335), 12, col, maxf(2.0, 0.11 * w))
 
 
 # --- geometry helpers ---------------------------------------------------------------------------

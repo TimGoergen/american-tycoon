@@ -27,6 +27,12 @@ func _initialize() -> void:
 	_check_display(6.0e33, "$6Dc")
 	_check_display(9.0e36, "$9Ud")
 	_check_display(2.5e39, "$2.5Dd")
+	# Past Dd — the ×16807/epoch scaling reaches these by epoch ~8; before 2026-07-26
+	# they piled digits on "Dd" ($2500Dd) instead of climbing to the next named rung.
+	_check_display(2.5e42, "$2.5Td")
+	_check_display(3.0e54, "$3Spd")
+	_check_display(7.0e63, "$7Vg")
+	_check_display(4.2e93, "$4.2Tg")
 	_check_display(-14_300.0, "-$14.3K")
 
 	# display(0): whole-number abbreviations (property income readout).

@@ -33,17 +33,33 @@ retires in favor of the standard epoch gate.
 ## Thresholds (the one real tuning decision)
 
 Epoch advance stays "earn the epoch's economic value AND own ≥1 of every property in it"
-(`EpochState.update`). The split needs one NEW threshold — Blue→White:
+(`EpochState.update`). The split needs one NEW threshold — Blue→White.
 
-- **Proposal: $60M earned.** Same anchor rule as every other epoch boundary: the next
-  cohort's flagship (Day Trading, $6M) ≈ 10% of the previous threshold. This also lands
-  close to when the White Collar tab unlocks today (afford $6M ≈ the same wealth band),
-  so early pacing barely moves — deliberate, per the locked fast-pace principle.
+**Decided by study: $150M earned** (`sim/BlueCollarStudy.gd`, run 2026-07-27 — Tim's
+brief: the threshold should land when a new player owns at least one of each Blue
+Collar property, has bought a few of each, and can afford Day Trading, $6M). A bare
+founder restricted to Blue Collar buying, same play model as Sim.gd's playouts:
+
+| milestone | IDLE (passive floor) | ACTIVE (rush top 2, no Strong-Arm) |
+|---|---|---|
+| own 1 of each | $11.9M earned (3.7 m) | $9.5M (1.5 m) |
+| own 3 of each | $28M (4.3 m) | $20.1M (1.8 m) |
+| cash covers Day Trading | $130M (5.6 m) | $69M (2.0 m) |
+| **at $150M: cash on hand** | **$7M (5.7 m)** | **$7.8M (2.4 m)** |
+
+- $150M is the smallest round threshold where BOTH playstyles arrive with Day Trading
+  money in hand (the brief's third condition; the binding one — ownership is satisfied
+  many times over by then). At $60M–$100M an idle player arrives $3–5M short.
+- Timing vs today: the White Collar tab currently unlocks (afford $6M) at 5.6 m idle /
+  2.0 m active — $150M lands at 5.7 m / 2.4 m. Early pace effectively unchanged, per
+  the locked fast-pace principle; the beat is added, not the wait.
+- Day Trading = 4% of the threshold — slightly more generous than the alien 10%
+  save-up convention, right for the first (rehearsal) boundary.
 - White→Luminari keeps the full `earth_economy_target` ($103.6T) — the Earth total is
   unchanged, it just becomes tier 2's exit rather than tier 1's.
 - Mechanically: `economy_scale` stays the single source of truth (threshold =
-  `scale × earth_economy_target`). Blue Collar gets `scale = 60e6 / 103.6e12 ≈ 5.79e-7`;
-  White Collar 1.0; aliens keep their 16807^(tier-2) ladder (exponent re-based, values
+  `scale × earth_economy_target`). Blue Collar gets `scale = 150e6 / 103.6e12 ≈ 1.45e-6`;
+  White Collar 1.0; aliens keep their 16807-per-step ladder (exponent re-based, values
   identical to today's).
 
 ## The arrival beat (design decision #2)
@@ -51,12 +67,11 @@ Epoch advance stays "earn the epoch's economic value AND own ≥1 of every prope
 Tier 2's arrival is Earth→Earth, so the alien First Contact framing (hail from a civ,
 trade-deal minigame for a new alien property type) doesn't fit as-is.
 
-- **Proposal: reuse the contact plumbing with promotion flavor.** A "You've outgrown the
-  corner hustle — Wall Street calls" beat: same overlay bones, Earth voice, no alien hail.
-- The trade-deal minigame CAN run here (White Collar opens a genuinely new property kind —
-  Day Trading — so GDD §5.5's "negotiate the opening bonus" logic applies cleanly), giving
-  the player a rehearsal of the First Contact minigame loop before the real thing. Upside-
-  only, as always. If Tim prefers a quieter beat, skip the minigame and keep just the card.
+**Decided (Tim, 2026-07-27): quiet card only for v1.** A promotion-flavored beat on the
+contact-overlay bones — moving up, not alien contact — with NO minigame at tier 2 for
+now. **Deferred follow-up:** add the trade-deal minigame here later with new
+promotion-themed copy (Tim likes the rehearsal idea; it needs its own writing pass).
+The dispatch just needs a clean seam so the minigame can slot in later.
 
 ## Blast radius (what actually changes)
 
@@ -70,17 +85,24 @@ trade-deal minigame for a new alien property type) doesn't fit as-is.
 - `EpochState`: no logic change (the loop already handles N epochs); Earth-is-tier-1
   comments update.
 - Staff blocks: `staff_block_epoch` / `staff_blocks_available` key off `unlock_tier`, so
-  they follow automatically — but note the FEEL changes: Blue Collar properties open
-  their second 20-level staff block at the White Collar arrival (nice — an early staff-
-  block beat too), and White Collar properties now start their ladder one epoch later
-  than Blue's (one fewer block at any reached tier than today).
+  they follow automatically — and the renumbering is NEUTRAL at every equivalent content
+  moment. White Collar properties: at "Luminari just arrived" they have 2 blocks today
+  (reached 2 − unlock 1 + 1) and 2 blocks after (3 − 2 + 1); block prices are anchored
+  to the block's epoch ECONOMY (`get_staff_block_anchor` → `economy_scale(block_epoch)`),
+  which renumbers along with them — same blocks, same prices, at every point of the run.
+  The one real change is a GAIN: Blue Collar properties open an extra 20-level block at
+  the White Collar arrival, priced off the White economy (modest) — an early staff-depth
+  beat that reinforces the new epoch. Endgame depth: Blue 27 blocks (one more than
+  today), White 26 (exactly today's).
 
 **Save migration (save format v10)**
 - `current_tier`: saved tier T ≥ 2 → T + 1. A saved tier-1 (mid-Earth) run maps to Blue
   or White by the own-all-Blue-Collar test, then money.
-- White Collar `staff_level`s: their per-property cap drops by one block (20 levels) at
-  any given reached tier. Forward-only precedent (the ownership gate, 2026-07-23): DON'T
-  clamp existing levels — keep them, cap only future buys until the cap catches up.
+- White Collar `staff_level`s need NO clamping or grandfathering: a save at today's tier
+  T migrates to tier T+1, where the White cap is identical (20·(T+1−2+1) = 20·T — see
+  the staff-blocks note above). Blue caps only grow. The only mapping rule is the
+  tier-1 one above: a mid-Earth save that already owns any White Collar property (or
+  meets the gate) maps to tier 2, so nothing the player owns ever locks on them.
 - `_tab_unlocked` persistence: sizes already track `_epoch_tab_count()`; resize logic
   must handle the +1 growth on load (same pattern as the 11→26 growth already shipped).
 
@@ -111,14 +133,16 @@ trade-deal minigame for a new alien property type) doesn't fit as-is.
 - Tab count and order in the pager (27 tabs were already planned as 26+1... the pager
   simply gains formal tier identity — dots/arrows/swipe behave as today).
 
-## Open questions for Tim
+## Decisions log (all three open questions resolved 2026-07-27)
 
-1. **$60M Blue→White threshold** — right band? (It intentionally mirrors today's White
-   Collar tab-unlock timing; a lower value makes the first epoch beat land even sooner.)
-2. **Promotion beat**: full treatment with the trade-deal minigame rehearsal, or a quiet
-   card-only beat?
-3. OK that White Collar staff ladders start one epoch later than today (one fewer block
-   at a given tier), with existing saves grandfathered rather than clamped?
+1. **Threshold: $150M**, set by `sim/BlueCollarStudy.gd` against Tim's brief (see the
+   Thresholds section — both playstyles arrive owning several of each Blue Collar
+   property with Day Trading money in hand, and today's early pacing is preserved).
+2. **Arrival beat: quiet promotion card only.** The trade-deal minigame comes later
+   with promotion-themed copy (deferred follow-up; leave a dispatch seam).
+3. **Staff blocks: uniform rule, no special-casing, no migration clamps** — the
+   renumbering turned out to be neutral at every equivalent content moment (blocks AND
+   prices), with Blue Collar gaining one cheap early block. See the staff-blocks note.
 
 ## Implementation order (when approved)
 

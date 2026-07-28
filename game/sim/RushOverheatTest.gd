@@ -1991,6 +1991,12 @@ func _test_freeze_reset_unfreezes(tuning: TuningConfig) -> void:
 	# a new tier, which is the live First Contact path — rush_momentum.reset() plus the
 	# unfreeze sweep, both inside GameState.tick. (Dynasty succession needs no equivalent
 	# probe: DynastyState builds a brand-new GameState, whose properties are born unfrozen.)
+	# Epoch arrival is ALSO gated on owning at least one of every property in the tier being
+	# left (Tim 2026-07-23), so seed ownership of the whole Earth ladder or the money alone
+	# can't advance the tier (this setup predated the gate and silently stalled at tier 1).
+	game.economy.award_cash(1e15)
+	for i in range(12):
+		game.try_buy(i, 1)
 	game.economy.cash_earned_this_gen = 1e30
 	game.tick(TICK_SECONDS)
 	_check("(setup) the contact tick advanced the epoch", game.epoch.current_tier > 1)

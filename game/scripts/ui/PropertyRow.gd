@@ -820,13 +820,14 @@ func _pump_held_rush(delta: float) -> void:
 	var pulse_interval := 1.0 / _prop.tuning.hold_rush_per_second
 	while _hold_accumulator >= pulse_interval:
 		_hold_accumulator -= pulse_interval
-		if _prop.is_cycle_running:
-			_rush_hold_pulsed = true
-			hold_rush_requested.emit(prop_index)
-		else:
-			# Idle: the held pulse starts the cycle. Signals are synchronous, so
-			# the property is running by the next pulse/frame and rushes follow.
-			tap_requested.emit(prop_index)
+		# Every held pulse is the RUSH verb — the core starts an idle cycle itself before
+		# rushing it (GameState.hold_rush_property). Routing idle pulses to a plain tap here
+		# (the old behavior) broke on very short cycles: an unstaffed sub-pulse-interval
+		# cycle was ALWAYS stopped when the pulse landed, so every pulse became a start-tap
+		# and no rush ever fired — rush mode could not engage on that property (Tim's
+		# Photon Exchange report, 2026-07-27).
+		_rush_hold_pulsed = true
+		hold_rush_requested.emit(prop_index)
 
 
 ## Holding the BUY button keeps purchasing on a calm cadence (hold-to-buy). A quick tap is

@@ -35,10 +35,11 @@ retires in favor of the standard epoch gate.
 Epoch advance stays "earn the epoch's economic value AND own ≥1 of every property in it"
 (`EpochState.update`). The split needs one NEW threshold — Blue→White.
 
-**Decided by study: $150M earned** (`sim/BlueCollarStudy.gd`, run 2026-07-27 — Tim's
-brief: the threshold should land when a new player owns at least one of each Blue
-Collar property, has bought a few of each, and can afford Day Trading, $6M). A bare
-founder restricted to Blue Collar buying, same play model as Sim.gd's playouts:
+**Decided: $75M earned** (Tim, 2026-07-27, revising the study's first $150M read —
+`sim/BlueCollarStudy.gd`; brief: the threshold should land when a new player owns at
+least one of each Blue Collar property, has bought a few of each, and can afford Day
+Trading, $6M). A bare founder restricted to Blue Collar buying, same play model as
+Sim.gd's playouts:
 
 | milestone | IDLE (passive floor) | ACTIVE (rush top 2, no Strong-Arm) |
 |---|---|---|
@@ -47,18 +48,22 @@ founder restricted to Blue Collar buying, same play model as Sim.gd's playouts:
 | cash covers Day Trading | $130M (5.6 m) | $69M (2.0 m) |
 | **at $150M: cash on hand** | **$7M (5.7 m)** | **$7.8M (2.4 m)** |
 
-- $150M is the smallest round threshold where BOTH playstyles arrive with Day Trading
-  money in hand (the brief's third condition; the binding one — ownership is satisfied
-  many times over by then). At $60M–$100M an idle player arrives $3–5M short.
+- $75M anchors on the ACTIVE player, who arrives with Day Trading money in hand
+  (~$7.5M at $69M earned). An idle player arrives a few million short — but the sim's
+  cash figures come from a greedy buyer that never stops reinvesting; a real player
+  who wants Day Trading just pauses Blue Collar buying, and at that income the gap
+  closes in tens of seconds. A brief, deliberate save-up is ON-design: every alien
+  boundary works this way (flagship ≈ 10% of the previous threshold ≈ cash on hand;
+  "earning your first purchase is the achievement", GDD §5.5). Day Trading at $75M is
+  an 8% flagship — almost exactly the established ratio ($150M would soften it to 4%).
 - Timing vs today: the White Collar tab currently unlocks (afford $6M) at 5.6 m idle /
-  2.0 m active — $150M lands at 5.7 m / 2.4 m. Early pace effectively unchanged, per
-  the locked fast-pace principle; the beat is added, not the wait.
-- Day Trading = 4% of the threshold — slightly more generous than the alien 10%
-  save-up convention, right for the first (rehearsal) boundary.
+  2.0 m active — $75M lands the game's FIRST epoch beat at ~5.1 m / ~2.1 m. Slightly
+  earlier than today, per the locked fast-pace principle, and it rehearses the real
+  boundary feel rather than a softened version.
 - White→Luminari keeps the full `earth_economy_target` ($103.6T) — the Earth total is
   unchanged, it just becomes tier 2's exit rather than tier 1's.
 - Mechanically: `economy_scale` stays the single source of truth (threshold =
-  `scale × earth_economy_target`). Blue Collar gets `scale = 150e6 / 103.6e12 ≈ 1.45e-6`;
+  `scale × earth_economy_target`). Blue Collar gets `scale = 75e6 / 103.6e12 ≈ 7.24e-7`;
   White Collar 1.0; aliens keep their 16807-per-step ladder (exponent re-based, values
   identical to today's).
 
@@ -135,9 +140,10 @@ The dispatch just needs a clean seam so the minigame can slot in later.
 
 ## Decisions log (all three open questions resolved 2026-07-27)
 
-1. **Threshold: $150M**, set by `sim/BlueCollarStudy.gd` against Tim's brief (see the
-   Thresholds section — both playstyles arrive owning several of each Blue Collar
-   property with Day Trading money in hand, and today's early pacing is preserved).
+1. **Threshold: $75M** (Tim's call, 2026-07-27, on the `sim/BlueCollarStudy.gd` data —
+   see the Thresholds section: active players arrive with Day Trading money in hand,
+   idle players get a seconds-long deliberate save-up matching the alien-boundary
+   convention, and the first epoch beat lands slightly EARLIER than today's tab unlock).
 2. **Arrival beat: quiet promotion card only.** The trade-deal minigame comes later
    with promotion-themed copy (deferred follow-up; leave a dispatch seam).
 3. **Staff blocks: uniform rule, no special-casing, no migration clamps** — the

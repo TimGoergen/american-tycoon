@@ -272,13 +272,23 @@ func tap_property(prop_index: int) -> void:
 ## hold factor — holding is convenient, so real tapping stays superior.
 func hold_rush_property(prop_index: int) -> void:
 	var prop := economy.properties[prop_index] as PropertyState
-	if not prop.is_cycle_running:
-		return
 	# A frozen property is DOWN: the held rush is dead on it until rush_ready. This guard is
 	# LOAD-BEARING now — it used to be covered incidentally by the can_rush() gate below, but that
 	# gate no longer refuses the whole empire (see tap_property).
 	if prop.is_overheat_frozen:
 		return
+	if not prop.is_cycle_running:
+		# An UNSTAFFED cycle stops the moment it pays out, so on a very short cycle it is
+		# usually stopped when the next 5/s hold pulse lands. This used to bail out here,
+		# which let a fast property (Photon Exchange, 0.54s base, shortened further by
+		# Legacy cycle upgrades + the First Contact bonus) complete-and-stop between EVERY
+		# pulse: each pulse saw an idle cycle, restarted it as a plain tap, and no rush verb
+		# ever fired — so Rush Momentum never engaged on that one property (Tim's device
+		# report, 2026-07-27). A held pulse on an idle property now STARTS the cycle and
+		# rushes it in the same pulse, so holding always engages regardless of cycle length.
+		if prop.units_owned == 0:
+			return
+		prop.start_cycle()
 	frenzy.on_tap(tuning.frenzy_fill_hold_factor)
 	# Same rule as tap_property: a property that is not frozen keeps rushing through someone
 	# else's lockout for income and frenzy, but the downed meter grants no heat and no bonus.

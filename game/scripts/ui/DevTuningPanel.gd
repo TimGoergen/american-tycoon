@@ -541,11 +541,20 @@ func _add_playtest_section() -> void:
 	var body := _add_collapsible_section(title)
 
 	body.add_child(_playtest_label("Jump to epoch (teleport + entry cash):"))
-	var epoch_row := HBoxContainer.new()
-	epoch_row.add_theme_constant_override("separation", 8)
+	# A FLOW container, not an HBox: with the full 26-epoch ladder, one row of E1..E26
+	# buttons is far wider than the panel and would push everything off the right edge
+	# (an HBox never wraps). The flow lays the buttons left-to-right and wraps to a new
+	# line when the panel width runs out.
+	var epoch_row := HFlowContainer.new()
+	epoch_row.add_theme_constant_override("h_separation", 8)
+	epoch_row.add_theme_constant_override("v_separation", 8)
 	for tier in range(1, EpochCatalog.tier_count() + 1):
 		var t := tier
 		var eb := _playtest_button("E%d" % t)
+		# Fixed width instead of expand-to-fill: expanding buttons in a flow container
+		# stretch a partly-filled last line to giant widths, so the grid would look ragged.
+		eb.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		eb.custom_minimum_size = Vector2(118, 84)
 		eb.pressed.connect(func() -> void: jump_epoch_requested.emit(t))
 		epoch_row.add_child(eb)
 	body.add_child(epoch_row)

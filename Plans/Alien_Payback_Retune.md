@@ -1,6 +1,10 @@
 # Alien Payback Retune — fix the Earth→Luminari income cliff
 
-**Status: draft for Tim's review (2026-07-27). Nothing implemented.**
+**Status: Candidate B approved by Tim and implemented (2026-07-27).**
+The live recipe constants are now **R = 0.25, d = 0.80** — any future tier extension
+must generate alien incomes as `income(per 60s) = cost × 0.25 × 0.80^(tier−1)`
+(4sf on the base step, then %.6g after decay, then %.6g after the cycle step),
+replacing the retired 0.01824 ratio everywhere the batch-2 recipe is reproduced.
 Target branch: `feature/civs-12-26` (this responds to the device feel-test of that branch,
 and it edits the same 326-property content, so it should land there before merge).
 

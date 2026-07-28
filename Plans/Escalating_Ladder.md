@@ -27,6 +27,8 @@ Per epoch T (rungs N = T + 4), rung k (0-based) of the cohort:
   threshold) and the ×3 step-up (both Tim-approved).
 - `income(k) = cost(k) × 0.01824` — the live cohorts hold income/cost constant at
   0.01824 (verified against every shipped .tres by the sim's pattern check).
+  **SUPERSEDED 2026-07-27:** the income rule is now `cost × 0.25 × 0.80^(tier−1)` —
+  see `Plans/Alien_Payback_Retune.md`. The cost grid above is unchanged and still live.
 - Cycle 60s, r0, accent color: inherited from the epoch's flagship.
 
 Identity order on the grid: flagship (rung 0) → the 3 existing siblings (rungs 1-3) →

@@ -20,11 +20,25 @@ extends ColorRect
 
 signal dismissed
 
+# Fixed-chrome text, per beat flavor. The overlay serves TWO kinds of arrival since the
+# Earth split (Plans/Earth_Split_Epochs.md): the alien First Contact, and the Earth→Earth
+# PROMOTION into White Collar (tier 2) — same staged reveal, different voice. show_contact
+# picks a set by the epoch's civilization ("Earth" = promotion).
+const EYEBROW_ALIEN := "◄  INCOMING TRANSMISSION  ►"
+const HEADLINE_ALIEN := "FIRST CONTACT"
+const NOTE_ALIEN := "A new kind of business opens in their market. Your staff can be upgraded with their technology, too."
+const BUTTON_ALIEN := "ANSWER THE CALL"
+const EYEBROW_PROMOTION := "◄  MEMO FROM UPSTAIRS  ►"
+const HEADLINE_PROMOTION := "MOVING UP"
+const NOTE_PROMOTION := "A new kind of business opens uptown. Your blue-collar crews can take on a second tier of staff, too."
+const BUTTON_PROMOTION := "TAKE THE PROMOTION"
+
 var _eyebrow_label: Label
 var _headline_label: Label
 var _civ_label: Label
 var _planet_label: Label
 var _flavor_label: Label
+var _note_label: Label
 ## The civilization's own first words (EpochCatalog.hail) — the actual transmission,
 ## typewritten in the civ's accent color so every contact sounds and looks different
 ## (Tim, 2026-07-07: the contacts read samey).
@@ -82,14 +96,14 @@ func _ready() -> void:
 	# up a size, and the gold lines carry a NAVY outline — gold-on-gold outlines vanished
 	# into the cream plate, navy makes the gold pop off it.
 	_eyebrow_label = Label.new()
-	_eyebrow_label.text = "◄  INCOMING TRANSMISSION  ►"
+	_eyebrow_label.text = EYEBROW_ALIEN
 	_eyebrow_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_eyebrow_label.add_theme_color_override("font_color", UiPalette.KETCHUP_RED)
 	_eyebrow_label.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
 	column.add_child(_eyebrow_label)
 
 	_headline_label = Label.new()
-	_headline_label.text = "FIRST CONTACT"
+	_headline_label.text = HEADLINE_ALIEN
 	_headline_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	# Gold: this is a celebratory milestone, like the Legacy reward chrome.
 	_headline_label.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD)
@@ -156,20 +170,21 @@ func _ready() -> void:
 	_narration_label.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
 	column.add_child(_narration_label)
 
-	var note := Label.new()
+	_note_label = Label.new()
 	# Foreshadows both rewards of contact: a brand-new kind of business opens in the alien
 	# market (negotiated via the trade-deal minigame on "Answer the Call"), and every existing
 	# property's staffer can now be upgraded to this civilization's technology tier.
-	note.text = "A new kind of business opens in their market. Your staff can be upgraded with their technology, too."
-	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	note.custom_minimum_size = Vector2(760, 0)
-	note.add_theme_color_override("font_color", UiPalette.NAVY)
-	note.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
-	column.add_child(note)
+	# (Text is swapped per show_contact — the Earth→Earth promotion beat has its own copy.)
+	_note_label.text = NOTE_ALIEN
+	_note_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_note_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_note_label.custom_minimum_size = Vector2(760, 0)
+	_note_label.add_theme_color_override("font_color", UiPalette.NAVY)
+	_note_label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
+	column.add_child(_note_label)
 
 	_proceed_button = Button.new()
-	_proceed_button.text = "ANSWER THE CALL"
+	_proceed_button.text = BUTTON_ALIEN
 	_proceed_button.custom_minimum_size = Vector2(0, 96)
 	_proceed_button.add_theme_font_size_override("font_size", UiPalette.FONT_BUTTON)
 	UiPalette.style_button(_proceed_button, true)
@@ -229,8 +244,20 @@ func show_contact(tier: int) -> void:
 		_reveal_tween.kill()
 	_reveal_tween = null
 
-	_civ_label.text = String(epoch["civilization"])
-	_planet_label.text = "Home world: %s" % String(epoch["home_planet"])
+	# The Earth→Earth PROMOTION beat (White Collar, tier 2 — the Earth split) reuses this
+	# staged reveal with its own voice: no alien transmission framing, and the big name on
+	# the card is the new ERA ("WHITE COLLAR"), since the civilization is still Earth.
+	var is_promotion := String(epoch["civilization"]) == "Earth"
+	_eyebrow_label.text = EYEBROW_PROMOTION if is_promotion else EYEBROW_ALIEN
+	_headline_label.text = HEADLINE_PROMOTION if is_promotion else HEADLINE_ALIEN
+	_note_label.text = NOTE_PROMOTION if is_promotion else NOTE_ALIEN
+	_proceed_button.text = BUTTON_PROMOTION if is_promotion else BUTTON_ALIEN
+	if is_promotion:
+		_civ_label.text = "WHITE COLLAR"
+		_planet_label.text = "Same planet — higher floors."
+	else:
+		_civ_label.text = String(epoch["civilization"])
+		_planet_label.text = "Home world: %s" % String(epoch["home_planet"])
 	_flavor_label.text = "They trade in %s." % String(epoch["currency_flavor"])
 	# The civ's accent color tints its name and its words, so each contact is visually
 	# distinct as well as verbally (Tim, 2026-07-07).
@@ -393,10 +420,13 @@ func _reveal_proceed_button() -> void:
 ## Compact ×N formatting for the market-growth line (1,000 / 1 million / 1 billion …),
 ## so an order-of-magnitude jump reads cleanly instead of as a wall of zeroes.
 func _format_multiplier(value: float) -> String:
+	# 3 significant figures: the promotion beat's ratio is a messy 1.38139... million
+	# (Earth total ÷ the $75M Blue Collar slice), and "×1.38 million" reads as a number
+	# while "×1.38139 million" reads as a defect. Alien steps are exact and unaffected.
 	if value >= 1_000_000_000.0:
-		return "%g billion" % (value / 1_000_000_000.0)
+		return "%.3g billion" % (value / 1_000_000_000.0)
 	if value >= 1_000_000.0:
-		return "%g million" % (value / 1_000_000.0)
+		return "%.3g million" % (value / 1_000_000.0)
 	# Group the thousands with commas (e.g. 1000 → "1,000").
 	var digits := str(int(value))
 	var grouped := ""

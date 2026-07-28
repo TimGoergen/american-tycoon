@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 204
 display_name = "Auction Seances"
-unlock_tier = 18
+unlock_tier = 19
 base_cost = 3.378e+81
 r0 = 1.09
 base_income_per_unit = 5.07421e+77

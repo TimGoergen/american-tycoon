@@ -93,8 +93,11 @@ const PLANET_WATERMARK_ALPHA := 0.6
 const PLANET_CORNER_RADIUS_TOP := UiPalette.SCREEN_CORNER_RADIUS - 12
 const PLANET_CORNER_RADIUS_BOTTOM := 4
 # Tier (1-based, EpochCatalog) -> world image. Index 0 is unused so the array is tier-aligned.
+# Tiers 1-2 are BOTH Earth (the Blue/White Collar split, Plans/Earth_Split_Epochs.md); the
+# alien worlds start at tier 3. Tiers past the table simply show no watermark (existing rule).
 const PLANET_IMAGE_PATHS := [
 	"",
+	"res://art/worlds/earth.svg",
 	"res://art/worlds/earth.svg",
 	"res://art/worlds/luminari.svg",
 	"res://art/worlds/geth-sentinel.svg",

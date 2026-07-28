@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 66
 display_name = "Coilfold Annuities"
-unlock_tier = 8
+unlock_tier = 9
 base_cost = 1.182e+39
 r0 = 1.09
 base_income_per_unit = 1.31378e+36

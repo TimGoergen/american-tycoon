@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 139
 display_name = "Hostile Takeover Legion"
-unlock_tier = 13
+unlock_tier = 14
 base_cost = 8.133e+61
 r0 = 1.09
 base_income_per_unit = 2.28235e+59

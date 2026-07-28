@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 102
 display_name = "The Deep-Ice Endowment"
-unlock_tier = 10
+unlock_tier = 11
 base_cost = 5.533e+50
 r0 = 1.09
 base_income_per_unit = 1.85623e+49

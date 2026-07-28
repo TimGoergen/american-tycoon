@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 50
 display_name = "Timeline Repossessions"
-unlock_tier = 6
+unlock_tier = 7
 base_cost = 283500000000000000000000000000000.0
 r0 = 1.09
 base_income_per_unit = 4.8314e+30

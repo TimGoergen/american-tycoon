@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 64
 display_name = "Venom Underwriting"
-unlock_tier = 8
+unlock_tier = 9
 base_cost = 2.335e+38
 r0 = 1.09
 base_income_per_unit = 1.10189e+35

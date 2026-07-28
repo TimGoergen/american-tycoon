@@ -35,8 +35,13 @@ SCRATCH = REGEN_DIR / "live_snapshot"
 DRAFT_PATH = Path(r"C:\Claude\American Tycoon\docs\civilizations_v2_draft.json")
 
 # Alien Payback Retune, Candidate B (Plans/Alien_Payback_Retune.md, 2026-07-27) — was 0.01824.
-# This is the UNDECAYED per-60s ratio; the .tres generation step applies x0.80^(tier-1)
-# decay and the cycle/60 factor on top (see the recipe in the plan doc).
+# This is the UNDECAYED per-60s ratio; the .tres generation step applies the decay and the
+# cycle/60 factor on top (see the recipe in the plan doc).
+#
+# EARTH SPLIT (Plans/Earth_Split_Epochs.md, 2026-07-27): the GAME's tier numbering is now
+# draft/civ tier + 1 (Earth spans game tiers 1-2, so draft tier 2 = Luminari = game tier 3).
+# This pipeline keeps the draft's own civ numbering; anything generating game .tres files
+# from it must write unlock_tier = draft_tier + 1 and decay incomes by 0.80^(game_tier - 2).
 INCOME_RATIO = 0.25
 EPOCH_SPAN = 16807.0        # 7^5 — one epoch's total cost span AND threshold step
 COHORT_CAP = 14             # scaling analysis: keeps per-rung ratio at ~x2

@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 264
 display_name = "Drama Exchanges"
-unlock_tier = 22
+unlock_tier = 23
 base_cost = 4.344e+99
 r0 = 1.09
 base_income_per_unit = 1.13905e+96

@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 35
 display_name = "Biosphere Trust"
-unlock_tier = 4
+unlock_tier = 5
 base_cost = 14570000000000000000000000.0
 r0 = 1.09
 base_income_per_unit = 1.86522e+24

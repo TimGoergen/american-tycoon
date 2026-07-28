@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 255
 display_name = "Afterlife Sovereign Fund"
-unlock_tier = 21
+unlock_tier = 22
 base_cost = 8.348e+96
 r0 = 1.09
 base_income_per_unit = 1.67476e+94

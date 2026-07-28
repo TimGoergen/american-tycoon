@@ -404,11 +404,23 @@ func _build_chrome() -> void:
 	subtitle_row.add_child(expand_all_button)
 
 	# ── Scrollable list of constant rows ──
+	# The scroll wears the property ladder's full edge treatment (Tim, 2026-07-27 — one
+	# "more content this way" vocabulary everywhere): tappable ScrollEdgeArrows strips
+	# overlaid on a plain Control host, plus the visible-fraction edge fade on the rows
+	# (see _update_edge_fade / ScrollEdgeArrows.apply_edge_fade).
+	var scroll_host := Control.new()
+	scroll_host.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	column.add_child(scroll_host)
 	var scroll := ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_RESERVE
-	column.add_child(scroll)
+	scroll_host.add_child(scroll)
+	var arrows := ScrollEdgeArrows.new()
+	arrows.setup(scroll)
+	scroll_host.add_child(arrows)
+	scroll.get_v_scroll_bar().value_changed.connect(func(_v: float) -> void: _update_edge_fade())
+	scroll.resized.connect(_update_edge_fade)
 	_scroll = scroll  # kept for the drag-to-scroll handler (see _pan_scroll_on_drag)
 
 	# Right margin keeps every row clear of the overlaid scrollbar (see SCROLLBAR_GAP); the
@@ -638,6 +650,28 @@ func _toggle_section(title: String) -> void:
 	section["expanded"] = not bool(section["expanded"])
 	(section["body"] as Control).visible = bool(section["expanded"])
 	_update_section_header(title)
+	# The list just re-laid-out (a body appeared or vanished) — refresh the edge fade once
+	# the new layout has settled (deferred: sizes are stale until the next layout pass).
+	_update_edge_fade.call_deferred()
+
+
+## The shared property-ladder edge treatment (ScrollEdgeArrows.apply_edge_fade), fading
+## whatever the scroll is clipping at either edge. Items are collected fresh each call —
+## the section headers plus, for every EXPANDED section, its individual rows — so a tall
+## open body fades row by row like the ladder rather than dimming as one giant block.
+func _update_edge_fade() -> void:
+	if _scroll == null or _list == null:
+		return
+	var items: Array = []
+	for child in _list.get_children():
+		var control := child as Control
+		if control == null or not control.visible:
+			continue
+		if control is VBoxContainer:
+			items.append_array((control as VBoxContainer).get_children())
+		else:
+			items.append(control)
+	ScrollEdgeArrows.apply_edge_fade(_scroll, items)
 
 
 # ---------------------------------------------------------------------------
@@ -689,6 +723,7 @@ func set_all_collapsed(collapsed: bool) -> void:
 		section["expanded"] = not collapsed
 		(section["body"] as Control).visible = not collapsed
 		_update_section_header(String(title))
+	_update_edge_fade.call_deferred()  # every body just appeared/vanished — re-fade post-layout
 
 
 ## Refresh a section header's caret + name to match its expanded state. "+" invites a tap to open a
@@ -800,6 +835,7 @@ func open(effective_tuning: TuningConfig, baked_tuning: TuningConfig) -> void:
 	_refresh_all_section_markers()
 
 	visible = true
+	_update_edge_fade.call_deferred()  # rows just rebuilt — fade once they have laid out
 
 
 ## The title of the section a knob belongs to: the first SECTIONS entry with a prefix the knob

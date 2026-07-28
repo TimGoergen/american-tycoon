@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 313
 display_name = "Fine Print Mills"
-unlock_tier = 26
+unlock_tier = 27
 base_cost = 2.674e+114
 r0 = 1.09
 base_income_per_unit = 2.27297e+109

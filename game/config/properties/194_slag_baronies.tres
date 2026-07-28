@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 194
 display_name = "Slag Baronies"
-unlock_tier = 17
+unlock_tier = 18
 base_cost = 3.24e+78
 r0 = 1.09
 base_income_per_unit = 2.59268e+75

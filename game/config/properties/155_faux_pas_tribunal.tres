@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 155
 display_name = "Faux Pas Tribunal"
-unlock_tier = 14
+unlock_tier = 15
 base_cost = 5.488e+66
 r0 = 1.09
 base_income_per_unit = 2.54351e+64

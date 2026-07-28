@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 176
 display_name = "Dead Language Estates"
-unlock_tier = 16
+unlock_tier = 17
 base_cost = 1.196e+73
 r0 = 1.09
 base_income_per_unit = 2.80711e+69

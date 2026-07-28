@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 187
 display_name = "Scrap Tithes"
-unlock_tier = 17
+unlock_tier = 18
 base_cost = 2.499e+76
 r0 = 1.09
 base_income_per_unit = 1.58279e+72

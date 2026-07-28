@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 237
 display_name = "Kaleidoscope Trust"
-unlock_tier = 20
+unlock_tier = 21
 base_cost = 3.081e+91
 r0 = 1.09
 base_income_per_unit = 1.81357e+88

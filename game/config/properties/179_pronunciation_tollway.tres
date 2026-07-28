@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 179
 display_name = "Pronunciation Tollway"
-unlock_tier = 16
+unlock_tier = 17
 base_cost = 9.621e+73
 r0 = 1.09
 base_income_per_unit = 6.69755e+70

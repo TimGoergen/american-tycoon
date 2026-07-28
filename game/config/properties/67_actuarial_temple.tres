@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 67
 display_name = "Actuarial Temple"
-unlock_tier = 8
+unlock_tier = 9
 base_cost = 2.659e+39
 r0 = 1.09
 base_income_per_unit = 4.53276e+36

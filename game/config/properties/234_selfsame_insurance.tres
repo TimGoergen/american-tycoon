@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 234
 display_name = "Selfsame Insurance"
-unlock_tier = 20
+unlock_tier = 21
 base_cost = 3.83e+90
 r0 = 1.09
 base_income_per_unit = 7.60095e+86

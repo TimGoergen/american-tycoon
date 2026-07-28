@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 31
 display_name = "Moment Market"
-unlock_tier = 6
+unlock_tier = 7
 base_cost = 5786000000000000000000000000000.0
 r0 = 1.09
 base_income_per_unit = 1.21541e+28

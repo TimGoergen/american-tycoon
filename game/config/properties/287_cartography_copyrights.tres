@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 287
 display_name = "Cartography Copyrights"
-unlock_tier = 24
+unlock_tier = 25
 base_cost = 3.8e+106
 r0 = 1.09
 base_income_per_unit = 1.04212e+102

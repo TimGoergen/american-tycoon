@@ -33,7 +33,9 @@ class_name EpochCatalog
 # previous threshold (≈ cash on hand), income anchored separately for a ~3× step-up. So it is ×7
 # within and across alien epochs, with one "catch up to your wealth" jump at the Earth→alien
 # boundary (Tim 2026-07-12: the flagship must not be pocket change on arrival).
-#   economy_scale = 7^(5·(tier-1)) = (7^5)^(tier-1) -> 1, 16807, 2.82e8, 4.75e12, 7.98e16, 1.34e21
+#   Tiers 1-2 are the EARTH SPLIT (2026-07-27, Plans/Earth_Split_Epochs.md): Blue Collar
+#   scale ~7.24e-7 ($75M) and White Collar 1.0 (the full Earth target). Alien epochs then run
+#   economy_scale = (7^5)^(tier-2) -> 16807, 2.82e8, 4.75e12, 7.98e16, 1.34e21, ...
 # i.e. the earn-to-clear threshold grows one 5-rung ladder block per epoch, matching how far the
 # property magnitudes climb in that epoch — so pacing stays ~flat and you can never trivially buy
 # across epochs (a rung 5 blocks up is 7^25× more expensive). The property BASE magnitude carries
@@ -57,148 +59,175 @@ class_name EpochCatalog
 #                        types added at later epochs — GDD §5.5 site 2). One entry per property.
 # (Alien staff cost is no longer a per-epoch multiplier; it is derived from economy_scale
 #  × earth_economy_target in EconomyState.get_staff_cost — see TuningConfig.staff_cost_*.)
+# Earth staffer titles, one per property in ladder order — shared by BOTH Earth epochs
+# (Blue Collar tier 1 and White Collar tier 2, the 2026-07-27 Earth split): the roster
+# names a block's staffer by the block's epoch, and both Earth blocks use the same Earth
+# voice. (A 'Senior ...' White Collar naming pass is possible later content work.)
+# These mirror the staffer_name in each property's .tres so the tier system has one
+# authoritative table; the .tres field is now vestigial.
+const EARTH_STAFFER_NAMES := [
+		"ATM Technician", "Botanical Manager", "NFT Community Manager",
+		"Tax Strategist", "Logistics Director", "Freshness Consultant",
+		"Portfolio Analyst", "Property Manager", "Downline Coordinator",
+		"Fund Administrator", "Lobbyist", "Chief of Staff",
+		# Rungs 13–17 are the alien property types (Photon Exchange, Data Foundry, Spore Bank,
+		# Prism Vault, Time Bank). Earth never staffs them (each is locked until its epoch),
+		# but the roster stays the same length as the property ladder so indexing always works.
+		"Exchange Floor Boss",
+		"Data Foundry Manager", "Spore Bank Manager", "Vault Keeper", "Time Bank Manager",
+		# Cohort siblings (Phase 2, property indices 17–31). Earth never staffs them
+		# (each is locked until its epoch), but every roster spans the full 52-property ladder.
+		"Beam Utilities Foreman", "Futures Desk Chief", "Dyson Site Manager",
+		"Server City Superintendent", "Mine Boss", "Labor Agency Director",
+		"Network Line Manager", "Refinery Foreman", "Co-op Chairman",
+		"Gem Floor Manager", "Lens Works Foreman", "Realty Broker",
+		"Deadline Desk Manager", "Market Stall Keeper", "Escrow Officer",
+		# Cohort 5th members (Phase 3, indices 32–36): Starcore, Singularity, Biosphere,
+		# Geode, Causality. Earth never staffs them; the roster stays ladder-length.
+		"Starcore Site Manager", "Singularity Project Director", "Biosphere Estate Director",
+		"Geode Holdings Director", "Causality Fund Director",
+		# Escalating-ladder additions (2026-07-15, indices 37–51): epochs 2–6 now hold
+		# 6/7/8/9/10 properties — 1 new for epoch 2, then 2, 3, 4, 5, cheapest first.
+		# Earth never staffs these either; the entries are plain professional titles.
+		"Stellar Insurance Adjuster",
+		"Sentience Leasing Agent", "Mainframe Operations Director",
+		"Orchard Operations Manager", "Interstellar Logistics Coordinator",
+		"Colony Operations Director",
+		"Annuity Portfolio Manager", "Arbitrage Desk Chief", "Extraction Site Director",
+		"Chief Assay Officer",
+		"Hedge Fund Analyst", "Refinery Operations Manager", "Repossession Agent",
+		"Mortgage Underwriter", "Chief Acquisitions Officer",
+		# --- first-batch new-civ properties (tiers 7-11), appended ---
+		"Storefront Supervisor", "Vault Operations Manager", "Toll Booth Operator",
+		"Fleet Dispatcher", "Estate Liquidator", "Utility Plant Operator",
+		"Bond Trader", "Mint Operations Supervisor", "Exchange Floor Manager",
+		"Trust Administrator", "Regional Governor", "Underwriting Agent",
+		"Reinsurance Adjuster", "Annuities Advisor", "Staff Actuary",
+		"Liability Adjuster", "Life Insurance Agent", "Escrow Vault Custodian",
+		"Claims Examiner", "Coverage Specialist", "Policy Rider Analyst",
+		"Indemnity Underwriter", "Perpetuity Trustee", "Wax Plant Foreman",
+		"Commodities Trader", "Placement Recruiter", "Leasing Agent",
+		"Patent Examiner", "Distillery Manager", "Floor Trader",
+		"Assurance Agent", "Broadcast Station Manager", "Annexation Case Officer",
+		"Regional Administrator", "Mint Director", "Reserve Warehouse Manager",
+		"Ledger Clerk", "Cold Storage Supervisor", "Yard Foreman",
+		"Derivatives Trader", "Debt Collector", "Annuity Salesman",
+		"Claims Processor", "Toll Road Administrator", "Bond Vault Custodian",
+		"Commodity Exchange Manager", "Mineral Rights Broker", "Holdings Portfolio Director",
+		"Futures Trader", "Endowment Administrator", "Licensing Coordinator",
+		"Booking Agent", "Rights Clearance Officer", "Concert Promoter",
+		"Royalties Auditor", "Tour Manager", "Patent Attorney",
+		"Easement Negotiator", "Antitrust Compliance Officer", "Acoustics Engineer",
+		"Venue Operations Manager", "Music Rights Trader", "Licensing Account Manager",
+		"Orchestra Conductor",
+		# --- tiers 12-26 property titles (appended 2026-07-26) ---
+		"Records Custodian", "Shell Company Registrar", "Back Office Broker",
+		"Trust Officer", "Discreet Settlements Clerk", "Favor Desk Trader",
+		"Payroll Administrator", "Auctioneer", "Branch Manager",
+		"Vault Compliance Officer", "Records Redaction Specialist", "Deputy Governor",
+		"Undersecretary", "Night Shift Manager", "Escrow Negotiator",
+		"Supply Chain Manager", "Staffing Recruiter", "Bond Salesman",
+		"Account Protection Specialist", "Asset Intake Clerk", "Pit Trader",
+		"Toll Authority Superintendent", "Mergers Specialist", "Land Redevelopment Agent",
+		"Dividend Disbursement Officer", "Embargo Compliance Manager", "Portfolio Acquisitions Director",
+		"Security Chief", "Toll Collections Clerk", "Notary Public",
+		"Events Coordinator", "Grants Administrator", "Stationery Press Operator",
+		"Reserve Teller", "Response Processing Clerk", "Seating Arrangements Broker",
+		"Bereavement Coordinator", "Society Registrar", "Hearing Officer",
+		"Dean of Admissions", "Reserve Bank Examiner", "Estate Executor",
+		"Collections Agent", "Licensing Examiner", "Claims Adjuster",
+		"Real Estate Appraiser", "Toll Plaza Supervisor", "Livestock Leasing Agent",
+		"Royalty Reconciliation Clerk", "Commodities Broker", "Night Shift Recruiter",
+		"Subscription Retention Specialist", "Refinery Night Foreman", "Grid Operations Engineer",
+		"Trust Beneficiary Liaison", "Franchise Director", "Mint Supervisor",
+		"Mining Shift Lead", "Archivist", "Estate Sale Coordinator",
+		"Refinery Line Supervisor", "Corrections Officer", "Tollway Attendant",
+		"Futures Exchange Analyst", "Reserve Curator", "Derrick Operator",
+		"Reconstruction Project Manager", "Exclusive Rights Manager", "Concession Stand Operator",
+		"Reference Librarian", "Scrap Yard Manager", "Refinery Shift Supervisor",
+		"Metallurgist", "Smelter Plant Manager", "Escrow Account Manager",
+		"Debt Registrar", "Futures Desk Analyst", "Slag Yard Supervisor",
+		"Foundry Floor Manager", "Tithe Collections Officer", "Utilities Commissioner",
+		"Treaty Compliance Officer", "Casting Supervisor", "Board Chairman",
+		"Guest List Manager", "Panel Judge", "Head Tailor",
+		"Auction House Manager", "Gallery Circuit Manager", "Blacklist Registrar",
+		"Art Restorer", "Provenance Archivist", "Exhibitions Director",
+		"Manifesto Copywriter", "Cultural Analyst", "Sunset Planning Officer",
+		"Vacancy Broker", "Museum Curator", "Franchise Operator",
+		"Pit Boss", "Slot Floor Attendant", "Bookmaker",
+		"Dice Quality Inspector", "Comp Suite Concierge", "Roulette Croupier",
+		"High Roller Host", "Odds Compiler", "Luck Futures Broker",
+		"House Percentage Auditor", "Resort General Manager", "Sportsbook Manager",
+		"Casino General Manager", "Mint Press Operator", "Temp Agency Recruiter",
+		"Exchange Teller", "Royalties Accountant", "Escrow Verification Clerk",
+		"Identity Underwriter", "Image Rights Examiner", "Gallery Docent",
+		"Trust Portfolio Officer", "Mercury Plant Operator", "Works Site Foreman",
+		"Ring Maintenance Technician", "Optical Engineer", "Portrait Studio Manager",
+		"Probate Clerk", "Pension Administrator", "Cemetery Plot Salesman",
+		"Trust Fund Manager", "Niche Leasing Agent", "Securities Analyst",
+		"Clearinghouse Clerk", "Eulogy Underwriter", "Licensed Medium",
+		"Bond Market Analyst", "Bourse Floor Manager", "Escrow Holdings Officer",
+		"Sovereign Fund Manager", "Estate Planning Attorney", "Content Moderator",
+		"Analytics Manager", "Fan Club President", "Trend Forecaster",
+		"Headline Copywriter", "Brand Partnerships Manager", "Audience Growth Specialist",
+		"Drama Desk Editor", "Reputation Claims Adjuster", "Brand Identity Technician",
+		"Recommendation Engineer", "Broadcast Operations Chief", "Chief Engagement Officer",
+		"Head of Programming", "Line Attendant", "Stamp Press Foreman",
+		"Permit Office Clerk", "Committee Secretary", "Filing Clerk",
+		"Receptionist", "Complaints Intake Officer", "Authorized Signatory",
+		"Internal Auditor", "Records Retrieval Specialist", "Stamp Vault Teller",
+		"Queue Management Officer", "Deferred Approvals Manager", "Chief Planning Officer",
+		"Customs Agent", "Leasing Office Manager", "Copyright Clerk",
+		"Land Surveyor", "Franchise Sales Rep", "Legend Licensing Clerk",
+		"Patent Agent", "Overseas Holdings Manager", "Toll Ring Supervisor",
+		"Pole Station Manager", "Drift Rate Analyst", "Escrow Surveyor",
+		"Grid Standards Officer", "Chief Cartographer", "Clearinghouse Supervisor",
+		"Arbitrage Trader", "Staff Auditor", "Reserve Fund Manager",
+		"Radiological Asset Manager", "Court-Appointed Receiver", "Catastrophe Futures Broker",
+		"Long-Term Trust Officer", "Foreclosure Court Clerk", "Liquidation Fleet Coordinator",
+		"One-Way Deposits Officer", "Impairment Accountant", "Thermodynamics Auditor",
+		"Chief Accounting Officer", "Contracts Paralegal", "Intellectual Property Attorney",
+		"Lien Filing Clerk", "Title Registrar", "Soul Escrow Officer",
+		"Easement Filing Clerk", "Math Licensing Examiner", "Timeshare Sales Rep",
+		"Trust Risk Manager", "Causality Loan Officer", "Condemnation Attorney",
+		"Divine Foreclosure Agent", "Unclaimed Property Examiner", "General Counsel",
+	]
+
+
 const EPOCHS := [
 	{
 		"tier": 1,
 		"civilization": "Earth",
 		"home_planet": "Earth",
 		"currency_flavor": "Dollars",
-		"economy_scale": 1.0,
+		# The Earth split (Plans/Earth_Split_Epochs.md, Tim 2026-07-27): Blue Collar is its
+		# own epoch, cleared at $75M earned — expressed as a fraction of the Earth target so
+		# the threshold keeps one source of truth (consume_threshold = scale x earth_target).
+		"economy_scale": 75e6 / 103.6e12,
 		"staff_income_multiplier": 1.0,
-		# Earth is where every run begins — there is no contact beat for it.
+		# Earth Blue Collar is where every run begins — there is no arrival beat for it.
 		"contact_line": "",
-		# Earth staffers — these mirror the staffer_name in each property's .tres so the
-		# tier system has one authoritative table; the .tres field is now vestigial.
-		"staffer_names": [
-			"ATM Technician", "Botanical Manager", "NFT Community Manager",
-			"Tax Strategist", "Logistics Director", "Freshness Consultant",
-			"Portfolio Analyst", "Property Manager", "Downline Coordinator",
-			"Fund Administrator", "Lobbyist", "Chief of Staff",
-			# Rungs 13–17 are the alien property types (Photon Exchange, Data Foundry, Spore Bank,
-			# Prism Vault, Time Bank). Earth never staffs them (each is locked until its epoch),
-			# but the roster stays the same length as the property ladder so indexing always works.
-			"Exchange Floor Boss",
-			"Data Foundry Manager", "Spore Bank Manager", "Vault Keeper", "Time Bank Manager",
-			# Cohort siblings (Phase 2, property indices 17–31). Earth never staffs them
-			# (each is locked until its epoch), but every roster spans the full 52-property ladder.
-			"Beam Utilities Foreman", "Futures Desk Chief", "Dyson Site Manager",
-			"Server City Superintendent", "Mine Boss", "Labor Agency Director",
-			"Network Line Manager", "Refinery Foreman", "Co-op Chairman",
-			"Gem Floor Manager", "Lens Works Foreman", "Realty Broker",
-			"Deadline Desk Manager", "Market Stall Keeper", "Escrow Officer",
-			# Cohort 5th members (Phase 3, indices 32–36): Starcore, Singularity, Biosphere,
-			# Geode, Causality. Earth never staffs them; the roster stays ladder-length.
-			"Starcore Site Manager", "Singularity Project Director", "Biosphere Estate Director",
-			"Geode Holdings Director", "Causality Fund Director",
-			# Escalating-ladder additions (2026-07-15, indices 37–51): epochs 2–6 now hold
-			# 6/7/8/9/10 properties — 1 new for epoch 2, then 2, 3, 4, 5, cheapest first.
-			# Earth never staffs these either; the entries are plain professional titles.
-			"Stellar Insurance Adjuster",
-			"Sentience Leasing Agent", "Mainframe Operations Director",
-			"Orchard Operations Manager", "Interstellar Logistics Coordinator",
-			"Colony Operations Director",
-			"Annuity Portfolio Manager", "Arbitrage Desk Chief", "Extraction Site Director",
-			"Chief Assay Officer",
-			"Hedge Fund Analyst", "Refinery Operations Manager", "Repossession Agent",
-			"Mortgage Underwriter", "Chief Acquisitions Officer",
-			# --- first-batch new-civ properties (tiers 7-11), appended ---
-			"Storefront Supervisor", "Vault Operations Manager", "Toll Booth Operator",
-			"Fleet Dispatcher", "Estate Liquidator", "Utility Plant Operator",
-			"Bond Trader", "Mint Operations Supervisor", "Exchange Floor Manager",
-			"Trust Administrator", "Regional Governor", "Underwriting Agent",
-			"Reinsurance Adjuster", "Annuities Advisor", "Staff Actuary",
-			"Liability Adjuster", "Life Insurance Agent", "Escrow Vault Custodian",
-			"Claims Examiner", "Coverage Specialist", "Policy Rider Analyst",
-			"Indemnity Underwriter", "Perpetuity Trustee", "Wax Plant Foreman",
-			"Commodities Trader", "Placement Recruiter", "Leasing Agent",
-			"Patent Examiner", "Distillery Manager", "Floor Trader",
-			"Assurance Agent", "Broadcast Station Manager", "Annexation Case Officer",
-			"Regional Administrator", "Mint Director", "Reserve Warehouse Manager",
-			"Ledger Clerk", "Cold Storage Supervisor", "Yard Foreman",
-			"Derivatives Trader", "Debt Collector", "Annuity Salesman",
-			"Claims Processor", "Toll Road Administrator", "Bond Vault Custodian",
-			"Commodity Exchange Manager", "Mineral Rights Broker", "Holdings Portfolio Director",
-			"Futures Trader", "Endowment Administrator", "Licensing Coordinator",
-			"Booking Agent", "Rights Clearance Officer", "Concert Promoter",
-			"Royalties Auditor", "Tour Manager", "Patent Attorney",
-			"Easement Negotiator", "Antitrust Compliance Officer", "Acoustics Engineer",
-			"Venue Operations Manager", "Music Rights Trader", "Licensing Account Manager",
-			"Orchestra Conductor",
-			# --- tiers 12-26 property titles (appended 2026-07-26) ---
-			"Records Custodian", "Shell Company Registrar", "Back Office Broker",
-			"Trust Officer", "Discreet Settlements Clerk", "Favor Desk Trader",
-			"Payroll Administrator", "Auctioneer", "Branch Manager",
-			"Vault Compliance Officer", "Records Redaction Specialist", "Deputy Governor",
-			"Undersecretary", "Night Shift Manager", "Escrow Negotiator",
-			"Supply Chain Manager", "Staffing Recruiter", "Bond Salesman",
-			"Account Protection Specialist", "Asset Intake Clerk", "Pit Trader",
-			"Toll Authority Superintendent", "Mergers Specialist", "Land Redevelopment Agent",
-			"Dividend Disbursement Officer", "Embargo Compliance Manager", "Portfolio Acquisitions Director",
-			"Security Chief", "Toll Collections Clerk", "Notary Public",
-			"Events Coordinator", "Grants Administrator", "Stationery Press Operator",
-			"Reserve Teller", "Response Processing Clerk", "Seating Arrangements Broker",
-			"Bereavement Coordinator", "Society Registrar", "Hearing Officer",
-			"Dean of Admissions", "Reserve Bank Examiner", "Estate Executor",
-			"Collections Agent", "Licensing Examiner", "Claims Adjuster",
-			"Real Estate Appraiser", "Toll Plaza Supervisor", "Livestock Leasing Agent",
-			"Royalty Reconciliation Clerk", "Commodities Broker", "Night Shift Recruiter",
-			"Subscription Retention Specialist", "Refinery Night Foreman", "Grid Operations Engineer",
-			"Trust Beneficiary Liaison", "Franchise Director", "Mint Supervisor",
-			"Mining Shift Lead", "Archivist", "Estate Sale Coordinator",
-			"Refinery Line Supervisor", "Corrections Officer", "Tollway Attendant",
-			"Futures Exchange Analyst", "Reserve Curator", "Derrick Operator",
-			"Reconstruction Project Manager", "Exclusive Rights Manager", "Concession Stand Operator",
-			"Reference Librarian", "Scrap Yard Manager", "Refinery Shift Supervisor",
-			"Metallurgist", "Smelter Plant Manager", "Escrow Account Manager",
-			"Debt Registrar", "Futures Desk Analyst", "Slag Yard Supervisor",
-			"Foundry Floor Manager", "Tithe Collections Officer", "Utilities Commissioner",
-			"Treaty Compliance Officer", "Casting Supervisor", "Board Chairman",
-			"Guest List Manager", "Panel Judge", "Head Tailor",
-			"Auction House Manager", "Gallery Circuit Manager", "Blacklist Registrar",
-			"Art Restorer", "Provenance Archivist", "Exhibitions Director",
-			"Manifesto Copywriter", "Cultural Analyst", "Sunset Planning Officer",
-			"Vacancy Broker", "Museum Curator", "Franchise Operator",
-			"Pit Boss", "Slot Floor Attendant", "Bookmaker",
-			"Dice Quality Inspector", "Comp Suite Concierge", "Roulette Croupier",
-			"High Roller Host", "Odds Compiler", "Luck Futures Broker",
-			"House Percentage Auditor", "Resort General Manager", "Sportsbook Manager",
-			"Casino General Manager", "Mint Press Operator", "Temp Agency Recruiter",
-			"Exchange Teller", "Royalties Accountant", "Escrow Verification Clerk",
-			"Identity Underwriter", "Image Rights Examiner", "Gallery Docent",
-			"Trust Portfolio Officer", "Mercury Plant Operator", "Works Site Foreman",
-			"Ring Maintenance Technician", "Optical Engineer", "Portrait Studio Manager",
-			"Probate Clerk", "Pension Administrator", "Cemetery Plot Salesman",
-			"Trust Fund Manager", "Niche Leasing Agent", "Securities Analyst",
-			"Clearinghouse Clerk", "Eulogy Underwriter", "Licensed Medium",
-			"Bond Market Analyst", "Bourse Floor Manager", "Escrow Holdings Officer",
-			"Sovereign Fund Manager", "Estate Planning Attorney", "Content Moderator",
-			"Analytics Manager", "Fan Club President", "Trend Forecaster",
-			"Headline Copywriter", "Brand Partnerships Manager", "Audience Growth Specialist",
-			"Drama Desk Editor", "Reputation Claims Adjuster", "Brand Identity Technician",
-			"Recommendation Engineer", "Broadcast Operations Chief", "Chief Engagement Officer",
-			"Head of Programming", "Line Attendant", "Stamp Press Foreman",
-			"Permit Office Clerk", "Committee Secretary", "Filing Clerk",
-			"Receptionist", "Complaints Intake Officer", "Authorized Signatory",
-			"Internal Auditor", "Records Retrieval Specialist", "Stamp Vault Teller",
-			"Queue Management Officer", "Deferred Approvals Manager", "Chief Planning Officer",
-			"Customs Agent", "Leasing Office Manager", "Copyright Clerk",
-			"Land Surveyor", "Franchise Sales Rep", "Legend Licensing Clerk",
-			"Patent Agent", "Overseas Holdings Manager", "Toll Ring Supervisor",
-			"Pole Station Manager", "Drift Rate Analyst", "Escrow Surveyor",
-			"Grid Standards Officer", "Chief Cartographer", "Clearinghouse Supervisor",
-			"Arbitrage Trader", "Staff Auditor", "Reserve Fund Manager",
-			"Radiological Asset Manager", "Court-Appointed Receiver", "Catastrophe Futures Broker",
-			"Long-Term Trust Officer", "Foreclosure Court Clerk", "Liquidation Fleet Coordinator",
-			"One-Way Deposits Officer", "Impairment Accountant", "Thermodynamics Auditor",
-			"Chief Accounting Officer", "Contracts Paralegal", "Intellectual Property Attorney",
-			"Lien Filing Clerk", "Title Registrar", "Soul Escrow Officer",
-			"Easement Filing Clerk", "Math Licensing Examiner", "Timeshare Sales Rep",
-			"Trust Risk Manager", "Causality Loan Officer", "Condemnation Attorney",
-			"Divine Foreclosure Agent", "Unclaimed Property Examiner", "General Counsel",
-		],
+		"staffer_names": EARTH_STAFFER_NAMES,
 	},
 	{
 		"tier": 2,
+		"civilization": "Earth",
+		"home_planet": "Earth",
+		"currency_flavor": "Other People's Money",
+		# White Collar's exit is the FULL Earth target — the alien-frontier entry bar is
+		# unchanged by the split; Blue Collar's slice above is the only new threshold.
+		"economy_scale": 1.0,
+		"staff_income_multiplier": 1.0,
+		# Earth -> Earth: this is the PROMOTION beat, not an alien contact. The overlay
+		# swaps its fixed chrome (eyebrow/headline/note/button) when civilization == "Earth";
+		# the trade-deal minigame is deliberately NOT run here yet (quiet card v1 — the
+		# rehearsal minigame with promotion copy is a planned follow-up).
+		"hail": "Nice hustle out there, kid. The people upstairs keep a list of names, " 			+ "and yours just made it on. Corner office. Company card. Try not to spill " 			+ "anything on the carpet.",
+		"contact_line": "Same planet, same money — the buildings are just taller and " 			+ "the handshakes cost more.",
+		"staffer_names": EARTH_STAFFER_NAMES,
+	},
+	{
+		"tier": 3,
 		"civilization": "Luminari Collective",
 		"home_planet": "Solaria Prime",
 		"currency_flavor": "Photons",
@@ -339,7 +368,7 @@ const EPOCHS := [
 		],
 	},
 	{
-		"tier": 3,
+		"tier": 4,
 		"civilization": "Geth-Sentinel Grid",
 		"home_planet": "Rannoch-01",
 		"currency_flavor": "Logic Nodes",
@@ -478,7 +507,7 @@ const EPOCHS := [
 		],
 	},
 	{
-		"tier": 4,
+		"tier": 5,
 		"civilization": "Mycelium Unity",
 		"home_planet": "Spore-Deep",
 		"currency_flavor": "Spores",
@@ -617,7 +646,7 @@ const EPOCHS := [
 		],
 	},
 	{
-		"tier": 5,
+		"tier": 6,
 		"civilization": "Quartzite Conglomerate",
 		"home_planet": "Geode-7",
 		"currency_flavor": "Prisms",
@@ -756,7 +785,7 @@ const EPOCHS := [
 		],
 	},
 	{
-		"tier": 6,
+		"tier": 7,
 		"civilization": "Chronophage Enclave",
 		"home_planet": "Tempus",
 		"currency_flavor": "Seconds",
@@ -897,7 +926,7 @@ const EPOCHS := [
 		],
 	},
 	{
-		"tier": 7,
+		"tier": 8,
 		"civilization": "Vashti Deep-Court",
 		"home_planet": "Bathyros",
 		"currency_flavor": "Lures",
@@ -1022,7 +1051,7 @@ const EPOCHS := [
 		],
 	},
 	{
-		"tier": 8,
+		"tier": 9,
 		"civilization": "Ssethraki Coil-Banks",
 		"home_planet": "Ssethra",
 		"currency_flavor": "Premiums",
@@ -1147,7 +1176,7 @@ const EPOCHS := [
 		],
 	},
 	{
-		"tier": 9,
+		"tier": 10,
 		"civilization": "Melissar Hive-Court",
 		"home_planet": "Melissar VI",
 		"currency_flavor": "Royal Jelly",
@@ -1272,7 +1301,7 @@ const EPOCHS := [
 		],
 	},
 	{
-		"tier": 10,
+		"tier": 11,
 		"civilization": "Norrvane Frostholm",
 		"home_planet": "Norrvane",
 		"currency_flavor": "Glacier Shares",
@@ -1397,7 +1426,7 @@ const EPOCHS := [
 		],
 	},
 	{
-		"tier": 11,
+		"tier": 12,
 		"civilization": "The Resonant Octave",
 		"home_planet": "Cadenza",
 		"currency_flavor": "Notes",
@@ -1524,7 +1553,7 @@ const EPOCHS := [
 	# ===== REMAINING CIVILIZATIONS (tiers 12-26), added 2026-07-26. =====
 	# Each re-skins all 326 properties; rosters are in ConfigLoader/save-index order.
 	{
-		"tier": 12,
+		"tier": 13,
 		"civilization": "Umbrafex Syndicate",
 		"home_planet": "Nocturne-9",
 		"currency_flavor": "Favors",
@@ -1646,7 +1675,7 @@ const EPOCHS := [
 		],
 	},
 	{
-		"tier": 13,
+		"tier": 14,
 		"civilization": "Karr'ghan Warhoard",
 		"home_planet": "Karr'Vok",
 		"currency_flavor": "Plunder",
@@ -1768,7 +1797,7 @@ const EPOCHS := [
 		],
 	},
 	{
-		"tier": 14,
+		"tier": 15,
 		"civilization": "The Politesse Ascendancy",
 		"home_planet": "Decorum",
 		"currency_flavor": "Regards",
@@ -1890,7 +1919,7 @@ const EPOCHS := [
 		],
 	},
 	{
-		"tier": 15,
+		"tier": 16,
 		"civilization": "Oneiroi Drift",
 		"home_planet": "Somnia",
 		"currency_flavor": "REMs",
@@ -2012,7 +2041,7 @@ const EPOCHS := [
 		],
 	},
 	{
-		"tier": 16,
+		"tier": 17,
 		"civilization": "The Glossolalia Lyceum",
 		"home_planet": "Lexica",
 		"currency_flavor": "Syllables",
@@ -2134,7 +2163,7 @@ const EPOCHS := [
 		],
 	},
 	{
-		"tier": 17,
+		"tier": 18,
 		"civilization": "Ferrovore Guilds",
 		"home_planet": "Oxidane",
 		"currency_flavor": "Ingots",
@@ -2256,7 +2285,7 @@ const EPOCHS := [
 		],
 	},
 	{
-		"tier": 18,
+		"tier": 19,
 		"civilization": "The Vantablack Salon",
 		"home_planet": "Monochrome",
 		"currency_flavor": "Critiques",
@@ -2378,7 +2407,7 @@ const EPOCHS := [
 		],
 	},
 	{
-		"tier": 19,
+		"tier": 20,
 		"civilization": "Fortuna Cartel",
 		"home_planet": "Fortuna Prime",
 		"currency_flavor": "Odds",
@@ -2500,7 +2529,7 @@ const EPOCHS := [
 		],
 	},
 	{
-		"tier": 20,
+		"tier": 21,
 		"civilization": "Mirror Meridian",
 		"home_planet": "Speculum",
 		"currency_flavor": "Reflections",
@@ -2622,7 +2651,7 @@ const EPOCHS := [
 		],
 	},
 	{
-		"tier": 21,
+		"tier": 22,
 		"civilization": "Ossuary Compact",
 		"home_planet": "Ossuar",
 		"currency_flavor": "Heirlooms",
@@ -2744,7 +2773,7 @@ const EPOCHS := [
 		],
 	},
 	{
-		"tier": 22,
+		"tier": 23,
 		"civilization": "Spectacle Prime",
 		"home_planet": "Limelight",
 		"currency_flavor": "Views",
@@ -2866,7 +2895,7 @@ const EPOCHS := [
 		],
 	},
 	{
-		"tier": 23,
+		"tier": 24,
 		"civilization": "Vek-Tor Kollektiv",
 		"home_planet": "Kartoteka",
 		"currency_flavor": "Stamps",
@@ -2988,7 +3017,7 @@ const EPOCHS := [
 		],
 	},
 	{
-		"tier": 24,
+		"tier": 25,
 		"civilization": "Atlas Concordat",
 		"home_planet": "Meridian Zero",
 		"currency_flavor": "Coordinates",
@@ -3110,7 +3139,7 @@ const EPOCHS := [
 		],
 	},
 	{
-		"tier": 25,
+		"tier": 26,
 		"civilization": "The Null Ledger",
 		"home_planet": "Asymptote",
 		"currency_flavor": "Entropy Credits",
@@ -3232,7 +3261,7 @@ const EPOCHS := [
 		],
 	},
 	{
-		"tier": 26,
+		"tier": 27,
 		"civilization": "The Proprietors Absolute",
 		"home_planet": "Provisio",
 		"currency_flavor": "Titles",

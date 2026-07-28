@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 100
 display_name = "Polar Crown Holdings"
-unlock_tier = 10
+unlock_tier = 11
 base_cost = 1.378e+50
 r0 = 1.09
 base_income_per_unit = 2.24008e+48

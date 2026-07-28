@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 27
 display_name = "Gem Exchange"
-unlock_tier = 5
+unlock_tier = 6
 base_cost = 145000000000000000000000000.0
 r0 = 1.09
 base_income_per_unit = 2.40785e+23

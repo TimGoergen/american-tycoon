@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 44
 display_name = "Bedrock Annuities"
-unlock_tier = 5
+unlock_tier = 6
 base_cost = 3714000000000000000000000000.0
 r0 = 1.09
 base_income_per_unit = 3.60791e+25

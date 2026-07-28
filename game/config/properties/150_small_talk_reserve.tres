@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 150
 display_name = "Small Talk Reserve"
-unlock_tier = 14
+unlock_tier = 15
 base_cost = 1.7e+65
 r0 = 1.09
 base_income_per_unit = 1.287e+62

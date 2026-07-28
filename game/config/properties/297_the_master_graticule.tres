@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 297
 display_name = "The Master Graticule"
-unlock_tier = 24
+unlock_tier = 25
 base_cost = 3.963e+109
 r0 = 1.09
 base_income_per_unit = 4.07086e+106

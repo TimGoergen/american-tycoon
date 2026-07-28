@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 253
 display_name = "Necropolis Bourse"
-unlock_tier = 21
+unlock_tier = 22
 base_cost = 2.079e+96
 r0 = 1.09
 base_income_per_unit = 2.02051e+93

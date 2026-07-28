@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 186
 display_name = "The Unspeakable Lexicon"
-unlock_tier = 16
+unlock_tier = 17
 base_cost = 1.247e+76
 r0 = 1.09
 base_income_per_unit = 1.09705e+74

@@ -15,9 +15,10 @@ class_name StafferFace
 #
 # EACH facial feature has its own small set of variants (eye shapes, brows, noses, mouths,
 # hairstyles), picked independently from the seed, so faces read as distinct individuals rather
-# than one template with different hair (Tim, 2026-07-25). Only Earth (tier 1, human) faces exist
-# so far; draw_face() returns false for any other tier so the caller can fall back to the old
-# headshot icon until the abstract alien treatments are built (the plan's phase 2).
+# than one template with different hair (Tim, 2026-07-25). Earth's two epochs (tiers 1-2, the
+# Blue/White Collar split) draw human faces; alien tiers with a bespoke being draw it, and
+# draw_face() returns false for the rest so the caller can fall back to the old headshot icon
+# until those treatments are built (currently tiers 13+, the batch-2 civs).
 
 ## The living generation, pushed here by Main every frame (a plain assignment; no work when
 ## unchanged). Folded into every seed so faces refresh per dynasty. 1-based, like DynastyState.
@@ -55,10 +56,14 @@ const INK := Color("#1B2436")
 ## and sized to bounding radius `radius`. Returns true if a face was drawn, false if this tier has
 ## no face yet (caller should fall back to the headshot icon).
 static func draw_face(canvas: CanvasItem, property_index: int, tier: int, center: Vector2, radius: float) -> bool:
-	if tier != 1:
-		# Alien epochs: each civilization has its own bespoke procedural "being" (Phase 2). Tiers
-		# without one built yet return false so the caller falls back to the headshot.
+	if tier > 2:
+		# Alien epochs (tier 3+ since the Earth split): each civilization has its own bespoke
+		# procedural "being" (Phase 2). Tiers without one built yet return false so the caller
+		# falls back to the headshot.
 		return _draw_alien(canvas, property_index, tier, center, radius)
+	# Tiers 1-2 are the Earth split's Blue/White Collar epochs — both human faces. The tier
+	# feeds the seed below, so a property's White Collar-era staffer is a DIFFERENT person
+	# than its Blue Collar-era one for free.
 
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_for(property_index, tier)
@@ -459,46 +464,46 @@ static func _draw_glasses(canvas: CanvasItem, c: Vector2, r: float, square: bool
 
 ## Dispatch an alien portrait by epoch tier. Each civ has its own hand-tuned design + palette,
 ## seeded per role so staffers within one civ vary. Returns false for tiers not built yet (the
-## caller then falls back to the gray headshot). Built so far: Vashti Deep-Court (tier 7).
+## caller then falls back to the gray headshot). Built so far: Vashti Deep-Court (tier 8).
 static func _draw_alien(canvas: CanvasItem, property_index: int, tier: int, center: Vector2, radius: float) -> bool:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_for(property_index, tier)
 	match tier:
-		2:
+		3:
 			_draw_luminari(canvas, center, radius, rng)
 			return true
-		3:
+		4:
 			_draw_geth(canvas, center, radius, rng)
 			return true
-		4:
+		5:
 			_draw_mycelium(canvas, center, radius, rng)
 			return true
-		5:
+		6:
 			_draw_quartzite(canvas, center, radius, rng)
 			return true
-		6:
+		7:
 			_draw_chronophage(canvas, center, radius, rng)
 			return true
-		7:
+		8:
 			_draw_vashti(canvas, center, radius, rng)
 			return true
-		8:
+		9:
 			_draw_ssethraki(canvas, center, radius, rng)
 			return true
-		9:
+		10:
 			_draw_melissar(canvas, center, radius, rng)
 			return true
-		10:
+		11:
 			_draw_norrvane(canvas, center, radius, rng)
 			return true
-		11:
+		12:
 			_draw_octave(canvas, center, radius, rng)
 			return true
 		_:
 			return false
 
 
-# Vashti Deep-Court (tier 7) — a bioluminescent deep-sea anglerfish being: a dark bulbous body, big
+# Vashti Deep-Court (tier 8) — a bioluminescent deep-sea anglerfish being: a dark bulbous body, big
 # glowing eyes, a toothy grin, and a glowing lure on a stalk (the signature). Everything is kept
 # inside the bounding radius so no glow spills past the disc.
 const _VASHTI_BODIES: Array[Color] = [
@@ -568,7 +573,7 @@ static func _glow(canvas: CanvasItem, center: Vector2, radius: float) -> void:
 	canvas.draw_circle(center, radius * 0.5, Color(0.93, 1.0, 0.98, 1.0))
 
 
-# Ssethraki Coil-Banks (tier 8) — a serpent: wedge head, slit-pupil eyes, forked tongue, coils.
+# Ssethraki Coil-Banks (tier 9) — a serpent: wedge head, slit-pupil eyes, forked tongue, coils.
 const _SSE_SCALES: Array[Color] = [
 	Color("#4f7942"), Color("#3f6b6a"), Color("#6a7a3a"), Color("#5a7050"), Color("#7a8a3a")]
 const _SSE_EYES: Array[Color] = [Color("#e6c24a"), Color("#d97a2a"), Color("#9ac84a"), Color("#e05a5a")]
@@ -608,7 +613,7 @@ static func _draw_ssethraki(canvas: CanvasItem, c: Vector2, r: float, rng: Rando
 	canvas.draw_line(f, f + Vector2(0.05 * r, tongue * 0.4), _SSE_TONGUE, maxf(2.0, 0.02 * r))
 
 
-# Melissar Hive-Court (tier 9) — a bee: fuzzy striped body, compound eyes, antennae, sometimes a crown.
+# Melissar Hive-Court (tier 10) — a bee: fuzzy striped body, compound eyes, antennae, sometimes a crown.
 const _BEE_GOLDS: Array[Color] = [
 	Color("#d3a52a"), Color("#c99038"), Color("#d8822a"), Color("#bfa63e"), Color("#caa020")]
 const _BEE_DARK := Color("#3a2a0e")
@@ -648,7 +653,7 @@ static func _draw_melissar(canvas: CanvasItem, c: Vector2, r: float, rng: Random
 			Vector2(hc.x + 0.13 * r, hc.y - 0.40 * r)]), hi)
 
 
-# Norrvane Frostholm (tier 10) — an ice giant: broad angular head, glowing cold eyes, an icicle beard.
+# Norrvane Frostholm (tier 11) — an ice giant: broad angular head, glowing cold eyes, an icicle beard.
 const _ICE_BODIES: Array[Color] = [
 	Color("#bcd8e6"), Color("#a9c6d8"), Color("#c8d2dc"), Color("#9fb8c8"), Color("#aecbe4")]
 const _ICE_EYES: Array[Color] = [Color("#9fe8ff"), Color("#c0f0ff"), Color("#8fd0ff"), Color("#b8e0d0")]
@@ -685,7 +690,7 @@ static func _draw_norrvane(canvas: CanvasItem, c: Vector2, r: float, rng: Random
 		canvas.draw_line(Vector2(hc.x, hc.y - 0.40 * r), Vector2(hc.x + 0.06 * r, hc.y - 0.33 * r), eye_col, maxf(2.0, 0.02 * r))
 
 
-# The Resonant Octave (tier 11) — a living sound-being: soundwave rings, glowing eyes, equalizer voice.
+# The Resonant Octave (tier 12) — a living sound-being: soundwave rings, glowing eyes, equalizer voice.
 const _OCT_BODIES: Array[Color] = [
 	Color("#5a52a8"), Color("#6a4a9e"), Color("#4a5aa8"), Color("#7050a0"), Color("#4e56a4")]
 const _OCT_GLOWS: Array[Color] = [Color("#c8c0f5"), Color("#a8dcf0"), Color("#e0b0ec"), Color("#b8f0d0")]
@@ -715,7 +720,7 @@ static func _draw_octave(canvas: CanvasItem, c: Vector2, r: float, rng: RandomNu
 		canvas.draw_rect(Rect2(bx - bw * 0.3, hc.y + 0.24 * r - bh, bw * 0.6, bh), glow)
 
 
-# Luminari Collective (tier 2) — a radiant light-being: an orb head with rays and a bright core.
+# Luminari Collective (tier 3) — a radiant light-being: an orb head with rays and a bright core.
 const _LUM_BODIES: Array[Color] = [Color("#c96a12"), Color("#d97a1a"), Color("#b85c0e"), Color("#e08a22")]
 const _LUM_RAY := Color("#ffdf8a")
 const _LUM_INK := Color("#3a1e05")
@@ -748,7 +753,7 @@ static func _draw_luminari(canvas: CanvasItem, c: Vector2, r: float, rng: Random
 	_alien_mouth(canvas, c.x, c.y + 0.24 * r, 0.28 * r, _LUM_INK, mouth_shape)
 
 
-# Geth-Sentinel Grid (tier 3) — a machine: angular metal head, glowing optic(s), status lights.
+# Geth-Sentinel Grid (tier 4) — a machine: angular metal head, glowing optic(s), status lights.
 const _GETH_METAL := Color("#2e3742")
 const _GETH_HI := Color("#4a5764")
 const _GETH_OPTICS: Array[Color] = [
@@ -788,7 +793,7 @@ static func _draw_geth(canvas: CanvasItem, c: Vector2, r: float, rng: RandomNumb
 		canvas.draw_circle(Vector2(hc.x - 0.22 * r + float(i) * 0.14 * r, hc.y + 0.13 * r), 0.02 * r, optic)
 
 
-# Mycelium Unity (tier 4) — a fungal being: a spotted cap over a pale face, varied eyes, spores.
+# Mycelium Unity (tier 5) — a fungal being: a spotted cap over a pale face, varied eyes, spores.
 const _MYC_CAPS: Array[Color] = [
 	Color("#a94f38"), Color("#8e6b3f"), Color("#b5723f"), Color("#7a4a6a"), Color("#c0603a")]
 const _MYC_SPOT := Color("#ecd9b0")
@@ -825,7 +830,7 @@ static func _draw_mycelium(canvas: CanvasItem, c: Vector2, r: float, rng: Random
 		canvas.draw_circle(Vector2(hc.x + (spore_x[i] - 0.5) * 0.9 * r, hc.y - 0.44 * r), 0.02 * r, _MYC_SPOT)
 
 
-# Quartzite Conglomerate (tier 5) — a crystalloid: a faceted angular head, gem eyes, glints.
+# Quartzite Conglomerate (tier 6) — a crystalloid: a faceted angular head, gem eyes, glints.
 const _QZ_BODIES: Array[Color] = [
 	Color("#6f9fd0"), Color("#5fb0a4"), Color("#8a7fc4"), Color("#c081a6"), Color("#7ab0d8")]
 const _QZ_EYE := Color("#eef9ff")
@@ -862,7 +867,7 @@ static func _draw_quartzite(canvas: CanvasItem, c: Vector2, r: float, rng: Rando
 		canvas.draw_line(Vector2(gx, gy - 0.03 * r), Vector2(gx, gy + 0.03 * r), _QZ_EYE, maxf(1.5, 0.015 * r))
 
 
-# Chronophage Enclave (tier 6) — a time-eater: a dark head with a glowing clock or hourglass.
+# Chronophage Enclave (tier 7) — a time-eater: a dark head with a glowing clock or hourglass.
 const _CHR_BODIES: Array[Color] = [
 	Color("#5a2535"), Color("#3f2a4a"), Color("#4a2a2a"), Color("#2f3550"), Color("#43304a")]
 const _CHR_GLOWS: Array[Color] = [Color("#e8b04a"), Color("#e8734a"), Color("#c77dff"), Color("#4de8ff")]

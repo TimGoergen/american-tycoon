@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 323
 display_name = "Eminent Domain of Reality"
-unlock_tier = 26
+unlock_tier = 27
 base_cost = 2.788e+117
 r0 = 1.09
 base_income_per_unit = 8.87956e+113

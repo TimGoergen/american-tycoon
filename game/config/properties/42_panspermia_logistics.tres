@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 42
 display_name = "Panspermia Logistics"
-unlock_tier = 4
+unlock_tier = 5
 base_cost = 1280000000000000000000000.0
 r0 = 1.09
 base_income_per_unit = 4.26503e+22

@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 325
 display_name = "Escheat of the Multiverse"
-unlock_tier = 26
+unlock_tier = 27
 base_cost = 1.119e+118
 r0 = 1.09
 base_income_per_unit = 7.35742e+114

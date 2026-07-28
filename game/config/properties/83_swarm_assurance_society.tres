@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 83
 display_name = "Swarm Assurance Society"
-unlock_tier = 9
+unlock_tier = 10
 base_cost = 7.398e+44
 r0 = 1.09
 base_income_per_unit = 4.35795e+42

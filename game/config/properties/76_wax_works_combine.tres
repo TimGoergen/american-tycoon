@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 76
 display_name = "Wax Works Combine"
-unlock_tier = 9
+unlock_tier = 10
 base_cost = 3.925e+42
 r0 = 1.09
 base_income_per_unit = 1.48156e+39

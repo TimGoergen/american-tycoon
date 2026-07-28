@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 19
 display_name = "Solar Futures Desk"
-unlock_tier = 2
+unlock_tier = 3
 base_cost = 265400000000000.0
 r0 = 1.09
 base_income_per_unit = 3.14411e+12

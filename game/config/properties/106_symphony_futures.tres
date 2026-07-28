@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 106
 display_name = "Symphony Futures"
-unlock_tier = 11
+unlock_tier = 12
 base_cost = 8.921e+51
 r0 = 1.09
 base_income_per_unit = 6.38916e+48

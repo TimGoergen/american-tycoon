@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 260
 display_name = "Virality Futures"
-unlock_tier = 22
+unlock_tier = 23
 base_cost = 2.695e+98
 r0 = 1.09
 base_income_per_unit = 1.65805e+94

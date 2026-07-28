@@ -107,6 +107,39 @@ func _process(_delta: float) -> void:
 	_down_button.visible = float(_scroll.scroll_vertical) < max_scroll - EDGE_SLACK_PX
 
 
+## The companion EDGE FADE, shared by every scrolling list that wears these strips (the
+## property ladder, Balance Tuning, Challenges — Tim 2026-07-27: one treatment everywhere).
+## Each item the viewport is clipping shows at the alpha of its VISIBLE FRACTION — half-
+## clipped means half-faded, dissolving to nothing as it slides out — but only on an edge
+## that actually has more content beyond it. The fade is measured against the INNER edge of
+## the strip, not the raw viewport: the strip covers the items beneath it, so fading against
+## the viewport left items behind the strip looking solid-but-buried (Tim, 2026-07-06).
+## Items may sit at ANY nesting depth inside the scroll (positions are taken from global
+## rects, which already carry the scroll offset). Call whenever scroll/layout changes.
+static func apply_edge_fade(scroll: ScrollContainer, items: Array) -> void:
+	var view := scroll.get_global_rect()
+	var bar := scroll.get_v_scroll_bar()
+	var more_above := scroll.scroll_vertical > 0
+	# The furthest scroll_vertical can go is the content height minus one page; anything
+	# less than that (with 1px slack for rounding) means content is still clipped below.
+	var more_below := float(scroll.scroll_vertical) < bar.max_value - bar.page - 1.0
+	for item_variant in items:
+		var item := item_variant as Control
+		if item == null or item.size.y <= 0.0:
+			continue
+		var item_top := item.get_global_rect().position.y - view.position.y
+		var alpha := 1.0
+		if more_above:
+			# Fraction of the item below the top strip (its visible share).
+			var below_strip := item_top + item.size.y - STRIP_HEIGHT
+			alpha = minf(alpha, clampf(below_strip / item.size.y, 0.0, 1.0))
+		if more_below:
+			# Fraction of the item above the bottom strip (its visible share).
+			var above_strip := view.size.y - STRIP_HEIGHT - item_top
+			alpha = minf(alpha, clampf(above_strip / item.size.y, 0.0, 1.0))
+		item.modulate.a = alpha
+
+
 ## Glide the list one page in `direction` (-1 up, +1 down), clamped to the ends.
 func _page(direction: float) -> void:
 	var bar := _scroll.get_v_scroll_bar()

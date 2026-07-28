@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 244
 display_name = "Ancestor Annuities"
-unlock_tier = 21
+unlock_tier = 22
 base_cost = 3.995e+93
 r0 = 1.09
 base_income_per_unit = 1.48933e+89

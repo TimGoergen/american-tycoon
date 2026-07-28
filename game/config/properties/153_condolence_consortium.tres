@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 153
 display_name = "Condolence Consortium"
-unlock_tier = 14
+unlock_tier = 15
 base_cost = 1.367e+66
 r0 = 1.09
 base_income_per_unit = 3.06977e+63

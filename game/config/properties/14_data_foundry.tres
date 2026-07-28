@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 14
 display_name = "Data Foundry"
-unlock_tier = 3
+unlock_tier = 4
 base_cost = 174100000000000000.0
 r0 = 1.09
 base_income_per_unit = 2.50675e+14

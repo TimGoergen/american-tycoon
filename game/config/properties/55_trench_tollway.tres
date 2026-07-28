@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 55
 display_name = "Trench Tollway"
-unlock_tier = 7
+unlock_tier = 8
 base_cost = 8.147e+34
 r0 = 1.09
 base_income_per_unit = 1.23262e+32

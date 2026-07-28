@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 171
 display_name = "Collective Unconscious Trust"
-unlock_tier = 15
+unlock_tier = 16
 base_cost = 3.703e+71
 r0 = 1.09
 base_income_per_unit = 2.83405e+69

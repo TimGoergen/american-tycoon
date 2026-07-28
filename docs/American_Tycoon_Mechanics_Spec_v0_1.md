@@ -117,6 +117,18 @@ Milestone progress slider per property: min = last milestone, max = next (recove
 - **Rushed income readout (2026-07-07).** While rush is held a row's income label quotes the effective rate — `per_cycle × the completion rate above` — as `$X / s` (not gated on `is_cycle_running`: an unstaffed cycle stops momentarily at each payout and would flicker the readout). The hero panel's headline is the **simple sum of the rates the rows currently display** (unowned rows' buy-previews contribute 0), so it rises live under rush/frenzy; the core's `displayed_income_per_sec` (theoretical staffed-passive rate) is unchanged and still drives the executive wage floor (§5).
 
 ### 3.6 Alien property types — epoch unlock + First Contact reward (built 2026-06-28, GDD §5.5 site 2)
+
+> **EARTH SPLIT (2026-07-27, `Plans/Earth_Split_Epochs.md`, Tim-approved):** Earth is now TWO
+> epochs — **Blue Collar (tier 1**, properties 1–6, cleared at **$75M** earned + own all six**)**
+> and **White Collar (tier 2**, properties 7–12, cleared at the full Earth target**)** — so every
+> alien tier below reads +1 (Luminari = tier 3, …, 27 epochs total). The pager tab = tier − 1
+> uniformly; the White Collar tab's old affordability unlock is retired (every tab opens at its
+> epoch's arrival). Tier 2's arrival is the **promotion beat** — the contact overlay in an Earth
+> voice, card-only (its trade-deal minigame is a planned follow-up with moving-up copy). No
+> economy re-tune: all costs/incomes/cycles kept their shipped values; the alien income decay
+> re-based to `0.80^(tier−2)`. Saves migrate at v12 (aliens +1; a mid-Earth save maps to White
+> Collar iff it owns a White Collar property). Tier references BELOW this line predate the split
+> — read alien "tier N" as "tier N+1".
 The ladder is **52** `PropertyConfig`s: the 12 Earth properties plus **40 alien properties in an escalating cohort per epoch — 6, 7, 8, 9, 10 rungs for epochs 2–6** (escalating-ladder rework, Tim 2026-07-15, the unlock-cadence fix; was one property per epoch at build, then 4-property cohorts in the Epoch Depth pass). Each epoch's cohort is anchored by its **flagship** — Photon Exchange (epoch 2), Data Foundry (3), Spore Bank (4), Prism Vault (5), Time Bank (6) — and topped by the epoch's grandest venture (Starcore Syndicate etc.). New rungs were APPENDED at array indices 37–51 (append-only convention), so saves load unchanged.
 
 **Cohort grid (2026-07-15).** Per epoch T, cohort size `N = T + 4`; rung k (0-based, flagship = rung 0):

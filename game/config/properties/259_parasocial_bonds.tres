@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 259
 display_name = "Parasocial Bonds"
-unlock_tier = 22
+unlock_tier = 23
 base_cost = 1.345e+98
 r0 = 1.09
 base_income_per_unit = 5.76422e+93

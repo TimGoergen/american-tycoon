@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 257
 display_name = "Engagement Farms"
-unlock_tier = 22
+unlock_tier = 23
 base_cost = 3.351e+97
 r0 = 1.09
 base_income_per_unit = 6.95461e+92

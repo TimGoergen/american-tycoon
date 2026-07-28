@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 16
 display_name = "Prism Vault"
-unlock_tier = 5
+unlock_tier = 6
 base_cost = 49179999999999998000000000.0
 r0 = 1.09
 base_income_per_unit = 4.53058e+22

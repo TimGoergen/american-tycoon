@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 189
 display_name = "Alloy Dynasties"
-unlock_tier = 17
+unlock_tier = 18
 base_cost = 1.003e+77
 r0 = 1.09
 base_income_per_unit = 1.31135e+73

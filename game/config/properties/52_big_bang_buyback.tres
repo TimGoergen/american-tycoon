@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 52
 display_name = "Big Bang Buyback"
-unlock_tier = 6
+unlock_tier = 7
 base_cost = 1985000000000000000000000000000000.0
 r0 = 1.09
 base_income_per_unit = 9.63375e+31

@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 214
 display_name = "The Canon Estate"
-unlock_tier = 18
+unlock_tier = 19
 base_cost = 3.523e+84
 r0 = 1.09
 base_income_per_unit = 1.98339e+82

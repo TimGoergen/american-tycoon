@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 309
 display_name = "Black Hole Escrow"
-unlock_tier = 25
+unlock_tier = 26
 base_cost = 1.659e+113
 r0 = 1.09
 base_income_per_unit = 6.60395e+109

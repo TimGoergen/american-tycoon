@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 107
 display_name = "Reverb Royalties"
-unlock_tier = 11
+unlock_tier = 12
 base_cost = 1.787e+52
 r0 = 1.09
 base_income_per_unit = 1.83983e+49

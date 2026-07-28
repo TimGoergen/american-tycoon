@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 75
 display_name = "The Ouroboros Perpetuity"
-unlock_tier = 8
+unlock_tier = 9
 base_cost = 1.744e+42
 r0 = 1.09
 base_income_per_unit = 9.14358e+40

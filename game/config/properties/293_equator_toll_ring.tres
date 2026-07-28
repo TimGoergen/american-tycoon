@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 293
 display_name = "Equator Toll Ring"
-unlock_tier = 24
+unlock_tier = 25
 base_cost = 2.459e+108
 r0 = 1.09
 base_income_per_unit = 5.92784e+104

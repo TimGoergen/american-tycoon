@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 258
 display_name = "Attention Refineries"
-unlock_tier = 22
+unlock_tier = 23
 base_cost = 6.714e+97
 r0 = 1.09
 base_income_per_unit = 2.00286e+93

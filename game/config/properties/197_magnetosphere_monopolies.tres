@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 197
 display_name = "Magnetosphere Monopolies"
-unlock_tier = 17
+unlock_tier = 18
 base_cost = 2.606e+79
 r0 = 1.09
 base_income_per_unit = 6.18391e+76

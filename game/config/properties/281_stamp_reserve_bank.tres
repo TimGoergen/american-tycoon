@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 281
 display_name = "Stamp Reserve Bank"
-unlock_tier = 23
+unlock_tier = 24
 base_cost = 5.873e+104
 r0 = 1.09
 base_income_per_unit = 3.6527e+101

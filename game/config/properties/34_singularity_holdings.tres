@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 34
 display_name = "Singularity Holdings"
-unlock_tier = 3
+unlock_tier = 4
 base_cost = 728900000000000000000.0
 r0 = 1.09
 base_income_per_unit = 1.16608e+20

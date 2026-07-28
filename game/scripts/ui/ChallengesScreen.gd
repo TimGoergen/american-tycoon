@@ -233,15 +233,23 @@ func _build_card() -> Control:
 	column.add_child(explainer)
 
 	# --- The scrollable list of the six game panels. Six fit most screens, but the list scrolls so
-	# the tall panels can never overflow the card on a shorter device. A panel the scroll is clipping
-	# fades by its visible fraction (see _update_edge_fade), the same "partial transparency = more
-	# content" cue the property ladder uses. The rows column is rebuilt on refresh. ---
+	# the tall panels can never overflow the card on a shorter device. The full property-ladder
+	# treatment (Tim, 2026-07-27 — one "more content this way" vocabulary everywhere): tappable
+	# ScrollEdgeArrows strips overlay the edges, and a panel the scroll is clipping fades by its
+	# visible fraction against the strip's inner edge (ScrollEdgeArrows.apply_edge_fade). The
+	# strips need a plain Control host over the scroll (see ScrollEdgeArrows' usage note). ---
+	var scroll_host := Control.new()
+	scroll_host.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	column.add_child(scroll_host)
 	_scroll = ScrollContainer.new()
-	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_scroll.get_v_scroll_bar().value_changed.connect(func(_v: float) -> void: _update_edge_fade())
 	_scroll.resized.connect(_update_edge_fade)
-	column.add_child(_scroll)
+	scroll_host.add_child(_scroll)
+	var arrows := ScrollEdgeArrows.new()
+	arrows.setup(_scroll)
+	scroll_host.add_child(arrows)
 
 	_rows_column = VBoxContainer.new()
 	_rows_column.add_theme_constant_override("separation", 18)
@@ -375,33 +383,13 @@ func _icon_for(game_key: String) -> Texture2D:
 	return null
 
 
-## Fade each game panel by its visible fraction when the scroll is clipping it, but only on an edge
-## that actually has more content beyond it — the same "partial transparency = the list continues" cue
-## the property ladder uses (Main._update_ladder_edge_fade). Called on scroll, on resize, and after a
-## refresh once the panels have laid out.
+## The shared property-ladder edge treatment (ScrollEdgeArrows.apply_edge_fade): each game
+## panel the scroll is clipping fades by its visible fraction against the arrow strips.
+## Called on scroll, on resize, and after a refresh once the panels have laid out.
 func _update_edge_fade() -> void:
 	if _scroll == null:
 		return
-	var view_height := _scroll.size.y
-	var scroll_bar := _scroll.get_v_scroll_bar()
-	var more_above := _scroll.scroll_vertical > 0
-	# The furthest scroll_vertical can go is the content height minus one page; anything less than that
-	# (with 1px slack for rounding) means content is still clipped below.
-	var more_below := float(_scroll.scroll_vertical) < scroll_bar.max_value - scroll_bar.page - 1.0
-	for child in _rows_column.get_children():
-		var panel := child as Control
-		if panel == null or panel.size.y <= 0.0:
-			continue
-		# The panel's top edge in viewport space: its position in the column, shifted up by the scroll.
-		var panel_top := panel.position.y - float(_scroll.scroll_vertical)
-		var alpha := 1.0
-		if more_above:
-			# Visible share below the viewport's top edge.
-			alpha = minf(alpha, clampf((panel_top + panel.size.y) / panel.size.y, 0.0, 1.0))
-		if more_below:
-			# Visible share above the viewport's bottom edge.
-			alpha = minf(alpha, clampf((view_height - panel_top) / panel.size.y, 0.0, 1.0))
-		panel.modulate.a = alpha
+	ScrollEdgeArrows.apply_edge_fade(_scroll, _rows_column.get_children())
 
 
 ## One text line inside a game panel. `emphasize` faux-bolds it (used for the game name). A dark navy

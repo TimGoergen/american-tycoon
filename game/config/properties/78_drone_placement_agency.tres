@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 78
 display_name = "Drone Placement Agency"
-unlock_tier = 9
+unlock_tier = 10
 base_cost = 1.754e+43
 r0 = 1.09
 base_income_per_unit = 1.45174e+40

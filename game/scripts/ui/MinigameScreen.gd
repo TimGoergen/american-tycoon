@@ -47,6 +47,13 @@ const MINIGAME_TYPES := [
 	preload("res://scripts/ui/BasketballMinigame.gd"),
 ]
 
+## The last randomly-dealt type, excluded from the next deal so the same minigame never
+## comes up twice in a row (Tim, 2026-07-27). STATIC on purpose: prestige reloads the whole
+## scene between transition rounds, and an instance field would forget the last deal exactly
+## when it matters. Not saved — across an app restart a repeat is possible, accepted.
+## Forced/review rounds neither read nor update it (they aren't random deals).
+static var _last_dealt_type: Script = null
+
 ## The default purpose blurb shown in the play view's top section outside review mode. Each
 ## site passes its own line through its reward context (see `make_reward`); this is the
 ## prestige default, used when a reward omits a purpose.
@@ -1166,8 +1173,12 @@ func start_game(
 
 	for child in _play_area.get_children():
 		child.queue_free()
-	var type_script: Script = forced_type if forced_type != null \
-			else MINIGAME_TYPES[randi() % MINIGAME_TYPES.size()]
+	var type_script: Script = forced_type
+	if type_script == null:
+		# Deal from every type EXCEPT the one dealt last round (see _last_dealt_type).
+		var pool := MINIGAME_TYPES.filter(func(t: Variant) -> bool: return t != _last_dealt_type)
+		type_script = pool[randi() % pool.size()]
+		_last_dealt_type = type_script
 	_active_minigame = type_script.new()
 	_active_minigame.set_anchors_preset(Control.PRESET_FULL_RECT)
 	# Tell the type where this round's outcome curve sits (floor + bonus cap) BEFORE it begins, so

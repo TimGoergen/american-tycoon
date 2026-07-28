@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 320
 display_name = "Timeshares in Time"
-unlock_tier = 26
+unlock_tier = 27
 base_cost = 3.467e+116
 r0 = 1.09
 base_income_per_unit = 3.72342e+112

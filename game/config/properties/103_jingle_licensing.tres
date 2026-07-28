@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 103
 display_name = "Jingle Licensing"
-unlock_tier = 11
+unlock_tier = 12
 base_cost = 1.109e+51
 r0 = 1.09
 base_income_per_unit = 2.67877e+47

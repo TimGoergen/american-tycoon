@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 162
 display_name = "Subconscious Real Estate"
-unlock_tier = 15
+unlock_tier = 16
 base_cost = 7.116e+68
 r0 = 1.09
 base_income_per_unit = 2.08774e+65

@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 236
 display_name = "The Gallery of You"
-unlock_tier = 20
+unlock_tier = 21
 base_cost = 1.538e+91
 r0 = 1.09
 base_income_per_unit = 6.3013e+87

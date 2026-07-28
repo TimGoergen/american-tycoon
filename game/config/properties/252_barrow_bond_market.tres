@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 252
 display_name = "Barrow Bond Market"
-unlock_tier = 21
+unlock_tier = 22
 base_cost = 1.038e+96
 r0 = 1.09
 base_income_per_unit = 7.02232e+92

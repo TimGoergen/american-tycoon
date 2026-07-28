@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 120
 display_name = "Deniability Trust"
-unlock_tier = 12
+unlock_tier = 13
 base_cost = 1.499e+56
 r0 = 1.09
 base_income_per_unit = 8.58843e+52

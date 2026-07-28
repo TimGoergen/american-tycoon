@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 232
 display_name = "Reflection Royalties"
-unlock_tier = 20
+unlock_tier = 21
 base_cost = 9.54e+89
 r0 = 1.09
 base_income_per_unit = 9.17146e+85

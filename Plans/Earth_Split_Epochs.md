@@ -1,7 +1,11 @@
 # Earth Split — Blue Collar and White Collar as full epochs
 
-**Status: draft for Tim's review (2026-07-27). Nothing implemented.**
-Target branch: `feature/civs-12-26` (it renumbers the same 27-tier content that branch ships).
+**Status: IMPLEMENTED on `feature/civs-12-26` (2026-07-27).** All decisions below are live;
+the sims re-passed (EpochTest rebuilt for the 27-tier world incl. v12 migration checks). The
+one intentional behavioral side effect: the "new ventures" nudge is now effectively dormant —
+every tab opens at its epoch's arrival beat with an auto-jump, a stronger cue than the nudge
+(the code remains, harmless). Deferred follow-ups: the promotion trade-deal minigame with
+moving-up copy, and an optional "Senior …" White Collar staffer naming pass.
 
 ## What Tim asked for
 

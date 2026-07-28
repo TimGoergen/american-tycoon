@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 149
 display_name = "Thank-You Note Mint"
-unlock_tier = 14
+unlock_tier = 15
 base_cost = 8.482e+64
 r0 = 1.09
 base_income_per_unit = 4.46962e+61

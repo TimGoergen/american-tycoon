@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 240
 display_name = "Orbital Vanity Ring"
-unlock_tier = 20
+unlock_tier = 21
 base_cost = 2.478e+92
 r0 = 1.09
 base_income_per_unit = 4.32529e+89

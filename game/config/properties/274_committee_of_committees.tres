@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 274
 display_name = "Committee of Committees"
-unlock_tier = 23
+unlock_tier = 24
 base_cost = 4.53e+102
 r0 = 1.09
 base_income_per_unit = 2.22878e+98

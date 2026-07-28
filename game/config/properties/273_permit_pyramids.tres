@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 273
 display_name = "Permit Pyramids"
-unlock_tier = 23
+unlock_tier = 24
 base_cost = 2.261e+102
 r0 = 1.09
 base_income_per_unit = 7.75007e+97

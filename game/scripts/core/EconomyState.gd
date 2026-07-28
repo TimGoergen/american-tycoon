@@ -78,9 +78,12 @@ static func compute_staff_price_ranks(configs: Array) -> Array[int]:
 	ranks.resize(configs.size())
 	# Earth rungs: rank = position among Earth properties, which is their array
 	# index today (Earth fills indices 0–11) and stays correct if that ever grows.
+	# Earth spans TWO epochs since the Earth split (Blue Collar tier 1, White Collar
+	# tier 2 — Plans/Earth_Split_Epochs.md), so the Earth test is tier ≤ 2; every
+	# Earth property keeps the exact rank (= index) it had before the split.
 	var earth_count := 0
 	for i in range(configs.size()):
-		if (configs[i] as PropertyConfig).unlock_tier <= 1:
+		if (configs[i] as PropertyConfig).unlock_tier <= 2:
 			ranks[i] = earth_count
 			earth_count += 1
 	# Alien rungs: gather each epoch's cohort, order it by base_cost, and rank each
@@ -88,7 +91,7 @@ static func compute_staff_price_ranks(configs: Array) -> Array[int]:
 	var cohort_indices_by_tier: Dictionary = {}  # unlock_tier -> Array of property indices
 	for i in range(configs.size()):
 		var tier := (configs[i] as PropertyConfig).unlock_tier
-		if tier <= 1:
+		if tier <= 2:
 			continue
 		if not cohort_indices_by_tier.has(tier):
 			cohort_indices_by_tier[tier] = []

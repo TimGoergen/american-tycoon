@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 40
 display_name = "Planetary Mainframe"
-unlock_tier = 3
+unlock_tier = 4
 base_cost = 181600000000000000000.0
 r0 = 1.09
 base_income_per_unit = 1.3252e+19

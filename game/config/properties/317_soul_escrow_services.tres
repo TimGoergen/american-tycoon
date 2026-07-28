@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 317
 display_name = "Soul Escrow Services"
-unlock_tier = 26
+unlock_tier = 27
 base_cost = 4.31e+115
 r0 = 1.09
 base_income_per_unit = 1.56038e+111

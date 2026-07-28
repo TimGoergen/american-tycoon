@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 161
 display_name = "Nightmare Insurance"
-unlock_tier = 15
+unlock_tier = 16
 base_cost = 3.551e+68
 r0 = 1.09
 base_income_per_unit = 7.25521e+64

@@ -66,10 +66,10 @@ var _lifetime_earned_label: RichTextLabel
 var _shown_lifetime_earned := -1
 var _rows: Array = []
 
-# Epoch PAGER (Tim 2026-07-11): the property ladder is split into epoch "tabs" — Earth Blue
-# Collar (indices 0-5), Earth White Collar (6-11), then one tab per alien epoch. The pager
-# shows ONE tab at a time (big label + ‹ › arrows + dots + swipe), so only that tab's ~6 rows
-# ever draw (the CPU win at 37 properties). Tab index: 0/1 = Earth, 2..tier_count = epoch N.
+# Epoch PAGER (Tim 2026-07-11): the property ladder is split into epoch "tabs" — one per
+# epoch, tab = tier − 1 (the Earth split made Blue and White Collar full epochs, tiers 1-2).
+# The pager shows ONE tab at a time (big label + ‹ › arrows + dots + swipe), so only that
+# tab's rows ever draw (the CPU win at 326 properties).
 var _epoch_tab := 0
 var _epoch_pager_label: Label       # the big civilization / "EARTH" name
 var _epoch_pager_sub: Label         # the "Blue Collar" / "White Collar" subtitle (blank for aliens)
@@ -293,7 +293,9 @@ func _process(delta: float) -> void:
 	# Reaching cruise enables the OVERDRIVE button — teach it the first frame it lights up.
 	if _tip_armed.get("overdrive", false) and not _momentum_bar.get_overdrive_button().disabled:
 		_fire_polled_tip("overdrive", _momentum_bar.get_overdrive_button())
-	if _tip_armed.get("epochs", false) and game.epoch.current_tier >= 2:
+	# Tier 3+ = the first ALIEN contact: tier 2 is the Earth split's White Collar promotion,
+	# and this card's "a new civilization opens a market" copy belongs to the alien beat.
+	if _tip_armed.get("epochs", false) and game.epoch.current_tier >= 3:
 		_fire_polled_tip("epochs", _epoch_pager_box)
 	# Epoch progress gate (Tim, 2026-07-23): when the player has earned enough to advance but hasn't
 	# bought all of the era's properties, (1) show a red dot on the pager's NEXT button, and (2) once,
@@ -333,54 +335,23 @@ func _process(delta: float) -> void:
 		_check_new_ventures()
 
 	# The hero stat's planet watermark follows the epoch pager's ACTIVE TAB, not the reached
-	# epoch (Tim 2026-07-15) — page back to Earth and the header shows Earth. Both Earth tabs
-	# (Blue/White Collar, 0 and 1) are tier 1; every alien tab's index IS its tier. (The
+	# epoch (Tim 2026-07-15) — page back to Earth and the header shows Earth. Tab = tier − 1
+	# since the Earth split; both Earth tiers map to the Earth image in HeroStat's table. (The
 	# civilization NAME moved to the pager itself — it was duplicative here.) The prestige-exit
 	# button and the Estate Office button (with its Legacy balance) reflect the live state.
-	_hero_stat.set_planet_tier(1 if _epoch_tab <= 1 else _epoch_tab)
+	_hero_stat.set_planet_tier(_epoch_tab + 1)
 	_refresh_contact_progress()
 	_update_plan_button()
 	_update_estate_badge()
 	_update_ladder_edge_fade()
 
 
-## Apply the ladder's edge fade: a property row the scroll viewport is clipping shows at
-## the alpha of its VISIBLE FRACTION — half-clipped means half-faded, dissolving to
-## nothing as it slides fully out — but only on an edge that actually has more content
-## beyond it. A dissolving row says "the list continues" without drawing extra chrome.
-## (First cut faded over a fixed 48px zone measured from the row's far edge, which only
-## triggered on the last sliver of a ~150px row — invisible in practice, Tim 2026-07-06.)
+## Apply the ladder's edge fade — the shared "partial transparency = the list continues"
+## treatment (ScrollEdgeArrows.apply_edge_fade; also worn by Balance Tuning + Challenges).
 func _update_ladder_edge_fade() -> void:
 	if _active_tab != TAB_PROPERTY:
 		return
-	var view_height := _ladder_scroll.size.y
-	var scroll_bar := _ladder_scroll.get_v_scroll_bar()
-	var more_above := _ladder_scroll.scroll_vertical > 0
-	# The furthest scroll_vertical can go is the content height minus one page; anything
-	# less than that (with 1px slack for rounding) means content is clipped below.
-	var more_below := float(_ladder_scroll.scroll_vertical) < scroll_bar.max_value - scroll_bar.page - 1.0
-	for row_node in _rows:
-		var row := row_node as PropertyRow
-		if row.size.y <= 0.0:
-			continue
-		# The row's top edge in viewport space: its position in the ladder, shifted up by
-		# the scroll offset (the ladder column sits at the scroll content's origin).
-		var row_top := row.position.y - float(_ladder_scroll.scroll_vertical)
-		var alpha := 1.0
-		# Each fading edge is measured from the INNER edge of its ScrollEdgeArrows strip,
-		# not the viewport itself: the strip shows under the same "more content this way"
-		# condition and covers the rows beneath it, so fading against the raw viewport
-		# left rows behind the strip looking solid-but-buried (Tim, 2026-07-06). The strip
-		# and the fade agree on where the visible window starts.
-		if more_above:
-			# Fraction of the row below the top strip (its visible share).
-			var below_strip := row_top + row.size.y - ScrollEdgeArrows.STRIP_HEIGHT
-			alpha = minf(alpha, clampf(below_strip / row.size.y, 0.0, 1.0))
-		if more_below:
-			# Fraction of the row above the bottom strip (its visible share).
-			var above_strip := view_height - ScrollEdgeArrows.STRIP_HEIGHT - row_top
-			alpha = minf(alpha, clampf(above_strip / row.size.y, 0.0, 1.0))
-		row.modulate.a = alpha
+	ScrollEdgeArrows.apply_edge_fade(_ladder_scroll, _rows)
 
 
 ## Feed the hero stat's contact-progress line: how much of the CURRENT epoch's economy this
@@ -852,25 +823,22 @@ func _build_property_tab() -> Control:
 # Epoch pager — the property ladder's per-epoch tabs (Tim 2026-07-11)
 # ---------------------------------------------------------------------------
 
-## Number of pager tabs: 2 Earth (Blue/White Collar) + one per alien epoch.
+## Number of pager tabs: one per epoch, since the Earth split (Plans/Earth_Split_Epochs.md)
+## made Blue Collar and White Collar full epochs. Tab = tier − 1, uniformly.
 func _epoch_tab_count() -> int:
-	return EpochCatalog.tier_count() + 1
+	return EpochCatalog.tier_count()
 
 
-## Which tab a property index belongs to: 0 = Earth Blue Collar (indices 0-5), 1 = Earth White
-## Collar (6-11), else the property's alien epoch (unlock_tier 2..tier_count).
+## Which tab a property index belongs to: its epoch's tab. Blue Collar (unlock_tier 1) is
+## tab 0, White Collar (tier 2) tab 1, then one tab per alien epoch — tab = tier − 1.
 func _epoch_tab_of(prop_index: int) -> int:
-	if prop_index <= 5:
-		return 0
-	if prop_index <= 11:
-		return 1
 	var prop := game.economy.properties[prop_index] as PropertyState
-	return (prop.config as PropertyConfig).unlock_tier
+	return (prop.config as PropertyConfig).unlock_tier - 1
 
 
 ## The highest tab the player can currently open (the navigation upper bound) — the deepest
-## UNLOCKED tab. Tabs unlock in order (you can afford White Collar long before reaching epoch 2),
-## so the deepest unlocked index is also the count of open tabs. See _update_tab_unlocks().
+## UNLOCKED tab. Tabs unlock in order (each opens at its epoch's arrival), so the deepest
+## unlocked index is also the count of open tabs. See _update_tab_unlocks().
 func _epoch_tab_max() -> int:
 	var highest := 0
 	for tab in range(_tab_unlocked.size()):
@@ -884,9 +852,10 @@ func _epoch_default_tab() -> int:
 	return _epoch_tab_max()
 
 
-## Open any still-locked tab that now qualifies (persisted once open). Blue Collar is always open;
-## Earth WHITE COLLAR opens the first time its cheapest property is affordable (or already owned —
-## Tim 2026-07-12); an alien epoch tab opens at First Contact (its epoch reached). Repaints the
+## Open any still-locked tab that now qualifies (persisted once open). Blue Collar (tab 0) is
+## always open; every other tab opens at its epoch's ARRIVAL — White Collar at the promotion
+## beat, alien tabs at First Contact. One rule since the Earth split: the epoch gate itself
+## (earned the threshold + own all of the previous cohort) is what opens a tab. Repaints the
 ## pager when something opens so the new dot lights up. Idempotent — an open tab never re-locks.
 func _update_tab_unlocks() -> void:
 	if _tab_unlocked.is_empty():
@@ -895,48 +864,18 @@ func _update_tab_unlocks() -> void:
 	for tab in range(_tab_unlocked.size()):
 		if bool(_tab_unlocked[tab]):
 			continue
-		var should_open := false
-		if tab == 0:
-			should_open = true
-		elif tab >= 2:
-			should_open = game.epoch.current_tier >= tab  # alien: First Contact opens it
-		else:
-			# White Collar (tab 1): also require owning at least one of every Blue Collar property
-			# before it opens — engage the whole first tab before the next (Tim, 2026-07-23), the
-			# same rule the alien epochs get. Affordability is the money half.
-			should_open = _owns_all_blue_collar() and _tab_affordable_or_owned(tab)
-		if should_open:
+		if tab == 0 or game.epoch.current_tier >= tab + 1:
 			_tab_unlocked[tab] = true
 			changed = true
 	if changed:
 		_update_epoch_pager()
 
 
-## True when the player owns any property in `tab`, or can afford its cheapest — the condition
-## for a non-epoch tab (White Collar) to open.
-func _tab_affordable_or_owned(tab: int) -> bool:
-	var cheapest := INF
-	for i in range(game.economy.properties.size()):
-		if _epoch_tab_of(i) != tab:
-			continue
-		var prop := game.economy.properties[i] as PropertyState
-		if prop.units_owned > 0:
-			return true
-		cheapest = minf(cheapest, prop.get_bulk_cost(1))
-	return game.economy.cash >= cheapest
-
-
-## True once the player owns at least one of every Blue Collar property (tab 0 = indices 0-5, per
-## _epoch_tab_of) — the ownership gate on the White Collar tab (Tim, 2026-07-23), matching the
-## epoch-advance rule so every tab is engaged before the next opens.
-func _owns_all_blue_collar() -> bool:
-	return game.economy.owns_at_least_one_of_each([0, 1, 2, 3, 4, 5])
-
-
 ## The lowest-index property the player must still own before they can progress past the current
-## era, or -1 if not blocked. Covers BOTH gates: an alien epoch (earned this tier's money threshold
-## but not all its properties owned) and Earth White Collar (can afford it but hasn't owned all Blue
-## Collar). Drives the epoch-blocked card AND the pager's red-dot indicator (Tim, 2026-07-23).
+## era, or -1 if not blocked: the epoch's money threshold is earned but the ownership half of the
+## gate (own ≥1 of every property in the epoch being left) isn't met. Since the Earth split this
+## one rule covers every boundary, Blue→White included. Drives the epoch-blocked card AND the
+## pager's red-dot indicator (Tim, 2026-07-23).
 func _property_blocking_epoch_progress() -> int:
 	var tier := game.epoch.current_tier
 	if tier < EpochCatalog.tier_count() and game.economy.cash_earned_this_gen \
@@ -944,20 +883,13 @@ func _property_blocking_epoch_progress() -> int:
 		for i in game.economy.get_property_indices_for_unlock_tier(tier):
 			if (game.economy.properties[i] as PropertyState).units_owned <= 0:
 				return i
-	# Earth White Collar (tab 1): affordable, but not all Blue Collar owned yet.
-	if _tab_unlocked.size() > 1 and not bool(_tab_unlocked[1]) \
-			and _tab_affordable_or_owned(1) and not _owns_all_blue_collar():
-		for i in [0, 1, 2, 3, 4, 5]:
-			if (game.economy.properties[i] as PropertyState).units_owned <= 0:
-				return i
 	return -1
 
 
-## The big label for a tab: "EARTH" for the two Earth tabs, else the civilization's name.
+## The big label for a tab: the tab's civilization name — "EARTH" for both Earth tabs
+## (their dicts share the civ), the alien race for the rest. Tab = tier − 1.
 func _epoch_tab_name(tab: int) -> String:
-	if tab <= 1:
-		return "EARTH"
-	return String(EpochCatalog.get_epoch(tab).get("civilization", "")).to_upper()
+	return EpochCatalog.civilization(tab + 1).to_upper()
 
 
 ## The subtitle under the name: the collar for Earth, blank for aliens (the civ name stands alone).
@@ -1971,7 +1903,7 @@ func _on_contact_made(new_tier: int) -> void:
 	# The new epoch just opened its pager tab — unlock it, then jump to it so that when the contact
 	# beat (and any trade-deal minigame) clears, the player is looking at the new civ's properties.
 	_update_tab_unlocks()
-	_set_epoch_tab(new_tier)
+	_set_epoch_tab(new_tier - 1)  # tab = tier − 1 since the Earth split
 	_pending_contact_tier = new_tier
 	_first_contact_overlay.show_contact(new_tier)
 
@@ -1984,6 +1916,11 @@ func _on_contact_made(new_tier: int) -> void:
 func _on_contact_dismissed() -> void:
 	var tier := _pending_contact_tier
 	_pending_contact_tier = 0
+	# The Earth→Earth promotion beat (White Collar, tier 2) is a quiet card only for now —
+	# no trade-deal minigame (Tim, 2026-07-27). SEAM: when the promotion minigame gets its
+	# own moving-up copy (planned follow-up, Plans/Earth_Split_Epochs.md), remove this guard.
+	if EpochCatalog.civilization(tier) == "Earth":
+		return
 	var prop_index := game.economy.get_property_index_for_unlock_tier(tier)
 	if prop_index < 0:
 		return  # no new business this epoch — nothing more to negotiate
@@ -2023,12 +1960,13 @@ const BACKGROUND_SPACE_CENTERED := "res://art/backgrounds/space_centered_backgro
 
 
 ## The backdrop image path for a given epoch tier. Used both to set the initial backdrop
-## on load and to swap it the moment a contact advances the epoch.
+## on load and to swap it the moment a contact advances the epoch. Earth spans tiers 1-2
+## since the Earth split, so only ALIEN contacts (tier 3+) leave the prairie behind.
 func _background_path_for_tier(tier: int) -> String:
-	var contacts_made := tier - 1
-	if contacts_made >= 10:
+	var alien_contacts_made := tier - 2
+	if alien_contacts_made >= 10:
 		return BACKGROUND_SPACE_CENTERED
-	if contacts_made >= 1:
+	if alien_contacts_made >= 1:
 		return BACKGROUND_SPACE
 	return BACKGROUND_EARTH
 

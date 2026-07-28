@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 299
 display_name = "Zero-Sum Clearinghouses"
-unlock_tier = 25
+unlock_tier = 26
 base_cost = 1.591e+110
 r0 = 1.09
 base_income_per_unit = 1.69028e+105

@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 118
 display_name = "Umbral Shell Foundry"
-unlock_tier = 12
+unlock_tier = 13
 base_cost = 3.733e+55
 r0 = 1.09
 base_income_per_unit = 1.03686e+52

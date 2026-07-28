@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 316
 display_name = "Title Registry of Everything"
-unlock_tier = 26
+unlock_tier = 27
 base_cost = 2.151e+115
 r0 = 1.09
 base_income_per_unit = 5.42139e+110

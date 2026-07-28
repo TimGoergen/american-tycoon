@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 92
 display_name = "Avalanche Derivatives"
-unlock_tier = 10
+unlock_tier = 11
 base_cost = 5.306e+47
 r0 = 1.09
 base_income_per_unit = 4.75249e+44

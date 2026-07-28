@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 246
 display_name = "Reliquary Trusts"
-unlock_tier = 21
+unlock_tier = 22
 base_cost = 1.604e+94
 r0 = 1.09
 base_income_per_unit = 1.23363e+90

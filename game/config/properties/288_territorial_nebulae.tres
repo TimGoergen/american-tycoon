@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 288
 display_name = "Territorial Nebulae"
-unlock_tier = 24
+unlock_tier = 25
 base_cost = 7.614e+106
 r0 = 1.09
 base_income_per_unit = 2.99742e+102

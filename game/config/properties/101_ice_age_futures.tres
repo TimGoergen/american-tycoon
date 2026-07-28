@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 101
 display_name = "Ice Age Futures"
-unlock_tier = 10
+unlock_tier = 11
 base_cost = 2.761e+50
 r0 = 1.09
 base_income_per_unit = 6.44878e+48

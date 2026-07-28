@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 198
 display_name = "Mantle Mining Concordats"
-unlock_tier = 17
+unlock_tier = 18
 base_cost = 5.221e+79
 r0 = 1.09
 base_income_per_unit = 1.77957e+77

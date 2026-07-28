@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 303
 display_name = "Half-Life Holdings"
-unlock_tier = 25
+unlock_tier = 26
 base_cost = 2.564e+111
 r0 = 1.09
 base_income_per_unit = 1.16087e+107

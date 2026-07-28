@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 301
 display_name = "Entropy Audit Bureaus"
-unlock_tier = 25
+unlock_tier = 26
 base_cost = 6.387e+110
 r0 = 1.09
 base_income_per_unit = 1.40148e+106

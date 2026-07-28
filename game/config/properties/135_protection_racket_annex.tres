@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 135
 display_name = "Protection Racket Annex"
-unlock_tier = 13
+unlock_tier = 14
 base_cost = 5.046e+60
 r0 = 1.09
 base_income_per_unit = 3.32587e+57

@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 145
 display_name = "Courtesy Tolls"
-unlock_tier = 14
+unlock_tier = 15
 base_cost = 5.263e+63
 r0 = 1.09
 base_income_per_unit = 6.51131e+59

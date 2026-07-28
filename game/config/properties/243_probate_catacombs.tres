@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 243
 display_name = "Probate Catacombs"
-unlock_tier = 21
+unlock_tier = 22
 base_cost = 1.994e+93
 r0 = 1.09
 base_income_per_unit = 5.17258e+88

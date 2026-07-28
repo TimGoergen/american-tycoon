@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 174
 display_name = "Etymology Mines"
-unlock_tier = 16
+unlock_tier = 17
 base_cost = 2.979e+72
 r0 = 1.09
 base_income_per_unit = 3.38922e+68

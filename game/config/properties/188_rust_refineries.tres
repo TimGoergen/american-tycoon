@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 188
 display_name = "Rust Refineries"
-unlock_tier = 17
+unlock_tier = 18
 base_cost = 5.007e+76
 r0 = 1.09
 base_income_per_unit = 4.5578e+72

@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 193
 display_name = "Tarnish Futures"
-unlock_tier = 17
+unlock_tier = 18
 base_cost = 1.617e+78
 r0 = 1.09
 base_income_per_unit = 9.00505e+74

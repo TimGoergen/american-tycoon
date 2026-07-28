@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 233
 display_name = "Echo Escrow"
-unlock_tier = 20
+unlock_tier = 21
 base_cost = 1.911e+90
 r0 = 1.09
 base_income_per_unit = 2.64071e+86

@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 68
 display_name = "Fang Liability Consortium"
-unlock_tier = 8
+unlock_tier = 9
 base_cost = 5.981e+39
 r0 = 1.09
 base_income_per_unit = 1.56448e+37

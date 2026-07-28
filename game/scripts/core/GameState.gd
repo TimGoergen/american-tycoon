@@ -24,7 +24,12 @@ class_name GameState
 # v11 added the dynasty's Challenge-Mode cleared-tier record (DynastyState.challenge_highest_tiers,
 # the permanent diminishing income bonus); older saves load with a warning and default it to empty
 # (→ 0 bonus).
-const SAVE_VERSION := 11
+# v12 is the EARTH SPLIT (Plans/Earth_Split_Epochs.md): Earth became TWO epochs (Blue Collar
+# tier 1, White Collar tier 2), pushing every alien tier up one. A pre-v12 save's epoch_tier
+# migrates on load: 2+ shift to 3+, and a mid-Earth tier-1 save maps to White Collar if it
+# owns any White Collar property (indices 6-11) — so nothing a player owns ever locks on them.
+# Staff levels need no migration: caps are identical at every equivalent moment (plan doc).
+const SAVE_VERSION := 12
 
 var tuning: TuningConfig
 var economy: EconomyState
@@ -513,7 +518,20 @@ func load_save_dict(data: Dictionary) -> void:
 	economy.cash_earned_this_gen = float(data.get("cash_earned_this_gen", 0.0))
 
 	# Reached epoch (pre-v5 saves default to Earth/tier 1).
-	epoch.restore(int(data.get("epoch_tier", 1)))
+	var saved_tier := int(data.get("epoch_tier", 1))
+	if version <= 11:
+		# Earth-split migration (v12): alien tiers shift up one. A tier-1 (mid-Earth) save
+		# maps to White Collar only if it already owns a White Collar property — otherwise
+		# it stays in Blue Collar and earns the new promotion beat like a fresh run.
+		if saved_tier >= 2:
+			saved_tier += 1
+		else:
+			var old_props: Array = data.get("properties", [])
+			for i in range(6, mini(12, old_props.size())):
+				if int((old_props[i] as Dictionary).get("units_owned", 0)) > 0:
+					saved_tier = 2
+					break
+	epoch.restore(saved_tier)
 
 	var saved_props: Array = data.get("properties", [])
 	for i in range(mini(saved_props.size(), economy.properties.size())):

@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 203
 display_name = "Couture Foundries"
-unlock_tier = 18
+unlock_tier = 19
 base_cost = 1.686e+81
 r0 = 1.09
 base_income_per_unit = 1.76381e+77

@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 218
 display_name = "Destiny Bookmakers"
-unlock_tier = 19
+unlock_tier = 20
 base_cost = 5.677e+85
 r0 = 1.09
 base_income_per_unit = 6.8209e+81

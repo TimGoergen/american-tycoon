@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 175
 display_name = "Thesaurus Vaults"
-unlock_tier = 16
+unlock_tier = 17
 base_cost = 5.97e+72
 r0 = 1.09
 base_income_per_unit = 9.75534e+68

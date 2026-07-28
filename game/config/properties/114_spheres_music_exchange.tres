@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 114
 display_name = "Spheres Music Exchange"
-unlock_tier = 11
+unlock_tier = 12
 base_cost = 2.317e+54
 r0 = 1.09
 base_income_per_unit = 3.01295e+52

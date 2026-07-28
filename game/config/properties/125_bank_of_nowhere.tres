@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 125
 display_name = "Bank of Nowhere"
-unlock_tier = 12
+unlock_tier = 13
 base_cost = 4.839e+57
 r0 = 1.09
 base_income_per_unit = 1.698e+55

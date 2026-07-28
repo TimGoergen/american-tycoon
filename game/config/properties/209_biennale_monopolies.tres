@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 209
 display_name = "Biennale Monopolies"
-unlock_tier = 18
+unlock_tier = 19
 base_cost = 1.091e+83
 r0 = 1.09
 base_income_per_unit = 1.00318e+80

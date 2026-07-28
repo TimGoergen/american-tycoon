@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 87
 display_name = "The Queen's Mint"
-unlock_tier = 9
+unlock_tier = 10
 base_cost = 1.477e+46
 r0 = 1.09
 base_income_per_unit = 4.18312e+44

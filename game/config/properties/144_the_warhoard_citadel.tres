@@ -6,7 +6,7 @@
 script = ExtResource("1")
 property_id = 144
 display_name = "The Warhoard Citadel"
-unlock_tier = 13
+unlock_tier = 14
 base_cost = 2.626e+63
 r0 = 1.09
 base_income_per_unit = 4.51143e+61

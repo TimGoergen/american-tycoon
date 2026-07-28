@@ -653,6 +653,33 @@ func set_tab_active(active: bool) -> void:
 	_tab_active = active
 	if not active:
 		visible = false
+		# Drop any held action NOW. A deactivated row stops running _process, so the
+		# _pump_held_* functions can never clear a hold that was engaged at the moment the
+		# tab switched — e.g. holding a rush when First Contact auto-jumps the pager to the
+		# new epoch's tab (the overlay swallows the finger release). The stale latch made
+		# is_hold_active() report true forever, which killed epoch swiping until the player
+		# paged back to this tab by button (Tim's report, 2026-07-27).
+		_release_all_holds()
+
+
+## Reset every held-action latch to "not held", mirroring what the _pump_held_* functions do
+## when they see the button released — including notifying Main that an engaged rush ended,
+## so the rush-momentum state doesn't stay stuck on a hidden row.
+func _release_all_holds() -> void:
+	if _rush_hold_pulsed:
+		_rush_hold_pulsed = false
+		rush_hold_released.emit(prop_index)
+	# Close the raw press/release edge stream too (the vent-gesture reader tracks it), exactly
+	# as _pump_rush_edges would on the finger lifting.
+	if _rush_button_was_down:
+		_rush_button_was_down = false
+		rush_released.emit(prop_index)
+	_hold_accumulator = 0.0
+	_rush_hold_seconds = 0.0
+	_buy_hold_accumulator = 0.0
+	_buy_hold_repeating = false
+	_hire_hold_accumulator = 0.0
+	_hire_hold_repeating = false
 
 
 func _process(delta: float) -> void:

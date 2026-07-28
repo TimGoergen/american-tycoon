@@ -1,23 +1,28 @@
 extends "res://sim/Sim.gd"
 
-# One-off reachability check for the tier 12-26 rollout (2026-07-26). The full EpochPaceStudy
-# grinds to the 6h sim cap when a run stalls in the deep epochs (the intended prestige wall),
-# which is slow in wall-clock. This runs the SAME active-heir loop but with a short sim-time cap
-# and heavy Legacy stacks, just to confirm a funded dynasty MECHANICALLY advances into the new
-# tiers 12-26 (properties buyable, income flows, epoch gate keeps opening) — leaving the true
-# pacing feel to Tim's device test. Usage:
-#   Godot_console.exe --headless --path game --script res://sim/EpochDepthCheck.gd
+# Reachability check for the deep ladder (2026-07-26; retargeted 2026-07-28 for the
+# Progressive Decay bake, Tim's call). The full EpochPaceStudy grinds to the 6h sim cap when
+# a run stalls in the deep epochs (the intended prestige wall), which is slow in wall-clock.
+# This runs the SAME active-heir loop but with a short sim-time cap and heavy Legacy stacks,
+# to confirm a funded dynasty MECHANICALLY advances deep into the ladder (properties buyable,
+# income flows, epoch gate keeps opening). The bar is DEPTH_TARGET, not the final epoch: under
+# progressive decay a stall inside the last epochs is the design working, not a dead-end —
+# the endgame stays reachable for the largest stacks (see the 1T/10T rows), just not trivially.
+# Usage: Godot_console.exe --headless --path game --script res://sim/EpochDepthCheck.gd
 
 const MY_CAP := 600.0   # sim-seconds; short so a stalled run returns fast
+## The mechanical-reachability bar (Tim, 2026-07-28): a heavily funded dynasty must reach
+## at least this tier within the cap. The final epochs beyond it are ALLOWED to stall.
+const DEPTH_TARGET := 25
 
 func _initialize() -> void:
 	if not _load_configs():
 		quit(1)
 		return
-	print("=== American Tycoon — Epoch Depth Check (tiers 12-26 reachability) ===")
+	print("=== American Tycoon — Epoch Depth Check (deep-ladder reachability, target tier %d) ===" % DEPTH_TARGET)
 	print("Active heir (rush top 3, power 6), short %ss sim cap. Reports how deep each stack" % MY_CAP)
-	print("reaches — confirming the new epochs are buyable/advanceable, not a structural dead-end.")
-	for gems in [10_000_000_000_000]:
+	print("reaches — confirming the deep epochs are buyable/advanceable, not a structural dead-end.")
+	for gems in [10_000_000_000_000, 1_000_000_000_000]:
 		_run_capped(gems)
 	quit()
 
@@ -50,9 +55,13 @@ func _run_capped(heir_legacy: int) -> void:
 		dynasty.tick(TICK_SIZE)
 		sim_time += TICK_SIZE
 	var reached := game.epoch.current_tier
+	var verdict := "  (still climbing at cap — BELOW the tier %d target)" % DEPTH_TARGET
+	if reached >= EpochCatalog.tier_count():
+		verdict = "  (FINAL EPOCH REACHED)"
+	elif reached >= DEPTH_TARGET:
+		verdict = "  (target tier %d reached; the last epochs may stall — intended)" % DEPTH_TARGET
 	print("  %14s gems: started tier %d, reached tier %d/%d in %.0fs sim%s"
-		% [_group(heir_legacy), start_tier, reached, EpochCatalog.tier_count(), sim_time,
-			("  (FINAL EPOCH REACHED)" if reached >= EpochCatalog.tier_count() else "  (still climbing at cap)")])
+		% [_group(heir_legacy), start_tier, reached, EpochCatalog.tier_count(), sim_time, verdict])
 
 
 func _group(n: int) -> String:

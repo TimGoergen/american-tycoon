@@ -41,7 +41,9 @@ DRAFT_PATH = Path(r"C:\Claude\American Tycoon\docs\civilizations_v2_draft.json")
 # EARTH SPLIT (Plans/Earth_Split_Epochs.md, 2026-07-27): the GAME's tier numbering is now
 # draft/civ tier + 1 (Earth spans game tiers 1-2, so draft tier 2 = Luminari = game tier 3).
 # This pipeline keeps the draft's own civ numbering; anything generating game .tres files
-# from it must write unlock_tier = draft_tier + 1 and decay incomes by 0.80^(game_tier - 2).
+# from it must write unlock_tier = draft_tier + 1 and decay incomes by the PROGRESSIVE
+# decay D(game_tier) — per-epoch steps x0.80 (tiers 3-11), x0.72 (12-19), x0.65 (20-27),
+# compounded from tier 3 (Plans/Progressive_Decay.md, 2026-07-28).
 INCOME_RATIO = 0.25
 EPOCH_SPAN = 16807.0        # 7^5 — one epoch's total cost span AND threshold step
 COHORT_CAP = 14             # scaling analysis: keeps per-rung ratio at ~x2

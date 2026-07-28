@@ -135,9 +135,15 @@ The ladder is **52** `PropertyConfig`s: the 12 Earth properties plus **40 alien 
 ```
 cost(k)   = flagship_cost × (16807^(1/N))^k     (the cohort spans exactly ×16807 = 7^5,
                                                  matching the per-epoch threshold growth)
-income(k) = cost(k) × 0.25 × 0.80^(T−1)         (income/cost constant within a cohort;
-                                                 decays ×0.80 per epoch — the prestige ramp)
+income(k) = cost(k) × 0.25 × D(T)               (income/cost constant within a cohort;
+                                                 D = the PROGRESSIVE decay — the prestige ramp)
+D(T) = product of per-epoch steps from tier 3:   ×0.80 (tiers 3–11), ×0.72 (12–19), ×0.65 (20–27)
 ```
+*(Progressive Decay, 2026-07-28 — `Plans/Progressive_Decay.md`, Tim's Candidate B, replacing the
+flat ×0.80 step: a flat step totals only ~÷265 across the ladder, which endgame gem stacks cancel
+outright (Tim at 447M gems: "every epoch faster and faster") — the banded steps total ~÷3,240 so
+every stack meets a growing wall inside the ladder, while tiers 3–11 keep their byte-identical
+device-approved incomes and trillion-gem dynasties still reach the final epoch.)*
 *(Income rule retuned 2026-07-27 — the **Alien Payback Retune**, `Plans/Alien_Payback_Retune.md`, Tim's Candidate B. The original `× 0.01824` constant made every alien property a ~19× income-per-dollar cliff vs. Earth's frontier (64-minute per-unit payback at first contact); the new rule starts Luminari at a 5-minute payback — continuing Earth's 0.1→3.4-minute ramp — and lets the per-epoch ×0.80 decay carry the deep-ladder prestige stall instead (tier 26 ≈ 18 h). Incomes are cycle-neutral: a rung's `.tres` income is the per-60s figure × `cycle/60`.)*
 Cycle 60 s, r0, and accent color are inherited from the epoch's flagship. Because every cohort spans ×16807 regardless of size, epoch durations, thresholds, and the ~1-epoch-per-prestige cadence are untouched by construction — only the per-rung ratio shrinks (×5.06 at epoch 2 down to ×2.64 at epoch 6), which is what flattens the unlock cadence (sim-measured median gap ~3.2–4.0 min per epoch, vs. 4.4→7.1 min before).
 - **`unlock_tier`** (new `PropertyConfig` field, default 1): a property is buyable/visible only once `EpochState.current_tier ≥ unlock_tier`. Earth's 12 are tier 1; each alien property carries its epoch tier. Gate enforced in `EconomyState.try_buy` / `is_property_unlocked` / `get_cheapest_unaffordable_unowned_index` (all take the run's reached tier) and hidden entirely in `PropertyRow` until unlocked. A locked property is also skipped by the sim's greedy buy.

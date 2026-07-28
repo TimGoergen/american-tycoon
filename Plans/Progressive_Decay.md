@@ -1,8 +1,11 @@
 # Progressive Decay — every gem stack finds its wall inside the ladder
 
-**Status: draft for Tim's review (2026-07-28). Nothing implemented.**
-Target branch: `feature/civs-12-26`. Successor to the Alien Payback Retune
-(`Plans/Alien_Payback_Retune.md`) — same machinery, one new curve.
+**Status: Candidate B baked (2026-07-28, Tim-approved).** Decisions: seed with B; the
+endgame must stay reachable in reasonable time (confirmed: 1T and 10T-gem dynasties reach
+tier 27 in ~62s sim — EpochDepthCheck); the depth-check reachability bar moved to tier 25.
+Band-1 (tiers 3–11) `.tres` files verified byte-identical after the bake; 224 deep-tier
+incomes regenerated. The recipe's decay term is now `D(tier)` (banded), recorded below and
+in the Mechanics Spec — any future tier extension must use it.
 
 ## Why
 

@@ -33,40 +33,56 @@ locked Idle Slayer principle — *always a next upgrade worth wanting* — at ev
 
 - G1. At any gem fortune, the shop offers a purchasable next level whose price bites.
 - G2. A bigger run always mints visibly more — but mints stay in designed territory
-  (currency, not noise).
+  (currency, not noise). **Decided (Tim, 2026-07-28): endgame mints read in the
+  BILLIONS** — "right now the number grows so fast that it doesn't feel valuable."
 - G3. The wall's position is a designed, sim-verified function of lifetime gems; the
-  final tier is reachable "in reasonable time" by a dynasty near the TOP of the designed
-  gem curve (Tim, 2026-07-28) — and only near it.
-- G4. Everything device-approved is untouched: upgrade levels 1–30 (costs AND effects),
-  the mint below its knee, decay bands, all property costs/cycles, early/mid pacing.
+  final tier falls, slowly, for a dynasty that has banked **about a dozen deep runs'
+  mints** (Tim's confirmed summit target) — and only around there.
+- G4. AMENDED (Tim, 2026-07-28): the upgrade shop's current curve is NOT preserved —
+  "even the first 30 levels feel like they cost too few gems and grant outsized
+  bonuses; I'd like the curve more gradual from the beginning." So the compounder
+  re-curve applies from level 1 (no seam at 30). Still untouched: the mint below its
+  knee, the decay bands, all property costs/cycles, and the pre-prestige game.
 
-## Change A — uncapped compounder tails (the sink)
+## Change A — uncapped compounders on ONE gradual curve from level 1 (the sink)
 
-The four-plus ×1.2-per-level compounding tracks (Family Fortune, Efficiency Experts,
-Strong-Arm Tactics, Killer Instinct, Second Wind, …) lose their max_level. Levels 1–30
-keep their exact shipped costs and effects. From level 31 the track enters its TAIL:
+The ×1.2-per-level compounding tracks (Family Fortune, Efficiency Experts, Strong-Arm
+Tactics, Killer Instinct, Second Wind, …) lose their max_level AND their current cost
+curve. Per Tim's amendment there is no preserved region and no seam — one smooth curve
+from the first level, steeper overall than today's, so early levels stop feeling like
+outsized bonuses at throwaway prices and late levels absorb any fortune.
 
-- Effect per level: unchanged (×1.2 compounding — the track stays itself).
-- Cost growth per level: jumps from the shipped ~×2 to a much steeper `tail_growth`.
-
-Why this shape works: with cost growth `g` per level, a fortune `G` buys ~log_g(G) tail
-levels, so the effective multiplier grows as `G^(ln 1.2 / ln g)` — POLYNOMIALLY SLOWER
-than the fortune. Gems never go worthless (G1), yet no fortune runs away (G3's wall
-always sits ahead). The wall-position-vs-gems curve becomes a designed dial:
-
-| tail_growth g | multiplier scales as | ×1000 more gems buys… |
-|---|---|---|
-| ×5 | G^0.113 | ×2.2 income |
-| **×8 (recommended)** | **G^0.088** | **×1.8 income** |
-| ×12 | G^0.073 | ×1.7 income |
-
-- One global `legacy_tail_cost_growth` knob in TuningConfig (dev-panel tunable, no
-  constants in code), applied by every compounding track past its old cap.
+- **Effect per level: unchanged (×1.2 compounding).** All correction goes through COST —
+  one lever, and an upgrade purchase always feels like the same meaningful step; it just
+  has to be earned. (Flagged as open question 1 in case Tim also wants the effect eased.)
+- **Cost shape candidates** (per track: `cost(n) = base × growth-product`, uncapped):
+  - **Shape 1 — flat-but-steeper geometric, `g` per level, g ∈ {2.5, 2.75, 3.0}.**
+    Simple, one knob. Early levels rise modestly in absolute terms (level 5 ≈ 2–5×
+    today's), level 30 costs orders of magnitude more than today's 9.7B, and a fortune
+    `G` maps to multiplier ~`G^(ln 1.2 / ln g)`: at g = 2.75, ×1000 more gems buys
+    ~×3.7 more income — gradual, never worthless, never runaway.
+  - **Shape 2 — progressively steepening: `growth(n) = g0 × s^n`** (e.g. g0 = 2.0,
+    s ∈ {1.02, 1.03}). Starts almost exactly like today and steepens continuously —
+    the most literal "more gradual from the beginning," and the strongest brake deep
+    (each level's growth factor itself keeps climbing, so NO fixed fortune-exponent
+    exists — deep fortunes buy ever fewer levels).
+  - Recommendation: **Shape 2, s ≈ 1.03** — it honors "gradual from the beginning"
+    exactly (first-prestige purchases at ~800-gem mints stay accessible), while its
+    ever-steepening deep end pairs naturally with the dozen-runs summit.
+- Knobs in TuningConfig (dev-panel tunable, no constants in code): the per-level base
+  growth and, for Shape 2, the steepening rate. `legacy_upgrade_cost_multiplier` (the
+  global ×3 brake) folds into the new curve rather than stacking on top.
 - Non-compounding utility tracks (Trust Fund, Estate Lawyers, Cooling Systems, …) STAY
-  capped — their caps are ergonomic, not economic.
-- No save migration: existing levels remain valid; the cap simply stops existing.
-- UX: LegacyScreen's hold-to-buy already paces long climbs; the tail's price growth makes
+  capped — their caps are ergonomic, not economic (open question 3).
+- No save migration: existing LEVELS remain valid at their owned counts; only future
+  purchase prices change. (Tim's 5T save keeps its maxed levels and immediately has a
+  real next price to look at.)
+- UX: LegacyScreen's hold-to-buy already paces long climbs; the steepening price makes
   "hold until broke" self-limiting.
+- Co-tuning constraint (the summit): under the new mint (Change B), a dozen deep runs
+  banks roughly 50–200B lifetime gems; the curve constants are chosen so THAT fortune's
+  multiplier — on top of maxed staff and normal play — is what cracks tier 27 slowly.
+  This is the sim pass's primary fit target, not a hand-picked constant.
 
 ## Change B — mint soft-cap (the faucet)
 
@@ -79,10 +95,10 @@ net > KNEE:  gems = floor(gems(KNEE) × (net/KNEE)^alpha_deep)
 
 - `KNEE` ≈ $1 sextillion (the neighborhood PrestigeStudy validated; exact value from the
   study so the curve is continuous through the device-approved rows).
-- `alpha_deep` candidates: **0.10 (recommended)** / 0.06. At a 10¹⁰⁰ estate: ~tens of
-  trillions of gems per run at 0.10, ~tens of billions at 0.06 — big, legible, and the
-  tail cost curve absorbs either logarithmically. (For contrast, today's curve mints
-  ~10²⁷ there.)
+- **Decided (Tim, 2026-07-28): `alpha_deep` = 0.06 — endgame mints read in the
+  BILLIONS.** At a 10¹⁰⁰ estate this mints ~tens of billions per run (vs ~10²⁷ under
+  today's curve): a dozen deep runs banks the ~50–200B-gem summit fortune, and the
+  number on the prestige button stays a number that feels valuable.
 - Two new TuningConfig knobs (`legacy_knee_net`, `alpha_legacy_deep`), dev-panel tunable.
 - The waterfall (exemption/tax/loopholes) is untouched — this bends only the final curve.
 
@@ -93,20 +109,21 @@ multiplier) → (Progressive Decay positions the wall against that multiplier). 
 is separately tunable and separately sim-checkable, so endgame balance stops being an
 emergent accident.
 
-**The "designed top"** (G3's summit population): propose "a dynasty that has banked the
-mints of ~a dozen deep runs under the new curve" — concretely a lifetime fortune around
-10¹⁴–10¹⁵ gems at alpha_deep 0.10. Tail level ≈ 30 + log₈(10¹⁵/20e9) ≈ 35–36 levels →
-total multiplier ≈ maxed-shop × ~2.5-3 — sized so tier 27 falls, slowly, at that stack.
-(These are starting figures; the validation matrix decides.)
+**The designed top (decided: a dozen deep runs):** under alpha_deep 0.06 that is a
+lifetime fortune of roughly 50–200B gems. The cost-curve constants are FIT to make that
+fortune's multiplier the one that cracks tier 27 slowly — the summit is the target the
+sim pass solves for, not an emergent accident.
 
 ## Validation matrix (all sim-gated before device)
 
 1. **PrestigeStudy** extended with deep-magnitude rows (10³⁰ … 10¹⁰⁰ net) × knee/alpha_deep
    candidates — read down the columns: mints keep growing, stay legible, no runaway.
-2. **EpochPaceStudy** with tail-aware greedy upgrade buying, stacks {66M, 447M, 5T,
-   10¹², designed-top}: every below-top stack shows per-epoch ratios ≥ ~1.5 before the
-   final tier; the designed-top row clears tier 27; bare/10M/66M rows byte-match today's
-   through their unchanged regions.
+2. **EpochPaceStudy** with curve-aware greedy upgrade buying, stacks {830 (a first
+   prestige), 10M, 66M, 447M, 5T, designed-top}: every below-top stack shows per-epoch
+   ratios ≥ ~1.5 before the final tier; the designed-top row clears tier 27. Since the
+   re-curve touches level 1, ALSO gate the entry experience: a first-prestige mint
+   (~800 gems) must still buy several meaningful levels, and the low-stack rows'
+   early-epoch pace must stay in today's band (no early-game slowdown creep).
 3. **Dynasty protocol** (GDD §13 speeds-up-every-time) + waterfall spot-check still pass.
 4. Full gate suite (EpochTest, MoneyTest, RushOverheatTest, ChallengeGoalsTest) + boot.
 5. Device: Tim resumes the 5T-gem save — the shop must offer a real next purchase, the
@@ -119,12 +136,18 @@ total multiplier ≈ maxed-shop × ~2.5-3 — sized so tier 27 falls, slowly, at
 - Vent-bonus stacking cap (flagged in `Plans/Progressive_Decay.md`) — revisit only if
   deep pacing still feels off after this lands.
 
+## Decisions so far (Tim, 2026-07-28)
+
+- The compounder curve is re-shaped from LEVEL 1 — no preserved first-30, no seam;
+  gradual and steeper throughout ("even the first 30 levels feel too cheap and grant
+  outsized bonuses").
+- Summit population: **a dozen deep runs' banked mints finishes the ladder.**
+- Mint bend: **alpha_deep = 0.06** — endgame mints read in the billions.
+
 ## Open questions for Tim
 
-1. Tail growth: ×8 as the seed? (×5 keeps late shopping sprees juicier; ×12 pins the
-   wall harder.)
-2. Mint bend: alpha_deep 0.10 (trillions-scale endgame fortunes) or 0.06
-   (billions-scale)? Purely about what NUMBER you like reading on the prestige button.
-3. The designed top: is "roughly a dozen deep runs' worth of banked mints finishes the
-   ladder" the right summit population?
-4. OK that the capped utility tracks (Trust Fund etc.) stay capped?
+1. Effects: keep ×1.2 per level and correct through COST only (recommended — one lever,
+   every purchase stays a meaningful step), or also ease the per-level effect?
+2. Curve shape: Shape 2 (progressively steepening, s ≈ 1.03 — recommended) or Shape 1
+   (flat geometric ~×2.75 per level)?
+3. OK that the capped utility tracks (Trust Fund etc.) stay capped?

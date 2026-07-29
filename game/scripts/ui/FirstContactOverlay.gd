@@ -123,15 +123,21 @@ func _ready() -> void:
 	_civ_label.add_theme_font_size_override("font_size", UiPalette.FONT_DISPLAY)
 	column.add_child(_civ_label)
 
-	# Home world + their currency (flavor only — Earth stays on dollars).
+	# Home world + their currency (flavor only — Earth stays on dollars). Both wrap for
+	# the same reason as the market line: per-beat copy varies in length, and an
+	# unwrapped line longer than the card would widen it off-screen.
 	_planet_label = Label.new()
 	_planet_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_planet_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_planet_label.custom_minimum_size = Vector2(760, 0)
 	_planet_label.add_theme_color_override("font_color", UiPalette.NAVY)
 	_planet_label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
 	column.add_child(_planet_label)
 
 	_flavor_label = Label.new()
 	_flavor_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_flavor_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_flavor_label.custom_minimum_size = Vector2(760, 0)
 	# Darkened harder than the palette green so it holds contrast on the cream plate.
 	_flavor_label.add_theme_color_override("font_color", UiPalette.MONEY_GREEN.darkened(0.35))
 	_flavor_label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
@@ -152,6 +158,12 @@ func _ready() -> void:
 	# reveal punches hardest (an overshoot scale-in pop).
 	_market_label = Label.new()
 	_market_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# Wraps like the civ/hail lines: the alien ratios are short ("×16,807"), but the
+	# promotion beat's "×1.38 million" at this headline size is wider than a portrait
+	# screen — an unwrapped Label's minimum width forces the whole card column past the
+	# right edge (Tim's report, 2026-07-29). Wrapping caps the card at its 760px design.
+	_market_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_market_label.custom_minimum_size = Vector2(760, 0)
 	_market_label.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD)
 	_market_label.add_theme_color_override("font_outline_color", UiPalette.NAVY)
 	_market_label.add_theme_constant_override("outline_size", 5)

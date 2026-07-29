@@ -72,8 +72,18 @@ outsized bonuses at throwaway prices and late levels absorb any fortune.
 - Knobs in TuningConfig (dev-panel tunable, no constants in code): the per-level base
   growth and, for Shape 2, the steepening rate. `legacy_upgrade_cost_multiplier` (the
   global ×3 brake) folds into the new curve rather than stacking on top.
-- Non-compounding utility tracks (Trust Fund, Estate Lawyers, Cooling Systems, …) STAY
-  capped — their caps are ergonomic, not economic (open question 3).
+- **Utility tracks (decided, Tim 2026-07-28): capped ceilings unchanged, climbs
+  restructured.** Every non-compounding track's EFFECT TOTAL is load-bearing (a discount
+  heads to free, compounding the gem yield runs the loop away, limitation-removers must
+  not compound) and stays exactly where it is — but the climbs get finer steps (~double
+  the levels at proportionally smaller per-level effects) and prices rescaled onto the
+  new gem curve, so maxing the utility shop is a MID-DYNASTY project (~runs 5–8 of the
+  dozen-run summit arc), not a run-2 checkbox. Exceptions kept gentle: Trust Fund
+  level 1 stays the cheap first-prestige buy (Tim, 2026-07-23), and Cooling Systems /
+  Rapid Restart stay the shortest climbs (QoL must not feel withheld). Concrete
+  per-track numbers come out of the fit pass for Tim's review. Save note: owned levels
+  map by EFFECT (a saved level-5 Cooling Systems becomes the restructured level with
+  the same +0.05 total), never by raw level number.
 - No save migration: existing LEVELS remain valid at their owned counts; only future
   purchase prices change. (Tim's 5T save keeps its maxed levels and immediately has a
   real next price to look at.)
@@ -144,10 +154,14 @@ sim pass solves for, not an emergent accident.
 - Summit population: **a dozen deep runs' banked mints finishes the ladder.**
 - Mint bend: **alpha_deep = 0.06** — endgame mints read in the billions.
 
-## Open questions for Tim
+## All open questions resolved (Tim, 2026-07-28)
 
-1. Effects: keep ×1.2 per level and correct through COST only (recommended — one lever,
-   every purchase stays a meaningful step), or also ease the per-level effect?
-2. Curve shape: Shape 2 (progressively steepening, s ≈ 1.03 — recommended) or Shape 1
-   (flat geometric ~×2.75 per level)?
-3. OK that the capped utility tracks (Trust Fund etc.) stay capped?
+1. **Cost-only correction** — per-level effects stay as shipped; the cost curve does all
+   the work.
+2. **Shape 2, s = 1.03** — progressively steepening growth from level 1.
+3. **Utility tracks: capped ceilings, restructured climbs** (see Change A) — finer
+   steps, prices on the new curve, maxed mid-dynasty.
+
+Next step: the fit pass — solve the curve constants against the dozen-runs summit,
+extend PrestigeStudy for the 0.06 mint bend, produce the per-track number table for
+Tim's review, then the full validation matrix.

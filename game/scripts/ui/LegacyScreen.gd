@@ -721,7 +721,13 @@ func refresh() -> void:
 		var level := _upgrades.get_level(id)
 		var max_level := int(definition["max_level"])
 
-		(controls["level_label"] as Label).text = "Level %d / %d" % [level, max_level]
+		# An UNCAPPED compounder (Endgame Economy: max_level is a 9999 sentinel, the
+		# steepening cost curve is the real ceiling) shows a plain level — "Level 12 / 9999"
+		# would read as a bug, and there is deliberately no top to advertise.
+		if max_level > 100:
+			(controls["level_label"] as Label).text = "Level %d" % level
+		else:
+			(controls["level_label"] as Label).text = "Level %d / %d" % [level, max_level]
 		(controls["effect_label"] as Label).text = LegacyUpgradeCatalog.describe_effect(id, level)
 
 		var buy_button := controls["buy_button"] as Button

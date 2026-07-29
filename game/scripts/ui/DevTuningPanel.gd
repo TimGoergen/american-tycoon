@@ -165,6 +165,9 @@ const DESCRIPTIONS := {
 	"loophole_rate_floor": "Lowest the estate tax can fall via loopholes.",
 	"k_legacy": "Legacy payout scale on the power curve (K × (net/floor) ^ alpha).",
 	"alpha_legacy": "Legacy curve exponent; lower = flatter yield, tames the prestige runaway.",
+	"alpha_legacy_deep": "Mint exponent ABOVE the knee (0.06 = +15% gems per 10x deeper estate).",
+	"legacy_knee_net": "Estate net where the mint curve bends to the deep exponent ($).",
+	"legacy_cost_steepening": "Upgrade cost growth's own per-level multiplier — the uncapped shop's brake.",
 	"legacy_upgrade_cost_multiplier": "Global x on every Legacy upgrade cost — the prestige-power brake (higher = a prestige buys fewer levels).",
 	"challenge_bonus_scale": "Global x on every Challenge tier payout, both tracks (1.0 = authored ~24% income + 24% Legacy across all six games maxed).",
 	"challenge_timer_start_seconds": "Challenge keep-alive run timer's starting seconds — a run begins with this on the clock and drains until scoring tops it up (Wave 2).",
@@ -289,7 +292,8 @@ const SECTIONS := [
 		"basketball_launch_", "basketball_max_", "memory_gem_",
 	]},
 	{"title": "Legacy Bonus", "prefixes": ["legacy_bonus_", "legacy_gem_chance_"]},
-	{"title": "Estate & Legacy", "prefixes": ["estate_", "loophole_", "k_legacy", "alpha_legacy", "legacy_upgrade_cost_multiplier"]},
+	{"title": "Estate & Legacy", "prefixes": ["estate_", "loophole_", "k_legacy", "alpha_legacy",
+		"legacy_knee_net", "legacy_cost_steepening", "legacy_upgrade_cost_multiplier"]},
 	{"title": "Events", "prefixes": ["crash_", "audit_"]},
 ]
 

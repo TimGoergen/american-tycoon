@@ -247,6 +247,20 @@ estate_net     = after_credit − tax
 ```
 legacy_gain = floor( K_LEGACY × (estate_net / LEGACY_BASE) ^ ALPHA )   K=0.50 ALPHA=0.22 LEGACY_BASE=$1k
 ```
+
+> **ENDGAME ECONOMY (2026-07-29, `Plans/Endgame_Economy.md`, Tim-approved design; constants
+> sim-FIT by `sim/DynastyArcStudy.gd`):** the conversion is now PIECEWISE — the (re-tuned
+> 2026-07-23: K=0.16, ALPHA=0.35) curve applies exactly up to `legacy_knee_net` ($1Sx),
+> then bends to `alpha_legacy_deep` (0.05): `gems = gems(knee) × (net/knee)^0.05`, so
+> deep-frontier estates (10⁸⁰⁺, which the old curve ran to septillions — past int64) mint
+> BILLIONS (Tim: numbers that still feel valuable). Downstream, the §9.4 shop changed shape:
+> the seven ×-per-level COMPOUNDERS are UNCAPPED on a progressively steepening cost curve —
+> `cost(n) = base × growth^(n−1) × s^((n−1)(n−2)/2)`, growth 2.8/2.7, s = `legacy_cost_steepening`
+> = 1.10 — so any fortune buys a slowly-growing multiplier and there is ALWAYS a next level
+> worth wanting; the six capped UTILITY tracks keep their load-bearing effect ceilings over
+> double the levels at half the per-level effect (save v13 migrates owned levels BY EFFECT).
+> Fit target (Tim): "a dozen deep runs" crack tier 27 — confirmed arc: tier 26 at generation
+> ~11, summit ~15, no stall, summit fortune ~200–300B gems.
 (`estate_net` here is the post-tax net of the §9.2 waterfall, whose gross is lifetime cash earned
 this generation — not net worth at death; nothing converts at or below the `LEGACY_BASE` floor.
 **Curve history:** the 2026-06-17 log² curve — `floor(K × log10(net/base)²)` — fixed the original

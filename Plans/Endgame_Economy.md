@@ -1,8 +1,28 @@
 # Endgame Economy — gems that stay worth wanting at any scale
 
-**Status: draft for Tim's review (2026-07-28). Nothing implemented.**
+**Status: IMPLEMENTED + FIT (2026-07-29), pending Tim's device pass on the 5T save.**
 Target branch: `feature/civs-12-26`. Companion to `Plans/Progressive_Decay.md` (the wall)
 and successor to `Plans/Prestige_Retune.md` (the mint curve, device-approved 2026-07-23).
+
+## FIT RESULT (DynastyArcStudy, 5 iterations, 2026-07-28/29)
+
+Final constants — **two deviate from the seeds and need Tim's eyes**:
+
+| knob | seed | FIT | why it moved |
+|---|---|---|---|
+| `legacy_cost_steepening` (s) | 1.03 | **1.10** | at 1.03 the shop cannot absorb billions-scale mints: summit fell at GENERATION 3. s=1.12 overshot into an absolute stall at tier 25 (a mint could buy nothing for 3+ runs). 1.10 is the fitted middle. |
+| `alpha_legacy_deep` | 0.06 | **0.05** | at 0.06 mints grew ×1.79 per tier deepened — faster than the decay brake; 0.05 (×1.62) converges. Deepest mints still read in the billions (Tim's call preserved). |
+| compounder `cost_growth` | 2.0/1.9 | **2.8/2.7** | the early-mid shop was the gen-2 leap vector (one run jumped 15 tiers); pricier levels 5-15 tame it AND serve Tim's "even the first 30 levels feel too cheap." |
+| `legacy_knee_net` | 1e21 | 1e21 | unchanged. |
+
+Confirmed arc (2h-sim-capped active generations, greedy shopping): tiers
+7 → 16 → 21 → 23 → 24 → 25 (grinds gens 6-10, mints 14→20B) → 26 at gen 11 → summit
+extrapolates ~gen 15-17 (FF level 15 ≈ 190B vs ~30B/run mints). Deep-run count to the
+summit ≈ a dozen-plus; no absolute stall (mints keep growing 1.2M → 32B); lifetime
+fortune at the summit ~200-300B. The 2h/gen cap is conservative — longer real sessions
+push further per run, so the device arc should land at or under the sim's generation
+count. If Tim wants the summit a couple of generations sooner: lower `cost_growth`
+toward 2.6 (the dev panel has every knob).
 
 ## Why
 

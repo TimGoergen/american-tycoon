@@ -609,15 +609,21 @@ func _test_overdrive_disengages_on_release(tuning: TuningConfig) -> void:
 func _test_legacy_cruise_and_boundary(tuning: TuningConfig) -> void:
 	print("\n11. Legacy cruise points raise the clamp (capped at bonus_at_hot); heat 1.0 is safe")
 
-	# The LegacyUpgrades getters map catalog levels to the values the state consumes.
+	# The LegacyUpgrades getters map catalog levels to the values the state consumes. Buy to
+	# each track's MAX (not a hardcoded level): the Endgame Economy utility restructure
+	# doubled the level counts at half the per-level effect, and it is the CEILING that is
+	# load-bearing — maxed Cooling is +0.05 cruise, maxed Rapid halves the lockout, at
+	# whatever level count the catalog ships.
+	var cooling_max := int(LegacyUpgradeCatalog.get_definition(LegacyUpgradeCatalog.COOLING_SYSTEMS)["max_level"])
+	var rapid_max := int(LegacyUpgradeCatalog.get_definition(LegacyUpgradeCatalog.RAPID_RESTART)["max_level"])
 	var upgrades := LegacyUpgrades.new()
 	upgrades.levels = {
-		LegacyUpgradeCatalog.COOLING_SYSTEMS: 5,
-		LegacyUpgradeCatalog.RAPID_RESTART: 5,
+		LegacyUpgradeCatalog.COOLING_SYSTEMS: cooling_max,
+		LegacyUpgradeCatalog.RAPID_RESTART: rapid_max,
 	}
-	_check("Cooling Systems level 5 grants +0.05 cruise points",
+	_check("maxed Cooling Systems grants +0.05 cruise points",
 		absf(upgrades.cruise_bonus_points() - 0.05) < 0.0001)
-	_check("Rapid Restart level 5 halves the lockout scale",
+	_check("maxed Rapid Restart halves the lockout scale",
 		absf(upgrades.overheat_lockout_scale() - 0.5) < 0.0001)
 
 	# Max Cooling Systems: cruise = bonus_at_hot, so the clamp sits at heat 1.0 EXACTLY.

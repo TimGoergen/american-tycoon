@@ -42,7 +42,12 @@ func _initialize() -> void:
 	_print_gem_yield_table()
 	_print_family_fortune_table()
 	_print_max_cost_table()
+	_print_deep_mint_table()
 
+	print("")
+	print("Read table 4 for the ENDGAME: the piecewise knee (Plans/Endgame_Economy.md) keeps the")
+	print("approved curve through its tuned range, then bends so 1e80+ estates mint BILLIONS —")
+	print("numbers that still grow every run but stay legible currency (Tim, 2026-07-28).")
 	print("")
 	print("Read table 1 DOWN a column: how much more a bigger run pays (the 'reward for pushing').")
 	print("Read table 2: the compounding income a single run's gems can buy (×237 = Family Fortune")
@@ -100,12 +105,18 @@ func _print_max_cost_table() -> void:
 	for definition in LegacyUpgradeCatalog.all():
 		var id := String(definition["id"])
 		var max_lvl := int(definition["max_level"])
-		var row := "%-22s %6.1f" % ["%s (%d)" % [definition["name"], max_lvl], float(definition["cost_growth"])]
+		# The compounders are UNCAPPED since the Endgame Economy (max_level 9999 sentinel);
+		# show their level-40 slice — far past any real fortune — instead of a meaningless
+		# (and float-overflowing) sum to the sentinel.
+		var shown_lvl := mini(max_lvl, 40)
+		var label := "%s (%s)" % [definition["name"],
+				"uncapped, @40" if max_lvl > 40 else str(max_lvl)]
+		var row := "%-26s %6.1f" % [label, float(definition["cost_growth"])]
 		for c in CANDIDATES:
 			LegacyUpgradeCatalog.cost_multiplier = float(c["cost"])
-			var top := LegacyUpgradeCatalog.cost_for_level(id, max_lvl)
+			var top := LegacyUpgradeCatalog.cost_for_level(id, shown_lvl)
 			var total := 0
-			for lvl in range(1, max_lvl + 1):
+			for lvl in range(1, shown_lvl + 1):
 				total += LegacyUpgradeCatalog.cost_for_level(id, lvl)
 			row += " %9s|%9s" % [Money.abbrev(float(top)), Money.abbrev(float(total))]
 		print(row)
@@ -120,3 +131,22 @@ func _family_fortune_income(gems: int, cost_mult: float) -> float:
 	while up.can_buy(LegacyUpgradeCatalog.FAMILY_FORTUNE):
 		up.buy(LegacyUpgradeCatalog.FAMILY_FORTUNE)
 	return up.property_income_multiplier()
+
+
+## Table 4 — the DEEP-frontier mint under the live piecewise curve (the Endgame Economy
+## knee, Plans/Endgame_Economy.md): estate nets from the tuned range out to the 27-tier
+## ladder's deepest magnitudes, with the un-bent single-exponent curve alongside to show
+## exactly what the knee prevents. Uses the REAL tuning knobs + EstateWaterfall, so this
+## table and the game can never drift.
+func _print_deep_mint_table() -> void:
+	var tuning := ConfigLoader.load_tuning(false)
+	print("")
+	print("--- Table 4: deep-frontier mint — LIVE piecewise (knee %s, deep alpha %.2f) vs un-bent ---"
+			% [Money.abbrev(tuning.legacy_knee_net), tuning.alpha_legacy_deep])
+	print("estate net       LIVE piecewise mint      un-bent single-exponent")
+	for net in [1e18, 2.5e21, 1e30, 1e50, 1e70, 1e90, 1e110, 1e120]:
+		var bent := EstateWaterfall.legacy_gain(net, tuning.k_legacy, tuning.alpha_legacy,
+				tuning.legacy_knee_net, tuning.alpha_legacy_deep)
+		var unbent := EstateWaterfall.legacy_gain(net, tuning.k_legacy, tuning.alpha_legacy)
+		print("%10s   %20s   %24s" % [
+			Money.abbrev(net), Money.abbrev(float(bent)), Money.abbrev(float(unbent))])

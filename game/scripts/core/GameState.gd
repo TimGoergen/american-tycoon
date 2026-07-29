@@ -29,7 +29,11 @@ class_name GameState
 # migrates on load: 2+ shift to 3+, and a mid-Earth tier-1 save maps to White Collar if it
 # owns any White Collar property (indices 6-11) — so nothing a player owns ever locks on them.
 # Staff levels need no migration: caps are identical at every equivalent moment (plan doc).
-const SAVE_VERSION := 12
+# v13 is the ENDGAME ECONOMY (Plans/Endgame_Economy.md): the mint curve bends at a knee,
+# the compounders run uncapped on a steepening cost curve, and the utility tracks doubled
+# their level counts at half the per-level effect. Pre-v13 utility levels migrate BY EFFECT
+# (level ×2 = the same owned bonus) in DynastyState.load_save_dict; nothing else moves.
+const SAVE_VERSION := 13
 
 var tuning: TuningConfig
 var economy: EconomyState

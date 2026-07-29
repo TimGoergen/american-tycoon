@@ -468,6 +468,23 @@ extends Resource
 ## lower alpha_legacy) on the multiplier runaway that made late epochs trivial (Tim 2026-07-14).
 @export var legacy_upgrade_cost_multiplier: float = 2.0  # feel-tune
 
+## The estate net where the Legacy mint curve BENDS (Plans/Endgame_Economy.md, Tim 2026-07-28):
+## below this the approved alpha_legacy power curve applies exactly; above it the shallow
+## alpha_legacy_deep exponent takes over, so deep-frontier estates (1e80+) mint ~billions
+## instead of septillions — big numbers that still read as valuable.
+@export var legacy_knee_net: float = 1e21  # feel-tune (~the $1-sextillion estates the curve was tuned on)
+
+## The mint curve's exponent ABOVE the knee — how fast gems keep growing once estates pass
+## the tuned range. 0.06 = a 10x deeper estate mints ~+15% more gems (Tim: endgame mints
+## should read in the BILLIONS; the old single-exponent curve ran to septillions).
+@export var alpha_legacy_deep: float = 0.05  # feel-tune
+
+## The upgrade shop's cost STEEPENING (LegacyUpgradeCatalog.cost_steepening): each level's
+## cost-growth factor is itself multiplied by this per level, so the curve starts near the
+## authored per-level growth and steepens without limit — the uncapped compounders' real
+## brake (Plans/Endgame_Economy.md "Shape 2", Tim 2026-07-28). 1.0 = the old flat geometric.
+@export var legacy_cost_steepening: float = 1.1  # fit: DynastyArcStudy (1.03 seed missed the dozen-run summit)
+
 # Note: the old k_sprint / beta_sprint / k_residual constants were removed when
 # Legacy became a spendable upgrade currency. Per-level upgrade magnitudes and
 # costs now live in LegacyUpgradeCatalog.gd, not here.

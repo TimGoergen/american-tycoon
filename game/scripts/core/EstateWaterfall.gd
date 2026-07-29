@@ -68,9 +68,19 @@ const LEGACY_BASE := 1_000.0
 ## the real brake — even the ~320k gems an endgame run mints buy only ~14 levels of one track, and
 ## the deepest levels cost billions, so it never "buys out the shop." Balance found via
 ## sim/PrestigeStudy.gd (device-scale gem-yield + shop-cost tables). Legacy accumulates.
-static func legacy_gain(estate_net: float, k_legacy: float, alpha: float) -> int:
+## PIECEWISE since the Endgame Economy pass (Plans/Endgame_Economy.md, Tim 2026-07-28): the
+## approved curve applies exactly up to `knee_net` (~the $1-sextillion estates it was tuned
+## against), then the shallow `alpha_deep` exponent takes over, continuously. Deep-frontier
+## estates (1e80+) were minting SEPTILLIONS under the single exponent — inflating gems past
+## meaning; under the bend they mint billions, which still grows every run but stays a
+## number that feels valuable. knee_net <= 0 disables the bend (pure single-exponent curve).
+static func legacy_gain(estate_net: float, k_legacy: float, alpha: float,
+		knee_net: float = 0.0, alpha_deep: float = 0.0) -> int:
 	if estate_net <= LEGACY_BASE:
 		return 0
+	if knee_net > LEGACY_BASE and estate_net > knee_net:
+		var gems_at_knee := k_legacy * pow(knee_net / LEGACY_BASE, alpha)
+		return int(floor(gems_at_knee * pow(estate_net / knee_net, alpha_deep)))
 	return int(floor(k_legacy * pow(estate_net / LEGACY_BASE, alpha)))
 
 # §9.4 note: Legacy is no longer applied as an automatic sprint/residual income

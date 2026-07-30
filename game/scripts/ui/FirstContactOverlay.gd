@@ -432,15 +432,33 @@ func _reveal_proceed_button() -> void:
 ## Compact ×N formatting for the market-growth line (1,000 / 1 million / 1 billion …),
 ## so an order-of-magnitude jump reads cleanly instead of as a wall of zeroes.
 func _format_multiplier(value: float) -> String:
-	# 3 significant figures: the promotion beat's ratio is a messy 1.38139... million
-	# (Earth total ÷ the $75M Blue Collar slice), and "×1.38 million" reads as a number
-	# while "×1.38139 million" reads as a defect. Alien steps are exact and unaffected.
+	# Two decimals, trailing zeros trimmed: the promotion beat's ratio is a messy
+	# 1.38139... million (Earth total ÷ the $75M Blue Collar slice) — "×1.38 million"
+	# reads as a number, "×1.38139 million" reads as a defect. NOTE: GDScript's %
+	# operator has no %g specifier (a %.3g here printed LITERALLY — Tim's 2026-07-29
+	# report), so the rounding is done with %.2f + a manual trim.
 	if value >= 1_000_000_000.0:
-		return "%.3g billion" % (value / 1_000_000_000.0)
+		return "%s billion" % _trimmed_two_decimals(value / 1_000_000_000.0)
 	if value >= 1_000_000.0:
-		return "%.3g million" % (value / 1_000_000.0)
+		return "%s million" % _trimmed_two_decimals(value / 1_000_000.0)
 	# Group the thousands with commas (e.g. 1000 → "1,000").
 	var digits := str(int(value))
+	return _group_thousands(digits)
+
+
+## "1.38" from 1.381, "2" from 2.004 — two decimals with trailing zeros (and a bare dot)
+## trimmed, so the market line never shows noise digits or a dangling "2.00".
+static func _trimmed_two_decimals(value: float) -> String:
+	var s := "%.2f" % value
+	while s.ends_with("0"):
+		s = s.substr(0, s.length() - 1)
+	if s.ends_with("."):
+		s = s.substr(0, s.length() - 1)
+	return s
+
+
+## Comma-group an integer's digits (e.g. "16807" → "16,807").
+static func _group_thousands(digits: String) -> String:
 	var grouped := ""
 	var count := 0
 	for i in range(digits.length() - 1, -1, -1):

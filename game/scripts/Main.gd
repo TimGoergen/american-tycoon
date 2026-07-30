@@ -1020,6 +1020,14 @@ func _update_epoch_pager() -> void:
 func _input(event: InputEvent) -> void:
 	if _ladder_area == null or _epoch_pager_box == null:
 		return
+	# NO swiping while a full-screen overlay is up. This raw handler sees every touch, and a
+	# hidden Control's get_global_rect() still reports its rect — so a horizontal drag INSIDE
+	# a transition minigame (Catch Money, Balance…) or the welcome screen was registering as
+	# an epoch swipe on the covered pager, and the player came back to the game on the wrong
+	# tab (Tim, 2026-07-29 — "returned to the game screen but not on the newest tab").
+	if _any_fullscreen_overlay_visible():
+		_swipe_tracking = false
+		return
 	if event is InputEventScreenTouch:
 		if event.pressed:
 			# Swipe anywhere on the "page" — the pager title strip OR the property list below it.

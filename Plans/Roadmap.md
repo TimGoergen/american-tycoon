@@ -60,3 +60,90 @@ signal: `dynasty.ancestors.size() > 0` (the Ledger's own "first prestige happene
 signal). Per the no-moving-UI rule, the Settings → CHALLENGES button grays in place with
 a "unlocks after your first succession" subtitle, never hides. Small enough to ship in
 any session on Tim's word.
+
+## 6. Currency formatting as a player setting (Tim, 2026-07-30)
+
+Tim's ask: a Settings option to choose how large numbers are formatted. Three modes —
+ALPHABET NOTATION (Tim's "all letters": `aa`, `ab`, `ac`, …), the CURRENT abbreviations
+(`Qa`, `Sx`, `OcTg`), and a third format (Tim: "something else"; recommendation below).
+
+**Take: good idea, and it gets BETTER the deeper the ladder goes.** The current suffix
+ladder (`Money.SUFFIXES`, 40 rungs to 1e120) is mnemonic for maybe ten rungs — `K/M/B/T`
+are universal, `Qa/Qi/Sx/Sp` are learnable — and then it degrades. By the deep epochs the
+player is reading `Nod`, `QaVg`, `SpTg`, `OcTg`, which carry no intuition at all and,
+worse, are hard to ORDER at a glance: is `SxVg` bigger than `QaTg`? (It isn't.) A player
+in tier 24 cannot tell whether a price went up or down by reading the suffix. That is a
+real legibility problem in the part of the game Tim is actively tuning, and a format
+setting is the cheap fix. It also fits the "minigames are a player setting" precedent —
+presentation preferences belong to the player.
+
+**Alphabet notation is the mode that earns this feature** (`$4.2aa`, `ab`, `ac`, … `az`,
+`ba`, …), the idle-genre standard (AdVenture Capitalist, Cookie Clicker's option). It is
+the only format that fixes the ordering problem: `ac` is obviously past `ab`, and it stays
+two characters wide forever, so deep-epoch prices become both compact AND sortable by eye.
+Map it straight onto the existing rung index so it can never disagree with the other
+formats — rung 0 (`K`) = `aa`, rung 1 (`M`) = `ab`, … rung 39 (`NoTg`) = `bn`. Deriving it
+from the index rather than a parallel table also means it extends for free if the ladder
+ever grows past 1e120.
+
+**Third format: SCIENTIFIC NOTATION — `$4.2e18` (Tim's call, 2026-07-30).** This overrides
+the standing "never scientific notation" rule in GDD §2 / Mechanics Spec §Display, which
+is now scoped to the DEFAULT rather than absolute: the game still never shows an exponent
+unless the player asks for one. Both docs amended 2026-07-30 to say so.
+
+It is a good fit for the third slot on the merits: it is the only format that is exactly
+unambiguous at every magnitude with no vocabulary to learn and no ordering puzzle, it is
+the shortest of the three at depth, and it is what a numerically-minded player actually
+wants for comparing deep-epoch prices. It also sidesteps the "can never disagree on a
+suffix" invariant entirely, because it uses no suffix — it just has to be arithmetically
+exact.
+
+Recommended specifics:
+- **True scientific**, mantissa `1 ≤ m < 10` (`$4.2e18`), not engineering-style. That is
+  what the name implies and it is maximally compact. (Engineering style — exponent forced
+  to a multiple of 3, mantissa up to 1000 — would map 1:1 onto the existing rungs, which is
+  tidy, but it reads as a half-measure and is wider. Noted as the alternative if Tim
+  prefers the rung alignment.)
+- Lowercase `e`, no `+` on the exponent, no superscript — plain `Label`s can't do
+  superscript, and the whole point is compactness.
+- 2 decimals in the mantissa with trailing zeros trimmed, reusing `Money.trim()` so it
+  matches the other modes' rounding behaviour.
+- Keep today's small-value thresholds unchanged: plain dollars below $1,000, comma-grouped
+  thousands, and scientific only where the abbreviated range starts ($1M+). A player who
+  picks this mode wants it for big numbers, not for `$4.20e2`.
+- Negatives keep the existing prefix treatment: `-$4.2e18`.
+
+Rejected for the third slot: **spelled-out words** (`$4.2 quadrillion`) — the teaching mode,
+and the natural complement to the other two, but "$4.2 quattuorvigintillion" is 26
+characters and cannot fit a property row's price button at this game's font sizes. Logged
+here as a possible FOURTH mode if Tim ever wants it, scoped to the roomy readouts only
+(cash header, Ledger, Will screen). If it is ever built, the layout question below is the
+whole risk.
+
+Rejected: **plain full digits with comma grouping.** Reads beautifully at $1,250,000 and is
+unusable by mid-game — the costliest property is 2.243e118, a 119-digit number. It would
+obliterate every layout it touched. If Tim wants it anyway it has to be a hybrid that falls
+back to abbreviations above a ceiling, which is really "the current format with a higher
+full-digits threshold" and belongs as a tweak to `display_cash()`, not a third mode.
+
+**Load-bearing implementation facts:**
+- Everything funnels through `Money.gd` — one `SUFFIXES` array plus two formatters,
+  `display(max_decimals)` (tight: `$4.2Qa`) and `display_cash()` (spaced, 2dp: `$4.2 Qa`).
+  A format mode is a static on `Money` read by both. They deliberately share the rung
+  ladder "so the two formats can never disagree on a suffix" — any new mode must preserve
+  that property, i.e. derive from the rung INDEX, never from a parallel table.
+- **Spelled-out words will break tight layouts, and that is the whole risk of this
+  feature.** "$4.2 quattuorvigintillion" is 26 characters. It cannot go in a property
+  row's price button at the font sizes this game uses (large text is a locked
+  accessibility requirement — Tim is 49 with imperfect vision). Before this ships, decide
+  whether word mode applies EVERYWHERE or only to the few roomy readouts (cash header,
+  Ledger, Will screen). Recommend: everywhere it fits, and let the tight controls fall
+  back to abbreviations — but that is a real decision, not an implementation detail, and
+  the no-moving-UI rule means nothing may resize or reflow when the setting changes.
+- GDD §2 says "never scientific notation." A player-opt-in `1.23e18` mode is arguably a
+  different thing from a default, but it is Tim's call and currently a no.
+- Settings → HELP already has a glossary; a format setting wants an entry there, and the
+  full 40-rung abbreviation table (every suffix and the number it stands for) is the
+  natural content for it.
+- The setting is presentation-only: it must never touch save data or any comparison, only
+  the display string.

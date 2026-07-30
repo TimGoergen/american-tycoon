@@ -70,7 +70,7 @@ The satire lives in the mechanics, not the writing. In America, success is defin
 | Qa (Quadrillion) | 1e15 | | Dc (Decillion) | 1e33 |
 | Qi (Quintillion) | 1e18 | | | |
 
-The exact abbreviations are fixed here so they're unambiguous (Qa vs Qi, Sx vs Sp). **Never scientific notation** (the §2 Numbers rule). Beyond Decillion is out of the planned range; a graceful overflow (extend the names, or an AdCap-style `aa/ab/ac…` scheme) is a minor open item, not a launch blocker.
+The exact abbreviations are fixed here so they're unambiguous (Qa vs Qi, Sx vs Sp). **Never scientific notation BY DEFAULT** (the §2 Numbers rule) — amended 2026-07-30 (Tim): the default display never shows an exponent, but a planned Settings option lets the player opt into scientific notation (`$4.2e18`) alongside alphabet notation (`aa/ab/ac…`) and today's abbreviations. See `Plans/Roadmap.md` §6. Beyond Decillion is no longer out of range — the ladder was extended to 1e120 (`Money.SUFFIXES`, 40 rungs) for the 27-tier epoch ladder, and the AdCap-style `aa/ab/ac…` scheme anticipated here is now the roadmap's alphabet-notation mode.
 
 > **IMPLEMENTED 2026-07-03** (Tim confirmed real abbreviations over letter schemes; the epoch
 > roadmap may grow past 6, so headroom matters). `Money.SUFFIXES` is one shared ladder driving

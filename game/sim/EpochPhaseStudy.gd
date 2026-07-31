@@ -64,8 +64,14 @@ extends "res://sim/Sim.gd"
 # THIRD RESULT (2026-07-31): a NON-DOLLAR gate works. Requiring N units of the epoch's
 # flagship before it will advance — a condition that can only be met AFTER the roster is
 # complete, in the calm post-unlock regime:
-#     1 unit (live) -> 0.3%     10 -> 1.2%     25 -> 3.3%
+#     1 unit (live) -> 0.3%     10 -> 1.2%     25 -> 3.3%     30 -> 15.3%
 #     35            -> 34.3%    40 -> 55.5%    50 -> 83.5%
+# The knee sits between 25 and 40 because cumulative unit cost runs 84.7x (25) -> 136x (30)
+# -> 215.6x (35) -> 338x (40) of the flagship's price, and what the player accumulates
+# anyway lands in the 150-200x band: below it the requirement is free, above it it bites.
+# 25 does NOT solve the reported problem (tail is 1-25 s, epochs 3-16). 30 only reaches
+# epochs 14+ (epochs 3-13 stay at 3-6%). 35 is the first value whose tail reaches down to
+# epoch 12, which is where the stack phase originally hit zero.
 # 35 is the pick (Plans/Epoch_Advance_Rework.md) on its SHAPE, not its mean: epochs 3-11
 # sit at 6-18% stack so the fast early pace is untouched, while epochs 12-16 run 32-57%,
 # which is where the problem was reported. At 50 the unlock phase collapses to 2-14 s —
@@ -140,6 +146,8 @@ const CANDIDATES: Array[Dictionary] = [
 	# flagship's price against a 20x threshold, and you cannot spend what you have not
 	# earned, so the threshold is already met ~10x over whenever the units condition is.
 	{"label": "flagship 35 units, MONEY GATE REMOVED", "gate": 0.0, "spread": 0.0, "flagship": 35},
+	{"label": "flagship 25 units, MONEY GATE REMOVED", "gate": 0.0, "spread": 0.0, "flagship": 25},
+	{"label": "flagship 30 units, MONEY GATE REMOVED", "gate": 0.0, "spread": 0.0, "flagship": 30},
 ]
 
 ## Earth's two epochs are hand-tuned and device-validated; the spread rewrite touches only

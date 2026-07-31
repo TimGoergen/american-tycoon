@@ -43,7 +43,8 @@ one. Measured:
 |---|---|---|
 | 1 (live) | 0.3% | no tail |
 | 10 | 1.2% | negligible |
-| 25 | 3.3% | negligible |
+| 25 | 3.3% | negligible — tail is 1-25 s, problem unsolved |
+| 30 | 15.3% | tail only reaches epochs 14+; 3-13 stay at 3-6% |
 | **35** | **34.3%** | **unlock dominant early, real tail deep** |
 | 40 | 55.5% | mid epochs become mostly stacking |
 | 50 | 83.5% | unlock collapses to 2-14s |

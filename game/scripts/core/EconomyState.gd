@@ -171,6 +171,21 @@ func get_property_index_for_unlock_tier(tier: int) -> int:
 ## Every property index gated to exactly `tier` — the epoch's whole COHORT
 ## (Epoch_Depth_Pass Phase 2). The First Contact bonus applies to all of them (Tim's
 ## call: the negotiated terms cover every venture in that civilization's market).
+## The index of an epoch's FLAGSHIP — its most expensive property, which is the one the
+## epoch is themed around and the last rung a player can afford. Returns -1 for a tier with
+## no properties. Chosen by COST rather than by config order, because config order is
+## save/append order (flagship-then-siblings for some tiers), not cheapest-first.
+func get_flagship_index_for_unlock_tier(tier: int) -> int:
+	var flagship := -1
+	var best_cost := -1.0
+	for i in get_property_indices_for_unlock_tier(tier):
+		var cost := ((properties[i] as PropertyState).config as PropertyConfig).base_cost
+		if cost > best_cost:
+			best_cost = cost
+			flagship = i
+	return flagship
+
+
 func get_property_indices_for_unlock_tier(tier: int) -> Array[int]:
 	var indices: Array[int] = []
 	for i in range(properties.size()):

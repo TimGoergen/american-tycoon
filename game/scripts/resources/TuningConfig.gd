@@ -75,6 +75,21 @@ extends Resource
 ## Seconds between each HIRE/UPGRADE auto-repeat after the first.
 @export var hire_hold_repeat_interval: float = 0.1  # device-tuned (Tim, 2026-07-20)
 
+## How many units of an epoch's FLAGSHIP (its most expensive property) you must own before
+## that epoch will advance — the non-dollar half of the advance gate.
+##
+## WHY THIS EXISTS (Tim, device report 2026-07-30): an epoch used to end the instant the
+## roster was complete, so the flagship — the property the epoch is named for — got almost
+## no playtime. `sim/EpochPhaseStudy.gd` measured the post-roster "stack" phase at 0.3% of
+## an epoch, and showed that no DOLLAR-denominated fix works: end-of-epoch income grows
+## super-exponentially, so a 10x money threshold is crossed in seconds and reshaping the
+## cost ladder does nothing. A UNIT requirement is different in kind because it can only be
+## satisfied AFTER the roster is complete, in the calmer post-unlock growth regime.
+##
+## 1 = the historical behaviour exactly (owning one of each already implies one flagship),
+## so this defaults to a no-op and every existing balance result still holds.
+@export var epoch_flagship_units_required: int = 1  # device-tune
+
 # --- Staffing & offline (Spec §6) ---
 
 ## Alien staff (tier 2+) ENTRY hire cost as a fraction of the TARGET epoch's whole economy

@@ -61,7 +61,23 @@ extends "res://sim/Sim.gd"
 # to earn; it ends the moment the ownership gate is satisfied, and the ownership gate is
 # satisfied by one purchase.
 #
-# So a tail cannot be bought with economy tuning. The options left are structural:
+# THIRD RESULT (2026-07-31): a NON-DOLLAR gate works. Requiring N units of the epoch's
+# flagship before it will advance — a condition that can only be met AFTER the roster is
+# complete, in the calm post-unlock regime:
+#     1 unit (live) -> 0.3%     10 -> 1.2%     25 -> 3.3%
+#     35            -> 34.3%    40 -> 55.5%    50 -> 83.5%
+# 35 is the pick (Plans/Epoch_Advance_Rework.md) on its SHAPE, not its mean: epochs 3-11
+# sit at 6-18% stack so the fast early pace is untouched, while epochs 12-16 run 32-57%,
+# which is where the problem was reported. At 50 the unlock phase collapses to 2-14 s —
+# the player enters each epoch able to buy the whole roster at once, which destroys the
+# unlock cadence that is the core loop.
+#
+# THE KNOB IS TWITCHY: 25 -> 3.3%, 35 -> 34%, 40 -> 55%. Cumulative cost of N units grows
+# as r0^N (r0 = 1.09), so the requirement is cheaper than what the player accumulates
+# anyway until abruptly it is not. Re-run this study after ANY change to r0 or the decay
+# bands — they move this knob's effective value.
+#
+# The remaining structural options, if 35 ever proves wrong:
 #   (a) flatten the end-of-epoch income explosion itself (staff/upgrade compounding) —
 #       powerful, but it overlaps the banded-decay retune still under device validation;
 #   (b) make advancement require something not denominated in dollars (the gate already
@@ -88,11 +104,21 @@ const GATE_MULTIPLIERS: Array[float] = [1.0, 3.0, 10.0]
 ##   ratio 1.80 -> 44.5%
 ##   ratio 1.70 -> 41.2%
 ##   ratio 1.60 -> 37.6%
+## `flagship` sets tuning.epoch_flagship_units_required — how many units of the epoch's most
+## expensive property must be owned before it will advance. 1 = live (a no-op, since owning
+## one of each already implies one flagship). This is the only candidate family that can
+## ONLY be satisfied after the roster is complete, which is the point: it lives in the
+## post-unlock growth regime rather than the explosive one that ate the money-gate sweep.
 const CANDIDATES: Array[Dictionary] = [
-	{"label": "LIVE — gate x1, spread 2.00x", "gate": 1.0, "spread": 0.0},
-	{"label": "spread 1.80x", "gate": 1.0, "spread": 1.8},
-	{"label": "spread 1.70x", "gate": 1.0, "spread": 1.7},
-	{"label": "spread 1.60x", "gate": 1.0, "spread": 1.6},
+	{"label": "LIVE — gate x1, spread 2.00x, flagship 1", "gate": 1.0, "spread": 0.0, "flagship": 1},
+	{"label": "spread 1.80x", "gate": 1.0, "spread": 1.8, "flagship": 1},
+	{"label": "spread 1.70x", "gate": 1.0, "spread": 1.7, "flagship": 1},
+	{"label": "spread 1.60x", "gate": 1.0, "spread": 1.6, "flagship": 1},
+	{"label": "flagship 10 units", "gate": 1.0, "spread": 0.0, "flagship": 10},
+	{"label": "flagship 25 units", "gate": 1.0, "spread": 0.0, "flagship": 25},
+	{"label": "flagship 50 units", "gate": 1.0, "spread": 0.0, "flagship": 50},
+	{"label": "flagship 35 units", "gate": 1.0, "spread": 0.0, "flagship": 35},
+	{"label": "flagship 40 units", "gate": 1.0, "spread": 0.0, "flagship": 40},
 ]
 
 ## Earth's two epochs are hand-tuned and device-validated; the spread rewrite touches only
@@ -220,6 +246,7 @@ func _top_rung_share(ratio: float, rungs: int) -> float:
 func _print_phase_table(candidate: Dictionary) -> void:
 	var gate_multiplier: float = candidate["gate"]
 	var spread: float = candidate["spread"]
+	var flagship_units: int = candidate.get("flagship", 1)
 	# Reload a FRESH tuning + configs per candidate, then move the knobs on them. Reloading
 	# (rather than duplicate()) keeps candidates provably free of shared state, which matters
 	# here because a candidate can rewrite every property's cost.
@@ -228,6 +255,7 @@ func _print_phase_table(candidate: Dictionary) -> void:
 		return
 	var tuning := _tuning
 	tuning.earth_economy_target = tuning.earth_economy_target * gate_multiplier
+	tuning.epoch_flagship_units_required = flagship_units
 
 	var configs := _property_configs
 	var spread_note := "spread 2.00x (live), last rung %.1f%% of cohort" % [
@@ -239,8 +267,8 @@ func _print_phase_table(candidate: Dictionary) -> void:
 
 	print("")
 	print("  --- %s ---" % candidate["label"])
-	print("      gate x%.1f (target %s) | %s" % [
-		gate_multiplier, _format_big(tuning.earth_economy_target), spread_note])
+	print("      gate x%.1f (target %s) | %s | flagship %d unit(s)" % [
+		gate_multiplier, _format_big(tuning.earth_economy_target), spread_note, flagship_units])
 
 	var result := _measure_epoch_phases(tuning, configs)
 	var phases: Dictionary = result["phases"]

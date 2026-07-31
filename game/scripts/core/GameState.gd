@@ -216,7 +216,17 @@ func _update_displayed_income() -> void:
 ## the ownership half of the epoch-advance gate (Tim, 2026-07-23). Passed to epoch.update as the
 ## per-tier predicate.
 func _owns_all_in_epoch(tier: int) -> bool:
-	return economy.owns_at_least_one_of_each(economy.get_property_indices_for_unlock_tier(tier))
+	if not economy.owns_at_least_one_of_each(economy.get_property_indices_for_unlock_tier(tier)):
+		return false
+	# Second, non-dollar half of the gate: run the epoch's flagship at scale before moving on.
+	# At the default of 1 this is already implied by the check above, so it is a no-op.
+	var required := tuning.epoch_flagship_units_required
+	if required <= 1:
+		return true
+	var flagship := economy.get_flagship_index_for_unlock_tier(tier)
+	if flagship < 0:
+		return true
+	return (economy.properties[flagship] as PropertyState).units_owned >= required
 
 
 func tap_wage() -> void:

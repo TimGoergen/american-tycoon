@@ -79,7 +79,17 @@ var _epoch_next_button: Button
 ## bought all of the current era's properties (the ownership gate is blocking; Tim, 2026-07-23).
 var _epoch_next_badge: Panel
 var _epoch_pager_dots: EpochPagerDots
-var _epoch_pager_box: Control       # the pager header (label + arrows + dots)
+var _epoch_pager_box: Control       # the pager header (label + arrows + dots + MAKE CONTACT)
+## MAKE CONTACT (Plans/Epoch_Advance_Rework.md §2): the epoch no longer advances by itself —
+## _create_game turns EpochState.auto_advance off — so leaving an era is this button's tap.
+## Always present, gray + disabled until game.epoch.contact_ready (the standing no-moving-UI rule).
+var _make_contact_button: Button
+## Drives the ready-state brightness pulse below; reset to 0 whenever the button is not pressable.
+var _contact_pulse_time := 0.0
+## How the READY state shouts. Missing this button stalls the whole run (epoch advance is the
+## progression spine), so a static enabled plate is not enough — it breathes brighter on the beat.
+const CONTACT_PULSE_HZ := 1.2
+const CONTACT_PULSE_BRIGHTNESS := 0.35
 var _ladder_area: Control           # the property-list region; swipes over either change tabs
 var _swipe_tracking := false        # a touch is down on the ladder, tracking for a horizontal swipe
 var _swipe_start := Vector2.ZERO
@@ -308,7 +318,14 @@ func _process(delta: float) -> void:
 		# Switch to the blocking property's tab so the card's anchor is visible, then teach the rule.
 		if _epoch_tab != _epoch_tab_of(blocking_prop):
 			_set_epoch_tab(_epoch_tab_of(blocking_prop))
-		_fire_polled_tip("epoch_blocked", _row_for_index(blocking_prop))
+		_fire_polled_tip("epoch_blocked", _row_for_index(blocking_prop),
+				_epoch_blocked_body(blocking_prop))
+
+	# MAKE CONTACT just lit up. Fired on AVAILABILITY like every other tip, and this one matters
+	# most: the epoch will never advance on its own, so a player who does not find this button
+	# stalls for good.
+	if _tip_armed.get("make_contact", false) and game.epoch.contact_ready:
+		_fire_polled_tip("make_contact", _make_contact_button)
 
 	# The first time the player is viewing Earth White Collar (the second pager tab), point out the
 	# LEFT arrow so they learn the pager pages back and forth between eras (Tim, 2026-07-25).
@@ -341,6 +358,7 @@ func _process(delta: float) -> void:
 	# button and the Estate Office button (with its Legacy balance) reflect the live state.
 	_hero_stat.set_planet_tier(_epoch_tab + 1)
 	_refresh_contact_progress()
+	_refresh_make_contact_button(delta)
 	_update_plan_button()
 	_update_estate_badge()
 	_update_ladder_edge_fade()
@@ -364,6 +382,19 @@ func _refresh_contact_progress() -> void:
 	if tier >= EpochCatalog.tier_count():
 		_hero_stat.set_epoch_progress(0.0, 0.0)  # final civilization — no next contact to chase
 		return
+	# ALIEN eras advance on FLAGSHIP UNITS, not money (EpochState._may_leave), and the money
+	# threshold there is crossed minutes before the real gate opens — so a money bar would pin at
+	# 100% while the player was still blocked. Track the requirement that actually gates them, and
+	# the bar fills exactly as MAKE CONTACT lights up. A zero `required` means the rule does not
+	# apply (Earth eras, or the knob at its no-op default) and we fall through to the money bar.
+	# Owned is clamped for display: nothing stops a player lingering past the requirement, and
+	# "FLAGSHIP 41 / 35" would read as broken rather than as "done".
+	var flagship := game.get_flagship_progress(tier)
+	if flagship.y > 0:
+		_hero_stat.set_epoch_progress(float(flagship.x), float(flagship.y),
+				"FLAGSHIP %d / %d" % [mini(flagship.x, flagship.y), flagship.y])
+		return
+
 	var goal := EpochCatalog.consume_threshold(tier, tuning.earth_economy_target)
 	var epoch_start := 0.0
 	if tier > 1:
@@ -411,6 +442,15 @@ func _create_game() -> void:
 
 	# The UI verbs all act on the living generation; keep a direct handle to it.
 	game = dynasty.current
+
+	# In the PLAYED game, reaching an epoch's requirements does not advance it — the player
+	# presses MAKE CONTACT when they are ready (Plans/Epoch_Advance_Rework.md §2). The headless
+	# sims leave auto_advance TRUE so their playouts still climb by themselves.
+	#
+	# This is set here rather than at first boot because a NEW GameState is built on every path
+	# into the game — fresh run, loaded save, and the scene reload that follows a succession or a
+	# Balance Tuning apply — and _create_game is the one funnel all of them pass through.
+	game.epoch.auto_advance = false
 
 	# Restore the saved buy-mode preference (defaults to ×1 for a fresh game).
 	_buy_mode = game.ui_buy_mode as PropertyRow.BuyMode
@@ -600,8 +640,8 @@ func _build_ui() -> void:
 	# the fact (Tim, 2026-07-23).
 	var tips_on := TutorialProgress.is_enabled()
 	for tip_id in ["getting_started", "first_property", "first_rush", "buy_mode", "first_hire",
-			"turbo_ready", "overdrive", "epochs", "epoch_blocked", "epoch_navigation",
-			"prestige", "family_ledger"]:
+			"turbo_ready", "overdrive", "epochs", "epoch_blocked", "make_contact",
+			"epoch_navigation", "prestige", "family_ledger"]:
 		_tip_armed[tip_id] = tips_on and not TutorialProgress.has_seen(tip_id)
 	# Signal-driven tip: the vent gesture, fired during an overdrive rush. (The offline-earnings
 	# concept is NOT a card — it is taught as a permanent line ON the welcome-back screen itself,
@@ -871,19 +911,47 @@ func _update_tab_unlocks() -> void:
 		_update_epoch_pager()
 
 
-## The lowest-index property the player must still own before they can progress past the current
-## era, or -1 if not blocked: the epoch's money threshold is earned but the ownership half of the
-## gate (own ≥1 of every property in the epoch being left) isn't met. Since the Earth split this
-## one rule covers every boundary, Blue→White included. Drives the epoch-blocked card AND the
-## pager's red-dot indicator (Tim, 2026-07-23).
+## The property the player must still buy before they can progress past the current era, or -1 if
+## nothing is blocking them. Drives the epoch-blocked card AND the pager's red-dot indicator
+## (Tim, 2026-07-23). Two things can block, in this order:
+##   1. a business in this era they own none of (the roster half of the gate), or
+##   2. on an ALIEN era, too few UNITS of the era's flagship — every business is owned and what
+##      is missing is a quantity, so we point at the flagship's own row
+##      (Plans/Epoch_Advance_Rework.md §4).
+##
+## The money threshold still decides WHEN we start pointing any of this out, even on alien eras
+## where it no longer gates the advance: it is the honest "you have earned this era's whole
+## economy" line, and before it the player is simply still playing the era — nothing is blocking
+## them yet, so a red dot would just nag for the entire epoch.
 func _property_blocking_epoch_progress() -> int:
 	var tier := game.epoch.current_tier
-	if tier < EpochCatalog.tier_count() and game.economy.cash_earned_this_gen \
-			>= EpochCatalog.consume_threshold(tier, tuning.earth_economy_target):
-		for i in game.economy.get_property_indices_for_unlock_tier(tier):
-			if (game.economy.properties[i] as PropertyState).units_owned <= 0:
-				return i
+	if tier >= EpochCatalog.tier_count():
+		return -1  # final civilization — there is nothing further to be blocked from
+	if game.economy.cash_earned_this_gen \
+			< EpochCatalog.consume_threshold(tier, tuning.earth_economy_target):
+		return -1
+	for i in game.economy.get_property_indices_for_unlock_tier(tier):
+		if (game.economy.properties[i] as PropertyState).units_owned <= 0:
+			return i
+	# Roster complete. A zero `required` means the flagship-units rule does not apply here
+	# (Earth, or the knob at its no-op default), which leaves nothing blocking.
+	var flagship := game.get_flagship_progress(tier)
+	if flagship.y > 0 and flagship.x < flagship.y:
+		return game.get_flagship_index(tier)
 	return -1
+
+
+## The epoch-blocked card's body for whichever requirement is actually holding the player back.
+## Returns "" for the roster case, meaning "use the catalog's own copy" — only the flagship case
+## needs copy built at fire time, because it has to name the count they are short of.
+func _epoch_blocked_body(blocking_prop: int) -> String:
+	var tier := game.epoch.current_tier
+	var flagship := game.get_flagship_progress(tier)
+	if flagship.y <= 0 or blocking_prop != game.get_flagship_index(tier):
+		return ""
+	var prop := game.economy.properties[blocking_prop] as PropertyState
+	return TutorialCatalog.epoch_blocked_flagship_body(
+			prop.config.display_name, flagship.x, flagship.y)
 
 
 ## The big label for a tab: the tab's civilization name — "EARTH" for both Earth tabs
@@ -951,7 +1019,65 @@ func _build_epoch_pager() -> Control:
 
 	_epoch_pager_dots = EpochPagerDots.new()
 	box.add_child(_epoch_pager_dots)
+
+	# MAKE CONTACT lives here, at the bottom of the epoch header, because this pager is the one
+	# place on screen that is ABOUT the current era: it names the civilization the button would
+	# leave, and it already carries the red dot that says "something is holding you back". The
+	# button sits directly above the property ladder the requirement is bought from, so the
+	# requirement, the reason, and the way out all read as one block.
+	_make_contact_button = Button.new()
+	_make_contact_button.text = "MAKE CONTACT"
+	# Full width and a standard-height plate: this is the single most important tap in the run,
+	# so it gets the largest, easiest target the row can give it.
+	_make_contact_button.custom_minimum_size = Vector2(0, UiPalette.STANDARD_BUTTON_HEIGHT)
+	_make_contact_button.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
+	_make_contact_button.add_theme_font_override("font", UiPalette.make_bold_font())
+	# Red "act" plate (Style Guide §8: red = spend/act) — pressing it spends the era, the same
+	# class of deliberate, irreversible act as OVERDRIVE and PASS THE TORCH.
+	UiPalette.style_button(_make_contact_button, true)
+	# While contact is not yet possible the button grays its OUTLINE too, exactly like the TURBO
+	# pop button and OVR: "not yet" has to read at a glance (Tim 2026-07-15).
+	var disabled_plate := StyleBoxFlat.new()
+	disabled_plate.bg_color = UiPalette.CREAM
+	disabled_plate.border_color = UiPalette.MID_GRAY
+	disabled_plate.set_border_width_all(3)
+	disabled_plate.set_corner_radius_all(4)
+	disabled_plate.set_content_margin_all(12)
+	_make_contact_button.add_theme_stylebox_override("disabled", disabled_plate)
+	_make_contact_button.pressed.connect(_on_make_contact_pressed)
+	# A second finger can make contact while the first holds a rush (the same reason the buy-mode
+	# and TURBO buttons carry this).
+	_make_contact_button.add_child(SecondaryTapButton.new())
+	_make_contact_button.disabled = true  # _refresh_make_contact_button enables it when ready
+	box.add_child(_make_contact_button)
 	return box
+
+
+## MAKE CONTACT pressed: leave this era now. advance() does nothing unless the requirements are
+## currently met (so a stale tap can never skip an epoch) and emits contact_made on success, so
+## the First Contact beat and the trade-deal minigame play exactly as they always have.
+func _on_make_contact_pressed() -> void:
+	game.epoch.advance()
+
+
+## Keep MAKE CONTACT honest every frame: pressable only while the epoch's requirements are met
+## and the player has not left yet. The ready state also pulses brighter — a plain enabled plate
+## is easy to scroll past, and a player who never notices this button never advances again.
+## The pulse multiplies brightness rather than changing color, so the red plate stays red (the
+## same "flash of light, not a recolor" treatment the hero stat uses for a purchase).
+func _refresh_make_contact_button(delta: float) -> void:
+	if _make_contact_button == null:
+		return
+	var ready := game.epoch.contact_ready
+	_make_contact_button.disabled = not ready
+	if ready:
+		_contact_pulse_time += delta
+		var pulse := 0.5 + 0.5 * sin(_contact_pulse_time * TAU * CONTACT_PULSE_HZ)
+		var brightness := 1.0 + CONTACT_PULSE_BRIGHTNESS * pulse
+		_make_contact_button.modulate = Color(brightness, brightness, brightness)
+	elif _make_contact_button.modulate != Color.WHITE:
+		_contact_pulse_time = 0.0
+		_make_contact_button.modulate = Color.WHITE
 
 
 ## A large, readable ‹ / › stepper button for the pager.
@@ -1562,7 +1688,11 @@ func _on_buy_requested(prop_index: int, mode: PropertyRow.BuyMode) -> void:
 ## Show the one-time tutorial card for `tip_id`, anchored near `target` (null = screen-centered),
 ## unless tips are turned off or this one has already been seen. Marking it seen persists
 ## immediately so it never repeats (TutorialProgress lives outside the dynasty save).
-func _maybe_show_tip(tip_id: String, target: Control) -> bool:
+##
+## `body_override` replaces the catalog's body for THIS showing only, for the one tip whose copy
+## has to carry live numbers (epoch_blocked's flagship case). The catalog keeps the generic
+## wording, so the Help glossary still reads correctly.
+func _maybe_show_tip(tip_id: String, target: Control, body_override: String = "") -> bool:
 	# Never stack cards: if one is already up, decline. A poll-driven tip stays armed and retries a
 	# later frame; a verb-driven tip simply skips. Checked FIRST so nothing below (including the
 	# disk reads) runs while a card is visible.
@@ -1581,7 +1711,10 @@ func _maybe_show_tip(tip_id: String, target: Control) -> bool:
 	if tip.is_empty():
 		return false
 	TutorialProgress.mark_seen(tip_id)
-	_tutorial_tip.show_tip(tip["title"], tip["body"], target)
+	var body: String = tip["body"]
+	if body_override != "":
+		body = body_override
+	_tutorial_tip.show_tip(tip["title"], body, target)
 	return true
 
 
@@ -1598,8 +1731,8 @@ func _any_fullscreen_overlay_visible() -> bool:
 ## Fire a poll-driven availability tip. Disarms ONLY once the card actually shows, so a tip whose
 ## turn is blocked by another card still on screen stays armed and retries on a later frame (the
 ## natural queue for availability tips that come due together).
-func _fire_polled_tip(tip_id: String, target: Control) -> void:
-	if _maybe_show_tip(tip_id, target):
+func _fire_polled_tip(tip_id: String, target: Control, body_override: String = "") -> void:
+	if _maybe_show_tip(tip_id, target, body_override):
 		_tip_armed[tip_id] = false
 
 

@@ -292,14 +292,22 @@ func set_cash(cash: float) -> void:
 ## Pass goal <= 0 when there is no further epoch — the bar hides on the final civilization.
 ## Applied to the bar immediately: unlike the old text line, a bar has no fast-flickering
 ## digits, so it needs no repaint throttle.
-func set_epoch_progress(consumed: float, goal: float) -> void:
+##
+## `readout` overrides the line printed over the bar. Leave it empty for the default
+## "N% of economy consumed" wording; alien epochs pass their own line ("FLAGSHIP 21 / 35")
+## because there the bar tracks flagship UNITS rather than money, and the label has to say
+## what is actually being counted (Plans/Epoch_Advance_Rework.md §3).
+func set_epoch_progress(consumed: float, goal: float, readout: String = "") -> void:
 	var show_bar := goal > 0.0
 	_economy_bar.visible = show_bar
 	_economy_divider.visible = show_bar
 	if show_bar:
 		var fraction := clampf(maxf(0.0, consumed) / goal, 0.0, 1.0)
 		_economy_bar.value = fraction
-		_economy_label.text = "%d%% of economy consumed" % int(round(fraction * 100.0))
+		if readout != "":
+			_economy_label.text = readout
+		else:
+			_economy_label.text = "%d%% of economy consumed" % int(round(fraction * 100.0))
 
 
 ## Toggle the frenzy glow. Main drives this from the live frenzy state each frame.

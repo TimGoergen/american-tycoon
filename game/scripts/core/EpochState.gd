@@ -12,9 +12,26 @@ class_name EpochState
 # the climb resets each generation (a fresh EpochState is built with each GameState),
 # and prestige/Legacy is what lets a later heir punch deeper into the ladder than the last.
 
+## The last EARTH epoch. Tiers 1-2 (Blue/White Collar) keep the money gate; alien epochs
+## (3+) advance on the flagship-units requirement instead (Plans/Epoch_Advance_Rework.md).
+## Earth is exempt because it is the onboarding stretch: measured on a bare heir, applying
+## the flagship gate to Earth stretched it from ~1.6 min to ~6.7 min and made it 80-92%
+## stacking with no new content, which the locked "never slow the early game" rule forbids.
+const LAST_EARTH_TIER := 2
+
 ## Which epoch this generation is currently in (1 = Earth). Also the highest staff
 ## tier any property is allowed to be hired/upgraded to right now.
 var current_tier: int = 1
+
+## When false, meeting the requirements does NOT advance on its own: `contact_ready` latches
+## and the player chooses the moment via the MAKE CONTACT control (advance()). The scene
+## layer sets this false; headless sims leave it TRUE so playouts still climb by themselves
+## and every existing study keeps working untouched.
+var auto_advance: bool = true
+
+## True when every requirement to leave `current_tier` is satisfied but contact has not been
+## made yet. Only ever set while `auto_advance` is false. Drives the MAKE CONTACT control.
+var contact_ready: bool = false
 
 var _tuning: TuningConfig
 
@@ -36,14 +53,48 @@ func _init(p_tuning: TuningConfig) -> void:
 ## check is per-tier INSIDE the loop, so a single large tick can never skip past an un-owned epoch.
 ## Emits one contact signal per epoch crossed. Caps at the last defined epoch.
 func update(cash_earned_this_gen: float, owns_all_in_tier: Callable = Callable()) -> void:
+	contact_ready = false
 	while current_tier < EpochCatalog.tier_count():
-		var threshold := EpochCatalog.consume_threshold(current_tier, _tuning.earth_economy_target)
+		if not _may_leave(current_tier, cash_earned_this_gen, owns_all_in_tier):
+			break
+		if not auto_advance:
+			# Requirements met, but leaving is the player's call — latch and wait.
+			contact_ready = true
+			break
+		_enter_next_epoch()
+
+
+## Every requirement for leaving `tier`. Earth epochs use the money threshold; alien epochs
+## use the ownership predicate alone, because the flagship-units requirement inside it makes
+## the money threshold mathematically redundant — 35 units cost 215.6x the flagship's price
+## against a 20x threshold, and you cannot spend what you have not earned (verified in
+## sim/EpochPhaseStudy.gd: switching the money gate off reproduced the gated run exactly).
+##
+## The money gate ALSO still applies whenever no ownership predicate was supplied — that is
+## the isolated money-mechanic path (EpochTest), which must keep its original behaviour.
+func _may_leave(tier: int, cash_earned_this_gen: float, owns_all_in_tier: Callable) -> bool:
+	if tier <= LAST_EARTH_TIER or not owns_all_in_tier.is_valid():
+		var threshold := EpochCatalog.consume_threshold(tier, _tuning.earth_economy_target)
 		if cash_earned_this_gen < threshold:
-			break
-		if owns_all_in_tier.is_valid() and not owns_all_in_tier.call(current_tier):
-			break
-		current_tier += 1
-		contact_made.emit(current_tier)
+			return false
+	if owns_all_in_tier.is_valid() and not owns_all_in_tier.call(tier):
+		return false
+	return true
+
+
+## Make contact: the player pressed MAKE CONTACT. Returns false (and does nothing) unless
+## the requirements are currently met, so a stale tap can never skip an epoch.
+func advance() -> bool:
+	if not contact_ready:
+		return false
+	contact_ready = false
+	_enter_next_epoch()
+	return true
+
+
+func _enter_next_epoch() -> void:
+	current_tier += 1
+	contact_made.emit(current_tier)
 
 
 ## Restore the reached epoch from a save (clamped to the valid range).

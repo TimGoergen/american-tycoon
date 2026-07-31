@@ -49,6 +49,7 @@ crash_duration_minutes = 10.0
 audit_settle_rate = 0.08
 audit_threshold = 1
 earth_economy_target = 103600000000000.0
+epoch_flagship_units_required = 35
 autosave_cadence = 10.0
 challenge_bonus_scale = 1.0
 challenge_timer_start_seconds = 6.0

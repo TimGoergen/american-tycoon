@@ -218,6 +218,8 @@ func _update_displayed_income() -> void:
 func _owns_all_in_epoch(tier: int) -> bool:
 	if not economy.owns_at_least_one_of_each(economy.get_property_indices_for_unlock_tier(tier)):
 		return false
+	if tier <= EpochState.LAST_EARTH_TIER:
+		return true  # Earth keeps the money gate; no flagship requirement (onboarding)
 	# Second, non-dollar half of the gate: run the epoch's flagship at scale before moving on.
 	# At the default of 1 this is already implied by the check above, so it is a no-op.
 	var required := tuning.epoch_flagship_units_required
@@ -227,6 +229,27 @@ func _owns_all_in_epoch(tier: int) -> bool:
 	if flagship < 0:
 		return true
 	return (economy.properties[flagship] as PropertyState).units_owned >= required
+
+
+## The flagship-units requirement for `tier` as (owned, required) — what the epoch progress
+## bar and the blocked coach card both read. `required` is 0 for a tier with no flagship
+## requirement (Earth, or the default no-op setting), which callers treat as "not applicable".
+func get_flagship_progress(tier: int) -> Vector2i:
+	if tier <= EpochState.LAST_EARTH_TIER:
+		return Vector2i(0, 0)
+	var required := tuning.epoch_flagship_units_required
+	if required <= 1:
+		return Vector2i(0, 0)
+	var flagship := economy.get_flagship_index_for_unlock_tier(tier)
+	if flagship < 0:
+		return Vector2i(0, 0)
+	return Vector2i((economy.properties[flagship] as PropertyState).units_owned, required)
+
+
+## The index of `tier`'s flagship property, or -1 — so the UI can point the player at the
+## exact row they need to keep buying.
+func get_flagship_index(tier: int) -> int:
+	return economy.get_flagship_index_for_unlock_tier(tier)
 
 
 func tap_wage() -> void:

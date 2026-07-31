@@ -77,6 +77,21 @@ extends "res://sim/Sim.gd"
 # anyway until abruptly it is not. Re-run this study after ANY change to r0 or the decay
 # bands — they move this knob's effective value.
 #
+# THE MONEY GATE IS REDUNDANT AT 35, provably and empirically (Tim spotted this). Buying N
+# units costs base x (r0^N - 1)/(r0 - 1); at N=35 that is 215.6x the flagship's price against
+# a 20x threshold, and you cannot spend what you have not earned — so satisfying the units
+# condition forces cumulative earnings ~10x past the threshold. Crossover is N ~= 12. Running
+# flagship 35 with the money gate switched OFF (threshold 0) reproduced the flagship-35 rows
+# EXACTLY, mean 34.3% either way. So the money half can be deleted, not merely out-ranked.
+#
+# EARTH MUST BE EXEMPT (bare heir, 0 gems — the first-ever climb, which is the onboarding
+# stretch). Epochs 1-2 under flagship 35 vs live:
+#     epoch 1: unlock 36 s, stack 6 s (14%)  ->  36 s / 2.3 m (80%)
+#     epoch 2: unlock 21 s, stack 33 s (62%) ->  18 s / 3.5 m (92%)
+# Earth goes from ~1.6 min to ~6.7 min and becomes 80-92% stacking with no new content — a
+# 4x slower onboarding that is pure grind. That directly violates the locked "never slow the
+# early game" principle. Tiers 1-2 keep the money gate (or a much smaller N).
+#
 # The remaining structural options, if 35 ever proves wrong:
 #   (a) flatten the end-of-epoch income explosion itself (staff/upgrade compounding) —
 #       powerful, but it overlaps the banded-decay retune still under device validation;
@@ -119,6 +134,12 @@ const CANDIDATES: Array[Dictionary] = [
 	{"label": "flagship 50 units", "gate": 1.0, "spread": 0.0, "flagship": 50},
 	{"label": "flagship 35 units", "gate": 1.0, "spread": 0.0, "flagship": 35},
 	{"label": "flagship 40 units", "gate": 1.0, "spread": 0.0, "flagship": 40},
+	# Money gate switched OFF entirely (threshold 0). If this matches "flagship 35 units"
+	# row-for-row, the money half of the gate is provably dead weight at 35 and can be
+	# deleted rather than merely out-ranked. Predicted identical: 35 units costs 215.6x the
+	# flagship's price against a 20x threshold, and you cannot spend what you have not
+	# earned, so the threshold is already met ~10x over whenever the units condition is.
+	{"label": "flagship 35 units, MONEY GATE REMOVED", "gate": 0.0, "spread": 0.0, "flagship": 35},
 ]
 
 ## Earth's two epochs are hand-tuned and device-validated; the spread rewrite touches only

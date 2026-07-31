@@ -52,6 +52,42 @@ one. Measured:
 stack (the fast early pace survives untouched, per the locked pace principle), while epochs
 12-16 run 32-57%, which is exactly where Tim noticed the problem.
 
+### The money gate goes away entirely (Tim, 2026-07-31)
+
+Tim: *"doesn't the flagship boundary make the money boundary irrelevant? I'd rather just
+simplify the epoch gate and make it based solely on flagship count."* Correct, and it is
+provable rather than merely observed. Buying N units costs `base × (r0^N − 1)/(r0 − 1)`;
+at N=35 that is **215.6×** the flagship's price against a **20×** threshold, and a player
+cannot spend what they have not earned — so satisfying the units condition forces cumulative
+earnings roughly 10× past the money threshold. The crossover is **N ≈ 12**; above it, money
+can never bind.
+
+Confirmed empirically: running flagship 35 with the money gate switched fully OFF
+(threshold 0) reproduced the flagship-35 rows **exactly**, mean 34.3% either way. So the
+money half is dead weight and gets deleted, not merely out-ranked.
+
+**Do NOT delete `earth_economy_target` or `economy_scale`.** Only `consume_threshold`'s role
+in ADVANCEMENT goes. Both values still price alien staff (`staff_cost_fraction × earth_target
+× economy_scale`), which is what makes staffing scale per epoch. Removing them would silently
+break staff pricing across the whole ladder.
+
+### Earth (tiers 1-2) must be EXEMPT
+
+Measured with a BARE heir (0 gems — the first-ever climb, i.e. onboarding), epochs 1-2 under
+flagship 35 versus live:
+
+| epoch | live | flagship 35 |
+|---|---|---|
+| 1 | 36 s unlock / 6 s stack (14%) | 36 s / **2.3 m** (80%) |
+| 2 | 21 s unlock / 33 s stack (62%) | 18 s / **3.5 m** (92%) |
+
+Earth goes from ~1.6 minutes to ~6.7 minutes and becomes 80-92% stacking with no new content
+— a 4× slower onboarding that is pure grind, landing exactly on the stretch the tutorial
+system teaches. That is a direct violation of the locked "never slow the early game"
+principle. **Tiers 1-2 keep the money gate** (or take a much smaller N); the flagship gate
+applies to alien epochs only. The earlier 66M-gem reading of Earth (45%/67%) was misleading
+— a juiced heir blasts through Earth, so onboarding must always be measured bare.
+
 **The knob is TWITCHY and must be device-tuned.** 25 → 3.3%, 35 → 34%, 40 → 55%: a ±5 swing
 reshapes the game. The cause is that cumulative cost of N units grows as `r0^N` (r0 = 1.09),
 so the requirement is cheaper than what the player accumulates anyway until it suddenly
@@ -71,9 +107,19 @@ the milestone" — 50 is measured and it is far too much.
   tiers is flagship-then-siblings).
 - `GameState._owns_all_in_epoch(tier)` now also requires the flagship's `units_owned >=
   epoch_flagship_units_required`.
-- **Remaining:** set `epoch_flagship_units_required = 35` in `tuning.tres`. Deliberately not
+- **Remaining:** set `epoch_flagship_units_required = 35` in `tuning.tres`, drop the money
+  condition from `EpochState.update` for alien tiers, and exempt tiers 1-2. Deliberately not
   done yet — it is a live balance change and it overlaps the banded-decay retune still
   awaiting Tim's device verdict.
+
+**Open question for Tim:** does the `owns_at_least_one_of_each` roster requirement stay?
+"Solely on flagship count" read literally would drop it, but that reverses the deliberate
+2026-07-23 "engage the whole ladder" call — and because income is neutral across a cohort, a
+player could funnel everything into the flagship and skip the roster entirely, losing the
+content the rule exists to protect. Recommendation: KEEP the roster requirement (it is
+satisfied long before 35 flagship units, so it costs nothing) and delete only the money
+threshold. That still leaves one *number* on screen, which is the simplification that
+matters.
 
 ### 2. MAKE CONTACT button — Tim's call, wanted on its own merits
 
@@ -105,15 +151,15 @@ before the gate opens. The bar (`Main._refresh_contact_progress` → `HeroStat.s
 currently tracks only `cash_earned_this_gen` against `consume_threshold`, so it would pin at
 100% and sit there while the real requirement is still running.
 
-**Recommendation: the bar shows the LEAST COMPLETE of the two requirements** — money
-progress and flagship-units progress — so it reaches 100% exactly when the player can
-actually advance, and never lies. That handles both regimes automatically without a mode
-switch: early epochs are money-bound and it behaves as today; deep epochs are flagship-bound
-and it tracks units. The readout should name whichever half is binding (e.g. "FLAGSHIP
-21 / 35") so the number is actionable rather than mysterious.
+**With the money gate deleted this becomes trivial, which is the best argument for Tim's
+simplification.** On alien epochs the bar is just `flagship units owned / required` — exactly
+Tim's original instinct ("% of flagships owned"), one number, always the real requirement,
+never able to lie. No `min()` of two conditions, no mode switch, no explaining to the player
+why a full bar isn't full. Readout: "FLAGSHIP 21 / 35".
 
-Alternative considered: a two-segment bar showing both. Rejected as busier for no gain — the
-player only ever needs to know what is currently blocking them.
+Earth epochs keep the money bar they have today, since they keep the money gate.
+
+Rejected: a two-segment bar showing both conditions — moot once there is only one condition.
 
 ### 4. Blocked-state UX — needs updating, currently would mislead
 

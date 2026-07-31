@@ -43,11 +43,32 @@ extends "res://sim/Sim.gd"
 # property is bought, and the money threshold has been irrelevant for minutes. Raising
 # the gate mostly just buys back that slack.
 #
-# So the lever for the compressed ending is NOT here. It is the within-cohort cost spread
-# (rungs are exactly 2.00x, which makes the final rung 50% of the epoch's capital and
-# every purchase an income doubling). Narrowing that ratio is the change worth simming
-# next; this study's harness can measure it by feeding variant property configs the way
-# PaceStudy._make_variant_property_configs does.
+# SECOND RESULT (2026-07-31): the within-cohort COST SPREAD is not the lever either.
+# Holding each cohort's total capital fixed and only redistributing it across the rungs:
+#     spread 2.00x (live, last rung 50.1% of cohort) -> 0.3%
+#     spread 1.80x (44.5%)                           -> 0.4%
+#     spread 1.60x (37.6%)                           -> 0.4%
+# Moving a third of the epoch's capital out of the final rung changed the stack share by
+# one tenth of one percent. (1.70x was skipped once 1.80x and 1.60x came back identical.)
+# It also made the epoch's OPENING slower — holding the total fixed means a flatter ladder
+# has a pricier cheapest rung, so epoch 3's unlock went 24 s -> 47 s -> 52 s. That fights
+# the locked "fast pace is intentional" principle for no measured benefit.
+#
+# WHY BOTH LEVERS FAIL, and what it implies. By the end of an epoch the player's income is
+# growing SUPER-exponentially (staff levels, upgrades and unit stacking compound at once).
+# Anything denominated in dollars — a bigger threshold, a differently-shaped ladder — is
+# therefore crossed in seconds. The epoch does not end when the player runs out of things
+# to earn; it ends the moment the ownership gate is satisfied, and the ownership gate is
+# satisfied by one purchase.
+#
+# So a tail cannot be bought with economy tuning. The options left are structural:
+#   (a) flatten the end-of-epoch income explosion itself (staff/upgrade compounding) —
+#       powerful, but it overlaps the banded-decay retune still under device validation;
+#   (b) make advancement require something not denominated in dollars (the gate already
+#       takes a predicate — e.g. N units of each property, or a staff-level requirement);
+#   (c) accept the shape and treat buying the flagship AS the epoch's climax, investing in
+#       the transition beat rather than in a tail that the income curve will always erase.
+# Nothing here is implemented; this study exists to stop (a)-(c) being argued from guesses.
 #
 # Nothing here mutates live config: each candidate duplicates the loaded TuningConfig
 # and overrides one field, the same pattern PaceStudy/PaybackStudy use for r0.
@@ -55,6 +76,29 @@ extends "res://sim/Sim.gd"
 ## Gate multipliers to sweep. 1.0 is live. Measured STACK shares: 0.3% / 0.8% / 2.3%
 ## (see the RESULT block above — the money gate is not the lever).
 const GATE_MULTIPLIERS: Array[float] = [1.0, 3.0, 10.0]
+
+## THE CANDIDATES. Each is one playout. `gate` multiplies earth_economy_target; `spread`
+## rewrites the within-cohort cost ratio (0.0 = leave the live 2.00x alone).
+##
+## The spread rewrite holds each cohort's TOTAL capital constant and only redistributes it
+## across the 14 rungs. That is deliberate: total capital is what sets income at a complete
+## roster, so holding it fixed keeps epoch DURATION roughly unchanged and isolates the one
+## variable in question — how much of the epoch's economy is concentrated in the final rung.
+##   ratio 2.00 -> last rung is 50.0% of the cohort   (live)
+##   ratio 1.80 -> 44.5%
+##   ratio 1.70 -> 41.2%
+##   ratio 1.60 -> 37.6%
+const CANDIDATES: Array[Dictionary] = [
+	{"label": "LIVE — gate x1, spread 2.00x", "gate": 1.0, "spread": 0.0},
+	{"label": "spread 1.80x", "gate": 1.0, "spread": 1.8},
+	{"label": "spread 1.70x", "gate": 1.0, "spread": 1.7},
+	{"label": "spread 1.60x", "gate": 1.0, "spread": 1.6},
+]
+
+## Earth's two epochs are hand-tuned and device-validated; the spread rewrite touches only
+## the alien cohorts (tier 3+), which are all generated from one recipe. That also leaves
+## epochs 1-2 as an untouched control in every run.
+const FIRST_ALIEN_TIER := 3
 
 ## Legacy stack to model. A mid-stack engaged heir — deep enough to reach the late epochs
 ## inside the time cap, not so deep that everything trivialises. Matches the stack
@@ -102,30 +146,103 @@ func _initialize() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.is_valid_int():
 			selected = arg.to_int()
-	for i in range(GATE_MULTIPLIERS.size()):
+	for i in range(CANDIDATES.size()):
 		if selected < 0 or selected == i:
-			_print_phase_table(GATE_MULTIPLIERS[i])
+			_print_phase_table(CANDIDATES[i])
 
 	quit()
 
 
-## Run one playout at the given gate multiplier and print the per-epoch phase split.
-func _print_phase_table(gate_multiplier: float) -> void:
-	# Reload a FRESH tuning per candidate and move the one knob on it. Deliberately not
-	# duplicate() — deep-duplicating TuningConfig and handing the copy to DynastyState
-	# tripped an engine-level StringName refcount crash, and reloading is both cheap and
-	# obviously free of shared state.
+## Rebuild the property configs with a different within-cohort cost ratio, holding each
+## cohort's TOTAL capital constant so only the concentration changes.
+##
+## Two things must move together. Cost is rewritten per rung, and base_income_per_unit is
+## scaled by the SAME factor — that preserves income-neutrality (income/sec per dollar of
+## cost is identical across a cohort), which is a load-bearing property of the live economy
+## and not something this study is trying to vary.
+##
+## Rung order is taken by SORTING ON COST, never by config order: ConfigLoader's order is
+## save/append order, which for some tiers is flagship-then-siblings rather than cheapest
+## -first (see the civ pipeline notes in the project memory).
+func _make_spread_variant_configs(ratio: float) -> Array:
+	var indices_by_tier := {}
+	for i in range(_property_configs.size()):
+		var cfg := _property_configs[i] as PropertyConfig
+		if cfg.unlock_tier < FIRST_ALIEN_TIER:
+			continue
+		if not indices_by_tier.has(cfg.unlock_tier):
+			indices_by_tier[cfg.unlock_tier] = []
+		(indices_by_tier[cfg.unlock_tier] as Array).append(i)
+
+	# index -> multiplier to apply to both cost and income
+	var rescale := {}
+	for tier in indices_by_tier:
+		var rungs: Array = indices_by_tier[tier]
+		rungs.sort_custom(func(a, b):
+			return (_property_configs[a] as PropertyConfig).base_cost \
+				< (_property_configs[b] as PropertyConfig).base_cost)
+		var cohort_total := 0.0
+		for i in rungs:
+			cohort_total += (_property_configs[i] as PropertyConfig).base_cost
+		# Solve the cheapest rung from the geometric sum so the cohort total is preserved:
+		#   total = base * (ratio^0 + ratio^1 + ... + ratio^(n-1))
+		var geometric_sum := 0.0
+		for k in range(rungs.size()):
+			geometric_sum += pow(ratio, float(k))
+		var base_rung := cohort_total / geometric_sum
+		for k in range(rungs.size()):
+			var idx: int = rungs[k]
+			var live_cost := (_property_configs[idx] as PropertyConfig).base_cost
+			rescale[idx] = (base_rung * pow(ratio, float(k))) / live_cost
+
+	var variants: Array = []
+	for i in range(_property_configs.size()):
+		var live := _property_configs[i] as PropertyConfig
+		var dup := live.duplicate() as PropertyConfig
+		if rescale.has(i):
+			var factor: float = rescale[i]
+			dup.base_cost = live.base_cost * factor
+			dup.base_income_per_unit = live.base_income_per_unit * factor
+		variants.append(dup)
+	return variants
+
+
+## What fraction of a cohort's capital sits in its most expensive rung, for `ratio`.
+## Printed per candidate so the table says what the knob actually did.
+func _top_rung_share(ratio: float, rungs: int) -> float:
+	var geometric_sum := 0.0
+	for k in range(rungs):
+		geometric_sum += pow(ratio, float(k))
+	return pow(ratio, float(rungs - 1)) / geometric_sum
+
+
+## Run one candidate's playout and print its per-epoch phase split.
+func _print_phase_table(candidate: Dictionary) -> void:
+	var gate_multiplier: float = candidate["gate"]
+	var spread: float = candidate["spread"]
+	# Reload a FRESH tuning + configs per candidate, then move the knobs on them. Reloading
+	# (rather than duplicate()) keeps candidates provably free of shared state, which matters
+	# here because a candidate can rewrite every property's cost.
 	if not _load_configs():
 		print("    (could not reload configs)")
 		return
 	var tuning := _tuning
 	tuning.earth_economy_target = tuning.earth_economy_target * gate_multiplier
 
-	print("")
-	print("  --- gate x%.1f  (earth_economy_target = %s) ---" % [
-		gate_multiplier, _format_big(tuning.earth_economy_target)])
+	var configs := _property_configs
+	var spread_note := "spread 2.00x (live), last rung %.1f%% of cohort" % [
+		_top_rung_share(2.0, 14) * 100.0]
+	if spread > 0.0:
+		configs = _make_spread_variant_configs(spread)
+		spread_note = "spread %.2fx, last rung %.1f%% of cohort" % [
+			spread, _top_rung_share(spread, 14) * 100.0]
 
-	var result := _measure_epoch_phases(tuning)
+	print("")
+	print("  --- %s ---" % candidate["label"])
+	print("      gate x%.1f (target %s) | %s" % [
+		gate_multiplier, _format_big(tuning.earth_economy_target), spread_note])
+
+	var result := _measure_epoch_phases(tuning, configs)
 	var phases: Dictionary = result["phases"]
 	print("    epoch      unlock       stack   stack share   binding   money waited")
 	var unlock_total := 0.0
@@ -164,8 +281,8 @@ func _print_phase_table(gate_multiplier: float) -> void:
 ## Sim._measure_epoch_durations_via_playout's active-play model exactly, with the extra
 ## roster-completion probe — kept as its own function rather than threading a flag through
 ## the shared one, so the existing studies are untouched.
-func _measure_epoch_phases(tuning: TuningConfig) -> Dictionary:
-	var dynasty := DynastyState.new(_property_configs, tuning)
+func _measure_epoch_phases(tuning: TuningConfig, configs: Array) -> Dictionary:
+	var dynasty := DynastyState.new(configs, tuning)
 	dynasty.upgrades.award(HEIR_LEGACY)
 	_buy_upgrades_greedily(dynasty)
 	var game := dynasty.current

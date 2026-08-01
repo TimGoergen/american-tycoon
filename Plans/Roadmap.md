@@ -273,21 +273,28 @@ quietly deletes the pacing shipped alongside it.
 
 ### Scope and cadence behaviour (Tim, 2026-07-31)
 
-**The mode operates ONLY on the civ tab that is currently active.** It buys from that pager
-tab's properties, never the whole ladder — so **the player is necessarily always looking at the
-page where the purchase happens** (Tim's clarification, 2026-07-31). The mode never acts
-off-screen.
+**The mode operates on ONE civ tab: the last one the player was on.** It buys from that pager
+tab's properties, never the whole ladder. While the player is on the property tab, that is
+simply the tab in front of them — so purchases happen where they are looking. **It keeps
+running when they are elsewhere in the app** (Estate, Ledger, Settings), still against that
+last civ tab, and stops only while the economy is FROZEN (Tim, 2026-07-31).
 
-That is a stronger guarantee than "it is scoped to a page", and it changes what the UI has to
-do. There is no risk of the feature working invisibly somewhere else, so no "acting on era N"
-indicator is needed — every purchase self-evidences, because the row it touches is on screen
-and animating. All the UI owes the player is the mode's ON/OFF state. It also means auto-buy
-FOLLOWS the player's navigation rather than running behind their back, and that the purchases
-land inside the feedback loop the game already has instead of being discovered later in a
-number that quietly changed.
+So the guarantee is "never buys on a page other than the one you last chose", not "never buys
+while you are not looking". Two consequences:
+
+- **Reuse the existing frozen-economy condition; do not invent a second one.** Full-screen
+  beats already freeze the economy (the Will sits behind the minigame scrim precisely so it
+  stays frozen). Auto-purchase should ride that exact flag, so a beat can never be undermined by
+  purchases ticking away behind it.
+- **No "acting on era N" indicator is needed, but the ON/OFF state must be visible.** Purchases
+  made while the property tab is up self-evidence — the row is on screen and animating. Ones
+  made while the player is in the Estate tab do not, so the player has to at least know the mode
+  is running. Cash spent off-tab is harmless in the one case that would matter: Estate spending
+  is in GEMS, and prestige payout is computed from lifetime EARNED rather than cash on hand, so
+  auto-purchase can never quietly eat a succession the player was planning.
 
 This is the best part of the design, because it hands the allocation decision back to the
-player in the most legible possible form: *which page am I on*. The mode stops being a hidden
+player in the most legible possible form: *which page did I last choose*. The mode stops being a hidden
 optimiser and becomes a directed tool — point it at an era and it sweeps that era's cheap end.
 It also produces a useful emergent control: parking on an early epoch, where everything costs a
 rounding error against current wealth, effectively idles the mode without toggling it off.
@@ -303,13 +310,12 @@ Consequences worth building around:
   rung. That is bounded (a cohort spans 8192× from cheapest to flagship, so the skim is small)
   but it is real, and the answer is page away or toggle off — which only works if the UI makes
   the page-scoping obvious.
-- **OPEN: what happens when no civ tab is on screen?** The rule is well-defined while the
-  player is on the property tab, but says nothing about the Estate / Ledger / Settings tabs, or
-  about a full-screen modal (a transition minigame, First Contact, the Will). Two readings:
-  keep buying on the last-active civ page, or pause until a civ page is visible again. **Pausing
-  is the reading consistent with the guarantee above** — the whole point is that the player sees
-  every purchase — and modals already freeze the economy anyway, so that path is half-built. But
-  it must be decided, or the mode will silently do one of the two.
+- **DECIDED — off-tab behaviour (Tim, 2026-07-31): keep buying.** On the Estate / Ledger /
+  Settings tabs the mode continues against the last civ tab; only a frozen economy stops it. The
+  alternative (pause whenever no civ page is visible) was rejected: it would make the upgrade
+  stop working every time the player opened the shop it was bought from, which reads as broken.
+  The state this needs is a persisted "last active civ tab", which the pager already tracks for
+  its own navigation.
 - Watching for affordability is cheap — compare cash against the minimum next-unit cost among
   that page's properties — so the paused state can be evaluated on the normal logic tick.
 

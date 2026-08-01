@@ -20,7 +20,7 @@ extends Resource
 # --- Cost curve (Spec §3.2) ---
 
 ## Global band-steepening factor; ratio multiplies by this at each milestone band.
-@export var band_step: float = 1.15  # TBD-SIM
+@export var band_step: float = 1.1  # TBD-SIM; synced to tuning.tres 2026-07-31
 
 # --- Cycles & milestones (Spec §3.3) ---
 
@@ -30,7 +30,7 @@ extends Resource
 # --- Active tapping (Spec §4) ---
 
 ## Fraction of cycle_length that one rush-tap advances the cycle.
-@export var rush_pct: float = 0.05  # TBD-SIM
+@export var rush_pct: float = 0.1  # TBD-SIM; synced to tuning.tres 2026-07-31
 
 ## Auto-rush pulses per second while the rush button is held down.
 @export var hold_rush_per_second: float = 5.0  # feel-tune M1
@@ -67,11 +67,11 @@ extends Resource
 # held Buy may want to rip through units while a held Hire steps more deliberately.
 
 ## Seconds a held BUY button waits before its first auto-repeat.
-@export var buy_hold_initial_delay: float = 0.45  # feel-tune
+@export var buy_hold_initial_delay: float = 0.2  # feel-tune; synced to tuning.tres 2026-07-31
 ## Seconds between each BUY auto-repeat after the first.
 @export var buy_hold_repeat_interval: float = 0.1  # device-tuned (Tim, 2026-07-20)
 ## Seconds a held HIRE/UPGRADE button waits before its first auto-repeat.
-@export var hire_hold_initial_delay: float = 0.45  # feel-tune
+@export var hire_hold_initial_delay: float = 0.2  # feel-tune; synced to tuning.tres 2026-07-31
 ## Seconds between each HIRE/UPGRADE auto-repeat after the first.
 @export var hire_hold_repeat_interval: float = 0.1  # device-tuned (Tim, 2026-07-20)
 
@@ -86,9 +86,12 @@ extends Resource
 ## cost ladder does nothing. A UNIT requirement is different in kind because it can only be
 ## satisfied AFTER the roster is complete, in the calmer post-unlock growth regime.
 ##
-## 1 = the historical behaviour exactly (owning one of each already implies one flagship),
-## so this defaults to a no-op and every existing balance result still holds.
-@export var epoch_flagship_units_required: int = 1  # device-tune
+## DELIBERATE EXCEPTION to the "defaults mirror tuning.tres" convention: the shipped value is
+## 35, but this default stays 1. 1 reproduces the pre-feature behaviour exactly (owning one of
+## each already implies one flagship), so any code path that builds a TuningConfig without the
+## resource degrades to the old gate rather than to a hard 35-unit wall it never asked for.
+## Not drift — if a defaults-vs-tres audit flags this key, this comment is the answer.
+@export var epoch_flagship_units_required: int = 1  # device-tune; shipped value lives in tuning.tres
 
 # --- Staffing & offline (Spec §6) ---
 
@@ -200,7 +203,7 @@ extends Resource
 @export var frenzy_max_multiplier: float = 5.6  # feel-tune M1
 
 ## Duration of a full-charge frenzy burn in seconds.
-@export var frenzy_burn_duration: float = 90.0  # feel-tune M1
+@export var frenzy_burn_duration: float = 30.0  # feel-tune M1; synced to tuning.tres 2026-07-31
 
 ## Meter fill added per tap (fraction of full bar, 0–1).
 @export var frenzy_fill_per_tap: float = 0.004  # feel-tune M1
@@ -487,18 +490,18 @@ extends Resource
 ## Raised 0.045 → 0.50 (Tim 2026-07-14) to keep the FIRST prestige near its old ~350 gems after
 ## alpha_legacy was lowered to 0.22 — the two move together (a lower exponent needs a higher
 ## coefficient to hold the same yield at the founder's estate scale).
-@export var k_legacy: float = 0.50  # feel-tune
+@export var k_legacy: float = 0.16  # feel-tune; synced to tuning.tres 2026-07-31 (prestige retune)
 
 ## Exponent on the estate-magnitude term of the Legacy curve — how fast gems grow with earnings.
 ## Lowered 0.30 → 0.22 (Tim 2026-07-14) to flatten the prestige runaway (at 0.30 the yield compounded
 ## ~18× per epoch, driving income to ×237 over a dynasty); paired with the upgrade-cost nerf below so
 ## the correction is split. Still rewards a better run (~+16% gems per 2× estate), just less punchy.
-@export var alpha_legacy: float = 0.22  # feel-tune
+@export var alpha_legacy: float = 0.35  # feel-tune; synced to tuning.tres 2026-07-31 (prestige retune)
 
 ## Global multiplier on EVERY Legacy upgrade's cost (LegacyUpgradeCatalog.cost_multiplier). 1.0 = the
 ## authored prices; >1 makes a prestige's gems buy fewer upgrade levels, the second brake (with the
 ## lower alpha_legacy) on the multiplier runaway that made late epochs trivial (Tim 2026-07-14).
-@export var legacy_upgrade_cost_multiplier: float = 2.0  # feel-tune
+@export var legacy_upgrade_cost_multiplier: float = 3.0  # feel-tune; synced to tuning.tres 2026-07-31 (prestige retune)
 
 ## The estate net where the Legacy mint curve BENDS (Plans/Endgame_Economy.md, Tim 2026-07-28):
 ## below this the approved alpha_legacy power curve applies exactly; above it the shallow

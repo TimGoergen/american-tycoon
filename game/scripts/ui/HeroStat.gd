@@ -140,8 +140,26 @@ var _cash_bill: TextureRect  # dollar-bill icon beneath the cash number, right-a
 var _economy_bar: ProgressBar
 ## The silver "N% of economy consumed" readout centered over the economy bar.
 var _economy_label: Label
+## The icon + counts half of the readout, and the gap before them. Hidden for the money bar,
+## which is one sentence with nothing to count (see set_epoch_progress).
+var _economy_gap: Control
+var _economy_icon_gap: Control
+var _economy_icon: TextureRect
+var _economy_counts: Label
 ## White for that readout (Tim, 2026-07-09), no outline.
 const ECONOMY_SILVER := Color.WHITE
+
+## The property icon shown before the flagship count on the epoch bar. Same asset the property
+## tab and PropertyRow's buy-count use, so "this is about properties" reads consistently.
+const PROPERTY_ICON := preload("res://art/icons/tab_property_inactive.svg")
+## Icon box side in px. Comfortably above FONT_LABEL (28) because this glyph is a thin-lined
+## factory — at a tighter box it reads as a smudge next to the bold numerals.
+const ECONOMY_ICON_PX := 38
+## Space between the property's name and its icon + counts.
+const ECONOMY_READOUT_GAP := 22
+## The smaller space between the icon and the numerals it labels. They belong together, so this
+## is deliberately much tighter than the gap above — but not zero, which reads as collision.
+const ECONOMY_ICON_GAP := 8
 var _economy_divider: ColorRect
 ## Height of the economy bar strip, and of the red divider above it (the divider matches
 ## the panel frame's 12px thickness so it reads as the same line).
@@ -250,9 +268,17 @@ func _ready() -> void:
 	# A silver readout centered over the economy bar telling the player how much of this epoch's
 	# economy they've consumed (Tim, 2026-07-09). Full-rect over the bar, mouse-ignored, with a
 	# navy outline so the silver stays legible over the blue fill and the bubbles.
+	# The readout is a centered ROW, not one label, so a property icon can sit between the name
+	# and the counts (Tim, 2026-07-31). Centering the row rather than the labels keeps the whole
+	# group optically centered on the bar however long the property's name is.
+	var readout_row := HBoxContainer.new()
+	readout_row.set_anchors_preset(Control.PRESET_FULL_RECT)
+	readout_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	readout_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	readout_row.add_theme_constant_override("separation", 0)  # gaps are explicit spacers below
+	_economy_bar.add_child(readout_row)
+
 	_economy_label = Label.new()
-	_economy_label.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_economy_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_economy_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_economy_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_economy_label.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
@@ -268,7 +294,46 @@ func _ready() -> void:
 	_economy_label.add_theme_constant_override("shadow_offset_y", 2)
 	# A slight spread so the shadow reads as depth rather than as a doubled glyph.
 	_economy_label.add_theme_constant_override("shadow_outline_size", 2)
-	_economy_bar.add_child(_economy_label)
+	readout_row.add_child(_economy_label)
+
+	# Breathing room between the property's name and its count (Tim, 2026-07-31) — without it
+	# "Photon Exchange" and "21 / 35" run together as one phrase instead of reading as a label
+	# and its value.
+	_economy_gap = Control.new()
+	_economy_gap.custom_minimum_size = Vector2(ECONOMY_READOUT_GAP, 0)
+	_economy_gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	readout_row.add_child(_economy_gap)
+
+	# The property icon, tinted to match the readout so icon and text read as one unit. preload
+	# takes the IMPORTED texture — never read the .svg source at runtime, which the export strips
+	# (that crashed a device build once; see PropertyRow._crisp_icon_texture).
+	_economy_icon = TextureRect.new()
+	_economy_icon.texture = PROPERTY_ICON
+	_economy_icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	_economy_icon.custom_minimum_size = Vector2(ECONOMY_ICON_PX, ECONOMY_ICON_PX)
+	_economy_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_economy_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_economy_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_economy_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_economy_icon.modulate = ECONOMY_SILVER
+	readout_row.add_child(_economy_icon)
+
+	_economy_icon_gap = Control.new()
+	_economy_icon_gap.custom_minimum_size = Vector2(ECONOMY_ICON_GAP, 0)
+	_economy_icon_gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	readout_row.add_child(_economy_icon_gap)
+
+	# The counts ("21 / 35"), carrying the same shadow treatment as the name.
+	_economy_counts = Label.new()
+	_economy_counts.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_economy_counts.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_economy_counts.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
+	_economy_counts.add_theme_color_override("font_color", ECONOMY_SILVER)
+	_economy_counts.add_theme_color_override("font_shadow_color", Color(UiPalette.NAVY, 0.85))
+	_economy_counts.add_theme_constant_override("shadow_offset_x", 2)
+	_economy_counts.add_theme_constant_override("shadow_offset_y", 2)
+	_economy_counts.add_theme_constant_override("shadow_outline_size", 2)
+	readout_row.add_child(_economy_counts)
 
 	_content.add_child(_economy_bar)
 
@@ -307,7 +372,7 @@ func set_cash(cash: float) -> void:
 ## "N% of economy consumed" wording; alien epochs pass their own line ("FLAGSHIP 21 / 35")
 ## because there the bar tracks flagship UNITS rather than money, and the label has to say
 ## what is actually being counted (Plans/Epoch_Advance_Rework.md §3).
-func set_epoch_progress(consumed: float, goal: float, readout: String = "") -> void:
+func set_epoch_progress(consumed: float, goal: float, readout: String = "", counts: String = "") -> void:
 	var show_bar := goal > 0.0
 	_economy_bar.visible = show_bar
 	_economy_divider.visible = show_bar
@@ -318,6 +383,15 @@ func set_epoch_progress(consumed: float, goal: float, readout: String = "") -> v
 			_economy_label.text = readout
 		else:
 			_economy_label.text = "%d%% of economy consumed" % int(round(fraction * 100.0))
+		# `counts` present means this is the flagship bar: show the icon and the count after a
+		# gap. The money bar is one sentence with nothing to count, so all three stay hidden and
+		# the name label is simply centered on its own.
+		var counting := counts != ""
+		_economy_counts.text = counts
+		_economy_counts.visible = counting
+		_economy_icon.visible = counting
+		_economy_gap.visible = counting
+		_economy_icon_gap.visible = counting
 
 
 ## Toggle the frenzy glow. Main drives this from the live frenzy state each frame.

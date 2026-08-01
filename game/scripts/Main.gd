@@ -410,8 +410,10 @@ func _refresh_contact_progress() -> void:
 		if flagship_index >= 0:
 			var flagship_prop := game.economy.properties[flagship_index] as PropertyState
 			flagship_name = (flagship_prop.config as PropertyConfig).display_name
-		_hero_stat.set_epoch_progress(float(flagship.x), float(flagship.y),
-				"%s %d / %d" % [flagship_name, mini(flagship.x, flagship.y), flagship.y])
+		# Name and counts are passed SEPARATELY so HeroStat can set the property icon between
+		# them; it renders as "<name>   [icon] 21 / 35".
+		_hero_stat.set_epoch_progress(float(flagship.x), float(flagship.y), flagship_name,
+				"%d / %d" % [mini(flagship.x, flagship.y), flagship.y])
 		return
 
 	var goal := EpochCatalog.consume_threshold(tier, tuning.earth_economy_target)

@@ -147,3 +147,73 @@ full-digits threshold" and belongs as a tweak to `display_cash()`, not a third m
   natural content for it.
 - The setting is presentation-only: it must never touch save data or any comparison, only
   the display string.
+
+## 7. Auto-property-purchase mode, unlocked by a Legacy upgrade (Tim, 2026-07-31)
+
+Tim's ask: a Legacy upgrade unlocks an AUTO-PURCHASE mode. While the player has it enabled,
+the game buys as many properties as it can afford on a cadence — 3s by default, with further
+upgrades shortening it. Rush is unavailable while the mode is on.
+
+**Take: the strongest idea in this QoL family, and the rush trade-off is what makes it one.**
+Every other entry here (§1-4) removes taps. This one removes the ACTIVITY, which would
+normally make it strictly dominant — except that giving up rush is a real price. Rush is the
+core active loop and a large multiplier (the sims model an engaged player as rush on the top 3
+earners at ~Strong-Arm lv10). So the mode is a genuine choice between hands-off accumulation
+and active throughput, not a straight upgrade. That is exactly the shape a QoL reward should
+have, and it echoes the "minigames are a player setting" principle: choice, not chore.
+
+Theme fit is clean too — a tycoon delegating purchasing to an acquisitions desk is the
+fiction the game is already telling.
+
+### The tension that has to be resolved first
+
+**It automates the epoch tail we just deliberately built.** As of 2026-07-31 an alien epoch
+advances on owning 35 units of its flagship (Plans/Epoch_Advance_Rework.md), and that stacking
+phase — measured at 34% of an epoch — exists specifically so the flagship gets playtime.
+Auto-purchase automates precisely that grind. Left unconstrained, this upgrade deletes the
+pacing feature.
+
+That is not automatically wrong: earning the right to automate a grind is the genre's core
+progression, and it costs gems and rush to do it. But it is a deliberate decision, not a
+detail, and it should be made with the flagship gate in view rather than by accident.
+
+### The open question — what does "as many as it can afford" mean?
+
+Income is NEUTRAL across a cohort (income/sec per dollar of cost is identical), so every
+purchase is equally efficient and the optimal play is simply to spend to zero. An auto-buyer
+that does that will hold the player's cash at ~0 forever, which means it can never SAVE. It
+would starve the very thing the player most wants: the next rung up, and the 35 flagship
+units. The mode would actively fight the epoch gate.
+
+Options, in rough order of preference:
+- **Priority + reserve (recommended).** Buy in a defined order — recommend most-expensive-first,
+  since that is what actually advances the epoch — and never spend below a reserve sized to the
+  next thing worth saving for. Keeps the mode useful without letting it hoover cash into cheap
+  rungs.
+- **Respect the current buy mode.** Auto-buy at ×1/×10/MAX as set. Simple and predictable, but
+  MAX (the shipped default) still drains to zero.
+- **Flagship-first.** Buy the epoch's flagship exclusively until the gate is met, then spread.
+  Most aligned with the new gate, least flexible.
+
+Whatever is chosen, it must be stated in the upgrade's own description — a mode that spends
+the player's money on a rule they cannot see will read as a bug.
+
+### Load-bearing facts for whoever builds it
+
+- **Prior art exists and is proven:** `Sim._greedy_build_out` is this exact behaviour (buy
+  units + staff + hires, spend down each tick) and has run at 10 Hz across every balance study.
+  Start there rather than writing a new buyer. Note it allocates PERFECTLY, so it is a stronger
+  buyer than a human — auto-purchase would hand the player sim-grade allocation, which is worth
+  sizing before it ships.
+- **Cadence:** 3s default with upgrades shortening it. Diminishing returns are steep — below
+  roughly a second it is indistinguishable from continuous, so the track wants few levels with
+  meaningful steps rather than many small ones. Watch device cost: the ladder is 326 properties
+  and each buy touches UI.
+- **Rush lockout is UI work, not just a flag.** Per the no-moving-UI rule the rush affordances
+  gray in place, never disappear, and the reason has to be legible ("auto-buy is on") or it
+  reads as a bug. `RushMomentumState` heat should presumably idle rather than decay-punish while
+  locked out — check `Plans/Rush_Overheat.md` before deciding.
+- The mode needs a persistent toggle (it is a player setting, like `ui_buy_mode` /
+  `ui_minigame_enabled`, which live in the GameState save dict).
+- **Interaction with offline earnings** is unspecified: does auto-buy run while away? Almost
+  certainly not (offline is its own banked-pile system), but say so explicitly.

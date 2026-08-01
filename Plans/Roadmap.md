@@ -18,12 +18,23 @@ tab/epoch in one tap"). Decide deliberately; don't ship the collision.
 
 ## 2. "MAX" hire mode for staffers, unlocked by a Legacy upgrade (Tim, 2026-07-29)
 
+> **GRADUATED 2026-08-01 → `Plans/Auto_Purchase_And_Bulk_Hire.md` §B2.** Built as the
+> **Head Hunters** track (3 levels: ×10 → BLOCK → MAX). BLOCK buys to the next 20-level
+> staffer block boundary, which is the meaningful unit because level 1 of each block is the
+> expensive hire and 2-20 are the cheap steps.
+
 **Take:** clean fit, no collisions — staff levels today only have hold-to-repeat
 (`hire_hold_*`), so a "buy to cap / buy N levels" mode is genuinely new value, and deep
 runs (20-level blocks × 27 epochs) genuinely need it. Natural shape: a utility-family
 Legacy track ("Head Hunters"?) whose levels unlock ×10 → block → MAX hire modes.
 
 ## 3. "MAX" mode for staffer retention — and maybe all upgrades — via Legacy upgrade (Tim, 2026-07-29)
+
+> **GRADUATED 2026-08-01 → `Plans/Auto_Purchase_And_Bulk_Hire.md` §B3.** Shipped UNGATED
+> rather than behind a Legacy track (see that doc's open decisions): gating would charge the
+> player gems to fix a usability defect. The spend-preview caution above is honoured by making
+> the button's own label the quote ("RETAIN TO LVL 150 · 4.2B Gems"), and the purchase buys
+> exactly the number the label showed rather than re-deriving it at press time.
 
 **Take:** this IS the queued "staff-retention bulk-buy UX" item (Tim, 2026-07-28: "way
 too many buttons to press"), upgraded from a UX fix to a prestige reward — better framing,
@@ -149,6 +160,14 @@ full-digits threshold" and belongs as a tweak to `display_cash()`, not a third m
   the display string.
 
 ## 7. Auto-property-purchase mode, unlocked by a Legacy upgrade (Tim, 2026-07-31)
+
+> **GRADUATED 2026-08-01 → `Plans/Auto_Purchase_And_Bulk_Hire.md` Part A.** Built as the
+> **Acquisitions Desk** track (8 levels; N = level, X fixed at 3, cadence 3.0s → 1.0s).
+> Three assumptions below did NOT match the code and were corrected in that doc: the last
+> civ tab was never persisted (it is now); "rush is unavailable" could not mean refusing
+> `tap_property` outright, since the same verb also starts idle cycles; and the tentative
+> "heat should idle rather than decay" was overturned — heat decays, because a bar showing a
+> bonus the player is not paid breaks this system's binding invariant.
 
 Tim's ask: a Legacy upgrade unlocks an AUTO-PURCHASE mode. While the player has it enabled,
 the game buys on a cadence — 3s by default, with further upgrades shortening it. Rush is

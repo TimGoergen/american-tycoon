@@ -209,7 +209,11 @@ extends Resource
 @export var frenzy_idle_grace: float = 5.0  # feel-tune M1
 
 ## Minimum meter charge at which the player can trigger a frenzy pop.
-@export var frenzy_pop_floor: float = 0.15  # feel-tune M1
+## DOUBLED 0.15 → 0.30 (Tim, 2026-07-31): a pop was available at a sixth of the bar, so the
+## floor barely gated anything and an early pop locked in a weak multiplier. At 0.30 the
+## player waits for a pop worth taking. The bar's floor marker and its grayscale-until-poppable
+## treatment both read this value, so they move with it automatically.
+@export var frenzy_pop_floor: float = 0.3  # feel-tune M1
 
 # --- Rush Momentum / Overheat (Tim 2026-07-15; design: Plans/Rush_Overheat.md) ---
 # Rushing heats the property up — heat IS the momentum meter, in HEAT UNITS where 1.0 = the old

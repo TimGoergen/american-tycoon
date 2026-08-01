@@ -273,8 +273,18 @@ quietly deletes the pacing shipped alongside it.
 
 ### Scope and cadence behaviour (Tim, 2026-07-31)
 
-**The mode operates ONLY on the epoch page the player is currently viewing.** It buys from that
-pager tab's properties, not the whole ladder.
+**The mode operates ONLY on the civ tab that is currently active.** It buys from that pager
+tab's properties, never the whole ladder — so **the player is necessarily always looking at the
+page where the purchase happens** (Tim's clarification, 2026-07-31). The mode never acts
+off-screen.
+
+That is a stronger guarantee than "it is scoped to a page", and it changes what the UI has to
+do. There is no risk of the feature working invisibly somewhere else, so no "acting on era N"
+indicator is needed — every purchase self-evidences, because the row it touches is on screen
+and animating. All the UI owes the player is the mode's ON/OFF state. It also means auto-buy
+FOLLOWS the player's navigation rather than running behind their back, and that the purchases
+land inside the feedback loop the game already has instead of being discovered later in a
+number that quietly changed.
 
 This is the best part of the design, because it hands the allocation decision back to the
 player in the most legible possible form: *which page am I on*. The mode stops being a hidden
@@ -293,9 +303,13 @@ Consequences worth building around:
   rung. That is bounded (a cohort spans 8192× from cheapest to flagship, so the skim is small)
   but it is real, and the answer is page away or toggle off — which only works if the UI makes
   the page-scoping obvious.
-- **The page-scoping has to be visible.** The mode's behaviour now depends on a navigation
-  state, so the ladder or pager needs to show that auto-purchase is acting on THIS era.
-  Otherwise a player who pages away will think the feature broke.
+- **OPEN: what happens when no civ tab is on screen?** The rule is well-defined while the
+  player is on the property tab, but says nothing about the Estate / Ledger / Settings tabs, or
+  about a full-screen modal (a transition minigame, First Contact, the Will). Two readings:
+  keep buying on the last-active civ page, or pause until a civ page is visible again. **Pausing
+  is the reading consistent with the guarantee above** — the whole point is that the player sees
+  every purchase — and modals already freeze the economy anyway, so that path is half-built. But
+  it must be decided, or the mode will silently do one of the two.
 - Watching for affordability is cheap — compare cash against the minimum next-unit cost among
   that page's properties — so the paused state can be evaluated on the normal logic tick.
 

@@ -217,3 +217,53 @@ the player's money on a rule they cannot see will read as a bug.
   `ui_minigame_enabled`, which live in the GameState save dict).
 - **Interaction with offline earnings** is unspecified: does auto-buy run while away? Almost
   certainly not (offline is its own banked-pile system), but say so explicitly.
+
+## 8. Challenge Mode shows only games you have met (Tim, 2026-07-31)
+
+Tim's ask: on the CHALLENGES screen, only the minigames the player has actually encountered
+are available. Plus a new Balance Tuning option to show ALL games, for testing.
+
+**Take: good, and it completes the thought behind §5.** §5 gates Challenge Mode behind the
+first prestige so the minigames are first met in their real context — a transition, with
+stakes — before free play. This is the same principle applied per-GAME rather than to the
+screen as a whole: a game you have never seen shouldn't be sitting in an arcade menu waiting
+to be practised. Together the two turn the CHALLENGES screen into a trophy case of games you
+have earned rather than a list handed over up front, and each new one appearing is a small
+reward in itself.
+
+The Balance Tuning escape hatch is not a nicety — it is required. With six types dealt at
+random, testing one specific game currently means replaying transitions until it comes up.
+That is exactly the workflow this gate would make worse, so the override ships with it.
+
+### Decide first: scoped to the run, or to the bloodline?
+
+Tim said "current run". Worth deciding deliberately, because the surrounding systems are
+DYNASTY-scoped, not generation-scoped: challenge records live on the bloodline
+(`ChallengeGoals` talks about the bloodline's cleared tiers; `DynastyState.best_vent_streak`
+is explicitly "another dynasty-wide earned record"). If encounters reset each generation, a
+player who prestiges loses access to games they have demonstrably met — and their SCORES for
+those games stay on screen, which reads as a bug rather than as a rule.
+
+**Recommendation: scope to the bloodline.** Met is met. It also matches where the data would
+naturally live (the dynasty save dict, beside `ui_buy_mode` and the challenge records). If Tim
+wants the tighter per-generation version, the score display needs a rule too.
+
+### Load-bearing facts
+
+- **Locked games must still be VISIBLE.** Per the no-moving-UI rule they gray in place with a
+  reason ("meet this game at a transition"), never vanish — otherwise the screen silently
+  changes shape as the run goes on, which is the exact behaviour that rule forbids. This also
+  preserves the trophy-case read: you can see what you have not met yet.
+- **Encounter tracking does not exist yet.** The nearest thing is `MinigameScreen`'s
+  `user://minigame_history.json`, added 2026-07-31, but that stores only the LAST dealt type
+  for the repeat guard. This needs a SET of encountered types, and if scoped to the bloodline
+  it belongs in the dynasty save instead, not that file.
+- **Key games by `display_name()`.** `ChallengeGoals` deliberately keys everything — ladders,
+  arcade scores, the CHALLENGES screen — off the same `display_name()` strings. An encounter
+  set must use those same keys or the two will drift.
+- **Count the right encounters.** A game met in Challenge Mode itself should probably NOT
+  count (that would be circular once the override is on); a game met at a transition should.
+  Forced/review rounds are already distinguished in `MinigameScreen.start_game`'s `forced_type`
+  path, which is the natural place to tell the two apart.
+- **The Balance Tuning toggle** is a display override only — it must not write to the encounter
+  set, or testing with it on would permanently unlock everything.

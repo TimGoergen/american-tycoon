@@ -93,6 +93,24 @@ extends Resource
 ## Not drift — if a defaults-vs-tres audit flags this key, this comment is the answer.
 @export var epoch_flagship_units_required: int = 1  # device-tune; shipped value lives in tuning.tres
 
+# --- Auto-purchase mode (Plans/Auto_Purchase_And_Bulk_Hire.md §A3) ---
+# The "Acquisitions Desk" Legacy upgrade buys property on the player's behalf: every CADENCE
+# seconds it buys up to N units each of the BREADTH cheapest affordable properties on the
+# targeted civ tab. Cadence shrinks with upgrade level, from the base down to the floor:
+#   cadence = auto_purchase_base_cadence − 0.25 × (level − 1), floored at auto_purchase_min_cadence
+# The per-level MAGNITUDES (N, and the 0.25 step) live in LegacyUpgradeCatalog, which is where
+# per-level upgrade numbers now belong; only the shape of the cadence curve is tuned here.
+
+## Seconds between auto-purchase ticks at upgrade level 1 — the slowest the desk ever runs.
+@export var auto_purchase_base_cadence: float = 3.0  # device-tune
+## Floor on the auto-purchase cadence, reached at the top upgrade level. Guards against a
+## cadence that shrinks to zero and turns the mode into a per-frame buyer.
+@export var auto_purchase_min_cadence: float = 1.0  # device-tune
+## How many DISTINCT properties one auto-purchase tick buys into (X in the plan). Fixed rather
+## than upgradable: a cohort is only ~14 properties, so breadth saturates almost immediately
+## and stops being worth selling as an upgrade level.
+@export var auto_purchase_breadth: int = 3  # device-tune
+
 # --- Staffing & offline (Spec §6) ---
 
 ## Alien staff (tier 2+) ENTRY hire cost as a fraction of the TARGET epoch's whole economy

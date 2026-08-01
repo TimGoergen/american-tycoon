@@ -236,24 +236,118 @@ func get_staff_block_anchor(prop_index: int, block: int) -> float:
 	return CostCurve.round_nice(epoch_economy * fraction * prop.staff_cost_multiplier)
 
 
-## Cost of the NEXT ladder level (staff_level + 1) for a property. Level 1 of a block
-## costs the block's full anchor (it is the staffer hire — the meaningful entry spend);
-## each level after it costs anchor × staff_level_cost_base, climbing geometrically
-## within the block. The climb restarts every block (an un-reset exponent would make a
-## 120-level ladder unbuyable) off that block's own, permanently-fixed anchor.
-func get_next_staff_level_cost(prop_index: int) -> float:
+## Price of ONE specific ladder level, named by its absolute 1-based level number.
+## Pure: it reads no mutable state beyond the property's config/tuning, so it can price
+## levels the player has not bought yet — which is what makes bulk pricing possible
+## without simulating purchases. Level 1 of a block costs the block's full anchor (it is
+## the staffer hire — the meaningful entry spend); each level after it costs
+## anchor × staff_level_cost_base, climbing geometrically within the block. The climb
+## restarts every block (an un-reset exponent would make a 120-level ladder unbuyable)
+## off that block's own, permanently-fixed anchor.
+##
+## This is the SINGLE source of truth for staff prices — get_next_staff_level_cost and
+## every bulk API below route through it, so they can never disagree about a price.
+func _staff_level_cost_at(prop_index: int, level: int) -> float:
 	var prop := properties[prop_index] as PropertyState
 	var tuning := prop.tuning
-	var next_level := prop.staff_level + 1
-	var block := prop.staff_block_of_level(next_level)
+	var block := prop.staff_block_of_level(level)
 	var anchor := get_staff_block_anchor(prop_index, block)
 	# 1-based position of the level within its block (1 = the hire, 2–20 = the steps).
-	var position := next_level - (block - 1) * tuning.staff_levels_per_epoch
+	var position := level - (block - 1) * tuning.staff_levels_per_epoch
 	if position <= 1:
 		return anchor
 	var level_factor := tuning.staff_level_cost_base \
 			* pow(tuning.staff_level_cost_growth, float(position - 2))
 	return CostCurve.round_nice(anchor * level_factor)
+
+
+## Cost of the NEXT ladder level (staff_level + 1) for a property.
+func get_next_staff_level_cost(prop_index: int) -> float:
+	var prop := properties[prop_index] as PropertyState
+	return _staff_level_cost_at(prop_index, prop.staff_level + 1)
+
+
+# ---------------------------------------------------------------------------
+# Bulk staff hiring (the HireMode buttons: ×10 / BLOCK / MAX)
+# ---------------------------------------------------------------------------
+# WHY THESE ARE LOOPS AND NOT A FORMULA.
+# Within one 20-level block the prices ARE a geometric series, so a closed form would
+# work — but a bulk buy routinely crosses a block boundary, and at that boundary the
+# price does two discontinuous things at once:
+#   1. the position exponent RESETS to the start of the new block, and
+#   2. the anchor the prices hang off JUMPS to the new block's own anchor, which is
+#      frozen at that block's epoch economy (see get_staff_block_anchor above).
+# So the ladder is a chain of differently-anchored series, not one series. Pricing it
+# level-by-level in a loop is the only way to stay exactly equal to what the player is
+# actually charged one tap at a time — the same reason CostCurve.get_bulk_cost sums
+# per-unit prices instead of using a geometric-sum shortcut.
+
+
+## Exact total cost of buying the next `count` staff levels, stopping early at the
+## reached-epoch cap. The returned figure is the sum of the individual prices the player
+## would pay tapping the single-level button `count` times, to the cent.
+func get_bulk_staff_level_cost(prop_index: int, count: int, reached_tier: int) -> float:
+	var prop := properties[prop_index] as PropertyState
+	var level_cap := get_staff_level_cap(prop_index, reached_tier)
+	var total := 0.0
+	var level := prop.staff_level + 1
+	for _i in range(count):
+		if level > level_cap:
+			break  # the next block is gated behind the next first contact
+		total += _staff_level_cost_at(prop_index, level)
+		level += 1
+	return total
+
+
+## How many staff levels the player can afford right now, at exact per-level pricing.
+## Drives the MAX hire button. Bounded by BOTH the reached-epoch level cap and `cap`
+## (a loop-safety limit on how many levels we are willing to price in one call, the
+## same guard PropertyState.get_max_affordable uses).
+func get_max_affordable_staff_levels(prop_index: int, reached_tier: int, cap: int = 1000) -> int:
+	var prop := properties[prop_index] as PropertyState
+	var level_cap := get_staff_level_cap(prop_index, reached_tier)
+	var affordable := 0
+	var remaining := cash
+	var level := prop.staff_level + 1
+	while affordable < cap and level <= level_cap:
+		var level_cost := _staff_level_cost_at(prop_index, level)
+		if remaining < level_cost:
+			break
+		remaining -= level_cost
+		level += 1
+		affordable += 1
+	return affordable
+
+
+## Levels remaining to the next 20-level BLOCK boundary — the size of a "BLOCK" hire.
+## A block is the meaningful staff unit: level 1 of it is the expensive staffer hire and
+## levels 2–20 are the cheap steps after, so finishing a block is what a player actually
+## wants to buy. Clamped at the reached-epoch cap, so it returns 0 when the ladder is
+## maxed and a short count when the cap lands mid-block.
+func get_staff_levels_to_next_block(prop_index: int, reached_tier: int) -> int:
+	var prop := properties[prop_index] as PropertyState
+	var next_level := prop.staff_level + 1
+	var block := prop.staff_block_of_level(next_level)
+	# The last level of that block — e.g. block 1 ends at 20, block 2 at 40.
+	var block_last_level := block * prop.tuning.staff_levels_per_epoch
+	var stop_at := mini(block_last_level, get_staff_level_cap(prop_index, reached_tier))
+	return maxi(0, stop_at - prop.staff_level)
+
+
+## Buy up to `count` staff levels, charging each one individually, and return how many
+## were ACTUALLY bought (0 if none were affordable). Deliberately NOT all-or-nothing:
+## a MAX/BLOCK tap that can pay for 7 of 10 levels buys 7 rather than reading as broken.
+##
+## It calls the single-level verb in a loop on purpose. That verb owns the cap check, the
+## cash deduction, the spent_on_staff_this_gen book-keeping and the add_staff_level
+## mutation — routing through it means the bulk path can never drift from the one-tap path.
+func try_buy_staff_levels(prop_index: int, count: int, reached_tier: int) -> int:
+	var bought := 0
+	for _i in range(count):
+		if not try_buy_staff_level(prop_index, reached_tier):
+			break  # hit the cap or ran out of cash — keep what we already bought
+		bought += 1
+	return bought
 
 
 ## The hard cap on a property's staff_level: 20 × the blocks the run has opened for it

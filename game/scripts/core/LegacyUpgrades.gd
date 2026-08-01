@@ -207,6 +207,31 @@ func minigame_bonus_max() -> float:
 	return MINIGAME_BONUS_BASE + per_level * float(level)
 
 
+## True once the Acquisitions Desk is owned, which is what makes the auto-purchase mode
+## available to switch on at all (level 0 = the toggle stays grayed in place).
+func auto_purchase_unlocked() -> bool:
+	return get_level(LegacyUpgradeCatalog.ACQUISITIONS_DESK) >= 1
+
+
+## SECONDS to shave off the auto-purchase cadence (Acquisitions Desk). Additive and capped,
+## like the other utility tracks: level 1 only unlocks the mode, and every level after that
+## shortens the wait by another 0.25s. Returns 0.0 when the desk isn't owned.
+## The caller subtracts this from the tuned base cadence and clamps to the tuned minimum —
+## those two knobs live in TuningConfig, so this getter reports the magnitude only.
+func auto_purchase_cadence_scale() -> float:
+	var level := get_level(LegacyUpgradeCatalog.ACQUISITIONS_DESK)
+	if level < 1:
+		return 0.0
+	return _per_level(LegacyUpgradeCatalog.ACQUISITIONS_DESK) * float(level - 1)
+
+
+## The deepest bulk-hire mode the player has unlocked (Head Hunters). The number indexes the
+## HireMode ladder in order: 0 = only ×1, 1 = also ×10, 2 = also BLOCK, 3 = also MAX. It is
+## just the purchased level, but named for what it means so callers don't compare raw levels.
+func max_hire_mode() -> int:
+	return get_level(LegacyUpgradeCatalog.HEAD_HUNTERS)
+
+
 ## The catalog's per-level magnitude for an upgrade (0.0 if unknown).
 func _per_level(id: String) -> float:
 	var definition := LegacyUpgradeCatalog.get_definition(id)

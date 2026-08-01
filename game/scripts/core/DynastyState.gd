@@ -229,6 +229,46 @@ func buy_staff_retention(property_index: int) -> bool:
 	return true
 
 
+## The highest retention level a property can currently be bought up to: the best any
+## generation of the bloodline ever reached there. Shared by the bulk-buy path and the
+## spend preview so the button's quote and the purchase can never disagree.
+func retention_ceiling(property_index: int) -> int:
+	var prop := current.economy.properties[property_index] as PropertyState
+	return maxi(prop.staff_level, staff_retention.get_ladder_high(property_index))
+
+
+## How many retention levels the wallet could buy on a property right now, capped at the
+## bloodline's earned ceiling. This is what "RETAIN MAX" would purchase.
+func max_affordable_retention_levels(property_index: int) -> int:
+	return staff_retention.max_affordable_levels(
+		property_index, upgrades.available, retention_ceiling(property_index)
+	)
+
+
+## The exact Legacy price of retaining the next `count` levels — the number the bulk-buy
+## button shows BEFORE the player commits. Retention is the endgame's open gem sink, so a
+## one-tap bulk buy must never spend a fortune the player couldn't see coming (Roadmap §3).
+func retention_cost_for_levels(property_index: int, count: int) -> int:
+	return staff_retention.bulk_cost_for_levels(property_index, count)
+
+
+## Buy up to `count` more retention levels in one action, returning how many were actually
+## bought. Deliberately PARTIAL-FILL (buys 7 of 10 rather than refusing outright), matching
+## how the bulk property and staff buys behave — a bulk button that silently does nothing
+## because the last level is a point short reads as broken.
+##
+## This loops the single-level buy_staff_retention() rather than reimplementing the
+## deduction: one purchase path means the wallet accounting and the ladder-high ceiling
+## can never drift between the single and bulk versions.
+func buy_staff_retention_levels(property_index: int, count: int) -> int:
+	var bought := 0
+	while bought < count:
+		if not buy_staff_retention(property_index):
+			break
+		bought += 1
+	return bought
+
+
 ## Copy the retention pricing knobs from tuning into the (tuning-free) StaffRetention.
 ## Called on construction and again on load, since load rebuilds the object.
 func _configure_retention_pricing() -> void:

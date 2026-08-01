@@ -41,6 +41,8 @@ const FRENZY_INTENSITY := "frenzy_intensity"
 const FRENZY_DURATION  := "frenzy_duration"
 const COOLING_SYSTEMS  := "cooling_systems"
 const RAPID_RESTART    := "rapid_restart"
+const ACQUISITIONS_DESK := "acquisitions_desk"
+const HEAD_HUNTERS      := "head_hunters"
 
 
 # ── The catalog ───────────────────────────────────────────────────────────────
@@ -214,6 +216,33 @@ const UPGRADES := [
 		"cost_growth": 2.0,
 		"effect_per_level": 0.05,     # −5% total lockout time per level (see LegacyUpgrades getter)
 	},
+	{
+		"id": ACQUISITIONS_DESK,
+		"name": "Acquisitions Desk",
+		"category": "Operations",
+		# The buy rule is spelled out on purpose (Plans/Auto_Purchase_And_Bulk_Hire.md §A6): a mode
+		# that spends the player's money on a rule they cannot see reads as a bug, not a feature.
+		"description": "Buyers work the era you are viewing, taking its cheapest holdings first. Rushing is closed while the desk is open.",
+		# ADDITIVE and capped, like the other utility tracks: level 1 unlocks the mode, and each
+		# further level both deepens the buy (units per property) and shortens the wait between
+		# buys. Capped at 8 so peak throughput stays small against a flagship's price.
+		"max_level": 8,
+		"base_cost": 12,
+		"cost_growth": 2.2,
+		"effect_per_level": 0.25,     # seconds shaved off the purchase cadence per level past the first
+	},
+	{
+		"id": HEAD_HUNTERS,
+		"name": "Head Hunters",
+		"category": "Operations",
+		"description": "Recruiters on retainer. Sign staff by the ten, then by the block, then by the houseful.",
+		# A gate, not a magnitude: each level unlocks one more bulk-hire mode (×10, BLOCK, MAX),
+		# so max_level is exactly the number of modes there are to unlock.
+		"max_level": 3,
+		"base_cost": 8,
+		"cost_growth": 2.4,
+		"effect_per_level": 1.0,      # one unlocked hire mode per level (see LegacyUpgrades.max_hire_mode)
+	},
 ]
 
 
@@ -312,4 +341,20 @@ static func describe_effect(id: String, level: int) -> String:
 			return "+%d%% safe cruise rush bonus" % int(round(per_level * 100.0 * float(shown_level)))
 		RAPID_RESTART:
 			return "−%d%% overheat lockout time" % int(round(per_level * 100.0 * float(shown_level)))
+		ACQUISITIONS_DESK:
+			# Depth is the level itself; the cadence shave only starts at level 2, and the base
+			# cadence it is shaved from is a live tuning knob, so the card quotes the shave alone.
+			if shown_level <= 1:
+				return "auto-buys 1 unit per property"
+			var shave := per_level * float(shown_level - 1)
+			return "auto-buys %d units per property, %ss faster" % [shown_level, Money.trim(shave, 2)]
+		HEAD_HUNTERS:
+			# Each level adds one mode, so the card lists every mode owned so far.
+			match shown_level:
+				1:
+					return "×10 hire unlocked"
+				2:
+					return "×10 and BLOCK hire unlocked"
+				_:
+					return "×10, BLOCK and MAX hire unlocked"
 	return ""

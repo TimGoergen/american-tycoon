@@ -97,6 +97,39 @@ func cost_for_level(property_index: int, level: int) -> int:
 	))
 
 
+## Legacy cost to retain the next `count` ladder levels of a property in one go, starting
+## from whatever is already retained. This LOOPS rather than using a closed-form geometric
+## sum on purpose: cost_for_level() rounds each level up individually (the `ceil` above), so
+## the true price of a block is the sum of the ROUNDED levels, not the rounding of the sum.
+## The two differ by up to one point per level, and the bulk-buy UI quotes this number to the
+## player before they commit — so it has to be the exact figure the purchase will charge.
+func bulk_cost_for_levels(property_index: int, count: int) -> int:
+	if count <= 0:
+		return 0
+	var first_level := next_retention_level(property_index)
+	var total := 0
+	for offset in range(count):
+		total += cost_for_level(property_index, first_level + offset)
+	return total
+
+
+## How many further ladder levels `budget` Legacy could retain on a property, never
+## exceeding `ceiling` (the bloodline's earned high — retention can't outrun what the
+## family actually reached). Walks level by level for the same rounding reason as
+## bulk_cost_for_levels: only a per-level walk can agree with what the buy path charges.
+func max_affordable_levels(property_index: int, budget: int, ceiling: int) -> int:
+	var first_level := next_retention_level(property_index)
+	var affordable := 0
+	var remaining := budget
+	while first_level + affordable <= ceiling:
+		var cost := cost_for_level(property_index, first_level + affordable)
+		if cost > remaining:
+			break
+		remaining -= cost
+		affordable += 1
+	return affordable
+
+
 ## Record a property's retained level count directly (used by the buy path and on load).
 func set_retained_levels(property_index: int, levels: int) -> void:
 	if levels <= 0:

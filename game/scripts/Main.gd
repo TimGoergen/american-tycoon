@@ -838,6 +838,15 @@ func _build_property_tab() -> Control:
 		var cost_a: float = (game.economy.properties[a] as PropertyState).config.base_cost
 		var cost_b: float = (game.economy.properties[b] as PropertyState).config.base_cost
 		return cost_a < cost_b)
+	# Which rung of each epoch is that cohort's FLAGSHIP — the property whose 35th unit advances the
+	# epoch, and the one auto-purchase never buys. It is fixed by config (the cohort's most expensive
+	# member), so it is resolved ONCE here and handed to each row, which marks itself visually.
+	var flagship_indices := {}
+	for tier in range(1, EpochCatalog.tier_count() + 1):
+		var flagship := game.economy.get_flagship_index_for_unlock_tier(tier)
+		if flagship >= 0:
+			flagship_indices[flagship] = true
+
 	for i in ladder_order:
 		var row := PropertyRow.new()
 		# game.rush_momentum is passed so the row can present the rush control as disabled while
@@ -852,6 +861,7 @@ func _build_property_tab() -> Control:
 		row.rush_released.connect(_on_rush_released)
 		row.hire_requested.connect(_on_hire_requested)
 		row.set_buy_mode(_buy_mode)
+		row.set_flagship(flagship_indices.has(i))
 		ladder.add_child(row)
 		_rows.append(row)
 

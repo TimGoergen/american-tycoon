@@ -290,6 +290,10 @@ const SECOND_ROW_FONT_SIZE := 41
 ## the export, so it must not be read at runtime.
 const DOLLAR_ICON_SVG := "res://art/icons/dollar_bill.svg"
 const PROPERTY_ICON_SVG := "res://art/icons/tab_property_inactive.svg"
+## The Family Ledger book, reused here as the FLAGSHIP badge (see _flagship_icon). It is the same
+## art the Family Ledger tab uses, and it is already imported at svg/scale=4 (≈324px native), so
+## it downscales into the badge cleanly instead of blocking up the way a scale-1 import would.
+const LEDGER_ICON_SVG := "res://art/icons/tab_ledger_inactive.svg"
 
 ## The hire button's headshot icon and the buy button's factory (property-tab) icon are sized
 ## so their VISIBLE (opaque) art is the SAME height: 50.6px, the average of their former
@@ -299,9 +303,27 @@ const PROPERTY_ICON_SVG := "res://art/icons/tab_property_inactive.svg"
 ## fraction at each use (headshot: art fills 86/96 of its box; factory: 279/324).
 const MATCHED_ICON_VISIBLE_HEIGHT := 50.6
 
+## The flagship badge's box, in pixels. The ledger art fills only the middle ~33/48 of its square
+## canvas, so a 76px box draws a ~52px-tall book — about the height of the NAME line it sits
+## beside, which is what makes it readable at arm's length.
+const FLAGSHIP_ICON_BOX := 76
+## The badge is nudged 8px right and 4px up from the name line's top-right corner so the VISIBLE
+## book (not its transparent padding) sits close to the panel's inner frame. Both nudges only move
+## paint — the badge is anchored, not laid out, so nothing on the row shifts.
+const FLAGSHIP_ICON_NUDGE_RIGHT := 8
+const FLAGSHIP_ICON_NUDGE_UP := 4
+
 ## Imported icon textures, loaded once and keyed by source path. Shared across every row
 ## (all rows draw the same two icons), loaded lazily on first use.
 static var _crisp_icon_cache := {}
+
+## True when this rung is its epoch cohort's FLAGSHIP — the property whose 35th unit advances the
+## epoch, and the one auto-purchase never buys. Fixed for the life of the row (flagship-ness is a
+## property of the config: the cohort's highest base_cost), so Main sets it once at row setup.
+var _is_flagship := false
+## The Family Ledger badge in the row's top-right corner, shown only on the flagship. An overlay
+## anchored inside the name label — see the note where it is built.
+var _flagship_icon: TextureRect
 
 var _manager_circle: ManagerCircle
 var _name_label: Label
@@ -633,6 +655,87 @@ func _ready() -> void:
 	# bars — anything that isn't one of the buttons above) scroll the ladder,
 	# rather than being swallowed by the row. See UiPalette.allow_scroll_drag_through.
 	UiPalette.allow_scroll_drag_through(self)
+
+	# The FLAGSHIP badge — the Family Ledger book in the row's top-right corner, shown only on the
+	# rung that advances the epoch. Like the OVERHEATED plate above, it is an OVERLAY: it borrows
+	# space the row already occupies and costs the layout nothing, so a flagship row is EXACTLY the
+	# same size, with every control in exactly the same place, as any other row (no-moving-UI rule).
+	#
+	# It is parented to the NAME LABEL rather than to this PanelContainer on purpose. A
+	# PanelContainer is a Container: it re-lays-out its direct children and would stretch the badge
+	# across the whole panel, ignoring its anchors. A Label is not a container, so a Control child
+	# of it keeps its own anchors — and the name label already spans the row's full content width on
+	# the top line, which makes its top-right corner the panel's top-right corner.
+	#
+	# Added LAST so it draws over everything, and mouse-ignored (re-asserted AFTER
+	# allow_scroll_drag_through, which would otherwise flip it to PASS) so it can never intercept a
+	# tap or a scroll drag.
+	_flagship_icon = _make_inline_icon(LEDGER_ICON_SVG, FLAGSHIP_ICON_BOX, true)
+	_flagship_icon.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_flagship_icon.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_flagship_icon.offset_right = FLAGSHIP_ICON_NUDGE_RIGHT
+	_flagship_icon.offset_left = _flagship_icon.offset_right - FLAGSHIP_ICON_BOX
+	_flagship_icon.offset_top = -FLAGSHIP_ICON_NUDGE_UP
+	_flagship_icon.offset_bottom = _flagship_icon.offset_top + FLAGSHIP_ICON_BOX
+	# The source art is already solid NAVY (#1D2D50) — the same navy as the flagship plate's heavy
+	# border — so it is drawn untinted (modulate stays white). Tinting it gold was the alternative,
+	# but gold-on-gold-warmed-cream is a low-contrast pairing, and this badge has to be legible for
+	# a low-vision player; navy on the warm plate is the strongest reading of the two.
+	_flagship_icon.modulate = Color.WHITE
+	_flagship_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_flagship_icon.visible = _is_flagship
+	_name_label.add_child(_flagship_icon)
+	# Main sets flagship-ness BEFORE _ready, when there was no label to inset yet — so apply it
+	# here too, now that both exist. (set_flagship handles the after-_ready case.)
+	_apply_flagship_name_inset(_is_flagship)
+
+
+## Mark this rung as its epoch cohort's FLAGSHIP (or not). Main calls this ONCE per row at setup:
+## which property is the flagship is fixed by config (the cohort's highest base_cost), so this is
+## never re-evaluated per frame.
+##
+## Safe to call before OR after _ready: the badge is only touched once it exists, and the plate is
+## rebuilt on the next refresh.
+func set_flagship(value: bool) -> void:
+	if _is_flagship == value:
+		return
+	_is_flagship = value
+	if _flagship_icon != null:
+		_flagship_icon.visible = value
+	if _name_label != null:
+		_apply_flagship_name_inset(value)
+	# CACHE INVALIDATION: _apply_ownership_styling early-returns when the look it wants is already
+	# the one applied, and it keys only off owned/frozen — it has no idea flagship-ness changed. A
+	# row told it is the flagship AFTER its plain plate was applied would therefore keep that plate
+	# forever. Clearing the sentinel forces the next refresh to rebuild the stylebox.
+	_ownership_style_applied = -1
+	# Re-apply right away when the row is already built (is_node_ready() is false while Main is
+	# still configuring a freshly constructed row — its labels don't exist yet, and _ready will
+	# pick the right plate on the first refresh anyway).
+	if is_node_ready() and _prop != null:
+		_apply_ownership_styling(_prop.units_owned > 0, _prop.is_overheat_frozen)
+
+
+## Keep a long property name from running underneath the flagship badge.
+##
+## The name Label spans the full content width and clips at the PANEL edge, not at the badge,
+## so on a flagship row the longest names (28 characters, e.g. "Pheromone Broadcasting Guild")
+## would slide under the ledger icon and become unreadable — unacceptable for a low-vision
+## player, and the badge is on the marquee property precisely so it gets read.
+##
+## The fix is a right-side CONTENT margin on the Label itself, not a layout change. A Label's
+## "normal" stylebox insets where its text is drawn INSIDE its own rect; the Label's size, the
+## column's layout, and every sibling control stay exactly where they were. So the text simply
+## clips earlier on flagship rows and nothing moves — the no-moving-UI rule is preserved.
+func _apply_flagship_name_inset(flagship: bool) -> void:
+	if not flagship:
+		_name_label.remove_theme_stylebox_override("normal")
+		return
+	var inset := StyleBoxEmpty.new()
+	# Reserve exactly the width the badge actually occupies over the label: the box, less the
+	# amount it is nudged out past the panel edge, plus a little air so text never touches art.
+	inset.content_margin_right = FLAGSHIP_ICON_BOX - FLAGSHIP_ICON_NUDGE_RIGHT + 8
+	_name_label.add_theme_stylebox_override("normal", inset)
 
 
 ## Called by Main when the player cycles the global buy-mode toggle.
@@ -1400,8 +1503,16 @@ func _apply_ownership_styling(owned: bool, frozen: bool) -> void:
 	if want == _ownership_style_applied:
 		return
 	_ownership_style_applied = want
+	# The FLAGSHIP rung takes the warmed, heavy-bordered, softly glowing plate in every one of the
+	# three states below — owning it, not owning it yet, and being overheat-frozen don't change
+	# WHICH property advances the epoch, so the marker must never blink off. (Both flagship plates
+	# keep the standard plate's content margin, so swapping them in never moves anything: see
+	# UiPalette._apply_flagship_frame.)
+	var owned_plate := (
+			UiPalette.make_flagship_panel_style() if _is_flagship else UiPalette.make_panel_style()
+	)
 	if want == 0:
-		add_theme_stylebox_override("panel", UiPalette.make_panel_style())
+		add_theme_stylebox_override("panel", owned_plate)
 		# Owned: the per-cycle payout in bold black (Tim, 2026-07-01).
 		_income_label.add_theme_color_override("font_color", Color.BLACK)
 		# The dollar-bill icon is FULL-COLOR art (green note, gold seal), so it shows at its
@@ -1409,7 +1520,9 @@ func _apply_ownership_styling(owned: bool, frozen: bool) -> void:
 		# icon into a solid black silhouette (Tim, 2026-07-09).
 		_income_icon.modulate = Color.WHITE
 	elif want == 1:
-		add_theme_stylebox_override("panel", UiPalette.make_unowned_panel_style())
+		add_theme_stylebox_override("panel",
+				UiPalette.make_unowned_flagship_panel_style() if _is_flagship
+				else UiPalette.make_unowned_panel_style())
 		# Unowned: a drab dark-gray single-unit preview, matching the locked row look. Fade the
 		# color icon back with alpha (rather than recolor it) so it still reads as a dollar bill.
 		_income_label.add_theme_color_override("font_color", UiPalette.DARK_GRAY)
@@ -1420,7 +1533,7 @@ func _apply_ownership_styling(owned: bool, frozen: bool) -> void:
 		# full over the bar cell and fully occludes them, so dimming them here was dead work that only
 		# made the code look like a $0 readout stays visible during a freeze; it does not. When the row
 		# thaws, want==0 restores the black readout (see the function comment above; Tim, 2026-07-22).
-		add_theme_stylebox_override("panel", UiPalette.make_panel_style())
+		add_theme_stylebox_override("panel", owned_plate)
 
 
 ## The staff button's `pressed` handler. One action only — buy the next ladder rung —

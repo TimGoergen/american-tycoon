@@ -174,6 +174,69 @@ static func make_panel_style() -> StyleBoxFlat:
 	return _make_plate(CREAM, NAVY)
 
 
+# --- Flagship plates -------------------------------------------------------------------------
+# The FLAGSHIP of an epoch's cohort is the property the era actually turns on: owning 35 units of
+# it advances the epoch (Epoch Advance Rework), and auto-purchase deliberately never buys it. Until
+# now nothing on screen said which row that was. These plates mark it (Tim, 2026-07-31): "a more
+# bold outline, a family ledger icon in the top right corner, and the background slightly glowing."
+# The icon half lives in PropertyRow; the outline + glow are here.
+
+## Twice the standard plate's 3px border. Same NAVY as every other frame — this is the SAME frame
+## language, just carrying more weight, rather than a new color that would read as a new kind of
+## thing.
+const FLAGSHIP_BORDER_WIDTH := 6
+## How far the gold halo bleeds out past the plate's edge. This shadow IS the "glow" — a warmer
+## background alone is too quiet to find while scrolling a ladder.
+const FLAGSHIP_GLOW_SIZE := 10
+## Alpha of that halo. Low on purpose: Tim asked for "slightly glowing", so it should read as warm
+## lighting spilling off the panel, not as a highlight marker painted on top of it.
+const FLAGSHIP_GLOW_ALPHA := 0.35
+## How far the plate's background is pulled toward MUSTARD_GOLD. Enough to be obvious beside a
+## plain cream row, not so far that the navy text loses contrast.
+const FLAGSHIP_WARM_BLEND := 0.18
+## The gray (unowned) flagship warms a little harder than the cream one: it starts from a drab
+## LIGHT_GRAY, so it needs more gold to travel the same visual distance.
+const FLAGSHIP_UNOWNED_WARM_BLEND := 0.22
+
+
+## Warm cream plate with a heavy navy border and a gold halo — the OWNED flagship rung.
+static func make_flagship_panel_style() -> StyleBoxFlat:
+	var style := _make_plate(CREAM.lerp(MUSTARD_GOLD, FLAGSHIP_WARM_BLEND), NAVY)
+	_apply_flagship_frame(style)
+	return style
+
+
+## The flagship rung the player has not bought yet. It keeps the gray family's drabness (it is
+## still locked) but takes the same heavy border, gold warmth and halo, because an UNBOUGHT
+## flagship is exactly the row the player is saving toward — it has to stay findable. Its border
+## goes DARK_GOLD rather than the unowned plate's MID_GRAY: navy would read as "owned" beside the
+## gray rows, while mid-gray at 6px just looks like a thicker gray line.
+static func make_unowned_flagship_panel_style() -> StyleBoxFlat:
+	var style := _make_plate(LIGHT_GRAY.lerp(MUSTARD_GOLD, FLAGSHIP_UNOWNED_WARM_BLEND), DARK_GOLD)
+	_apply_flagship_frame(style)
+	return style
+
+
+## Turn a plate built by _make_plate into a flagship plate: heavier border + gold outer halo.
+##
+## LAYOUT NOTE — this is what keeps the no-moving-UI rule. The content margin is deliberately left
+## at _make_plate's 12. In Godot, StyleBox.get_margin() returns the CONTENT margin whenever one is
+## set (>= 0) and only falls back to the border width when it is not: the two are ALTERNATIVES,
+## not a sum. So the content box is inset 12px from the panel's outer edge whether the border is
+## 3px or 6px, and a PanelContainer's minimum size — which is built from those same margins — is
+## identical either way. The thicker border simply eats 3px of the padding it was already sitting
+## inside; nothing on the row moves, resizes, or reflows. (Dropping the margin to 9 to "compensate"
+## for the border would in fact shift every control 3px OUTWARD and shrink the panel — the exact
+## thing to avoid.)
+##
+## The halo is a StyleBoxFlat SHADOW, drawn outside the box. Unlike expand_margin, a shadow
+## contributes nothing to minimum size or layout — it is pure paint.
+static func _apply_flagship_frame(style: StyleBoxFlat) -> void:
+	style.set_border_width_all(FLAGSHIP_BORDER_WIDTH)
+	style.shadow_color = Color(MUSTARD_GOLD, FLAGSHIP_GLOW_ALPHA)
+	style.shadow_size = FLAGSHIP_GLOW_SIZE
+
+
 ## Vertical gap that floats each tab's content panel between the hero stat above and the
 ## tab bar below. TOP/BOTTOM only since 2026-07-06 (Tim): the panel's left/right edges
 ## now sit flush with the hero stat panel and the tab buttons, full column width.

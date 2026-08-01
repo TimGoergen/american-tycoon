@@ -152,8 +152,9 @@ full-digits threshold" and belongs as a tweak to `display_cash()`, not a third m
 
 Tim's ask: a Legacy upgrade unlocks an AUTO-PURCHASE mode. While the player has it enabled,
 the game buys on a cadence — 3s by default, with further upgrades shortening it. Rush is
-unavailable while the mode is on. WHAT it buys is the X most expensive properties the player
-can afford, with further upgrades raising X (Tim's revision, 2026-07-31 — see below).
+unavailable while the mode is on. WHAT it buys is the X LEAST expensive properties the player
+can afford, in a larger quantity each, **limited to the epoch page currently on screen**
+(Tim's final rule, 2026-07-31 — see below).
 
 **Take: the strongest idea in this QoL family, and the rush trade-off is what makes it one.**
 Every other entry here (§1-4) removes taps. This one removes the ACTIVITY, which would
@@ -166,69 +167,150 @@ have, and it echoes the "minigames are a player setting" principle: choice, not 
 Theme fit is clean too — a tycoon delegating purchasing to an acquisitions desk is the
 fiction the game is already telling.
 
-### The tension that still has to be resolved
+### The tension this had to clear (resolved by the buy rule below)
 
-**It automates the epoch tail we just deliberately built.** As of 2026-07-31 an alien epoch
-advances on owning 35 units of its flagship (Plans/Epoch_Advance_Rework.md), and that stacking
-phase — measured at 34% of an epoch — exists specifically so the flagship gets playtime.
-Auto-purchase automates precisely that grind. Left unconstrained, this upgrade deletes the
-pacing feature.
+As of 2026-07-31 an alien epoch advances on owning 35 units of its flagship
+(Plans/Epoch_Advance_Rework.md), and that stacking phase — measured at 34% of an epoch —
+exists specifically so the flagship gets playtime. Any auto-purchase rule that targets
+expensive properties automates exactly that grind, and would sell away a pacing feature
+shipped the same day.
 
-That is not automatically wrong: earning the right to automate a grind is the genre's core
-progression, and it costs gems and rush to do it. But it is a deliberate decision, not a
-detail, and it should be made with the flagship gate in view rather than by accident.
+**The least-expensive rule settles it structurally rather than by tuning:** the mode never
+touches the epoch's most expensive property, so the gate is untouched by construction. Recorded
+here because it is the constraint any future change to the buy rule has to keep clearing — if
+someone later "improves" the mode to buy the best properties, this is what it breaks.
 
-### DECIDED: the X most expensive properties you can afford (Tim, 2026-07-31)
+### DECIDED: the X LEAST expensive properties you can afford (Tim, 2026-07-31)
 
-Tim's revision, replacing his own "as many as it can afford": **each tick, buy the X most
-expensive properties the player can currently afford**, with further upgrades raising X.
+Tim's second revision, and the final rule: **each tick, buy the X least expensive properties
+the player can afford**, in a larger quantity per purchase so the mode is worth its cost.
+(History: "as many as it can afford" → "X most expensive" → this. Only this one is live.)
 
-This is the right rule, and it fixes the flaw the original had. Income is NEUTRAL across a
-cohort (income/sec per dollar of cost is identical), so "as many as it can afford" is
-literally "spend to zero" — the auto-buyer would hold cash at ~0 forever and could never SAVE,
-starving both the next rung and the 35 flagship units. Ranking by price and taking only the
-top X bounds the spend, so the mode assists instead of competing.
+**This is the better of the three, and it is what dissolves the tension flagged above.** The
+most-expensive rule aimed the automation squarely at the flagship — i.e. at the 35-unit
+stacking phase that exists precisely to give the flagship playtime, so the upgrade would have
+sold away a pacing feature shipped the same day. Least-expensive inverts that cleanly:
 
-Two properties of this rule are worth keeping deliberately:
+- **It automates the chore and leaves the decision.** The cheap end of a cohort is where the
+  tedium lives — many small buys, each individually trivial. The flagship, which is what
+  actually advances the epoch, stays a deliberate player purchase.
+- **It cannot skip the gate.** The mode never touches the most expensive property, so the
+  35-unit requirement is untouched by definition rather than by a tuning value.
+- **It still earns real money.** Income is NEUTRAL across a cohort — income/sec per dollar of
+  cost is identical at both ends of the ladder — so a dollar auto-spent on the cheapest rung
+  earns exactly as much as a dollar spent on the flagship. Cheap does not mean weak here.
 
-- **It aims straight at the epoch gate.** The flagship IS its epoch's most expensive property,
-  so at X=1 the mode feeds the flagship and nothing else — exactly the 35-unit requirement.
-- **It does NOT trivialise the unlock phase.** Because it always prefers expensive rungs, it
-  will happily ignore the cheap ones a roster still needs. Completing "one of each" stays the
-  player's job at small X. That is a good outcome, not a gap: auto-purchase accelerates the
-  tail without skipping the part of the epoch where new things appear.
+**The real trade-off, and it is a good one.** Because income is neutral, cheap and expensive
+purchases compound identically — but only flagship units advance the epoch. So a player
+running this mode grows income just as fast while advancing more slowly, and has given up rush
+on top. That is a genuine strategic posture ("bank income, coast on the era") rather than a
+straight power-up, which is exactly what a QoL reward should be.
 
 Recommended specifics:
-- **One unit per property per tick**, not MAX. The cadence is the throttle — that is what makes
-  the cadence upgrades meaningful. MAX would zero the wallet on the first tick and undo the
-  bound the rule just bought.
-- **Re-evaluate affordability after each purchase within a tick.** Buy the most expensive
-  affordable, deduct, re-check, up to X. Choosing all X up front against the opening balance
-  would try to buy things the earlier purchases just made unaffordable.
+- **The larger quantity must be a BOUNDED number of units, never MAX.** MAX means "spend all
+  cash" by definition, which resurrects the spend-to-zero problem the first rule had and would
+  starve the flagship the player is saving for. A fixed N per property per tick keeps the drain
+  proportionate — and the drain is naturally small anyway, since a cohort spans 2^13 = 8192×
+  from cheapest to flagship, so even a generous N at the low end is a rounding error against
+  one flagship unit.
+- **Which axis does "larger" scale — breadth (X) or depth (N)?** Tim's wording covers both.
+  Recommend making N (units per property) the upgrade axis and keeping X modest: a cohort is
+  only 14 properties, so X saturates quickly and stops being a meaningful purchase, whereas N
+  keeps mattering. If both become tracks, note that throughput is X × N ÷ cadence — three
+  multiplying axes will outrun any of them tuned alone.
+- **Re-evaluate affordability after each purchase within a tick.** Buy, deduct, re-check.
+  Choosing the whole batch up front against the opening balance would try to buy things the
+  earlier purchases just made unaffordable.
 - **Rank by CURRENT next-unit cost**, not base cost — that is what "can afford" means, and it
-  keeps the ranking honest as `r0` escalation reorders the ladder.
-- Two upgrade axes now exist and they multiply: X (breadth) and cadence (rate), giving
-  throughput ≈ X ÷ cadence units per second. Size them together, or the pair will outrun
-  whatever either was tuned against alone.
+  keeps the ranking honest as `r0` escalation reorders the low end. Note this makes the mode
+  self-balancing: hammering the cheapest rung raises its price until another rung becomes the
+  cheapest, so it spreads across the low end on its own instead of tunnelling into one row.
+- **A newly-arrived epoch is all-cheap.** On contact, 14 unowned properties appear and the mode
+  will sweep the bottom of them — which is the roster grunt work of §4's "epoch-arrival
+  auto-buy", handled for free. Worth checking the two ideas do not end up duplicating.
 
 The rule still has to be stated plainly in the upgrade's own description — a mode that spends
 the player's money on a rule they cannot see reads as a bug.
 
-**The tension above sharpens under this rule, not away from it:** at low X this mode is
-precisely "automate the flagship grind", which is the pacing phase shipped on 2026-07-31. That
-may well be the correct prestige reward, but it is now unmistakably the thing being sold.
+### Why not the other candidates (Tim asked these be compared, 2026-07-31)
+
+Four rules were considered: most expensive, least expensive, "next most profitable" ($/s
+earned per dollar spent), and "whichever you own least of".
+
+**Two of those four are the same rule.** For any property, income/sec per unit is
+`base_cost × k(tier)` and the next unit costs `base_cost × r0^n`, so
+
+    marginal $/s per $ spent  =  (base_cost × k) / (base_cost × r0^n)  =  k / r0^n
+
+`base_cost` CANCELS. Within a cohort — where `k` is identical, because income is
+income-neutral by construction — "the next most profitable property" is mathematically
+identical to "the property you own the fewest units of". They only diverge across tiers (older
+epochs have a better `k`, since the decay bands have not eaten it yet) and where staffing or a
+milestone doubling has lifted one property's income per unit. Do not implement them as two
+different features; they are one.
+
+Interaction with the flagship gate is what separates the rest:
+
+| rule | where the money goes | flagship gate |
+|---|---|---|
+| most expensive | straight into the flagship | automates the 35-unit tail |
+| **least expensive** | bottom of the cohort only | **never touches it, by construction** |
+| most profitable ≡ fewest owned | evenly across the cohort by unit count | pushes everything, flagship included, to 35 |
+
+Against "most profitable" specifically, two further strikes:
+- **It is not actually optimal.** Milestones at 25/50/100 units grant income DOUBLINGS, so a
+  myopic marginal-ratio rule undervalues a property sitting at 24 units. It is neither simple
+  nor correct.
+- **It is unexplainable.** The honest answer to "why did it buy that one?" involves `r0`
+  escalation and decay bands. If this behaviour is ever wanted, ship it as **fewest owned** —
+  identical outcome, and it states itself ("keeps your portfolio even").
+
+**A place for it later, if the track needs depth:** make the BUY RULE itself an upgrade axis.
+Tier 1 sweeps the cheap end (chores). A much later, much more expensive tier switches to
+fewest-owned — balanced portfolio, flagship included — which is openly "automate the whole
+game", earned at a point where that is a legitimate prestige reward rather than something that
+quietly deletes the pacing shipped alongside it.
+
+### Scope and cadence behaviour (Tim, 2026-07-31)
+
+**The mode operates ONLY on the epoch page the player is currently viewing.** It buys from that
+pager tab's properties, not the whole ladder.
+
+This is the best part of the design, because it hands the allocation decision back to the
+player in the most legible possible form: *which page am I on*. The mode stops being a hidden
+optimiser and becomes a directed tool — point it at an era and it sweeps that era's cheap end.
+It also produces a useful emergent control: parking on an early epoch, where everything costs a
+rounding error against current wealth, effectively idles the mode without toggling it off.
+
+**When a tick finds nothing affordable on that page, it does not burn the cycle.** It pauses,
+fires the instant something becomes affordable, and only then restarts the wait timer. So the
+cadence stays a genuine throttle — never more than one purchase per cadence — while the mode
+never feels dead during a stretch where the player is poor.
+
+Consequences worth building around:
+- **The mode is maximally eager to spend on its page.** A player saving for flagship units
+  while sitting on the current epoch will have cash skimmed the moment it clears the cheapest
+  rung. That is bounded (a cohort spans 8192× from cheapest to flagship, so the skim is small)
+  but it is real, and the answer is page away or toggle off — which only works if the UI makes
+  the page-scoping obvious.
+- **The page-scoping has to be visible.** The mode's behaviour now depends on a navigation
+  state, so the ladder or pager needs to show that auto-purchase is acting on THIS era.
+  Otherwise a player who pages away will think the feature broke.
+- Watching for affordability is cheap — compare cash against the minimum next-unit cost among
+  that page's properties — so the paused state can be evaluated on the normal logic tick.
 
 ### Load-bearing facts for whoever builds it
 
-- **Prior art exists and is proven:** `Sim._greedy_build_out` is this exact behaviour (buy
-  units + staff + hires, spend down each tick) and has run at 10 Hz across every balance study.
-  Start there rather than writing a new buyer. Note it allocates PERFECTLY, so it is a stronger
-  buyer than a human — auto-purchase would hand the player sim-grade allocation, which is worth
-  sizing before it ships.
+- **Prior art, with a caveat:** `Sim._greedy_build_out` is the closest existing buyer (buy units
+  + staff + hires, spend down each tick) and has run at 10 Hz across every balance study, so the
+  purchase plumbing is proven. But do NOT reuse its POLICY: it is global and allocates perfectly,
+  where this mode is deliberately page-scoped, cheap-end-only and bounded. Borrow the mechanism,
+  not the strategy — reusing the strategy is exactly how this ends up handing the player
+  sim-grade allocation, which the buy rule above was chosen to avoid.
 - **Cadence:** 3s default with upgrades shortening it. Diminishing returns are steep — below
   roughly a second it is indistinguishable from continuous, so the track wants few levels with
-  meaningful steps rather than many small ones. Watch device cost: the ladder is 326 properties
-  and each buy touches UI.
+  meaningful steps rather than many small ones. Device cost is modest now that the mode is
+  page-scoped: one tick ranks ~14 properties, not the full 326 ladder.
 - **Rush lockout is UI work, not just a flag.** Per the no-moving-UI rule the rush affordances
   gray in place, never disappear, and the reason has to be legible ("auto-buy is on") or it
   reads as a bug. `RushMomentumState` heat should presumably idle rather than decay-punish while

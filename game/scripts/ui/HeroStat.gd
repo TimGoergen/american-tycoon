@@ -142,7 +142,6 @@ var _economy_bar: ProgressBar
 var _economy_label: Label
 ## The icon + counts half of the readout, and the gap before them. Hidden for the money bar,
 ## which is one sentence with nothing to count (see set_epoch_progress).
-var _economy_gap: Control
 var _economy_icon_gap: Control
 var _economy_icon: TextureRect
 var _economy_counts: Label
@@ -152,18 +151,22 @@ const ECONOMY_SILVER := Color.WHITE
 ## The property icon shown before the flagship count on the epoch bar. Same asset the property
 ## tab and PropertyRow's buy-count use, so "this is about properties" reads consistently.
 const PROPERTY_ICON := preload("res://art/icons/tab_property_inactive.svg")
-## Icon box side in px. Comfortably above FONT_LABEL (28) because this glyph is a thin-lined
-## factory — at a tighter box it reads as a smudge next to the bold numerals.
-const ECONOMY_ICON_PX := 38
-## Space between the property's name and its icon + counts.
-const ECONOMY_READOUT_GAP := 22
-## The smaller space between the icon and the numerals it labels. They belong together, so this
-## is deliberately much tighter than the gap above — but not zero, which reads as collision.
-const ECONOMY_ICON_GAP := 8
+## Readout type size. Stepped up with the taller bar (Tim, 2026-07-31: "as large as can fit") —
+## FONT_SUBHEAD is the largest rung of the palette scale that clears ECONOMY_BAR_HEIGHT with its
+## descenders and the 2px shadow intact. Going higher clips.
+const ECONOMY_FONT_SIZE := UiPalette.FONT_SUBHEAD
+## Icon box side in px, grown with the type so the pair stays proportionate.
+const ECONOMY_ICON_PX := 50
+## The space between the numerals and the icon. They belong together, so this stays tight —
+## but not zero, which reads as collision.
+const ECONOMY_ICON_GAP := 10
+## Inset from the bar's left and right ends, so neither the name nor the icon sits against the
+## frame. Matches the framed fill's own inset plus a little air.
+const ECONOMY_READOUT_INSET := 14
 var _economy_divider: ColorRect
 ## Height of the economy bar strip, and of the red divider above it (the divider matches
 ## the panel frame's 12px thickness so it reads as the same line).
-const ECONOMY_BAR_HEIGHT := 54  # 26 + 30% -> 34, then +60% -> 54 (Tim, 2026-07-06)
+const ECONOMY_BAR_HEIGHT := 68  # 26 +30% -> 34, +60% -> 54 (Tim, 2026-07-06), +25% -> 68 (2026-07-31)
 const ECONOMY_DIVIDER_HEIGHT := 12
 
 # Frenzy glow: while a burn is active the ticket pulses toward red to signal the
@@ -268,20 +271,28 @@ func _ready() -> void:
 	# A silver readout centered over the economy bar telling the player how much of this epoch's
 	# economy they've consumed (Tim, 2026-07-09). Full-rect over the bar, mouse-ignored, with a
 	# navy outline so the silver stays legible over the blue fill and the bubbles.
-	# The readout is a centered ROW, not one label, so a property icon can sit between the name
-	# and the counts (Tim, 2026-07-31). Centering the row rather than the labels keeps the whole
-	# group optically centered on the bar however long the property's name is.
+	# The readout is a ROW spanning the bar, not one centered label (Tim, 2026-07-31): the
+	# property NAME sits hard left and the count + icon sit hard right, so the two halves have
+	# fixed homes and the eye always finds each in the same place regardless of name length.
+	# The name label EXPANDS, which is what pushes the right-hand group to the far end.
 	var readout_row := HBoxContainer.new()
 	readout_row.set_anchors_preset(Control.PRESET_FULL_RECT)
-	readout_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	readout_row.offset_left = ECONOMY_READOUT_INSET
+	readout_row.offset_right = -ECONOMY_READOUT_INSET
 	readout_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	readout_row.add_theme_constant_override("separation", 0)  # gaps are explicit spacers below
 	_economy_bar.add_child(readout_row)
 
 	_economy_label = Label.new()
 	_economy_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_economy_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	# Expanding is what pins everything after it to the right end of the bar.
+	_economy_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# Clip rather than overflow: the name owns whatever is left after the count and icon, and a
+	# future property name longer than today's 28-character maximum must never draw over them.
+	_economy_label.clip_text = true
 	_economy_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_economy_label.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
+	_economy_label.add_theme_font_size_override("font_size", ECONOMY_FONT_SIZE)
 	# Light gray, no outline (Tim, 2026-07-09).
 	_economy_label.add_theme_color_override("font_color", ECONOMY_SILVER)
 	# A drop SHADOW behind the readout (Tim, 2026-07-31) so the silver stays readable wherever it
@@ -296,13 +307,28 @@ func _ready() -> void:
 	_economy_label.add_theme_constant_override("shadow_outline_size", 2)
 	readout_row.add_child(_economy_label)
 
-	# Breathing room between the property's name and its count (Tim, 2026-07-31) — without it
-	# "Photon Exchange" and "21 / 35" run together as one phrase instead of reading as a label
-	# and its value.
-	_economy_gap = Control.new()
-	_economy_gap.custom_minimum_size = Vector2(ECONOMY_READOUT_GAP, 0)
-	_economy_gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	readout_row.add_child(_economy_gap)
+	# Right-hand group, in reading order: the counts, then the icon hard against the bar's right
+	# end (Tim, 2026-07-31). The icon anchors the corner and the numerals it labels sit just
+	# inside it. No spacer is needed before this group — the name label above expands and pushes
+	# it here on its own.
+
+	# The counts ("21 / 35"), carrying the same shadow treatment as the name.
+	_economy_counts = Label.new()
+	_economy_counts.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_economy_counts.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_economy_counts.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_economy_counts.add_theme_font_size_override("font_size", ECONOMY_FONT_SIZE)
+	_economy_counts.add_theme_color_override("font_color", ECONOMY_SILVER)
+	_economy_counts.add_theme_color_override("font_shadow_color", Color(UiPalette.NAVY, 0.85))
+	_economy_counts.add_theme_constant_override("shadow_offset_x", 2)
+	_economy_counts.add_theme_constant_override("shadow_offset_y", 2)
+	_economy_counts.add_theme_constant_override("shadow_outline_size", 2)
+	readout_row.add_child(_economy_counts)
+
+	_economy_icon_gap = Control.new()
+	_economy_icon_gap.custom_minimum_size = Vector2(ECONOMY_ICON_GAP, 0)
+	_economy_icon_gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	readout_row.add_child(_economy_icon_gap)
 
 	# The property icon, tinted to match the readout so icon and text read as one unit. preload
 	# takes the IMPORTED texture — never read the .svg source at runtime, which the export strips
@@ -317,23 +343,6 @@ func _ready() -> void:
 	_economy_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_economy_icon.modulate = ECONOMY_SILVER
 	readout_row.add_child(_economy_icon)
-
-	_economy_icon_gap = Control.new()
-	_economy_icon_gap.custom_minimum_size = Vector2(ECONOMY_ICON_GAP, 0)
-	_economy_icon_gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	readout_row.add_child(_economy_icon_gap)
-
-	# The counts ("21 / 35"), carrying the same shadow treatment as the name.
-	_economy_counts = Label.new()
-	_economy_counts.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_economy_counts.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_economy_counts.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
-	_economy_counts.add_theme_color_override("font_color", ECONOMY_SILVER)
-	_economy_counts.add_theme_color_override("font_shadow_color", Color(UiPalette.NAVY, 0.85))
-	_economy_counts.add_theme_constant_override("shadow_offset_x", 2)
-	_economy_counts.add_theme_constant_override("shadow_offset_y", 2)
-	_economy_counts.add_theme_constant_override("shadow_outline_size", 2)
-	readout_row.add_child(_economy_counts)
 
 	_content.add_child(_economy_bar)
 
@@ -387,10 +396,13 @@ func set_epoch_progress(consumed: float, goal: float, readout: String = "", coun
 		# gap. The money bar is one sentence with nothing to count, so all three stay hidden and
 		# the name label is simply centered on its own.
 		var counting := counts != ""
+		# The flagship readout is a label/value pair, so the name sits hard left against its
+		# count (Tim, 2026-07-31). The money bar is one sentence with no value beside it, so it
+		# keeps the centering it has always had rather than drifting left for no reason.
+		_economy_label.horizontal_alignment = 			HORIZONTAL_ALIGNMENT_LEFT if counting else HORIZONTAL_ALIGNMENT_CENTER
 		_economy_counts.text = counts
 		_economy_counts.visible = counting
 		_economy_icon.visible = counting
-		_economy_gap.visible = counting
 		_economy_icon_gap.visible = counting
 
 

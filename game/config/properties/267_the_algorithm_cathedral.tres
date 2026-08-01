@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 267
+display_name = "The Algorithm Cathedral"
+unlock_tier = 23
+base_cost = 3.494e+100
+r0 = 1.09
+base_income_per_unit = 5.09676e+96
+base_cycle_length = 20.233
+staffer_name = "For You Page High Priest"
+accent_color = Color(0.6902, 0.1882, 0.3765, 1)

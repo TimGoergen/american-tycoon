@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 243
+display_name = "Probate Catacombs"
+unlock_tier = 22
+base_cost = 1.994e+93
+r0 = 1.09
+base_income_per_unit = 1.19431e+88
+base_cycle_length = 0.54
+staffer_name = "Catacomb Probate Clerk"
+accent_color = Color(0.4902, 0.4471, 0.349, 1)

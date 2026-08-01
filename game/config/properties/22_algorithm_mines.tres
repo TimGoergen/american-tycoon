@@ -6,10 +6,10 @@
 script = ExtResource("1")
 property_id = 22
 display_name = "Algorithm Mines"
-unlock_tier = 3
+unlock_tier = 4
 base_cost = 2806000000000000000.0
 r0 = 1.09
-base_income_per_unit = 1.60052e+15
+base_income_per_unit = 1.9425e+16
 base_cycle_length = 2.596
 staffer_name = "Mining Subroutine"
 accent_color = Color(0.2, 0.7, 0.75, 1)

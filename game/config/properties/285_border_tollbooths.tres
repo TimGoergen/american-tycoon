@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 285
+display_name = "Border Tollbooths"
+unlock_tier = 25
+base_cost = 9.466e+105
+r0 = 1.09
+base_income_per_unit = 1.55737e+100
+base_cycle_length = 0.54
+staffer_name = "Border Toll Cartographer"
+accent_color = Color(0.2745, 0.4078, 0.549, 1)

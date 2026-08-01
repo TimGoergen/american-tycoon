@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 208
+display_name = "Provenance Vaults"
+unlock_tier = 19
+base_cost = 5.445e+82
+r0 = 1.09
+base_income_per_unit = 1.50021e+79
+base_cycle_length = 6.823
+staffer_name = "Impeccable Pedigree Archivist"
+accent_color = Color(0.0784, 0.0784, 0.0784, 1)

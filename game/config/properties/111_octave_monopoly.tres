@@ -6,10 +6,10 @@
 script = ExtResource("1")
 property_id = 111
 display_name = "Octave Monopoly"
-unlock_tier = 11
+unlock_tier = 12
 base_cost = 2.881e+53
 r0 = 1.09
-base_income_per_unit = 1.69015e+50
+base_income_per_unit = 1.13715e+51
 base_cycle_length = 9.802
 staffer_name = "Twelve-Tone Scale Baron"
 accent_color = Color(0.3294, 0.3059, 0.6196, 1)

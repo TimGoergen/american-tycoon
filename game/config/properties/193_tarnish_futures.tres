@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 193
+display_name = "Tarnish Futures"
+unlock_tier = 18
+base_cost = 1.617e+78
+r0 = 1.09
+base_income_per_unit = 4.3071e+74
+base_cycle_length = 4.749
+staffer_name = "Tarnish Futures Underwriter"
+accent_color = Color(0.5412, 0.2902, 0.1098, 1)

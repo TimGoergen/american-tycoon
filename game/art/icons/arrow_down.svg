@@ -30,25 +30,33 @@
      inkscape:window-x="-8"
      inkscape:window-y="-8"
      inkscape:window-maximized="1"
-     inkscape:current-layer="svg1" />
-  <!-- Down arrow = "expand all" (the list opens downward). Navy strokes to read on the gold
+     inkscape:current-layer="svg1"
+     showguides="true">
+    <sodipodi:guide
+       position="3.8066914,23.315985"
+       orientation="1,0"
+       id="guide1"
+       inkscape:locked="false" />
+    <sodipodi:guide
+       position="44.966543,24.267658"
+       orientation="1,0"
+       id="guide2"
+       inkscape:locked="false" />
+    <sodipodi:guide
+       position="16.237918,44.312268"
+       orientation="0,-1"
+       id="guide3"
+       inkscape:locked="false" />
+    <sodipodi:guide
+       position="28.847584,4.3420074"
+       orientation="0,-1"
+       id="guide4"
+       inkscape:locked="false" />
+  </sodipodi:namedview>
+  <!-- Up arrow = "collapse all" (the list folds upward). Navy strokes to read on the gold
        utility button. Drawn as strokes (the SVG importer embeds no fonts). -->
-  <g
-     fill="none"
-     stroke="#1D2D50"
-     stroke-width="9"
-     stroke-linecap="round"
-     stroke-linejoin="round"
-     id="g1">
-    <line
-       x1="24"
-       y1="8"
-       x2="24"
-       y2="32"
-       id="line1" />
-    <polyline
-       points="11,22 24,39 37,22"
-       id="polyline1"
-       transform="matrix(1.2061155,0,0,1.5550281,-5.065731,-23.471027)" />
-  </g>
+  <path
+     style="fill:#1d2d50;fill-opacity:1;stroke:#1d2d50;stroke-width:2.639;stroke-linejoin:round;stroke-miterlimit:5.4;stroke-opacity:1;paint-order:fill markers stroke"
+     d="M 45.16524,3.6284099 24.882712,43.777109 3.88643,3.4499709 c 41.33829,0.05948 41.27881,0.178439 41.27881,0.178439 z"
+     id="path4" />
 </svg>

@@ -165,6 +165,9 @@ const DESCRIPTIONS := {
 	"loophole_rate_floor": "Lowest the estate tax can fall via loopholes.",
 	"k_legacy": "Legacy payout scale on the power curve (K × (net/floor) ^ alpha).",
 	"alpha_legacy": "Legacy curve exponent; lower = flatter yield, tames the prestige runaway.",
+	"alpha_legacy_deep": "Mint exponent ABOVE the knee (0.06 = +15% gems per 10x deeper estate).",
+	"legacy_knee_net": "Estate net where the mint curve bends to the deep exponent ($).",
+	"legacy_cost_steepening": "Upgrade cost growth's own per-level multiplier — the uncapped shop's brake.",
 	"legacy_upgrade_cost_multiplier": "Global x on every Legacy upgrade cost — the prestige-power brake (higher = a prestige buys fewer levels).",
 	"challenge_bonus_scale": "Global x on every Challenge tier payout, both tracks (1.0 = authored ~24% income + 24% Legacy across all six games maxed).",
 	"challenge_timer_start_seconds": "Challenge keep-alive run timer's starting seconds — a run begins with this on the clock and drains until scoring tops it up (Wave 2).",
@@ -289,7 +292,8 @@ const SECTIONS := [
 		"basketball_launch_", "basketball_max_", "memory_gem_",
 	]},
 	{"title": "Legacy Bonus", "prefixes": ["legacy_bonus_", "legacy_gem_chance_"]},
-	{"title": "Estate & Legacy", "prefixes": ["estate_", "loophole_", "k_legacy", "alpha_legacy", "legacy_upgrade_cost_multiplier"]},
+	{"title": "Estate & Legacy", "prefixes": ["estate_", "loophole_", "k_legacy", "alpha_legacy",
+		"legacy_knee_net", "legacy_cost_steepening", "legacy_upgrade_cost_multiplier"]},
 	{"title": "Events", "prefixes": ["crash_", "audit_"]},
 ]
 
@@ -404,11 +408,23 @@ func _build_chrome() -> void:
 	subtitle_row.add_child(expand_all_button)
 
 	# ── Scrollable list of constant rows ──
+	# The scroll wears the property ladder's full edge treatment (Tim, 2026-07-27 — one
+	# "more content this way" vocabulary everywhere): tappable ScrollEdgeArrows strips
+	# overlaid on a plain Control host, plus the visible-fraction edge fade on the rows
+	# (see _update_edge_fade / ScrollEdgeArrows.apply_edge_fade).
+	var scroll_host := Control.new()
+	scroll_host.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	column.add_child(scroll_host)
 	var scroll := ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_RESERVE
-	column.add_child(scroll)
+	scroll_host.add_child(scroll)
+	var arrows := ScrollEdgeArrows.new()
+	arrows.setup(scroll)
+	scroll_host.add_child(arrows)
+	scroll.get_v_scroll_bar().value_changed.connect(func(_v: float) -> void: _update_edge_fade())
+	scroll.resized.connect(_update_edge_fade)
 	_scroll = scroll  # kept for the drag-to-scroll handler (see _pan_scroll_on_drag)
 
 	# Right margin keeps every row clear of the overlaid scrollbar (see SCROLLBAR_GAP); the
@@ -541,11 +557,20 @@ func _add_playtest_section() -> void:
 	var body := _add_collapsible_section(title)
 
 	body.add_child(_playtest_label("Jump to epoch (teleport + entry cash):"))
-	var epoch_row := HBoxContainer.new()
-	epoch_row.add_theme_constant_override("separation", 8)
+	# A FLOW container, not an HBox: with the full 26-epoch ladder, one row of E1..E26
+	# buttons is far wider than the panel and would push everything off the right edge
+	# (an HBox never wraps). The flow lays the buttons left-to-right and wraps to a new
+	# line when the panel width runs out.
+	var epoch_row := HFlowContainer.new()
+	epoch_row.add_theme_constant_override("h_separation", 8)
+	epoch_row.add_theme_constant_override("v_separation", 8)
 	for tier in range(1, EpochCatalog.tier_count() + 1):
 		var t := tier
 		var eb := _playtest_button("E%d" % t)
+		# Fixed width instead of expand-to-fill: expanding buttons in a flow container
+		# stretch a partly-filled last line to giant widths, so the grid would look ragged.
+		eb.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		eb.custom_minimum_size = Vector2(118, 84)
 		eb.pressed.connect(func() -> void: jump_epoch_requested.emit(t))
 		epoch_row.add_child(eb)
 	body.add_child(epoch_row)
@@ -629,6 +654,28 @@ func _toggle_section(title: String) -> void:
 	section["expanded"] = not bool(section["expanded"])
 	(section["body"] as Control).visible = bool(section["expanded"])
 	_update_section_header(title)
+	# The list just re-laid-out (a body appeared or vanished) — refresh the edge fade once
+	# the new layout has settled (deferred: sizes are stale until the next layout pass).
+	_update_edge_fade.call_deferred()
+
+
+## The shared property-ladder edge treatment (ScrollEdgeArrows.apply_edge_fade), fading
+## whatever the scroll is clipping at either edge. Items are collected fresh each call —
+## the section headers plus, for every EXPANDED section, its individual rows — so a tall
+## open body fades row by row like the ladder rather than dimming as one giant block.
+func _update_edge_fade() -> void:
+	if _scroll == null or _list == null:
+		return
+	var items: Array = []
+	for child in _list.get_children():
+		var control := child as Control
+		if control == null or not control.visible:
+			continue
+		if control is VBoxContainer:
+			items.append_array((control as VBoxContainer).get_children())
+		else:
+			items.append(control)
+	ScrollEdgeArrows.apply_edge_fade(_scroll, items)
 
 
 # ---------------------------------------------------------------------------
@@ -680,6 +727,7 @@ func set_all_collapsed(collapsed: bool) -> void:
 		section["expanded"] = not collapsed
 		(section["body"] as Control).visible = not collapsed
 		_update_section_header(String(title))
+	_update_edge_fade.call_deferred()  # every body just appeared/vanished — re-fade post-layout
 
 
 ## Refresh a section header's caret + name to match its expanded state. "+" invites a tap to open a
@@ -791,6 +839,7 @@ func open(effective_tuning: TuningConfig, baked_tuning: TuningConfig) -> void:
 	_refresh_all_section_markers()
 
 	visible = true
+	_update_edge_fade.call_deferred()  # rows just rebuilt — fade once they have laid out
 
 
 ## The title of the section a knob belongs to: the first SECTIONS entry with a prefix the knob

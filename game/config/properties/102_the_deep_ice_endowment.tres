@@ -6,10 +6,10 @@
 script = ExtResource("1")
 property_id = 102
 display_name = "The Deep-Ice Endowment"
-unlock_tier = 10
+unlock_tier = 11
 base_cost = 5.533e+50
 r0 = 1.09
-base_income_per_unit = 2.33701e+48
+base_income_per_unit = 1.85623e+49
 base_cycle_length = 60.0
 staffer_name = "Deep-Ice Endowment Elder"
 accent_color = Color(0.4275, 0.5569, 0.6275, 1)

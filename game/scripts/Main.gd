@@ -66,10 +66,10 @@ var _lifetime_earned_label: RichTextLabel
 var _shown_lifetime_earned := -1
 var _rows: Array = []
 
-# Epoch PAGER (Tim 2026-07-11): the property ladder is split into epoch "tabs" — Earth Blue
-# Collar (indices 0-5), Earth White Collar (6-11), then one tab per alien epoch. The pager
-# shows ONE tab at a time (big label + ‹ › arrows + dots + swipe), so only that tab's ~6 rows
-# ever draw (the CPU win at 37 properties). Tab index: 0/1 = Earth, 2..tier_count = epoch N.
+# Epoch PAGER (Tim 2026-07-11): the property ladder is split into epoch "tabs" — one per
+# epoch, tab = tier − 1 (the Earth split made Blue and White Collar full epochs, tiers 1-2).
+# The pager shows ONE tab at a time (big label + ‹ › arrows + dots + swipe), so only that
+# tab's rows ever draw (the CPU win at 326 properties).
 var _epoch_tab := 0
 var _epoch_pager_label: Label       # the big civilization / "EARTH" name
 var _epoch_pager_sub: Label         # the "Blue Collar" / "White Collar" subtitle (blank for aliens)
@@ -79,7 +79,28 @@ var _epoch_next_button: Button
 ## bought all of the current era's properties (the ownership gate is blocking; Tim, 2026-07-23).
 var _epoch_next_badge: Panel
 var _epoch_pager_dots: EpochPagerDots
-var _epoch_pager_box: Control       # the pager header (label + arrows + dots)
+var _epoch_pager_box: Control       # the pager header (label + arrows + dots + MAKE CONTACT)
+## MAKE CONTACT (Plans/Epoch_Advance_Rework.md §2): the epoch no longer advances by itself —
+## _create_game turns EpochState.auto_advance off — so leaving an era is this button's tap.
+## Always present, gray + disabled until game.epoch.contact_ready (the standing no-moving-UI rule).
+var _make_contact_button: Button
+## The button's caption, held separately so the ready pulse can scale it (see _set_contact_caption).
+var _contact_label: Label
+## Which colour the caption is currently wearing, so the override is only re-applied on a flip.
+## Starts TRUE against an initial not-ready state, which forces the first refresh to paint the
+## disabled colour — without that the caption would sit pale gold on a grayed plate until the
+## epoch first became ready.
+var _contact_caption_ready := true
+## Drives the ready-state brightness pulse below; reset to 0 whenever the button is not pressable.
+var _contact_pulse_time := 0.0
+## How the READY state shouts. Missing this button stalls the whole run (epoch advance is the
+## progression spine), so a static enabled plate is not enough — it breathes brighter on the beat.
+const CONTACT_PULSE_HZ := 1.2
+const CONTACT_PULSE_BRIGHTNESS := 0.35
+## How much the caption grows at the top of the pulse (0.12 = +12%). Kept modest on purpose:
+## the plate does not move, so a large swing would read as the text sliding around inside a
+## fixed box rather than as a heartbeat.
+const CONTACT_PULSE_SCALE := 0.12
 var _ladder_area: Control           # the property-list region; swipes over either change tabs
 var _swipe_tracking := false        # a touch is down on the ladder, tracking for a horizontal swipe
 var _swipe_start := Vector2.ZERO
@@ -293,7 +314,9 @@ func _process(delta: float) -> void:
 	# Reaching cruise enables the OVERDRIVE button — teach it the first frame it lights up.
 	if _tip_armed.get("overdrive", false) and not _momentum_bar.get_overdrive_button().disabled:
 		_fire_polled_tip("overdrive", _momentum_bar.get_overdrive_button())
-	if _tip_armed.get("epochs", false) and game.epoch.current_tier >= 2:
+	# Tier 3+ = the first ALIEN contact: tier 2 is the Earth split's White Collar promotion,
+	# and this card's "a new civilization opens a market" copy belongs to the alien beat.
+	if _tip_armed.get("epochs", false) and game.epoch.current_tier >= 3:
 		_fire_polled_tip("epochs", _epoch_pager_box)
 	# Epoch progress gate (Tim, 2026-07-23): when the player has earned enough to advance but hasn't
 	# bought all of the era's properties, (1) show a red dot on the pager's NEXT button, and (2) once,
@@ -306,7 +329,14 @@ func _process(delta: float) -> void:
 		# Switch to the blocking property's tab so the card's anchor is visible, then teach the rule.
 		if _epoch_tab != _epoch_tab_of(blocking_prop):
 			_set_epoch_tab(_epoch_tab_of(blocking_prop))
-		_fire_polled_tip("epoch_blocked", _row_for_index(blocking_prop))
+		_fire_polled_tip("epoch_blocked", _row_for_index(blocking_prop),
+				_epoch_blocked_body(blocking_prop))
+
+	# MAKE CONTACT just lit up. Fired on AVAILABILITY like every other tip, and this one matters
+	# most: the epoch will never advance on its own, so a player who does not find this button
+	# stalls for good.
+	if _tip_armed.get("make_contact", false) and game.epoch.contact_ready:
+		_fire_polled_tip("make_contact", _make_contact_button)
 
 	# The first time the player is viewing Earth White Collar (the second pager tab), point out the
 	# LEFT arrow so they learn the pager pages back and forth between eras (Tim, 2026-07-25).
@@ -333,54 +363,24 @@ func _process(delta: float) -> void:
 		_check_new_ventures()
 
 	# The hero stat's planet watermark follows the epoch pager's ACTIVE TAB, not the reached
-	# epoch (Tim 2026-07-15) — page back to Earth and the header shows Earth. Both Earth tabs
-	# (Blue/White Collar, 0 and 1) are tier 1; every alien tab's index IS its tier. (The
+	# epoch (Tim 2026-07-15) — page back to Earth and the header shows Earth. Tab = tier − 1
+	# since the Earth split; both Earth tiers map to the Earth image in HeroStat's table. (The
 	# civilization NAME moved to the pager itself — it was duplicative here.) The prestige-exit
 	# button and the Estate Office button (with its Legacy balance) reflect the live state.
-	_hero_stat.set_planet_tier(1 if _epoch_tab <= 1 else _epoch_tab)
+	_hero_stat.set_planet_tier(_epoch_tab + 1)
 	_refresh_contact_progress()
+	_refresh_make_contact_button(delta)
 	_update_plan_button()
 	_update_estate_badge()
 	_update_ladder_edge_fade()
 
 
-## Apply the ladder's edge fade: a property row the scroll viewport is clipping shows at
-## the alpha of its VISIBLE FRACTION — half-clipped means half-faded, dissolving to
-## nothing as it slides fully out — but only on an edge that actually has more content
-## beyond it. A dissolving row says "the list continues" without drawing extra chrome.
-## (First cut faded over a fixed 48px zone measured from the row's far edge, which only
-## triggered on the last sliver of a ~150px row — invisible in practice, Tim 2026-07-06.)
+## Apply the ladder's edge fade — the shared "partial transparency = the list continues"
+## treatment (ScrollEdgeArrows.apply_edge_fade; also worn by Balance Tuning + Challenges).
 func _update_ladder_edge_fade() -> void:
 	if _active_tab != TAB_PROPERTY:
 		return
-	var view_height := _ladder_scroll.size.y
-	var scroll_bar := _ladder_scroll.get_v_scroll_bar()
-	var more_above := _ladder_scroll.scroll_vertical > 0
-	# The furthest scroll_vertical can go is the content height minus one page; anything
-	# less than that (with 1px slack for rounding) means content is clipped below.
-	var more_below := float(_ladder_scroll.scroll_vertical) < scroll_bar.max_value - scroll_bar.page - 1.0
-	for row_node in _rows:
-		var row := row_node as PropertyRow
-		if row.size.y <= 0.0:
-			continue
-		# The row's top edge in viewport space: its position in the ladder, shifted up by
-		# the scroll offset (the ladder column sits at the scroll content's origin).
-		var row_top := row.position.y - float(_ladder_scroll.scroll_vertical)
-		var alpha := 1.0
-		# Each fading edge is measured from the INNER edge of its ScrollEdgeArrows strip,
-		# not the viewport itself: the strip shows under the same "more content this way"
-		# condition and covers the rows beneath it, so fading against the raw viewport
-		# left rows behind the strip looking solid-but-buried (Tim, 2026-07-06). The strip
-		# and the fade agree on where the visible window starts.
-		if more_above:
-			# Fraction of the row below the top strip (its visible share).
-			var below_strip := row_top + row.size.y - ScrollEdgeArrows.STRIP_HEIGHT
-			alpha = minf(alpha, clampf(below_strip / row.size.y, 0.0, 1.0))
-		if more_below:
-			# Fraction of the row above the bottom strip (its visible share).
-			var above_strip := view_height - ScrollEdgeArrows.STRIP_HEIGHT - row_top
-			alpha = minf(alpha, clampf(above_strip / row.size.y, 0.0, 1.0))
-		row.modulate.a = alpha
+	ScrollEdgeArrows.apply_edge_fade(_ladder_scroll, _rows)
 
 
 ## Feed the hero stat's contact-progress line: how much of the CURRENT epoch's economy this
@@ -393,6 +393,29 @@ func _refresh_contact_progress() -> void:
 	if tier >= EpochCatalog.tier_count():
 		_hero_stat.set_epoch_progress(0.0, 0.0)  # final civilization — no next contact to chase
 		return
+	# ALIEN eras advance on FLAGSHIP UNITS, not money (EpochState._may_leave), and the money
+	# threshold there is crossed minutes before the real gate opens — so a money bar would pin at
+	# 100% while the player was still blocked. Track the requirement that actually gates them, and
+	# the bar fills exactly as MAKE CONTACT lights up. A zero `required` means the rule does not
+	# apply (Earth eras, or the knob at its no-op default) and we fall through to the money bar.
+	# Owned is clamped for display: nothing stops a player lingering past the requirement, and
+	# "FLAGSHIP 41 / 35" would read as broken rather than as "done".
+	var flagship := game.get_flagship_progress(tier)
+	if flagship.y > 0:
+		# Name the property rather than saying "FLAGSHIP" (Tim, 2026-07-31): the player has to go
+		# buy a specific row, and the era's own business name says which one. Falls back to the
+		# generic word only if the lookup somehow fails, so the bar can never read "  21 / 35".
+		var flagship_index := game.get_flagship_index(tier)
+		var flagship_name := "FLAGSHIP"
+		if flagship_index >= 0:
+			var flagship_prop := game.economy.properties[flagship_index] as PropertyState
+			flagship_name = (flagship_prop.config as PropertyConfig).display_name
+		# Name and counts are passed SEPARATELY so HeroStat can set the property icon between
+		# them; it renders as "<name>   [icon] 21 / 35".
+		_hero_stat.set_epoch_progress(float(flagship.x), float(flagship.y), flagship_name,
+				"%d / %d" % [mini(flagship.x, flagship.y), flagship.y])
+		return
+
 	var goal := EpochCatalog.consume_threshold(tier, tuning.earth_economy_target)
 	var epoch_start := 0.0
 	if tier > 1:
@@ -440,6 +463,15 @@ func _create_game() -> void:
 
 	# The UI verbs all act on the living generation; keep a direct handle to it.
 	game = dynasty.current
+
+	# In the PLAYED game, reaching an epoch's requirements does not advance it — the player
+	# presses MAKE CONTACT when they are ready (Plans/Epoch_Advance_Rework.md §2). The headless
+	# sims leave auto_advance TRUE so their playouts still climb by themselves.
+	#
+	# This is set here rather than at first boot because a NEW GameState is built on every path
+	# into the game — fresh run, loaded save, and the scene reload that follows a succession or a
+	# Balance Tuning apply — and _create_game is the one funnel all of them pass through.
+	game.epoch.auto_advance = false
 
 	# Restore the saved buy-mode preference (defaults to ×1 for a fresh game).
 	_buy_mode = game.ui_buy_mode as PropertyRow.BuyMode
@@ -629,8 +661,8 @@ func _build_ui() -> void:
 	# the fact (Tim, 2026-07-23).
 	var tips_on := TutorialProgress.is_enabled()
 	for tip_id in ["getting_started", "first_property", "first_rush", "buy_mode", "first_hire",
-			"turbo_ready", "overdrive", "epochs", "epoch_blocked", "epoch_navigation",
-			"prestige", "family_ledger"]:
+			"turbo_ready", "overdrive", "epochs", "epoch_blocked", "make_contact",
+			"epoch_navigation", "prestige", "family_ledger"]:
 		_tip_armed[tip_id] = tips_on and not TutorialProgress.has_seen(tip_id)
 	# Signal-driven tip: the vent gesture, fired during an overdrive rush. (The offline-earnings
 	# concept is NOT a card — it is taught as a permanent line ON the welcome-back screen itself,
@@ -852,25 +884,22 @@ func _build_property_tab() -> Control:
 # Epoch pager — the property ladder's per-epoch tabs (Tim 2026-07-11)
 # ---------------------------------------------------------------------------
 
-## Number of pager tabs: 2 Earth (Blue/White Collar) + one per alien epoch.
+## Number of pager tabs: one per epoch, since the Earth split (Plans/Earth_Split_Epochs.md)
+## made Blue Collar and White Collar full epochs. Tab = tier − 1, uniformly.
 func _epoch_tab_count() -> int:
-	return EpochCatalog.tier_count() + 1
+	return EpochCatalog.tier_count()
 
 
-## Which tab a property index belongs to: 0 = Earth Blue Collar (indices 0-5), 1 = Earth White
-## Collar (6-11), else the property's alien epoch (unlock_tier 2..tier_count).
+## Which tab a property index belongs to: its epoch's tab. Blue Collar (unlock_tier 1) is
+## tab 0, White Collar (tier 2) tab 1, then one tab per alien epoch — tab = tier − 1.
 func _epoch_tab_of(prop_index: int) -> int:
-	if prop_index <= 5:
-		return 0
-	if prop_index <= 11:
-		return 1
 	var prop := game.economy.properties[prop_index] as PropertyState
-	return (prop.config as PropertyConfig).unlock_tier
+	return (prop.config as PropertyConfig).unlock_tier - 1
 
 
 ## The highest tab the player can currently open (the navigation upper bound) — the deepest
-## UNLOCKED tab. Tabs unlock in order (you can afford White Collar long before reaching epoch 2),
-## so the deepest unlocked index is also the count of open tabs. See _update_tab_unlocks().
+## UNLOCKED tab. Tabs unlock in order (each opens at its epoch's arrival), so the deepest
+## unlocked index is also the count of open tabs. See _update_tab_unlocks().
 func _epoch_tab_max() -> int:
 	var highest := 0
 	for tab in range(_tab_unlocked.size()):
@@ -884,9 +913,10 @@ func _epoch_default_tab() -> int:
 	return _epoch_tab_max()
 
 
-## Open any still-locked tab that now qualifies (persisted once open). Blue Collar is always open;
-## Earth WHITE COLLAR opens the first time its cheapest property is affordable (or already owned —
-## Tim 2026-07-12); an alien epoch tab opens at First Contact (its epoch reached). Repaints the
+## Open any still-locked tab that now qualifies (persisted once open). Blue Collar (tab 0) is
+## always open; every other tab opens at its epoch's ARRIVAL — White Collar at the promotion
+## beat, alien tabs at First Contact. One rule since the Earth split: the epoch gate itself
+## (earned the threshold + own all of the previous cohort) is what opens a tab. Repaints the
 ## pager when something opens so the new dot lights up. Idempotent — an open tab never re-locks.
 func _update_tab_unlocks() -> void:
 	if _tab_unlocked.is_empty():
@@ -895,69 +925,60 @@ func _update_tab_unlocks() -> void:
 	for tab in range(_tab_unlocked.size()):
 		if bool(_tab_unlocked[tab]):
 			continue
-		var should_open := false
-		if tab == 0:
-			should_open = true
-		elif tab >= 2:
-			should_open = game.epoch.current_tier >= tab  # alien: First Contact opens it
-		else:
-			# White Collar (tab 1): also require owning at least one of every Blue Collar property
-			# before it opens — engage the whole first tab before the next (Tim, 2026-07-23), the
-			# same rule the alien epochs get. Affordability is the money half.
-			should_open = _owns_all_blue_collar() and _tab_affordable_or_owned(tab)
-		if should_open:
+		if tab == 0 or game.epoch.current_tier >= tab + 1:
 			_tab_unlocked[tab] = true
 			changed = true
 	if changed:
 		_update_epoch_pager()
 
 
-## True when the player owns any property in `tab`, or can afford its cheapest — the condition
-## for a non-epoch tab (White Collar) to open.
-func _tab_affordable_or_owned(tab: int) -> bool:
-	var cheapest := INF
-	for i in range(game.economy.properties.size()):
-		if _epoch_tab_of(i) != tab:
-			continue
-		var prop := game.economy.properties[i] as PropertyState
-		if prop.units_owned > 0:
-			return true
-		cheapest = minf(cheapest, prop.get_bulk_cost(1))
-	return game.economy.cash >= cheapest
-
-
-## True once the player owns at least one of every Blue Collar property (tab 0 = indices 0-5, per
-## _epoch_tab_of) — the ownership gate on the White Collar tab (Tim, 2026-07-23), matching the
-## epoch-advance rule so every tab is engaged before the next opens.
-func _owns_all_blue_collar() -> bool:
-	return game.economy.owns_at_least_one_of_each([0, 1, 2, 3, 4, 5])
-
-
-## The lowest-index property the player must still own before they can progress past the current
-## era, or -1 if not blocked. Covers BOTH gates: an alien epoch (earned this tier's money threshold
-## but not all its properties owned) and Earth White Collar (can afford it but hasn't owned all Blue
-## Collar). Drives the epoch-blocked card AND the pager's red-dot indicator (Tim, 2026-07-23).
+## The property the player must still buy before they can progress past the current era, or -1 if
+## nothing is blocking them. Drives the epoch-blocked card AND the pager's red-dot indicator
+## (Tim, 2026-07-23). Two things can block, in this order:
+##   1. a business in this era they own none of (the roster half of the gate), or
+##   2. on an ALIEN era, too few UNITS of the era's flagship — every business is owned and what
+##      is missing is a quantity, so we point at the flagship's own row
+##      (Plans/Epoch_Advance_Rework.md §4).
+##
+## The money threshold still decides WHEN we start pointing any of this out, even on alien eras
+## where it no longer gates the advance: it is the honest "you have earned this era's whole
+## economy" line, and before it the player is simply still playing the era — nothing is blocking
+## them yet, so a red dot would just nag for the entire epoch.
 func _property_blocking_epoch_progress() -> int:
 	var tier := game.epoch.current_tier
-	if tier < EpochCatalog.tier_count() and game.economy.cash_earned_this_gen \
-			>= EpochCatalog.consume_threshold(tier, tuning.earth_economy_target):
-		for i in game.economy.get_property_indices_for_unlock_tier(tier):
-			if (game.economy.properties[i] as PropertyState).units_owned <= 0:
-				return i
-	# Earth White Collar (tab 1): affordable, but not all Blue Collar owned yet.
-	if _tab_unlocked.size() > 1 and not bool(_tab_unlocked[1]) \
-			and _tab_affordable_or_owned(1) and not _owns_all_blue_collar():
-		for i in [0, 1, 2, 3, 4, 5]:
-			if (game.economy.properties[i] as PropertyState).units_owned <= 0:
-				return i
+	if tier >= EpochCatalog.tier_count():
+		return -1  # final civilization — there is nothing further to be blocked from
+	if game.economy.cash_earned_this_gen \
+			< EpochCatalog.consume_threshold(tier, tuning.earth_economy_target):
+		return -1
+	for i in game.economy.get_property_indices_for_unlock_tier(tier):
+		if (game.economy.properties[i] as PropertyState).units_owned <= 0:
+			return i
+	# Roster complete. A zero `required` means the flagship-units rule does not apply here
+	# (Earth, or the knob at its no-op default), which leaves nothing blocking.
+	var flagship := game.get_flagship_progress(tier)
+	if flagship.y > 0 and flagship.x < flagship.y:
+		return game.get_flagship_index(tier)
 	return -1
 
 
-## The big label for a tab: "EARTH" for the two Earth tabs, else the civilization's name.
+## The epoch-blocked card's body for whichever requirement is actually holding the player back.
+## Returns "" for the roster case, meaning "use the catalog's own copy" — only the flagship case
+## needs copy built at fire time, because it has to name the count they are short of.
+func _epoch_blocked_body(blocking_prop: int) -> String:
+	var tier := game.epoch.current_tier
+	var flagship := game.get_flagship_progress(tier)
+	if flagship.y <= 0 or blocking_prop != game.get_flagship_index(tier):
+		return ""
+	var prop := game.economy.properties[blocking_prop] as PropertyState
+	return TutorialCatalog.epoch_blocked_flagship_body(
+			prop.config.display_name, flagship.x, flagship.y)
+
+
+## The big label for a tab: the tab's civilization name — "EARTH" for both Earth tabs
+## (their dicts share the civ), the alien race for the rest. Tab = tier − 1.
 func _epoch_tab_name(tab: int) -> String:
-	if tab <= 1:
-		return "EARTH"
-	return String(EpochCatalog.get_epoch(tab).get("civilization", "")).to_upper()
+	return EpochCatalog.civilization(tab + 1).to_upper()
 
 
 ## The subtitle under the name: the collar for Earth, blank for aliens (the civ name stands alone).
@@ -1019,7 +1040,109 @@ func _build_epoch_pager() -> Control:
 
 	_epoch_pager_dots = EpochPagerDots.new()
 	box.add_child(_epoch_pager_dots)
+
+	# MAKE CONTACT lives here, at the bottom of the epoch header, because this pager is the one
+	# place on screen that is ABOUT the current era: it names the civilization the button would
+	# leave, and it already carries the red dot that says "something is holding you back". The
+	# button sits directly above the property ladder the requirement is bought from, so the
+	# requirement, the reason, and the way out all read as one block.
+	_make_contact_button = Button.new()
+	# The caption is a CHILD Label, not the Button's own text, so the ready pulse can scale it
+	# (Tim, 2026-07-31: the text should pulse in size, not only brightness). Scaling a child
+	# Control is a pure transform — it cannot grow the plate or reflow the pager, which is what
+	# pulsing a font_size override would do, since a Button's minimum size follows its font.
+	# Full width and a standard-height plate: this is the single most important tap in the run,
+	# so it gets the largest, easiest target the row can give it.
+	_make_contact_button.custom_minimum_size = Vector2(0, UiPalette.STANDARD_BUTTON_HEIGHT)
+	_make_contact_button.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
+	_make_contact_button.add_theme_font_override("font", UiPalette.make_bold_font())
+	# Red "act" plate (Style Guide §8: red = spend/act) — pressing it spends the era, the same
+	# class of deliberate, irreversible act as OVERDRIVE and PASS THE TORCH.
+	UiPalette.style_button(_make_contact_button, true)
+	# While contact is not yet possible the button grays its OUTLINE too, exactly like the TURBO
+	# pop button and OVR: "not yet" has to read at a glance (Tim 2026-07-15).
+	var disabled_plate := StyleBoxFlat.new()
+	disabled_plate.bg_color = UiPalette.CREAM
+	disabled_plate.border_color = UiPalette.MID_GRAY
+	disabled_plate.set_border_width_all(3)
+	disabled_plate.set_corner_radius_all(4)
+	disabled_plate.set_content_margin_all(12)
+	_make_contact_button.add_theme_stylebox_override("disabled", disabled_plate)
+	_make_contact_button.pressed.connect(_on_make_contact_pressed)
+	# A second finger can make contact while the first holds a rush (the same reason the buy-mode
+	# and TURBO buttons carry this).
+	_make_contact_button.add_child(SecondaryTapButton.new())
+	_make_contact_button.disabled = true  # _refresh_make_contact_button enables it when ready
+
+	# The caption itself. Centered over the whole plate and ignoring input, so a tap anywhere on
+	# the button still presses it. Its colour is driven by _refresh_make_contact_button, because
+	# the Button's own font_color overrides no longer apply to text it does not own.
+	_contact_label = Label.new()
+	_contact_label.text = "MAKE CONTACT"
+	_contact_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_contact_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_contact_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_contact_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_contact_label.add_theme_font_override("font", UiPalette.make_bold_font())
+	_contact_label.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
+	_make_contact_button.add_child(_contact_label)
+
+	box.add_child(_make_contact_button)
 	return box
+
+
+## MAKE CONTACT pressed: leave this era now. advance() does nothing unless the requirements are
+## currently met (so a stale tap can never skip an epoch) and emits contact_made on success, so
+## the First Contact beat and the trade-deal minigame play exactly as they always have.
+func _on_make_contact_pressed() -> void:
+	game.epoch.advance()
+
+
+## Keep MAKE CONTACT honest every frame: pressable only while the epoch's requirements are met
+## and the player has not left yet. The ready state also pulses brighter — a plain enabled plate
+## is easy to scroll past, and a player who never notices this button never advances again.
+## The pulse multiplies brightness rather than changing color, so the red plate stays red (the
+## same "flash of light, not a recolor" treatment the hero stat uses for a purchase).
+func _refresh_make_contact_button(delta: float) -> void:
+	if _make_contact_button == null:
+		return
+	var ready := game.epoch.contact_ready
+	_make_contact_button.disabled = not ready
+	if ready:
+		_contact_pulse_time += delta
+		# One 0..1 wave drives both channels, so the caption is biggest exactly when it is
+		# brightest — two cues on one beat read as one emphasis, not two competing ones.
+		var pulse := 0.5 + 0.5 * sin(_contact_pulse_time * TAU * CONTACT_PULSE_HZ)
+		var brightness := 1.0 + CONTACT_PULSE_BRIGHTNESS * pulse
+		_make_contact_button.modulate = Color(brightness, brightness, brightness)
+		_set_contact_caption(true, 1.0 + CONTACT_PULSE_SCALE * pulse)
+	else:
+		# Reset unconditionally rather than only on a detected change: on the very first frame
+		# modulate and scale already sit at their defaults, so a change test would skip this and
+		# leave the caption unpainted. _set_contact_caption only touches the colour override when
+		# the ready state actually flips, so running it every frame costs two property writes.
+		_contact_pulse_time = 0.0
+		_make_contact_button.modulate = Color.WHITE
+		_set_contact_caption(false, 1.0)
+
+
+## Dress the MAKE CONTACT caption: `scale` about its own centre, and the ready/not-ready colour.
+## Scaling the Label rather than the Button keeps this a transform on a child — the plate holds
+## its size and nothing in the pager moves, which the no-moving-UI rule requires. The colour
+## override is only re-applied when the ready state actually flips, not every frame.
+func _set_contact_caption(ready: bool, scale_factor: float) -> void:
+	if _contact_label == null:
+		return
+	# pivot_offset is refreshed from the live size so the text grows from its middle even after
+	# a resize (the button is full-width, so its size changes with the pager).
+	_contact_label.pivot_offset = _contact_label.size * 0.5
+	_contact_label.scale = Vector2(scale_factor, scale_factor)
+	if ready != _contact_caption_ready:
+		_contact_caption_ready = ready
+		# Matches UiPalette.style_button's own colours for an action plate: pale gold when live,
+		# the dimmed navy it uses for font_disabled_color when not.
+		_contact_label.add_theme_color_override(
+			"font_color", UiPalette.PALE_GOLD if ready else Color(UiPalette.NAVY, 0.45))
 
 
 ## A large, readable ‹ / › stepper button for the pager.
@@ -1087,6 +1210,14 @@ func _update_epoch_pager() -> void:
 ## or the property list — count, so swipes over the income panel / wage button / bottom bar are ignored.
 func _input(event: InputEvent) -> void:
 	if _ladder_area == null or _epoch_pager_box == null:
+		return
+	# NO swiping while a full-screen overlay is up. This raw handler sees every touch, and a
+	# hidden Control's get_global_rect() still reports its rect — so a horizontal drag INSIDE
+	# a transition minigame (Catch Money, Balance…) or the welcome screen was registering as
+	# an epoch swipe on the covered pager, and the player came back to the game on the wrong
+	# tab (Tim, 2026-07-29 — "returned to the game screen but not on the newest tab").
+	if _any_fullscreen_overlay_visible():
+		_swipe_tracking = false
 		return
 	if event is InputEventScreenTouch:
 		if event.pressed:
@@ -1622,7 +1753,11 @@ func _on_buy_requested(prop_index: int, mode: PropertyRow.BuyMode) -> void:
 ## Show the one-time tutorial card for `tip_id`, anchored near `target` (null = screen-centered),
 ## unless tips are turned off or this one has already been seen. Marking it seen persists
 ## immediately so it never repeats (TutorialProgress lives outside the dynasty save).
-func _maybe_show_tip(tip_id: String, target: Control) -> bool:
+##
+## `body_override` replaces the catalog's body for THIS showing only, for the one tip whose copy
+## has to carry live numbers (epoch_blocked's flagship case). The catalog keeps the generic
+## wording, so the Help glossary still reads correctly.
+func _maybe_show_tip(tip_id: String, target: Control, body_override: String = "") -> bool:
 	# Never stack cards: if one is already up, decline. A poll-driven tip stays armed and retries a
 	# later frame; a verb-driven tip simply skips. Checked FIRST so nothing below (including the
 	# disk reads) runs while a card is visible.
@@ -1641,7 +1776,10 @@ func _maybe_show_tip(tip_id: String, target: Control) -> bool:
 	if tip.is_empty():
 		return false
 	TutorialProgress.mark_seen(tip_id)
-	_tutorial_tip.show_tip(tip["title"], tip["body"], target)
+	var body: String = tip["body"]
+	if body_override != "":
+		body = body_override
+	_tutorial_tip.show_tip(tip["title"], body, target)
 	return true
 
 
@@ -1658,8 +1796,8 @@ func _any_fullscreen_overlay_visible() -> bool:
 ## Fire a poll-driven availability tip. Disarms ONLY once the card actually shows, so a tip whose
 ## turn is blocked by another card still on screen stays armed and retries on a later frame (the
 ## natural queue for availability tips that come due together).
-func _fire_polled_tip(tip_id: String, target: Control) -> void:
-	if _maybe_show_tip(tip_id, target):
+func _fire_polled_tip(tip_id: String, target: Control, body_override: String = "") -> void:
+	if _maybe_show_tip(tip_id, target, body_override):
 		_tip_armed[tip_id] = false
 
 
@@ -1971,7 +2109,7 @@ func _on_contact_made(new_tier: int) -> void:
 	# The new epoch just opened its pager tab — unlock it, then jump to it so that when the contact
 	# beat (and any trade-deal minigame) clears, the player is looking at the new civ's properties.
 	_update_tab_unlocks()
-	_set_epoch_tab(new_tier)
+	_set_epoch_tab(new_tier - 1)  # tab = tier − 1 since the Earth split
 	_pending_contact_tier = new_tier
 	_first_contact_overlay.show_contact(new_tier)
 
@@ -1984,6 +2122,11 @@ func _on_contact_made(new_tier: int) -> void:
 func _on_contact_dismissed() -> void:
 	var tier := _pending_contact_tier
 	_pending_contact_tier = 0
+	# The Earth→Earth promotion beat (White Collar, tier 2) is a quiet card only for now —
+	# no trade-deal minigame (Tim, 2026-07-27). SEAM: when the promotion minigame gets its
+	# own moving-up copy (planned follow-up, Plans/Earth_Split_Epochs.md), remove this guard.
+	if EpochCatalog.civilization(tier) == "Earth":
+		return
 	var prop_index := game.economy.get_property_index_for_unlock_tier(tier)
 	if prop_index < 0:
 		return  # no new business this epoch — nothing more to negotiate
@@ -2023,12 +2166,13 @@ const BACKGROUND_SPACE_CENTERED := "res://art/backgrounds/space_centered_backgro
 
 
 ## The backdrop image path for a given epoch tier. Used both to set the initial backdrop
-## on load and to swap it the moment a contact advances the epoch.
+## on load and to swap it the moment a contact advances the epoch. Earth spans tiers 1-2
+## since the Earth split, so only ALIEN contacts (tier 3+) leave the prairie behind.
 func _background_path_for_tier(tier: int) -> String:
-	var contacts_made := tier - 1
-	if contacts_made >= 10:
+	var alien_contacts_made := tier - 2
+	if alien_contacts_made >= 10:
 		return BACKGROUND_SPACE_CENTERED
-	if contacts_made >= 1:
+	if alien_contacts_made >= 1:
 		return BACKGROUND_SPACE
 	return BACKGROUND_EARTH
 

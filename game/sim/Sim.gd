@@ -955,10 +955,11 @@ const STEP_UP_EARTH_INDEX := 11      # Executive Assets — the strongest Earth 
 
 func _run_step_up_check() -> void:
 	print("")
-	print("=== Step-up CHECK: each epoch's flagship vs the best staffed Earth property ===")
+	print("=== Step-up CHECK: each ALIEN epoch's flagship vs the best staffed Earth property ===")
 	print("    One unit, staffed to the epoch cap. Target: flagship >= ~3x Executive Assets (Tim).")
+	print("    (Tier 2 is Earth White Collar since the Earth split — not an alien step-up; skipped.)")
 	print("    epoch   Executive Assets      flagship                        flagship/Earth")
-	for tier in range(2, EpochCatalog.tier_count() + 1):
+	for tier in range(3, EpochCatalog.tier_count() + 1):
 		var earth_ips := _staffed_unit_income(tier, STEP_UP_EARTH_INDEX)
 		var flagship_index := _cheapest_index_for_tier(tier)
 		var flag_ips := _staffed_unit_income(tier, flagship_index)

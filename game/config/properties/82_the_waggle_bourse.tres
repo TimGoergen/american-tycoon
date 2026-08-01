@@ -6,10 +6,10 @@
 script = ExtResource("1")
 property_id = 82
 display_name = "The Waggle Bourse"
-unlock_tier = 9
+unlock_tier = 10
 base_cost = 3.5e+44
 r0 = 1.09
-base_income_per_unit = 1.65028e+41
+base_income_per_unit = 1.39265e+42
 base_cycle_length = 5.692
 staffer_name = "Waggle Floor Auctioneer"
 accent_color = Color(0.7569, 0.6039, 0.149, 1)

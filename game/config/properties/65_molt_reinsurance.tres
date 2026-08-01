@@ -6,10 +6,10 @@
 script = ExtResource("1")
 property_id = 65
 display_name = "Molt Reinsurance"
-unlock_tier = 8
+unlock_tier = 9
 base_cost = 5.253e+38
 r0 = 1.09
-base_income_per_unit = 4.2437e+34
+base_income_per_unit = 3.8045e+35
 base_cycle_length = 0.829
 staffer_name = "Second-Skin Reinsurer"
 accent_color = Color(0.3098, 0.4745, 0.2588, 1)

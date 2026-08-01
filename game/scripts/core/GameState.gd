@@ -24,7 +24,16 @@ class_name GameState
 # v11 added the dynasty's Challenge-Mode cleared-tier record (DynastyState.challenge_highest_tiers,
 # the permanent diminishing income bonus); older saves load with a warning and default it to empty
 # (→ 0 bonus).
-const SAVE_VERSION := 11
+# v12 is the EARTH SPLIT (Plans/Earth_Split_Epochs.md): Earth became TWO epochs (Blue Collar
+# tier 1, White Collar tier 2), pushing every alien tier up one. A pre-v12 save's epoch_tier
+# migrates on load: 2+ shift to 3+, and a mid-Earth tier-1 save maps to White Collar if it
+# owns any White Collar property (indices 6-11) — so nothing a player owns ever locks on them.
+# Staff levels need no migration: caps are identical at every equivalent moment (plan doc).
+# v13 is the ENDGAME ECONOMY (Plans/Endgame_Economy.md): the mint curve bends at a knee,
+# the compounders run uncapped on a steepening cost curve, and the utility tracks doubled
+# their level counts at half the per-level effect. Pre-v13 utility levels migrate BY EFFECT
+# (level ×2 = the same owned bonus) in DynastyState.load_save_dict; nothing else moves.
+const SAVE_VERSION := 13
 
 var tuning: TuningConfig
 var economy: EconomyState
@@ -207,7 +216,40 @@ func _update_displayed_income() -> void:
 ## the ownership half of the epoch-advance gate (Tim, 2026-07-23). Passed to epoch.update as the
 ## per-tier predicate.
 func _owns_all_in_epoch(tier: int) -> bool:
-	return economy.owns_at_least_one_of_each(economy.get_property_indices_for_unlock_tier(tier))
+	if not economy.owns_at_least_one_of_each(economy.get_property_indices_for_unlock_tier(tier)):
+		return false
+	if tier <= EpochState.LAST_EARTH_TIER:
+		return true  # Earth keeps the money gate; no flagship requirement (onboarding)
+	# Second, non-dollar half of the gate: run the epoch's flagship at scale before moving on.
+	# At the default of 1 this is already implied by the check above, so it is a no-op.
+	var required := tuning.epoch_flagship_units_required
+	if required <= 1:
+		return true
+	var flagship := economy.get_flagship_index_for_unlock_tier(tier)
+	if flagship < 0:
+		return true
+	return (economy.properties[flagship] as PropertyState).units_owned >= required
+
+
+## The flagship-units requirement for `tier` as (owned, required) — what the epoch progress
+## bar and the blocked coach card both read. `required` is 0 for a tier with no flagship
+## requirement (Earth, or the default no-op setting), which callers treat as "not applicable".
+func get_flagship_progress(tier: int) -> Vector2i:
+	if tier <= EpochState.LAST_EARTH_TIER:
+		return Vector2i(0, 0)
+	var required := tuning.epoch_flagship_units_required
+	if required <= 1:
+		return Vector2i(0, 0)
+	var flagship := economy.get_flagship_index_for_unlock_tier(tier)
+	if flagship < 0:
+		return Vector2i(0, 0)
+	return Vector2i((economy.properties[flagship] as PropertyState).units_owned, required)
+
+
+## The index of `tier`'s flagship property, or -1 — so the UI can point the player at the
+## exact row they need to keep buying.
+func get_flagship_index(tier: int) -> int:
+	return economy.get_flagship_index_for_unlock_tier(tier)
 
 
 func tap_wage() -> void:
@@ -272,13 +314,23 @@ func tap_property(prop_index: int) -> void:
 ## hold factor — holding is convenient, so real tapping stays superior.
 func hold_rush_property(prop_index: int) -> void:
 	var prop := economy.properties[prop_index] as PropertyState
-	if not prop.is_cycle_running:
-		return
 	# A frozen property is DOWN: the held rush is dead on it until rush_ready. This guard is
 	# LOAD-BEARING now — it used to be covered incidentally by the can_rush() gate below, but that
 	# gate no longer refuses the whole empire (see tap_property).
 	if prop.is_overheat_frozen:
 		return
+	if not prop.is_cycle_running:
+		# An UNSTAFFED cycle stops the moment it pays out, so on a very short cycle it is
+		# usually stopped when the next 5/s hold pulse lands. This used to bail out here,
+		# which let a fast property (Photon Exchange, 0.54s base, shortened further by
+		# Legacy cycle upgrades + the First Contact bonus) complete-and-stop between EVERY
+		# pulse: each pulse saw an idle cycle, restarted it as a plain tap, and no rush verb
+		# ever fired — so Rush Momentum never engaged on that one property (Tim's device
+		# report, 2026-07-27). A held pulse on an idle property now STARTS the cycle and
+		# rushes it in the same pulse, so holding always engages regardless of cycle length.
+		if prop.units_owned == 0:
+			return
+		prop.start_cycle()
 	frenzy.on_tap(tuning.frenzy_fill_hold_factor)
 	# Same rule as tap_property: a property that is not frozen keeps rushing through someone
 	# else's lockout for income and frenzy, but the downed meter grants no heat and no bonus.
@@ -503,7 +555,20 @@ func load_save_dict(data: Dictionary) -> void:
 	economy.cash_earned_this_gen = float(data.get("cash_earned_this_gen", 0.0))
 
 	# Reached epoch (pre-v5 saves default to Earth/tier 1).
-	epoch.restore(int(data.get("epoch_tier", 1)))
+	var saved_tier := int(data.get("epoch_tier", 1))
+	if version <= 11:
+		# Earth-split migration (v12): alien tiers shift up one. A tier-1 (mid-Earth) save
+		# maps to White Collar only if it already owns a White Collar property — otherwise
+		# it stays in Blue Collar and earns the new promotion beat like a fresh run.
+		if saved_tier >= 2:
+			saved_tier += 1
+		else:
+			var old_props: Array = data.get("properties", [])
+			for i in range(6, mini(12, old_props.size())):
+				if int((old_props[i] as Dictionary).get("units_owned", 0)) > 0:
+					saved_tier = 2
+					break
+	epoch.restore(saved_tier)
 
 	var saved_props: Array = data.get("properties", [])
 	for i in range(mini(saved_props.size(), economy.properties.size())):

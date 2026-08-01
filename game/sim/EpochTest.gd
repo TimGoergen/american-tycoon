@@ -58,33 +58,46 @@ func _check(label: String, condition: bool) -> void:
 func _test_thresholds(tuning: TuningConfig) -> void:
 	print("1. Epoch thresholds scale off the Earth target")
 	var earth := tuning.earth_economy_target
-	_check("Earth (tier 1) consume threshold == Earth target",
-		is_equal_approx(EpochCatalog.consume_threshold(1, earth), earth))
-	# Continuous-ladder rework (2026-07-12): the threshold grows one 5-rung ladder block per epoch
-	# (7^5 = 16807x), and staff is now a FLAT modest boost — staff_income_multiplier is 1.0 every tier.
-	_check("Luminari (tier 2) threshold == Earth target x16807 (7^5, continuous ladder)",
-		is_equal_approx(EpochCatalog.consume_threshold(2, earth), earth * 16807.0))
-	# 11 epochs after the first batch of new civs (Earth + 5 original aliens + 5 new: tiers 7-11).
-	# Grows to 26 as later batches land (Plans/Add_20_Civs_And_Alien_Portraits.md).
-	_check("There are 11 epochs (Earth + 10 aliens)", EpochCatalog.tier_count() == 11)
+	# The EARTH SPLIT (Plans/Earth_Split_Epochs.md, 2026-07-27): Blue Collar (tier 1) clears
+	# at $75M (a fixed fraction of the Earth target), White Collar (tier 2) at the full Earth
+	# target — the alien-frontier entry bar the split left unchanged.
+	_check("Blue Collar (tier 1) consume threshold == $75M",
+		is_equal_approx(EpochCatalog.consume_threshold(1, earth), earth * (75e6 / 103.6e12)))
+	_check("White Collar (tier 2) consume threshold == Earth target",
+		is_equal_approx(EpochCatalog.consume_threshold(2, earth), earth))
+	# Continuous-ladder rework (2026-07-12): the threshold grows one 5-rung ladder block per
+	# alien epoch (7^5 = 16807x); staff is a FLAT modest boost (multiplier 1.0 every tier).
+	_check("Luminari (tier 3) threshold == Earth target x16807 (7^5, continuous ladder)",
+		is_equal_approx(EpochCatalog.consume_threshold(3, earth), earth * 16807.0))
+	# 27 epochs: the two Earth epochs (Blue/White Collar) + 25 aliens. Full 326-property ladder.
+	_check("There are 27 epochs (Earth split + 25 aliens)", EpochCatalog.tier_count() == 27)
 	_check("Staffer multiplier is FLAT 1.0 at every tier (the ladder carries the leap, not staff)",
 		is_equal_approx(EpochCatalog.staff_income_multiplier(1), 1.0) \
 			and is_equal_approx(EpochCatalog.staff_income_multiplier(2), 1.0) \
-			and is_equal_approx(EpochCatalog.staff_income_multiplier(6), 1.0))
+			and is_equal_approx(EpochCatalog.staff_income_multiplier(7), 1.0))
 
 
 func _test_epoch_advances(configs: Array, tuning: TuningConfig) -> void:
 	print("\n2. A generation advances epochs as lifetime earnings cross thresholds")
 	var game := GameState.new(configs, tuning)
-	_check("starts in epoch 1 (Earth)", game.epoch.current_tier == 1)
+	_check("starts in epoch 1 (Earth Blue Collar)", game.epoch.current_tier == 1)
 
-	# Just under the Earth threshold: still Earth.
+	# Just under the Blue Collar threshold: still tier 1.
+	var blue_threshold := EpochCatalog.consume_threshold(1, tuning.earth_economy_target)
+	game.epoch.update(blue_threshold - 1.0)
+	_check("just under Blue Collar's value: still epoch 1", game.epoch.current_tier == 1)
+
+	# Consume Blue Collar: the promotion into White Collar (epoch 2).
+	game.epoch.update(blue_threshold)
+	_check("consumed Blue Collar: promoted to epoch 2 (White Collar)", game.epoch.current_tier == 2)
+
+	# Just under the full Earth target: still White Collar.
 	game.epoch.update(tuning.earth_economy_target - 1.0)
-	_check("just under Earth's value: still epoch 1", game.epoch.current_tier == 1)
+	_check("just under Earth's full value: still epoch 2", game.epoch.current_tier == 2)
 
-	# Exactly consume Earth's economy: contact with Luminari (epoch 2).
+	# Exactly consume Earth's economy: contact with Luminari (epoch 3).
 	game.epoch.update(tuning.earth_economy_target)
-	_check("consumed Earth's economy: advanced to epoch 2", game.epoch.current_tier == 2)
+	_check("consumed Earth's economy: advanced to epoch 3 (Luminari)", game.epoch.current_tier == 3)
 
 	# A huge jump can cross several epochs at once, capped at the last defined epoch. The factor is
 	# large enough to blow past the top threshold regardless of how many epochs exist.
@@ -115,19 +128,20 @@ func _test_staff_ladder_basics(configs: Array, tuning: TuningConfig) -> void:
 	_check("Earth-block levels are additive small steps",
 		is_equal_approx(atm._effective_staff_multiplier(), 1.0 + tuning.staff_level_step))
 
-	# The whole Earth block is open at epoch 1 — and nothing past it.
+	# The whole Blue Collar block is open at epoch 1 — and nothing past it.
 	while not game.economy.is_staff_level_maxed(0, 1):
 		game.try_buy_staff_level(0)
 	_check("epoch 1 caps the ladder at one full block", atm.staff_level == per_block)
-	_check("the Luminari hire (level %d) is refused before contact" % (per_block + 1),
+	_check("the White Collar hire (level %d) is refused before the promotion" % (per_block + 1),
 		not game.try_buy_staff_level(0))
 
-	# Contact: the next block opens; its level 1 is the Luminari hire. Under the FLAT staff model
+	# The promotion (epoch 2): the next block opens; its level 1 is the White Collar-era
+	# hire (the Earth split's early staff-depth beat). Under the FLAT staff model
 	# (continuous-ladder rework, 2026-07-12) a hire is automation only — no entry jump — and every
 	# block's per-level step is the SAME modest size (the property's base magnitude carries the leap).
 	game.epoch.current_tier = 2
 	var multiplier_before := atm._effective_staff_multiplier()
-	_check("the Luminari hire succeeds after contact", game.try_buy_staff_level(0))
+	_check("the White Collar hire succeeds after the promotion", game.try_buy_staff_level(0))
 	_check("derived staff tier advanced to 2", atm.staff_tier == 2)
 	_check("block 2's hire adds no entry jump (flat staff)",
 		is_equal_approx(atm.staff_entry_step(2), 0.0))
@@ -169,6 +183,33 @@ func _test_save_round_trip(configs: Array, tuning: TuningConfig) -> void:
 	migrated_v8.load_save_dict(v8_dict)
 	var atm_v8 := migrated_v8.economy.properties[0] as PropertyState
 	_check("pre-v9 tier 2 + level 25 merges to ladder level 27", atm_v8.staff_level == 27)
+
+	# The v12 EARTH SPLIT migration (Plans/Earth_Split_Epochs.md): a pre-v12 save's alien
+	# tiers shift up one, and a mid-Earth tier-1 save maps to White Collar exactly when it
+	# already owns a White Collar property (indices 6-11).
+	var v11_alien := game.to_save_dict()
+	v11_alien["version"] = 11
+	v11_alien["epoch_tier"] = 2  # old Luminari
+	var migrated_alien := GameState.new(configs, tuning)
+	migrated_alien.load_save_dict(v11_alien)
+	_check("v11 epoch_tier 2 (old Luminari) migrates to tier 3", migrated_alien.epoch.current_tier == 3)
+	var v11_white := game.to_save_dict()
+	v11_white["version"] = 11
+	v11_white["epoch_tier"] = 1
+	(v11_white["properties"][6] as Dictionary)["units_owned"] = 3  # owns Day Trading
+	var migrated_white := GameState.new(configs, tuning)
+	migrated_white.load_save_dict(v11_white)
+	_check("v11 tier-1 save owning a White Collar property migrates to tier 2",
+		migrated_white.epoch.current_tier == 2)
+	var v11_blue := game.to_save_dict()
+	v11_blue["version"] = 11
+	v11_blue["epoch_tier"] = 1
+	for k in range(6, 12):
+		(v11_blue["properties"][k] as Dictionary)["units_owned"] = 0
+	var migrated_blue := GameState.new(configs, tuning)
+	migrated_blue.load_save_dict(v11_blue)
+	_check("v11 tier-1 save with no White Collar holdings stays tier 1 (Blue Collar)",
+		migrated_blue.epoch.current_tier == 1)
 
 	# A pre-v5 save (is_staffed bool only) becomes a single hire (ladder level 1).
 	var legacy_dict := game.to_save_dict()
@@ -228,16 +269,18 @@ func _test_staff_retention(configs: Array, tuning: TuningConfig) -> void:
 	# RANK, not global array index, so every epoch's flagship prices identically
 	# (rank 12) and an appended cohort sibling can never out-price a later epoch's
 	# flagship the way raw indices did.
-	var flagship_2 := game.economy.get_property_index_for_unlock_tier(2)
-	# The LAST epoch that actually ships properties (tier 6 today) — not tier_count(): the newest
-	# flavor-only epochs (Path A) add no property cohort, so tier_count() has no flagship.
-	var last_prop_tier := 2
+	# Tier 3 = the first ALIEN epoch (the Earth split holds tiers 1-2); Earth properties keep
+	# their index ranks, so only alien flagships share the anchored rank 12.
+	var flagship_3 := game.economy.get_property_index_for_unlock_tier(3)
+	# The LAST epoch that actually ships properties — not tier_count(): a flavor-only epoch
+	# (Path A) adds no property cohort, so tier_count() may have no flagship.
+	var last_prop_tier := 3
 	for ps in game.economy.properties:
 		last_prop_tier = maxi(last_prop_tier, ((ps as PropertyState).config as PropertyConfig).unlock_tier)
 	var flagship_last := game.economy.get_property_index_for_unlock_tier(last_prop_tier)
-	_check("every epoch's flagship retention prices identically (rank 12)",
-		flagship_2 >= 0 and flagship_last >= 0
-			and dynasty.staff_retention.cost_for_level(flagship_2, 1)
+	_check("every alien epoch's flagship retention prices identically (rank 12)",
+		flagship_3 >= 0 and flagship_last >= 0
+			and dynasty.staff_retention.cost_for_level(flagship_3, 1)
 				== dynasty.staff_retention.cost_for_level(flagship_last, 1))
 
 	# Pass on with only 3 of the 5 levels retained. The heir is born at the 3 retained
@@ -305,8 +348,9 @@ func _test_staff_ladder_costs(configs: Array, tuning: TuningConfig) -> void:
 		step_cost > 0.0 and absf(next_step_cost / step_cost - tuning.staff_level_cost_growth) < 0.1)
 	_check("step costs hang off the block's own anchor", step_cost < anchor)
 
-	# Block anchors climb with their epoch: block 2 (Luminari-priced) dwarfs block 1,
-	# and block 3 (Geth-priced) dwarfs block 2 — priced once, by their home epochs.
+	# Block anchors climb with their epoch: block 2 (White Collar-priced, the full Earth
+	# economy) dwarfs block 1, and block 3 (Luminari-priced) dwarfs block 2 — priced once,
+	# by their home epochs.
 	var anchor_2 := game.economy.get_staff_block_anchor(0, 2)
 	var anchor_3 := game.economy.get_staff_block_anchor(0, 3)
 	_check("each block's anchor dwarfs the previous block's", anchor_2 > anchor and anchor_3 > anchor_2)
@@ -318,17 +362,18 @@ func _test_staff_ladder_costs(configs: Array, tuning: TuningConfig) -> void:
 
 	# An ALIEN property's ladder starts at its home epoch: no blocks (cap 0) before its
 	# epoch is reached, one block once it is, and its later blocks are priced by the
-	# epochs AFTER its home epoch.
-	var alien_index := game.economy.get_property_index_for_unlock_tier(2)
+	# epochs AFTER its home epoch. Tier 3 (Luminari) is the first alien epoch since the
+	# Earth split made tier 2 White Collar.
+	var alien_index := game.economy.get_property_index_for_unlock_tier(3)
 	if alien_index < 0:
-		_check("ladder ships an epoch-2 alien property (needed for this test)", false)
+		_check("ladder ships an epoch-3 alien property (needed for this test)", false)
 		return
 	var alien := game.economy.properties[alien_index] as PropertyState
 	_check("an alien property has no staff blocks before its epoch",
-		alien.staff_blocks_available(1) == 0)
-	_check("its home epoch opens exactly one block", alien.staff_blocks_available(2) == 1)
-	_check("its block 2 is priced by the NEXT epoch (block epoch 3)",
-		alien.staff_block_epoch(2) == 3)
+		alien.staff_blocks_available(2) == 0)
+	_check("its home epoch opens exactly one block", alien.staff_blocks_available(3) == 1)
+	_check("its block 2 is priced by the NEXT epoch (block epoch 4)",
+		alien.staff_block_epoch(2) == 4)
 	_check("its first hire is automation-only (entry step 0)",
 		is_equal_approx(alien.staff_entry_step(1), 0.0))
 
@@ -361,14 +406,18 @@ func _test_epoch_content(configs: Array) -> void:
 func _test_epoch_locked_properties(configs: Array, tuning: TuningConfig) -> void:
 	print("\n9. A property locked behind a later epoch is hidden and unbuyable until reached")
 
-	# Every Earth property (GDD §4 ladder rows 1–12) is tier 1, unlocked from the start; only
-	# the alien property types added for later epochs (property_id 13+) carry a higher tier.
-	var earth_all_tier1 := true
+	# The Earth split: Blue Collar (ids 1-6) is tier 1, unlocked from the start; White Collar
+	# (ids 7-12) is tier 2; the alien property types (id 13+) carry tier 3 and up.
+	var earth_tiers_ok := true
 	for cfg in configs:
 		var pc := cfg as PropertyConfig
-		if pc.property_id <= 12 and pc.unlock_tier != 1:
-			earth_all_tier1 = false
-	_check("all 12 Earth properties default to unlock_tier 1", earth_all_tier1)
+		if pc.property_id <= 6 and pc.unlock_tier != 1:
+			earth_tiers_ok = false
+		elif pc.property_id > 6 and pc.property_id <= 12 and pc.unlock_tier != 2:
+			earth_tiers_ok = false
+		elif pc.property_id > 12 and pc.unlock_tier < 3:
+			earth_tiers_ok = false
+	_check("Blue Collar is tier 1, White Collar tier 2, aliens tier 3+", earth_tiers_ok)
 
 	# Build a run where property index 0 is gated behind epoch 2 (a stand-in for a future
 	# alien property). Duplicate the config so we never mutate the shared loaded resource.
@@ -420,12 +469,15 @@ func _test_first_contact_grant(configs: Array, tuning: TuningConfig) -> void:
 		game_for_lookup.economy.get_staff_price_rank(0) == 0
 			and game_for_lookup.economy.get_staff_price_rank(11) == 11)
 
-	var expected_total := 12
+	# Cohort sizes since the Earth split: tier 2 is White Collar's classic Earth six; the
+	# alien escalation is unchanged in content, re-tiered +1 (6 rungs at tier 3 up to the
+	# 14-rung cap from ~tier 11). Blue Collar's six are the `expected_total` seed.
+	var expected_total := 6
 	for tier in range(2, EpochCatalog.tier_count() + 1):
 		var cohort := game_for_lookup.economy.get_property_indices_for_unlock_tier(tier)
 		if cohort.is_empty():
 			continue  # flavor-only epoch (Path A): re-skins the ladder, adds no new properties
-		var expected_size := mini(tier + 4, 14)  # escalating cohorts, capped at 14 rungs (~epoch 10+)
+		var expected_size := 6 if tier == 2 else mini(tier + 3, 14)
 		expected_total += expected_size
 		var gated := 0
 		for cfg in configs:
@@ -452,8 +504,9 @@ func _test_first_contact_grant(configs: Array, tuning: TuningConfig) -> void:
 		# The cohort spans exactly one epoch's worth of cost (×16807 = 7^5, the threshold
 		# growth) split evenly across its rungs: consecutive sorted costs step by
 		# ~16807^(1/N), so the whole cohort spans ~16807^((N-1)/N). Loose tolerances —
-		# authored costs round to clean numbers.
-		var rung_ratio := pow(16807.0, 1.0 / float(expected_size))
+		# authored costs round to clean numbers. White Collar (tier 2) predates the alien
+		# grid and keeps Earth's classic ~×7 per rung (Day Trading $6M → Executive $100B).
+		var rung_ratio := 7.0 if tier == 2 else pow(16807.0, 1.0 / float(expected_size))
 		var spacing_ok := true
 		for k in range(1, sorted_costs.size()):
 			var step := sorted_costs[k] / sorted_costs[k - 1]
@@ -466,30 +519,32 @@ func _test_first_contact_grant(configs: Array, tuning: TuningConfig) -> void:
 		_check("epoch %d's cohort spans ~x%.0f flagship-to-top" % [tier, expected_span],
 			absf(span / expected_span - 1.0) < 0.10)
 
-		# Staff price ranks (escalating ladder re-anchor): the flagship ranks 12 — its
-		# old global index, so flagship staff prices are unchanged — and the cohort's
-		# ranks are exactly 12..12+N-1 in cost order, regardless of array positions.
+		# Staff price ranks (escalating ladder re-anchor): an ALIEN flagship ranks 12 — its
+		# old global index, so flagship staff prices are unchanged — and the cohort's ranks
+		# are exactly 12..12+N-1 in cost order, regardless of array positions. White Collar
+		# (tier 2) is Earth: its properties keep their plain index ranks, 6..11.
+		var rank_start := 6 if tier == 2 else 12
 		var cohort_ranks: Array[int] = []
 		for member in cohort:
 			cohort_ranks.append(game_for_lookup.economy.get_staff_price_rank(member))
 		cohort_ranks.sort()
 		var ranks_contiguous := cohort_ranks.size() == expected_size
 		for k in range(cohort_ranks.size()):
-			if cohort_ranks[k] != 12 + k:
+			if cohort_ranks[k] != rank_start + k:
 				ranks_contiguous = false
-		_check("epoch %d's staff price ranks run 12..%d (flagship anchored at 12)" \
-				% [tier, 12 + expected_size - 1], ranks_contiguous)
-	_check("the ladder totals 12 Earth + the escalating cohorts (%d)" % expected_total,
+		_check("epoch %d's staff price ranks run %d..%d (flagship anchored at %d)" \
+				% [tier, rank_start, rank_start + expected_size - 1, rank_start], ranks_contiguous)
+	_check("the ladder totals Blue Collar's 6 + the epoch cohorts (%d)" % expected_total,
 		configs.size() == expected_total)
 
 	# The cohort-wide First Contact bonus: applying a bonus to every member of a tier's
 	# cohort (exactly what Main does when the trade-deal minigame finishes) lands the
-	# same income/cycle multipliers on every member.
+	# same income/cycle multipliers on every member. Tier 3 = the first alien cohort.
 	var bonus_game := GameState.new(configs, tuning)
-	for member in bonus_game.economy.get_property_indices_for_unlock_tier(2):
+	for member in bonus_game.economy.get_property_indices_for_unlock_tier(3):
 		(bonus_game.economy.properties[member] as PropertyState).set_first_contact_bonus(1.4, 0.88)
 	var all_bonused := true
-	for member in bonus_game.economy.get_property_indices_for_unlock_tier(2):
+	for member in bonus_game.economy.get_property_indices_for_unlock_tier(3):
 		var prop_state := bonus_game.economy.properties[member] as PropertyState
 		if not is_equal_approx(prop_state.first_contact_income_multiplier, 1.4) \
 				or not is_equal_approx(prop_state.first_contact_cycle_multiplier, 0.88):
@@ -502,7 +557,7 @@ func _test_first_contact_grant(configs: Array, tuning: TuningConfig) -> void:
 		if (configs[i] as PropertyConfig).unlock_tier >= 2:
 			alien_index = i
 			break
-	_check("ladder ships an alien property gated to epoch 2+", alien_index >= 0)
+	_check("ladder ships a property gated to a later epoch", alien_index >= 0)
 	if alien_index < 0:
 		return
 

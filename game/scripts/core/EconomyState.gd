@@ -78,9 +78,12 @@ static func compute_staff_price_ranks(configs: Array) -> Array[int]:
 	ranks.resize(configs.size())
 	# Earth rungs: rank = position among Earth properties, which is their array
 	# index today (Earth fills indices 0–11) and stays correct if that ever grows.
+	# Earth spans TWO epochs since the Earth split (Blue Collar tier 1, White Collar
+	# tier 2 — Plans/Earth_Split_Epochs.md), so the Earth test is tier ≤ 2; every
+	# Earth property keeps the exact rank (= index) it had before the split.
 	var earth_count := 0
 	for i in range(configs.size()):
-		if (configs[i] as PropertyConfig).unlock_tier <= 1:
+		if (configs[i] as PropertyConfig).unlock_tier <= 2:
 			ranks[i] = earth_count
 			earth_count += 1
 	# Alien rungs: gather each epoch's cohort, order it by base_cost, and rank each
@@ -88,7 +91,7 @@ static func compute_staff_price_ranks(configs: Array) -> Array[int]:
 	var cohort_indices_by_tier: Dictionary = {}  # unlock_tier -> Array of property indices
 	for i in range(configs.size()):
 		var tier := (configs[i] as PropertyConfig).unlock_tier
-		if tier <= 1:
+		if tier <= 2:
 			continue
 		if not cohort_indices_by_tier.has(tier):
 			cohort_indices_by_tier[tier] = []
@@ -168,6 +171,21 @@ func get_property_index_for_unlock_tier(tier: int) -> int:
 ## Every property index gated to exactly `tier` — the epoch's whole COHORT
 ## (Epoch_Depth_Pass Phase 2). The First Contact bonus applies to all of them (Tim's
 ## call: the negotiated terms cover every venture in that civilization's market).
+## The index of an epoch's FLAGSHIP — its most expensive property, which is the one the
+## epoch is themed around and the last rung a player can afford. Returns -1 for a tier with
+## no properties. Chosen by COST rather than by config order, because config order is
+## save/append order (flagship-then-siblings for some tiers), not cheapest-first.
+func get_flagship_index_for_unlock_tier(tier: int) -> int:
+	var flagship := -1
+	var best_cost := -1.0
+	for i in get_property_indices_for_unlock_tier(tier):
+		var cost := ((properties[i] as PropertyState).config as PropertyConfig).base_cost
+		if cost > best_cost:
+			best_cost = cost
+			flagship = i
+	return flagship
+
+
 func get_property_indices_for_unlock_tier(tier: int) -> Array[int]:
 	var indices: Array[int] = []
 	for i in range(properties.size()):

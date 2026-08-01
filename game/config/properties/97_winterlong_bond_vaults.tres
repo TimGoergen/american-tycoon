@@ -6,10 +6,10 @@
 script = ExtResource("1")
 property_id = 97
 display_name = "Winterlong Bond Vaults"
-unlock_tier = 10
+unlock_tier = 11
 base_cost = 1.713e+49
 r0 = 1.09
-base_income_per_unit = 1.18245e+46
+base_income_per_unit = 9.38901e+46
 base_cycle_length = 9.802
 staffer_name = "Thousand-Winter Bondsman"
 accent_color = Color(0.4275, 0.5569, 0.6275, 1)

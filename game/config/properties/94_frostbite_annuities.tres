@@ -6,10 +6,10 @@
 script = ExtResource("1")
 property_id = 94
 display_name = "Frostbite Annuities"
-unlock_tier = 10
+unlock_tier = 11
 base_cost = 2.13e+48
 r0 = 1.09
-base_income_per_unit = 4.95658e+44
+base_income_per_unit = 3.93686e+45
 base_cycle_length = 3.305
 staffer_name = "Slow-Drip Annuity Skald"
 accent_color = Color(0.4275, 0.5569, 0.6275, 1)

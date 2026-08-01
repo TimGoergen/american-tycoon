@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 168
+display_name = "Insomnia Subscriptions"
+unlock_tier = 16
+base_cost = 4.604e+70
+r0 = 1.09
+base_income_per_unit = 7.01603e+67
+base_cycle_length = 14.083
+staffer_name = "Insomnia Retention Specialist"
+accent_color = Color(0.5608, 0.4824, 0.7098, 1)

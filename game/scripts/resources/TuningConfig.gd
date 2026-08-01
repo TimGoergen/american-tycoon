@@ -20,7 +20,7 @@ extends Resource
 # --- Cost curve (Spec §3.2) ---
 
 ## Global band-steepening factor; ratio multiplies by this at each milestone band.
-@export var band_step: float = 1.15  # TBD-SIM
+@export var band_step: float = 1.1  # TBD-SIM; synced to tuning.tres 2026-07-31
 
 # --- Cycles & milestones (Spec §3.3) ---
 
@@ -30,7 +30,7 @@ extends Resource
 # --- Active tapping (Spec §4) ---
 
 ## Fraction of cycle_length that one rush-tap advances the cycle.
-@export var rush_pct: float = 0.05  # TBD-SIM
+@export var rush_pct: float = 0.1  # TBD-SIM; synced to tuning.tres 2026-07-31
 
 ## Auto-rush pulses per second while the rush button is held down.
 @export var hold_rush_per_second: float = 5.0  # feel-tune M1
@@ -67,13 +67,31 @@ extends Resource
 # held Buy may want to rip through units while a held Hire steps more deliberately.
 
 ## Seconds a held BUY button waits before its first auto-repeat.
-@export var buy_hold_initial_delay: float = 0.45  # feel-tune
+@export var buy_hold_initial_delay: float = 0.2  # feel-tune; synced to tuning.tres 2026-07-31
 ## Seconds between each BUY auto-repeat after the first.
 @export var buy_hold_repeat_interval: float = 0.1  # device-tuned (Tim, 2026-07-20)
 ## Seconds a held HIRE/UPGRADE button waits before its first auto-repeat.
-@export var hire_hold_initial_delay: float = 0.45  # feel-tune
+@export var hire_hold_initial_delay: float = 0.2  # feel-tune; synced to tuning.tres 2026-07-31
 ## Seconds between each HIRE/UPGRADE auto-repeat after the first.
 @export var hire_hold_repeat_interval: float = 0.1  # device-tuned (Tim, 2026-07-20)
+
+## How many units of an epoch's FLAGSHIP (its most expensive property) you must own before
+## that epoch will advance — the non-dollar half of the advance gate.
+##
+## WHY THIS EXISTS (Tim, device report 2026-07-30): an epoch used to end the instant the
+## roster was complete, so the flagship — the property the epoch is named for — got almost
+## no playtime. `sim/EpochPhaseStudy.gd` measured the post-roster "stack" phase at 0.3% of
+## an epoch, and showed that no DOLLAR-denominated fix works: end-of-epoch income grows
+## super-exponentially, so a 10x money threshold is crossed in seconds and reshaping the
+## cost ladder does nothing. A UNIT requirement is different in kind because it can only be
+## satisfied AFTER the roster is complete, in the calmer post-unlock growth regime.
+##
+## DELIBERATE EXCEPTION to the "defaults mirror tuning.tres" convention: the shipped value is
+## 35, but this default stays 1. 1 reproduces the pre-feature behaviour exactly (owning one of
+## each already implies one flagship), so any code path that builds a TuningConfig without the
+## resource degrades to the old gate rather than to a hard 35-unit wall it never asked for.
+## Not drift — if a defaults-vs-tres audit flags this key, this comment is the answer.
+@export var epoch_flagship_units_required: int = 1  # device-tune; shipped value lives in tuning.tres
 
 # --- Staffing & offline (Spec §6) ---
 
@@ -179,10 +197,13 @@ extends Resource
 # --- Frenzy meter (Spec §7) ---
 
 ## Peak frenzy multiplier (applied to all income during a burn).
-@export var frenzy_max_multiplier: float = 4.0  # feel-tune M1
+## Synced 4.0 → 5.6 to match tuning.tres (2026-07-31). It had drifted, which mattered more than
+## usual here because frenzy_pop_floor is SOLVED from this value — at the stale 4.0 the "weakest
+## pop is 2×" floor would be 1/3, not 1/4.6. Keep the two in step.
+@export var frenzy_max_multiplier: float = 5.6  # feel-tune M1
 
 ## Duration of a full-charge frenzy burn in seconds.
-@export var frenzy_burn_duration: float = 90.0  # feel-tune M1
+@export var frenzy_burn_duration: float = 30.0  # feel-tune M1; synced to tuning.tres 2026-07-31
 
 ## Meter fill added per tap (fraction of full bar, 0–1).
 @export var frenzy_fill_per_tap: float = 0.004  # feel-tune M1
@@ -194,7 +215,21 @@ extends Resource
 @export var frenzy_idle_grace: float = 5.0  # feel-tune M1
 
 ## Minimum meter charge at which the player can trigger a frenzy pop.
-@export var frenzy_pop_floor: float = 0.15  # feel-tune M1
+##
+## SOLVED, not hand-picked (Tim, 2026-07-31): the floor is set so a NEW player's weakest
+## possible pop is exactly 2×. A pop pays `1 + (frenzy_max_multiplier − 1) × intensity × meter`
+## (FrenzyState.pop), and a fresh dynasty has intensity 1.0, so
+##     floor = 1 / (frenzy_max_multiplier − 1) = 1 / 4.6 = 0.2174
+## It was 0.15 (a 1.69× worst pop — the floor barely gated anything and cashing in early locked
+## a weak multiplier), briefly 0.30 (2.38×) before landing on the exact-2× solve.
+##
+## THIS VALUE DEPENDS ON frenzy_max_multiplier. Change that and this stops meaning 2×; re-solve
+## it. Killer Instinct raises intensity above 1.0, so an invested bloodline's worst pop is
+## higher than 2× by design — the floor pins the new player's case only.
+##
+## The bar's floor marker and its grayscale-until-poppable treatment both read this, so they
+## follow automatically.
+@export var frenzy_pop_floor: float = 0.2174  # solved for a 2× worst pop
 
 # --- Rush Momentum / Overheat (Tim 2026-07-15; design: Plans/Rush_Overheat.md) ---
 # Rushing heats the property up — heat IS the momentum meter, in HEAT UNITS where 1.0 = the old
@@ -455,18 +490,35 @@ extends Resource
 ## Raised 0.045 → 0.50 (Tim 2026-07-14) to keep the FIRST prestige near its old ~350 gems after
 ## alpha_legacy was lowered to 0.22 — the two move together (a lower exponent needs a higher
 ## coefficient to hold the same yield at the founder's estate scale).
-@export var k_legacy: float = 0.50  # feel-tune
+@export var k_legacy: float = 0.16  # feel-tune; synced to tuning.tres 2026-07-31 (prestige retune)
 
 ## Exponent on the estate-magnitude term of the Legacy curve — how fast gems grow with earnings.
 ## Lowered 0.30 → 0.22 (Tim 2026-07-14) to flatten the prestige runaway (at 0.30 the yield compounded
 ## ~18× per epoch, driving income to ×237 over a dynasty); paired with the upgrade-cost nerf below so
 ## the correction is split. Still rewards a better run (~+16% gems per 2× estate), just less punchy.
-@export var alpha_legacy: float = 0.22  # feel-tune
+@export var alpha_legacy: float = 0.35  # feel-tune; synced to tuning.tres 2026-07-31 (prestige retune)
 
 ## Global multiplier on EVERY Legacy upgrade's cost (LegacyUpgradeCatalog.cost_multiplier). 1.0 = the
 ## authored prices; >1 makes a prestige's gems buy fewer upgrade levels, the second brake (with the
 ## lower alpha_legacy) on the multiplier runaway that made late epochs trivial (Tim 2026-07-14).
-@export var legacy_upgrade_cost_multiplier: float = 2.0  # feel-tune
+@export var legacy_upgrade_cost_multiplier: float = 3.0  # feel-tune; synced to tuning.tres 2026-07-31 (prestige retune)
+
+## The estate net where the Legacy mint curve BENDS (Plans/Endgame_Economy.md, Tim 2026-07-28):
+## below this the approved alpha_legacy power curve applies exactly; above it the shallow
+## alpha_legacy_deep exponent takes over, so deep-frontier estates (1e80+) mint ~billions
+## instead of septillions — big numbers that still read as valuable.
+@export var legacy_knee_net: float = 1e21  # feel-tune (~the $1-sextillion estates the curve was tuned on)
+
+## The mint curve's exponent ABOVE the knee — how fast gems keep growing once estates pass
+## the tuned range. 0.06 = a 10x deeper estate mints ~+15% more gems (Tim: endgame mints
+## should read in the BILLIONS; the old single-exponent curve ran to septillions).
+@export var alpha_legacy_deep: float = 0.05  # feel-tune
+
+## The upgrade shop's cost STEEPENING (LegacyUpgradeCatalog.cost_steepening): each level's
+## cost-growth factor is itself multiplied by this per level, so the curve starts near the
+## authored per-level growth and steepens without limit — the uncapped compounders' real
+## brake (Plans/Endgame_Economy.md "Shape 2", Tim 2026-07-28). 1.0 = the old flat geometric.
+@export var legacy_cost_steepening: float = 1.1  # fit: DynastyArcStudy (1.03 seed missed the dozen-run summit)
 
 # Note: the old k_sprint / beta_sprint / k_residual constants were removed when
 # Legacy became a spendable upgrade currency. Per-level upgrade magnitudes and

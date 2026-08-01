@@ -6,6 +6,7 @@
 script = ExtResource("1")
 property_id = 7
 display_name = "Day Trading"
+unlock_tier = 2
 base_cost = 6000000.0
 r0 = 1.15
 base_income_per_unit = 1583415.0

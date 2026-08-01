@@ -20,11 +20,25 @@ extends ColorRect
 
 signal dismissed
 
+# Fixed-chrome text, per beat flavor. The overlay serves TWO kinds of arrival since the
+# Earth split (Plans/Earth_Split_Epochs.md): the alien First Contact, and the Earth→Earth
+# PROMOTION into White Collar (tier 2) — same staged reveal, different voice. show_contact
+# picks a set by the epoch's civilization ("Earth" = promotion).
+const EYEBROW_ALIEN := "◄  INCOMING TRANSMISSION  ►"
+const HEADLINE_ALIEN := "FIRST CONTACT"
+const NOTE_ALIEN := "A new kind of business opens in their market. Your staff can be upgraded with their technology, too."
+const BUTTON_ALIEN := "ANSWER THE CALL"
+const EYEBROW_PROMOTION := "◄  MEMO FROM UPSTAIRS  ►"
+const HEADLINE_PROMOTION := "MOVING UP"
+const NOTE_PROMOTION := "A new kind of business opens uptown. Your blue-collar crews can take on a second tier of staff, too."
+const BUTTON_PROMOTION := "TAKE THE PROMOTION"
+
 var _eyebrow_label: Label
 var _headline_label: Label
 var _civ_label: Label
 var _planet_label: Label
 var _flavor_label: Label
+var _note_label: Label
 ## The civilization's own first words (EpochCatalog.hail) — the actual transmission,
 ## typewritten in the civ's accent color so every contact sounds and looks different
 ## (Tim, 2026-07-07: the contacts read samey).
@@ -82,14 +96,14 @@ func _ready() -> void:
 	# up a size, and the gold lines carry a NAVY outline — gold-on-gold outlines vanished
 	# into the cream plate, navy makes the gold pop off it.
 	_eyebrow_label = Label.new()
-	_eyebrow_label.text = "◄  INCOMING TRANSMISSION  ►"
+	_eyebrow_label.text = EYEBROW_ALIEN
 	_eyebrow_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_eyebrow_label.add_theme_color_override("font_color", UiPalette.KETCHUP_RED)
 	_eyebrow_label.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
 	column.add_child(_eyebrow_label)
 
 	_headline_label = Label.new()
-	_headline_label.text = "FIRST CONTACT"
+	_headline_label.text = HEADLINE_ALIEN
 	_headline_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	# Gold: this is a celebratory milestone, like the Legacy reward chrome.
 	_headline_label.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD)
@@ -109,15 +123,21 @@ func _ready() -> void:
 	_civ_label.add_theme_font_size_override("font_size", UiPalette.FONT_DISPLAY)
 	column.add_child(_civ_label)
 
-	# Home world + their currency (flavor only — Earth stays on dollars).
+	# Home world + their currency (flavor only — Earth stays on dollars). Both wrap for
+	# the same reason as the market line: per-beat copy varies in length, and an
+	# unwrapped line longer than the card would widen it off-screen.
 	_planet_label = Label.new()
 	_planet_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_planet_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_planet_label.custom_minimum_size = Vector2(760, 0)
 	_planet_label.add_theme_color_override("font_color", UiPalette.NAVY)
 	_planet_label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
 	column.add_child(_planet_label)
 
 	_flavor_label = Label.new()
 	_flavor_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_flavor_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_flavor_label.custom_minimum_size = Vector2(760, 0)
 	# Darkened harder than the palette green so it holds contrast on the cream plate.
 	_flavor_label.add_theme_color_override("font_color", UiPalette.MONEY_GREEN.darkened(0.35))
 	_flavor_label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
@@ -138,6 +158,12 @@ func _ready() -> void:
 	# reveal punches hardest (an overshoot scale-in pop).
 	_market_label = Label.new()
 	_market_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# Wraps like the civ/hail lines: the alien ratios are short ("×16,807"), but the
+	# promotion beat's "×1.38 million" at this headline size is wider than a portrait
+	# screen — an unwrapped Label's minimum width forces the whole card column past the
+	# right edge (Tim's report, 2026-07-29). Wrapping caps the card at its 760px design.
+	_market_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_market_label.custom_minimum_size = Vector2(760, 0)
 	_market_label.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD)
 	_market_label.add_theme_color_override("font_outline_color", UiPalette.NAVY)
 	_market_label.add_theme_constant_override("outline_size", 5)
@@ -156,20 +182,21 @@ func _ready() -> void:
 	_narration_label.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
 	column.add_child(_narration_label)
 
-	var note := Label.new()
+	_note_label = Label.new()
 	# Foreshadows both rewards of contact: a brand-new kind of business opens in the alien
 	# market (negotiated via the trade-deal minigame on "Answer the Call"), and every existing
 	# property's staffer can now be upgraded to this civilization's technology tier.
-	note.text = "A new kind of business opens in their market. Your staff can be upgraded with their technology, too."
-	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	note.custom_minimum_size = Vector2(760, 0)
-	note.add_theme_color_override("font_color", UiPalette.NAVY)
-	note.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
-	column.add_child(note)
+	# (Text is swapped per show_contact — the Earth→Earth promotion beat has its own copy.)
+	_note_label.text = NOTE_ALIEN
+	_note_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_note_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_note_label.custom_minimum_size = Vector2(760, 0)
+	_note_label.add_theme_color_override("font_color", UiPalette.NAVY)
+	_note_label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
+	column.add_child(_note_label)
 
 	_proceed_button = Button.new()
-	_proceed_button.text = "ANSWER THE CALL"
+	_proceed_button.text = BUTTON_ALIEN
 	_proceed_button.custom_minimum_size = Vector2(0, 96)
 	_proceed_button.add_theme_font_size_override("font_size", UiPalette.FONT_BUTTON)
 	UiPalette.style_button(_proceed_button, true)
@@ -229,8 +256,20 @@ func show_contact(tier: int) -> void:
 		_reveal_tween.kill()
 	_reveal_tween = null
 
-	_civ_label.text = String(epoch["civilization"])
-	_planet_label.text = "Home world: %s" % String(epoch["home_planet"])
+	# The Earth→Earth PROMOTION beat (White Collar, tier 2 — the Earth split) reuses this
+	# staged reveal with its own voice: no alien transmission framing, and the big name on
+	# the card is the new ERA ("WHITE COLLAR"), since the civilization is still Earth.
+	var is_promotion := String(epoch["civilization"]) == "Earth"
+	_eyebrow_label.text = EYEBROW_PROMOTION if is_promotion else EYEBROW_ALIEN
+	_headline_label.text = HEADLINE_PROMOTION if is_promotion else HEADLINE_ALIEN
+	_note_label.text = NOTE_PROMOTION if is_promotion else NOTE_ALIEN
+	_proceed_button.text = BUTTON_PROMOTION if is_promotion else BUTTON_ALIEN
+	if is_promotion:
+		_civ_label.text = "WHITE COLLAR"
+		_planet_label.text = "Same planet — higher floors."
+	else:
+		_civ_label.text = String(epoch["civilization"])
+		_planet_label.text = "Home world: %s" % String(epoch["home_planet"])
 	_flavor_label.text = "They trade in %s." % String(epoch["currency_flavor"])
 	# The civ's accent color tints its name and its words, so each contact is visually
 	# distinct as well as verbally (Tim, 2026-07-07).
@@ -393,12 +432,33 @@ func _reveal_proceed_button() -> void:
 ## Compact ×N formatting for the market-growth line (1,000 / 1 million / 1 billion …),
 ## so an order-of-magnitude jump reads cleanly instead of as a wall of zeroes.
 func _format_multiplier(value: float) -> String:
+	# Two decimals, trailing zeros trimmed: the promotion beat's ratio is a messy
+	# 1.38139... million (Earth total ÷ the $75M Blue Collar slice) — "×1.38 million"
+	# reads as a number, "×1.38139 million" reads as a defect. NOTE: GDScript's %
+	# operator has no %g specifier (a %.3g here printed LITERALLY — Tim's 2026-07-29
+	# report), so the rounding is done with %.2f + a manual trim.
 	if value >= 1_000_000_000.0:
-		return "%g billion" % (value / 1_000_000_000.0)
+		return "%s billion" % _trimmed_two_decimals(value / 1_000_000_000.0)
 	if value >= 1_000_000.0:
-		return "%g million" % (value / 1_000_000.0)
+		return "%s million" % _trimmed_two_decimals(value / 1_000_000.0)
 	# Group the thousands with commas (e.g. 1000 → "1,000").
 	var digits := str(int(value))
+	return _group_thousands(digits)
+
+
+## "1.38" from 1.381, "2" from 2.004 — two decimals with trailing zeros (and a bare dot)
+## trimmed, so the market line never shows noise digits or a dangling "2.00".
+static func _trimmed_two_decimals(value: float) -> String:
+	var s := "%.2f" % value
+	while s.ends_with("0"):
+		s = s.substr(0, s.length() - 1)
+	if s.ends_with("."):
+		s = s.substr(0, s.length() - 1)
+	return s
+
+
+## Comma-group an integer's digits (e.g. "16807" → "16,807").
+static func _group_thousands(digits: String) -> String:
 	var grouped := ""
 	var count := 0
 	for i in range(digits.length() - 1, -1, -1):

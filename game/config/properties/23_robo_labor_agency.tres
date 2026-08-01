@@ -6,10 +6,10 @@
 script = ExtResource("1")
 property_id = 23
 display_name = "Robo-Labor Agency"
-unlock_tier = 3
+unlock_tier = 4
 base_cost = 11260000000000000000.0
 r0 = 1.09
-base_income_per_unit = 1.40921e+16
+base_income_per_unit = 1.70912e+17
 base_cycle_length = 5.692
 staffer_name = "Labor Dispatch Core"
 accent_color = Color(0.2, 0.7, 0.75, 1)

@@ -6,6 +6,7 @@
 script = ExtResource("1")
 property_id = 8
 display_name = "Flipping Houses"
+unlock_tier = 2
 base_cost = 42000000.0
 r0 = 1.15
 base_income_per_unit = 10552056.0

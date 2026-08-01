@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 303
+display_name = "Half-Life Holdings"
+unlock_tier = 26
+base_cost = 2.564e+111
+r0 = 1.09
+base_income_per_unit = 1.16812e+106
+base_cycle_length = 2.301
+staffer_name = "Half-Life Portfolio Manager"
+accent_color = Color(0.3059, 0.3451, 0.3765, 1)

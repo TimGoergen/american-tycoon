@@ -6,10 +6,10 @@
 script = ExtResource("1")
 property_id = 58
 display_name = "Ventworks Utility"
-unlock_tier = 7
+unlock_tier = 8
 base_cost = 1.157e+36
 r0 = 1.09
-base_income_per_unit = 7.54936e+32
+base_income_per_unit = 7.19453e+33
 base_cycle_length = 5.692
 staffer_name = "Hydrothermal Vent Baron"
 accent_color = Color(0.0588, 0.298, 0.3608, 1)

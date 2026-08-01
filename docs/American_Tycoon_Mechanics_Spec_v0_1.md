@@ -10,7 +10,7 @@
 ## 1. Currency & Numbers
 
 - **Per-planet currency scale.** Each planet's economy resets the displayed scale (GDD §3); Earth's full arc fits comfortably in double precision (~$1e14 target vs. ~1e15 safe integer threshold). `[ENG]` Implement a `Money` wrapper type from day one (internally double for Earth) so a later mantissa+exponent backend for large planets is a drop-in, not a refactor.
-- **Display:** real-dollar formatting throughout — `$#,##0` below $1M; named suffixes above ($14.27M / B / T / Qa / Qi / Sx / Sp / Oc / No / Dc / Ud / Dd — the full ladder is the canonical table in GDD §2, implemented 2026-07-03 as `Money.SUFFIXES`, one shared ladder for both `display()` and `display_cash()`; pinned by `sim/MoneyTest.gd`). Never scientific notation, never "quadragintillion" (GDD §2).
+- **Display:** real-dollar formatting throughout — `$#,##0` below $1M; named suffixes above ($14.27M / B / T / Qa / Qi / Sx / Sp / Oc / No / Dc / Ud / Dd — the full ladder is the canonical table in GDD §2, implemented 2026-07-03 as `Money.SUFFIXES`, one shared ladder for both `display()` and `display_cash()`; pinned by `sim/MoneyTest.gd`). Never scientific notation BY DEFAULT, never "quadragintillion" (GDD §2, amended 2026-07-30 — a planned Settings option lets the player opt into scientific notation, alphabet notation, or today's abbreviations; see `Plans/Roadmap.md` §6).
 - **All currency math floors** at the point of award/charge (matches 2022 code's `Mathf.Floor` convention).
 
 ## 2. Time & Tick Architecture `[ENG]`
@@ -117,14 +117,34 @@ Milestone progress slider per property: min = last milestone, max = next (recove
 - **Rushed income readout (2026-07-07).** While rush is held a row's income label quotes the effective rate — `per_cycle × the completion rate above` — as `$X / s` (not gated on `is_cycle_running`: an unstaffed cycle stops momentarily at each payout and would flicker the readout). The hero panel's headline is the **simple sum of the rates the rows currently display** (unowned rows' buy-previews contribute 0), so it rises live under rush/frenzy; the core's `displayed_income_per_sec` (theoretical staffed-passive rate) is unchanged and still drives the executive wage floor (§5).
 
 ### 3.6 Alien property types — epoch unlock + First Contact reward (built 2026-06-28, GDD §5.5 site 2)
+
+> **EARTH SPLIT (2026-07-27, `Plans/Earth_Split_Epochs.md`, Tim-approved):** Earth is now TWO
+> epochs — **Blue Collar (tier 1**, properties 1–6, cleared at **$75M** earned + own all six**)**
+> and **White Collar (tier 2**, properties 7–12, cleared at the full Earth target**)** — so every
+> alien tier below reads +1 (Luminari = tier 3, …, 27 epochs total). The pager tab = tier − 1
+> uniformly; the White Collar tab's old affordability unlock is retired (every tab opens at its
+> epoch's arrival). Tier 2's arrival is the **promotion beat** — the contact overlay in an Earth
+> voice, card-only (its trade-deal minigame is a planned follow-up with moving-up copy). No
+> economy re-tune: all costs/incomes/cycles kept their shipped values; the alien income decay
+> re-based to `0.80^(tier−2)`. Saves migrate at v12 (aliens +1; a mid-Earth save maps to White
+> Collar iff it owns a White Collar property). Tier references BELOW this line predate the split
+> — read alien "tier N" as "tier N+1".
 The ladder is **52** `PropertyConfig`s: the 12 Earth properties plus **40 alien properties in an escalating cohort per epoch — 6, 7, 8, 9, 10 rungs for epochs 2–6** (escalating-ladder rework, Tim 2026-07-15, the unlock-cadence fix; was one property per epoch at build, then 4-property cohorts in the Epoch Depth pass). Each epoch's cohort is anchored by its **flagship** — Photon Exchange (epoch 2), Data Foundry (3), Spore Bank (4), Prism Vault (5), Time Bank (6) — and topped by the epoch's grandest venture (Starcore Syndicate etc.). New rungs were APPENDED at array indices 37–51 (append-only convention), so saves load unchanged.
 
 **Cohort grid (2026-07-15).** Per epoch T, cohort size `N = T + 4`; rung k (0-based, flagship = rung 0):
 ```
 cost(k)   = flagship_cost × (16807^(1/N))^k     (the cohort spans exactly ×16807 = 7^5,
                                                  matching the per-epoch threshold growth)
-income(k) = cost(k) × 0.01824                   (income/cost held constant across all rungs)
+income(k) = cost(k) × 0.25 × D(T)               (income/cost constant within a cohort;
+                                                 D = the PROGRESSIVE decay — the prestige ramp)
+D(T) = product of per-epoch steps from tier 3:   ×0.80 (tiers 3–11), ×0.72 (12–19), ×0.65 (20–27)
 ```
+*(Progressive Decay, 2026-07-28 — `Plans/Progressive_Decay.md`, Tim's Candidate B, replacing the
+flat ×0.80 step: a flat step totals only ~÷265 across the ladder, which endgame gem stacks cancel
+outright (Tim at 447M gems: "every epoch faster and faster") — the banded steps total ~÷3,240 so
+every stack meets a growing wall inside the ladder, while tiers 3–11 keep their byte-identical
+device-approved incomes and trillion-gem dynasties still reach the final epoch.)*
+*(Income rule retuned 2026-07-27 — the **Alien Payback Retune**, `Plans/Alien_Payback_Retune.md`, Tim's Candidate B. The original `× 0.01824` constant made every alien property a ~19× income-per-dollar cliff vs. Earth's frontier (64-minute per-unit payback at first contact); the new rule starts Luminari at a 5-minute payback — continuing Earth's 0.1→3.4-minute ramp — and lets the per-epoch ×0.80 decay carry the deep-ladder prestige stall instead (tier 26 ≈ 18 h). Incomes are cycle-neutral: a rung's `.tres` income is the per-60s figure × `cycle/60`.)*
 Cycle 60 s, r0, and accent color are inherited from the epoch's flagship. Because every cohort spans ×16807 regardless of size, epoch durations, thresholds, and the ~1-epoch-per-prestige cadence are untouched by construction — only the per-rung ratio shrinks (×5.06 at epoch 2 down to ×2.64 at epoch 6), which is what flattens the unlock cadence (sim-measured median gap ~3.2–4.0 min per epoch, vs. 4.4→7.1 min before).
 - **`unlock_tier`** (new `PropertyConfig` field, default 1): a property is buyable/visible only once `EpochState.current_tier ≥ unlock_tier`. Earth's 12 are tier 1; each alien property carries its epoch tier. Gate enforced in `EconomyState.try_buy` / `is_property_unlocked` / `get_cheapest_unaffordable_unowned_index` (all take the run's reached tier) and hidden entirely in `PropertyRow` until unlocked. A locked property is also skipped by the sim's greedy buy.
 - **Reward = an upside-only opening bonus, not the unlock (REWORKED 2026-07-02; free-units reward retired).** A property is unlocked-or-not, so the minigame can't multiply the unlock. Instead the First Contact trade-deal minigame's universal multiplier selects a **reward bucket** (`FIRST_CONTACT_BUCKETS`) that gives the newly-opened epoch a permanent opening **income boost + faster cycles** — pure upside, never a penalty (matches GDD §5.5: "you start with ZERO free units"). Full deal → the top bucket; skip / opt-out → a lower bucket; minigames-off banks the keep-floor bucket with no screen; bucket 0 = no bonus. Flow lives in `Main` (`MinigameSite.FIRST_CONTACT`): contact overlay → its `dismissed` signal launches the minigame → `_finish_first_contact_minigame` applies the boost + saves. (The earlier `grant_starting_units = floor(first_contact_starting_units × multiplier)` free-units model was cut on `feature/ui-tap-targets` and no longer exists in code; `first_contact_starting_units = 8` lingers only as a vestigial `tuning.tres` knob.)
@@ -227,6 +247,20 @@ estate_net     = after_credit − tax
 ```
 legacy_gain = floor( K_LEGACY × (estate_net / LEGACY_BASE) ^ ALPHA )   K=0.50 ALPHA=0.22 LEGACY_BASE=$1k
 ```
+
+> **ENDGAME ECONOMY (2026-07-29, `Plans/Endgame_Economy.md`, Tim-approved design; constants
+> sim-FIT by `sim/DynastyArcStudy.gd`):** the conversion is now PIECEWISE — the (re-tuned
+> 2026-07-23: K=0.16, ALPHA=0.35) curve applies exactly up to `legacy_knee_net` ($1Sx),
+> then bends to `alpha_legacy_deep` (0.05): `gems = gems(knee) × (net/knee)^0.05`, so
+> deep-frontier estates (10⁸⁰⁺, which the old curve ran to septillions — past int64) mint
+> BILLIONS (Tim: numbers that still feel valuable). Downstream, the §9.4 shop changed shape:
+> the seven ×-per-level COMPOUNDERS are UNCAPPED on a progressively steepening cost curve —
+> `cost(n) = base × growth^(n−1) × s^((n−1)(n−2)/2)`, growth 2.8/2.7, s = `legacy_cost_steepening`
+> = 1.10 — so any fortune buys a slowly-growing multiplier and there is ALWAYS a next level
+> worth wanting; the six capped UTILITY tracks keep their load-bearing effect ceilings over
+> double the levels at half the per-level effect (save v13 migrates owned levels BY EFFECT).
+> Fit target (Tim): "a dozen deep runs" crack tier 27 — confirmed arc: tier 26 at generation
+> ~11, summit ~15, no stall, summit fortune ~200–300B gems.
 (`estate_net` here is the post-tax net of the §9.2 waterfall, whose gross is lifetime cash earned
 this generation — not net worth at death; nothing converts at or below the `LEGACY_BASE` floor.
 **Curve history:** the 2026-06-17 log² curve — `floor(K × log10(net/base)²)` — fixed the original

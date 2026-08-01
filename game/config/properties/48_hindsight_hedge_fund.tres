@@ -6,10 +6,10 @@
 script = ExtResource("1")
 property_id = 48
 display_name = "Hindsight Hedge Fund"
-unlock_tier = 6
+unlock_tier = 7
 base_cost = 40500000000000000000000000000000.0
 r0 = 1.09
-base_income_per_unit = 2.39388e+28
+base_income_per_unit = 2.42372e+29
 base_cycle_length = 4.381
 staffer_name = "Hindsight Fund Oracle"
 accent_color = Color(0.4, 0.6, 0.85, 1)

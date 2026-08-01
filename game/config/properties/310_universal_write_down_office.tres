@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 310
+display_name = "Universal Write-Down Office"
+unlock_tier = 26
+base_cost = 3.324e+113
+r0 = 1.09
+base_income_per_unit = 1.91306e+109
+base_cycle_length = 29.068
+staffer_name = "Comptroller of Cosmic Write-Downs"
+accent_color = Color(0.3059, 0.3451, 0.3765, 1)

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 313
+display_name = "Fine Print Mills"
+unlock_tier = 27
+base_cost = 2.674e+114
+r0 = 1.09
+base_income_per_unit = 1.85832e+108
+base_cycle_length = 0.54
+staffer_name = "Subclause Mill Foreman"
+accent_color = Color(0.2275, 0.1804, 0.349, 1)

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 323
+display_name = "Eminent Domain of Reality"
+unlock_tier = 27
+base_cost = 2.788e+117
+r0 = 1.09
+base_income_per_unit = 7.2597e+112
+base_cycle_length = 20.233
+staffer_name = "Condemnor of Realities"
+accent_color = Color(0.2275, 0.1804, 0.349, 1)

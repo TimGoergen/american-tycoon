@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 120
+display_name = "Deniability Trust"
+unlock_tier = 13
+base_cost = 1.499e+56
+r0 = 1.09
+base_income_per_unit = 6.95664e+52
+base_cycle_length = 1.601
+staffer_name = "Plausible Deniability Trustee"
+accent_color = Color(0.149, 0.1333, 0.1804, 1)

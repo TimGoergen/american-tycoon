@@ -6,10 +6,10 @@
 script = ExtResource("1")
 property_id = 72
 display_name = "Planetary Coverage Coils"
-unlock_tier = 8
+unlock_tier = 9
 base_cost = 1.532e+41
 r0 = 1.09
-base_income_per_unit = 2.47868e+38
+base_income_per_unit = 2.22275e+39
 base_cycle_length = 16.604
 staffer_name = "World-Wrap Policy Magnate"
 accent_color = Color(0.3098, 0.4745, 0.2588, 1)

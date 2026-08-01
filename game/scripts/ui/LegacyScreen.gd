@@ -299,12 +299,12 @@ func _add_collapsible_section(parent: VBoxContainer, category: String, accent: C
 	header.pressed.connect(_toggle_section.bind(category))
 	parent.add_child(header)
 
-	# Right-aligned "+x affordable" badge (Tim, 2026-06-24). When the section is COLLAPSED, this
-	# tells the player at a glance how many of the category's upgrades they can buy right now (x
-	# may be 0 — meaning there are upgrades left, but none affordable). It is hidden while the
-	# section is expanded (the buy buttons are visible then) and hidden entirely once every
-	# upgrade in the category is maxed. A child of the header Button, ignoring mouse input so a
-	# tap anywhere still toggles the section. _update_section_count fills in the text.
+	# Right-aligned affordability badge (Tim, 2026-06-24; always-visible + MAX, 2026-07-31).
+	# Tells the player at a glance how many of the category's upgrades they can buy right now
+	# ("+x", x may be 0 — upgrades remain, none affordable), or "MAX" once the category is
+	# finished. Shown whether the section is collapsed or expanded, since the header stays in
+	# view while scrolling a long category. A child of the header Button, ignoring mouse input
+	# so a tap anywhere still toggles the section. _update_section_count fills in the text.
 	var count_label := Label.new()
 	count_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	# Pin to the header's right edge, vertically centered, with a small inset off the border.
@@ -338,6 +338,22 @@ func _add_collapsible_section(parent: VBoxContainer, category: String, accent: C
 ## Pick a label color that reads on `color`: navy on light accents, cream on dark ones.
 func _readable_on(color: Color) -> Color:
 	return UiPalette.NAVY if color.get_luminance() > 0.5 else UiPalette.CREAM
+
+
+## Greys for the MAX badge — deliberately NOT UiPalette.DARK_GRAY/LIGHT_GRAY. Those are the
+## unowned-row greys, and several category accents sit near mid-luminance (Operations 0.51,
+## Household Staff 0.61), where DARK_GRAY measures 1.16:1 against the plate — invisible. These
+## are pushed to the ends of the range so MAX still reads as grey-and-quiet while staying
+## legible on every accent, which the large-text/high-contrast rule requires.
+const MAX_BADGE_ON_LIGHT := Color("#3E4247")
+const MAX_BADGE_ON_DARK := Color("#DCE0E5")
+
+
+## The MUTED counterpart of _readable_on, for the MAX badge (Tim, 2026-07-31): dark grey on a
+## light accent, light grey on a dark one. Quieter than the live "+x" count — a finished
+## category should recede rather than compete with the ones still worth spending on.
+func _muted_on(color: Color) -> Color:
+	return MAX_BADGE_ON_LIGHT if color.get_luminance() > 0.5 else MAX_BADGE_ON_DARK
 
 
 ## A colored plate (category accent fill, navy border) for a section header button.
@@ -439,15 +455,18 @@ func _refresh_staff_section_header() -> void:
 		_update_section_count(HOUSEHOLD_STAFF_CATEGORY)
 
 
-## Refresh a collapsed section header's right-aligned "+x affordable" badge (Tim, 2026-06-24).
-## Rules:
-##   • Hidden entirely (empty text) when EVERY upgrade in the category is maxed — there is nothing
-##     left to consider, so no badge.
-##   • Hidden while the section is EXPANDED — the buy buttons themselves are visible then.
-##   • Otherwise (collapsed, with at least one non-maxed upgrade) shows "+x", where x is how many
-##     of the category's upgrades are affordable AND not maxed right now. x may be 0 ("+0"): there
-##     are upgrades to buy, just none the player can afford yet.
-## Household Staff (and any category with no catalog ids) never shows a badge.
+## Refresh a section header's right-aligned affordability badge (Tim, 2026-06-24; revised
+## 2026-07-31). Rules:
+##   • "MAX", in the muted grey, once EVERY upgrade in the category is maxed — the category is
+##     finished, and saying so is more useful than saying nothing.
+##   • Otherwise "+x", where x is how many of the category's upgrades are affordable AND not
+##     maxed right now. x may be 0 ("+0"): there are upgrades to buy, just none affordable yet.
+##   • Empty only when there is genuinely nothing to report — before the live state arrives, or
+##     for a Household Staff section with no staff to retain yet (which is NOT the same as maxed).
+##
+## The badge now shows whether the section is collapsed OR expanded (Tim, 2026-07-31). It used
+## to hide while expanded on the theory that the buy buttons said it instead — but with a long
+## category you cannot see them all at once, and the header stays in view as you scroll.
 func _update_section_count(category: String) -> void:
 	var section: Dictionary = _sections[category]
 	var label := section["count_label"] as Label
@@ -459,11 +478,16 @@ func _update_section_count(category: String) -> void:
 
 	var non_maxed_count := 0
 	var affordable_count := 0
+	# How many things this category CONTAINS at all. Distinguishes "everything is maxed" (show
+	# MAX) from "there is nothing here yet" (show nothing) — the two collapse together if you
+	# only look at the non-maxed count, and Household Staff legitimately starts empty.
+	var total_count := 0
 	if category == HOUSEHOLD_STAFF_CATEGORY:
 		# Household Staff has no catalog upgrades — count the retention entries with a level still
 		# left to buy (cost >= 0) and how many of those the player can afford right now.
 		for entry_variant in _retention_entries:
 			var entry := entry_variant as Dictionary
+			total_count += 1
 			if int(entry["cost"]) < 0:
 				continue  # this staffer is already retained to the bloodline's best level
 			non_maxed_count += 1
@@ -472,16 +496,22 @@ func _update_section_count(category: String) -> void:
 	else:
 		for id in section["upgrade_ids"]:
 			var upgrade_id := String(id)
+			total_count += 1
 			if _upgrades.is_maxed(upgrade_id):
 				continue
 			non_maxed_count += 1
 			if _upgrades.can_buy(upgrade_id):
 				affordable_count += 1
 
-	if non_maxed_count == 0 or bool(section["expanded"]):
-		label.text = ""
+	var accent := _category_color(category)
+	if total_count == 0:
+		label.text = ""                      # nothing in this category yet — no claim to make
+	elif non_maxed_count == 0:
+		label.text = "MAX"
+		label.add_theme_color_override("font_color", _muted_on(accent))
 	else:
 		label.text = "+%d" % affordable_count
+		label.add_theme_color_override("font_color", _readable_on(accent))
 
 
 ## One upgrade card: name + level on top, description, then effect + a BUY button
@@ -721,7 +751,13 @@ func refresh() -> void:
 		var level := _upgrades.get_level(id)
 		var max_level := int(definition["max_level"])
 
-		(controls["level_label"] as Label).text = "Level %d / %d" % [level, max_level]
+		# An UNCAPPED compounder (Endgame Economy: max_level is a 9999 sentinel, the
+		# steepening cost curve is the real ceiling) shows a plain level — "Level 12 / 9999"
+		# would read as a bug, and there is deliberately no top to advertise.
+		if max_level > 100:
+			(controls["level_label"] as Label).text = "Level %d" % level
+		else:
+			(controls["level_label"] as Label).text = "Level %d / %d" % [level, max_level]
 		(controls["effect_label"] as Label).text = LegacyUpgradeCatalog.describe_effect(id, level)
 
 		var buy_button := controls["buy_button"] as Button
@@ -738,7 +774,7 @@ func refresh() -> void:
 			buy_button.disabled = not _upgrades.can_buy(id)
 
 	# Update every section's header (its invested-gems total may have changed after a buy) and its
-	# collapsed "+x affordable" badge, to match the new wallet/levels.
+	# affordability badge, to match the new wallet/levels.
 	for category in _sections:
 		_update_section_header(String(category))
 		_update_section_count(String(category))

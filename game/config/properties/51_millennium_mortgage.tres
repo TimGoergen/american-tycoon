@@ -6,10 +6,10 @@
 script = ExtResource("1")
 property_id = 51
 display_name = "Millennium Mortgage"
-unlock_tier = 6
+unlock_tier = 7
 base_cost = 750100000000000000000000000000000.0
 r0 = 1.09
-base_income_per_unit = 2.13093e+30
+base_income_per_unit = 2.15695e+31
 base_cycle_length = 21.064
 staffer_name = "Thousand-Year Lienholder"
 accent_color = Color(0.4, 0.6, 0.85, 1)

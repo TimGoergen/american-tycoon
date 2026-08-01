@@ -6,10 +6,10 @@
 script = ExtResource("1")
 property_id = 30
 display_name = "Deadline Futures"
-unlock_tier = 6
+unlock_tier = 7
 base_cost = 2187000000000000000000000000000.0
 r0 = 1.09
-base_income_per_unit = 2.68803e+26
+base_income_per_unit = 2.72047e+27
 base_cycle_length = 0.911
 staffer_name = "Deadline Enforcer"
 accent_color = Color(0.4, 0.6, 0.85, 1)

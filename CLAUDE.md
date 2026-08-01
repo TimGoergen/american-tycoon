@@ -27,7 +27,7 @@ Every implementation is judged against **Principle 4 (playable and fun first)** 
 - `scripts/Main.gd` — the root screen that wires the UI to the core.
 - `scripts/resources/` — the `.tres`-backed data classes (`PropertyConfig.gd`, `TuningConfig.gd`).
 - `sim/` — headless verification (SceneTree scripts). See its `CLAUDE.md`.
-- `config/` — `tuning.tres` and `properties/NN_*.tres` (the 52-property ladder, in `ConfigLoader.PROPERTY_PATHS` order).
+- `config/` — `tuning.tres` and `properties/NN_*.tres` (the 326-property ladder over 27 epochs — Earth Blue/White Collar + 25 alien civs — in `ConfigLoader.PROPERTY_PATHS` order).
 - There are **no autoloads**. Shared helpers are `class_name` static classes (`ConfigLoader`, `EpochCatalog`,
   `UiPalette`, `Money`, `SaveManager`, …) used directly, e.g. `ConfigLoader.load_tuning()`.
 

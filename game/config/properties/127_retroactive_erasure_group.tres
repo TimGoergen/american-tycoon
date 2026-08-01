@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 127
+display_name = "Retroactive Erasure Group"
+unlock_tier = 13
+base_cost = 1.943e+58
+r0 = 1.09
+base_income_per_unit = 1.1396e+56
+base_cycle_length = 20.233
+staffer_name = "Never-Happened Adjuster"
+accent_color = Color(0.149, 0.1333, 0.1804, 1)

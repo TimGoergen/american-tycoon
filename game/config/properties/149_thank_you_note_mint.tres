@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 149
+display_name = "Thank-You Note Mint"
+unlock_tier = 15
+base_cost = 8.482e+64
+r0 = 1.09
+base_income_per_unit = 2.93252e+61
+base_cycle_length = 2.301
+staffer_name = "Perpetual Gratitude Engraver"
+accent_color = Color(0.6196, 0.4196, 0.5412, 1)

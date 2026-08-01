@@ -59,7 +59,14 @@ const TIPS := {
 	},
 	"epoch_blocked": {
 		"title": "Own the whole era first",
-		"body": "You've earned enough to reach the next civilization — but first you need at least one of every business in this era. Grab this one to keep climbing.",
+		"body": "You've earned enough to reach the next civilization — but first you need at least one of every business in this era, and a real stack of its flagship. Grab this one to keep climbing.",
+	},
+	# The pull that replaced the automatic advance (Plans/Epoch_Advance_Rework.md §2). The epoch
+	# will now sit still forever until this button is pressed, so this card is the stall guard —
+	# it fires the frame MAKE CONTACT first lights up.
+	"make_contact": {
+		"title": "Make contact when you're ready",
+		"body": "This era is finished — tap MAKE CONTACT to meet the next civilization. Nothing moves on until you do, so stay and stack up as long as you like.",
 	},
 	"epoch_navigation": {
 		"title": "Page between eras",
@@ -91,3 +98,13 @@ const TIPS := {
 ## The {title, body} for a tip id, or an empty Dictionary if the id is unknown.
 static func get_tip(tip_id: String) -> Dictionary:
 	return TIPS.get(tip_id, {})
+
+
+## The epoch_blocked card's body for the case the generic copy above cannot state: the player
+## owns every business in the era and what is left is a QUANTITY of its flagship. The numbers
+## have to be in the copy — "own more" is not an instruction a player can act on — so this
+## fills them in at fire time. The glossary keeps the generic line above; only the live card
+## uses this one (Main._epoch_blocked_body).
+static func epoch_blocked_flagship_body(property_name: String, owned: int, required: int) -> String:
+	return "Own %d of %s to reach the next civilization — you have %d. Keep buying this one." \
+			% [required, property_name, owned]

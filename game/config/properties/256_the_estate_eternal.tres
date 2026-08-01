@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 256
+display_name = "The Estate Eternal"
+unlock_tier = 22
+base_cost = 1.673e+97
+r0 = 1.09
+base_income_per_unit = 1.11352e+94
+base_cycle_length = 60.0
+staffer_name = "Executor Everlasting"
+accent_color = Color(0.4902, 0.4471, 0.349, 1)

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 253
+display_name = "Necropolis Bourse"
+unlock_tier = 22
+base_cost = 2.079e+96
+r0 = 1.09
+base_income_per_unit = 4.66522e+92
+base_cycle_length = 20.233
+staffer_name = "Graveshift Floor Trader"
+accent_color = Color(0.4902, 0.4471, 0.349, 1)

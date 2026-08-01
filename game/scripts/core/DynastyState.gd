@@ -248,6 +248,9 @@ func _configure_retention_pricing() -> void:
 	# Push the global Legacy-upgrade cost multiplier into the (stateless) catalog too, so every
 	# upgrade price reflects the tuning knob (Tim 2026-07-14 — the prestige-runaway brake).
 	LegacyUpgradeCatalog.cost_multiplier = tuning.legacy_upgrade_cost_multiplier
+	# And the cost STEEPENING (Plans/Endgame_Economy.md): the per-level growth factor itself
+	# grows by this each level, which is what lets the compounders run uncapped.
+	LegacyUpgradeCatalog.cost_steepening = tuning.legacy_cost_steepening
 	# Same pattern for the (stateless) Challenge-goal tables: push the whole tuning object in so every
 	# payout, escalating-cost, and per-game keep-alive query sees the tuned values. Re-pushed on every
 	# construction/load — see the GOTCHA in ChallengeGoals (a sim sets the TUNING field, not the
@@ -284,7 +287,8 @@ func get_draft_will() -> Dictionary:
 	# the single-source get_legacy_yield_multiplier so the Challenge Legacy-track bonus is folded in
 	# here exactly once (the ONLY caller of that method) — never doubled, never missed.
 	var base_gain := EstateWaterfall.legacy_gain(
-		will["estate_net"], tuning.k_legacy, tuning.alpha_legacy
+		will["estate_net"], tuning.k_legacy, tuning.alpha_legacy,
+		tuning.legacy_knee_net, tuning.alpha_legacy_deep
 	)
 	will["legacy_gain"] = int(floor(float(base_gain) * get_legacy_yield_multiplier()))
 	return will
@@ -488,6 +492,19 @@ func load_save_dict(data: Dictionary) -> void:
 	upgrades = LegacyUpgrades.new()
 	if data.has("upgrades"):
 		upgrades.load_save_dict(data["upgrades"])
+		# v13 utility restructure (Plans/Endgame_Economy.md): the capped utility tracks
+		# doubled their level counts at half the per-level effect. Owned levels migrate
+		# BY EFFECT — a pre-v13 level maps to twice the level number, which grants the
+		# exact same total bonus the player had bought (never by raw level number).
+		var save_version := int((data.get("current", data) as Dictionary).get("version", 1)) \
+				if data.get("current", data) is Dictionary else 1
+		if save_version <= 12:
+			for id in [LegacyUpgradeCatalog.SEED_CAPITAL, LegacyUpgradeCatalog.LOYAL_STAFF,
+					LegacyUpgradeCatalog.ESTATE_LAWYERS, LegacyUpgradeCatalog.MINIGAME_BONUS,
+					LegacyUpgradeCatalog.COOLING_SYSTEMS, LegacyUpgradeCatalog.RAPID_RESTART]:
+				if upgrades.get_level(id) > 0:
+					var max_level := int(LegacyUpgradeCatalog.get_definition(id)["max_level"])
+					upgrades.levels[id] = mini(upgrades.get_level(id) * 2, max_level)
 	elif data.has("legacy_total"):
 		# Migrate the old accumulate-only Legacy into the new spendable wallet.
 		var carried := int(data.get("legacy_total", 0))

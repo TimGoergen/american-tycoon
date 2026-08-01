@@ -6,10 +6,10 @@
 script = ExtResource("1")
 property_id = 42
 display_name = "Panspermia Logistics"
-unlock_tier = 4
+unlock_tier = 5
 base_cost = 1280000000000000000000000.0
 r0 = 1.09
-base_income_per_unit = 3.73449e+21
+base_income_per_unit = 4.26503e+22
 base_cycle_length = 15.619
 staffer_name = "Panspermia Drift-Shepherd"
 accent_color = Color(0.55, 0.3, 0.65, 1)

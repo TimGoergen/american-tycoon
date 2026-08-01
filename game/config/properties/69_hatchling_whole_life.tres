@@ -6,10 +6,10 @@
 script = ExtResource("1")
 property_id = 69
 display_name = "Hatchling Whole-Life"
-unlock_tier = 8
+unlock_tier = 9
 base_cost = 1.346e+40
 r0 = 1.09
-base_income_per_unit = 6.02723e+36
+base_income_per_unit = 5.40442e+37
 base_cycle_length = 4.595
 staffer_name = "Clutch Policy Broker"
 accent_color = Color(0.3098, 0.4745, 0.2588, 1)

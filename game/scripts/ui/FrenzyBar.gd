@@ -34,13 +34,27 @@ var _pop_button: Button
 var _meter: ProgressBar
 ## The reward readout drawn on the right of the meter. Set live in _process.
 var _label: Label
-## The carbonation overlay — kept so _set_burn_style can restyle it with the fill.
+## The carbonation overlay — kept so _apply_fill_style can restyle it with the fill.
 var _bubbles: GoldBubbles
 ## The pop-floor marker: a vertical line on the meter at the charge needed before TURBO can
 ## fire early, so the player can see how far away "poppable" is (Tim 2026-07-15). Hidden
 ## while burning — the bar is a countdown timer then, and the floor means nothing.
 var _floor_marker: Control
-var _showing_burn_style := false
+
+## The three looks the meter can wear. Below the pop floor it is GRAYSCALE — there is no
+## reward available yet, so it should not wear the reward's colour (Tim, 2026-07-31). Crossing
+## the floor turns it gold, which makes "TURBO is now available" a colour change the player
+## catches out of the corner of their eye rather than something they have to read.
+enum FillStyle {
+	LOCKED,    # charging, still under tuning.frenzy_pop_floor — gray fill, gray bubbles
+	READY,     # charging, at or past the floor — the dark-gold fill with gold carbonation
+	BURNING,   # popped and draining — red fill
+}
+var _fill_style: FillStyle = FillStyle.LOCKED
+
+## Carbonation colour while locked. A pale cool gray so the bubbles still read against the
+## dark-gray fill, exactly as the bright gold reads against the dark gold.
+const LOCKED_BUBBLE_GRAY := Color(0.82, 0.83, 0.86, 1.0)
 
 ## Width of the pop-floor marker line, in px.
 const FLOOR_MARKER_WIDTH := 4.0
@@ -92,8 +106,10 @@ func _ready() -> void:
 	_pop_button.add_child(SecondaryTapButton.new())
 	add_child(_pop_button)
 
-	# The charge meter: display only — dark-gold fill with bright-gold carbonation
-	# (Tim, 2026-07-15; it launched as a gold fill with dark bubbles).
+	# The charge meter: display only. It is built in the LOCKED look (grayscale) because a
+	# fresh meter starts empty, below the pop floor — and `_fill_style` starts at LOCKED to
+	# match, so the first _apply_fill_style call that matters is the one that turns it gold.
+	# Getting these two out of step would leave the bar gold until its first state change.
 	_meter = ProgressBar.new()
 	_meter.min_value = 0.0
 	_meter.max_value = 1.0
@@ -102,15 +118,15 @@ func _ready() -> void:
 	_meter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_meter.size_flags_vertical = Control.SIZE_FILL
 	_meter.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiPalette.style_framed_progress(_meter, UiPalette.DARK_GOLD, UiPalette.PROGRESS_TRACK_GRAY)
+	UiPalette.style_framed_progress(_meter, UiPalette.DARK_GRAY, UiPalette.PROGRESS_TRACK_GRAY)
 	add_child(_meter)
 
-	# Carbonation in the meter (Tim, 2026-07-05 — re-added after a brief removal): bright gold,
-	# glowing against the dark-gold charging fill and the red burning fill alike. Added BEFORE
-	# the label overlay so the readout draws over the bubbles.
+	# Carbonation in the meter (Tim, 2026-07-05 — re-added after a brief removal). Gold once the
+	# meter is poppable, glowing against the dark-gold charging fill and the red burning fill
+	# alike; pale gray while locked. Added BEFORE the label overlay so the readout draws over it.
 	_bubbles = GoldBubbles.new()
 	_bubbles.edge_inset = 3.0  # match the framed fill's 3px inset (style_framed_progress)
-	_bubbles.bubble_color = GoldBubbles.DEFAULT_GOLD
+	_bubbles.bubble_color = LOCKED_BUBBLE_GRAY
 	_bubbles.density_scale = CHARGING_BUBBLE_DENSITY  # the meter starts in the charging state
 	_meter.add_child(_bubbles)
 
@@ -149,7 +165,7 @@ func _process(delta: float) -> void:
 	_meter.value = _displayed_fill
 
 	if _frenzy.mode == FrenzyState.Mode.BURNING:
-		_set_burn_style(true)
+		_apply_fill_style(FillStyle.BURNING)
 		# Second Wind (duration_multiplier) divides the drain RATE, so real seconds left are
 		# meter × base duration × that multiplier. Omitting it understated the countdown by
 		# exactly the multiplier — at ~8 levels the label ticked down 1 per 3 real seconds
@@ -161,7 +177,9 @@ func _process(delta: float) -> void:
 		_label.text = "%s× — %ds left" % [Money.trim(_frenzy.locked_multiplier, 1), int(seconds_left)]
 		_pop_button.disabled = true
 	else:
-		_set_burn_style(false)
+		# Gold the moment a pop is actually possible, so the meter's colour and the pop
+		# button's enabled state always agree — they read the same can_pop().
+		_apply_fill_style(FillStyle.READY if _frenzy.can_pop() else FillStyle.LOCKED)
 		if _frenzy.can_pop():
 			# Live preview of what a pop right now would lock in. Must include the Frenzy
 			# Intensity (Killer Instinct) upgrade's intensity_multiplier — the SAME factor
@@ -179,19 +197,28 @@ func _process(delta: float) -> void:
 		_pop_button.disabled = not _frenzy.can_pop()
 
 
-## Swap the fill color when entering/leaving a burn. Only on change — the
-## stylebox override is not worth rebuilding every frame.
-func _set_burn_style(burning: bool) -> void:
-	if burning == _showing_burn_style:
+## Dress the meter for one of the three states. Only on CHANGE — rebuilding the stylebox
+## every frame is not worth it, and the carbonation keeps its own animation state.
+func _apply_fill_style(style: FillStyle) -> void:
+	if style == _fill_style:
 		return
-	_showing_burn_style = burning
-	var fill := UiPalette.KETCHUP_RED if burning else UiPalette.DARK_GOLD
+	_fill_style = style
+	var burning := style == FillStyle.BURNING
+	var fill := UiPalette.DARK_GRAY
+	if burning:
+		fill = UiPalette.KETCHUP_RED
+	elif style == FillStyle.READY:
+		fill = UiPalette.DARK_GOLD
 	UiPalette.style_framed_progress(_meter, fill, UiPalette.PROGRESS_TRACK_GRAY)
+	# Carbonation goes gray with the fill, so a locked meter is grayscale throughout rather
+	# than gray liquid fizzing gold.
+	_bubbles.bubble_color = LOCKED_BUBBLE_GRAY if style == FillStyle.LOCKED else GoldBubbles.DEFAULT_GOLD
 	# The pop-floor marker only means something while charging.
 	_floor_marker.visible = not burning
 	# Burning drains the meter right-to-left, so the liquid flows that way too, with the
 	# full crowd; charging fills left-to-right with the reduced crowd (Tim, 2026-07-06).
-	# The bright-gold bubble color reads on both fills, so it no longer swaps here.
+	# Gold reads on both the dark-gold and red fills, so the colour only swaps for LOCKED
+	# (handled above) — the two lively states share it.
 	_bubbles.flow_reversed = burning
 	_bubbles.density_scale = BURN_BUBBLE_DENSITY if burning else CHARGING_BUBBLE_DENSITY
 	# Carbonation TIER (Tim, 2026-07-10): burning discharges the multiplier — a livelier RUSHED

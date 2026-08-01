@@ -47,6 +47,24 @@ const MINIGAME_TYPES := [
 	preload("res://scripts/ui/BasketballMinigame.gd"),
 ]
 
+## The last randomly-dealt type, excluded from the next deal so the same minigame never
+## comes up twice in a row (Tim, 2026-07-27). STATIC on purpose: prestige reloads the whole
+## scene between transition rounds, and an instance field would forget the last deal exactly
+## when it matters.
+## Forced/review rounds neither read nor update it (they aren't random deals).
+##
+## PERSISTED since 2026-07-31 (Tim: "it seems common to be presented the same minigame at two
+## transitions in a row"). It used to be memory-only, with an app restart clearing it and a
+## repeat across that boundary written off as acceptable — but with six types that is a 1-in-6
+## chance every launch, and short device-testing sessions cross that boundary constantly, so
+## "possible" was showing up as "common". The last deal now survives a restart.
+static var _last_dealt_type: Script = null
+
+## Where the last deal is remembered between launches. Its own tiny file rather than a field in
+## the dynasty save: this is a presentation detail, it must outlive any single dynasty, and it
+## has no business forcing a save-format migration. Same pattern as TutorialProgress.
+const LAST_DEALT_PATH := "user://minigame_history.json"
+
 ## The default purpose blurb shown in the play view's top section outside review mode. Each
 ## site passes its own line through its reward context (see `make_reward`); this is the
 ## prestige default, used when a reward omits a purpose.
@@ -1130,6 +1148,37 @@ static func first_contact_reward(
 ## bonus fraction (Family Reputation). Normally picks a random minigame type; the review
 ## screen passes a specific `forced_type` and sets `review_mode` so a Back button appears.
 ## Live play leaves both at their defaults (random type, no Back).
+## The previously dealt type, read back from disk. Returns null when there is no file, the file
+## is unreadable, or it names a type that no longer exists — in every one of those cases the
+## caller simply deals from the full pool, which is the old behaviour.
+static func _load_last_dealt() -> Script:
+	if not FileAccess.file_exists(LAST_DEALT_PATH):
+		return null
+	var file := FileAccess.open(LAST_DEALT_PATH, FileAccess.READ)
+	if file == null:
+		return null
+	var parsed: Variant = JSON.parse_string(file.get_as_text())
+	file.close()
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return null
+	var path := String((parsed as Dictionary).get("last_dealt", ""))
+	for type_variant in MINIGAME_TYPES:
+		var type_script := type_variant as Script
+		if type_script.resource_path == path:
+			return type_script
+	return null
+
+
+## Remember this deal for the next launch. Stored by resource path so the file stays readable
+## and a renamed or removed type degrades to "no exclusion" rather than to a wrong one.
+static func _save_last_dealt(type_script: Script) -> void:
+	var file := FileAccess.open(LAST_DEALT_PATH, FileAccess.WRITE)
+	if file == null:
+		return  # a write failure must never break the round that is about to start
+	file.store_string(JSON.stringify({"last_dealt": type_script.resource_path}))
+	file.close()
+
+
 func start_game(
 		reward: Dictionary, bonus_max: float, forced_type: Script = null, review_mode: bool = false
 ) -> void:
@@ -1166,8 +1215,17 @@ func start_game(
 
 	for child in _play_area.get_children():
 		child.queue_free()
-	var type_script: Script = forced_type if forced_type != null \
-			else MINIGAME_TYPES[randi() % MINIGAME_TYPES.size()]
+	var type_script: Script = forced_type
+	if type_script == null:
+		# Deal from every type EXCEPT the one dealt last round (see _last_dealt_type). On the
+		# first deal of a launch the static is still empty, so pull the previous session's
+		# choice off disk — otherwise every restart re-opens the door to a repeat.
+		if _last_dealt_type == null:
+			_last_dealt_type = _load_last_dealt()
+		var pool := MINIGAME_TYPES.filter(func(t: Variant) -> bool: return t != _last_dealt_type)
+		type_script = pool[randi() % pool.size()]
+		_last_dealt_type = type_script
+		_save_last_dealt(type_script)
 	_active_minigame = type_script.new()
 	_active_minigame.set_anchors_preset(Control.PRESET_FULL_RECT)
 	# Tell the type where this round's outcome curve sits (floor + bonus cap) BEFORE it begins, so

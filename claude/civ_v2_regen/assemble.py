@@ -9,8 +9,9 @@
 #     rung a new property stops feeling like a new magnitude; N=14 keeps it at exactly ~x2.
 #   - each tier-7+ cohort keeps its draft flagship cost anchor (10% of the previous epoch's
 #     clear threshold) and re-spaces rungs: cost(k) = flagship * (16807^(1/N))^k, income =
-#     cost * 0.01824, both rounded to 4 significant figures, cycles 60s (the live pattern,
-#     verified against the shipped tiers 2-6 .tres values).
+#     cost * INCOME_RATIO, both rounded to 4 significant figures, cycles 60s. (Ratio was
+#     0.01824 through 2026-07-26; retuned to 0.25 — Plans/Alien_Payback_Retune.md. The
+#     master income stays undecayed/60s-normalized; decay and cycle land at .tres time.)
 #
 # Stages (each a subcommand):
 #   master  - build master_properties.json: the full 326-property ladder in roster order
@@ -33,7 +34,17 @@ REGEN_DIR = Path(r"C:\Claude\American Tycoon\claude\civ_v2_regen")
 SCRATCH = REGEN_DIR / "live_snapshot"
 DRAFT_PATH = Path(r"C:\Claude\American Tycoon\docs\civilizations_v2_draft.json")
 
-INCOME_RATIO = 0.01824
+# Alien Payback Retune, Candidate B (Plans/Alien_Payback_Retune.md, 2026-07-27) — was 0.01824.
+# This is the UNDECAYED per-60s ratio; the .tres generation step applies the decay and the
+# cycle/60 factor on top (see the recipe in the plan doc).
+#
+# EARTH SPLIT (Plans/Earth_Split_Epochs.md, 2026-07-27): the GAME's tier numbering is now
+# draft/civ tier + 1 (Earth spans game tiers 1-2, so draft tier 2 = Luminari = game tier 3).
+# This pipeline keeps the draft's own civ numbering; anything generating game .tres files
+# from it must write unlock_tier = draft_tier + 1 and decay incomes by the PROGRESSIVE
+# decay D(game_tier) — per-epoch steps x0.80 (tiers 3-11), x0.72 (12-19), x0.65 (20-27),
+# compounded from tier 3 (Plans/Progressive_Decay.md, 2026-07-28).
+INCOME_RATIO = 0.25
 EPOCH_SPAN = 16807.0        # 7^5 — one epoch's total cost span AND threshold step
 COHORT_CAP = 14             # scaling analysis: keeps per-rung ratio at ~x2
 

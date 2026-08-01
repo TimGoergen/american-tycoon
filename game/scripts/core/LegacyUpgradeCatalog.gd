@@ -69,23 +69,23 @@ const UPGRADES := [
 		"name": "Trust Fund",
 		"category": "Wealth",
 		"description": "Every heir is born into more money.",
-		"max_level": 10,
-		# The cheapest upgrade and the intended FIRST buy: base 1 → 3 Legacy after the ×3 cost
-		# multiplier, so even a modest first prestige can afford something (Tim, 2026-07-23). Safe to
-		# keep this low: Trust Fund is a flat, capped, ADDITIVE bonus, not a compounding runaway
-		# vector, so its price doesn't affect the runaway the cost multiplier guards against.
+		# Utility restructure (Endgame Economy, Tim 2026-07-28): same +$50K ceiling over
+		# twice the levels at half the step, so the climb lives longer under the new gem
+		# curve. Level 1 stays the cheapest first-prestige buy (Tim, 2026-07-23) — a flat,
+		# capped, ADDITIVE bonus, not a runaway vector.
+		"max_level": 20,
 		"base_cost": 1,
 		"cost_growth": 1.8,
-		"effect_per_level": 5000.0,   # +$5,000 starting cash per level
+		"effect_per_level": 2500.0,   # +$2,500 starting cash per level
 	},
 	{
 		"id": FAMILY_FORTUNE,
 		"name": "Family Fortune",
 		"category": "Wealth",
 		"description": "The family name itself earns. All property income rises.",
-		"max_level": 30,              # effectively endless: geometric cost is the real brake
+		"max_level": 9999,            # UNCAPPED (Endgame Economy, Tim 2026-07-28): the steepening cost curve is the brake
 		"base_cost": 6,
-		"cost_growth": 2.0,
+		"cost_growth": 2.8,
 		"effect_per_level": 0.20,     # COMPOUNDING: ×1.20 income per level (see LegacyUpgrades getter)
 	},
 	{
@@ -93,9 +93,9 @@ const UPGRADES := [
 		"name": "Efficiency Experts",
 		"category": "Operations",
 		"description": "Sharper management. Every property cycles faster.",
-		"max_level": 30,              # effectively endless: geometric cost is the real brake
+		"max_level": 9999,            # UNCAPPED (Endgame Economy, Tim 2026-07-28): the steepening cost curve is the brake
 		"base_cost": 6,
-		"cost_growth": 2.0,
+		"cost_growth": 2.8,
 		"effect_per_level": 0.12,     # COMPOUNDING: ×1.12 cycle speed per level (see LegacyUpgrades getter)
 	},
 	{
@@ -103,19 +103,21 @@ const UPGRADES := [
 		"name": "Loyal Staff",
 		"category": "Operations",
 		"description": "Hardened family retainers work for less. Hiring costs drop.",
-		"max_level": 8,
+		# Utility restructure: same −64% ceiling over 16 half-steps; growth raised so the
+		# deep levels price on the new gem curve (a discount must stay capped — free staff).
+		"max_level": 16,
 		"base_cost": 5,
-		"cost_growth": 1.9,
-		"effect_per_level": 0.08,     # −8% staff hiring cost per level (capped, see getter)
+		"cost_growth": 2.6,
+		"effect_per_level": 0.04,     # −4% staff hiring cost per level (capped, see getter)
 	},
 	{
 		"id": CONNECTIONS,
 		"name": "Old-Money Connections",
 		"category": "Career",
 		"description": "Doors open faster for old money. Your wage per tap rises.",
-		"max_level": 30,              # effectively endless: geometric cost is the real brake
+		"max_level": 9999,            # UNCAPPED (Endgame Economy, Tim 2026-07-28): the steepening cost curve is the brake
 		"base_cost": 4,
-		"cost_growth": 1.9,
+		"cost_growth": 2.7,
 		"effect_per_level": 0.40,     # COMPOUNDING: ×1.40 wage per tap per level (see LegacyUpgrades getter)
 	},
 	{
@@ -123,31 +125,34 @@ const UPGRADES := [
 		"name": "Estate Lawyers",
 		"category": "Legacy",
 		"description": "Clever paperwork. Each succession yields more Legacy.",
-		"max_level": 6,
+		# Utility restructure: same +90% ceiling over 12 half-steps; the STEEPEST utility
+		# growth, because the gem-yield cap is load-bearing (compounding it runs the loop away).
+		"max_level": 12,
 		"base_cost": 10,
-		"cost_growth": 2.2,
-		"effect_per_level": 0.15,     # +15% Legacy gained at succession per level
+		"cost_growth": 3.8,
+		"effect_per_level": 0.075,    # +7.5% Legacy gained at succession per level
 	},
 	{
 		"id": MINIGAME_BONUS,
 		"name": "Family Reputation",
 		"category": "Legacy",
 		"description": "A name worth showing off. A great inheritance minigame pays a bigger bonus.",
-		"max_level": 10,
+		# Utility restructure: same +50% ceiling over 20 half-steps (steepening carries the price).
+		"max_level": 20,
 		"base_cost": 8,
 		"cost_growth": 2.0,
-		# +5% to the minigame's extra-high bonus CAP per level, on top of the 0.25 base
+		# +2.5% to the minigame's extra-high bonus CAP per level, on top of the 0.25 base
 		# (see LegacyUpgrades.minigame_bonus_max). Additive: a steady, ownable climb.
-		"effect_per_level": 0.05,
+		"effect_per_level": 0.025,
 	},
 	{
 		"id": AUTO_CLICK_SPEED,
 		"name": "Restless Hands",
 		"category": "Labor",
 		"description": "Hold to work faster. Auto-tapping and auto-rushing speed up.",
-		"max_level": 30,              # effectively endless: geometric cost is the real brake
+		"max_level": 9999,            # UNCAPPED (Endgame Economy, Tim 2026-07-28): the steepening cost curve is the brake
 		"base_cost": 5,
-		"cost_growth": 1.9,
+		"cost_growth": 2.7,
 		"effect_per_level": 0.15,     # COMPOUNDING: ×1.15 held auto-tap/rush rate per level
 	},
 	{
@@ -155,9 +160,9 @@ const UPGRADES := [
 		"name": "Strong-Arm Tactics",
 		"category": "Operations",
 		"description": "Lean on it. Each rush-tap drives a property's cycle further.",
-		"max_level": 30,              # effectively endless: geometric cost is the real brake
+		"max_level": 9999,            # UNCAPPED (Endgame Economy, Tim 2026-07-28): the steepening cost curve is the brake
 		"base_cost": 6,
-		"cost_growth": 2.0,
+		"cost_growth": 2.8,
 		"effect_per_level": 0.20,     # COMPOUNDING: ×1.20 rush advance per level
 	},
 	{
@@ -165,9 +170,9 @@ const UPGRADES := [
 		"name": "Killer Instinct",
 		"category": "Frenzy",
 		"description": "In a market frenzy you go for the throat. TURBO's multiplier climbs higher.",
-		"max_level": 30,              # effectively endless: geometric cost is the real brake
+		"max_level": 9999,            # UNCAPPED (Endgame Economy, Tim 2026-07-28): the steepening cost curve is the brake
 		"base_cost": 6,
-		"cost_growth": 2.0,
+		"cost_growth": 2.8,
 		"effect_per_level": 0.15,     # COMPOUNDING: ×1.15 the TURBO bonus (amount above 1×) per level
 	},
 	{
@@ -175,37 +180,39 @@ const UPGRADES := [
 		"name": "Second Wind",
 		"category": "Frenzy",
 		"description": "The frenzy just won't quit. Every TURBO burn lasts longer.",
-		"max_level": 30,              # effectively endless: geometric cost is the real brake
+		"max_level": 9999,            # UNCAPPED (Endgame Economy, Tim 2026-07-28): the steepening cost curve is the brake
 		"base_cost": 6,
-		"cost_growth": 2.0,
+		"cost_growth": 2.8,
 		"effect_per_level": 0.15,     # COMPOUNDING: ×1.15 burn duration per level
 	},
 	{
 		"id": COOLING_SYSTEMS,
 		"name": "Cooling Systems",
 		"category": "Rush",
-		"description": "Better heat sinks. The safe cruise rush bonus climbs a point per level.",
+		"description": "Better heat sinks. The safe cruise rush bonus climbs with every level.",
 		# ADDITIVE with a hard cap, NOT compounding: this is a limitation-remover, and a
-		# compounding limitation-remover runs away (see the effect-model note above). Level 5
+		# compounding limitation-remover runs away (see the effect-model note above). Level 10
 		# lifts cruise from +25% to +30% — the old always-on cap, re-earned, NEVER exceeded
-		# (Tim 2026-07-16: Hot/Critical bonuses stay exclusive to riding overdrive).
-		"max_level": 5,
+		# (Tim 2026-07-16). Restructured to 10 half-steps; deliberately kept the CHEAPEST
+		# climb with Rapid Restart — QoL must not feel withheld (Endgame Economy).
+		"max_level": 10,
 		"base_cost": 6,
 		"cost_growth": 2.0,
-		"effect_per_level": 0.01,     # +0.01 cruise bonus per level (see LegacyUpgrades getter)
+		"effect_per_level": 0.005,    # +0.005 cruise bonus per level (see LegacyUpgrades getter)
 	},
 	{
 		"id": RAPID_RESTART,
 		"name": "Rapid Restart",
 		"category": "Rush",
 		"description": "Seasoned cool-down crews. Overheat lockouts pass faster.",
-		# ADDITIVE with a hard cap, same rationale as Cooling Systems: level 5 halves the
+		# ADDITIVE with a hard cap, same rationale as Cooling Systems: max level halves the
 		# lockout (drain AND re-arm shrink together) — overheating always stings, but a
-		# storied dynasty recovers faster. Never reaches zero by design.
-		"max_level": 5,
+		# storied dynasty recovers faster. Never reaches zero by design. Restructured to
+		# 10 half-steps; kept cheap alongside Cooling Systems (QoL, Endgame Economy).
+		"max_level": 10,
 		"base_cost": 6,
 		"cost_growth": 2.0,
-		"effect_per_level": 0.10,     # −10% total lockout time per level (see LegacyUpgrades getter)
+		"effect_per_level": 0.05,     # −5% total lockout time per level (see LegacyUpgrades getter)
 	},
 ]
 
@@ -232,19 +239,29 @@ static func get_definition(id: String) -> Dictionary:
 ## every cost query (buy, badge, invested total) sees the same price.
 static var cost_multiplier := 1.0
 
+## The cost curve's STEEPENING `s` (Plans/Endgame_Economy.md "Shape 2", Tim 2026-07-28): the
+## step from level n to n+1 costs ×(cost_growth × s^n) — the growth factor itself grows each
+## level, so the curve starts near the authored geometric and steepens without limit. That
+## ever-steepening deep end is what lets the compounding tracks run uncapped: any gem fortune
+## buys only a few more levels than a much smaller one. 1.0 = the old flat geometric. Set
+## from tuning.legacy_cost_steepening at dynasty construction/load, like cost_multiplier.
+static var cost_steepening := 1.0
+
 
 ## Legacy cost to buy a specific level of an upgrade (levels are 1-based).
-## Level 1 costs base_cost; each further level multiplies by cost_growth.
-## Returns 0 for an invalid level so callers never divide by a bogus price.
+## Level 1 costs base_cost; the step to level n multiplies by cost_growth × s^(n-2)
+## (s = cost_steepening), so cost(n) = base × growth^(n-1) × s^((n-1)(n-2)/2) — the
+## closed form of the progressively steepening curve. Returns 0 for an invalid level
+## so callers never divide by a bogus price.
 static func cost_for_level(id: String, level: int) -> int:
 	var definition := get_definition(id)
 	if definition.is_empty() or level < 1 or level > int(definition["max_level"]):
 		return 0
 	var base_cost := float(definition["base_cost"])
 	var growth := float(definition["cost_growth"])
-	# Geometric growth: level 1 = base, level 2 = base×growth, level 3 = base×growth², … then the
-	# global cost_multiplier scales the whole ladder.
-	return int(floor(base_cost * pow(growth, float(level - 1)) * cost_multiplier))
+	var steps := float(level - 1)
+	var steepen := pow(cost_steepening, steps * (steps - 1.0) / 2.0)
+	return int(floor(base_cost * pow(growth, steps) * steepen * cost_multiplier))
 
 
 ## A human-readable summary of what ONE upgrade does at a given level — shown on

@@ -6,10 +6,10 @@
 script = ExtResource("1")
 property_id = 18
 display_name = "Beam Utilities"
-unlock_tier = 2
+unlock_tier = 3
 base_cost = 52430000000000.0
 r0 = 1.09
-base_income_per_unit = 1.87693e+10
+base_income_per_unit = 2.42098e+11
 base_cycle_length = 1.385
 staffer_name = "Beam Grid Operator"
 accent_color = Color(0.98, 0.8, 0.25, 1)

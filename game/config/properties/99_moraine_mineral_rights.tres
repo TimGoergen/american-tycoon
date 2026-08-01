@@ -6,10 +6,10 @@
 script = ExtResource("1")
 property_id = 99
 display_name = "Moraine Mineral Rights"
-unlock_tier = 10
+unlock_tier = 11
 base_cost = 6.878e+49
 r0 = 1.09
-base_income_per_unit = 9.80219e+46
+base_income_per_unit = 7.78026e+47
 base_cycle_length = 20.233
 staffer_name = "Moraine Claims Reeve"
 accent_color = Color(0.4275, 0.5569, 0.6275, 1)

@@ -27,10 +27,14 @@ func _initialize() -> void:
 	# rush_top_n = 3, rush_power = 6 (~Strong-Arm lv10) models an engaged rushing player.
 	# Ordered fast-first: high-gem runs clear quickly (few sim-seconds), so their tables
 	# stream out before the bare climb (which grinds to the 6h cap) finishes computing.
-	_print_playout("66M gems (Tim's device stack)", 66_000_000, _property_configs, 3, 6.0)
+	# The Progressive-Decay gate ladder (Plans/Progressive_Decay.md): every stack must meet
+	# a growing wall (ratios > ~1.5) BEFORE the final tier, while bare/10M stay on today's
+	# early-game pace. Fast rows first so results stream while the slow climbs compute.
+	_print_playout("10B gems", 10_000_000_000, _property_configs, 3, 6.0)
 	_print_playout("1B gems", 1_000_000_000, _property_configs, 3, 6.0)
+	_print_playout("447M gems (Tim's device stack, 2026-07-28)", 447_000_000, _property_configs, 3, 6.0)
+	_print_playout("66M gems (Tim's 2026-07-26 stack)", 66_000_000, _property_configs, 3, 6.0)
 	_print_playout("10M gems", 10_000_000, _property_configs, 3, 6.0)
-	_print_playout("1M gems", 1_000_000, _property_configs, 3, 6.0)
 	_print_playout("BARE heir — 0 gems (first-ever climb)", 0, _property_configs, 3, 6.0)
 
 	quit()

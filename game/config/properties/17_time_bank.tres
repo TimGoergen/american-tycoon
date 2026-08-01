@@ -6,10 +6,10 @@
 script = ExtResource("1")
 property_id = 17
 display_name = "Time Bank"
-unlock_tier = 6
+unlock_tier = 7
 base_cost = 826600000000000120000000000000.0
 r0 = 1.09
-base_income_per_unit = 6.02197e+25
+base_income_per_unit = 6.09584e+26
 base_cycle_length = 0.54
 staffer_name = "Time Banker"
 accent_color = Color(0.4, 0.6, 0.85, 1)

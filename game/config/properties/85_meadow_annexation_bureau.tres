@@ -6,10 +6,10 @@
 script = ExtResource("1")
 property_id = 85
 display_name = "Meadow Annexation Bureau"
-unlock_tier = 9
+unlock_tier = 10
 base_cost = 3.305e+45
 r0 = 1.09
-base_income_per_unit = 5.05911e+42
+base_income_per_unit = 4.26928e+43
 base_cycle_length = 18.48
 staffer_name = "Wildflower Annexation Envoy"
 accent_color = Color(0.7569, 0.6039, 0.149, 1)

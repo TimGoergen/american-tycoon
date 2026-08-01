@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 197
+display_name = "Magnetosphere Monopolies"
+unlock_tier = 18
+base_cost = 2.606e+79
+r0 = 1.09
+base_income_per_unit = 2.95774e+76
+base_cycle_length = 20.233
+staffer_name = "Magnetosphere Monopolist"
+accent_color = Color(0.5412, 0.2902, 0.1098, 1)

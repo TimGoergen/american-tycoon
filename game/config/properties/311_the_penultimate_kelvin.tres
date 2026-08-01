@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 311
+display_name = "The Penultimate Kelvin"
+unlock_tier = 26
+base_cost = 6.661e+113
+r0 = 1.09
+base_income_per_unit = 5.5069e+109
+base_cycle_length = 41.762
+staffer_name = "Custodian of the Penultimate Kelvin"
+accent_color = Color(0.3059, 0.3451, 0.3765, 1)

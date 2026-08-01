@@ -6,10 +6,10 @@
 script = ExtResource("1")
 property_id = 44
 display_name = "Bedrock Annuities"
-unlock_tier = 5
+unlock_tier = 6
 base_cost = 3714000000000000000000000000.0
 r0 = 1.09
-base_income_per_unit = 3.35505e+24
+base_income_per_unit = 3.60791e+25
 base_cycle_length = 5.692
 staffer_name = "Bedrock Annuity Setter"
 accent_color = Color(0.85, 0.45, 0.7, 1)

@@ -6,10 +6,10 @@
 script = ExtResource("1")
 property_id = 90
 display_name = "Cold Storage Monopoly"
-unlock_tier = 10
+unlock_tier = 11
 base_cost = 1.322e+47
 r0 = 1.09
-base_income_per_unit = 7.22235e+42
+base_income_per_unit = 5.7371e+43
 base_cycle_length = 0.776
 staffer_name = "Cold-Hoard Monopolist"
 accent_color = Color(0.4275, 0.5569, 0.6275, 1)

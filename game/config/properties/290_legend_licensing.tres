@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 290
+display_name = "Legend Licensing"
+unlock_tier = 25
+base_cost = 3.057e+107
+r0 = 1.09
+base_income_per_unit = 3.07735e+102
+base_cycle_length = 3.305
+staffer_name = "Map Key Notary"
+accent_color = Color(0.2745, 0.4078, 0.549, 1)

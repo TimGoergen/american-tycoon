@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PropertyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/PropertyConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+property_id = 129
+display_name = "Ministry of Nonexistence"
+unlock_tier = 13
+base_cost = 7.799e+58
+r0 = 1.09
+base_income_per_unit = 9.44364e+56
+base_cycle_length = 41.762
+staffer_name = "Undersecretary of ██████"
+accent_color = Color(0.149, 0.1333, 0.1804, 1)

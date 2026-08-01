@@ -6,10 +6,10 @@
 script = ExtResource("1")
 property_id = 84
 display_name = "Pheromone Broadcasting Guild"
-unlock_tier = 9
+unlock_tier = 10
 base_cost = 1.564e+45
 r0 = 1.09
-base_income_per_unit = 1.61715e+42
+base_income_per_unit = 1.36457e+43
 base_cycle_length = 12.481
 staffer_name = "Scent Decree Herald"
 accent_color = Color(0.7569, 0.6039, 0.149, 1)

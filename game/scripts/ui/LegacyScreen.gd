@@ -24,6 +24,15 @@ signal purchased(upgrade_id: String)
 ## Main spends the Legacy, records it, then re-feeds the entries.
 signal retain_requested(property_index: int)
 
+## The player asked to retain a property's staffer as far as the wallet reaches, in ONE action
+## (the RETAIN MAX button). `levels` is exactly the block size the button quoted on its face
+## before the press, so Main must buy THAT count — dynasty.buy_staff_retention_levels(index,
+## levels) — and never re-derive a (possibly larger) count of its own. Passing the quoted number
+## is what makes the label's price and the actual charge the same number by construction, which
+## is the whole point of the spend preview: retention is the endgame's open gem sink, and one tap
+## must never drain more than the button said it would.
+signal retain_max_requested(property_index: int, levels: int)
+
 
 # Type sizes — large for at-a-glance phone reading (UI notes §1). The title/wallet are a
 # notch smaller than the old full-screen sizes so the stacked header fits the tab width.
@@ -601,9 +610,17 @@ func _add_upgrade_card(parent: VBoxContainer, definition: Dictionary, accent: Co
 
 ## Rebuild the Household Staff rows from Main's snapshot of the bloodline's staff-ladder
 ## achievements vs. the dynasty's retained ladder LEVELS. Each entry:
-##   { index, property_name, staffer_name, best_levels, retained_levels, cost, can_afford }
+##   { index, property_name, staffer_name, best_levels, retained_levels, cost, can_afford,
+##     gems_spent, max_levels, max_cost }
 ## cost < 0 means there is nothing to buy (never staffed, or already retained to the
 ## bloodline's best level).
+##
+## max_levels / max_cost drive the RETAIN MAX button and must be produced together, from the
+## same pair of calls, so the quote can't disagree with the charge:
+##   max_levels = dynasty.max_affordable_retention_levels(index)
+##   max_cost   = dynasty.retention_cost_for_levels(index, max_levels)
+## Both are optional and default to 0, which paints RETAIN MAX as disabled — an older snapshot
+## therefore under-promises rather than quoting a price it can't stand behind.
 func set_retention_entries(entries: Array) -> void:
 	_retention_entries = entries
 	_refresh_staff_section_header()  # its invested total + affordable badge track this snapshot
@@ -647,7 +664,8 @@ func update_retention_entries(entries: Array) -> void:
 
 
 ## One Household Staff card: property + current staffer on top, the now/retained tiers
-## and a RETAIN button (or "RETAINED" when fully retained / unstaffed) beneath.
+## and two stacked buy buttons beneath — RETAIN (one level, hold to repeat) above
+## RETAIN MAX (one press, everything the wallet reaches).
 func _add_retention_row(entry: Dictionary) -> void:
 	var index := int(entry["index"])
 
@@ -679,6 +697,16 @@ func _add_retention_row(entry: Dictionary) -> void:
 	status.add_theme_font_size_override("font_size", CARD_BODY_SIZE)
 	bottom.add_child(status)
 
+	# The two buy buttons STACK on the right of the row rather than sitting side by side.
+	# Side by side, two 240-wide buttons plus the status text overflow the (horizontally
+	# non-scrolling) card, and the only way to fit them would be to shrink both below a
+	# comfortable tap target — which the large-target rule forbids. Stacking costs the row
+	# ~88px of height and keeps each button at its full, unchanged size.
+	var buttons := VBoxContainer.new()
+	buttons.add_theme_constant_override("separation", 8)
+	buttons.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	bottom.add_child(buttons)
+
 	var button := Button.new()
 	# Flexible width (was a fixed 440 that overflowed the framed viewport), matching the
 	# upgrade cards' RETAIN/BUY buttons. ~35% shorter (Tim, 2026-06-28); a smaller font so the
@@ -690,9 +718,19 @@ func _add_retention_row(entry: Dictionary) -> void:
 	# upgrade cards' hold-to-buy: the down fires the first purchase, _process repeats it.
 	button.button_down.connect(_on_retain_down.bind(index))
 	button.button_up.connect(_on_retain_up)
-	bottom.add_child(button)
+	buttons.add_child(button)
 
-	_retention_rows[index] = {"status": status, "button": button}
+	# RETAIN MAX: one press buys every level the wallet reaches. Deliberately `pressed`, NOT
+	# button_down/button_up — this is already a bulk action, so hold-to-repeat on top of it
+	# would let a lean on the screen empty the wallet several times over.
+	var max_button := Button.new()
+	max_button.custom_minimum_size = Vector2(240, 80)
+	max_button.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
+	UiPalette.style_button(max_button, true)  # red: spends Legacy, same as its neighbour
+	max_button.pressed.connect(_on_retain_max_pressed.bind(index))
+	buttons.add_child(max_button)
+
+	_retention_rows[index] = {"status": status, "button": button, "max_button": max_button}
 	_apply_retention_entry(entry)
 
 
@@ -717,12 +755,61 @@ func _apply_retention_entry(entry: Dictionary) -> void:
 		button.text = "RETAIN LVL %d\n%s Gems" % [int(entry["retained_levels"]) + 1, Money.abbrev(cost)]
 		button.disabled = not bool(entry["can_afford"])
 
+	_apply_retain_max_button(entry, row)
+
+
+## Paint one row's RETAIN MAX button. ITS LABEL IS THE SPEND PREVIEW: it names the level the
+## press will actually REACH and the exact total it will charge, so a bulk gem spend is never a
+## surprise. Both numbers come straight off the snapshot, which computed them from the same
+## core calls the purchase itself uses.
+##
+## The button never hides — when there is nothing to buy it greys in place saying why:
+##   • "FULLY RETAINED"            — already at the bloodline's earned ceiling.
+##   • "RETAIN MAX / NEED n Gems"  — levels remain, but not even the next one is affordable;
+##                                   the number shown is the price of that next level.
+func _apply_retain_max_button(entry: Dictionary, row: Dictionary) -> void:
+	var max_button := row["max_button"] as Button
+	var cost := int(entry["cost"])
+	# Default to 0 so a snapshot without these fields disables the button rather than quoting
+	# a price nobody computed (see set_retention_entries for the contract).
+	var max_levels := int(entry.get("max_levels", 0))
+	var max_cost := int(entry.get("max_cost", 0))
+
+	# The quote was priced against the wallet as it stood when the snapshot was built. If gems
+	# have left the wallet since, honour the wallet, not the stale quote — a button that offers
+	# to spend money the player no longer has is the one failure this preview exists to prevent.
+	if _upgrades != null and max_cost > _upgrades.available:
+		max_levels = 0
+
+	if cost < 0:
+		max_button.text = "FULLY RETAINED"
+		max_button.disabled = true
+		row["max_levels"] = 0
+	elif max_levels <= 0:
+		max_button.text = "RETAIN MAX\nNEED %s Gems" % Money.abbrev(cost)
+		max_button.disabled = true
+		row["max_levels"] = 0
+	else:
+		max_button.text = "RETAIN TO LVL %d\n%s Gems" % [
+			int(entry["retained_levels"]) + max_levels, Money.abbrev(max_cost)
+		]
+		max_button.disabled = false
+		# Remember the quoted count so the press emits THIS number — the one on the label —
+		# instead of letting Main re-derive a possibly different one.
+		row["max_levels"] = max_levels
+
 
 ## Re-derive every retention entry's can_afford from the LIVE wallet and re-render the rows
 ## and the section header. The entries' COSTS are stable while the tab is open (they only
 ## change when a level is bought, which rebuilds the snapshot anyway) — affordability is the
 ## one field that can go stale on its own, so the wallet watcher in _process fixes exactly
 ## that field rather than needing Main to rebuild the whole snapshot.
+##
+## The RETAIN MAX quote is the one thing this pass CANNOT recompute — its size depends on the
+## wallet, and pricing a block needs the core's cost curve, which this screen deliberately does
+## not reach into. So _apply_retain_max_button only ever shrinks a stale quote (to disabled when
+## the wallet can no longer cover it); a wallet that GREW leaves the button under-promising until
+## Main re-feeds the snapshot, which is the harmless direction to be wrong in.
 func _refresh_retention_affordability() -> void:
 	if _retention_entries.is_empty():
 		return
@@ -845,6 +932,16 @@ func _on_retain_down(property_index: int) -> void:
 ## Release: stop the retain auto-repeat.
 func _on_retain_up() -> void:
 	_held_retain_index = -1
+
+
+## Press on a RETAIN MAX button: ask Main for exactly the block of levels this button's label
+## just quoted. A single press — no hold-to-repeat — because it is already a bulk action.
+func _on_retain_max_pressed(property_index: int) -> void:
+	var row: Dictionary = _retention_rows.get(property_index, {})
+	var levels := int(row.get("max_levels", 0))
+	if levels <= 0:
+		return  # nothing quoted (disabled, or a snapshot without the bulk fields)
+	retain_max_requested.emit(property_index, levels)
 
 
 ## Buy one level of an upgrade, refresh the shop, and notify Main. Returns whether the

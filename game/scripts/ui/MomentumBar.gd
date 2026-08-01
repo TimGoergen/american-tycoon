@@ -37,6 +37,19 @@ extends HBoxContainer
 #     drains from the right in proportion to the re-arm countdown — the gray's movement IS the
 #     re-arm timer, and the READY flash lands on a fully normal-looking bar.
 #
+#   • AUTO-BUY lockout (Plans/Auto_Purchase_And_Bulk_Hire.md §A5): while the Acquisitions Desk
+#     mode is on, the core refuses the rush verb entirely — that trade-off is what stops the mode
+#     being strictly dominant. This bar is where the player is told WHY: the readout reads
+#     AUTO-BUY ON, the OVR button wears its existing gray "can't trigger" plate, and the bubbles
+#     and streaks (both of which claim an active rush) go quiet. Deliberately NOT a per-row
+#     banner: a global rush shutdown that painted all 14 property rows read as the whole property
+#     tab being dead (Overdrive_Vent_Windows.md:375-391).
+#
+#     There is NO frozen/idle heat state here and there must never be one. Turning the mode on
+#     simply is "the player let go", so heat decays on the ordinary spin-down path and the
+#     ordinary cruise/build fill plots that tail — the bar keeps showing exactly what is still
+#     being earned, right down to zero. The lockout is a change of EXPLANATION, not of arithmetic.
+#
 # Vent resolutions still land as timed chips ABOVE the bar: green "VENTED — PEAK +X%!" plus
 # the white flash on success; red "VENT MISSED!" with the unfinished pips strobing on a miss.
 # The miss chip KEEPS its own pip row (VentPipRow) even though the bar now draws pips too:
@@ -72,6 +85,18 @@ var _tuning: TuningConfig
 ## Threaded in from Main via set_dynasty (like setup() threads the rush state) rather than reached
 ## through the scene tree, so this UI-only dependency stays an explicit hand-off, not a lookup.
 var _dynasty: DynastyState
+
+## True while the Acquisitions Desk (auto-purchase) mode is switched on, which is exactly when
+## the core refuses the rush verb (Plans/Auto_Purchase_And_Bulk_Hire.md §A5). Pushed in by Main
+## via set_auto_purchase_locked rather than read off the core, because it is a UI-mode fact
+## (a toggle the player flipped), not part of the heat instrument — the same hand-off shape as
+## set_dynasty above.
+##
+## This flag changes NOTHING about the fill math. Auto-buy on simply IS "the player let go", so
+## heat bleeds away on the ordinary spin-down path and the ordinary cruise/build fill already
+## plots that tail — which keeps this bar's binding invariant intact: whatever the bar shows IS
+## what the player earns. All this flag does is explain WHY rush is unavailable.
+var _auto_purchase_locked := false
 
 ## The OVR button, pinned left of the meter (the FrenzyBar layout). Always visible; enabled
 ## only while cruising — see _process.
@@ -173,7 +198,7 @@ var _blink_phase := 0.0
 
 ## Which label state is currently applied (see _LabelState), so the color/outline overrides are
 ## only rebuilt when the state flips, not every frame.
-enum _LabelState { NORMAL, CRUISING, OVERHEATED, COOLING }
+enum _LabelState { NORMAL, CRUISING, OVERHEATED, COOLING, AUTO_BUY }
 var _label_state_applied: int = -1
 
 ## Where the fixed vent target bar sits, as a fraction of the bar's width (~1/3 from the left,
@@ -220,9 +245,25 @@ func set_dynasty(dynasty: DynastyState) -> void:
 	_dynasty = dynasty
 
 
+## Tell the bar that auto-purchase mode is on and rush is therefore unavailable. Main calls this
+## whenever the Acquisitions Desk toggle changes (and once at startup, so a loaded save that had
+## the mode on comes up wearing the locked look).
+##
+## The bar does not go looking for this itself: the core has no "auto-buy" concept — it just
+## stops being fed `rushing = true` — so the reason has to be handed down from the screen that
+## owns the toggle. Idempotent; calling it every frame with the same value is harmless.
+func set_auto_purchase_locked(locked: bool) -> void:
+	_auto_purchase_locked = locked
+
+
 ## The OVERDRIVE (OVR) button, so a tutorial card can anchor to it. It stays disabled until the
 ## player reaches the cruise clamp, so `not get_overdrive_button().disabled` is exactly the
 ## "rush has met cruise control" moment the overdrive tip fires on.
+##
+## CAUTION for tutorial callers: the button is ALSO force-disabled for the whole time auto-purchase
+## mode is on, so a player who leaves that mode on would never satisfy `not disabled` and would
+## never be shown the overdrive tip. Anything gating a one-time tip on this button must treat the
+## auto-buy lockout as "not yet", not as "never" (Plans/Auto_Purchase_And_Bulk_Hire.md §A5).
 func get_overdrive_button() -> Button:
 	return _overdrive_button
 
@@ -569,19 +610,49 @@ func _process(delta: float) -> void:
 	# plate any other time. The >= (not ==) covers the re-press-while-still-hot case: heat
 	# bleeding DOWN toward the clamp is already at cruise depth, so the gamble is available
 	# immediately rather than after the cooldown dips below and climbs back.
+	# Auto-purchase mode forces it gray on top of all that: the core refuses engage_rush_overdrive
+	# outright while the mode is on, and a live-looking button whose taps are quietly ignored reads
+	# as a bug (Plans/Rush_Overheat.md:61-62). It grays IN PLACE using the disabled plate built in
+	# _ready — no new look, and nothing hides or moves.
 	var at_cruise_depth: bool = _rush_momentum.heat >= _rush_momentum.cruise_heat() \
 			or is_equal_approx(_rush_momentum.heat, _rush_momentum.cruise_heat())
-	_overdrive_button.disabled = not (cruising and at_cruise_depth)
+	_overdrive_button.disabled = _auto_purchase_locked or not (cruising and at_cruise_depth)
 
 	# The label: the live bonus normally; "CRUISE +X%" while the clamp is holding steady; the
-	# lockout narration while shut down. is_rearming is checked FIRST — it is a sub-state of
-	# is_locked_out (both true during the re-arm delay).
+	# lockout narration while shut down; "AUTO-BUY ON" while the Acquisitions Desk has rush
+	# switched off. is_rearming is checked FIRST — it is a sub-state of is_locked_out (both true
+	# during the re-arm delay).
+	#
+	# PRECEDENCE — the overheat states OUTRANK the auto-buy state, deliberately (both can be true
+	# at once: an overheat that is already draining when the player flips auto-buy on, or a miss
+	# landing on a hold that was live at the flip). The rule is "the state with a running clock
+	# wins", because only that state can LIE:
+	#   • OVERHEATED/COOLING is a bounded countdown that keeps running regardless of auto-buy —
+	#     the drain drains, the re-arm re-arms, rush_ready still fires. Hiding it behind AUTO-BUY
+	#     ON would strand the player with no idea how long the shutdown lasts.
+	#   • The reverse would be worse still if we ranked auto-buy first and it happened to also
+	#     show a countdown: a timer that is not counting down is a lie, and that is the exact
+	#     failure this ordering exists to avoid.
+	#   • AUTO-BUY ON has no clock to falsify. Deferring it costs only the couple of seconds the
+	#     lockout takes, and it is still true — and still shown — the instant the lockout clears.
+	# So a shutdown that happens during auto-buy narrates itself to completion, lands its READY
+	# flash, and then falls through to AUTO-BUY ON, which is the honest reason from then on.
 	if _rush_momentum.is_rearming():
 		_label.text = "COOLING…"
 		_apply_label_state(_LabelState.COOLING)
 	elif locked_out:
 		_label.text = "OVERHEATED"
 		_apply_label_state(_LabelState.OVERHEATED)
+	elif _auto_purchase_locked:
+		# The REASON, not the symptom: "rush is off because you turned auto-buy on". A control that
+		# states a fact without explaining it already failed a device review once (the frozen-row
+		# verdict, Plans/Overdrive_Vent_Windows.md:493-500), and "+0%" alone would be exactly that.
+		#
+		# This branch owns the readout for the whole spin-down too, which is on purpose: the bonus
+		# is still being PAID while the tail bleeds out, and the fill below still plots it honestly,
+		# but the one thing the player needs explained here is why the meter will not climb back.
+		_label.text = "AUTO-BUY ON"
+		_apply_label_state(_LabelState.AUTO_BUY)
 	elif cruising and is_equal_approx(_rush_momentum.heat, _rush_momentum.cruise_heat()):
 		# Sitting exactly on the clamp: the steady, content cruise state. The bonus quotes
 		# effective_cruise_bonus() (base +25% plus Cooling Systems levels), never a hardcoded
@@ -601,8 +672,11 @@ func _process(delta: float) -> void:
 		_apply_label_state(_LabelState.NORMAL)
 
 	# A locked meter is not accruing anything: hide the carbonation while it drains/re-arms so the
-	# shutdown reads as dead air, not business as usual.
-	_bubbles.visible = not locked_out
+	# shutdown reads as dead air, not business as usual. Auto-buy mode gets the same treatment for
+	# the same reason — the bubbles are the "value building automatically" cue, and with rush
+	# refused the meter can only go DOWN. Bubbling over a bleeding-out tail would say the opposite
+	# of what the fill is doing.
+	_bubbles.visible = not locked_out and not _auto_purchase_locked
 
 	# The SPINNING DOWN chip: up for exactly as long as a released hold is still paying a
 	# decaying bonus. This is the ONLY signal that bailing is different from blowing up (Tim
@@ -614,6 +688,14 @@ func _process(delta: float) -> void:
 	# shows: the chip's job is not to add a figure but to say WHY that figure is falling — the
 	# machine is easing off, not blowing up. Hidden during a lockout regardless, so a stale chip
 	# can never sit over the overheat display.
+	#
+	# It is deliberately NOT suppressed by the auto-buy lockout, even though the bubbles and
+	# streaks are. Those two imply an ACTIVE rush and would be false; this chip states that a
+	# real, decaying bonus is still being paid, which is exactly what is happening — switching
+	# auto-buy on IS letting go, and the tail pays out to zero as usual. It also becomes the only
+	# place the tail's NUMBER appears, since the readout beside it is spending those pixels on the
+	# reason ("AUTO-BUY ON") — so the two divide the work cleanly: chip quotes what is still being
+	# paid, label says why it will not climb back.
 	var spinning_down: bool = _rush_momentum.is_spinning_down() and not locked_out
 	_spindown_chip.visible = spinning_down
 	if spinning_down:
@@ -622,8 +704,11 @@ func _process(delta: float) -> void:
 
 	# The salmon streaks mark the overdrive ride itself now: with the fill pinned full, they are
 	# the motion cue that the bar has switched into its minigame instrument. Never while merely
-	# cruising or locked out.
-	_streaks.visible = overdrive
+	# cruising or locked out — and never while auto-buy has rush switched off, where a "you are
+	# riding the danger zone" cue would be plainly false. (The core refuses engage_rush_overdrive
+	# while the mode is on, so this should already be false; the belt-and-braces term guarantees
+	# it rather than trusting a second system's ordering.)
+	_streaks.visible = overdrive and not _auto_purchase_locked
 
 	_update_fill_color(delta, locked_out, overdrive)
 
@@ -723,6 +808,19 @@ func _apply_label_state(state: int) -> void:
 			_label.add_theme_color_override("font_color", UiPalette.PALE_GOLD)
 			_label.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
 			_label.add_theme_constant_override("outline_size", 6)
+		_LabelState.AUTO_BUY:
+			# CREAM on a heavy INK_NAVY outline — the same "readable over anything" treatment the
+			# OVERHEATED state gets, because this text has to survive the identical range of
+			# backgrounds: the dark purple fill while the tail is still high, and the pale track
+			# once it has bled to nothing.
+			#
+			# Cream (not red, not gold, not teal) on purpose: this is neither a failure, an
+			# act-now prompt, nor a reward — it is the machine standing down because the player
+			# chose it. Cream is the panel/paper color, the most neutral voice in the palette, and
+			# it is the same "inert" family as the disabled OVR plate this state also lights up.
+			_label.add_theme_color_override("font_color", UiPalette.CREAM)
+			_label.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
+			_label.add_theme_constant_override("outline_size", 8)
 		_:
 			_label.add_theme_color_override("font_color", Color.WHITE)
 			_label.remove_theme_color_override("font_outline_color")

@@ -13,6 +13,16 @@ extends PanelContainer
 # ×100, Tim 2026-07-07). It keeps ×100's ordinal slot so saved ui_buy_mode ints stay valid.
 enum BuyMode { ONE, TEN, NEXT_TIER, MAX }
 
+# The staff-hire equivalent of BuyMode (Plans/Auto_Purchase_And_Bulk_Hire.md §B2). BLOCK buys
+# up to the next 20-level staffer-block boundary, which is the meaningful unit on the staff
+# ladder: level 1 of a block is the expensive staffer HIRE and levels 2-20 are the cheap steps
+# after it, so "finish this block" is what a player actually wants to buy. It is the staff-side
+# analogue of BuyMode.NEXT_TIER.
+#
+# If this enum ever changes, follow the BuyMode lesson above: a retired mode KEEPS its ordinal
+# slot, because the player's chosen mode is persisted as a plain int in the save.
+enum HireMode { ONE, TEN, BLOCK, MAX }
+
 signal buy_requested(prop_index: int, mode: BuyMode)
 signal tap_requested(prop_index: int)
 signal hold_rush_requested(prop_index: int)
@@ -33,7 +43,11 @@ signal rush_released(prop_index: int)
 ## The staff button was pressed. There is only ONE staff action now — buy the next rung of
 ## the property's sequential staff ladder (hiring a staffer IS level 1 of each 20-level
 ## block, GDD §6.1 epoch-depth redesign) — so the button needs no state dispatch.
-signal hire_requested(prop_index: int)
+## Carries the HireMode the row is currently set to, exactly as buy_requested carries the
+## BuyMode: the row emits the MODE and Main resolves it to a level count (via this row's
+## resolve_hire_count) before spending. The mode sent is the EFFECTIVE one — already clamped
+## to what the player's Head Hunters level allows (see _effective_hire_mode).
+signal hire_requested(prop_index: int, mode: HireMode)
 
 var prop_index: int = -1
 
@@ -51,6 +65,12 @@ var _rush_momentum: RushMomentumState
 ## civilization is contacted (EpochState.current_tier).
 var _epoch: EpochState
 var _buy_mode: BuyMode = BuyMode.ONE
+## The global staff-hire mode, pushed in by Main's hire-mode toggle (set_hire_mode).
+var _hire_mode: HireMode = HireMode.ONE
+## The highest HireMode the player has unlocked, pushed in by Main (set_max_hire_mode) so the
+## row never has to read the dynasty itself. Defaults to ONE — bulk hiring is off until the
+## Head Hunters legacy track is bought.
+var _max_hire_mode: HireMode = HireMode.ONE
 
 ## Accumulates held-down time on the tap button to pace auto-rush pulses.
 var _hold_accumulator := 0.0
@@ -741,6 +761,58 @@ func _apply_flagship_name_inset(flagship: bool) -> void:
 ## Called by Main when the player cycles the global buy-mode toggle.
 func set_buy_mode(mode: BuyMode) -> void:
 	_buy_mode = mode
+
+
+## Called by Main when the player cycles the global hire-mode toggle.
+func set_hire_mode(mode: HireMode) -> void:
+	_hire_mode = mode
+
+
+## Called by Main to say how far the player's Head Hunters legacy track has unlocked bulk
+## hiring: level 0 → ×1 only, 1 → ×10, 2 → BLOCK, 3 → MAX. Those levels line up exactly with
+## the HireMode ordinals, which is why the clamp below is a plain mini(). Main pushes this in
+## rather than the row reading LegacyUpgrades itself — the row stays free of dynasty coupling,
+## exactly as it is today.
+func set_max_hire_mode(level: int) -> void:
+	_max_hire_mode = clampi(level, HireMode.ONE, HireMode.MAX) as HireMode
+
+
+## The mode this row will actually act on: the global choice, clamped to what the player has
+## unlocked. Clamping here (rather than refusing) means a save carrying a mode from a previous
+## generation's upgrades degrades gracefully to the best allowed one instead of doing nothing.
+func _effective_hire_mode() -> HireMode:
+	return mini(_hire_mode, _max_hire_mode) as HireMode
+
+
+## How many staff levels a hire press in `mode` would buy RIGHT NOW — the single source of
+## truth for that count. The hire button prices its quote with it and Main must resolve the
+## mode with it too; if either side computed its own count they would drift and the button
+## would advertise a purchase the core doesn't make.
+##
+## Static, and taking everything it needs as arguments, so Main can call it straight off the
+## class (PropertyRow.resolve_hire_count(...)) without having to find the row that emitted.
+##
+## PARTIAL FILL IS DELIBERATE: the returned count is the mode's desired count clamped to what
+## the player can actually afford (and to the reached-epoch level cap, which
+## get_max_affordable_staff_levels already respects). So a ×10 press with cash for 7 levels
+## returns 7 and buys 7 — a bulk button that went dead because the 10th level was a dollar
+## short would read as broken. EconomyState.try_buy_staff_levels is partial-fill for the same
+## reason, so the quote and the purchase agree even if cash changes between them.
+static func resolve_hire_count(mode: HireMode, economy: EconomyState, prop_index: int, reached_tier: int) -> int:
+	var desired := 0
+	match mode:
+		HireMode.ONE:
+			desired = 1
+		HireMode.TEN:
+			desired = 10
+		HireMode.BLOCK:
+			# Up to the next 20-level block boundary; 0 once the ladder is maxed.
+			desired = economy.get_staff_levels_to_next_block(prop_index, reached_tier)
+		HireMode.MAX:
+			desired = economy.get_max_affordable_staff_levels(prop_index, reached_tier)
+	if desired <= 0:
+		return 0
+	return economy.get_max_affordable_staff_levels(prop_index, reached_tier, desired)
 
 
 ## When false, this row belongs to an epoch/tab the pager is NOT currently showing: the row
@@ -1536,16 +1608,17 @@ func _apply_ownership_styling(owned: bool, frozen: bool) -> void:
 		add_theme_stylebox_override("panel", owned_plate)
 
 
-## The staff button's `pressed` handler. One action only — buy the next ladder rung —
-## so no state dispatch (the pre-redesign HIRE/UPGRADE/LEVEL-UP state machine is gone).
+## The staff button's `pressed` handler. One action only — buy up the ladder — so no state
+## dispatch (the pre-redesign HIRE/UPGRADE/LEVEL-UP state machine is gone). HOW MANY rungs is
+## the current hire mode's business, and Main resolves that from the mode we send.
 func _on_hire_pressed() -> void:
-	hire_requested.emit(prop_index)
+	hire_requested.emit(prop_index, _effective_hire_mode())
 
 
 ## Update the staff button for the property's sequential ladder (GDD §6.1, epoch-depth
-## redesign). The button is a pure BUY action — headshot + "+" on the left, the NEXT
-## rung's price on the right (the current level shows in the portrait disc instead,
-## Tim 2026-07-05) — plus a faint-green MAX park when every level the reached epoch
+## redesign). The button is a pure BUY action — headshot + "+" on the left, the price of
+## the levels the current hire mode would buy on the right (the current level shows in the
+## portrait disc instead, Tim 2026-07-05) — plus a faint-green MAX park when every level the reached epoch
 ## allows has been bought. Because each block's price is fixed by its own epoch, the
 ## number here can never silently jump at a first contact; a new block's bigger price
 ## only appears once the player has actually climbed to it (the 2026-07-03 bug fix).
@@ -1564,12 +1637,24 @@ func _refresh_hire_button() -> void:
 		return
 
 	_apply_hire_styling(false)
-	var cost := _economy.get_next_staff_level_cost(prop_index)
+	# Price what this press will ACTUALLY buy under the current hire mode, not one level. The
+	# count comes from resolve_hire_count — the same function Main uses to resolve the mode it
+	# receives — so the quote on the button and the levels actually bought can never disagree.
+	# The count is already clamped to what's affordable, so a ×10 press with cash for 7 quotes
+	# the 7 and stays live rather than going dead a dollar short of the tenth level.
+	var count := resolve_hire_count(_effective_hire_mode(), _economy, prop_index, _epoch.current_tier)
+	var cost := 0.0
+	if count > 0:
+		cost = _economy.get_bulk_staff_level_cost(prop_index, count, _epoch.current_tier)
+	else:
+		# Nothing affordable yet: show the next single level's price so the player can see how
+		# close they are, rather than a blank or a "$0" — the same fallback the buy button uses.
+		cost = _economy.get_next_staff_level_cost(prop_index)
 	# Drop the leading "$" — the dollar-bill icon before the label carries it (Tim, 2026-07-09).
 	_hire_cost_label.text = Money.of(cost).display().trim_prefix("$")
 	_hire_cost_icon.visible = true
 	# A property with no units can't be staffed — a staffer needs something to run.
-	_hire_button.disabled = _economy.cash < cost or _prop.units_owned == 0
+	_hire_button.disabled = count <= 0 or _prop.units_owned == 0
 	# Navy on the live mustard plate, dimmed to match the disabled cream plate — applied to
 	# the cost text and the headshot+plus glyph (both monochrome, so they take a flat tint).
 	var hire_color := Color(UiPalette.NAVY, 0.45) if _hire_button.disabled else UiPalette.NAVY

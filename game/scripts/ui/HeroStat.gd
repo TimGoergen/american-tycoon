@@ -258,6 +258,16 @@ func _ready() -> void:
 	_economy_label.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
 	# Light gray, no outline (Tim, 2026-07-09).
 	_economy_label.add_theme_color_override("font_color", ECONOMY_SILVER)
+	# A drop SHADOW behind the readout (Tim, 2026-07-31) so the silver stays readable wherever it
+	# falls — the bar's filled and unfilled halves are different values, and the carbonation moves
+	# under the text. Deliberately a shadow and not an outline: the 2026-07-09 call against an
+	# outline still holds, since an outline at this weight thickens the glyphs and muddies them.
+	# A shadow adds contrast underneath while leaving the letterforms alone.
+	_economy_label.add_theme_color_override("font_shadow_color", Color(UiPalette.NAVY, 0.85))
+	_economy_label.add_theme_constant_override("shadow_offset_x", 2)
+	_economy_label.add_theme_constant_override("shadow_offset_y", 2)
+	# A slight spread so the shadow reads as depth rather than as a doubled glyph.
+	_economy_label.add_theme_constant_override("shadow_outline_size", 2)
 	_economy_bar.add_child(_economy_label)
 
 	_content.add_child(_economy_bar)

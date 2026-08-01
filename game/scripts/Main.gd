@@ -402,8 +402,16 @@ func _refresh_contact_progress() -> void:
 	# "FLAGSHIP 41 / 35" would read as broken rather than as "done".
 	var flagship := game.get_flagship_progress(tier)
 	if flagship.y > 0:
+		# Name the property rather than saying "FLAGSHIP" (Tim, 2026-07-31): the player has to go
+		# buy a specific row, and the era's own business name says which one. Falls back to the
+		# generic word only if the lookup somehow fails, so the bar can never read "  21 / 35".
+		var flagship_index := game.get_flagship_index(tier)
+		var flagship_name := "FLAGSHIP"
+		if flagship_index >= 0:
+			var flagship_prop := game.economy.properties[flagship_index] as PropertyState
+			flagship_name = (flagship_prop.config as PropertyConfig).display_name
 		_hero_stat.set_epoch_progress(float(flagship.x), float(flagship.y),
-				"FLAGSHIP %d / %d" % [mini(flagship.x, flagship.y), flagship.y])
+				"%s %d / %d" % [flagship_name, mini(flagship.x, flagship.y), flagship.y])
 		return
 
 	var goal := EpochCatalog.consume_threshold(tier, tuning.earth_economy_target)

@@ -30,6 +30,15 @@ var enabled: bool = false
 ## next tick fires. Clamped so it can never exceed one full cadence — see tick() for why.
 var _time_since_last_purchase: float = 0.0
 
+## The property indices bought into by the most recent tick that bought anything — the UI
+## reads this to mark the exact rows the desk just fed (Tim, 2026-08-01: he wanted to see
+## WHERE the money went, rather than a headline flash that would strobe at this cadence).
+##
+## Deliberately a plain record rather than a signal: this class is headless policy with no
+## scene tree, and the sims drive it too. Rewritten in place on every buying tick, so a
+## reader must consume it right after tick() returns a non-zero count.
+var last_purchased_indices: Array[int] = []
+
 
 # ---------------------------------------------------------------------------
 # The tick
@@ -125,6 +134,7 @@ func _buy_cheapest(game: GameState, tab: int, units: int, breadth: int) -> int:
 	)
 
 	var units_bought := 0
+	last_purchased_indices.clear()
 	for rank in range(mini(breadth, candidates.size())):
 		var prop_index: int = candidates[rank]
 		var prop := game.economy.properties[prop_index] as PropertyState
@@ -145,6 +155,7 @@ func _buy_cheapest(game: GameState, tab: int, units: int, breadth: int) -> int:
 			# check reads the reduced balance. That re-check is why this is a loop and not a
 			# batch: the cheapest property can legitimately consume the whole tick's budget.
 			units_bought += count
+			last_purchased_indices.append(prop_index)
 	return units_bought
 
 

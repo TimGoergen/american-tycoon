@@ -135,6 +135,22 @@ const TAB_SETTINGS := 3
 ## it UP, so we let the icon expand and cap it here at this width (icons are square).
 const TAB_ICON_SIZE := 113
 
+## The two action-row mode toggles read "+ <icon> × <rate>": a building for BUY, a face for HIRE.
+## Both are monochrome navy silhouettes already in the repo — the BUY icon is the property tab's
+## own glyph (PropertyRow.PROPERTY_ICON_SVG) and the HIRE icon is the headshot the property rows'
+## hire button draws (PropertyRow.StaffHireGlyph).
+const PROPERTY_ICON_SVG := PropertyRow.PROPERTY_ICON_SVG
+const HIRE_MODE_ICON_SVG := "res://art/icons/headshot.svg"
+## Box side each icon is fitted into, chosen so the two icons' VISIBLE art lands at the same
+## ~50px height even though each SVG canvas carries a different amount of transparent padding
+## (the building fills 279/324 of its canvas, the face 86/96) — the same correction PropertyRow
+## makes for the pair. Both boxes stay at or below the icon's native IMPORTED size (the building
+## imports at 324px with svg/scale=4, the face at 96px), so neither is upscaled into a blocky
+## mess. See PropertyRow.MATCHED_ICON_VISIBLE_HEIGHT for the row-side twin of this number.
+const MODE_ICON_VISIBLE_HEIGHT := 50.0
+const BUY_MODE_ICON_BOX := int(MODE_ICON_VISIBLE_HEIGHT * 324.0 / 279.0)   # 58
+const HIRE_MODE_ICON_BOX := int(MODE_ICON_VISIBLE_HEIGHT * 96.0 / 86.0)    # 55
+
 # The screen-frame constants (bezel + universal content margin) live in UiPalette now, so the
 # Main screen and the full-screen overlays all frame identically (UiPalette.apply_screen_bezel
 # / make_screen_panel_style).
@@ -177,18 +193,24 @@ var _buy_mode: PropertyRow.BuyMode = PropertyRow.BuyMode.ONE
 ## the UI's live copy and the GameState one is what reaches the save file.
 var _hire_mode: PropertyRow.HireMode = PropertyRow.HireMode.ONE
 var _hire_mode_button: Button
-## Auto-Purchase Mode's ON/OFF toggle (the Acquisitions Desk). The mode's own state lives on
-## game.auto_purchase.enabled — this button only reads and flips it.
-var _auto_purchase_button: Button
-## A small always-present chip on the PROPERTY bottom-tab button that reads AUTO in green while
-## Auto-Purchase Mode is running and stays gray otherwise. The mode keeps spending money while the
-## player is reading the Estate or the Ledger, so its "I am on" state has to be visible from tabs
-## that cannot see the toggle itself. Never hidden — it grays in place (the standing UI rule).
-var _auto_purchase_chip: Panel
-var _auto_purchase_chip_label: Label
-## The last auto-buy rush-lockout state pushed into the momentum bar, so the push happens on the
-## flip rather than every frame.
-var _auto_purchase_lockout_shown := false
+
+## The pieces of the two action-row mode toggles' "+ <icon> × <rate>" faces. A Button draws one
+## flat string, so the caption is composed from mouse-ignoring child Controls laid over the
+## button (the same trick PropertyRow._add_split_button_labels uses); these are the parts that
+## have to be repainted when the mode or the lock state changes. See _make_mode_button.
+var _buy_mode_plus_label: Label
+var _buy_mode_icon: TextureRect
+var _buy_mode_rate_label: Label
+var _hire_mode_plus_label: Label
+var _hire_mode_icon: TextureRect
+var _hire_mode_rate_label: Label
+
+## The last Auto-Purchase Mode state pushed into the momentum bar (which owns the ON/OFF toggle
+## now), so the push happens when something changes rather than every frame. `_pushed` starts
+## false so the very first push always goes through, even when both flags happen to match.
+var _auto_purchase_state_pushed := false
+var _auto_purchase_unlocked_shown := false
+var _auto_purchase_enabled_shown := false
 
 ## The property ladder's ScrollContainer, kept for the edge fade below
 ## (Tim, 2026-07-06; chosen over an outline, which would have nested a third frame).
@@ -395,7 +417,7 @@ func _process(delta: float) -> void:
 	# civilization NAME moved to the pager itself — it was duplicative here.) The prestige-exit
 	# button and the Estate Office button (with its Legacy balance) reflect the live state.
 	_hero_stat.set_planet_tier(_epoch_tab + 1)
-	_refresh_auto_purchase_lockout()
+	_push_auto_purchase_state()
 	_refresh_contact_progress()
 	_refresh_make_contact_button(delta)
 	_update_plan_button()
@@ -793,10 +815,16 @@ func _build_property_tab() -> Control:
 	# The dynasty is read only for the overheat death chip's all-time best streak (Tim 2026-07-20).
 	_momentum_bar.set_dynasty(dynasty)
 	_momentum_bar.overdrive_requested.connect(_on_overdrive_requested)
+	# The bar also owns Auto-Purchase Mode's ON/OFF button (Tim, 2026-08-01): the mode's cost is
+	# that rushing is off while it runs, so its switch belongs on the rush meter it disables rather
+	# than on a row of its own above the ladder. Main only flips the flag and pushes state back.
+	_momentum_bar.auto_purchase_toggle_requested.connect(_on_auto_purchase_toggle_requested)
 	v.add_child(_momentum_bar)
+	_push_auto_purchase_state()
 
-	# Action row: the TURBO button (its background is the frenzy meter) takes the larger
-	# share; the buy-mode toggle takes the rest.
+	# Action row: the TURBO button (its background is the frenzy meter) plus the two global
+	# mode toggles, BUY and HIRE. TURBO stays the dominant control at twice either toggle's
+	# width; the toggles split the rest evenly.
 	var action_row := HBoxContainer.new()
 	action_row.add_theme_constant_override("separation", 10)
 	v.add_child(action_row)
@@ -805,45 +833,33 @@ func _build_property_tab() -> Control:
 	_frenzy_bar.setup(game.frenzy, tuning)
 	_frenzy_bar.pop_requested.connect(_on_pop_requested)
 	_frenzy_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_frenzy_bar.size_flags_stretch_ratio = 2.0  # TURBO ~2/3, buy-mode ~1/3
+	# TURBO 2.0 against 1.0 + 1.0: it keeps half the row and stays twice as wide as either
+	# toggle, which is the split that survived adding the third control (was 2.0 vs 1.0 alone).
+	_frenzy_bar.size_flags_stretch_ratio = 2.0
 	action_row.add_child(_frenzy_bar)
 
 	# Global buy-mode toggle: one button cycles ×1 → ×10 → NEXT TIER → MAX; every row follows.
-	_buy_mode_button = Button.new()
-	_buy_mode_button.custom_minimum_size = Vector2(0, UiPalette.STANDARD_BUTTON_HEIGHT)
-	_buy_mode_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	# FONT_SUBHEAD, deliberately matching the TURBO button's readout beside it — the two
-	# were resized together (Tim, 2026-07-07; both had been FONT_BUTTON and read small).
-	_buy_mode_button.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
-	_buy_mode_button.add_theme_font_override("font", UiPalette.make_bold_font())
-	UiPalette.style_button(_buy_mode_button, false)
-	_buy_mode_button.text = "BUY: " + _buy_mode_caption(_buy_mode)
+	var buy_parts := _make_mode_button(PROPERTY_ICON_SVG, BUY_MODE_ICON_BOX)
+	_buy_mode_button = buy_parts[0]
+	_buy_mode_plus_label = buy_parts[1]
+	_buy_mode_icon = buy_parts[2]
+	_buy_mode_rate_label = buy_parts[3]
 	_buy_mode_button.pressed.connect(_on_buy_mode_toggled)
-	# A second finger can cycle the buy mode while the first holds a rush (Tim, 2026-07-07).
-	_buy_mode_button.add_child(SecondaryTapButton.new())
 	action_row.add_child(_buy_mode_button)
+	_refresh_buy_mode_button()
 
-	# Mode row: the two newer global toggles, side by side under the buy-mode button —
-	# bulk HIRE and AUTO-BUY (Plans/Auto_Purchase_And_Bulk_Hire.md §A6/§B2). They live on their own
-	# row rather than squeezing into the action row above because both need room for a two-line
-	# "locked, and here is why" caption, and because the buy-mode button's position is where the
-	# tutorial's buy_mode card points.
-	#
-	# Both are PERMANENT fixtures: before their legacy tracks are bought they sit here grayed with
-	# the reason printed on them, never hidden (the standing no-moving-UI rule). Their height is
-	# fixed at 1.3× the standard plate so swapping between the one-line and two-line captions can
-	# never resize the row.
-	var mode_row := HBoxContainer.new()
-	mode_row.add_theme_constant_override("separation", 10)
-	v.add_child(mode_row)
-
-	_hire_mode_button = _make_mode_button()
+	# Global bulk-HIRE toggle, right beside it (Plans/Auto_Purchase_And_Bulk_Hire.md §B2). It is
+	# ABSENT until the Head Hunters track is bought, then permanent — a deliberate, Tim-approved
+	# exception to the no-moving-UI rule; see _refresh_mode_buttons for the full reasoning before
+	# changing it. With HIRE hidden the row is [TURBO 2.0][BUY 1.0], so TURBO takes two-thirds of the
+	# width and stays comfortably dominant; the ratios need no adjusting for the hidden case.
+	var hire_parts := _make_mode_button(HIRE_MODE_ICON_SVG, HIRE_MODE_ICON_BOX)
+	_hire_mode_button = hire_parts[0]
+	_hire_mode_plus_label = hire_parts[1]
+	_hire_mode_icon = hire_parts[2]
+	_hire_mode_rate_label = hire_parts[3]
 	_hire_mode_button.pressed.connect(_on_hire_mode_toggled)
-	mode_row.add_child(_hire_mode_button)
-
-	_auto_purchase_button = _make_mode_button()
-	_auto_purchase_button.pressed.connect(_on_auto_purchase_toggled)
-	mode_row.add_child(_auto_purchase_button)
+	action_row.add_child(_hire_mode_button)
 
 	# Epoch pager header: the big epoch label + ‹ › arrows + position dots, above the ladder.
 	# Only the active epoch's rows are drawn (PropertyRow.set_tab_active), so the property
@@ -1395,7 +1411,6 @@ func _build_estate_tab() -> Control:
 	_legacy_screen.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_legacy_screen.purchased.connect(_on_upgrade_purchased)
 	_legacy_screen.retain_requested.connect(_on_retain_requested)
-	_legacy_screen.retain_max_requested.connect(_on_retain_max_requested)
 	v.add_child(_legacy_screen)
 	# Populate once now so the cards aren't blank on first view.
 	_legacy_screen.set_retention_entries(_build_retention_entries())
@@ -1661,10 +1676,6 @@ func _build_tab_bar(column: VBoxContainer) -> void:
 		# overlay so the dot renders on top of the icon.
 		if i == TAB_ESTATE:
 			_estate_badge = _make_estate_badge(b)
-		# The Property tab carries the AUTO-BUY state chip: Auto-Purchase Mode keeps spending while
-		# the player is on any other tab, so its on/off state has to be readable from all of them.
-		if i == TAB_PROPERTY:
-			_make_auto_purchase_chip(b)
 
 
 ## Build the full-color icon overlay for one tab, layered exactly over the button's silhouette
@@ -1704,34 +1715,9 @@ func _crossfade_tab_icon(index: int, active: bool) -> void:
 	_tab_icon_tween[index] = fade
 
 
-## Build the AUTO chip pinned along the bottom of the Property tab button — a small always-present
-## plate reading "AUTO", green while Auto-Purchase Mode is running and gray while it is not. It is
-## a STATE indicator, deliberately not the red "something new" dot: those two signals are kept
-## apart (Plans/Tab_Bar_Icon_Treatment.md). Mouse-ignoring so it never eats a tab tap.
-func _make_auto_purchase_chip(button: Button) -> void:
-	_auto_purchase_chip = Panel.new()
-	_auto_purchase_chip.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	_auto_purchase_chip.offset_left = 24
-	_auto_purchase_chip.offset_right = -24
-	_auto_purchase_chip.offset_top = -58
-	_auto_purchase_chip.offset_bottom = -14
-	_auto_purchase_chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-	_auto_purchase_chip_label = Label.new()
-	_auto_purchase_chip_label.text = "AUTO"
-	_auto_purchase_chip_label.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_auto_purchase_chip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_auto_purchase_chip_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_auto_purchase_chip_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_auto_purchase_chip_label.add_theme_font_override("font", UiPalette.make_bold_font())
-	_auto_purchase_chip_label.add_theme_font_size_override("font_size", UiPalette.FONT_SMALL)
-	_auto_purchase_chip.add_child(_auto_purchase_chip_label)
-
-	button.add_child(_auto_purchase_chip)
-	# The tab bar is built AFTER the property tab, so _refresh_mode_buttons has already run once
-	# with no chip to paint — paint it here from the same two pieces of state it reads.
-	_refresh_auto_purchase_chip(
-			dynasty.upgrades.auto_purchase_unlocked() and game.auto_purchase.enabled)
+# The Property tab button carries NO Auto-Purchase state chip (Tim, 2026-08-01). The mode's own
+# button on the momentum bar is the single display of whether it is running; a second indicator on
+# the tab bar competed with the Estate tab's red "something new" dot for the same glance.
 
 
 ## Build the Estate tab's red-dot badge: a small red circle pinned to the button's top-right
@@ -2333,54 +2319,80 @@ func _build_retention_entries() -> Array:
 		# Show the roster's face: the staffer of the deepest block the bloodline has
 		# reached, named by that block's absolute epoch on this property's ladder.
 		var shown_blocks := prop.staff_block_of_level(maxi(maxi(best_levels, retained_levels), 1))
-		# RETAIN MAX's quote. The level count and its price come from ONE pair of calls, in this
-		# order, so the number of levels the button's label promises is exactly the number its
-		# price was computed for — and exactly the number _on_retain_max_requested is asked to buy.
-		var max_levels := dynasty.max_affordable_retention_levels(i)
+		# The RETAIN button's quote. The level count and its price come from ONE pair of calls, in
+		# this order, so the number of levels the button's label promises is exactly the number its
+		# price was computed for — and exactly the number _on_retain_requested is asked to buy.
+		var levels := _retention_levels_for_hire_mode(i)
 		entries.append({
 			"index": i,
 			"property_name": (prop.config as PropertyConfig).display_name,
 			"staffer_name": EpochCatalog.staffer_name(prop.staff_block_epoch(shown_blocks), i),
 			"best_levels": best_levels,
 			"retained_levels": retained_levels,
-			"cost": cost,
+			# What ONE press buys right now under the global hire mode, and its exact price.
+			# levels == 0 means nothing is buyable — `at_ceiling` says which of the two reasons
+			# it is, so the row can print "fully retained" rather than a misleading price.
+			"levels": levels,
+			"cost": dynasty.retention_cost_for_levels(i, levels),
+			"at_ceiling": retained_levels >= best_levels,
+			# The single next level's price (-1 once fully retained), so a row that can't afford
+			# the quoted block can still show the player how close they are.
+			"next_level_cost": cost,
 			"can_afford": can_afford,
 			"gems_spent": gems_spent,
-			"max_levels": max_levels,
-			"max_cost": dynasty.retention_cost_for_levels(i, max_levels),
 		})
 	return entries
 
 
-## Player bought one level of staffer retention in the Estate Office. Spend the Legacy,
-## refresh the shop (wallet, upgrade cards, and the staff rows), and persist. The staff
-## rows are updated IN PLACE (not rebuilt) so a held RETAIN button survives the refresh —
-## rebuilding would free the very button under the player's finger and break the hold.
-func _on_retain_requested(property_index: int) -> void:
-	if dynasty.buy_staff_retention(property_index):
-		_legacy_screen.refresh()
-		_legacy_screen.update_retention_entries(_build_retention_entries())
-		SaveManager.save_dict_to_file(dynasty.to_save_dict())
-		_maybe_show_tip("staff_retention", null)
+## How many retention levels ONE press of a Household Staff row's RETAIN button buys right now.
+## Retention climbs the same ladder staff levels do, so the GLOBAL HIRE MODE drives it: the four
+## rates mean here exactly what they mean on the property rows' hire buttons (Tim, 2026-08-01).
+##
+## The result is PARTIAL-FILLED against the wallet and the bloodline's earned ceiling — buys 7 of
+## 10 rather than refusing outright, matching every other bulk button in the game. Both clamps
+## come from max_affordable_retention_levels(), which walks the ladder level by level (retention
+## prices are rounded per level, so only a walk agrees with what the buy path will charge).
+func _retention_levels_for_hire_mode(property_index: int) -> int:
+	var affordable := dynasty.max_affordable_retention_levels(property_index)
+	var desired := 0
+	match _hire_mode:
+		PropertyRow.HireMode.ONE:
+			desired = 1
+		PropertyRow.HireMode.TEN:
+			desired = 10
+		PropertyRow.HireMode.BLOCK:
+			# Levels left to the next 20-level block boundary above what is already retained —
+			# the same "finish the block" unit EconomyState.get_staff_levels_to_next_block buys
+			# in dollars. A retained count already ON a boundary starts a whole fresh block.
+			var retained := dynasty.staff_retention.get_retained_levels(property_index)
+			var block_size: int = tuning.staff_levels_per_epoch
+			desired = block_size - (retained % block_size)
+		PropertyRow.HireMode.MAX:
+			desired = affordable
+	return mini(desired, affordable)
 
 
-## Player pressed RETAIN MAX on a Household Staff row. Buys exactly the `levels` the signal
-## carries and nothing else.
+## Player pressed RETAIN on a Household Staff row. Buys exactly the `levels` the signal carries
+## and nothing else, then refreshes the shop (wallet, upgrade cards, staff rows) and persists.
 ##
 ## THAT NUMBER IS NOT RE-DERIVED HERE, deliberately. `levels` is the count the button's own label
-## quoted a gem price for when the row was last painted; asking
-## dynasty.max_affordable_retention_levels() again at press time would let anything that changed
-## the wallet in between (a Legacy gem landing from a minigame, say) charge the player more than
-## the label they tapped promised. Retention is the endgame's open gem sink, so the quote wins.
+## quoted a gem price for when the row was last painted; re-deriving it at press time would let
+## anything that changed the wallet in between (a Legacy gem landing from a minigame, say) charge
+## the player more than the label they tapped promised. Retention is the endgame's open gem sink,
+## so the quote wins.
 ##
-## One save write for the whole block, not one per level: this is the bulk path's whole point.
-## (The single-level path above still writes per press, which is correct there — one press, one
-## purchase — even though its hold-to-repeat makes that ~3 writes/second.)
-func _on_retain_max_requested(property_index: int, levels: int) -> void:
+## ONE save write per press, whatever the count — not one per level.
+##
+## The staff rows are updated IN PLACE (not rebuilt) so a held RETAIN button survives the
+## refresh — rebuilding would free the very button under the player's finger and break the hold.
+func _on_retain_requested(property_index: int, levels: int) -> void:
+	if levels <= 0:
+		return
 	if dynasty.buy_staff_retention_levels(property_index, levels) > 0:
 		_legacy_screen.refresh()
 		_legacy_screen.update_retention_entries(_build_retention_entries())
 		SaveManager.save_dict_to_file(dynasty.to_save_dict())
+		_maybe_show_tip("staff_retention", null)
 
 
 ## An upgrade was just bought in the shop. Apply its effect to the living
@@ -2572,7 +2584,7 @@ func _on_heir_begin_pressed() -> void:
 func _on_buy_mode_toggled() -> void:
 	_buy_mode = ((_buy_mode + 1) % PropertyRow.BuyMode.size()) as PropertyRow.BuyMode
 	game.ui_buy_mode = _buy_mode  # persisted on the next autosave / on background
-	_buy_mode_button.text = "BUY: " + _buy_mode_caption(_buy_mode)
+	_refresh_buy_mode_button()
 	for row in _rows:
 		(row as PropertyRow).set_buy_mode(_buy_mode)
 
@@ -2597,16 +2609,22 @@ func _buy_mode_caption(mode: PropertyRow.BuyMode) -> String:
 # (Plans/Auto_Purchase_And_Bulk_Hire.md §A6 / §B2)
 # ---------------------------------------------------------------------------
 
-## Build one of the two mode-row buttons: full-width-sharing, fixed at 1.3× the standard plate so
-## its height never changes between the one-line and two-line (locked) captions, and carrying the
-## same grayed disabled plate MAKE CONTACT uses so "not yet" reads at a glance. Like the buy-mode
-## toggle it takes a SecondaryTapButton, so a second finger can flip it mid-rush.
-func _make_mode_button() -> Button:
+## Build one of the two action-row mode toggles and return its parts as
+## [button, plus_label, icon, rate_label].
+##
+## The face reads "+ <icon> × <rate>" — "add ten of THESE". A Button can only draw one flat
+## string, so the caption is assembled from child Controls laid over the button's plate, every one
+## of them MOUSE_FILTER_IGNORE so the button underneath stays a single tap target. That is the
+## house pattern for a mixed icon/text button here (PropertyRow._add_split_button_labels).
+##
+## The button keeps the standard plate height, so it lines up with the TURBO button beside it, and
+## carries the same grayed disabled plate MAKE CONTACT uses so "not yet" reads at a glance. Like
+## the buy-mode toggle it takes a SecondaryTapButton, so a second finger can flip it mid-rush.
+func _make_mode_button(icon_path: String, icon_box: int) -> Array:
 	var b := Button.new()
-	b.custom_minimum_size = Vector2(0, int(UiPalette.STANDARD_BUTTON_HEIGHT * 1.3))
+	b.custom_minimum_size = Vector2(0, UiPalette.STANDARD_BUTTON_HEIGHT)
 	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	b.add_theme_font_size_override("font_size", UiPalette.FONT_BUTTON)
-	b.add_theme_font_override("font", UiPalette.make_bold_font())
+	b.text = ""  # the visible caption is the overlay below, not the Button's own string
 	UiPalette.style_button(b, false)
 	# The locked plate grays the OUTLINE too, not just the fill — the same treatment the TURBO pop
 	# button, OVR, and MAKE CONTACT wear, so a locked control reads the same everywhere.
@@ -2618,12 +2636,74 @@ func _make_mode_button() -> Button:
 	locked_plate.set_content_margin_all(12)
 	b.add_theme_stylebox_override("disabled", locked_plate)
 	b.add_child(SecondaryTapButton.new())
-	return b
+
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(center)
+
+	var caption := HBoxContainer.new()
+	caption.add_theme_constant_override("separation", 6)
+	caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	center.add_child(caption)
+
+	var plus := _make_mode_caption_label("+")
+	caption.add_child(plus)
+
+	# The IMPORTED texture, never the raw .svg source: the export filter strips sources, and a
+	# runtime read of one crashed the device build (see PropertyRow._crisp_icon_texture).
+	var icon := TextureRect.new()
+	icon.texture = load(icon_path)
+	icon.custom_minimum_size = Vector2(icon_box, icon_box)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	caption.add_child(icon)
+
+	var rate := _make_mode_caption_label("×1")
+	caption.add_child(rate)
+
+	return [b, plus, icon, rate]
 
 
-## Repaint both mode toggles (and the Property tab's AUTO chip) from the live upgrade state.
-## Called at build, whenever a toggle is pressed, and after any Estate Office purchase — the two
-## legacy tracks that gate them can only be bought there.
+## One piece of text on a mode toggle's face. FONT_SUBHEAD, deliberately matching the TURBO
+## button's readout beside it — the two were resized together (Tim, 2026-07-07; both had been
+## FONT_BUTTON and read small).
+func _make_mode_caption_label(text: String) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
+	label.add_theme_font_override("font", UiPalette.make_bold_font())
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return label
+
+
+## Tint one mode toggle's overlay caption to match the plate it sits on. The overlay labels are
+## not the Button's own text, so they don't follow its font_color/font_disabled_color theme
+## overrides — we set them by hand, exactly as PropertyRow._set_split_label_color does. Both icons
+## are MONOCHROME navy silhouettes, so the icon takes the same flat tint as the text beside it.
+func _tint_mode_caption(plus: Label, icon: TextureRect, rate: Label, is_disabled: bool) -> void:
+	var color := Color(UiPalette.NAVY, 0.45) if is_disabled else UiPalette.NAVY
+	plus.add_theme_color_override("font_color", color)
+	rate.add_theme_color_override("font_color", color)
+	icon.modulate = color
+
+
+## Repaint the BUY toggle's face for the current buy mode. It is never locked — every run can
+## bulk-buy property from the start.
+func _refresh_buy_mode_button() -> void:
+	if _buy_mode_button == null:
+		return
+	_buy_mode_rate_label.text = _buy_mode_caption(_buy_mode)
+	_tint_mode_caption(_buy_mode_plus_label, _buy_mode_icon, _buy_mode_rate_label, false)
+
+
+## Repaint the HIRE toggle from the live upgrade state, and re-push Auto-Purchase Mode's state to
+## the momentum bar that now owns its switch. Called at build, whenever a toggle is pressed, and
+## after any Estate Office purchase — the legacy tracks that gate both can only be bought there.
 func _refresh_mode_buttons() -> void:
 	if _hire_mode_button == null:
 		return
@@ -2634,41 +2714,33 @@ func _refresh_mode_buttons() -> void:
 	# Clamp the standing choice down to what is unlocked, so the caption always states the mode the
 	# rows will actually act on (PropertyRow._effective_hire_mode clamps the same way).
 	_hire_mode = mini(_hire_mode, max_hire) as PropertyRow.HireMode
+	# DELIBERATE EXCEPTION TO THE NO-MOVING-UI RULE (Tim, decided 2026-08-01). The standing rule is
+	# "never hide/show controls — keep them visible with a gray disabled state" (scripts/ui/CLAUDE.md),
+	# and Tim overruled it here after being shown that the grayed version breaks on a phone: the
+	# reason a locked toggle is locked had nowhere to live but `tooltip_text` (the face carries the
+	# icon caption and cannot also carry a sentence without dropping below the low-vision text floor),
+	# and TOOLTIPS NEVER APPEAR ON TOUCH. So the grayed button said "not yet" and could never say why.
+	# An absent control is more honest than a dead one that cannot explain itself.
+	#
+	# DO NOT "fix" this back to a grayed-in-place toggle. If it is ever restored, the reason must
+	# move somewhere a touch player can actually read it.
+	#
+	# Tim made this call about the AUTO-BUY button; the HIRE toggle had the identical problem, so the
+	# same treatment is applied to both. Once bought, the toggle is permanent.
+	_hire_mode_button.visible = max_hire > PropertyRow.HireMode.ONE
 	if max_hire <= PropertyRow.HireMode.ONE:
-		# Level 0: the toggle STAYS, grayed, naming the track that opens it. Hiding it would mean
-		# a control appearing later, which the no-moving-UI rule forbids.
+		# Kept in step with `visible` so a stray tap can never reach a hidden-but-live button.
 		_hire_mode_button.disabled = true
-		_hire_mode_button.text = "HIRE ×1\nHEAD HUNTERS · ESTATE"
+		_hire_mode_rate_label.text = _hire_mode_caption(PropertyRow.HireMode.ONE)
 	else:
 		_hire_mode_button.disabled = false
-		_hire_mode_button.text = "HIRE: " + _hire_mode_caption(_hire_mode)
+		_hire_mode_rate_label.text = _hire_mode_caption(_hire_mode)
+		_hire_mode_button.tooltip_text = "Staff levels each HIRE button buys."
+	_tint_mode_caption(_hire_mode_plus_label, _hire_mode_icon, _hire_mode_rate_label,
+			_hire_mode_button.disabled)
 
-	# --- AUTO-BUY (Acquisitions Desk) ---
-	var auto_unlocked := dynasty.upgrades.auto_purchase_unlocked()
-	var auto_on := auto_unlocked and game.auto_purchase.enabled
-	_auto_purchase_button.disabled = not auto_unlocked
-	if not auto_unlocked:
-		_auto_purchase_button.text = "AUTO-BUY\nACQUISITIONS DESK · ESTATE"
-	else:
-		# The mode's price is that rushing is off while it runs, so the ON caption says so rather
-		# than just reading "ON" — the trade has to be legible from the button that makes it.
-		_auto_purchase_button.text = "AUTO-BUY: ON\nNO RUSH" if auto_on else "AUTO-BUY: OFF"
-	_refresh_auto_purchase_chip(auto_on)
-
-
-## The AUTO chip on the Property bottom-tab button: green while the desk is buying, gray otherwise.
-## Always present in both states (it is the same control, restyled) so nothing moves.
-func _refresh_auto_purchase_chip(on: bool) -> void:
-	if _auto_purchase_chip == null:
-		return
-	var style := StyleBoxFlat.new()
-	style.bg_color = UiPalette.MONEY_GREEN if on else UiPalette.LIGHT_GRAY
-	style.border_color = UiPalette.NAVY if on else UiPalette.MID_GRAY
-	style.set_border_width_all(3)
-	style.set_corner_radius_all(10)
-	_auto_purchase_chip.add_theme_stylebox_override("panel", style)
-	_auto_purchase_chip_label.add_theme_color_override(
-			"font_color", UiPalette.CREAM if on else UiPalette.MID_GRAY)
+	# --- AUTO-BUY (Acquisitions Desk) --- its button lives on the momentum bar now.
+	_push_auto_purchase_state()
 
 
 ## Cycle the hire mode, SKIPPING every mode the player's Head Hunters level has not opened: with
@@ -2680,6 +2752,9 @@ func _on_hire_mode_toggled() -> void:
 			PropertyRow.HireMode.ONE, PropertyRow.HireMode.MAX)
 	_hire_mode = ((_hire_mode + 1) % (max_hire + 1)) as PropertyRow.HireMode
 	game.ui_hire_mode = _hire_mode  # persisted on the next autosave / on background
+	# The Estate Office's RETAIN buttons follow this same mode (_retention_levels_for_hire_mode),
+	# but they don't need re-quoting here: _show_tab rebuilds their entries every time the Estate
+	# tab is opened, and this toggle only lives on the Property tab.
 	_refresh_mode_buttons()
 	for row in _rows:
 		(row as PropertyRow).set_hire_mode(_hire_mode)
@@ -2707,11 +2782,11 @@ func _hire_mode_caption(mode: PropertyRow.HireMode) -> String:
 ## which the policy clamps. That makes switching on buy something almost immediately, which is the
 ## feedback that says the toggle worked; it cannot be farmed for extra throughput, because the
 ## clamp caps the credit at a single tick.
-func _on_auto_purchase_toggled() -> void:
+func _on_auto_purchase_toggle_requested() -> void:
 	if not dynasty.upgrades.auto_purchase_unlocked():
 		return
 	game.auto_purchase.enabled = not game.auto_purchase.enabled
-	_refresh_mode_buttons()
+	_push_auto_purchase_state()
 
 
 ## Run one frame of Auto-Purchase Mode. Called from _process directly after the fixed-timestep
@@ -2731,24 +2806,42 @@ func _drive_auto_purchase(delta: float) -> void:
 	var units := dynasty.upgrades.get_level(LegacyUpgradeCatalog.ACQUISITIONS_DESK)
 	# The tab is read from the SAVED field rather than Main's _epoch_tab so the mode and the save
 	# can never disagree about which era it is aimed at; _set_epoch_tab keeps them in step.
-	game.auto_purchase.tick(delta, game, game.ui_epoch_tab, cadence, units,
+	var units_bought := game.auto_purchase.tick(delta, game, game.ui_epoch_tab, cadence, units,
 			tuning.auto_purchase_breadth)
-	# Nothing is refreshed on a purchase here, on purpose. A manual buy flashes the hero stat
-	# (_on_buy_requested) because it confirms a deliberate tap; the desk fires as often as once a
-	# second forever, and a flashing headline on that beat would read as a strobe rather than as
-	# feedback. The rows and the cash readout already repaint themselves from live state every
-	# frame, so the purchase is visible without announcing itself.
-
-
-## Keep the momentum bar's presentation honest about the auto-buy rush lockout (plan §A5, the
-## "core refuses, UI grays" split). The core already refuses the rush verb; the bar carries the
-## reason text and grays OVR in place. Pushed only on the flip, not every frame.
-func _refresh_auto_purchase_lockout() -> void:
-	var locked_out := game.is_rush_locked_out_by_auto_purchase()
-	if locked_out == _auto_purchase_lockout_shown:
+	if units_bought <= 0:
 		return
-	_auto_purchase_lockout_shown = locked_out
-	_momentum_bar.set_auto_purchase_locked(locked_out)
+	# Mark the exact rows the desk just fed (Tim, 2026-08-01). The HERO STAT is deliberately NOT
+	# flashed the way a manual buy flashes it (_on_buy_requested): that flash confirms a deliberate
+	# tap, whereas the desk fires as often as once a second forever, and a strobing headline reads
+	# as a glitch rather than as feedback. Marking the individual rows instead answers the question
+	# the player actually has — not "did something happen" but "where did my money go".
+	for prop_index in game.auto_purchase.last_purchased_indices:
+		var row := _row_for_index(prop_index)
+		if row != null:
+			row.flash_auto_purchased()
+
+
+## Push Auto-Purchase Mode's state into the momentum bar, which owns the mode's ON/OFF button and
+## paints the rush lockout that comes with it (plan §A5, the "core refuses, UI grays" split: the
+## core already refuses the rush verb; the bar carries the reason text and grays OVR in place).
+##
+## Two facts go over: whether the Acquisitions Desk has been bought at all (the button is ABSENT
+## until then — Tim's 2026-08-01 exception to the no-moving-UI rule, reasoned out in
+## MomentumBar._apply_auto_purchase_look) and whether the mode is running.
+## Pushed only when one of them changes, not every frame — hence the three tracking fields.
+func _push_auto_purchase_state() -> void:
+	if _momentum_bar == null:
+		return
+	var unlocked := dynasty.upgrades.auto_purchase_unlocked()
+	var enabled: bool = game.auto_purchase.enabled
+	if _auto_purchase_state_pushed \
+			and unlocked == _auto_purchase_unlocked_shown \
+			and enabled == _auto_purchase_enabled_shown:
+		return
+	_auto_purchase_state_pushed = true
+	_auto_purchase_unlocked_shown = unlocked
+	_auto_purchase_enabled_shown = enabled
+	_momentum_bar.set_auto_purchase_state(unlocked, enabled)
 	# The PROPERTY ROWS are deliberately left alone — no portrait dim.
 	#
 	# It is tempting to reuse the overheat lockout's uniform dim here, but that dim is

@@ -440,7 +440,12 @@ func _carry_player_settings_to_heir(heir: GameState) -> void:
 	heir.ui_hire_mode = current.ui_hire_mode
 	heir.ui_minigame_enabled = current.ui_minigame_enabled
 	heir.ui_epoch_tab = current.ui_epoch_tab
-	heir.auto_purchase.enabled = current.auto_purchase.enabled
+	# AUTO-PURCHASE IS DELIBERATELY NOT CARRIED — the heir wakes with the desk switched OFF
+	# (Tim, 2026-08-01). It is the one setting here that SPENDS money rather than describing a
+	# preference, and an heir owns almost nothing: the opening capital plus any Trust Fund. Left
+	# on, the desk would skim that seed before the player could aim it, and it would also hold
+	# rush shut during the fast early climb, which is exactly when rush is worth most. The track
+	# stays bought, so switching it back on is one tap whenever the generation is ready for it.
 
 
 ## Seed an heir with the staff-ladder levels the dynasty has paid (in Legacy) to retain

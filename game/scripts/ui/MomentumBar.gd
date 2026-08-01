@@ -40,10 +40,21 @@ extends HBoxContainer
 #   • AUTO-BUY lockout (Plans/Auto_Purchase_And_Bulk_Hire.md §A5): while the Acquisitions Desk
 #     mode is on, the core refuses the rush verb entirely — that trade-off is what stops the mode
 #     being strictly dominant. This bar is where the player is told WHY: the readout reads
-#     AUTO-BUY ON, the OVR button wears its existing gray "can't trigger" plate, and the bubbles
+#     NO RUSH, the OVR button wears its existing gray "can't trigger" plate, and the bubbles
 #     and streaks (both of which claim an active rush) go quiet. Deliberately NOT a per-row
 #     banner: a global rush shutdown that painted all 14 property rows read as the whole property
 #     tab being dead (Overdrive_Vent_Windows.md:375-391).
+#
+#     THE TOGGLE ITSELF LIVES HERE TOO (Tim 2026-07-31), pinned to the bar's RIGHT end so the row
+#     reads [OVR][meter][AUTO-BUY] — the switch that costs you rush sits on the rush instrument,
+#     mirroring OVR across the meter. It used to be a button on its own row in Main; that row is
+#     gone. The lit button is the ONLY on-screen indicator that the mode is running (Tim declined a
+#     separate one), which is why its ON state is a full contrast flip rather than a subtle tint.
+#
+#     The readout says NO RUSH, not "AUTO-BUY ON" (Tim 2026-07-31): the lit button one inch to the
+#     right already says what is ON, so repeating it would spend the meter's biggest text on a fact
+#     the player can already see. What the button CANNOT say is what the mode costs — so the label
+#     says that instead, and the two halves of the trade sit side by side.
 #
 #     There is NO frozen/idle heat state here and there must never be one. Turning the mode on
 #     simply is "the player let go", so heat decays on the ordinary spin-down path and the
@@ -78,6 +89,12 @@ extends HBoxContainer
 ## to GameState.engage_rush_overdrive() — the same seam as FrenzyBar.pop_requested.
 signal overdrive_requested
 
+## The player tapped AUTO-BUY: flip the Acquisitions Desk mode. The bar is a DISPLAY — it changes
+## no game state on this press. Main owns the flag, flips it, and pushes the result back through
+## set_auto_purchase_state, so the button's look can never disagree with the mode that is actually
+## running (the same request/paint split as overdrive_requested above).
+signal auto_purchase_toggle_requested
+
 var _rush_momentum: RushMomentumState
 var _tuning: TuningConfig
 
@@ -86,9 +103,9 @@ var _tuning: TuningConfig
 ## through the scene tree, so this UI-only dependency stays an explicit hand-off, not a lookup.
 var _dynasty: DynastyState
 
-## True while the Acquisitions Desk (auto-purchase) mode is switched on, which is exactly when
-## the core refuses the rush verb (Plans/Auto_Purchase_And_Bulk_Hire.md §A5). Pushed in by Main
-## via set_auto_purchase_locked rather than read off the core, because it is a UI-mode fact
+## True while the Acquisitions Desk (auto-purchase) mode is switched on AND owned, which is exactly
+## when the core refuses the rush verb (Plans/Auto_Purchase_And_Bulk_Hire.md §A5). Pushed in by Main
+## via set_auto_purchase_state rather than read off the core, because it is a UI-mode fact
 ## (a toggle the player flipped), not part of the heat instrument — the same hand-off shape as
 ## set_dynasty above.
 ##
@@ -101,6 +118,19 @@ var _auto_purchase_locked := false
 ## The OVR button, pinned left of the meter (the FrenzyBar layout). Always visible; enabled
 ## only while cruising — see _process.
 var _overdrive_button: Button
+
+## The AUTO-BUY toggle, pinned right of the meter — OVR's mirror image across the bar (Tim
+## 2026-07-31). ABSENT until the Acquisitions Desk track is bought, then a permanent fixture whose
+## size never changes and whose plate is the only thing that flips. The hide-until-unlocked part is
+## a deliberate, Tim-approved exception to the no-moving-UI rule — see _apply_auto_purchase_look
+## for the full reasoning before changing it.
+var _auto_purchase_button: Button
+
+## The AUTO-BUY button's two "unlocked" plates, built once in _ready and swapped in whole when the
+## mode flips. Kept as fields rather than rebuilt per call because set_auto_purchase_state is
+## idempotent and Main is free to call it on every toggle/load without churning allocations.
+var _auto_plate_off: StyleBoxFlat
+var _auto_plate_on: StyleBoxFlat
 
 ## The display-only meter. All the overlays below live inside it.
 var _meter: ProgressBar
@@ -245,15 +275,23 @@ func set_dynasty(dynasty: DynastyState) -> void:
 	_dynasty = dynasty
 
 
-## Tell the bar that auto-purchase mode is on and rush is therefore unavailable. Main calls this
-## whenever the Acquisitions Desk toggle changes (and once at startup, so a loaded save that had
-## the mode on comes up wearing the locked look).
+## Paint the AUTO-BUY button and the bar's lockout presentation in one call.
+## `unlocked` — the player owns the Acquisitions Desk legacy track (level >= 1).
+## `enabled`  — the mode is currently switched ON.
 ##
-## The bar does not go looking for this itself: the core has no "auto-buy" concept — it just
-## stops being fed `rushing = true` — so the reason has to be handed down from the screen that
-## owns the toggle. Idempotent; calling it every frame with the same value is harmless.
-func set_auto_purchase_locked(locked: bool) -> void:
-	_auto_purchase_locked = locked
+## One call rather than two setters because the two facts are never independent on screen: the
+## button's three looks and the bar's lockout narration are all read off this same pair, and a bar
+## that had been told only half of it would paint a state that does not exist (an "on" mode the
+## player does not own).
+##
+## The bar does not go looking for either fact itself: the core has no "auto-buy" concept — it just
+## stops being fed `rushing = true` — so the reason has to be handed down from the screen that owns
+## the toggle. Idempotent; calling it every frame with the same values is harmless.
+func set_auto_purchase_state(unlocked: bool, enabled: bool) -> void:
+	# The rush lockout is exactly "owned AND switched on". An unowned track can have a stale
+	# `enabled` left over from a prestige that reset the legacy levels, and that must not lock rush.
+	_auto_purchase_locked = unlocked and enabled
+	_apply_auto_purchase_look(unlocked, enabled)
 
 
 ## The OVERDRIVE (OVR) button, so a tutorial card can anchor to it. It stays disabled until the
@@ -266,6 +304,17 @@ func set_auto_purchase_locked(locked: bool) -> void:
 ## auto-buy lockout as "not yet", not as "never" (Plans/Auto_Purchase_And_Bulk_Hire.md §A5).
 func get_overdrive_button() -> Button:
 	return _overdrive_button
+
+
+## The AUTO-BUY toggle, so a tutorial card can anchor to it (the same role get_overdrive_button
+## plays for OVR).
+##
+## CAUTION for tutorial callers: this button is HIDDEN, not merely grayed, until the Acquisitions
+## Desk is owned (see _apply_auto_purchase_look). Any tip anchored here must gate on
+## `get_auto_purchase_button().visible`, or the card will point at a node that occupies no space.
+## No tip currently anchors to it.
+func get_auto_purchase_button() -> Button:
+	return _auto_purchase_button
 
 
 func _ready() -> void:
@@ -330,6 +379,8 @@ func _ready() -> void:
 	# Keep a handle on the fill stylebox so the mode/depth coloring can mutate its bg_color
 	# per frame instead of rebuilding styleboxes (see _process).
 	_fill_style = _meter.get_theme_stylebox("fill") as StyleBoxFlat
+
+	_build_auto_purchase_button()
 
 	# The overdrive instrument overlay, custom-drawn (the same approach as MomentumStreaks).
 	# Added FIRST among the meter's overlays so the bubbles, streaks, and text labels all draw
@@ -504,6 +555,110 @@ func _ready() -> void:
 	_rush_momentum.vent_missed.connect(_on_vent_missed)
 
 
+## Build the AUTO-BUY toggle at the bar's RIGHT end, mirroring the OVR button on the left
+## (Tim 2026-07-31). Called from _ready AFTER the meter has been added, because HBoxContainer lays
+## its children out in child order and the row must read [OVR][meter][AUTO-BUY].
+func _build_auto_purchase_button() -> void:
+	_auto_purchase_button = Button.new()
+	_auto_purchase_button.text = "AUTO-BUY"
+	# FONT_BUTTON, not OVR's FONT_HEADLINE: three letters can afford to be huge, eight cannot
+	# without either shrinking the meter or wrapping. This is still the standard action-button size,
+	# well above the readability floor (§1b).
+	_auto_purchase_button.add_theme_font_size_override("font_size", UiPalette.FONT_BUTTON)
+	_auto_purchase_button.add_theme_font_override("font", UiPalette.make_bold_font())
+	# The STANDARD (gold) plate, not OVR's red action plate: red is reserved for spend/act (§8) and
+	# this button spends nothing — it flips a mode. Keeping the two neighbors different colors also
+	# stops the row reading as a pair of matching triggers.
+	UiPalette.style_button(_auto_purchase_button, false)
+
+	# The unlocked pair of plates, swapped whole by _apply_auto_purchase_look.
+	_auto_plate_off = _make_auto_plate(UiPalette.MUSTARD_GOLD, UiPalette.NAVY, 3)
+	# LIT: the plate INVERTS — navy field, thick mustard frame, mustard text. A contrast flip (rather
+	# than a brighter shade of the off-state) is what makes "the mode is running" legible from across
+	# the room, which matters more here than anywhere else on the screen: since the separate
+	# indicator was declined, this button is the only thing telling the player the mode is on.
+	_auto_plate_on = _make_auto_plate(UiPalette.NAVY, UiPalette.MUSTARD_GOLD, 5)
+
+	# The gray "can't tap" plate, exactly the OVR treatment. Kept even though the locked button is now
+	# HIDDEN rather than grayed (see _apply_auto_purchase_look): `disabled` still tracks `visible`, so
+	# this plate is what a hidden button would wear, and it costs one stylebox to keep the two states
+	# from ever disagreeing if the button is shown while still locked.
+	_auto_purchase_button.add_theme_stylebox_override(
+			"disabled", _make_auto_plate(UiPalette.CREAM, UiPalette.MID_GRAY, 3))
+
+	# Fixed width so the button NEVER resizes between its ON and OFF states and never expands into
+	# the meter: 210px comfortably fits "AUTO-BUY" at FONT_BUTTON bold plus the plate's 12px content
+	# margins, with slack for the font's hinting. Height fills the row like OVR does.
+	_auto_purchase_button.custom_minimum_size = Vector2(210, 0)
+	_auto_purchase_button.size_flags_vertical = Control.SIZE_FILL
+	_auto_purchase_button.pressed.connect(
+			func() -> void: auto_purchase_toggle_requested.emit())
+	# Same reason OVR needs one: the player may well flip this mid-rush-hold, and on a phone that
+	# tap is a SECOND finger — which Godot never turns into a mouse click on its own.
+	_auto_purchase_button.add_child(SecondaryTapButton.new())
+	add_child(_auto_purchase_button)
+
+	# Start locked-and-off; Main pushes the real state via set_auto_purchase_state at startup.
+	_apply_auto_purchase_look(false, false)
+
+
+## One plate for the AUTO-BUY button, matching UiPalette's button geometry (3px/4px/12px) so it
+## sits flush with every other button in the game. Border width is a parameter only so the LIT
+## state can wear a heavier frame.
+func _make_auto_plate(bg: Color, border: Color, border_width: int) -> StyleBoxFlat:
+	var plate := StyleBoxFlat.new()
+	plate.bg_color = bg
+	plate.border_color = border
+	plate.set_border_width_all(border_width)
+	plate.set_corner_radius_all(4)
+	plate.set_content_margin_all(12)
+	return plate
+
+
+## Paint the AUTO-BUY button. Once the track is owned the button is a permanent fixture whose FACE
+## TEXT and SIZE never change — only the plate and the label color flip between OFF and ON.
+##
+## DELIBERATE EXCEPTION TO THE NO-MOVING-UI RULE (Tim, decided 2026-08-01, having been shown that
+## it breaks his own standing "never hide/show controls — gray them in place" rule; see
+## scripts/ui/CLAUDE.md). Until the Acquisitions Desk is bought the button is ABSENT, not grayed.
+##
+## Why Tim overruled the rule here: a grayed control has to explain itself somewhere, and the only
+## place left on this button was `tooltip_text` — the face is full at a legible size and shrinking it
+## would break the low-vision floor. TOOLTIPS NEVER APPEAR ON TOUCH. So on the device the grayed
+## button said "not yet" and could never say why, which is the exact failure the no-moving-UI rule
+## exists to prevent, arriving by a different road. An absent control is more honest than a dead one
+## that cannot state its own reason.
+##
+## DO NOT "fix" this back to a grayed-in-place button. Doing so would restore an unexplainable
+## control on a phone. If it is ever restored, the reason must move somewhere touch can read it.
+func _apply_auto_purchase_look(unlocked: bool, enabled: bool) -> void:
+	if _auto_purchase_button == null:
+		return  # set_auto_purchase_state can legitimately arrive before _ready
+
+	# The bar is an HBoxContainer and the meter is SIZE_EXPAND_FILL, so a hidden button simply
+	# hands its 210px to the meter: the row reads [OVR][meter] until the track is bought, then
+	# [OVR][meter][AUTO-BUY] permanently. Nothing here or in Main indexes this bar's children.
+	_auto_purchase_button.visible = unlocked
+	# Kept in step with `visible` so a stray tap can never reach a hidden-but-live button.
+	_auto_purchase_button.disabled = not unlocked
+	if not unlocked:
+		return
+
+	var plate := _auto_plate_on if enabled else _auto_plate_off
+	var label_color := UiPalette.MUSTARD_GOLD if enabled else UiPalette.NAVY
+	# All three interactive plates share the one look: this is a state indicator first and a button
+	# second, so a hover or a held press must not momentarily read as the other mode.
+	for state in ["normal", "hover", "pressed"]:
+		_auto_purchase_button.add_theme_stylebox_override(state, plate)
+	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color",
+			"font_hover_pressed_color"]:
+		_auto_purchase_button.add_theme_color_override(state, label_color)
+
+	_auto_purchase_button.tooltip_text = \
+			"Auto-buy is ON — properties buy themselves, but rush is unavailable." if enabled \
+			else "Auto-buy is OFF — tap to let properties buy themselves (rush turns off)."
+
+
 func _process(delta: float) -> void:
 	var locked_out := _rush_momentum.is_locked_out()
 	var cruising := _rush_momentum.is_cruising()
@@ -619,7 +774,7 @@ func _process(delta: float) -> void:
 	_overdrive_button.disabled = _auto_purchase_locked or not (cruising and at_cruise_depth)
 
 	# The label: the live bonus normally; "CRUISE +X%" while the clamp is holding steady; the
-	# lockout narration while shut down; "AUTO-BUY ON" while the Acquisitions Desk has rush
+	# lockout narration while shut down; "NO RUSH" while the Acquisitions Desk has rush
 	# switched off. is_rearming is checked FIRST — it is a sub-state of is_locked_out (both true
 	# during the re-arm delay).
 	#
@@ -628,15 +783,18 @@ func _process(delta: float) -> void:
 	# landing on a hold that was live at the flip). The rule is "the state with a running clock
 	# wins", because only that state can LIE:
 	#   • OVERHEATED/COOLING is a bounded countdown that keeps running regardless of auto-buy —
-	#     the drain drains, the re-arm re-arms, rush_ready still fires. Hiding it behind AUTO-BUY
-	#     ON would strand the player with no idea how long the shutdown lasts.
+	#     the drain drains, the re-arm re-arms, rush_ready still fires. Hiding it behind NO RUSH
+	#     would strand the player with no idea how long the shutdown lasts.
 	#   • The reverse would be worse still if we ranked auto-buy first and it happened to also
 	#     show a countdown: a timer that is not counting down is a lie, and that is the exact
 	#     failure this ordering exists to avoid.
-	#   • AUTO-BUY ON has no clock to falsify. Deferring it costs only the couple of seconds the
+	#   • NO RUSH has no clock to falsify. Deferring it costs only the couple of seconds the
 	#     lockout takes, and it is still true — and still shown — the instant the lockout clears.
 	# So a shutdown that happens during auto-buy narrates itself to completion, lands its READY
-	# flash, and then falls through to AUTO-BUY ON, which is the honest reason from then on.
+	# flash, and then falls through to NO RUSH, which is the honest reason from then on.
+	# (Nothing is lost by deferring it: the lit AUTO-BUY button at the end of this row keeps saying
+	# the mode is on for the whole lockout, so the player is never left guessing about the mode —
+	# only about which of the two reasons rush is currently unavailable, and the timed one wins.)
 	if _rush_momentum.is_rearming():
 		_label.text = "COOLING…"
 		_apply_label_state(_LabelState.COOLING)
@@ -651,7 +809,7 @@ func _process(delta: float) -> void:
 		# This branch owns the readout for the whole spin-down too, which is on purpose: the bonus
 		# is still being PAID while the tail bleeds out, and the fill below still plots it honestly,
 		# but the one thing the player needs explained here is why the meter will not climb back.
-		_label.text = "AUTO-BUY ON"
+		_label.text = "NO RUSH"
 		_apply_label_state(_LabelState.AUTO_BUY)
 	elif cruising and is_equal_approx(_rush_momentum.heat, _rush_momentum.cruise_heat()):
 		# Sitting exactly on the clamp: the steady, content cruise state. The bonus quotes
@@ -694,7 +852,7 @@ func _process(delta: float) -> void:
 	# real, decaying bonus is still being paid, which is exactly what is happening — switching
 	# auto-buy on IS letting go, and the tail pays out to zero as usual. It also becomes the only
 	# place the tail's NUMBER appears, since the readout beside it is spending those pixels on the
-	# reason ("AUTO-BUY ON") — so the two divide the work cleanly: chip quotes what is still being
+	# cost ("NO RUSH") — so the two divide the work cleanly: chip quotes what is still being
 	# paid, label says why it will not climb back.
 	var spinning_down: bool = _rush_momentum.is_spinning_down() and not locked_out
 	_spindown_chip.visible = spinning_down

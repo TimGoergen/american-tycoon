@@ -183,41 +183,58 @@ static func make_panel_style() -> StyleBoxFlat:
 
 ## Twice the standard plate's 3px border. Same NAVY as every other frame — this is the SAME frame
 ## language, just carrying more weight, rather than a new color that would read as a new kind of
-## thing.
+## thing. This weight is ALSO what marks the unowned flagship, which carries no gold at all (see
+## make_unowned_flagship_panel_style).
 const FLAGSHIP_BORDER_WIDTH := 6
-## How far the gold halo bleeds out past the plate's edge. This shadow IS the "glow" — a warmer
+## How far the halo bleeds out past the plate's edge. This shadow IS the "glow" — a warmer
 ## background alone is too quiet to find while scrolling a ladder.
-const FLAGSHIP_GLOW_SIZE := 10
-## Alpha of that halo. Low on purpose: Tim asked for "slightly glowing", so it should read as warm
+## 10 -> 16 (Tim, 2026-07-31: "glow is too subtle"). Most of that correction lands HERE rather than
+## in the background blend below: the halo is the part that is visible in peripheral vision while
+## the ladder is moving, and unlike the background it cannot cost the navy body text any contrast.
+const FLAGSHIP_GLOW_SIZE := 16
+## Alpha of that halo. 0.35 -> 0.62 (same pass). Still short of opaque on purpose: Tim's original
+## word was "slightly glowing" and this is a correction, not a reversal — it should read as warm
 ## lighting spilling off the panel, not as a highlight marker painted on top of it.
-const FLAGSHIP_GLOW_ALPHA := 0.35
-## How far the plate's background is pulled toward MUSTARD_GOLD. Enough to be obvious beside a
-## plain cream row, not so far that the navy text loses contrast.
-const FLAGSHIP_WARM_BLEND := 0.18
-## The gray (unowned) flagship warms a little harder than the cream one: it starts from a drab
-## LIGHT_GRAY, so it needs more gold to travel the same visual distance.
-const FLAGSHIP_UNOWNED_WARM_BLEND := 0.22
+const FLAGSHIP_GLOW_ALPHA := 0.62
+## How far the OWNED plate's background is pulled toward MUSTARD_GOLD. 0.18 -> 0.30 (same pass):
+## obvious beside a plain cream row without tipping the plate into "this is a gold button".
+## Contrast check for the raise: NAVY on cream-lerp-gold at 0.30 is #EFDBA9, which is 9.6:1 against
+## #1D2D50 — far above the 4.5:1 bar, so the body text is not what limits this number. What limits
+## it is the row's own MUSTARD_GOLD hire button: push much past 0.30 and the plate starts reading
+## as the same material as the button sitting on it.
+const FLAGSHIP_WARM_BLEND := 0.30
+## Alpha of the UNOWNED flagship's halo. Its halo is DARK_GRAY, not gold (see below), and a neutral
+## shadow needs more opacity than a warm one to read as lift rather than as smudge.
+const FLAGSHIP_UNOWNED_GLOW_ALPHA := 0.55
 
 
 ## Warm cream plate with a heavy navy border and a gold halo — the OWNED flagship rung.
 static func make_flagship_panel_style() -> StyleBoxFlat:
 	var style := _make_plate(CREAM.lerp(MUSTARD_GOLD, FLAGSHIP_WARM_BLEND), NAVY)
-	_apply_flagship_frame(style)
+	_apply_flagship_frame(style, Color(MUSTARD_GOLD, FLAGSHIP_GLOW_ALPHA))
 	return style
 
 
-## The flagship rung the player has not bought yet. It keeps the gray family's drabness (it is
-## still locked) but takes the same heavy border, gold warmth and halo, because an UNBOUGHT
-## flagship is exactly the row the player is saving toward — it has to stay findable. Its border
-## goes DARK_GOLD rather than the unowned plate's MID_GRAY: navy would read as "owned" beside the
-## gray rows, while mid-gray at 6px just looks like a thicker gray line.
+## The flagship rung the player has not bought yet — and it must read as UNOWNED FIRST (Tim,
+## 2026-07-31: "unowned flagship shouldn't be gold-framed"). So it carries NO gold whatsoever: plain
+## LIGHT_GRAY fill and the ordinary MID_GRAY border of every other locked rung, exactly as
+## make_unowned_panel_style. Its earlier DARK_GOLD border and gold-warmed fill are gone.
+##
+## It is still the rung the player is saving toward, so it still has to be findable — but the
+## distinction is now carried entirely by WEIGHT rather than by color: the same heavy
+## FLAGSHIP_BORDER_WIDTH frame, a neutral DARK_GRAY halo lifting the plate off the ladder, and the
+## Family Ledger badge (drawn by PropertyRow). Keeping even a little gold warmth here was the
+## alternative and was rejected: any gold on the plate re-states the "this one is special/valuable"
+## signal that made it stop reading as locked in the first place, and a half-measure would just be a
+## quieter version of the thing Tim asked to remove.
 static func make_unowned_flagship_panel_style() -> StyleBoxFlat:
-	var style := _make_plate(LIGHT_GRAY.lerp(MUSTARD_GOLD, FLAGSHIP_UNOWNED_WARM_BLEND), DARK_GOLD)
-	_apply_flagship_frame(style)
+	var style := _make_plate(LIGHT_GRAY, MID_GRAY)
+	_apply_flagship_frame(style, Color(DARK_GRAY, FLAGSHIP_UNOWNED_GLOW_ALPHA))
 	return style
 
 
-## Turn a plate built by _make_plate into a flagship plate: heavier border + gold outer halo.
+## Turn a plate built by _make_plate into a flagship plate: heavier border + an outer halo in
+## `halo_color` (gold when owned, neutral gray when not — see the two callers above).
 ##
 ## LAYOUT NOTE — this is what keeps the no-moving-UI rule. The content margin is deliberately left
 ## at _make_plate's 12. In Godot, StyleBox.get_margin() returns the CONTENT margin whenever one is
@@ -231,9 +248,9 @@ static func make_unowned_flagship_panel_style() -> StyleBoxFlat:
 ##
 ## The halo is a StyleBoxFlat SHADOW, drawn outside the box. Unlike expand_margin, a shadow
 ## contributes nothing to minimum size or layout — it is pure paint.
-static func _apply_flagship_frame(style: StyleBoxFlat) -> void:
+static func _apply_flagship_frame(style: StyleBoxFlat, halo_color: Color) -> void:
 	style.set_border_width_all(FLAGSHIP_BORDER_WIDTH)
-	style.shadow_color = Color(MUSTARD_GOLD, FLAGSHIP_GLOW_ALPHA)
+	style.shadow_color = halo_color
 	style.shadow_size = FLAGSHIP_GLOW_SIZE
 
 

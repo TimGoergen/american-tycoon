@@ -284,6 +284,13 @@ const BUTTON_ROW_HEIGHT := 92
 ## −20% back down to 37 after the on-device look (Tim, 2026-07-05).
 const BUTTON_LABEL_FONT_SIZE := 37
 
+## The hire button's COUNT caption ("×10") — see _refresh_hire_button. One tier below the cost
+## beside it (FONT_BUTTON = 34 vs 37): the price is the number the player is deciding on and the
+## count is its qualifier, and the hire button is the narrower of the two action buttons, so the
+## smaller of two legible sizes is what buys the count room to be spelled out in full rather than
+## ellipsized. Still well above UiPalette.FONT_SMALL, the readability floor.
+const HIRE_COUNT_FONT_SIZE := UiPalette.FONT_BUTTON
+
 ## Property-row readability pass (Tim, 2026-07-01): the row is taller and its labels bigger.
 ## The property NAME reads in bold on the top line at this size — FONT_SUBHEAD (41) + 25%
 ## from the all-panel-text-larger pass (Tim, 2026-07-05).
@@ -301,6 +308,21 @@ const SECOND_ROW_HEIGHT := 70
 ## FONT_BODY (32) → 41 with the 50%-taller band, +25% to 51 in the all-panel-text pass,
 ## then −20% back to 41 for this band specifically (Tim, 2026-07-05).
 const SECOND_ROW_FONT_SIZE := 41
+
+## --- The auto-purchase marker (Tim, 2026-08-01) ------------------------------------------------
+## Auto-Purchase Mode buys silently on a cadence — as fast as about once a second — and Tim's
+## question was simply "where did my money go?". A flash on a hero stat was rejected as a strobe,
+## so the answer is marked on the ROWS the desk actually bought into: the count chip (the readout
+## of the very number that just went up) washes green for a moment.
+##
+## Deliberately QUIETER than anything a manual purchase does. A manual buy flashes the hero stat
+## at the top of the screen; this stays inside one chip on one row, tops out well below opaque,
+## sits BEHIND the count text so it never touches its legibility, and is gone in half a second.
+## At the desk's fastest cadence it reads as a slow blink on whichever rows are being fed.
+const AUTO_PURCHASE_MARKER_SECONDS := 0.5
+## Peak alpha of that wash. Low on purpose: enough to catch the eye in peripheral vision, not
+## enough to repaint the chip.
+const AUTO_PURCHASE_MARKER_PEAK_ALPHA := 0.32
 
 ## Small inline icons that replace the leading "$" on money figures and mark the buy count
 ## (Tim, 2026-07-09). A dollar-bill sits just before every amount; a property-tab icon sits
@@ -327,11 +349,23 @@ const MATCHED_ICON_VISIBLE_HEIGHT := 50.6
 ## canvas, so a 76px box draws a ~52px-tall book — about the height of the NAME line it sits
 ## beside, which is what makes it readable at arm's length.
 const FLAGSHIP_ICON_BOX := 76
-## The badge is nudged 8px right and 4px up from the name line's top-right corner so the VISIBLE
-## book (not its transparent padding) sits close to the panel's inner frame. Both nudges only move
-## paint — the badge is anchored, not laid out, so nothing on the row shifts.
-const FLAGSHIP_ICON_NUDGE_RIGHT := 8
-const FLAGSHIP_ICON_NUDGE_UP := 4
+## How far the badge is INSET from the name line's top-right corner. It used to be NUDGED OUT
+## instead (8px right, 4px up), which pushed it into the panel's 12px content margin and left the
+## book only ~4px shy of the heavy border — Tim, 2026-07-31: "give the badge a little more space
+## from the edge."
+##
+## The RIGHT edge is where the crowding actually was, so that is where the correction goes: the
+## badge now sits 6px INSIDE the content edge instead of 8px outside it, an 18px move inward.
+## Vertically it is merely un-nudged to flush (0) rather than pushed down: the ledger art already
+## carries ~12px of transparent padding above it inside the box, and the box is taller than the
+## name line, so driving it further down would run the book into the cycle-bar band below — which
+## would be a crowding problem traded for a worse one.
+##
+## These only move PAINT: the badge is anchored, not laid out, so nothing on the row shifts.
+const FLAGSHIP_ICON_INSET_RIGHT := 6
+const FLAGSHIP_ICON_INSET_TOP := 0
+## Air between the end of a clipped property name and the badge's box, so text never touches art.
+const FLAGSHIP_NAME_CLEARANCE := 8
 
 ## Imported icon textures, loaded once and keyed by source path. Shared across every row
 ## (all rows draw the same two icons), loaded lazily on first use.
@@ -349,6 +383,12 @@ var _manager_circle: ManagerCircle
 var _name_label: Label
 ## The "owned / next-milestone-threshold" readout, inside its own gray-outlined chip (Tim, 2026-07-01).
 var _count_label: Label
+## The green wash inside that chip, shown for half a second after Auto-Purchase Mode buys into THIS
+## property (see flash_auto_purchased). An overlay inside the chip, drawn under the count text.
+var _auto_purchase_marker: ColorRect
+## Seconds of that wash still owed. Driven by a plain countdown in _refresh — NOT a Tween and NOT a
+## Timer, precisely because this fires forever at up to ~1/sec (see flash_auto_purchased).
+var _auto_purchase_marker_seconds := 0.0
 var _income_label: Label
 ## Dollar-bill icon drawn just left of the income readout, in place of its leading "$".
 var _income_icon: TextureRect
@@ -378,6 +418,10 @@ var _buy_cost_label: Label
 ## Dollar-bill icon before the buy button's cost (hidden when there is no cost to show).
 var _buy_cost_icon: TextureRect
 var _hire_button: Button
+## The hire button's count caption — "×10", the staff levels THIS press will buy (see
+## _refresh_hire_button). It is the left half of the button's split labels, the same slot the
+## buy button spells "+10" in.
+var _hire_count_label: Label
 var _hire_cost_label: Label
 ## Dollar-bill icon before the hire button's cost (hidden while the button shows "MAX").
 var _hire_cost_icon: TextureRect
@@ -506,6 +550,18 @@ func _ready() -> void:
 	_count_label.add_theme_font_override("font", UiPalette.make_bold_font())
 	count_chip.add_child(_count_label)
 
+	# The auto-purchase marker: a flat green wash filling the chip's inner area. Like the OVERHEATED
+	# plate and the flagship badge, it costs the layout NOTHING — a ColorRect's minimum size is zero,
+	# so the chip (and therefore the row) is exactly the same size whether it is showing or not.
+	# Moved to index 0 so it draws over the chip's plate but UNDER the count text, which keeps the
+	# numbers at full contrast while the wash is up.
+	_auto_purchase_marker = ColorRect.new()
+	_auto_purchase_marker.color = Color(UiPalette.MONEY_GREEN, 0.0)
+	_auto_purchase_marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_auto_purchase_marker.visible = false
+	count_chip.add_child(_auto_purchase_marker)
+	count_chip.move_child(_auto_purchase_marker, 0)
+
 	# Cycle progress bar (Style Guide §9: the "spin" is the real cycle progress), filling the cell.
 	_cycle_bar = ProgressBar.new()
 	_cycle_bar.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -619,16 +675,25 @@ func _ready() -> void:
 	# sign, and the next rung's price — the level readout itself lives in the portrait now.
 	_hire_button = Button.new()
 	_hire_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	# A little narrower than the buy button (0.85 : 1.0 ≈ a 46/54 split) — the freed width
-	# goes to BUY, whose "BUY ×N" + cost labels are the longer text (Tim, 2026-07-05).
-	_hire_button.size_flags_stretch_ratio = 0.85
+	# EQUAL width with the buy button (Tim, 2026-08-01). It used to be 0.85 : 1.0 — a 46/54 split
+	# in BUY's favour, "whose 'BUY ×N' + cost labels are the longer text" (2026-07-05). That reason
+	# has since expired twice over: BUY's caption was shortened to a bare "+N", and HIRE now carries
+	# a count caption of its own, so the two buttons hold the same three things (icon, count, cost).
+	# The measured effect at the shipped 1080-wide layout: HIRE 328 → ~358px, BUY 387 → ~358px,
+	# which is what gives the new count room to print in full beside the price on ordinary rows.
+	_hire_button.size_flags_stretch_ratio = 1.0
 	_hire_button.custom_minimum_size = Vector2(0, BUTTON_ROW_HEIGHT)
 	UiPalette.style_button(_hire_button, false)
 	# Connected ONCE here (a per-refresh reconnect would stack handlers and double-fire).
 	_hire_button.pressed.connect(_on_hire_pressed)
 	var hire_labels := _add_split_button_labels(_hire_button)
-	var unused_left_label := hire_labels[0] as Label
-	unused_left_label.queue_free()  # the headshot+plus glyph below replaces the left caption
+	# The LEFT caption is back (Tim, 2026-08-01). From 2026-07-05 it was queue_free'd, because the
+	# headshot+plus glyph below was the button's whole caption and the hire count was implied by the
+	# global HIRE toggle at the top of the screen. It now carries that count per row — "×10" — so a
+	# row states what ITS button will buy. Reusing this label (rather than adding another) keeps the
+	# hire button laid out exactly like the buy button: same slot, same clip_text yield rule.
+	_hire_count_label = hire_labels[0]
+	_hire_count_label.add_theme_font_size_override("font_size", HIRE_COUNT_FONT_SIZE)
 	_hire_cost_label = hire_labels[1]
 
 	# The "add staff" glyph — headshot + "+" — is DRAWN, not composed from nodes: a
@@ -636,11 +701,15 @@ func _ready() -> void:
 	# carries transparent padding, so container layout could neither top-align the pair
 	# nor pull them close (Tim, 2026-07-05). See StaffHireGlyph at the end of this file.
 	_hire_glyph = StaffHireGlyph.new()
-	_hire_glyph.size_flags_horizontal = Control.SIZE_EXPAND_FILL   # pushes the cost right
+	# The glyph takes only its own drawn width now; the count caption beside it is the piece that
+	# expands and pushes the cost to the right edge (it did that job while it was the only thing on
+	# the button's left). Keeping the glyph at its natural width is what puts the "×10" directly
+	# against it, so the pair reads as one caption: "+[staffer] ×10".
+	_hire_glyph.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	_hire_glyph.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	var hire_row := _hire_cost_label.get_parent() as HBoxContainer
 	hire_row.add_child(_hire_glyph)
-	hire_row.move_child(_hire_glyph, 0)  # the glyph first, then the cost label
+	hire_row.move_child(_hire_glyph, 0)  # glyph, then the count caption, then the cost label
 	# A dollar-bill icon just before the hire cost, standing in for its "$" (Tim, 2026-07-09).
 	# Hidden in _refresh_hire_button while the button shows "MAX" (no cost).
 	_hire_cost_icon = _make_inline_icon(DOLLAR_ICON_SVG, BUTTON_LABEL_FONT_SIZE)
@@ -693,9 +762,11 @@ func _ready() -> void:
 	_flagship_icon = _make_inline_icon(LEDGER_ICON_SVG, FLAGSHIP_ICON_BOX, true)
 	_flagship_icon.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	_flagship_icon.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	_flagship_icon.offset_right = FLAGSHIP_ICON_NUDGE_RIGHT
+	# Offsets are measured from the TOP_RIGHT anchor, so a positive inset pulls the box left/down —
+	# i.e. inward from the label's corner, which is the panel's content corner.
+	_flagship_icon.offset_right = -FLAGSHIP_ICON_INSET_RIGHT
 	_flagship_icon.offset_left = _flagship_icon.offset_right - FLAGSHIP_ICON_BOX
-	_flagship_icon.offset_top = -FLAGSHIP_ICON_NUDGE_UP
+	_flagship_icon.offset_top = FLAGSHIP_ICON_INSET_TOP
 	_flagship_icon.offset_bottom = _flagship_icon.offset_top + FLAGSHIP_ICON_BOX
 	# The source art is already solid NAVY (#1D2D50) — the same navy as the flagship plate's heavy
 	# border — so it is drawn untinted (modulate stays white). Tinting it gold was the alternative,
@@ -752,9 +823,13 @@ func _apply_flagship_name_inset(flagship: bool) -> void:
 		_name_label.remove_theme_stylebox_override("normal")
 		return
 	var inset := StyleBoxEmpty.new()
-	# Reserve exactly the width the badge actually occupies over the label: the box, less the
-	# amount it is nudged out past the panel edge, plus a little air so text never touches art.
-	inset.content_margin_right = FLAGSHIP_ICON_BOX - FLAGSHIP_ICON_NUDGE_RIGHT + 8
+	# Reserve exactly the width the badge actually occupies over the label, plus a little air.
+	# The badge's left edge sits at (label width − FLAGSHIP_ICON_INSET_RIGHT − FLAGSHIP_ICON_BOX),
+	# so the strip it covers is INSET_RIGHT + BOX wide — the inset ADDS to the reservation now that
+	# the badge sits inside the label's corner (it SUBTRACTED while the badge hung outside it).
+	inset.content_margin_right = (
+			FLAGSHIP_ICON_BOX + FLAGSHIP_ICON_INSET_RIGHT + FLAGSHIP_NAME_CLEARANCE
+	)
 	_name_label.add_theme_stylebox_override("normal", inset)
 
 
@@ -828,6 +903,10 @@ func set_tab_active(active: bool) -> void:
 	_tab_active = active
 	if not active:
 		visible = false
+		# A hidden row stops running _process, so a marker still fading when the tab was swiped away
+		# would be frozen mid-fade and reappear, stuck, the next time this tab is opened. Clear it
+		# here — the same reason the held-action latches are dropped below.
+		_clear_auto_purchase_marker()
 		# Drop any held action NOW. A deactivated row stops running _process, so the
 		# _pump_held_* functions can never clear a hold that was engaged at the moment the
 		# tab switched — e.g. holding a rush when First Contact auto-jumps the pager to the
@@ -855,6 +934,50 @@ func _release_all_holds() -> void:
 	_buy_hold_repeating = false
 	_hire_hold_accumulator = 0.0
 	_hire_hold_repeating = false
+
+
+## Mark this row as one Auto-Purchase Mode just bought into. Main calls it immediately after the
+## Acquisitions Desk spends into THIS property; nothing else calls it, so a manual purchase never
+## produces the marker and a row the desk skipped stays completely inert.
+##
+## RE-ENTRANCY (this fires forever, up to about once a second): the effect is ONE pre-built
+## ColorRect plus ONE float countdown, so re-triggering simply refills the countdown and repaints
+## the alpha. There is no Tween and no Timer to stack, kill, or leak — calling this every frame for
+## an hour allocates nothing and leaves nothing behind. A re-trigger mid-fade restarts cleanly at
+## full strength rather than fighting a previous animation, so the wash can only ever brighten on a
+## buy and dim in between — it never flickers dark first.
+func flash_auto_purchased() -> void:
+	# Before _ready (Main configures a freshly constructed row) there is nothing to paint yet, and a
+	# row on a tab the player isn't looking at must not bank a marker for the next time it is shown.
+	if _auto_purchase_marker == null or not _tab_active:
+		return
+	_auto_purchase_marker_seconds = AUTO_PURCHASE_MARKER_SECONDS
+	_auto_purchase_marker.color = Color(UiPalette.MONEY_GREEN, AUTO_PURCHASE_MARKER_PEAK_ALPHA)
+	_auto_purchase_marker.visible = true
+
+
+## Fade the auto-purchase marker out over AUTO_PURCHASE_MARKER_SECONDS. Called once per frame from
+## _refresh; a no-op (and free) on the overwhelming majority of frames, when nothing is showing.
+func _fade_auto_purchase_marker(delta: float) -> void:
+	if _auto_purchase_marker_seconds <= 0.0:
+		return
+	_auto_purchase_marker_seconds = maxf(0.0, _auto_purchase_marker_seconds - delta)
+	if _auto_purchase_marker_seconds <= 0.0:
+		_clear_auto_purchase_marker()
+		return
+	# Squared falloff: full strength on the buy itself, then away quickly — the marker should be
+	# noticed, not watched. Linear read as a lingering highlight at this duration.
+	var remaining := _auto_purchase_marker_seconds / AUTO_PURCHASE_MARKER_SECONDS
+	_auto_purchase_marker.color = Color(
+			UiPalette.MONEY_GREEN, AUTO_PURCHASE_MARKER_PEAK_ALPHA * remaining * remaining)
+
+
+## Take the marker down immediately, wherever it was in its fade.
+func _clear_auto_purchase_marker() -> void:
+	_auto_purchase_marker_seconds = 0.0
+	if _auto_purchase_marker != null:
+		_auto_purchase_marker.color = Color(UiPalette.MONEY_GREEN, 0.0)
+		_auto_purchase_marker.visible = false
 
 
 func _process(delta: float) -> void:
@@ -1452,6 +1575,7 @@ func _refresh(delta: float) -> void:
 		]
 
 	_refresh_frozen_banner(frozen)
+	_fade_auto_purchase_marker(delta)
 
 	_refresh_buy_button()
 	_refresh_hire_button()
@@ -1616,8 +1740,8 @@ func _on_hire_pressed() -> void:
 
 
 ## Update the staff button for the property's sequential ladder (GDD §6.1, epoch-depth
-## redesign). The button is a pure BUY action — headshot + "+" on the left, the price of
-## the levels the current hire mode would buy on the right (the current level shows in the
+## redesign). The button is a pure BUY action — headshot + "+" and the COUNT this press buys
+## ("×10") on the left, the price of those levels on the right (the current level shows in the
 ## portrait disc instead, Tim 2026-07-05) — plus a faint-green MAX park when every level the reached epoch
 ## allows has been bought. Because each block's price is fixed by its own epoch, the
 ## number here can never silently jump at a first contact; a new block's bigger price
@@ -1631,8 +1755,13 @@ func _refresh_hire_button() -> void:
 		_hire_cost_label.text = "MAX"
 		# "MAX" is not a price, so hide the dollar-bill icon (Tim, 2026-07-09).
 		_hire_cost_icon.visible = false
+		# No count either: this button buys NOTHING until the next first contact raises the cap, and
+		# "×0" beside the word MAX would read as a broken quote rather than as a parked button. The
+		# label stays in place (empty), so nothing about the button's layout changes here.
+		_hire_count_label.text = ""
 		_hire_button.disabled = true
 		_hire_cost_label.add_theme_color_override("font_color", UiPalette.NAVY)
+		_hire_count_label.add_theme_color_override("font_color", UiPalette.NAVY)
 		_hire_glyph.tint = UiPalette.NAVY
 		return
 
@@ -1653,12 +1782,25 @@ func _refresh_hire_button() -> void:
 	# Drop the leading "$" — the dollar-bill icon before the label carries it (Tim, 2026-07-09).
 	_hire_cost_label.text = Money.of(cost).display().trim_prefix("$")
 	_hire_cost_icon.visible = true
+	# The count caption states what THIS press buys, in the same "count on the left, price on the
+	# right" shape the buy button uses ("+10"). It is the RESOLVED count, not the mode's name, so:
+	#   • it is already clamped to the EFFECTIVE mode (_effective_hire_mode), and a player without
+	#     the Head Hunters level can never be shown a ×10 the button would not honour;
+	#   • BLOCK and MAX — which have no fixed number — state their actual number here;
+	#   • partial fills tell the truth: a ×10 press with cash for 7 levels reads "×7", matching the
+	#     price beside it (see resolve_hire_count).
+	# When nothing is affordable yet (count 0) the price beside it is the NEXT SINGLE LEVEL's — the
+	# fallback quote above — so the caption says "×1" to match that quote rather than "×0". The
+	# button is disabled and dimmed in that state anyway, which is what says "not yet"; a row of
+	# "×0"s across the whole early game would just be noise beside a price the player IS saving for.
+	_hire_count_label.text = "×%d" % maxi(count, 1)
 	# A property with no units can't be staffed — a staffer needs something to run.
 	_hire_button.disabled = count <= 0 or _prop.units_owned == 0
 	# Navy on the live mustard plate, dimmed to match the disabled cream plate — applied to
 	# the cost text and the headshot+plus glyph (both monochrome, so they take a flat tint).
 	var hire_color := Color(UiPalette.NAVY, 0.45) if _hire_button.disabled else UiPalette.NAVY
 	_hire_cost_label.add_theme_color_override("font_color", hire_color)
+	_hire_count_label.add_theme_color_override("font_color", hire_color)
 	_hire_glyph.tint = hire_color
 	# The dollar-bill icon is FULL-COLOR art, so it keeps its own colors (tinting it navy
 	# turned it into a solid dark box — Tim, 2026-07-09); only fade it with alpha when the
@@ -1687,6 +1829,16 @@ func _apply_hire_styling(staffed: bool) -> void:
 ## Button only draws one centered string, so to put the count on the left and the cost
 ## on the right we add our own labels on top of it. The overlay ignores the mouse so
 ## taps still reach the button underneath. Returns [left_label, right_label].
+##
+## NO-MOVING-UI GUARANTEE (why the captions can say anything without the row shifting):
+##   • a Button is NOT a Container, so its minimum size comes only from its own text/icon and
+##     custom_minimum_size — nothing added to this overlay can ever widen or heighten it, and the
+##     button line's widths are fixed by the two stretch ratios regardless;
+##   • inside the overlay the LEFT label is expanding AND clip_text, and a clipped Label reports a
+##     minimum width of 1, so its string length has no say in the layout either. The cost stays
+##     pinned to the right edge whatever the caption reads.
+## Together those two are why the buy count ("+1" … "+1240") and the hire count ("×1" … "×137")
+## can change every frame without a single pixel of reflow.
 func _add_split_button_labels(button: Button) -> Array:
 	# Fill the button, inset by the plate's content margin so the text clears the border.
 	var overlay := MarginContainer.new()

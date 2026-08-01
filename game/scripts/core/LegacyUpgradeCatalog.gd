@@ -54,6 +54,11 @@ const HEAD_HUNTERS      := "head_hunters"
 # With that, first-level costs run ~3 (Trust Fund) to ~30, comfortably bought by a decent run,
 # while the max-level compounders cost billions — the never-reached "endless chase" top end.
 #
+# TWO TRACKS SIT OUTSIDE THAT RANGE ON PURPOSE (Tim, 2026-08-01): the Acquisitions Desk and Head
+# Hunters open at 5,000 Legacy each — roughly six full Earth runs — because automating the buying
+# and hiring loops is meant to be a late, earned luxury rather than an early convenience pickup.
+# They are the shop's PREMIUM tier; read their entries' notes before repricing either.
+#
 # Effect model (set 2026-06-15, modeled on Idle Slayer): the three core accelerators —
 # Family Fortune (income), Efficiency (cycle speed), Connections (wage) — COMPOUND, so
 # each level is the same relative jump no matter how deep you are (the getters in
@@ -227,7 +232,15 @@ const UPGRADES := [
 		# further level both deepens the buy (units per property) and shortens the wait between
 		# buys. Capped at 8 so peak throughput stays small against a flagship's price.
 		"max_level": 8,
-		"base_cost": 12,
+		# PREMIUM PRICING (Tim, 2026-08-01): level 1 costs 5,000 Legacy, far above every other
+		# track's opening rung. Automating the buying loop is meant to be a late, earned luxury,
+		# not an early quality-of-life pickup — a full Earth run mints on the order of hundreds of
+		# gems, so this is several epochs' worth of dynasty rather than one succession's.
+		# NOTE the odd-looking number: base_cost is PRE-multiplier. Every price is scaled by
+		# tuning.legacy_upgrade_cost_multiplier (3.0), so 5000/3 here is what lands level 1 on
+		# exactly 5,000. The literal is rounded UP in its last digit on purpose, so the floor() in
+		# cost_for_level can never drop it to 4,999.
+		"base_cost": 1666.6666666667,
 		"cost_growth": 2.2,
 		"effect_per_level": 0.25,     # seconds shaved off the purchase cadence per level past the first
 	},
@@ -239,7 +252,11 @@ const UPGRADES := [
 		# A gate, not a magnitude: each level unlocks one more bulk-hire mode (×10, BLOCK, MAX),
 		# so max_level is exactly the number of modes there are to unlock.
 		"max_level": 3,
-		"base_cost": 8,
+		# PREMIUM PRICING (Tim, 2026-08-01) — same 5,000 opening rung as the Acquisitions Desk, and
+		# pre-multiplier for the same reason (see that track's note). Bulk hiring is the other half
+		# of "stop pressing buttons", so the two premium tracks are deliberately priced as a matched
+		# pair rather than one being the cheap way in.
+		"base_cost": 1666.6666666667,
 		"cost_growth": 2.4,
 		"effect_per_level": 1.0,      # one unlocked hire mode per level (see LegacyUpgrades.max_hire_mode)
 	},

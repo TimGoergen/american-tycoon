@@ -84,12 +84,23 @@ var _epoch_pager_box: Control       # the pager header (label + arrows + dots + 
 ## _create_game turns EpochState.auto_advance off — so leaving an era is this button's tap.
 ## Always present, gray + disabled until game.epoch.contact_ready (the standing no-moving-UI rule).
 var _make_contact_button: Button
+## The button's caption, held separately so the ready pulse can scale it (see _set_contact_caption).
+var _contact_label: Label
+## Which colour the caption is currently wearing, so the override is only re-applied on a flip.
+## Starts TRUE against an initial not-ready state, which forces the first refresh to paint the
+## disabled colour — without that the caption would sit pale gold on a grayed plate until the
+## epoch first became ready.
+var _contact_caption_ready := true
 ## Drives the ready-state brightness pulse below; reset to 0 whenever the button is not pressable.
 var _contact_pulse_time := 0.0
 ## How the READY state shouts. Missing this button stalls the whole run (epoch advance is the
 ## progression spine), so a static enabled plate is not enough — it breathes brighter on the beat.
 const CONTACT_PULSE_HZ := 1.2
 const CONTACT_PULSE_BRIGHTNESS := 0.35
+## How much the caption grows at the top of the pulse (0.12 = +12%). Kept modest on purpose:
+## the plate does not move, so a large swing would read as the text sliding around inside a
+## fixed box rather than as a heartbeat.
+const CONTACT_PULSE_SCALE := 0.12
 var _ladder_area: Control           # the property-list region; swipes over either change tabs
 var _swipe_tracking := false        # a touch is down on the ladder, tracking for a horizontal swipe
 var _swipe_start := Vector2.ZERO
@@ -1026,7 +1037,10 @@ func _build_epoch_pager() -> Control:
 	# button sits directly above the property ladder the requirement is bought from, so the
 	# requirement, the reason, and the way out all read as one block.
 	_make_contact_button = Button.new()
-	_make_contact_button.text = "MAKE CONTACT"
+	# The caption is a CHILD Label, not the Button's own text, so the ready pulse can scale it
+	# (Tim, 2026-07-31: the text should pulse in size, not only brightness). Scaling a child
+	# Control is a pure transform — it cannot grow the plate or reflow the pager, which is what
+	# pulsing a font_size override would do, since a Button's minimum size follows its font.
 	# Full width and a standard-height plate: this is the single most important tap in the run,
 	# so it gets the largest, easiest target the row can give it.
 	_make_contact_button.custom_minimum_size = Vector2(0, UiPalette.STANDARD_BUTTON_HEIGHT)
@@ -1049,6 +1063,20 @@ func _build_epoch_pager() -> Control:
 	# and TURBO buttons carry this).
 	_make_contact_button.add_child(SecondaryTapButton.new())
 	_make_contact_button.disabled = true  # _refresh_make_contact_button enables it when ready
+
+	# The caption itself. Centered over the whole plate and ignoring input, so a tap anywhere on
+	# the button still presses it. Its colour is driven by _refresh_make_contact_button, because
+	# the Button's own font_color overrides no longer apply to text it does not own.
+	_contact_label = Label.new()
+	_contact_label.text = "MAKE CONTACT"
+	_contact_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_contact_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_contact_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_contact_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_contact_label.add_theme_font_override("font", UiPalette.make_bold_font())
+	_contact_label.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
+	_make_contact_button.add_child(_contact_label)
+
 	box.add_child(_make_contact_button)
 	return box
 
@@ -1072,12 +1100,39 @@ func _refresh_make_contact_button(delta: float) -> void:
 	_make_contact_button.disabled = not ready
 	if ready:
 		_contact_pulse_time += delta
+		# One 0..1 wave drives both channels, so the caption is biggest exactly when it is
+		# brightest — two cues on one beat read as one emphasis, not two competing ones.
 		var pulse := 0.5 + 0.5 * sin(_contact_pulse_time * TAU * CONTACT_PULSE_HZ)
 		var brightness := 1.0 + CONTACT_PULSE_BRIGHTNESS * pulse
 		_make_contact_button.modulate = Color(brightness, brightness, brightness)
-	elif _make_contact_button.modulate != Color.WHITE:
+		_set_contact_caption(true, 1.0 + CONTACT_PULSE_SCALE * pulse)
+	else:
+		# Reset unconditionally rather than only on a detected change: on the very first frame
+		# modulate and scale already sit at their defaults, so a change test would skip this and
+		# leave the caption unpainted. _set_contact_caption only touches the colour override when
+		# the ready state actually flips, so running it every frame costs two property writes.
 		_contact_pulse_time = 0.0
 		_make_contact_button.modulate = Color.WHITE
+		_set_contact_caption(false, 1.0)
+
+
+## Dress the MAKE CONTACT caption: `scale` about its own centre, and the ready/not-ready colour.
+## Scaling the Label rather than the Button keeps this a transform on a child — the plate holds
+## its size and nothing in the pager moves, which the no-moving-UI rule requires. The colour
+## override is only re-applied when the ready state actually flips, not every frame.
+func _set_contact_caption(ready: bool, scale_factor: float) -> void:
+	if _contact_label == null:
+		return
+	# pivot_offset is refreshed from the live size so the text grows from its middle even after
+	# a resize (the button is full-width, so its size changes with the pager).
+	_contact_label.pivot_offset = _contact_label.size * 0.5
+	_contact_label.scale = Vector2(scale_factor, scale_factor)
+	if ready != _contact_caption_ready:
+		_contact_caption_ready = ready
+		# Matches UiPalette.style_button's own colours for an action plate: pale gold when live,
+		# the dimmed navy it uses for font_disabled_color when not.
+		_contact_label.add_theme_color_override(
+			"font_color", UiPalette.PALE_GOLD if ready else Color(UiPalette.NAVY, 0.45))
 
 
 ## A large, readable ‹ / › stepper button for the pager.

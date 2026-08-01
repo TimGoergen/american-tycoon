@@ -186,7 +186,7 @@ var _estate_badge_dismissed := false
 var _buy_mode: PropertyRow.BuyMode = PropertyRow.BuyMode.ONE
 
 ## Global staff-hire mode — the exact analogue of _buy_mode, driving every row's hire button
-## (Plans/Auto_Purchase_And_Bulk_Hire.md §B2). How far up the ×1 → ×10 → BLOCK → MAX ladder the
+## (Plans/Auto_Purchase_And_Bulk_Hire.md §B2). How far up the ×1 → ×10 → MAX ladder the
 ## toggle can cycle is gated by the Head Hunters legacy track (dynasty.upgrades.max_hire_mode()).
 ##
 ## Persisted as `GameState.ui_hire_mode`, exactly like `_buy_mode` / `ui_buy_mode`: this field is
@@ -2360,13 +2360,6 @@ func _retention_levels_for_hire_mode(property_index: int) -> int:
 			desired = 1
 		PropertyRow.HireMode.TEN:
 			desired = 10
-		PropertyRow.HireMode.BLOCK:
-			# Levels left to the next 20-level block boundary above what is already retained —
-			# the same "finish the block" unit EconomyState.get_staff_levels_to_next_block buys
-			# in dollars. A retained count already ON a boundary starts a whole fresh block.
-			var retained := dynasty.staff_retention.get_retained_levels(property_index)
-			var block_size: int = tuning.staff_levels_per_epoch
-			desired = block_size - (retained % block_size)
 		PropertyRow.HireMode.MAX:
 			desired = affordable
 	return mini(desired, affordable)
@@ -2766,9 +2759,6 @@ func _hire_mode_caption(mode: PropertyRow.HireMode) -> String:
 			return "×1"
 		PropertyRow.HireMode.TEN:
 			return "×10"
-		PropertyRow.HireMode.BLOCK:
-			# Up to the next 20-level block boundary — the staff-side "NEXT".
-			return "BLOCK"
 		PropertyRow.HireMode.MAX:
 			return "MAX"
 	return "×1"

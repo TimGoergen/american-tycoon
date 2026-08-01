@@ -75,6 +75,11 @@ var peak_net_worth: float = 0.0
 ## start in buy-max). The literal avoids a UI-class dependency from this headless file.
 var ui_buy_mode: int = 3
 
+## The highest valid PropertyRow.HireMode ordinal (MAX). A literal rather than a reference to the
+## enum, for the same reason ui_buy_mode's default is a literal: this file is headless and must not
+## depend on a UI class. Keep it in step if HireMode ever gains or loses an entry.
+const UI_HIRE_MODE_MAX := 2
+
 ## UI preference: the player's selected global staff HIRE mode (a PropertyRow.HireMode int).
 ## Same arrangement as ui_buy_mode above — parked here only so it survives the save file.
 ## Defaults to 0 = x1, because the bulk modes above it are gated by the Head Hunters Legacy
@@ -613,7 +618,12 @@ func load_save_dict(data: Dictionary) -> void:
 	economy.cash = float(data.get("cash", 0.0))
 	peak_net_worth = float(data.get("peak_net_worth", 0.0))
 	ui_buy_mode = int(data.get("buy_mode", 3))  # 3 = MAX; matches the fresh-game default
-	ui_hire_mode = maxi(int(data.get("hire_mode", 0)), 0)  # 0 = x1; the ungated default
+	# 0 = x1, the ungated default. CLAMPED to the live HireMode range because the BLOCK mode was
+	# removed on 2026-08-01, shrinking that enum from 4 entries to 3: a save written while BLOCK
+	# existed can hold a 3 that no longer names anything. Clamping lands both the old BLOCK (2) and
+	# the old MAX (3) on the new MAX (2) — the generous direction, and harmless either way, since
+	# Main clamps again to whatever the Head Hunters track has actually unlocked.
+	ui_hire_mode = clampi(int(data.get("hire_mode", 0)), 0, UI_HIRE_MODE_MAX)
 	# Pre-minigame saves have no flag; default to enabled (mandatory until opted out).
 	ui_minigame_enabled = bool(data.get("minigame_enabled", true))
 	# Saves written before Auto-Purchase Mode have neither key. Both defaults are the pre-feature

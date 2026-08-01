@@ -21,7 +21,13 @@ enum BuyMode { ONE, TEN, NEXT_TIER, MAX }
 #
 # If this enum ever changes, follow the BuyMode lesson above: a retired mode KEEPS its ordinal
 # slot, because the player's chosen mode is persisted as a plain int in the save.
-enum HireMode { ONE, TEN, BLOCK, MAX }
+# BLOCK (buy to the next 20-level staffer boundary) was REMOVED 2026-08-01 (Tim). Unlike the
+# BuyMode case above, this mode was deleted rather than replaced, so there is no successor to
+# inherit its ordinal — MAX moves down from 3 to 2 and the enum simply gets shorter. Saves
+# written while BLOCK existed are clamped into range on load (GameState.load_save_dict), which
+# lands an old BLOCK or MAX on the new MAX. Head Hunters dropped to 2 levels to match, since
+# each of its levels unlocks exactly one bulk mode and there are now only two.
+enum HireMode { ONE, TEN, MAX }
 
 signal buy_requested(prop_index: int, mode: BuyMode)
 signal tap_requested(prop_index: int)
@@ -880,9 +886,6 @@ static func resolve_hire_count(mode: HireMode, economy: EconomyState, prop_index
 			desired = 1
 		HireMode.TEN:
 			desired = 10
-		HireMode.BLOCK:
-			# Up to the next 20-level block boundary; 0 once the ladder is maxed.
-			desired = economy.get_staff_levels_to_next_block(prop_index, reached_tier)
 		HireMode.MAX:
 			desired = economy.get_max_affordable_staff_levels(prop_index, reached_tier)
 	if desired <= 0:

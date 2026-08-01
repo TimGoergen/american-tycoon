@@ -268,7 +268,7 @@ func get_next_staff_level_cost(prop_index: int) -> float:
 
 
 # ---------------------------------------------------------------------------
-# Bulk staff hiring (the HireMode buttons: ×10 / BLOCK / MAX)
+# Bulk staff hiring (the HireMode buttons: ×10 / MAX)
 # ---------------------------------------------------------------------------
 # WHY THESE ARE LOOPS AND NOT A FORMULA.
 # Within one 20-level block the prices ARE a geometric series, so a closed form would
@@ -319,24 +319,9 @@ func get_max_affordable_staff_levels(prop_index: int, reached_tier: int, cap: in
 	return affordable
 
 
-## Levels remaining to the next 20-level BLOCK boundary — the size of a "BLOCK" hire.
-## A block is the meaningful staff unit: level 1 of it is the expensive staffer hire and
-## levels 2–20 are the cheap steps after, so finishing a block is what a player actually
-## wants to buy. Clamped at the reached-epoch cap, so it returns 0 when the ladder is
-## maxed and a short count when the cap lands mid-block.
-func get_staff_levels_to_next_block(prop_index: int, reached_tier: int) -> int:
-	var prop := properties[prop_index] as PropertyState
-	var next_level := prop.staff_level + 1
-	var block := prop.staff_block_of_level(next_level)
-	# The last level of that block — e.g. block 1 ends at 20, block 2 at 40.
-	var block_last_level := block * prop.tuning.staff_levels_per_epoch
-	var stop_at := mini(block_last_level, get_staff_level_cap(prop_index, reached_tier))
-	return maxi(0, stop_at - prop.staff_level)
-
-
 ## Buy up to `count` staff levels, charging each one individually, and return how many
 ## were ACTUALLY bought (0 if none were affordable). Deliberately NOT all-or-nothing:
-## a MAX/BLOCK tap that can pay for 7 of 10 levels buys 7 rather than reading as broken.
+## a MAX tap that can pay for 7 of 10 levels buys 7 rather than reading as broken.
 ##
 ## It calls the single-level verb in a loop on purpose. That verb owns the cap check, the
 ## cash deduction, the spent_on_staff_this_gen book-keeping and the add_staff_level

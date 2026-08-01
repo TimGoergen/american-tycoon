@@ -220,9 +220,13 @@ buttons to press", quantified.
 ### B2. Bulk hire (Earth $)
 
 A **HireMode** mirroring the shipped `BuyMode` pattern exactly (`PropertyRow.gd:14`):
-`ONE, TEN, BLOCK, MAX`. `BLOCK` buys up to the next 20-level block boundary — the staff-side
-analogue of `NEXT_TIER`, and the meaningful unit here because level 1 of each block is the
-expensive staffer *hire* and levels 2-20 are the cheap steps (`EconomyState.gd:225`).
+`ONE, TEN, MAX`.
+
+> **A `BLOCK` mode (buy to the next 20-level staffer boundary) shipped first and was REMOVED
+> 2026-08-01 on Tim's review.** It was the staff-side analogue of `NEXT_TIER`. Because it was
+> deleted rather than replaced, MAX moved down into its ordinal (3 → 2) and saves written while
+> it existed are clamped into range on load (`GameState.load_save_dict`), landing an old BLOCK
+> or MAX on the new MAX. Its core helper `get_staff_levels_to_next_block` was deleted with it.
 
 New core APIs beside `get_next_staff_level_cost` (`EconomyState.gd:244`):
 
@@ -237,9 +241,12 @@ and path-dependent, so this is a loop, mirroring `CostCurve.get_bulk_cost` (`:93
 a closed form.
 
 Gated by a new capped track, **Head Hunters** (`head_hunters`, category "Operations",
-max_level 3): L1 → ×10, L2 → BLOCK, L3 → MAX. This gating is clean — unlike Roadmap §1's
-buy-MAX collision, staff hiring has no bulk mode today, so it is a genuine gift rather than a
-take-away.
+max_level 2): L1 → ×10, L2 → MAX. Each level unlocks exactly one bulk mode, so `max_level` is
+simply how many modes exist — it dropped from 3 with the BLOCK removal above, and must rise
+again in step if a mode is ever added back, or the top level would buy nothing.
+
+This gating is clean — unlike Roadmap §1's buy-MAX collision, staff hiring has no bulk mode
+today, so it is a genuine gift rather than a take-away.
 
 ### B3. Bulk retention (gems)
 

@@ -226,8 +226,9 @@ func auto_purchase_cadence_scale() -> float:
 
 
 ## The deepest bulk-hire mode the player has unlocked (Head Hunters). The number indexes the
-## HireMode ladder in order: 0 = only ×1, 1 = also ×10, 2 = also BLOCK, 3 = also MAX. It is
-## just the purchased level, but named for what it means so callers don't compare raw levels.
+## HireMode ladder in order: 0 = only ×1, 1 = also ×10, 2 = also MAX. It is just the purchased
+## level, but named for what it means so callers don't compare raw levels. (BLOCK sat at 2 until
+## Tim removed it on 2026-08-01; MAX took its slot and the track shortened to 2 levels.)
 func max_hire_mode() -> int:
 	return get_level(LegacyUpgradeCatalog.HEAD_HUNTERS)
 

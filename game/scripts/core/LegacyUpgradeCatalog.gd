@@ -248,10 +248,12 @@ const UPGRADES := [
 		"id": HEAD_HUNTERS,
 		"name": "Head Hunters",
 		"category": "Operations",
-		"description": "Recruiters on retainer. Sign staff by the ten, then by the block, then by the houseful.",
-		# A gate, not a magnitude: each level unlocks one more bulk-hire mode (×10, BLOCK, MAX),
-		# so max_level is exactly the number of modes there are to unlock.
-		"max_level": 3,
+		"description": "Recruiters on retainer. Sign staff by the ten, then by the houseful.",
+		# A gate, not a magnitude: each level unlocks one more bulk-hire mode (×10, then MAX), so
+		# max_level is exactly the number of modes there are to unlock. It was 3 until Tim removed
+		# the BLOCK mode on 2026-08-01 — if a mode is ever added back, raise this in step or the
+		# top level buys nothing.
+		"max_level": 2,
 		# PREMIUM PRICING (Tim, 2026-08-01) — same 5,000 opening rung as the Acquisitions Desk, and
 		# pre-multiplier for the same reason (see that track's note). Bulk hiring is the other half
 		# of "stop pressing buttons", so the two premium tracks are deliberately priced as a matched
@@ -370,8 +372,6 @@ static func describe_effect(id: String, level: int) -> String:
 			match shown_level:
 				1:
 					return "×10 hire unlocked"
-				2:
-					return "×10 and BLOCK hire unlocked"
 				_:
-					return "×10, BLOCK and MAX hire unlocked"
+					return "×10 and MAX hire unlocked"
 	return ""

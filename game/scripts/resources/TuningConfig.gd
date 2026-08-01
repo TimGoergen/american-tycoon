@@ -194,7 +194,10 @@ extends Resource
 # --- Frenzy meter (Spec §7) ---
 
 ## Peak frenzy multiplier (applied to all income during a burn).
-@export var frenzy_max_multiplier: float = 4.0  # feel-tune M1
+## Synced 4.0 → 5.6 to match tuning.tres (2026-07-31). It had drifted, which mattered more than
+## usual here because frenzy_pop_floor is SOLVED from this value — at the stale 4.0 the "weakest
+## pop is 2×" floor would be 1/3, not 1/4.6. Keep the two in step.
+@export var frenzy_max_multiplier: float = 5.6  # feel-tune M1
 
 ## Duration of a full-charge frenzy burn in seconds.
 @export var frenzy_burn_duration: float = 90.0  # feel-tune M1
@@ -209,11 +212,21 @@ extends Resource
 @export var frenzy_idle_grace: float = 5.0  # feel-tune M1
 
 ## Minimum meter charge at which the player can trigger a frenzy pop.
-## DOUBLED 0.15 → 0.30 (Tim, 2026-07-31): a pop was available at a sixth of the bar, so the
-## floor barely gated anything and an early pop locked in a weak multiplier. At 0.30 the
-## player waits for a pop worth taking. The bar's floor marker and its grayscale-until-poppable
-## treatment both read this value, so they move with it automatically.
-@export var frenzy_pop_floor: float = 0.3  # feel-tune M1
+##
+## SOLVED, not hand-picked (Tim, 2026-07-31): the floor is set so a NEW player's weakest
+## possible pop is exactly 2×. A pop pays `1 + (frenzy_max_multiplier − 1) × intensity × meter`
+## (FrenzyState.pop), and a fresh dynasty has intensity 1.0, so
+##     floor = 1 / (frenzy_max_multiplier − 1) = 1 / 4.6 = 0.2174
+## It was 0.15 (a 1.69× worst pop — the floor barely gated anything and cashing in early locked
+## a weak multiplier), briefly 0.30 (2.38×) before landing on the exact-2× solve.
+##
+## THIS VALUE DEPENDS ON frenzy_max_multiplier. Change that and this stops meaning 2×; re-solve
+## it. Killer Instinct raises intensity above 1.0, so an invested bloodline's worst pop is
+## higher than 2× by design — the floor pins the new player's case only.
+##
+## The bar's floor marker and its grayscale-until-poppable treatment both read this, so they
+## follow automatically.
+@export var frenzy_pop_floor: float = 0.2174  # solved for a 2× worst pop
 
 # --- Rush Momentum / Overheat (Tim 2026-07-15; design: Plans/Rush_Overheat.md) ---
 # Rushing heats the property up — heat IS the momentum meter, in HEAT UNITS where 1.0 = the old

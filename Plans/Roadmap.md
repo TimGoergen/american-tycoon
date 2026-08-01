@@ -151,8 +151,9 @@ full-digits threshold" and belongs as a tweak to `display_cash()`, not a third m
 ## 7. Auto-property-purchase mode, unlocked by a Legacy upgrade (Tim, 2026-07-31)
 
 Tim's ask: a Legacy upgrade unlocks an AUTO-PURCHASE mode. While the player has it enabled,
-the game buys as many properties as it can afford on a cadence — 3s by default, with further
-upgrades shortening it. Rush is unavailable while the mode is on.
+the game buys on a cadence — 3s by default, with further upgrades shortening it. Rush is
+unavailable while the mode is on. WHAT it buys is the X most expensive properties the player
+can afford, with further upgrades raising X (Tim's revision, 2026-07-31 — see below).
 
 **Take: the strongest idea in this QoL family, and the rush trade-off is what makes it one.**
 Every other entry here (§1-4) removes taps. This one removes the ACTIVITY, which would
@@ -165,7 +166,7 @@ have, and it echoes the "minigames are a player setting" principle: choice, not 
 Theme fit is clean too — a tycoon delegating purchasing to an acquisitions desk is the
 fiction the game is already telling.
 
-### The tension that has to be resolved first
+### The tension that still has to be resolved
 
 **It automates the epoch tail we just deliberately built.** As of 2026-07-31 an alien epoch
 advances on owning 35 units of its flagship (Plans/Epoch_Advance_Rework.md), and that stacking
@@ -177,26 +178,45 @@ That is not automatically wrong: earning the right to automate a grind is the ge
 progression, and it costs gems and rush to do it. But it is a deliberate decision, not a
 detail, and it should be made with the flagship gate in view rather than by accident.
 
-### The open question — what does "as many as it can afford" mean?
+### DECIDED: the X most expensive properties you can afford (Tim, 2026-07-31)
 
-Income is NEUTRAL across a cohort (income/sec per dollar of cost is identical), so every
-purchase is equally efficient and the optimal play is simply to spend to zero. An auto-buyer
-that does that will hold the player's cash at ~0 forever, which means it can never SAVE. It
-would starve the very thing the player most wants: the next rung up, and the 35 flagship
-units. The mode would actively fight the epoch gate.
+Tim's revision, replacing his own "as many as it can afford": **each tick, buy the X most
+expensive properties the player can currently afford**, with further upgrades raising X.
 
-Options, in rough order of preference:
-- **Priority + reserve (recommended).** Buy in a defined order — recommend most-expensive-first,
-  since that is what actually advances the epoch — and never spend below a reserve sized to the
-  next thing worth saving for. Keeps the mode useful without letting it hoover cash into cheap
-  rungs.
-- **Respect the current buy mode.** Auto-buy at ×1/×10/MAX as set. Simple and predictable, but
-  MAX (the shipped default) still drains to zero.
-- **Flagship-first.** Buy the epoch's flagship exclusively until the gate is met, then spread.
-  Most aligned with the new gate, least flexible.
+This is the right rule, and it fixes the flaw the original had. Income is NEUTRAL across a
+cohort (income/sec per dollar of cost is identical), so "as many as it can afford" is
+literally "spend to zero" — the auto-buyer would hold cash at ~0 forever and could never SAVE,
+starving both the next rung and the 35 flagship units. Ranking by price and taking only the
+top X bounds the spend, so the mode assists instead of competing.
 
-Whatever is chosen, it must be stated in the upgrade's own description — a mode that spends
-the player's money on a rule they cannot see will read as a bug.
+Two properties of this rule are worth keeping deliberately:
+
+- **It aims straight at the epoch gate.** The flagship IS its epoch's most expensive property,
+  so at X=1 the mode feeds the flagship and nothing else — exactly the 35-unit requirement.
+- **It does NOT trivialise the unlock phase.** Because it always prefers expensive rungs, it
+  will happily ignore the cheap ones a roster still needs. Completing "one of each" stays the
+  player's job at small X. That is a good outcome, not a gap: auto-purchase accelerates the
+  tail without skipping the part of the epoch where new things appear.
+
+Recommended specifics:
+- **One unit per property per tick**, not MAX. The cadence is the throttle — that is what makes
+  the cadence upgrades meaningful. MAX would zero the wallet on the first tick and undo the
+  bound the rule just bought.
+- **Re-evaluate affordability after each purchase within a tick.** Buy the most expensive
+  affordable, deduct, re-check, up to X. Choosing all X up front against the opening balance
+  would try to buy things the earlier purchases just made unaffordable.
+- **Rank by CURRENT next-unit cost**, not base cost — that is what "can afford" means, and it
+  keeps the ranking honest as `r0` escalation reorders the ladder.
+- Two upgrade axes now exist and they multiply: X (breadth) and cadence (rate), giving
+  throughput ≈ X ÷ cadence units per second. Size them together, or the pair will outrun
+  whatever either was tuned against alone.
+
+The rule still has to be stated plainly in the upgrade's own description — a mode that spends
+the player's money on a rule they cannot see reads as a bug.
+
+**The tension above sharpens under this rule, not away from it:** at low X this mode is
+precisely "automate the flagship grind", which is the pacing phase shipped on 2026-07-31. That
+may well be the correct prestige reward, but it is now unmistakably the thing being sold.
 
 ### Load-bearing facts for whoever builds it
 
@@ -235,18 +255,21 @@ The Balance Tuning escape hatch is not a nicety — it is required. With six typ
 random, testing one specific game currently means replaying transitions until it comes up.
 That is exactly the workflow this gate would make worse, so the override ships with it.
 
-### Decide first: scoped to the run, or to the bloodline?
+### DECIDED: scoped to the DYNASTY (Tim, 2026-07-31)
 
-Tim said "current run". Worth deciding deliberately, because the surrounding systems are
-DYNASTY-scoped, not generation-scoped: challenge records live on the bloodline
-(`ChallengeGoals` talks about the bloodline's cleared tiers; `DynastyState.best_vent_streak`
-is explicitly "another dynasty-wide earned record"). If encounters reset each generation, a
-player who prestiges loses access to games they have demonstrably met — and their SCORES for
-those games stay on screen, which reads as a bug rather than as a rule.
+Encounters persist for the whole bloodline. Prestige does NOT clear them — **only wiping the
+full game save does.** Met is met.
 
-**Recommendation: scope to the bloodline.** Met is met. It also matches where the data would
-naturally live (the dynasty save dict, beside `ui_buy_mode` and the challenge records). If Tim
-wants the tighter per-generation version, the score display needs a rule too.
+This matches every neighbouring system: challenge records live on the bloodline, and
+`DynastyState.best_vent_streak` is explicitly "another dynasty-wide earned record". The
+per-generation alternative was rejected because a player who prestiged would lose access to
+games they had demonstrably met while their SCORES for those games stayed on screen — a rule
+that reads as a bug.
+
+Consequence for storage: the encounter set belongs in the dynasty save dict, beside
+`ui_buy_mode` and the challenge records — NOT in `user://minigame_history.json`, which is
+deliberately a per-install presentation detail. Wiping the save is what clears it, which falls
+out of that placement for free rather than needing its own reset path.
 
 ### Load-bearing facts
 

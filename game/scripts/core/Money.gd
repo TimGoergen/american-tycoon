@@ -88,8 +88,8 @@ const SUFFIXES := [
 # number on screen is rendered. The mode is presentation-only — it never touches save data
 # (beyond its own preference int) and never takes part in a comparison.
 #
-#   ABBREVIATED (default) — today's behaviour, unchanged:      $4.2 Qa
-#   ALPHABET              — the rung's letter pair:            $4.2 ab
+#   ABBREVIATED (default) — the real short-scale suffix:       $4.2 Qa
+#   ALPHABET              — K/M/B/T, then letter pairs:        $4.2 ab
 #   SCIENTIFIC            — true scientific, 1 <= mantissa <10: $4.2e18
 #
 # NOTE: SCIENTIFIC deliberately overrides the standing "never scientific notation" rule in
@@ -105,18 +105,21 @@ static var format_mode: int = Format.ABBREVIATED
 # The alphabet mode's digits. Indexed by position, so 0 → "a" … 25 → "z".
 const _ALPHABET_LETTERS := "abcdefghijklmnopqrstuvwxyz"
 
+# How many rungs at the BOTTOM of the ladder keep their real suffix in ALPHABET mode.
+# Four: K (1e3), M (1e6), B (1e9), T (1e12). The letters begin at the fifth rung up,
+# quadrillions (1e15) = "aa". See _suffix_for_rung() for the index arithmetic.
+const _ALPHABET_FIRST_RUNG := 4
 
-## Format as a real-dollar string: $1,234 / $14.3K / $2.1M / $14.3B / $1.3T / $4.2Qa …
+
+## Format as a real-dollar string: $950 / $14.3K / $2.1M / $14.3B / $1.3T / $4.2Qa …
 ## Pass max_decimals = 0 for a whole-number abbreviation ($14M, $2B) — used by the
 ## property panels' income readout, which reads cleaner without the fractional part.
 ##
 ## THRESHOLD RULE (shared with display_cash, Plan "Thresholds"): a non-default format
 ## replaces the abbreviation exactly where an abbreviation would have appeared, and changes
-## NOTHING below that point. This formatter abbreviates from $1,000, so the alternate formats
-## also start at $1,000 and everything under it stays `str(int(v))` in all three modes.
-## Consequence, and it is intended: SCIENTIFIC renders $14,300 as "$1.43e4". Letting this
-## formatter hold out until, say, $1M would mean one number appearing on screen twice in two
-## different renderings ("$14.3K" here, "$1.43e4" in the balance) — strictly worse.
+## NOTHING below that point. Both formatters abbreviate from $1,000, so the alternate formats
+## also start at $1,000 and everything under it stays exact in all three modes.
+## Consequence, and it is intended: SCIENTIFIC renders $14,300 as "$1.43e4".
 func display(max_decimals: int = 1) -> String:
 	var v := absf(value)
 	var prefix := "-$" if value < 0.0 else "$"
@@ -137,22 +140,30 @@ func display(max_decimals: int = 1) -> String:
 ## Format specifically for the player's CASH BALANCE (Tim, 2026-06-14). This is more
 ## precise than display() at small scales — the balance is the one number the player
 ## watches grow, so it reads in full until it gets genuinely large:
-##   • below $1,000:        exact, with cents only when there are any   ($950, $5.50)
-##   • $1,000 – $999,999:   full number with comma separators, no cents ($1,250)
-##   • $1,000,000 and up:   abbreviated, up to two decimals, spaced      ($1.25 M, $2 B)
+##   • below $1,000:      exact, with cents only when there are any    ($950, $5.50)
+##   • $1,000 and up:     abbreviated, up to two decimals, spaced      ($18.61 K, $1.25 M)
 ## (Costs and income/sec keep the compact display() above so they fit in tight rows.)
+##
+## THE $1,000 THRESHOLD IS SHARED WITH display() ON PURPOSE (Tim, 2026-07-31). It used to
+## abbreviate only from $1,000,000 and comma-group the thousands below that, which meant a
+## $5,510 cost button and an $18,610 balance could sit on screen in two different NOTATION
+## SYSTEMS at once ("$5.51e3" beside "18,610" in SCIENTIFIC). Tim: "I dislike having
+## materially different text that means the same thing." So the comma-grouped thousands
+## range is retired and $18,610 now reads "$18.61 K" in every mode.
+##
+## The two formatters still differ in PRECISION and SPACING (1dp tight vs 2dp spaced), which
+## is deliberate and is not the same thing — "$2.3K" and "$2.3 K" are the same notation.
 func display_cash() -> String:
 	var v := absf(value)
 	var prefix := "-$" if value < 0.0 else "$"
 
-	if v >= 1_000_000.0:
+	if v >= 1_000.0:
 		# Abbreviated range: up to two decimals (trailing zeros dropped — "$1.5 M",
 		# never "$1.50 M" or "$1.00 M"; Tim, 2026-07-03) and a spaced suffix, from the
 		# same ladder display() uses so the two formats can never disagree on a suffix.
 		#
 		# Per the threshold rule, the alternate formats take over here and only here — the
-		# comma-grouped thousands range and the cents below $1,000 are byte-identical in all
-		# three modes.
+		# cents and whole dollars below $1,000 are byte-identical in all three modes.
 		if format_mode == Format.SCIENTIFIC:
 			# NO space before the "e". "$4.2 e18" would read as a number followed by a
 			# suffix; the exponent is part of the number itself, not a label beside it.
@@ -164,10 +175,7 @@ func display_cash() -> String:
 				# gets the suffix slot's spacing, and the balance readout stays visually
 				# aligned when the player switches modes.
 				return prefix + trim(v / rung["scale"], 2) + " " + _suffix_for_rung(i)
-	if v >= 1_000.0:
-		# Thousands range: the whole number with comma separators, cents dropped.
-		return prefix + _group_thousands(int(floor(v)))
-	elif v == floor(v):
+	if v == floor(v):
 		# Below $1,000 and a whole number of dollars: no decimal point at all.
 		return prefix + str(int(v))
 	else:
@@ -187,22 +195,35 @@ static func abbrev(v: float, max_decimals: int = 1) -> String:
 ## label belongs to which magnitude. (SCIENTIFIC never gets here — it has no rung label.)
 static func _suffix_for_rung(i: int) -> String:
 	if format_mode == Format.ALPHABET:
+		# ALPHABET KEEPS THE FAMILIAR FOUR (Tim, 2026-07-31): K / M / B / T are universally
+		# read, so the generic letters only start where the vocabulary stops being obvious —
+		# at QUADRILLIONS. Below that this mode is identical to ABBREVIATED.
+		#
 		# SUFFIXES is ordered LARGEST FIRST, but the alphabet counts UPWARD from the
-		# smallest rung, so the two indices run in opposite directions and we flip:
-		#   i = 39 (K, 1e3)     → alphabet index 0  → "aa"
-		#   i = 38 (M, 1e6)     → alphabet index 1  → "ab"
-		#   i = 0  (NoTg, 1e120) → alphabet index 39 → "bn"
+		# smallest rung, so the two indices run in opposite directions and we flip; then we
+		# subtract the four familiar rungs so 1e15 — not 1e3 — is alphabet index 0:
+		#   i = 39 (K, 1e3)      → -4 → below the letters → "K"
+		#   i = 36 (T, 1e12)     → -1 → below the letters → "T"
+		#   i = 35 (Qa, 1e15)    → alphabet index 0  → "aa"
+		#   i = 34 (Qi, 1e18)    → alphabet index 1  → "ab"
+		#   i = 0  (NoTg, 1e120) → alphabet index 35 → "bj"
 		# Deriving the letters from the INDEX rather than keeping a second, parallel table
 		# is load-bearing: a parallel table could drift out of step with the ladder, while
 		# this cannot. It also extends for free if the ladder ever grows past 1e120.
-		return alphabet_for_rung(SUFFIXES.size() - 1 - i)
+		var alphabet_index := (SUFFIXES.size() - 1 - i) - _ALPHABET_FIRST_RUNG
+		if alphabet_index >= 0:
+			return alphabet_for_rung(alphabet_index)
 	return SUFFIXES[i]["suffix"]
 
 
 ## Turn a 0-based alphabet index into its letter pair: 0 → "aa", 1 → "ab", 25 → "az",
-## 26 → "ba", 39 → "bn", 675 → "zz". Past 675 the pairs are exhausted, so it grows a third
+## 26 → "ba", 35 → "bj", 675 → "zz". Past 675 the pairs are exhausted, so it grows a third
 ## letter ("baa") rather than wrapping or asserting — a ladder that long is hypothetical, but
 ## a wrong-but-silent label would be worse than a slightly wider one.
+##
+## The index is the LETTERED rung's position, counting from quadrillions (1e15 = 0), NOT the
+## position in SUFFIXES — the four rungs below it (K/M/B/T) have no letter pair at all. The
+## ladder's top rung, 1e120, is index 35 → "bj".
 ##
 ## PUBLIC on purpose: the HELP glossary prints the alphabet ladder as a legend, and it needs the
 ## mapping regardless of which format the player currently has selected. It cannot use
@@ -258,21 +279,6 @@ static func _scientific(v: float, prefix: String) -> String:
 	# trim() (not a bare "%.2f") so the rounding and the trailing-zero rule match the other
 	# two modes exactly: 4.20 → "4.2", 1.00 → "1".
 	return prefix + trim(mantissa, 2) + "e" + str(exponent)
-
-
-## Insert comma thousands separators into a non-negative integer dollar amount.
-## E.g. 1250 → "1,250", 999999 → "999,999". (GDScript has no built-in for this.)
-static func _group_thousands(whole: int) -> String:
-	var digits := str(whole)
-	var grouped := ""
-	var count := 0
-	# Walk the digits right-to-left, prepending a comma after every third one.
-	for i in range(digits.length() - 1, -1, -1):
-		grouped = digits[i] + grouped
-		count += 1
-		if count % 3 == 0 and i > 0:
-			grouped = "," + grouped
-	return grouped
 
 
 ## Format a number to at most `decimals` decimal places, then drop any trailing zeros

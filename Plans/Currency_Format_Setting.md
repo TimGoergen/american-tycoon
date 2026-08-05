@@ -49,7 +49,36 @@ exponent unless the player asks for one. Both docs were already amended.
 
 ---
 
-## Thresholds — the one gap the Roadmap left
+## REVISED 2026-08-05 after device testing — read this before the section below
+
+Tim tested SCIENTIFIC in the early game and found a buy button reading `5.51e3` beside a cash
+header reading `18,610` — two different notation systems on screen at once. The cause was the
+threshold rule below: `display()` abbreviates from $1,000 but `display_cash()` only from
+$1,000,000, so between those two points one formatter was scientific and the other was
+comma-grouped. **His Roadmap §6 note was right and the "each formatter keeps its own
+switchover" reading below was wrong.** Three changes followed, all his:
+
+1. **Buttons and other displays must always agree** — "I dislike having materially different
+   text that means the same thing." Both formatters now switch notation at the SAME threshold
+   in every mode.
+2. **Everything abbreviates from $1,000** — `display_cash()`'s comma-grouped thousands range is
+   RETIRED, so $18,610 renders `$18.61 K`. This deliberately changes the DEFAULT experience,
+   not just the new modes. Below $1,000 is unchanged (exact, with cents in the cash formatter).
+   The per-formatter decimal difference (1dp vs 2dp) and the cash formatter's space before the
+   suffix are KEPT — those are precision and spacing, not different notation systems.
+3. **ALPHABET keeps K / M / B / T and starts lettering at QUADRILLIONS**: 1e15 → `aa`,
+   1e18 → `ab`, … 1e120 → `bj`. The letters now begin exactly where the familiar names run out,
+   which is the better design — `Qa` onward was always the unreadable part, and nobody needed
+   `K` replaced. Implemented as `_ALPHABET_FIRST_RUNG := 4` with the index rule
+   `(SUFFIXES.size() - 1 - i) - 4`, lettering only when that is >= 0 and otherwise falling
+   through to the real suffix. Still derived from the rung INDEX, never a parallel table.
+
+`Money._group_thousands` was deleted with the comma-grouped branch — it was that branch's only
+caller (the other screens carry their own private copies). `MoneyTest` gained a permanent
+regression for the reported bug: across the old fault band, in all three modes, `display()` and
+`display_cash()` must classify to the same notation system.
+
+## Thresholds — the one gap the Roadmap left (SUPERSEDED — see above)
 
 Roadmap §6 says "keep today's small-value thresholds unchanged", then illustrates with
 `display_cash()`'s thresholds ($1M+). But there are **two** formatters with **different**

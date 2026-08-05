@@ -33,6 +33,7 @@ func _initialize() -> void:
 	_check_scientific_mantissa_range()
 	_check_scientific_values()
 	_check_modes_agree_on_rung()
+	_check_formatters_agree_on_notation()
 	_check_small_values_identical_across_modes()
 	_check_negatives_in_every_mode()
 
@@ -88,7 +89,12 @@ func _run_abbreviated_checks(pass_label: String) -> void:
 	# trailing zeros dropped (no ".0"/".00" noise anywhere on screen; Tim, 2026-07-03).
 	# Cents under $1,000 keep their conventional two digits ($5.50, not $5.5).
 	_check(Money.of(5.5).display_cash(), "$5.50", "cash shows cents under $1,000")
-	_check(Money.of(1_250.0).display_cash(), "$1,250", "cash groups thousands")
+	_check(Money.of(950.0).display_cash(), "$950", "cash under $1,000 stays exact")
+	# The 2026-07-31 change: cash abbreviates from $1,000, like display(). The old
+	# comma-grouped thousands range ("$1,250", "$18,610") is retired.
+	_check(Money.of(1_250.0).display_cash(), "$1.25 K", "cash abbreviates from $1,000")
+	_check(Money.of(18_610.0).display_cash(), "$18.61 K", "Tim's balance now reads in K")
+	_check(Money.of(2_300.0).display_cash(), "$2.3 K", "Tim's example: 2,300 is 2.3 K")
 	_check(Money.of(1_000_000.0).display_cash(), "$1 M", "whole cash drops the decimals")
 	_check(Money.of(1_500_000.0).display_cash(), "$1.5 M", "cash drops only trailing zeros")
 	_check(Money.of(1.23e15).display_cash(), "$1.23 Qa", "cash uses the extended ladder")
@@ -109,7 +115,7 @@ func _run_abbreviated_checks(pass_label: String) -> void:
 
 ## The invariant that stops the alphabet mapping from ever drifting away from the ladder:
 ## walk all 40 rungs of Money.SUFFIXES programmatically and, for each, compare the label the
-## formatter actually prints against a base-26 label computed HERE, from the rung's index.
+## formatter actually prints against the label computed HERE from the rung's index.
 ## Nothing below is hand-typed, so adding a rung to the ladder extends this test for free.
 func _check_alphabet_maps_every_rung() -> void:
 	print("-- ALPHABET rung-for-rung (all %d rungs) --" % Money.SUFFIXES.size())
@@ -118,11 +124,7 @@ func _check_alphabet_maps_every_rung() -> void:
 	for i in Money.SUFFIXES.size():
 		var rung: Dictionary = Money.SUFFIXES[i]
 		var scale: float = rung["scale"]
-		# SUFFIXES is LARGEST first while the alphabet counts upward from the smallest
-		# rung, so the expected alphabet index is the flipped one. This is the rule under
-		# test; it is written out here independently of Money's own arithmetic.
-		var expected_index := Money.SUFFIXES.size() - 1 - i
-		var expected_label := _expected_alphabet_label(expected_index)
+		var expected_label := _expected_label_for_rung(i)
 
 		# 1.5× the rung's scale: comfortably inside this rung (the next one up is 1000×
 		# away) and far from any rounding boundary that could bump the mantissa.
@@ -132,29 +134,37 @@ func _check_alphabet_maps_every_rung() -> void:
 		_check(_trailing_label(tight), expected_label,
 			"display() rung %d (%s, %s) -> alphabet %s" % [i, rung["suffix"], _sci_str(scale), expected_label])
 
-		# display_cash() must land on the SAME label for the same rung. Every rung here is
-		# at or above $1,000, but display_cash() only abbreviates from $1,000,000, so skip
-		# the K rung — below cash's threshold it correctly prints comma-grouped digits.
-		if value >= 1_000_000.0:
-			var spaced := Money.of(value).display_cash()
-			_check(_trailing_label(spaced), expected_label,
-				"display_cash() rung %d (%s) -> alphabet %s" % [i, rung["suffix"], expected_label])
+		# display_cash() must land on the SAME label for the same rung — since 2026-07-31 it
+		# abbreviates from $1,000 too, so every rung on the ladder is checked in both
+		# formatters with no exceptions.
+		var spaced := Money.of(value).display_cash()
+		_check(_trailing_label(spaced), expected_label,
+			"display_cash() rung %d (%s) -> alphabet %s" % [i, rung["suffix"], expected_label])
 
 	_leave_mode()
 
 
-## The two anchors the plan states in words, checked as whole strings so a mapping that is
-## merely self-consistent (but shifted) still gets caught.
+## The anchors the spec states in words, checked as whole strings so a mapping that is
+## merely self-consistent (but shifted) still gets caught. Tim, 2026-07-31: ALPHABET keeps
+## K / M / B / T and starts the generic letters at QUADRILLIONS.
 func _check_alphabet_spot_values() -> void:
 	print("-- ALPHABET anchors --")
 	_enter_mode(Money.Format.ALPHABET)
 
-	_check(Money.of(14_300.0).display(), "$14.3aa", "rung 39 (K, 1e3) is 'aa'")
-	_check(Money.of(2_000_000.0).display(), "$2ab", "rung 38 (M, 1e6) is 'ab'")
-	_check(Money.of(1.5e120).display(), "$1.5bn", "rung 0 (NoTg, 1e120) is 'bn'")
-	_check(Money.of(1.5e78).display(), "$1.5" + _expected_alphabet_label(25), "the 26th rung is 'az'")
-	_check(Money.of(1.5e81).display(), "$1.5ba", "the 27th rung rolls over to 'ba'")
-	_check(Money.of(1_500_000.0).display_cash(), "$1.5 ab", "cash keeps the suffix slot's space")
+	# The four familiar rungs are NOT lettered — they read exactly as in ABBREVIATED.
+	_check(Money.of(14_300.0).display(), "$14.3K", "rung 39 (K, 1e3) keeps 'K'")
+	_check(Money.of(2_000_000.0).display(), "$2M", "rung 38 (M, 1e6) keeps 'M'")
+	_check(Money.of(7.0e9).display(), "$7B", "rung 37 (B, 1e9) keeps 'B'")
+	_check(Money.of(1.3e12).display(), "$1.3T", "rung 36 (T, 1e12) keeps 'T'")
+	# ...and the letters begin at the rung above T.
+	_check(Money.of(4.2e15).display(), "$4.2aa", "rung 35 (Qa, 1e15) starts the letters at 'aa'")
+	_check(Money.of(2.5e18).display(), "$2.5ab", "rung 34 (Qi, 1e18) is 'ab'")
+	_check(Money.of(2.5e21).display(), "$2.5ac", "rung 33 (Sx, 1e21) is 'ac'")
+	_check(Money.of(1.5e120).display(), "$1.5bj", "rung 0 (NoTg, 1e120) is 'bj'")
+	_check(Money.of(1.5e90).display(), "$1.5" + _expected_alphabet_label(25), "the 26th lettered rung is 'az'")
+	_check(Money.of(1.5e93).display(), "$1.5ba", "the 27th lettered rung rolls over to 'ba'")
+	_check(Money.of(1.5e15).display_cash(), "$1.5 aa", "cash keeps the suffix slot's space")
+	_check(Money.of(1_500_000.0).display_cash(), "$1.5 M", "cash keeps 'M' in alphabet mode")
 
 	_leave_mode()
 
@@ -182,7 +192,9 @@ func _check_scientific_mantissa_range() -> void:
 			if _check_mantissa_in_range(Money.of(value).display(),
 					"display(%s x %s)" % [_sci_str(scale), str(factor)]):
 				in_range += 1
-			if value >= 1_000_000.0:
+			# display_cash() abbreviates from $1,000 too (2026-07-31), so every rung of the
+			# ladder is sampled in both formatters.
+			if value >= 1_000.0:
 				sampled += 1
 				if _check_mantissa_in_range(Money.of(value).display_cash(),
 						"display_cash(%s x %s)" % [_sci_str(scale), str(factor)]):
@@ -207,9 +219,12 @@ func _check_scientific_values() -> void:
 	_check(Money.of(1.0e18).display(), "$1e18", "a whole mantissa drops its decimals")
 	_check(Money.of(1.23e15).display_cash(), "$1.23e15", "cash keeps two real decimals")
 	_check(Money.of(1_500_000.0).display_cash(), "$1.5e6", "no space before the 'e'")
-	# The intended consequence of the threshold rule: display() abbreviates from $1,000,
-	# so SCIENTIFIC takes over from $1,000 too.
+	# The intended consequence of the threshold rule: both formatters abbreviate from
+	# $1,000, so SCIENTIFIC takes over from $1,000 in both.
 	_check(Money.of(14_300.0).display(), "$1.43e4", "display() goes scientific from $1,000")
+	# Tim's exact case, as it now renders: the cost button and the balance header agree.
+	_check(Money.of(5_510.0).display(), "$5.51e3", "the cost button Tim saw")
+	_check(Money.of(18_610.0).display_cash(), "$1.86e4", "the balance beside it, no longer '18,610'")
 
 	_leave_mode()
 
@@ -232,7 +247,7 @@ func _check_modes_agree_on_rung() -> void:
 	]
 	for value in values:
 		var expected_rung := _rung_index_for(value)
-		var expected_alphabet := _expected_alphabet_label(Money.SUFFIXES.size() - 1 - expected_rung)
+		var expected_alphabet := _expected_label_for_rung(expected_rung)
 
 		_enter_mode(Money.Format.ABBREVIATED)
 		var abbreviated_label := _trailing_label(Money.of(value).display())
@@ -257,13 +272,65 @@ func _check_modes_agree_on_rung() -> void:
 
 
 # ──────────────────────────────────────────────────────────────────────────────────────
+# The two formatters never use two different NOTATION SYSTEMS at once
+# ──────────────────────────────────────────────────────────────────────────────────────
+
+## Regression for the bug Tim hit on 2026-07-31: in SCIENTIFIC, a property's cost button
+## showed "$5.51e3" while the cash header showed "18,610" — two different notation systems on
+## screen for the same order of magnitude, because display() abbreviated from $1,000 while
+## display_cash() held out until $1,000,000. Tim: "I dislike having materially different text
+## that means the same thing."
+##
+## So in EVERY mode the two formatters must agree on WHICH SYSTEM they are using: both a
+## mantissa-plus-suffix, or both scientific, never one of each. They may still differ in
+## precision and spacing ("$2.3K" vs "$2.3 K") — that is not a different system.
+##
+## The $1K–$1M band is where the two used to disagree, so it is sampled densely; a few values
+## above and below confirm the rule holds off the old fault line too.
+func _check_formatters_agree_on_notation() -> void:
+	print("-- display() and display_cash() use the same notation system --")
+
+	var values := [
+		# Tim's exact case: the cost he saw and the balance he saw.
+		5_510.0, 18_610.0,
+		# The rest of the old disagreement band, plus its two edges.
+		1_000.0, 2_300.0, 14_300.0, 250_000.0, 999_999.0,
+		# Off the fault line, in both directions.
+		999.99, 1_500_000.0, 4.2e15, 2.5e120,
+	]
+	for mode in [Money.Format.ABBREVIATED, Money.Format.ALPHABET, Money.Format.SCIENTIFIC]:
+		_enter_mode(mode)
+		for value in values:
+			var tight := Money.of(value).display()
+			var spaced := Money.of(value).display_cash()
+			_check(_notation_of(tight), _notation_of(spaced),
+				"mode %d, %s: display()=%s and display_cash()=%s share a notation"
+					% [mode, _sci_str(value), tight, spaced])
+		_leave_mode()
+
+
+## Which notation system a rendered string uses: "suffix" (mantissa + rung label, e.g.
+## "$14.3K" / "$1.5 ab"), "scientific" ("$1.43e4"), or "plain" (bare digits, "$950").
+##
+## The trailing label is tested FIRST and the "e" only after: the alphabet labels "ae" and
+## "be" contain an "e", so a string ending in letters is a suffix rendering no matter what
+## characters it holds. A scientific rendering always ends in the exponent's digits.
+func _notation_of(text: String) -> String:
+	if _trailing_label(text) != "":
+		return "suffix"
+	if text.find("e") != -1:
+		return "scientific"
+	return "plain"
+
+
+# ──────────────────────────────────────────────────────────────────────────────────────
 # Small values: byte-identical in all three modes
 # ──────────────────────────────────────────────────────────────────────────────────────
 
 ## The threshold rule: a mode replaces the abbreviation exactly where an abbreviation would
-## have appeared and changes NOTHING below it. So display() must be identical in all three
-## modes below $1,000, and display_cash() below $1,000,000 — cents, whole dollars,
-## comma-grouped thousands and negatives alike.
+## have appeared and changes NOTHING below it. Since 2026-07-31 BOTH formatters abbreviate
+## from $1,000, so both are byte-identical across the three modes below $1,000 — cents,
+## whole dollars and negatives alike — and neither is below it above $1,000.
 func _check_small_values_identical_across_modes() -> void:
 	print("-- small values are byte-identical in all three modes --")
 
@@ -271,9 +338,8 @@ func _check_small_values_identical_across_modes() -> void:
 	for value in [0.0, 5.5, 42.0, 950.0, 999.99, -0.5, -950.0]:
 		_check_all_modes_identical(value, false, "display(%s)" % str(value))
 
-	# display_cash(): below its $1,000,000 threshold — this range includes the
-	# comma-grouped thousands, which no mode may touch.
-	for value in [0.0, 5.5, 950.0, 999.99, 1_250.0, 14_300.0, 999_999.0, -1_250.0, -5.5]:
+	# display_cash(): below the SAME $1,000 threshold, cents included.
+	for value in [0.0, 5.5, 950.0, 999.99, -999.99, -5.5]:
 		_check_all_modes_identical(value, true, "display_cash(%s)" % str(value))
 
 
@@ -308,8 +374,8 @@ func _check_negatives_in_every_mode() -> void:
 	_leave_mode()
 
 	_enter_mode(Money.Format.ALPHABET)
-	_check(Money.of(-14_300.0).display(), "-$14.3aa", "alphabet display() negative")
-	_check(Money.of(-4.2e18).display_cash(), "-$4.2 af", "alphabet display_cash() negative")
+	_check(Money.of(-14_300.0).display(), "-$14.3K", "alphabet display() negative keeps 'K'")
+	_check(Money.of(-4.2e18).display_cash(), "-$4.2 ab", "alphabet display_cash() negative")
 	_leave_mode()
 
 	_enter_mode(Money.Format.SCIENTIFIC)
@@ -356,8 +422,25 @@ func _check_mode_is_default(where: String) -> void:
 # Helpers used by the assertions (all independent of Money's own implementations)
 # ──────────────────────────────────────────────────────────────────────────────────────
 
+## How many bottom rungs of SUFFIXES keep their real suffix in ALPHABET mode: K, M, B, T.
+## Spelled out here rather than read from Money, so a change to Money's own constant cannot
+## silently move this test's expectations with it.
+const ALPHABET_FIRST_RUNG := 4
+
+
+## The label ALPHABET mode must print for rung `i` of Money.SUFFIXES, derived here from the
+## rung's index alone. SUFFIXES is LARGEST first while the alphabet counts upward from the
+## smallest LETTERED rung, so the index is flipped and then offset past K/M/B/T. Below that
+## offset the rung has no letter pair at all and keeps its real suffix.
+func _expected_label_for_rung(i: int) -> String:
+	var alphabet_index := (Money.SUFFIXES.size() - 1 - i) - ALPHABET_FIRST_RUNG
+	if alphabet_index < 0:
+		return str(Money.SUFFIXES[i]["suffix"])
+	return _expected_alphabet_label(alphabet_index)
+
+
 ## Base-26 letter pair for an alphabet index, computed independently of Money's own
-## conversion: 0 -> "aa", 1 -> "ab", 25 -> "az", 26 -> "ba", 39 -> "bn". Straight
+## conversion: 0 -> "aa", 1 -> "ab", 25 -> "az", 26 -> "ba", 35 -> "bj". Straight
 ## quotient/remainder arithmetic rather than Money's digit-peeling loop, so a bug in that
 ## loop cannot hide behind an identical bug here. Only two digits are needed: the ladder is
 ## 40 rungs and the pairs do not run out until 676.

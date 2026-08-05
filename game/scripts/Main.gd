@@ -1392,6 +1392,25 @@ func _build_estate_tab() -> Control:
 	return v
 
 
+## One of the settings tab's bottom entry buttons — the tall, bold, full-caps kind (BALANCE
+## TUNING, CHALLENGES, HELP …). All six were six near-identical copy-pasted blocks, which is
+## what made them awkward to rearrange when they had to be paired onto shared rows; building
+## them through one function means a paired button and a full-width one can never drift apart
+## in height, font or styling.
+##
+## `size_flags_horizontal` is EXPAND_FILL so that two of these in an HBoxContainer split the
+## width evenly, while one on its own still fills the row — the same button works in both.
+func _make_settings_button(label: String, height: int, font_size: int, on_pressed: Callable) -> Button:
+	var button := Button.new()
+	button.custom_minimum_size = Vector2(0, height)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.add_theme_font_size_override("font_size", font_size)
+	UiPalette.style_button(button, false)
+	button.text = label
+	button.pressed.connect(on_pressed)
+	return button
+
+
 ## Settings tab: player options. Today the prestige-minigame toggle and the dev panel
 ## entry; later, audio / haptics. (Was previously a deferred standalone screen.)
 ##
@@ -1513,6 +1532,13 @@ func _build_settings_tab() -> Control:
 	_style_currency_format_rows()
 
 	# A spacer pushes the two tuning buttons to the bottom of the panel, clear of the options above.
+	#
+	# CAUTION for whoever adds the next setting: this page is a plain VBox, NOT a ScrollContainer,
+	# so content that does not fit is not merely clipped — it is unreachable, and this spacer's
+	# EXPAND_FILL hides the problem by silently collapsing to nothing first. Adding the
+	# number-format card pushed the bottom buttons off screen exactly this way (Tim, 2026-08-05).
+	# Pairing those buttons bought back two rows, but the durable fix is to host the page in a
+	# ScrollContainer; do that rather than shaving another control when this next overflows.
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(spacer)
@@ -1525,62 +1551,47 @@ func _build_settings_tab() -> Control:
 	bottom_buttons.add_theme_constant_override("separation", 16)
 	v.add_child(bottom_buttons)
 
+	# PAIRING (Tim, 2026-08-05): these six buttons used to take a full row each, and once the
+	# number-format card was added the last of them were pushed off the bottom of the panel —
+	# which on this tab means UNREACHABLE, because the settings page is a plain VBox with no
+	# scroll. Pairing the four short-labelled ones onto two shared rows buys back two rows'
+	# height (~310px). The two TUNING buttons keep their own full-width rows: their labels are
+	# the longest here, and they are the two most-used dev entries.
+	#
+	# NOTE this is headroom, not a structural fix — the next thing added to this tab will
+	# overflow again. See the comment on the spacer above.
+
 	# Dev tools entry: the balance tuning panel (GDD §13). Moved here from the action row.
-	var dev_button := Button.new()
-	dev_button.custom_minimum_size = Vector2(0, tuning_button_height)
-	dev_button.add_theme_font_size_override("font_size", TUNING_BUTTON_FONT)
-	UiPalette.style_button(dev_button, false)
-	dev_button.text = "BALANCE TUNING"
-	dev_button.pressed.connect(_on_dev_pressed)
-	bottom_buttons.add_child(dev_button)
+	bottom_buttons.add_child(
+		_make_settings_button("BALANCE TUNING", tuning_button_height, TUNING_BUTTON_FONT, _on_dev_pressed))
 
 	# Minigame review tool: opens the full-screen list of every minigame so they can each be
 	# played and reviewed on demand (GDD §5.5), independent of a real prestige.
-	var minigame_tuning_button := Button.new()
-	minigame_tuning_button.custom_minimum_size = Vector2(0, tuning_button_height)
-	minigame_tuning_button.add_theme_font_size_override("font_size", TUNING_BUTTON_FONT)
-	UiPalette.style_button(minigame_tuning_button, false)
-	minigame_tuning_button.text = "MINIGAME TUNING"
-	minigame_tuning_button.pressed.connect(_on_minigame_tuning_pressed)
-	bottom_buttons.add_child(minigame_tuning_button)
+	bottom_buttons.add_child(
+		_make_settings_button("MINIGAME TUNING", tuning_button_height, TUNING_BUTTON_FONT, _on_minigame_tuning_pressed))
 
-	# Stats: opens the Statistics modal (Best Vent Streak and other bloodline numbers; Tim 2026-07-20).
-	var stats_button := Button.new()
-	stats_button.custom_minimum_size = Vector2(0, tuning_button_height)
-	stats_button.add_theme_font_size_override("font_size", TUNING_BUTTON_FONT)
-	UiPalette.style_button(stats_button, false)
-	stats_button.text = "STATS"
-	stats_button.pressed.connect(_on_stats_pressed)
-	bottom_buttons.add_child(stats_button)
+	# CHALLENGES + STATS share a row, challenges first (Tim's order).
+	# Challenges opens the player-facing CHALLENGES screen (Plans/Challenge_Mode.md §3.4) — beat
+	# your best in each minigame for a permanent global income bonus. This is the real home for
+	# Challenge Mode; the CHALLENGE toggle under Minigame Tuning is now only a developer shortcut.
+	# Stats opens the Statistics modal (Best Vent Streak and other bloodline numbers, Tim 2026-07-20).
+	var challenge_stats_row := HBoxContainer.new()
+	challenge_stats_row.add_theme_constant_override("separation", 16)
+	challenge_stats_row.add_child(
+		_make_settings_button("CHALLENGES", tuning_button_height, TUNING_BUTTON_FONT, _on_challenges_pressed))
+	challenge_stats_row.add_child(
+		_make_settings_button("STATS", tuning_button_height, TUNING_BUTTON_FONT, _on_stats_pressed))
+	bottom_buttons.add_child(challenge_stats_row)
 
-	# Challenges: opens the player-facing CHALLENGES screen (Plans/Challenge_Mode.md §3.4) — beat your
-	# best in each minigame for a permanent global income bonus. This is the real home for Challenge
-	# Mode; the CHALLENGE toggle under Minigame Tuning above is now only a developer shortcut.
-	var challenges_button := Button.new()
-	challenges_button.custom_minimum_size = Vector2(0, tuning_button_height)
-	challenges_button.add_theme_font_size_override("font_size", TUNING_BUTTON_FONT)
-	UiPalette.style_button(challenges_button, false)
-	challenges_button.text = "CHALLENGES"
-	challenges_button.pressed.connect(_on_challenges_pressed)
-	bottom_buttons.add_child(challenges_button)
-
-	# About: opens the modal with the logo, name, version, and credits (Tim, 2026-07-09).
-	var about_button := Button.new()
-	about_button.custom_minimum_size = Vector2(0, tuning_button_height)
-	about_button.add_theme_font_size_override("font_size", TUNING_BUTTON_FONT)
-	UiPalette.style_button(about_button, false)
-	about_button.text = "ABOUT"
-	about_button.pressed.connect(_on_about_pressed)
-	bottom_buttons.add_child(about_button)
-
-	# Help: opens the tutorial glossary + Replay action (Plans/Tutorial_Onboarding_Plan.md).
-	var help_button := Button.new()
-	help_button.custom_minimum_size = Vector2(0, tuning_button_height)
-	help_button.add_theme_font_size_override("font_size", TUNING_BUTTON_FONT)
-	UiPalette.style_button(help_button, false)
-	help_button.text = "HELP"
-	help_button.pressed.connect(_on_help_pressed)
-	bottom_buttons.add_child(help_button)
+	# ABOUT + HELP share a row. About opens the logo/name/version/credits modal (Tim, 2026-07-09);
+	# Help opens the tutorial glossary + Replay action (Plans/Tutorial_Onboarding_Plan.md).
+	var about_help_row := HBoxContainer.new()
+	about_help_row.add_theme_constant_override("separation", 16)
+	about_help_row.add_child(
+		_make_settings_button("ABOUT", tuning_button_height, TUNING_BUTTON_FONT, _on_about_pressed))
+	about_help_row.add_child(
+		_make_settings_button("HELP", tuning_button_height, TUNING_BUTTON_FONT, _on_help_pressed))
+	bottom_buttons.add_child(about_help_row)
 
 	stack.add_child(v)
 	_settings_page = v

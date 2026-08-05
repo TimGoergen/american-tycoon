@@ -1460,15 +1460,50 @@ func _build_settings_tab() -> Control:
 	# not clear what will happen when you click it." A cycler hides its own behaviour — you cannot
 	# see what you are about to get until you have already changed it. Three rows show every
 	# option, each with a live example of that mode's output, and tapping one selects it directly.
+	#
+	# GROUPING (Tim, 2026-08-05: "the different buttons for number format are not clearly and
+	# intuitively related to the Number format label"). The heading and its three rows are drawn
+	# INSIDE one §8 card — UiPalette.make_panel_style, the cream-plate/navy-border card this
+	# codebase already uses wherever a set of things is one unit (FamilyLedgerScreen's cards,
+	# PropertyRow, TutorialTip). The card's border is the association: everything it encloses
+	# belongs to the heading at its top, and the plain toggles above it are visibly outside.
+	#
+	# Chosen over LegacyScreen's collapsible section header (_add_collapsible_section) for two
+	# reasons: that pattern HIDES its body until tapped, which the standing no-moving-UI rule
+	# forbids here, and its filled accent headers are the Estate screen's category language, so
+	# borrowing them in Settings would read as a second design system rather than a cluster.
+	var format_card := PanelContainer.new()
+	format_card.add_theme_stylebox_override("panel", UiPalette.make_panel_style())
+	v.add_child(format_card)
+
+	var format_group := VBoxContainer.new()
+	format_group.add_theme_constant_override("separation", 12)
+	format_card.add_child(format_group)
+
 	var format_heading := Label.new()
 	format_heading.text = "Number format"
 	format_heading.add_theme_font_size_override("font_size", 45)  # matches the toggles above
+	format_heading.add_theme_font_override("font", UiPalette.make_bold_font())
 	format_heading.add_theme_color_override("font_color", UiPalette.NAVY)
-	v.add_child(format_heading)
+	format_group.add_child(format_heading)
+
+	# Names the three magnitudes in the examples below (Tim asked for "a number in the hundreds,
+	# millions and quadrillions"), left to right, so the columns read as ONE amount growing rather
+	# than three unrelated numbers — and says outright that the hundreds column is identical in all
+	# three modes. It is: below each formatter's abbreviation threshold every mode prints the same
+	# string, by design (Plans/Currency_Format_Setting.md, "Thresholds"). That is worth showing —
+	# it tells the player the setting only touches big numbers — but without this line the repeated
+	# "$250" would read as a bug. Caption only; the examples themselves stay at FONT_SUBHEAD.
+	var format_caption := Label.new()
+	format_caption.text = "Hundreds, millions, quadrillions. Small amounts look the same either way."
+	format_caption.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	format_caption.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
+	format_caption.add_theme_color_override("font_color", UiPalette.NAVY)
+	format_group.add_child(format_caption)
 
 	var format_rows := VBoxContainer.new()
 	format_rows.add_theme_constant_override("separation", 12)
-	v.add_child(format_rows)
+	format_group.add_child(format_rows)
 
 	_currency_format_rows = []
 	_currency_format_markers = []
@@ -2474,21 +2509,34 @@ func _buy_mode_caption(mode: PropertyRow.BuyMode) -> String:
 	return "×1"
 
 
-## The value shown as the live sample beside the number-format setting. Deliberately DEEP
-## ($4.2 quattuordecillion, ~epoch 12+): down here the abbreviated suffix ("Qad") is the
-## opaque one the setting exists to escape, so the three samples actually read differently.
-const CURRENCY_FORMAT_SAMPLE := 4.2e45
+## The three values every number-format row shows, smallest first: hundreds, millions,
+## quadrillions (Tim, 2026-08-05 — one example was not enough to judge a format by). They share
+## the 4.2 mantissa so the same amount can be compared straight down a column, mode to mode.
+##
+## The HUNDREDS value renders IDENTICALLY in all three modes, and that is deliberate, not a bug:
+## every mode only replaces an abbreviation where one would have appeared, so below each
+## formatter's threshold the output is byte-identical (Plans/Currency_Format_Setting.md,
+## "Thresholds"). Showing it tells the player the setting leaves everyday amounts alone. The
+## caption above the rows (see _build_settings_tab) is what keeps the repetition from reading as
+## a rendering fault.
+const CURRENCY_FORMAT_SAMPLES := [250.0, 4.2e6, 4.2e15]
+
+## Fixed width (px) of a row's mode-name column. Wide enough for the longest name
+## ("ABBREVIATED" measures 275px faux-bold at FONT_SUBHEAD) so the three example columns start
+## at the same x on every row — which is the whole point of showing three: the same magnitude
+## must line up down the column to be comparable at a glance.
+const CURRENCY_FORMAT_NAME_WIDTH := 288
 
 
 ## Build one number-format row: a full-width plate carrying an active marker, the mode's name,
-## and a live example of THAT mode's output. Registers itself in _currency_format_rows /
+## and three live examples of THAT mode's output. Registers itself in _currency_format_rows /
 ## _currency_format_markers at index `mode`, so the restyler can find it by mode later.
 ##
-## The row is a Button used purely as the plate; its own `text` stays empty and the three pieces
-## of content are Labels anchored inside it. That is what makes the row un-resizable: a Button
-## sizes itself to its own text, and an anchored (non-container-managed) child cannot push on
-## its parent — so SCIENTIFIC's shorter example and ALPHABET's longer one all yield the exact
-## same row box. Standing no-moving-UI rule: nothing here hides, resizes, or reflows on select.
+## The row is a Button used purely as the plate; its own `text` stays empty and all of its content
+## is Labels anchored inside it. That is what makes the row un-resizable: a Button sizes itself to
+## its own text, and an anchored (non-container-managed) child cannot push on its parent — so
+## SCIENTIFIC's shorter examples and ALPHABET's longer ones all yield the exact same row box.
+## Standing no-moving-UI rule: nothing here hides, resizes, or reflows on select.
 func _build_currency_format_row(mode: int) -> Button:
 	var row := Button.new()
 	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -2518,29 +2566,42 @@ func _build_currency_format_row(mode: int) -> Button:
 	marker.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
 	strip.add_child(marker)
 
+	# Fixed-width name column (not expanding), so the example columns after it begin at the same x
+	# on all three rows even though "ABBREVIATED" and "ALPHABET" are different lengths.
 	var name_label := Label.new()
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	name_label.text = _currency_format_name(mode)
 	name_label.clip_text = true
+	name_label.custom_minimum_size = Vector2(CURRENCY_FORMAT_NAME_WIDTH, 0)
 	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	name_label.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
 	name_label.add_theme_font_override("font", UiPalette.make_bold_font())
 	name_label.add_theme_color_override("font_color", UiPalette.NAVY)
 	strip.add_child(name_label)
 
-	# The example, right-aligned and given all the leftover width. It is rendered through Money in
-	# THIS row's mode (see _currency_format_sample), so it can never disagree with what the game
-	# actually prints. clip_text keeps a long example from claiming more width than the row has.
-	var example := Label.new()
-	example.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	example.text = _currency_format_sample(mode)
-	example.clip_text = true
-	example.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	example.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	example.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	example.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
-	example.add_theme_color_override("font_color", UiPalette.NAVY)
-	strip.add_child(example)
+	# The three examples share the leftover width as EQUAL columns (one HBox, zero separation, each
+	# label expanding by the same default stretch ratio), so column 2 on the ALPHABET row sits at
+	# exactly the same x as column 2 on the SCIENTIFIC row. Right-aligned inside its column, the way
+	# a numeric table lines up. Each is rendered through Money in THIS row's mode (see
+	# _currency_format_samples), so no example can disagree with what the game actually prints;
+	# clip_text keeps a long one from claiming more width than its column has.
+	var examples := HBoxContainer.new()
+	examples.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	examples.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	examples.add_theme_constant_override("separation", 0)
+	strip.add_child(examples)
+
+	for sample_text in _currency_format_samples(mode):
+		var example := Label.new()
+		example.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		example.text = sample_text
+		example.clip_text = true
+		example.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		example.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		example.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		example.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
+		example.add_theme_color_override("font_color", UiPalette.NAVY)
+		examples.add_child(example)
 
 	_currency_format_rows.append(row)
 	_currency_format_markers.append(marker)
@@ -2582,20 +2643,24 @@ func _on_currency_format_selected(mode: int) -> void:
 	_shown_lifetime_earned = -1
 
 
-## The sample value as `mode` would render it — e.g. "$4.2 Qad" / "$4.2 ao" / "$4.2e45" — always
-## produced by Money itself, so no row's example can drift from real output.
+## The three sample values as `mode` would render them — e.g. ["$250", "$4.2 M", "$4.2 Qa"] —
+## always produced by Money itself, so no row's examples can drift from real output.
 ##
-## Money.format_mode is a STATIC shared by the whole game, so rendering a sample in a mode the
-## player has NOT selected means borrowing it for one call. The restore is guaranteed structurally:
-## this function is straight-line — no branch, no loop, no early return, and nothing between the
-## two assignments but one pure formatter call — so there is no path that reaches the end without
-## putting the previous mode back. Deliberately the ONLY place that touches the static this way.
-func _currency_format_sample(mode: int) -> String:
+## Money.format_mode is a STATIC shared by the whole game, so rendering samples in a mode the
+## player has NOT selected means borrowing it. The restore is guaranteed structurally: this
+## function is straight-line — no branch, NO LOOP, no early return, and nothing between the two
+## assignments but three pure formatter calls — so there is no path that reaches the end without
+## putting the previous mode back. The three values are formatted by hand rather than in a loop
+## precisely to keep that property obvious; if the static leaked, every number in the game would
+## silently reformat. Deliberately the ONLY place that touches the static this way.
+func _currency_format_samples(mode: int) -> Array[String]:
 	var previous_mode: int = Money.format_mode
 	Money.format_mode = mode
-	var sample := Money.of(CURRENCY_FORMAT_SAMPLE).display_cash()
+	var hundreds := Money.of(CURRENCY_FORMAT_SAMPLES[0]).display_cash()
+	var millions := Money.of(CURRENCY_FORMAT_SAMPLES[1]).display_cash()
+	var quadrillions := Money.of(CURRENCY_FORMAT_SAMPLES[2]).display_cash()
 	Money.format_mode = previous_mode
-	return sample
+	return [hundreds, millions, quadrillions]
 
 
 func _currency_format_name(mode: int) -> String:

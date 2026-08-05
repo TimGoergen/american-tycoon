@@ -155,6 +155,8 @@ var _tab_icon_tween: Array = []     # the in-flight fade Tween per tab (killed o
 var _active_tab: int = TAB_PROPERTY
 var _minigame_check: CheckBox  # the Settings-tab "play the minigame" toggle
 var _tutorial_check: CheckBox  # the Settings-tab "show tutorial tips" toggle
+## The Settings-tab number-format cycler (ABBREVIATED -> ALPHABET -> SCIENTIFIC).
+var _currency_format_button: Button
 ## The Settings tab's normal page — hidden while the embedded Balance Tuning panel
 ## (_dev_panel) is swapped into the tab's slot, restored on its Close.
 var _settings_page: Control
@@ -475,6 +477,11 @@ func _create_game() -> void:
 
 	# Restore the saved buy-mode preference (defaults to ×1 for a fresh game).
 	_buy_mode = game.ui_buy_mode as PropertyRow.BuyMode
+
+	# Restore the saved number-format preference the same way, and push it into the formatter
+	# BEFORE any screen is built — Money.format_mode is a static every readout reads, so setting
+	# it here means the very first frame already renders in the chosen format.
+	Money.format_mode = game.ui_currency_format
 
 
 ## Wall-clock seconds since the save was written. The dynastic save nests the
@@ -1443,6 +1450,30 @@ func _build_settings_tab() -> Control:
 	_tutorial_check.toggled.connect(func(on: bool) -> void: TutorialProgress.set_enabled(on))
 	v.add_child(_tutorial_check)
 
+	# Number format (Plans/Currency_Format_Setting.md): a cycling button, because three modes
+	# don't fit a checkbox. A static heading carries the wording so the button itself only has to
+	# hold the mode name plus a live sample — the names alone teach nothing, so the sample is what
+	# actually shows the player what they are choosing.
+	var format_heading := Label.new()
+	format_heading.text = "Number format"
+	format_heading.add_theme_font_size_override("font_size", 45)  # matches the toggles above
+	format_heading.add_theme_color_override("font_color", UiPalette.NAVY)
+	v.add_child(format_heading)
+
+	_currency_format_button = Button.new()
+	# NO-REFLOW (standing rule): the caption changes length as the modes cycle, so the button is
+	# pinned to the full panel width and a fixed height, and clips rather than growing. Nothing in
+	# the tab can shift when the setting is pressed.
+	_currency_format_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_currency_format_button.custom_minimum_size = Vector2(0, UiPalette.STANDARD_BUTTON_HEIGHT)
+	_currency_format_button.clip_text = true
+	_currency_format_button.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
+	_currency_format_button.add_theme_font_override("font", UiPalette.make_bold_font())
+	UiPalette.style_button(_currency_format_button, false)
+	_currency_format_button.text = _currency_format_caption()
+	_currency_format_button.pressed.connect(_on_currency_format_pressed)
+	v.add_child(_currency_format_button)
+
 	# A spacer pushes the two tuning buttons to the bottom of the panel, clear of the options above.
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -1678,6 +1709,10 @@ func _show_tab(index: int) -> void:
 		_minigame_check.button_pressed = game.ui_minigame_enabled
 		if _tutorial_check != null:
 			_tutorial_check.button_pressed = TutorialProgress.is_enabled()
+		# Resync the number-format caption + sample on entry, the same way the toggles above
+		# resync — so it can never show a mode the formatter isn't actually in.
+		if _currency_format_button != null:
+			_currency_format_button.text = _currency_format_caption()
 
 
 ## The active tab button reads as a mustard plate; the rest as plain cream plates. The
@@ -2434,6 +2469,48 @@ func _buy_mode_caption(mode: PropertyRow.BuyMode) -> String:
 		PropertyRow.BuyMode.MAX:
 			return "MAX"
 	return "×1"
+
+
+## The value shown as the live sample beside the number-format setting. Deliberately DEEP
+## ($4.2 quattuordecillion, ~epoch 12+): down here the abbreviated suffix ("Qad") is the
+## opaque one the setting exists to escape, so the three samples actually read differently.
+const CURRENCY_FORMAT_SAMPLE := 4.2e45
+
+
+## Cycle the number format: ABBREVIATED -> ALPHABET -> SCIENTIFIC -> back.
+## Presentation only — nothing but the formatting of already-computed numbers changes.
+func _on_currency_format_pressed() -> void:
+	var next_mode: int = (Money.format_mode + 1) % Money.Format.size()
+	Money.format_mode = next_mode
+	game.ui_currency_format = next_mode  # persisted on the next autosave / on background
+	_currency_format_button.text = _currency_format_caption()
+
+	# REPAINT. Nearly every number on screen is rebuilt from live state each frame (the property
+	# rows, the hero cash/income, the wage panel) or on tab entry (Estate, Family Ledger — see
+	# _show_tab), so they pick the new format up on their own. The ONE exception is the
+	# lifetime-earned line, which is only repainted when its value changes; clearing the cache
+	# forces _update_plan_button to rebuild it on the next frame instead of leaving it stale.
+	_shown_lifetime_earned = -1
+
+
+## "ABBREVIATED   $4.2 Qad" — the mode name plus a live sample formatted through Money itself,
+## so the example on the button can never disagree with what the game actually prints.
+func _currency_format_caption() -> String:
+	return "%s   %s" % [
+		_currency_format_name(Money.format_mode),
+		Money.of(CURRENCY_FORMAT_SAMPLE).display_cash(),
+	]
+
+
+func _currency_format_name(mode: int) -> String:
+	match mode:
+		Money.Format.ABBREVIATED:
+			return "ABBREVIATED"
+		Money.Format.ALPHABET:
+			return "ALPHABET"
+		Money.Format.SCIENTIFIC:
+			return "SCIENTIFIC"
+	return "ABBREVIATED"
 
 
 # ---------------------------------------------------------------------------

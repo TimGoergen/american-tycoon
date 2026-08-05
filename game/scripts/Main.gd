@@ -155,8 +155,13 @@ var _tab_icon_tween: Array = []     # the in-flight fade Tween per tab (killed o
 var _active_tab: int = TAB_PROPERTY
 var _minigame_check: CheckBox  # the Settings-tab "play the minigame" toggle
 var _tutorial_check: CheckBox  # the Settings-tab "show tutorial tips" toggle
-## The Settings-tab number-format cycler (ABBREVIATED -> ALPHABET -> SCIENTIFIC).
-var _currency_format_button: Button
+## The Settings tab's three number-format rows, INDEXED BY Money.Format (so
+## _currency_format_rows[Money.Format.ALPHABET] is the ALPHABET row). One always-visible row
+## per mode; the active one is restyled, never hidden or moved.
+var _currency_format_rows: Array[Button] = []
+## The fixed-width "●" marker Label at the left of each row above, same indexing. Its glyph is
+## the non-color half of the active cue; the width is fixed so the mode name never shifts.
+var _currency_format_markers: Array[Label] = []
 ## The Settings tab's normal page — hidden while the embedded Balance Tuning panel
 ## (_dev_panel) is swapped into the tab's slot, restored on its Close.
 var _settings_page: Control
@@ -1450,29 +1455,27 @@ func _build_settings_tab() -> Control:
 	_tutorial_check.toggled.connect(func(on: bool) -> void: TutorialProgress.set_enabled(on))
 	v.add_child(_tutorial_check)
 
-	# Number format (Plans/Currency_Format_Setting.md): a cycling button, because three modes
-	# don't fit a checkbox. A static heading carries the wording so the button itself only has to
-	# hold the mode name plus a live sample — the names alone teach nothing, so the sample is what
-	# actually shows the player what they are choosing.
+	# Number format (Plans/Currency_Format_Setting.md): THREE always-visible rows, one per mode,
+	# rather than one cycling button. Tim, 2026-08-05: "I don't like having a single button that is
+	# not clear what will happen when you click it." A cycler hides its own behaviour — you cannot
+	# see what you are about to get until you have already changed it. Three rows show every
+	# option, each with a live example of that mode's output, and tapping one selects it directly.
 	var format_heading := Label.new()
 	format_heading.text = "Number format"
 	format_heading.add_theme_font_size_override("font_size", 45)  # matches the toggles above
 	format_heading.add_theme_color_override("font_color", UiPalette.NAVY)
 	v.add_child(format_heading)
 
-	_currency_format_button = Button.new()
-	# NO-REFLOW (standing rule): the caption changes length as the modes cycle, so the button is
-	# pinned to the full panel width and a fixed height, and clips rather than growing. Nothing in
-	# the tab can shift when the setting is pressed.
-	_currency_format_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_currency_format_button.custom_minimum_size = Vector2(0, UiPalette.STANDARD_BUTTON_HEIGHT)
-	_currency_format_button.clip_text = true
-	_currency_format_button.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
-	_currency_format_button.add_theme_font_override("font", UiPalette.make_bold_font())
-	UiPalette.style_button(_currency_format_button, false)
-	_currency_format_button.text = _currency_format_caption()
-	_currency_format_button.pressed.connect(_on_currency_format_pressed)
-	v.add_child(_currency_format_button)
+	var format_rows := VBoxContainer.new()
+	format_rows.add_theme_constant_override("separation", 12)
+	v.add_child(format_rows)
+
+	_currency_format_rows = []
+	_currency_format_markers = []
+	for mode in Money.Format.size():
+		var row := _build_currency_format_row(mode)
+		format_rows.add_child(row)
+	_style_currency_format_rows()
 
 	# A spacer pushes the two tuning buttons to the bottom of the panel, clear of the options above.
 	var spacer := Control.new()
@@ -1709,10 +1712,10 @@ func _show_tab(index: int) -> void:
 		_minigame_check.button_pressed = game.ui_minigame_enabled
 		if _tutorial_check != null:
 			_tutorial_check.button_pressed = TutorialProgress.is_enabled()
-		# Resync the number-format caption + sample on entry, the same way the toggles above
-		# resync — so it can never show a mode the formatter isn't actually in.
-		if _currency_format_button != null:
-			_currency_format_button.text = _currency_format_caption()
+		# Resync which number-format row is marked active on entry, the same way the toggles above
+		# resync — so it can never mark a mode the formatter isn't actually in.
+		if not _currency_format_rows.is_empty():
+			_style_currency_format_rows()
 
 
 ## The active tab button reads as a mustard plate; the rest as plain cream plates. The
@@ -2477,13 +2480,99 @@ func _buy_mode_caption(mode: PropertyRow.BuyMode) -> String:
 const CURRENCY_FORMAT_SAMPLE := 4.2e45
 
 
-## Cycle the number format: ABBREVIATED -> ALPHABET -> SCIENTIFIC -> back.
+## Build one number-format row: a full-width plate carrying an active marker, the mode's name,
+## and a live example of THAT mode's output. Registers itself in _currency_format_rows /
+## _currency_format_markers at index `mode`, so the restyler can find it by mode later.
+##
+## The row is a Button used purely as the plate; its own `text` stays empty and the three pieces
+## of content are Labels anchored inside it. That is what makes the row un-resizable: a Button
+## sizes itself to its own text, and an anchored (non-container-managed) child cannot push on
+## its parent — so SCIENTIFIC's shorter example and ALPHABET's longer one all yield the exact
+## same row box. Standing no-moving-UI rule: nothing here hides, resizes, or reflows on select.
+func _build_currency_format_row(mode: int) -> Button:
+	var row := Button.new()
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.custom_minimum_size = Vector2(0, UiPalette.STANDARD_BUTTON_HEIGHT)
+	row.pressed.connect(_on_currency_format_selected.bind(mode))
+
+	# One horizontal strip pinned to the row's full rect, inset so the text clears the plate's
+	# border. MOUSE_FILTER_IGNORE throughout so taps land on the Button underneath, not the Labels.
+	var content := MarginContainer.new()
+	content.set_anchors_preset(Control.PRESET_FULL_RECT)
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for side in ["margin_left", "margin_right"]:
+		content.add_theme_constant_override(side, 24)
+	row.add_child(content)
+
+	var strip := HBoxContainer.new()
+	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	strip.add_theme_constant_override("separation", 16)
+	content.add_child(strip)
+
+	# Marker column: fixed width, so the mode name sits at the same x on every row whether or not
+	# that row is the active one. (An inline bullet in the name would shift the text instead.)
+	var marker := Label.new()
+	marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	marker.custom_minimum_size = Vector2(36, 0)
+	marker.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	marker.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
+	strip.add_child(marker)
+
+	var name_label := Label.new()
+	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	name_label.text = _currency_format_name(mode)
+	name_label.clip_text = true
+	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	name_label.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
+	name_label.add_theme_font_override("font", UiPalette.make_bold_font())
+	name_label.add_theme_color_override("font_color", UiPalette.NAVY)
+	strip.add_child(name_label)
+
+	# The example, right-aligned and given all the leftover width. It is rendered through Money in
+	# THIS row's mode (see _currency_format_sample), so it can never disagree with what the game
+	# actually prints. clip_text keeps a long example from claiming more width than the row has.
+	var example := Label.new()
+	example.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	example.text = _currency_format_sample(mode)
+	example.clip_text = true
+	example.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	example.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	example.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	example.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
+	example.add_theme_color_override("font_color", UiPalette.NAVY)
+	strip.add_child(example)
+
+	_currency_format_rows.append(row)
+	_currency_format_markers.append(marker)
+	return row
+
+
+## Mark whichever row matches Money.format_mode as the active one, and the other two as
+## selectable-but-not-current. This reuses the tab bar's "you are here" language (_style_tab_button
+## above): the active plate is MUSTARD_GOLD, the inactive plates are CREAM, both with the same navy
+## border — plus a "●" marker so the cue is not carried by color alone (Tim's eyesight).
+func _style_currency_format_rows() -> void:
+	for mode in _currency_format_rows.size():
+		var row: Button = _currency_format_rows[mode]
+		var active: bool = (mode == Money.format_mode)
+		var plate := StyleBoxFlat.new()
+		plate.bg_color = UiPalette.MUSTARD_GOLD if active else UiPalette.CREAM
+		plate.border_color = UiPalette.NAVY
+		plate.set_border_width_all(6 if active else 3)
+		plate.set_corner_radius_all(8)
+		# One plate for every interactive state: the row must not flash a different color on
+		# hover/press, which would read as "this is now selected" before it actually is.
+		for state in ["normal", "hover", "pressed", "focus"]:
+			row.add_theme_stylebox_override(state, plate)
+		(_currency_format_markers[mode] as Label).text = "●" if active else ""
+
+
+## Select a number format outright (no cycling — each row picks its own mode).
 ## Presentation only — nothing but the formatting of already-computed numbers changes.
-func _on_currency_format_pressed() -> void:
-	var next_mode: int = (Money.format_mode + 1) % Money.Format.size()
-	Money.format_mode = next_mode
-	game.ui_currency_format = next_mode  # persisted on the next autosave / on background
-	_currency_format_button.text = _currency_format_caption()
+func _on_currency_format_selected(mode: int) -> void:
+	Money.format_mode = mode
+	game.ui_currency_format = mode  # persisted on the next autosave / on background
+	_style_currency_format_rows()
 
 	# REPAINT. Nearly every number on screen is rebuilt from live state each frame (the property
 	# rows, the hero cash/income, the wage panel) or on tab entry (Estate, Family Ledger — see
@@ -2493,13 +2582,20 @@ func _on_currency_format_pressed() -> void:
 	_shown_lifetime_earned = -1
 
 
-## "ABBREVIATED   $4.2 Qad" — the mode name plus a live sample formatted through Money itself,
-## so the example on the button can never disagree with what the game actually prints.
-func _currency_format_caption() -> String:
-	return "%s   %s" % [
-		_currency_format_name(Money.format_mode),
-		Money.of(CURRENCY_FORMAT_SAMPLE).display_cash(),
-	]
+## The sample value as `mode` would render it — e.g. "$4.2 Qad" / "$4.2 ao" / "$4.2e45" — always
+## produced by Money itself, so no row's example can drift from real output.
+##
+## Money.format_mode is a STATIC shared by the whole game, so rendering a sample in a mode the
+## player has NOT selected means borrowing it for one call. The restore is guaranteed structurally:
+## this function is straight-line — no branch, no loop, no early return, and nothing between the
+## two assignments but one pure formatter call — so there is no path that reaches the end without
+## putting the previous mode back. Deliberately the ONLY place that touches the static this way.
+func _currency_format_sample(mode: int) -> String:
+	var previous_mode: int = Money.format_mode
+	Money.format_mode = mode
+	var sample := Money.of(CURRENCY_FORMAT_SAMPLE).display_cash()
+	Money.format_mode = previous_mode
+	return sample
 
 
 func _currency_format_name(mode: int) -> String:

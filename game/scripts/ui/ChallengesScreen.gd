@@ -18,6 +18,10 @@ extends ColorRect
 # it up to Main (which holds the dynasty, credits the tier, saves, and hands feedback back via
 # show_challenge_credit). All display numbers are read LIVE from the dynasty + ChallengeGoals on every
 # open() and after every credited run, so returning from a run shows the new tier at once.
+#
+# Only games the bloodline has actually MET at a transition can be played here (Plans/
+# Challenge_Mode_Gating.md Part B). A game you have not met still gets its row — grayed in place,
+# with the reason on it — so the list keeps reading as a trophy case rather than a shrinking menu.
 
 ## Emitted when the player closes the whole screen (◀ BACK). Main hides it (the game runs behind it).
 signal closed
@@ -50,6 +54,24 @@ const PANEL_GREEN_PRESSED := Color("#33702C")
 const PANEL_BORDER_WIDTH := 8
 const PANEL_CORNER_RADIUS := 26
 
+## The LOCKED plate (a game the bloodline has not met yet). Same shape as the live plate — same
+## corner radius, same border width — so only the COLOUR changes and the row keeps its place in the
+## list. The colours are the project's standing locked-control language, borrowed from the locked
+## tab treatment in Main.gd (LIGHT_GRAY fill, MID_GRAY border), so a locked challenge reads the same
+## way a locked tab does. A disabled Button draws ONLY its `disabled` stylebox, so without this the
+## panel would keep the live green plate while refusing taps — an unresponsive live-looking control,
+## which reads as a bug.
+const PANEL_LOCKED_FILL := UiPalette.LIGHT_GRAY
+const PANEL_LOCKED_BORDER := UiPalette.MID_GRAY
+
+## The reason shown on a locked row's third text line. Kept at body size (not fine print) — see
+## _make_game_panel for the height arithmetic that proves three lines still fit the 180px row.
+const LOCKED_REASON_TEXT := "MEET THIS GAME AT A TRANSITION"
+
+## How far a locked game's icon fades toward its gray plate. The Button's disabled state dims only
+## the Button's OWN icon/text; our icon is a separate child TextureRect, so it must be dimmed here.
+const LOCKED_ICON_ALPHA := 0.45
+
 ## Inner padding between the gold border and the panel content, so nothing touches the outline.
 const CONTENT_PAD_SIDE := 34
 const CONTENT_PAD_VERTICAL := 22
@@ -62,6 +84,11 @@ var _dynasty: DynastyState
 ## matched to its ChallengeGoals key by the type's display_name() — the same string ChallengeGoals
 ## and DynastyState key challenges by.
 var _type_scripts: Array = []
+
+## The balance-tuning knobs, kept so the list can read the `challenge_show_all_games` dev override
+## (see _show_all_games_override). Threaded in from Main via setup, like _dynasty. May be null if
+## anything ever builds this screen without calling setup, so every read goes through the helper.
+var _tuning: TuningConfig
 
 ## Our own minigame host for challenge play (mirrors MinigameReviewScreen's _player) — added as a
 ## child so a run never interferes with Main's prestige host. Built in setup (it needs the tuning).
@@ -92,6 +119,7 @@ var _list_view: Control
 func setup(dynasty: DynastyState, type_scripts: Array, tuning: TuningConfig) -> void:
 	_dynasty = dynasty
 	_type_scripts = type_scripts
+	_tuning = tuning
 
 	# Our own minigame host, set up exactly like MinigameReviewScreen's. Whether it lands above or
 	# below the backdrop/card depends on setup-vs-_ready ordering, so we swap by visibility, not z-order.
@@ -298,6 +326,13 @@ func _make_game_panel(game_key: String, type_script: Script) -> Control:
 	var cleared_tier := int(_dynasty.challenge_highest_tiers.get(game_key, 0))
 	var tier_text := "MAX TIER" if cleared_tier >= ChallengeGoals.MAX_TIER else "TIER %d" % cleared_tier
 
+	# Only games the bloodline has actually MET at a transition are playable here (Plans/
+	# Challenge_Mode_Gating.md Part B). An unmet game is never hidden — it stays in place, grayed,
+	# with the reason on its own line — so the list still reads as a trophy case of what is left to
+	# find. The dev override unlocks the ROW ONLY; it deliberately writes nothing back (see
+	# _show_all_games_override).
+	var locked := not _show_all_games_override() and not _dynasty.has_met_minigame(game_key)
+
 	# The whole panel is one Button (Tim, 2026-07-22 — no separate PLAY). Its content is overlaid as
 	# mouse-ignoring children so every tap on the panel lands on the button.
 	var panel := Button.new()
@@ -307,9 +342,14 @@ func _make_game_panel(game_key: String, type_script: Script) -> Control:
 	panel.add_theme_stylebox_override("normal", _make_plate_style(false))
 	panel.add_theme_stylebox_override("hover", _make_plate_style(false))
 	panel.add_theme_stylebox_override("focus", _make_plate_style(false))
-	panel.add_theme_stylebox_override("disabled", _make_plate_style(false))
+	panel.add_theme_stylebox_override("disabled", _make_locked_plate_style())
 	panel.add_theme_stylebox_override("pressed", _make_plate_style(true))  # a touch darker on press
-	panel.pressed.connect(_on_play_pressed.bind(type_script))
+	# Two independent locks, because one unresponsive-but-live-looking panel is worse than none:
+	# `disabled` stops the Button emitting `pressed` at all, and a locked row never connects the
+	# handler in the first place. (`_on_play_pressed` has exactly one caller — this line.)
+	panel.disabled = locked
+	if not locked:
+		panel.pressed.connect(_on_play_pressed.bind(type_script))
 
 	# Content overlay: a full-rect margin (clearing the gold frame) holding the icon + text row. All
 	# of it ignores the mouse so the underlying button receives every tap.
@@ -335,20 +375,43 @@ func _make_game_panel(game_key: String, type_script: Script) -> Control:
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if locked:
+		icon.modulate.a = LOCKED_ICON_ALPHA
 	row.add_child(icon)
 
 	# Right: name, cleared tier + earned contribution, and the next goal. In its own EXPAND_FILL column
 	# so the text fills the panel width beside the icon. Colors are cream/gold with a dark outline so
 	# they read over the green plate (Tim, 2026-07-22 contrast).
+	# A locked row carries a third line, so its lines sit 4px apart instead of 6 to keep the column
+	# comfortably inside the plate. The height arithmetic, using this project's font (measured line
+	# boxes: 57px at FONT_SUBHEAD 41, 45px at FONT_BODY 32):
+	#   unlocked, 2 lines: 57 + 45 + 6        = 108px
+	#   locked,   3 lines: 57 + 45 + 45 + 4+4 = 155px
+	# Both fit the 164px of clear plate inside the 8px border, so the third line never reaches the
+	# frame. The ROW height itself cannot move either way: it is pinned by the Button's
+	# custom_minimum_size of PANEL_HEIGHT, and a Button is not a Container — these overlay children
+	# are positioned by anchors and contribute nothing to the Button's minimum size.
 	var info := VBoxContainer.new()
-	info.add_theme_constant_override("separation", 6)
+	info.add_theme_constant_override("separation", 4 if locked else 6)
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	info.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(info)
 
-	info.add_child(_make_info_label(game_key, UiPalette.FONT_SUBHEAD, UiPalette.CREAM, true))
-	info.add_child(_make_info_label(tier_text, UiPalette.FONT_BODY, UiPalette.MUSTARD_GOLD, true))
+	# Text colours flip with the plate: cream/gold outlined in navy reads over the green plate, while
+	# dark navy outlined in cream reads over the pale gray locked plate. Both keep a full-size outline
+	# so the text stays crisp against the plate (low-vision rule).
+	if locked:
+		info.add_child(_make_info_label(
+			game_key, UiPalette.FONT_SUBHEAD, UiPalette.INK_NAVY, true, UiPalette.CREAM))
+		info.add_child(_make_info_label(
+			tier_text, UiPalette.FONT_BODY, UiPalette.NAVY, true, UiPalette.CREAM))
+		# The reason, at full body size — a locked row must say WHY, legibly, not in fine print.
+		info.add_child(_make_info_label(
+			LOCKED_REASON_TEXT, UiPalette.FONT_BODY, UiPalette.INK_NAVY, true, UiPalette.CREAM))
+	else:
+		info.add_child(_make_info_label(game_key, UiPalette.FONT_SUBHEAD, UiPalette.CREAM, true))
+		info.add_child(_make_info_label(tier_text, UiPalette.FONT_BODY, UiPalette.MUSTARD_GOLD, true))
 
 	return panel
 
@@ -362,6 +425,34 @@ func _make_plate_style(pressed: bool) -> StyleBoxFlat:
 	style.set_border_width_all(PANEL_BORDER_WIDTH)
 	style.border_color = UiPalette.MUSTARD_GOLD
 	return style
+
+
+## The LOCKED panel look, drawn for a game the bloodline has not met. Built by copying the live plate
+## and recolouring it, so the two can never drift apart in shape — identical corner radius and border
+## width, gray fill and gray border instead of green and gold. Same duplicate-and-recolour idiom the
+## locked tabs use (Main.gd).
+func _make_locked_plate_style() -> StyleBoxFlat:
+	var style := _make_plate_style(false)
+	style.bg_color = PANEL_LOCKED_FILL
+	style.border_color = PANEL_LOCKED_BORDER
+	return style
+
+
+## The developer's "show every game" knob from Balance Tuning, a 0/1 float read as `> 0.5` (the house
+## idiom for a boolean knob — see PropertyRow.gd). It exists because with six games dealt at random,
+## testing one specific game would otherwise mean replaying transitions until it comes up.
+##
+## THIS IS A DISPLAY OVERRIDE ONLY. It unlocks the ROWS on this screen and nothing else: it must never
+## cause a game to be recorded as met, or one testing session would permanently unlock everything and
+## the gate could never be seen again. This screen only ever READS the encounter set, so please keep
+## it that way — do not add a write here.
+##
+## _tuning is null if the screen was somehow built without setup(), in which case there is no knob to
+## read and the honest answer is "no override".
+func _show_all_games_override() -> bool:
+	if _tuning == null:
+		return false
+	return _tuning.challenge_show_all_games > 0.5
 
 
 ## Map a game's display_name() key to its Challenge icon. Basketball and Match Three reuse the games'
@@ -392,15 +483,22 @@ func _update_edge_fade() -> void:
 	ScrollEdgeArrows.apply_edge_fade(_scroll, _rows_column.get_children())
 
 
-## One text line inside a game panel. `emphasize` faux-bolds it (used for the game name). A dark navy
-## outline is always applied so the light text reads over the patterned green plate (low-vision rule).
-func _make_info_label(text: String, font_size: int, color: Color, emphasize: bool) -> Label:
+## One text line inside a game panel. `emphasize` faux-bolds it (used for the game name). An outline is
+## always applied so the text reads over the plate behind it (low-vision rule); it defaults to dark navy
+## for the light text on the green plate, and a locked row passes CREAM instead for its dark text on the
+## pale gray plate.
+func _make_info_label(
+		text: String,
+		font_size: int,
+		color: Color,
+		emphasize: bool,
+		outline_color: Color = UiPalette.INK_NAVY) -> Label:
 	var label := Label.new()
 	label.text = text
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.add_theme_font_size_override("font_size", font_size)
 	label.add_theme_color_override("font_color", color)
-	label.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
+	label.add_theme_color_override("font_outline_color", outline_color)
 	label.add_theme_constant_override("outline_size", 5)
 	if emphasize:
 		label.add_theme_font_override("font", UiPalette.make_bold_font())

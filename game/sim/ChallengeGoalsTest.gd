@@ -24,6 +24,12 @@ extends SceneTree
 #      raise-only (a worse/short run changes nothing).
 #   7. The GOTCHA: ChallengeGoals is configured from the TUNING fields, and DynastyState re-pushes that
 #      config on construction — so poking the static then building a dynasty is overwritten.
+#   8. DynastyState.met_minigames (the CHALLENGES encounter gate, Plans/Challenge_Mode_Gating.md):
+#      a fresh bloodline has met nothing; note_minigame_met is idempotent; the set round-trips through
+#      save/load into a dictionary the loaded dynasty OWNS; the load's absent-vs-present-and-empty
+#      branch behaves (absent seeds from challenge_highest_tiers, present-and-empty stays empty); the
+#      set survives a real succession; and the key vocabulary agrees across ChallengeGoals.GAME_KEYS
+#      and MinigameScreen.MINIGAME_TYPES' display_name()s.
 #
 # Exits 0 only if every check passes (1 otherwise), so headless/CI runs fail loudly.
 
@@ -47,6 +53,8 @@ func _initialize() -> void:
 	_test_both_tracks_fold_once(tuning)
 	_test_credit_challenge_score(tuning)
 	_test_configure_from_tuning_gotcha(tuning)
+	_test_met_minigames(tuning)
+	_test_met_minigame_key_vocabulary()
 
 	print("")
 	if _failures == 0:
@@ -499,3 +507,150 @@ func _test_configure_from_tuning_gotcha(tuning: TuningConfig) -> void:
 		is_equal_approx(ChallengeGoals.timer_cap_seconds(), 12.0))
 	_check("building a dynasty overwrote the static miss_penalty_ratio from tuning",
 		is_equal_approx(ChallengeGoals.miss_penalty_ratio(), 0.6))
+
+
+# ---------------------------------------------------------------------------
+# 8. DynastyState.met_minigames — the CHALLENGES encounter gate
+#    (Plans/Challenge_Mode_Gating.md, Part B)
+# ---------------------------------------------------------------------------
+func _test_met_minigames(tuning: TuningConfig) -> void:
+	print("-- met_minigames: fresh/idempotent/round-trip/old-save seeding/survives succession --")
+	var props := ConfigLoader.load_property_configs()
+
+	# --- A fresh bloodline has met NOTHING: every game reads locked. ---
+	var dynasty := DynastyState.new(props, tuning)
+	_check("a fresh bloodline's met_minigames is empty", dynasty.met_minigames.is_empty())
+	var all_unmet := true
+	for game_key in ChallengeGoals.GAME_KEYS:
+		if dynasty.has_met_minigame(game_key):
+			all_unmet = false
+	_check("has_met_minigame is false for every game key on a fresh bloodline", all_unmet)
+
+	# --- note_minigame_met is IDEMPOTENT: it is a set, so a second mark adds nothing. ---
+	dynasty.note_minigame_met(ChallengeGoals.TIMING_BAR)
+	dynasty.note_minigame_met(ChallengeGoals.TIMING_BAR)
+	_check("marking the same game twice leaves exactly one entry", dynasty.met_minigames.size() == 1)
+	_check("has_met_minigame agrees after a mark", dynasty.has_met_minigame(ChallengeGoals.TIMING_BAR))
+	_check("an unmarked game is still unmet", not dynasty.has_met_minigame(ChallengeGoals.MATCH_THREE))
+
+	dynasty.note_minigame_met(ChallengeGoals.BASKETBALL)
+	_check("a second distinct game adds a second entry", dynasty.met_minigames.size() == 2)
+
+	# --- Save/load round-trip preserves the set EXACTLY, and the loaded dynasty owns its own copy. ---
+	var saved := dynasty.to_save_dict()
+	var reborn := DynastyState.new(props, tuning)
+	reborn.load_save_dict(saved)
+	_check("met_minigames survives a save/load round-trip exactly",
+		reborn.met_minigames.size() == 2
+		and reborn.has_met_minigame(ChallengeGoals.TIMING_BAR)
+		and reborn.has_met_minigame(ChallengeGoals.BASKETBALL))
+
+	# The house rule at the load site: the loaded dynasty must own its OWN dictionary, not the save's.
+	# Marking a game on the reborn dynasty must NOT write through into the dict it loaded from — if it
+	# did, one live dynasty could silently rewrite another's (or a still-held) save.
+	reborn.note_minigame_met(ChallengeGoals.MATCH_THREE)
+	_check("mutating the loaded dynasty does NOT write through into the save dict it came from",
+		not (saved["met_minigames"] as Dictionary).has(ChallengeGoals.MATCH_THREE))
+
+	# --- OLD SAVE, key ABSENT, tiers PRESENT: seed from challenge_highest_tiers. ---
+	# A banked cleared tier proves the game was played, so an existing player must not open CHALLENGES
+	# and find everything locked. This is the whole point of the has()-not-get() branch at the load site.
+	var old_save := dynasty.to_save_dict()
+	old_save.erase("met_minigames")
+	old_save["challenge_highest_tiers"] = {
+		ChallengeGoals.MATCH_THREE: 12,
+		ChallengeGoals.CATCH_MONEY: 3,
+	}
+	var seeded := DynastyState.new(props, tuning)
+	seeded.load_save_dict(old_save)
+	_check("an OLD save with no met_minigames key seeds the set from challenge_highest_tiers",
+		seeded.met_minigames.size() == 2
+		and seeded.has_met_minigame(ChallengeGoals.MATCH_THREE)
+		and seeded.has_met_minigame(ChallengeGoals.CATCH_MONEY))
+	_check("seeding marks ONLY the games with banked tiers (a never-played game stays locked)",
+		not seeded.has_met_minigame(ChallengeGoals.TIMING_BAR))
+
+	# --- OLD SAVE, key ABSENT, NO tiers: a genuinely new bloodline seeds to EMPTY. ---
+	var brand_new_save := dynasty.to_save_dict()
+	brand_new_save.erase("met_minigames")
+	brand_new_save["challenge_highest_tiers"] = {}
+	var unseeded := DynastyState.new(props, tuning)
+	unseeded.load_save_dict(brand_new_save)
+	_check("an OLD save with no tiers either seeds to an empty set (a genuinely new bloodline)",
+		unseeded.met_minigames.is_empty())
+
+	# --- KEY PRESENT AND EMPTY: stays empty EVEN WITH tiers banked. ---
+	# THE REGRESSION CANARY. If the load site is ever "simplified" to data.get("met_minigames", {}),
+	# absent and present-and-empty collapse into the same branch and this stored empty set would be
+	# re-seeded from the tiers — silently un-locking games the player has not met. This check bites.
+	var explicit_empty_save := dynasty.to_save_dict()
+	explicit_empty_save["met_minigames"] = {}
+	explicit_empty_save["challenge_highest_tiers"] = {
+		ChallengeGoals.MATCH_THREE: 12,
+		ChallengeGoals.CATCH_MONEY: 3,
+	}
+	var stays_empty := DynastyState.new(props, tuning)
+	stays_empty.load_save_dict(explicit_empty_save)
+	_check("an EXPLICITLY EMPTY met_minigames stays empty even with tiers banked (no re-seed)",
+		stays_empty.met_minigames.is_empty())
+	_check("that dynasty reports every game unmet despite its banked tiers",
+		not stays_empty.has_met_minigame(ChallengeGoals.MATCH_THREE)
+		and not stays_empty.has_met_minigame(ChallengeGoals.CATCH_MONEY))
+
+	# --- The set is DYNASTY-scoped: a real succession must NOT clear it. ---
+	# Per Roadmap §8, losing met games at prestige while their SCORES stayed on screen "reads as a bug".
+	var heir_line := DynastyState.new(props, tuning)
+	heir_line.note_minigame_met(ChallengeGoals.MEMORY_MATCH)
+	heir_line.note_minigame_met(ChallengeGoals.BALANCE_BOOKS)
+	var generation_before := heir_line.generation
+	heir_line.perform_succession("Retired to Palm Beach", 1.0)
+	_check("perform_succession really did advance the generation (the succession ran)",
+		heir_line.generation == generation_before + 1)
+	_check("met_minigames SURVIVES a succession (dynasty-scoped; prestige must not clear it)",
+		heir_line.met_minigames.size() == 2
+		and heir_line.has_met_minigame(ChallengeGoals.MEMORY_MATCH)
+		and heir_line.has_met_minigame(ChallengeGoals.BALANCE_BOOKS))
+
+
+# ---------------------------------------------------------------------------
+# 8b. The key VOCABULARY: encounters are recorded under display_name() strings, and those must be
+#     exactly the keys the CHALLENGES screen looks up. If the two lists ever drift, a game could be
+#     marked met under a key the screen does not recognise and would stay locked forever.
+# ---------------------------------------------------------------------------
+func _test_met_minigame_key_vocabulary() -> void:
+	print("-- the encounter key vocabulary matches across ChallengeGoals + MinigameScreen --")
+
+	# Read each type's display_name() off a throwaway instance, the same probe pattern
+	# MinigameReviewScreen uses. The probe is never added to the tree, so free() it immediately.
+	var live_names := {}
+	for type_variant in MinigameScreen.MINIGAME_TYPES:
+		var probe := (type_variant as Script).new() as Minigame
+		live_names[probe.display_name()] = true
+		probe.free()
+
+	_check("MINIGAME_TYPES yields one display_name() per game, all distinct",
+		live_names.size() == MinigameScreen.MINIGAME_TYPES.size())
+
+	# Compare as SETS, not lists: GAME_KEYS and MINIGAME_TYPES are both canonical but are deliberately
+	# in different orders (display order vs. deal order), so order must not be asserted.
+	var goal_keys := {}
+	for game_key in ChallengeGoals.GAME_KEYS:
+		goal_keys[game_key] = true
+	_check("ChallengeGoals.GAME_KEYS has no duplicates",
+		goal_keys.size() == ChallengeGoals.GAME_KEYS.size())
+
+	var missing_from_goals: Array = []
+	for name in live_names.keys():
+		if not goal_keys.has(name):
+			missing_from_goals.append(name)
+	var missing_from_types: Array = []
+	for game_key in goal_keys.keys():
+		if not live_names.has(game_key):
+			missing_from_types.append(game_key)
+
+	if not missing_from_goals.is_empty():
+		print("      display_name()s with no ChallengeGoals key: %s" % str(missing_from_goals))
+	if not missing_from_types.is_empty():
+		print("      ChallengeGoals keys no minigame reports: %s" % str(missing_from_types))
+	_check("every live display_name() is a ChallengeGoals.GAME_KEYS entry", missing_from_goals.is_empty())
+	_check("every ChallengeGoals.GAME_KEYS entry is some minigame's display_name()", missing_from_types.is_empty())

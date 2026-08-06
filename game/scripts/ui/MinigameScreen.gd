@@ -36,6 +36,15 @@ signal legacy_bonus_earned(amount: int)
 ## arcade high-score store (ChallengeScores), which _end_challenge still updates directly.
 signal challenge_finished(game_key: String, final_score: int)
 
+## Emitted when a REAL transition round deals a game, carrying that game's key (its display_name()) —
+## the player has now MET it (Roadmap §8, Plans/Challenge_Mode_Gating.md). The host has NO dynasty
+## (same reason challenge_finished exists), so it only reports the encounter; Main marks it on the
+## dynasty via DynastyState.note_minigame_met and saves.
+##
+## Emitted ONLY from start_game's random-deal branch. See the emit site for why that placement gives
+## the required "Challenge Mode must not unlock itself" behaviour for free.
+signal minigame_met(game_key: String)
+
 # The minigame library — the host draws one at random each round so the player doesn't know
 # which they'll get. Add new types here (Phase 2).
 const MINIGAME_TYPES := [
@@ -1228,6 +1237,23 @@ func start_game(
 		_save_last_dealt(type_script)
 	_active_minigame = type_script.new()
 	_active_minigame.set_anchors_preset(Control.PRESET_FULL_RECT)
+
+	# The player has now MET this game (Roadmap §8, Plans/Challenge_Mode_Gating.md). Reported here,
+	# and ONLY here, on purpose — please don't "simplify" this placement away:
+	#   • RANDOM DEALS ONLY. A REVIEW round from the Minigame Tuning screen passes an explicit
+	#     forced_type, so it does not count as an encounter. Only a real transition deals randomly,
+	#     and only that path marks — hence the `forced_type == null` guard.
+	#   • CHALLENGE MODE DOES NOT COME THROUGH HERE AT ALL. It uses the separate start_challenge()
+	#     entry point below, which never marks. So "a game met inside Challenge Mode must not
+	#     circularly unlock itself there" holds by construction, not by a conditional. Do NOT add
+	#     marking to start_challenge.
+	#   • The mark must reach the DYNASTY (dynasty-scoped and permanent), NOT the per-install
+	#     LAST_DEALT_PATH file, which is deliberately a presentation detail. The host has no dynasty
+	#     handle, so it reports upward and Main writes it — the same route challenge_finished takes.
+	# The instance already exists here, so its display_name() is the key with no probe needed.
+	if forced_type == null:
+		minigame_met.emit(_active_minigame.display_name())
+
 	# Tell the type where this round's outcome curve sits (floor + bonus cap) BEFORE it begins, so
 	# a type that aligns its scoring to the shared "full" line (match-3) can read it. See Minigame.
 	_active_minigame.outcome_keep_floor = _tuning.minigame_keep_floor

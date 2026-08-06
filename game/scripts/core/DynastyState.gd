@@ -54,6 +54,16 @@ var lifetime_cash_earned: float = 0.0
 ## display_name() — see ChallengeGoals. Empty for a save that predates Challenge Mode → 0 bonus.
 var challenge_highest_tiers: Dictionary = {}
 
+## Every minigame the bloodline has actually MET at a real transition — a SET, {game_key -> true};
+## the value is never read, only the presence of the key (Roadmap §8, Plans/Challenge_Mode_Gating.md).
+## Challenge Mode lists only games in here, so each new one appears as a small reward in itself.
+## The game_key is a minigame's display_name(), the same key challenge_highest_tiers, ChallengeGoals
+## and ChallengeScores all use — anything else would drift.
+## Dynasty-wide and permanent: it sits in the dynasty save beside challenge_highest_tiers, so
+## prestige does NOT clear it and only wiping the save does. That falls out of the placement for
+## free — there is no reset path to write, and none should be added.
+var met_minigames: Dictionary = {}
+
 ## The deepest VENT TIER the bloodline has ever reached in a single overdrive excursion — an
 ## implicit high score (Plans/Overdrive_Vent_Windows.md, Tim 2026-07-20). A vent tier is the
 ## count of successful vents in one ride; a skilled run dies around tier 8. This is an ALL-TIME
@@ -105,6 +115,19 @@ func get_best_vent_streak() -> int:
 func note_challenge_tier(game_key: String, tier: int) -> void:
 	var previous := int(challenge_highest_tiers.get(game_key, 0))
 	challenge_highest_tiers[game_key] = maxi(previous, tier)
+
+
+## Record that the bloodline has now MET a minigame — it was dealt at a real transition and the
+## player saw it. Idempotent: marking a game already met is a no-op, since this is a set and the
+## stored value is never read. `game_key` is the minigame's display_name() (see ChallengeGoals).
+func note_minigame_met(game_key: String) -> void:
+	met_minigames[game_key] = true
+
+
+## Has the bloodline met this minigame? Challenge Mode uses this to decide whether a game's row is
+## playable or shown locked. `game_key` is the minigame's display_name().
+func has_met_minigame(game_key: String) -> bool:
+	return met_minigames.has(game_key)
 
 
 ## The whole-mode Challenge INCOME bonus in force right now (a fraction; 0.0 when nothing is cleared).
@@ -475,6 +498,7 @@ func to_save_dict() -> Dictionary:
 		"lifetime_cash_earned": lifetime_cash_earned,
 		"best_vent_streak": best_vent_streak,
 		"challenge_highest_tiers": challenge_highest_tiers,
+		"met_minigames": met_minigames,
 		"ancestors": ancestors,
 		"current": current.to_save_dict(),
 	}
@@ -498,6 +522,26 @@ func load_save_dict(data: Dictionary) -> void:
 	# Pre-Challenge-Mode saves have no cleared-tier record; default to empty (→ 0 income bonus).
 	# Duplicate so the loaded dynasty owns its own dictionary, not the save's (like `ancestors`).
 	challenge_highest_tiers = (data.get("challenge_highest_tiers", {}) as Dictionary).duplicate()
+	# The met-minigame set (Plans/Challenge_Mode_Gating.md). No SAVE_VERSION bump: an additive key
+	# that defaults safely needs none (the ui_currency_format precedent, 2026-08-05).
+	#
+	# We test has() rather than reading a {} default, because ABSENT and PRESENT-BUT-EMPTY are two
+	# different states and must not be conflated:
+	#   • ABSENT — a save written before this feature existed. Defaulting it to empty would show
+	#     every game locked to a player who has already met them all, which is the exact failure
+	#     Roadmap §8 rejects elsewhere. So we SEED it from the bloodline's own evidence: the keys of
+	#     challenge_highest_tiers. You cannot have banked a cleared tier in a game without having
+	#     played it, so those games are demonstrably met. (A pre-Challenge-Mode save has no tiers
+	#     either, and correctly seeds to nothing.)
+	#   • PRESENT AND EMPTY — a real, current state: a fresh dynasty that has met nothing yet. It
+	#     must be left empty, never re-seeded.
+	if data.has("met_minigames"):
+		# Duplicate so the loaded dynasty owns its own dictionary, not the save's (like `ancestors`).
+		met_minigames = (data["met_minigames"] as Dictionary).duplicate()
+	else:
+		met_minigames = {}
+		for game_key in challenge_highest_tiers.keys():
+			met_minigames[game_key] = true
 	# Pre-Family-Ledger saves have no ancestor list; default to empty. Duplicate each
 	# entry so the loaded dynasty owns its own dictionaries, not the save's.
 	ancestors = []

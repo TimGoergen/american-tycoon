@@ -165,6 +165,10 @@ var _currency_format_markers: Array[Label] = []
 ## The Settings tab's normal page — hidden while the embedded Balance Tuning panel
 ## (_dev_panel) is swapped into the tab's slot, restored on its Close.
 var _settings_page: Control
+## The Settings tab's CHALLENGES button. Kept as a member so its locked/unlocked state can be
+## refreshed every frame alongside the gated nav tabs — Challenge Mode is unavailable until the
+## first succession (Plans/Challenge_Mode_Gating.md, Roadmap §5).
+var _challenges_button: Button
 
 ## Red-dot badge on the Estate tab button: shown when the current run has earned claimable
 ## Legacy (a succession right now would yield ≥1), and cleared the moment the player opens
@@ -707,6 +711,9 @@ func _build_ui() -> void:
 	_minigame_screen.setup(tuning)
 	_minigame_screen.finished.connect(_on_minigame_finished)
 	_minigame_screen.legacy_bonus_earned.connect(_on_legacy_bonus_earned)
+	# The screen reports which game a REAL transition dealt; the dynasty records it (the host has
+	# no dynasty handle by design — it reports, Main credits, exactly like challenge_finished).
+	_minigame_screen.minigame_met.connect(_on_minigame_met)
 	add_child(_minigame_screen)
 
 	# The Minigame Tuning review screen (Settings): a full-screen list that opens any minigame
@@ -1545,8 +1552,9 @@ func _build_settings_tab() -> Control:
 
 	# Bottom-of-screen tuning buttons: 40% taller than the standard button, with a label
 	# large enough to fill that extra height (Tim, 2026-06-26).
+	# (TUNING_BUTTON_FONT is a class-level const — see next to CHALLENGES_LOCKED_FONT — because the
+	# CHALLENGES button's refresh, outside this function, restores it when the button unlocks.)
 	var tuning_button_height := int(UiPalette.STANDARD_BUTTON_HEIGHT * 1.4)
-	const TUNING_BUTTON_FONT := 50
 	var bottom_buttons := VBoxContainer.new()
 	bottom_buttons.add_theme_constant_override("separation", 16)
 	v.add_child(bottom_buttons)
@@ -1575,10 +1583,17 @@ func _build_settings_tab() -> Control:
 	# your best in each minigame for a permanent global income bonus. This is the real home for
 	# Challenge Mode; the CHALLENGE toggle under Minigame Tuning is now only a developer shortcut.
 	# Stats opens the Statistics modal (Best Vent Streak and other bloodline numbers, Tim 2026-07-20).
+	#
+	# CHALLENGES is gated until the first succession (Roadmap §5): it is kept in place and grayed,
+	# never hidden, with the reason printed on its own second line. _refresh_challenges_button below
+	# keeps that state current.
 	var challenge_stats_row := HBoxContainer.new()
 	challenge_stats_row.add_theme_constant_override("separation", 16)
-	challenge_stats_row.add_child(
-		_make_settings_button("CHALLENGES", tuning_button_height, TUNING_BUTTON_FONT, _on_challenges_pressed))
+	_challenges_button = _make_settings_button(
+		"CHALLENGES", tuning_button_height, TUNING_BUTTON_FONT, _on_challenges_pressed)
+	_style_locked_settings_button(_challenges_button)
+	_refresh_challenges_button()
+	challenge_stats_row.add_child(_challenges_button)
 	challenge_stats_row.add_child(
 		_make_settings_button("STATS", tuning_button_height, TUNING_BUTTON_FONT, _on_stats_pressed))
 	bottom_buttons.add_child(challenge_stats_row)
@@ -1971,6 +1986,43 @@ func _hire_control_of(row: PropertyRow) -> Control:
 func _refresh_locked_tabs() -> void:
 	_tab_buttons[TAB_ESTATE].disabled = not _estate_unlocked()
 	_tab_buttons[TAB_LEDGER].disabled = not _ledger_unlocked()
+	_refresh_challenges_button()
+
+
+## Font size (px) of the tall bottom-of-Settings entry buttons (BALANCE TUNING, CHALLENGES, HELP …),
+## large enough to fill their 40%-taller plate (Tim, 2026-06-26).
+const TUNING_BUTTON_FONT := 50
+
+## Font size (px) of the CHALLENGES button's label while it is LOCKED. Smaller than the unlocked
+## TUNING_BUTTON_FONT because the locked label is two lines: at the full size the pair would not
+## fit the button's fixed height and would grow the row, pushing the settings page's lower
+## content off the bottom (the tab is a plain VBox with no scroll).
+const CHALLENGES_LOCKED_FONT := 32
+
+
+## Keep the Settings tab's CHALLENGES button matching its unlock state. Challenge Mode opens only
+## after the first succession (Roadmap §5) — the same signal the Family Ledger tab uses. Per the
+## no-moving-UI rule the button stays exactly where it is and grays in place, printing the reason
+## on a second line so it never depends on a tooltip (invisible on touch).
+func _refresh_challenges_button() -> void:
+	if _challenges_button == null:
+		return
+	var unlocked := _ledger_unlocked()
+	_challenges_button.disabled = not unlocked
+	if unlocked:
+		_challenges_button.text = "CHALLENGES"
+		_challenges_button.add_theme_font_size_override("font_size", TUNING_BUTTON_FONT)
+	else:
+		_challenges_button.text = "CHALLENGES\nAFTER YOUR FIRST SUCCESSION"
+		_challenges_button.add_theme_font_size_override("font_size", CHALLENGES_LOCKED_FONT)
+
+
+## Give a settings button a real GRAY disabled plate. UiPalette.style_button registers a CREAM
+## disabled plate, which still reads as a live control with merely faded text — the "unresponsive
+## live-looking button looks like a bug" failure. This is the same LIGHT_GRAY / MID_GRAY treatment
+## the locked nav tabs use (_style_tab_button), so every locked control in the game matches.
+func _style_locked_settings_button(button: Button) -> void:
+	button.add_theme_stylebox_override("disabled", UiPalette.make_unowned_panel_style())
 
 
 ## The Estate tab is available once the player can prestige (so "Plan the Estate", which lives in
@@ -2070,7 +2122,13 @@ func _on_stats_closed() -> void:
 
 ## Challenges pressed: open the player-facing CHALLENGES screen. It reads the bloodline's cleared
 ## tiers on open; the economy freezes while it (or a challenge run inside it) is up — see _process.
+##
+## Refuses outright before the first succession (Roadmap §5). The button is already grayed then, so
+## this is the belt-and-braces half: the core refuses and the UI grays, rather than the gate living
+## in only one of the two.
 func _on_challenges_pressed() -> void:
+	if not _ledger_unlocked():
+		return
 	_challenges_screen.open()
 
 
@@ -2394,6 +2452,23 @@ func _on_legacy_bonus_earned(amount: int) -> void:
 	if amount <= 0:
 		return
 	dynasty.upgrades.grant_bonus(amount)
+	SaveManager.save_dict_to_file(dynasty.to_save_dict())
+
+
+## A real transition just dealt a minigame, so the bloodline has now MET it (Roadmap §8 /
+## Plans/Challenge_Mode_Gating.md). Recording it here unlocks that game on the CHALLENGES screen.
+##
+## Only genuine transitions reach this: MinigameScreen emits it from the random-deal branch of
+## start_game, so a REVIEW round (which passes an explicit type) does not count, and Challenge
+## Mode itself never enters start_game at all — it uses start_challenge. That last part is what
+## keeps the rule from being circular, and it holds by construction rather than by a check here.
+##
+## Saved immediately rather than waiting for the autosave: meeting a game is a permanent bloodline
+## record, and a transition is exactly the moment a player might background the app.
+func _on_minigame_met(game_key: String) -> void:
+	if dynasty.has_met_minigame(game_key):
+		return  # Already known — skip the save write entirely.
+	dynasty.note_minigame_met(game_key)
 	SaveManager.save_dict_to_file(dynasty.to_save_dict())
 
 

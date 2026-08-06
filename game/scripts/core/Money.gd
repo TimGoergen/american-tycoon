@@ -100,7 +100,12 @@ enum Format { ABBREVIATED, ALPHABET, SCIENTIFIC }
 # Static, like LegacyUpgradeCatalog's tuning-injected statics: every Money instance formats
 # the same way, so the setting reaches all ~37 call sites without any of them changing.
 # GameState owns the persisted preference and pushes it in here on load and on change.
-static var format_mode: int = Format.ABBREVIATED
+#
+# ALPHABET is the default (Tim, 2026-08-05) — it must match GameState.ui_currency_format's
+# default, since this is what formats anything rendered before that push lands. The enum ORDER
+# is deliberately unchanged: the chosen mode is persisted as a plain int, so renumbering it to
+# put ALPHABET at 0 would silently reinterpret every save that already stores a choice.
+static var format_mode: int = Format.ALPHABET
 
 # The alphabet mode's digits. Indexed by position, so 0 → "a" … 25 → "z".
 const _ALPHABET_LETTERS := "abcdefghijklmnopqrstuvwxyz"

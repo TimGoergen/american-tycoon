@@ -21,8 +21,24 @@ extends SceneTree
 var _failures := 0
 
 
+## The format every block in this harness returns to. It is the TEST's baseline, deliberately
+## NOT "whatever Money's product default happens to be": the shipped default moved from
+## ABBREVIATED to ALPHABET on 2026-08-05 (Tim), and when the two concepts were the same value,
+## that change silently re-ran the entire ABBREVIATED block in alphabet mode — every expectation
+## comparing "$4.2Qa" against "$4.2aa". Pinning the baseline here means a future default change
+## can never reinterpret these checks again; the default itself is asserted separately below.
+const BASELINE_FORMAT := Money.Format.ABBREVIATED
+
+
 func _initialize() -> void:
 	print("=== Money display checks ===")
+
+	# The shipped default is a real part of the spec (a fresh game must open in letters), so
+	# assert it BEFORE pinning the baseline — after this line the ambient value is the
+	# harness's, not the product's.
+	_check(str(Money.format_mode), str(Money.Format.ALPHABET),
+		"the shipped default format is ALPHABET (a fresh game opens in letters)")
+	Money.format_mode = BASELINE_FORMAT
 
 	# ── ABBREVIATED: the original checks, unchanged ───────────────────────────────────
 	_run_abbreviated_checks("first pass")
@@ -388,31 +404,31 @@ func _check_negatives_in_every_mode() -> void:
 # Mode handling — the only place this file touches Money.format_mode
 # ──────────────────────────────────────────────────────────────────────────────────────
 
-## Entering asserts the mode is currently the DEFAULT — i.e. whoever ran last put it back.
+## Entering asserts the mode is currently the BASELINE — i.e. whoever ran last put it back.
 ## This is the check that actually catches a missing _leave_mode(): the end-of-run sentinel
 ## alone does NOT, because the very next block's _leave_mode() would quietly clean up after
 ## the offender. (Verified by deleting a _leave_mode() and re-running: without this guard the
 ## run still passed; with it, the next block fails and names the leak.)
 func _enter_mode(mode: int) -> void:
-	if Money.format_mode != Money.Format.ABBREVIATED:
+	if Money.format_mode != BASELINE_FORMAT:
 		print("  [FAIL] format_mode was %d on entry — a previous block skipped _leave_mode()"
 			% Money.format_mode)
 		_failures += 1
 	Money.format_mode = mode
 
 
-## Always restores the DEFAULT (not "whatever was there before"), so a missing _leave_mode()
+## Always restores the BASELINE (not "whatever was there before"), so a missing _leave_mode()
 ## cannot be papered over by a later block's restore, and verifies the restore took.
 func _leave_mode() -> void:
-	Money.format_mode = Money.Format.ABBREVIATED
-	if Money.format_mode != Money.Format.ABBREVIATED:
-		print("  [FAIL] _leave_mode() did not restore the default format")
+	Money.format_mode = BASELINE_FORMAT
+	if Money.format_mode != BASELINE_FORMAT:
+		print("  [FAIL] _leave_mode() did not restore the harness baseline")
 		_failures += 1
 
 
 func _check_mode_is_default(where: String) -> void:
-	if Money.format_mode == Money.Format.ABBREVIATED:
-		print("  [PASS] format_mode is back to ABBREVIATED %s" % where)
+	if Money.format_mode == BASELINE_FORMAT:
+		print("  [PASS] format_mode is back to the harness baseline %s" % where)
 	else:
 		print("  [FAIL] format_mode LEAKED (%d) %s" % [Money.format_mode, where])
 		_failures += 1

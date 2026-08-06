@@ -73,7 +73,12 @@ var ui_buy_mode: int = 3
 ## survives the save; the headless model never reads it (the scene layer pushes it into
 ## Money.format_mode). Named rather than a literal because Money is a CORE class — referring
 ## to it from here adds no UI dependency, unlike ui_buy_mode's PropertyRow.BuyMode.
-var ui_currency_format: int = Money.Format.ABBREVIATED
+##
+## DEFAULTS TO ALPHABET (Tim, 2026-08-05), not to the historical abbreviations. The suffix ladder
+## stops being readable well before the end of the content — nobody can order SxVg against QaTg —
+## so the letters are the better out-of-the-box experience, and since ALPHABET keeps K/M/B/T the
+## early game looks exactly as it always did. Only an explicit choice moves it from here.
+var ui_currency_format: int = Money.Format.ALPHABET
 
 ## UI preference: whether the prestige minigame is played (true) or auto-skipped for a
 ## flat 1.0× Legacy multiplier (false). Defaults to on (the minigame is mandatory until
@@ -552,11 +557,14 @@ func load_save_dict(data: Dictionary) -> void:
 	economy.cash = float(data.get("cash", 0.0))
 	peak_net_worth = float(data.get("peak_net_worth", 0.0))
 	ui_buy_mode = int(data.get("buy_mode", 3))  # 3 = MAX; matches the fresh-game default
-	# Absent on every save written before this setting existed, so it defaults to ABBREVIATED —
-	# today's behaviour. That is why the setting needs no migration and no SAVE_VERSION bump.
+	# Absent on every save written before this setting existed, so those saves adopt the
+	# fresh-game default, ALPHABET (Tim, 2026-08-05). A save that DOES carry the key keeps
+	# whatever the player picked — including ABBREVIATED — so an explicit choice is never
+	# overwritten by the new default. Still no migration and no SAVE_VERSION bump: the key is
+	# simply absent, and absent means "never chose", which is exactly the default's job.
 	# Clamped because an out-of-range int here would break the formatter's match.
 	ui_currency_format = clampi(
-		int(data.get("currency_format", Money.Format.ABBREVIATED)),
+		int(data.get("currency_format", Money.Format.ALPHABET)),
 		0, Money.Format.size() - 1
 	)
 	# Pre-minigame saves have no flag; default to enabled (mandatory until opted out).

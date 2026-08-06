@@ -376,9 +376,30 @@ func _new_generation() -> GameState:
 	# Work Ethic (the lifetime tap count) carries forward as a number, but the heir
 	# re-climbs the clock-in ladder from level 0 (a fresh WageState already starts there).
 	heir.wage.lifetime_taps = dynastic_taps
+	_carry_player_settings_to_heir(heir)
 	_apply_upgrade_effects(heir)
 	_apply_retained_staff(heir)
 	return heir
+
+
+## Carry the player's PREFERENCES across a succession.
+##
+## A succession builds a brand-new GameState, so anything living on GameState that is a player
+## CHOICE rather than dynastic state silently reverts to its default every prestige. Tim caught
+## this on the number-format setting (2026-08-05: "I think the currency formatting option I chose
+## reset after prestige") — and it was never format-specific: the buy mode and the minigame
+## opt-out were being dropped the same way. It hid well, because Main keeps its own UI mirrors,
+## so the CONTROLS still showed the old choice while GameState had already reverted; the loss
+## only surfaced on the next launch, once the reverted value had been written to the save.
+##
+## `current` is null on the very first call (the constructor builds generation one before there
+## is anything to inherit from), so there is nothing to carry and the heir keeps its defaults.
+func _carry_player_settings_to_heir(heir: GameState) -> void:
+	if current == null:
+		return
+	heir.ui_buy_mode = current.ui_buy_mode
+	heir.ui_minigame_enabled = current.ui_minigame_enabled
+	heir.ui_currency_format = current.ui_currency_format
 
 
 ## Seed an heir with the staff-ladder levels the dynasty has paid (in Legacy) to retain

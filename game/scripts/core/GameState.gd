@@ -68,6 +68,18 @@ var peak_net_worth: float = 0.0
 ## start in buy-max). The literal avoids a UI-class dependency from this headless file.
 var ui_buy_mode: int = 3
 
+## UI preference: how every number on screen is formatted (a Money.Format value —
+## ABBREVIATED / ALPHABET / SCIENTIFIC). Like ui_buy_mode this is parked here only so it
+## survives the save; the headless model never reads it (the scene layer pushes it into
+## Money.format_mode). Named rather than a literal because Money is a CORE class — referring
+## to it from here adds no UI dependency, unlike ui_buy_mode's PropertyRow.BuyMode.
+##
+## DEFAULTS TO ALPHABET (Tim, 2026-08-05), not to the historical abbreviations. The suffix ladder
+## stops being readable well before the end of the content — nobody can order SxVg against QaTg —
+## so the letters are the better out-of-the-box experience, and since ALPHABET keeps K/M/B/T the
+## early game looks exactly as it always did. Only an explicit choice moves it from here.
+var ui_currency_format: int = Money.Format.ALPHABET
+
 ## UI preference: whether the prestige minigame is played (true) or auto-skipped for a
 ## flat 1.0× Legacy multiplier (false). Defaults to on (the minigame is mandatory until
 ## the player opts out — GDD §5.5). Persisted in the save like ui_buy_mode.
@@ -508,6 +520,7 @@ func to_save_dict() -> Dictionary:
 		"cash": economy.cash,
 		"peak_net_worth": peak_net_worth,
 		"buy_mode": ui_buy_mode,
+		"currency_format": ui_currency_format,
 		"minigame_enabled": ui_minigame_enabled,
 		# Which alien epoch this run has reached (1 = Earth).
 		"epoch_tier": epoch.current_tier,
@@ -544,6 +557,16 @@ func load_save_dict(data: Dictionary) -> void:
 	economy.cash = float(data.get("cash", 0.0))
 	peak_net_worth = float(data.get("peak_net_worth", 0.0))
 	ui_buy_mode = int(data.get("buy_mode", 3))  # 3 = MAX; matches the fresh-game default
+	# Absent on every save written before this setting existed, so those saves adopt the
+	# fresh-game default, ALPHABET (Tim, 2026-08-05). A save that DOES carry the key keeps
+	# whatever the player picked — including ABBREVIATED — so an explicit choice is never
+	# overwritten by the new default. Still no migration and no SAVE_VERSION bump: the key is
+	# simply absent, and absent means "never chose", which is exactly the default's job.
+	# Clamped because an out-of-range int here would break the formatter's match.
+	ui_currency_format = clampi(
+		int(data.get("currency_format", Money.Format.ALPHABET)),
+		0, Money.Format.size() - 1
+	)
 	# Pre-minigame saves have no flag; default to enabled (mandatory until opted out).
 	ui_minigame_enabled = bool(data.get("minigame_enabled", true))
 	economy.spent_on_units_this_gen = float(data.get("spent_on_units_this_gen", 0.0))

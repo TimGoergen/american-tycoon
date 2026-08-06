@@ -155,6 +155,13 @@ var _tab_icon_tween: Array = []     # the in-flight fade Tween per tab (killed o
 var _active_tab: int = TAB_PROPERTY
 var _minigame_check: CheckBox  # the Settings-tab "play the minigame" toggle
 var _tutorial_check: CheckBox  # the Settings-tab "show tutorial tips" toggle
+## The Settings tab's three number-format rows, INDEXED BY Money.Format (so
+## _currency_format_rows[Money.Format.ALPHABET] is the ALPHABET row). One always-visible row
+## per mode; the active one is restyled, never hidden or moved.
+var _currency_format_rows: Array[Button] = []
+## The fixed-width "●" marker Label at the left of each row above, same indexing. Its glyph is
+## the non-color half of the active cue; the width is fixed so the mode name never shifts.
+var _currency_format_markers: Array[Label] = []
 ## The Settings tab's normal page — hidden while the embedded Balance Tuning panel
 ## (_dev_panel) is swapped into the tab's slot, restored on its Close.
 var _settings_page: Control
@@ -475,6 +482,11 @@ func _create_game() -> void:
 
 	# Restore the saved buy-mode preference (defaults to ×1 for a fresh game).
 	_buy_mode = game.ui_buy_mode as PropertyRow.BuyMode
+
+	# Restore the saved number-format preference the same way, and push it into the formatter
+	# BEFORE any screen is built — Money.format_mode is a static every readout reads, so setting
+	# it here means the very first frame already renders in the chosen format.
+	Money.format_mode = game.ui_currency_format
 
 
 ## Wall-clock seconds since the save was written. The dynastic save nests the
@@ -1380,6 +1392,25 @@ func _build_estate_tab() -> Control:
 	return v
 
 
+## One of the settings tab's bottom entry buttons — the tall, bold, full-caps kind (BALANCE
+## TUNING, CHALLENGES, HELP …). All six were six near-identical copy-pasted blocks, which is
+## what made them awkward to rearrange when they had to be paired onto shared rows; building
+## them through one function means a paired button and a full-width one can never drift apart
+## in height, font or styling.
+##
+## `size_flags_horizontal` is EXPAND_FILL so that two of these in an HBoxContainer split the
+## width evenly, while one on its own still fills the row — the same button works in both.
+func _make_settings_button(label: String, height: int, font_size: int, on_pressed: Callable) -> Button:
+	var button := Button.new()
+	button.custom_minimum_size = Vector2(0, height)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.add_theme_font_size_override("font_size", font_size)
+	UiPalette.style_button(button, false)
+	button.text = label
+	button.pressed.connect(on_pressed)
+	return button
+
+
 ## Settings tab: player options. Today the prestige-minigame toggle and the dev panel
 ## entry; later, audio / haptics. (Was previously a deferred standalone screen.)
 ##
@@ -1443,7 +1474,71 @@ func _build_settings_tab() -> Control:
 	_tutorial_check.toggled.connect(func(on: bool) -> void: TutorialProgress.set_enabled(on))
 	v.add_child(_tutorial_check)
 
+	# Number format (Plans/Currency_Format_Setting.md): THREE always-visible rows, one per mode,
+	# rather than one cycling button. Tim, 2026-08-05: "I don't like having a single button that is
+	# not clear what will happen when you click it." A cycler hides its own behaviour — you cannot
+	# see what you are about to get until you have already changed it. Three rows show every
+	# option, each with a live example of that mode's output, and tapping one selects it directly.
+	#
+	# GROUPING (Tim, 2026-08-05: "the different buttons for number format are not clearly and
+	# intuitively related to the Number format label"). The heading and its three rows are drawn
+	# INSIDE one §8 card — UiPalette.make_panel_style, the cream-plate/navy-border card this
+	# codebase already uses wherever a set of things is one unit (FamilyLedgerScreen's cards,
+	# PropertyRow, TutorialTip). The card's border is the association: everything it encloses
+	# belongs to the heading at its top, and the plain toggles above it are visibly outside.
+	#
+	# Chosen over LegacyScreen's collapsible section header (_add_collapsible_section) for two
+	# reasons: that pattern HIDES its body until tapped, which the standing no-moving-UI rule
+	# forbids here, and its filled accent headers are the Estate screen's category language, so
+	# borrowing them in Settings would read as a second design system rather than a cluster.
+	var format_card := PanelContainer.new()
+	format_card.add_theme_stylebox_override("panel", UiPalette.make_panel_style())
+	v.add_child(format_card)
+
+	var format_group := VBoxContainer.new()
+	format_group.add_theme_constant_override("separation", 12)
+	format_card.add_child(format_group)
+
+	var format_heading := Label.new()
+	format_heading.text = "Number format"
+	format_heading.add_theme_font_size_override("font_size", 45)  # matches the toggles above
+	format_heading.add_theme_font_override("font", UiPalette.make_bold_font())
+	format_heading.add_theme_color_override("font_color", UiPalette.NAVY)
+	format_group.add_child(format_heading)
+
+	# Names the three magnitudes in the examples below (Tim asked for "a number in the hundreds,
+	# millions and quadrillions"), left to right, so the columns read as ONE amount growing rather
+	# than three unrelated numbers — and says outright that the hundreds column is identical in all
+	# three modes. It is: below each formatter's abbreviation threshold every mode prints the same
+	# string, by design (Plans/Currency_Format_Setting.md, "Thresholds"). That is worth showing —
+	# it tells the player the setting only touches big numbers — but without this line the repeated
+	# "$250" would read as a bug. Caption only; the examples themselves stay at FONT_SUBHEAD.
+	var format_caption := Label.new()
+	format_caption.text = "Hundreds, millions, quadrillions. Small amounts look the same either way."
+	format_caption.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	format_caption.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
+	format_caption.add_theme_color_override("font_color", UiPalette.NAVY)
+	format_group.add_child(format_caption)
+
+	var format_rows := VBoxContainer.new()
+	format_rows.add_theme_constant_override("separation", 12)
+	format_group.add_child(format_rows)
+
+	_currency_format_rows = []
+	_currency_format_markers = []
+	for mode in Money.Format.size():
+		var row := _build_currency_format_row(mode)
+		format_rows.add_child(row)
+	_style_currency_format_rows()
+
 	# A spacer pushes the two tuning buttons to the bottom of the panel, clear of the options above.
+	#
+	# CAUTION for whoever adds the next setting: this page is a plain VBox, NOT a ScrollContainer,
+	# so content that does not fit is not merely clipped — it is unreachable, and this spacer's
+	# EXPAND_FILL hides the problem by silently collapsing to nothing first. Adding the
+	# number-format card pushed the bottom buttons off screen exactly this way (Tim, 2026-08-05).
+	# Pairing those buttons bought back two rows, but the durable fix is to host the page in a
+	# ScrollContainer; do that rather than shaving another control when this next overflows.
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(spacer)
@@ -1456,62 +1551,47 @@ func _build_settings_tab() -> Control:
 	bottom_buttons.add_theme_constant_override("separation", 16)
 	v.add_child(bottom_buttons)
 
+	# PAIRING (Tim, 2026-08-05): these six buttons used to take a full row each, and once the
+	# number-format card was added the last of them were pushed off the bottom of the panel —
+	# which on this tab means UNREACHABLE, because the settings page is a plain VBox with no
+	# scroll. Pairing the four short-labelled ones onto two shared rows buys back two rows'
+	# height (~310px). The two TUNING buttons keep their own full-width rows: their labels are
+	# the longest here, and they are the two most-used dev entries.
+	#
+	# NOTE this is headroom, not a structural fix — the next thing added to this tab will
+	# overflow again. See the comment on the spacer above.
+
 	# Dev tools entry: the balance tuning panel (GDD §13). Moved here from the action row.
-	var dev_button := Button.new()
-	dev_button.custom_minimum_size = Vector2(0, tuning_button_height)
-	dev_button.add_theme_font_size_override("font_size", TUNING_BUTTON_FONT)
-	UiPalette.style_button(dev_button, false)
-	dev_button.text = "BALANCE TUNING"
-	dev_button.pressed.connect(_on_dev_pressed)
-	bottom_buttons.add_child(dev_button)
+	bottom_buttons.add_child(
+		_make_settings_button("BALANCE TUNING", tuning_button_height, TUNING_BUTTON_FONT, _on_dev_pressed))
 
 	# Minigame review tool: opens the full-screen list of every minigame so they can each be
 	# played and reviewed on demand (GDD §5.5), independent of a real prestige.
-	var minigame_tuning_button := Button.new()
-	minigame_tuning_button.custom_minimum_size = Vector2(0, tuning_button_height)
-	minigame_tuning_button.add_theme_font_size_override("font_size", TUNING_BUTTON_FONT)
-	UiPalette.style_button(minigame_tuning_button, false)
-	minigame_tuning_button.text = "MINIGAME TUNING"
-	minigame_tuning_button.pressed.connect(_on_minigame_tuning_pressed)
-	bottom_buttons.add_child(minigame_tuning_button)
+	bottom_buttons.add_child(
+		_make_settings_button("MINIGAME TUNING", tuning_button_height, TUNING_BUTTON_FONT, _on_minigame_tuning_pressed))
 
-	# Stats: opens the Statistics modal (Best Vent Streak and other bloodline numbers; Tim 2026-07-20).
-	var stats_button := Button.new()
-	stats_button.custom_minimum_size = Vector2(0, tuning_button_height)
-	stats_button.add_theme_font_size_override("font_size", TUNING_BUTTON_FONT)
-	UiPalette.style_button(stats_button, false)
-	stats_button.text = "STATS"
-	stats_button.pressed.connect(_on_stats_pressed)
-	bottom_buttons.add_child(stats_button)
+	# CHALLENGES + STATS share a row, challenges first (Tim's order).
+	# Challenges opens the player-facing CHALLENGES screen (Plans/Challenge_Mode.md §3.4) — beat
+	# your best in each minigame for a permanent global income bonus. This is the real home for
+	# Challenge Mode; the CHALLENGE toggle under Minigame Tuning is now only a developer shortcut.
+	# Stats opens the Statistics modal (Best Vent Streak and other bloodline numbers, Tim 2026-07-20).
+	var challenge_stats_row := HBoxContainer.new()
+	challenge_stats_row.add_theme_constant_override("separation", 16)
+	challenge_stats_row.add_child(
+		_make_settings_button("CHALLENGES", tuning_button_height, TUNING_BUTTON_FONT, _on_challenges_pressed))
+	challenge_stats_row.add_child(
+		_make_settings_button("STATS", tuning_button_height, TUNING_BUTTON_FONT, _on_stats_pressed))
+	bottom_buttons.add_child(challenge_stats_row)
 
-	# Challenges: opens the player-facing CHALLENGES screen (Plans/Challenge_Mode.md §3.4) — beat your
-	# best in each minigame for a permanent global income bonus. This is the real home for Challenge
-	# Mode; the CHALLENGE toggle under Minigame Tuning above is now only a developer shortcut.
-	var challenges_button := Button.new()
-	challenges_button.custom_minimum_size = Vector2(0, tuning_button_height)
-	challenges_button.add_theme_font_size_override("font_size", TUNING_BUTTON_FONT)
-	UiPalette.style_button(challenges_button, false)
-	challenges_button.text = "CHALLENGES"
-	challenges_button.pressed.connect(_on_challenges_pressed)
-	bottom_buttons.add_child(challenges_button)
-
-	# About: opens the modal with the logo, name, version, and credits (Tim, 2026-07-09).
-	var about_button := Button.new()
-	about_button.custom_minimum_size = Vector2(0, tuning_button_height)
-	about_button.add_theme_font_size_override("font_size", TUNING_BUTTON_FONT)
-	UiPalette.style_button(about_button, false)
-	about_button.text = "ABOUT"
-	about_button.pressed.connect(_on_about_pressed)
-	bottom_buttons.add_child(about_button)
-
-	# Help: opens the tutorial glossary + Replay action (Plans/Tutorial_Onboarding_Plan.md).
-	var help_button := Button.new()
-	help_button.custom_minimum_size = Vector2(0, tuning_button_height)
-	help_button.add_theme_font_size_override("font_size", TUNING_BUTTON_FONT)
-	UiPalette.style_button(help_button, false)
-	help_button.text = "HELP"
-	help_button.pressed.connect(_on_help_pressed)
-	bottom_buttons.add_child(help_button)
+	# ABOUT + HELP share a row. About opens the logo/name/version/credits modal (Tim, 2026-07-09);
+	# Help opens the tutorial glossary + Replay action (Plans/Tutorial_Onboarding_Plan.md).
+	var about_help_row := HBoxContainer.new()
+	about_help_row.add_theme_constant_override("separation", 16)
+	about_help_row.add_child(
+		_make_settings_button("ABOUT", tuning_button_height, TUNING_BUTTON_FONT, _on_about_pressed))
+	about_help_row.add_child(
+		_make_settings_button("HELP", tuning_button_height, TUNING_BUTTON_FONT, _on_help_pressed))
+	bottom_buttons.add_child(about_help_row)
 
 	stack.add_child(v)
 	_settings_page = v
@@ -1678,6 +1758,10 @@ func _show_tab(index: int) -> void:
 		_minigame_check.button_pressed = game.ui_minigame_enabled
 		if _tutorial_check != null:
 			_tutorial_check.button_pressed = TutorialProgress.is_enabled()
+		# Resync which number-format row is marked active on entry, the same way the toggles above
+		# resync — so it can never mark a mode the formatter isn't actually in.
+		if not _currency_format_rows.is_empty():
+			_style_currency_format_rows()
 
 
 ## The active tab button reads as a mustard plate; the rest as plain cream plates. The
@@ -2434,6 +2518,171 @@ func _buy_mode_caption(mode: PropertyRow.BuyMode) -> String:
 		PropertyRow.BuyMode.MAX:
 			return "MAX"
 	return "×1"
+
+
+## The three values every number-format row shows, smallest first: hundreds, millions,
+## quadrillions (Tim, 2026-08-05 — one example was not enough to judge a format by). They share
+## the 4.2 mantissa so the same amount can be compared straight down a column, mode to mode.
+##
+## The HUNDREDS value renders IDENTICALLY in all three modes, and that is deliberate, not a bug:
+## every mode only replaces an abbreviation where one would have appeared, so below each
+## formatter's threshold the output is byte-identical (Plans/Currency_Format_Setting.md,
+## "Thresholds"). Showing it tells the player the setting leaves everyday amounts alone. The
+## caption above the rows (see _build_settings_tab) is what keeps the repetition from reading as
+## a rendering fault.
+const CURRENCY_FORMAT_SAMPLES := [250.0, 4.2e6, 4.2e15]
+
+## Fixed width (px) of a row's mode-name column. Wide enough for the longest name
+## ("ABBREVIATED" measures 275px faux-bold at FONT_SUBHEAD) so the three example columns start
+## at the same x on every row — which is the whole point of showing three: the same magnitude
+## must line up down the column to be comparable at a glance.
+const CURRENCY_FORMAT_NAME_WIDTH := 288
+
+
+## Build one number-format row: a full-width plate carrying an active marker, the mode's name,
+## and three live examples of THAT mode's output. Registers itself in _currency_format_rows /
+## _currency_format_markers at index `mode`, so the restyler can find it by mode later.
+##
+## The row is a Button used purely as the plate; its own `text` stays empty and all of its content
+## is Labels anchored inside it. That is what makes the row un-resizable: a Button sizes itself to
+## its own text, and an anchored (non-container-managed) child cannot push on its parent — so
+## SCIENTIFIC's shorter examples and ALPHABET's longer ones all yield the exact same row box.
+## Standing no-moving-UI rule: nothing here hides, resizes, or reflows on select.
+func _build_currency_format_row(mode: int) -> Button:
+	var row := Button.new()
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.custom_minimum_size = Vector2(0, UiPalette.STANDARD_BUTTON_HEIGHT)
+	row.pressed.connect(_on_currency_format_selected.bind(mode))
+
+	# One horizontal strip pinned to the row's full rect, inset so the text clears the plate's
+	# border. MOUSE_FILTER_IGNORE throughout so taps land on the Button underneath, not the Labels.
+	var content := MarginContainer.new()
+	content.set_anchors_preset(Control.PRESET_FULL_RECT)
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for side in ["margin_left", "margin_right"]:
+		content.add_theme_constant_override(side, 24)
+	row.add_child(content)
+
+	var strip := HBoxContainer.new()
+	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	strip.add_theme_constant_override("separation", 16)
+	content.add_child(strip)
+
+	# Marker column: fixed width, so the mode name sits at the same x on every row whether or not
+	# that row is the active one. (An inline bullet in the name would shift the text instead.)
+	var marker := Label.new()
+	marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	marker.custom_minimum_size = Vector2(36, 0)
+	marker.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	marker.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
+	strip.add_child(marker)
+
+	# Fixed-width name column (not expanding), so the example columns after it begin at the same x
+	# on all three rows even though "ABBREVIATED" and "ALPHABET" are different lengths.
+	var name_label := Label.new()
+	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	name_label.text = _currency_format_name(mode)
+	name_label.clip_text = true
+	name_label.custom_minimum_size = Vector2(CURRENCY_FORMAT_NAME_WIDTH, 0)
+	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	name_label.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
+	name_label.add_theme_font_override("font", UiPalette.make_bold_font())
+	name_label.add_theme_color_override("font_color", UiPalette.NAVY)
+	strip.add_child(name_label)
+
+	# The three examples share the leftover width as EQUAL columns (one HBox, zero separation, each
+	# label expanding by the same default stretch ratio), so column 2 on the ALPHABET row sits at
+	# exactly the same x as column 2 on the SCIENTIFIC row. Right-aligned inside its column, the way
+	# a numeric table lines up. Each is rendered through Money in THIS row's mode (see
+	# _currency_format_samples), so no example can disagree with what the game actually prints;
+	# clip_text keeps a long one from claiming more width than its column has.
+	var examples := HBoxContainer.new()
+	examples.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	examples.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	examples.add_theme_constant_override("separation", 0)
+	strip.add_child(examples)
+
+	for sample_text in _currency_format_samples(mode):
+		var example := Label.new()
+		example.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		example.text = sample_text
+		example.clip_text = true
+		example.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		example.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		example.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		example.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
+		example.add_theme_color_override("font_color", UiPalette.NAVY)
+		examples.add_child(example)
+
+	_currency_format_rows.append(row)
+	_currency_format_markers.append(marker)
+	return row
+
+
+## Mark whichever row matches Money.format_mode as the active one, and the other two as
+## selectable-but-not-current. This reuses the tab bar's "you are here" language (_style_tab_button
+## above): the active plate is MUSTARD_GOLD, the inactive plates are CREAM, both with the same navy
+## border — plus a "●" marker so the cue is not carried by color alone (Tim's eyesight).
+func _style_currency_format_rows() -> void:
+	for mode in _currency_format_rows.size():
+		var row: Button = _currency_format_rows[mode]
+		var active: bool = (mode == Money.format_mode)
+		var plate := StyleBoxFlat.new()
+		plate.bg_color = UiPalette.MUSTARD_GOLD if active else UiPalette.CREAM
+		plate.border_color = UiPalette.NAVY
+		plate.set_border_width_all(6 if active else 3)
+		plate.set_corner_radius_all(8)
+		# One plate for every interactive state: the row must not flash a different color on
+		# hover/press, which would read as "this is now selected" before it actually is.
+		for state in ["normal", "hover", "pressed", "focus"]:
+			row.add_theme_stylebox_override(state, plate)
+		(_currency_format_markers[mode] as Label).text = "●" if active else ""
+
+
+## Select a number format outright (no cycling — each row picks its own mode).
+## Presentation only — nothing but the formatting of already-computed numbers changes.
+func _on_currency_format_selected(mode: int) -> void:
+	Money.format_mode = mode
+	game.ui_currency_format = mode  # persisted on the next autosave / on background
+	_style_currency_format_rows()
+
+	# REPAINT. Nearly every number on screen is rebuilt from live state each frame (the property
+	# rows, the hero cash/income, the wage panel) or on tab entry (Estate, Family Ledger — see
+	# _show_tab), so they pick the new format up on their own. The ONE exception is the
+	# lifetime-earned line, which is only repainted when its value changes; clearing the cache
+	# forces _update_plan_button to rebuild it on the next frame instead of leaving it stale.
+	_shown_lifetime_earned = -1
+
+
+## The three sample values as `mode` would render them — e.g. ["$250", "$4.2 M", "$4.2 Qa"] —
+## always produced by Money itself, so no row's examples can drift from real output.
+##
+## Money.format_mode is a STATIC shared by the whole game, so rendering samples in a mode the
+## player has NOT selected means borrowing it. The restore is guaranteed structurally: this
+## function is straight-line — no branch, NO LOOP, no early return, and nothing between the two
+## assignments but three pure formatter calls — so there is no path that reaches the end without
+## putting the previous mode back. The three values are formatted by hand rather than in a loop
+## precisely to keep that property obvious; if the static leaked, every number in the game would
+## silently reformat. Deliberately the ONLY place that touches the static this way.
+func _currency_format_samples(mode: int) -> Array[String]:
+	var previous_mode: int = Money.format_mode
+	Money.format_mode = mode
+	var hundreds := Money.of(CURRENCY_FORMAT_SAMPLES[0]).display_cash()
+	var millions := Money.of(CURRENCY_FORMAT_SAMPLES[1]).display_cash()
+	var quadrillions := Money.of(CURRENCY_FORMAT_SAMPLES[2]).display_cash()
+	Money.format_mode = previous_mode
+	return [hundreds, millions, quadrillions]
+
+
+func _currency_format_name(mode: int) -> String:
+	match mode:
+		Money.Format.ABBREVIATED:
+			return "ABBREVIATED"
+		Money.Format.ALPHABET:
+			return "ALPHABET"
+		Money.Format.SCIENTIFIC:
+			return "SCIENTIFIC"
+	return "ABBREVIATED"
 
 
 # ---------------------------------------------------------------------------

@@ -424,12 +424,18 @@ func _new_generation() -> GameState:
 
 ## Carry the player's PREFERENCES across a succession.
 ##
-## A succession builds a brand-new GameState, which means anything living on GameState that is
-## a player CHOICE rather than dynastic state silently reverts to its default every prestige.
-## For the auto-purchase mode that is a real bug with teeth: the mode is unlocked by a Legacy
-## upgrade, which by definition survives succession, so letting it switch itself off would keep
-## disabling something the player paid gems for. The same applies to the buy mode and the
-## targeted epoch tab — settings, not achievements.
+## A succession builds a brand-new GameState, so anything living on GameState that is a player
+## CHOICE rather than dynastic state silently reverts to its default every prestige. Tim caught
+## this on the number-format setting (2026-08-05: "I think the currency formatting option I chose
+## reset after prestige") — and it was never format-specific: the buy mode, the hire mode, the
+## targeted epoch tab and the minigame opt-out were all being dropped the same way. It hid well,
+## because Main keeps its own UI mirrors, so the CONTROLS still showed the old choice while
+## GameState had already reverted; the loss only surfaced on the next launch, once the reverted
+## value had been written to the save.
+##
+## These are settings, not achievements — and for anything gated behind a Legacy upgrade the
+## distinction has teeth, because the upgrade itself survives succession by definition. Letting
+## a mode switch itself off every generation would keep disabling something bought with gems.
 ##
 ## `current` is null on the very first call (the constructor builds generation one before there
 ## is anything to inherit from), so there is nothing to carry and the heir keeps its defaults.
@@ -440,6 +446,7 @@ func _carry_player_settings_to_heir(heir: GameState) -> void:
 	heir.ui_hire_mode = current.ui_hire_mode
 	heir.ui_minigame_enabled = current.ui_minigame_enabled
 	heir.ui_epoch_tab = current.ui_epoch_tab
+	heir.ui_currency_format = current.ui_currency_format
 	# AUTO-PURCHASE IS DELIBERATELY NOT CARRIED — the heir wakes with the desk switched OFF
 	# (Tim, 2026-08-01). It is the one setting here that SPENDS money rather than describing a
 	# preference, and an heir owns almost nothing: the opening capital plus any Trust Fund. Left

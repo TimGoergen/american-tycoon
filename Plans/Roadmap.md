@@ -74,6 +74,14 @@ any session on Tim's word.
 
 ## 6. Currency formatting as a player setting (Tim, 2026-07-30)
 
+> **GRADUATED 2026-08-05 → `Plans/Currency_Format_Setting.md`** (branch
+> `feature/currency-format-setting`, cut from `main`). All three modes shipped as specified.
+> One gap in the capture below had to be resolved: it says "keep today's small-value thresholds
+> unchanged" but illustrates with `display_cash()`'s $1M, while `display()` abbreviates from
+> $1K. Settled as "a non-default format replaces the abbreviation exactly where an abbreviation
+> would have appeared" — so SCIENTIFIC renders $14,300 as `$1.43e4` in the tight formatter.
+> The spelled-out-words FOURTH mode noted below is still unbuilt.
+
 Tim's ask: a Settings option to choose how large numbers are formatted. Three modes —
 ALPHABET NOTATION (Tim's "all letters": `aa`, `ab`, `ac`, …), the CURRENT abbreviations
 (`Qa`, `Sx`, `OcTg`), and a third format (Tim: "something else"; recommendation below).

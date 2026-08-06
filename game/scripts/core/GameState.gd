@@ -97,6 +97,18 @@ var ui_hire_mode: int = 0
 ## as the tab argument the caller passes to auto_purchase.tick().
 var ui_epoch_tab: int = 0
 
+## UI preference: how every number on screen is formatted (a Money.Format value —
+## ABBREVIATED / ALPHABET / SCIENTIFIC). Like ui_buy_mode this is parked here only so it
+## survives the save; the headless model never reads it (the scene layer pushes it into
+## Money.format_mode). Named rather than a literal because Money is a CORE class — referring
+## to it from here adds no UI dependency, unlike ui_buy_mode's PropertyRow.BuyMode.
+##
+## DEFAULTS TO ALPHABET (Tim, 2026-08-05), not to the historical abbreviations. The suffix ladder
+## stops being readable well before the end of the content — nobody can order SxVg against QaTg —
+## so the letters are the better out-of-the-box experience, and since ALPHABET keeps K/M/B/T the
+## early game looks exactly as it always did. Only an explicit choice moves it from here.
+var ui_currency_format: int = Money.Format.ALPHABET
+
 ## UI preference: whether the prestige minigame is played (true) or auto-skipped for a
 ## flat 1.0× Legacy multiplier (false). Defaults to on (the minigame is mandatory until
 ## the player opts out — GDD §5.5). Persisted in the save like ui_buy_mode.
@@ -577,6 +589,7 @@ func to_save_dict() -> Dictionary:
 		"peak_net_worth": peak_net_worth,
 		"buy_mode": ui_buy_mode,
 		"hire_mode": ui_hire_mode,
+		"currency_format": ui_currency_format,
 		"minigame_enabled": ui_minigame_enabled,
 		# The civ tab the pager last showed — also the tab Auto-Purchase Mode buys from.
 		"epoch_tab": ui_epoch_tab,
@@ -624,6 +637,16 @@ func load_save_dict(data: Dictionary) -> void:
 	# the old MAX (3) on the new MAX (2) — the generous direction, and harmless either way, since
 	# Main clamps again to whatever the Head Hunters track has actually unlocked.
 	ui_hire_mode = clampi(int(data.get("hire_mode", 0)), 0, UI_HIRE_MODE_MAX)
+	# Absent on every save written before this setting existed, so those saves adopt the
+	# fresh-game default, ALPHABET (Tim, 2026-08-05). A save that DOES carry the key keeps
+	# whatever the player picked — including ABBREVIATED — so an explicit choice is never
+	# overwritten by the new default. Still no migration and no SAVE_VERSION bump: the key is
+	# simply absent, and absent means "never chose", which is exactly the default's job.
+	# Clamped because an out-of-range int here would break the formatter's match.
+	ui_currency_format = clampi(
+		int(data.get("currency_format", Money.Format.ALPHABET)),
+		0, Money.Format.size() - 1
+	)
 	# Pre-minigame saves have no flag; default to enabled (mandatory until opted out).
 	ui_minigame_enabled = bool(data.get("minigame_enabled", true))
 	# Saves written before Auto-Purchase Mode have neither key. Both defaults are the pre-feature

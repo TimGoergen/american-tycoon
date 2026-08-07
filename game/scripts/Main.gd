@@ -3058,6 +3058,13 @@ func _drive_auto_purchase(delta: float) -> void:
 		var row := _row_for_index(prop_index)
 		if row != null:
 			row.flash_auto_purchased()
+	# And flare the button itself (Tim, 2026-08-07). The row markers answer "where did my money
+	# go", but they only appear on the tab the desk is aimed at — and a lit AUTO-BUY plate on its
+	# own cannot distinguish "running" from "running dry". Fired only on a tick that actually
+	# bought (this line sits past the units_bought <= 0 early return), so a desk that has outrun
+	# the player's cash goes quiet rather than blinking on forever.
+	if _momentum_bar != null:
+		_momentum_bar.flash_auto_purchase()
 
 
 ## Push Auto-Purchase Mode's state into the momentum bar, which owns the mode's ON/OFF button and

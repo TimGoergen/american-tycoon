@@ -62,6 +62,7 @@ func _run() -> void:
 
 	await _test_owned_push_before_ready_shows_button(bar_script, tuning)
 	await _test_untold_bar_starts_hidden(bar_script, tuning)
+	await _test_purchase_pulse(bar_script, tuning)
 
 	print("")
 	if _failures == 0:
@@ -141,3 +142,56 @@ func _test_untold_bar_starts_hidden(bar_script: GDScript, tuning: TuningConfig) 
 		fresh.set_auto_purchase_state(false, false)
 		_check("an explicit unowned push leaves it hidden", not button.visible)
 	fresh.queue_free()
+
+
+## The purchase pulse (Tim, 2026-08-07): the button flares when the desk actually buys.
+##
+## Decay is driven by calling _process with an explicit delta rather than awaiting real frames —
+## a frame is ~16ms against a 0.35s pulse, so waiting it out would take twenty-odd awaits and make
+## the test depend on wall-clock timing. One synthetic second is deterministic.
+func _test_purchase_pulse(bar_script: GDScript, tuning: TuningConfig) -> void:
+	print("\n3. The AUTO-BUY button flares on a purchase and returns to rest")
+
+	var bar: Control = await _mount_bar(bar_script, tuning, true, true, true)
+	var button: Button = bar.get_auto_purchase_button()
+	if button == null:
+		_check("the owned button exists (pulse cannot be tested without it)", false)
+		bar.queue_free()
+		return
+
+	_check("the button starts at rest (plain white modulate)", button.modulate.is_equal_approx(
+		Color.WHITE))
+
+	bar.flash_auto_purchase()
+	bar._process(0.0)  # apply the pulse without advancing it
+	_check("a purchase brightens the button", button.modulate.r > 1.0)
+
+	# Mid-pulse it must be dimmer than the peak but still brighter than rest — i.e. actually
+	# decaying, not latched at full brightness until it snaps off.
+	var peak := button.modulate.r
+	bar._process(0.2)
+	_check("the flare decays rather than latching",
+		button.modulate.r < peak and button.modulate.r > 1.0)
+
+	# Retriggering mid-pulse restarts it rather than stacking into something brighter.
+	bar.flash_auto_purchase()
+	bar._process(0.0)
+	_check("a second purchase mid-pulse restarts it (never stacks past the peak)",
+		is_equal_approx(button.modulate.r, peak))
+
+	# Well past the pulse length, the button must be EXACTLY white again — a residual tint here
+	# would leave the control permanently discoloured.
+	bar._process(1.0)
+	_check("the button returns to exactly plain white", button.modulate.is_equal_approx(
+		Color.WHITE))
+
+	bar.queue_free()
+
+	# A hidden button (desk unowned) must never pulse: it cannot have bought anything.
+	var hidden: Control = await _mount_bar(bar_script, tuning, false, false, false)
+	var hidden_button: Button = hidden.get_auto_purchase_button()
+	hidden.flash_auto_purchase()
+	hidden._process(0.0)
+	_check("an unowned desk's hidden button never flares",
+		hidden_button != null and hidden_button.modulate.is_equal_approx(Color.WHITE))
+	hidden.queue_free()

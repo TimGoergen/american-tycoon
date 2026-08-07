@@ -126,6 +126,12 @@ var _auto_purchase_locked := false
 var _auto_purchase_unlocked := false
 var _auto_purchase_enabled := false
 
+## Seconds left in the "the desk just bought something" pulse (0 = not pulsing). Counted down in
+## _process, exactly the way PropertyRow fades its auto-purchase row marker — a countdown rather
+## than a Tween so a purchase landing mid-pulse simply retriggers it, with no tween to kill and
+## no way to strand the button at half brightness.
+var _auto_purchase_pulse_seconds := 0.0
+
 ## The OVR button, pinned left of the meter (the FrenzyBar layout). Always visible; enabled
 ## only while cruising — see _process.
 var _overdrive_button: Button
@@ -266,6 +272,22 @@ const CHIP_STACK_SEPARATION := 6.0
 const TIER_CHIP_FADE_IN_SEC := 0.12
 const TIER_CHIP_FADE_OUT_SEC := 0.4
 
+## The AUTO-BUY button's "it just bought something" pulse (Tim, 2026-08-07). The button's plate
+## says the mode is ON, but a mode that is on and a mode that is actually spending look identical —
+## this is the difference.
+##
+## 0.35s, comfortably shorter than the desk's fastest cadence (1.0s at a maxed Acquisitions Desk),
+## so even at full speed the button returns to rest between purchases and reads as a slow blink
+## rather than a flicker. An unaffordable tick buys nothing and pulses nothing, which makes the
+## button honest about "running" versus "running dry".
+const AUTO_PURCHASE_PULSE_SECONDS := 0.35
+
+## Peak brightness multiplier at the top of the pulse. `modulate` MULTIPLIES, so on the lit plate
+## (navy field, mustard frame and text) the navy barely moves while the gold frame and label blow
+## out toward white — the flare reads as the button's own outline flashing, not as the whole
+## control changing colour, and the same multiplier stays legible on the unlit mustard plate.
+const AUTO_PURCHASE_PULSE_PEAK := 1.8
+
 ## The READY flash's peak alpha and fade time.
 const READY_FLASH_ALPHA := 0.75
 const READY_FLASH_FADE_SEC := 0.5
@@ -307,6 +329,41 @@ func set_auto_purchase_state(unlocked: bool, enabled: bool) -> void:
 	_auto_purchase_unlocked = unlocked
 	_auto_purchase_enabled = enabled
 	_apply_auto_purchase_look(unlocked, enabled)
+
+
+## The Acquisitions Desk just bought something — flare the button (Tim, 2026-08-07).
+##
+## Called by Main only on a tick that actually acquired units, so a tick that could not afford
+## anything stays dark. That distinction is the whole value of the pulse: "on" and "on and
+## spending" otherwise look the same.
+##
+## Retriggering mid-pulse simply restarts the countdown; there is no tween to collide with.
+func flash_auto_purchase() -> void:
+	# Nothing to paint before _ready, and a hidden button (desk unowned) must never flash — it
+	# cannot have bought anything, and modulating a hidden control would be pure waste.
+	if _auto_purchase_button == null or not _auto_purchase_button.visible:
+		return
+	_auto_purchase_pulse_seconds = AUTO_PURCHASE_PULSE_SECONDS
+
+
+## Ease the AUTO-BUY pulse back to rest. Called once per frame from _process; free on the
+## overwhelming majority of frames, when nothing is pulsing.
+##
+## Mirrors PropertyRow._fade_auto_purchase_marker: linear decay off a countdown, and an explicit
+## reset to plain white on the final frame so the button can never be left tinted.
+func _fade_auto_purchase_pulse(delta: float) -> void:
+	if _auto_purchase_pulse_seconds <= 0.0:
+		return
+	if _auto_purchase_button == null:
+		_auto_purchase_pulse_seconds = 0.0
+		return
+	_auto_purchase_pulse_seconds = maxf(0.0, _auto_purchase_pulse_seconds - delta)
+	if _auto_purchase_pulse_seconds <= 0.0:
+		_auto_purchase_button.modulate = Color.WHITE
+		return
+	var strength := _auto_purchase_pulse_seconds / AUTO_PURCHASE_PULSE_SECONDS
+	var brightness := 1.0 + (AUTO_PURCHASE_PULSE_PEAK - 1.0) * strength
+	_auto_purchase_button.modulate = Color(brightness, brightness, brightness)
 
 
 ## The OVERDRIVE (OVR) button, so a tutorial card can anchor to it. It stays disabled until the
@@ -688,6 +745,7 @@ func _apply_auto_purchase_look(unlocked: bool, enabled: bool) -> void:
 
 
 func _process(delta: float) -> void:
+	_fade_auto_purchase_pulse(delta)
 	var locked_out := _rush_momentum.is_locked_out()
 	var cruising := _rush_momentum.is_cruising()
 	# Overdrive DISPLAY mode: the engaged flag, not heat position — the instant the player opts

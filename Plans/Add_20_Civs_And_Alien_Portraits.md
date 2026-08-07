@@ -1,6 +1,47 @@
 # Add 20 More Civilizations + Alien Staffer Portraits
 
-**Status:** APPROVED — decisions made by Tim 2026-07-25 (below); executing. Raised by Tim 2026-07-25.
+**Status:** ⚠️ **DELIVERED — AND THIS DOC IS MATERIALLY STALE. Read this box before anything
+below it.** (Corrected 2026-08-06.)
+
+**The work is done.** Path B shipped in full: **326 properties across 27 game tiers**, merged
+to `main` 2026-08-01 (commit `04a299e`). Alien portraits are complete for **every tier 3–27** —
+`StafferFace.gd:475 _draw_alien` dispatches a bespoke `_draw_*` routine per civ
+(`_draw_luminari` … `_draw_proprietors`), and the header at `:473` records that the
+gray-headshot fallback is now unreachable in normal play.
+
+**Four things below are WRONG. Do not build from them:**
+
+1. **The whole of §6.1–§6.3 describes the REJECTED architecture.** Those sections specify a
+   shared ~8-archetype system with an `archetype` string per epoch carried through the
+   pipeline. **Decision 2 reversed that** in favour of a bespoke procedural design per civ —
+   and bespoke is what shipped. Anyone implementing §6.2 today would build the wrong thing.
+2. **§2's portrait claim is obsolete.** *"`StafferFace.draw_face()` returns `false` for any
+   `tier != 1`"* was true when written; every alien tier now has its own routine.
+3. **Everything framed as "Path A" is dead** (§3's recommendation, §4, §5, §10's phasing).
+   Path A was wired first and then **reversed after the Sim** — see decision 1. The doc still
+   recommends Path A in §3 and phases against it in §10.
+4. **The tier numbers shifted +1.** The Earth split (2026-07-28,
+   `Plans/Earth_Split_Epochs.md`) made Earth two epochs, so draft civ tier N is now game tier
+   N+1. The 20 civs listed here as tiers 7–26 are **game tiers 8–27**; the "batch 2" cohort
+   described as 12–26 is **game tiers 13–27**.
+
+**What is still true and worth keeping:** §1 (the authored draft content and its field list,
+including that `staff_income_multiplier` is a flat injected `1.0`, *"a constant to inject, not
+content to author"*), §3's Path A/B analysis as the record of *why* B won, §7's UI dependency
+list, and the decision log below. The durable build recipe for extending the ladder is **not**
+here — it lives in the project memory's civ-content-pipeline entry.
+
+**Still genuinely outstanding** (see `Device_Feel_Test_Checklist.md` §7.3):
+- **Batch-2 device validation was never done.** Decision 3 was explicit — *"wire + portrait
+  tiers 7–11 first, device-validate, then 12–26."* Batch 1 was validated; batch 2 shipped
+  without it, and the checklist had no line for it until 2026-08-06.
+- **The planet watermark decision (§9 item 4) is still open** — see §9's corrected status.
+- **§6.4 Phase-2 step 3** (extra variation, optional hero overrides for flagship roles) is
+  unbuilt; `manager_portrait` remains the authored escape hatch.
+
+---
+
+**Original status line:** APPROVED — decisions made by Tim 2026-07-25 (below); executing. Raised by Tim 2026-07-25.
 
 **Decisions (Tim, 2026-07-25):**
 1. ~~Path A now, B later~~ **→ PATH B (reversed after the Sim).** Path A was wired first, but the Sim
@@ -55,8 +96,10 @@ scaling, and the alien portraits.
 - **Scaling:** `economy_scale = 16807^(tier−1)`; consuming `earth_target × economy_scale` lifetime
   dollars advances to the next epoch. Tier 26 ≈ 1.6e105 — comfortably inside float64 (ceiling
   ~epoch 70), so no number-overflow work is needed for this range.
-- **Portraits:** `StafferFace.draw_face()` returns `false` for any `tier != 1`, so alien staffers
-  currently fall back to the gray `headshot.svg`.
+- **Portraits:** ~~`StafferFace.draw_face()` returns `false` for any `tier != 1`, so alien staffers
+  currently fall back to the gray `headshot.svg`.~~ **NO LONGER TRUE (2026-08-06).** Every tier
+  3–27 now has a bespoke routine via `StafferFace.gd:475 _draw_alien`; the gray fallback is
+  unreachable in normal play and survives only as a safety net for a future tier 28+.
 
 ---
 
@@ -65,7 +108,10 @@ scaling, and the alien portraits.
 The draft is built for a **326-property, 26-epoch** ladder (each epoch introduces its own new property
 cohort). The live game is **52 properties / 6 epochs**. Two ways to spend the draft:
 
-### Path A — Flavor + scale (re-skin the existing 52). **Recommended for this pass.**
+### ~~Path A — Flavor + scale (re-skin the existing 52). **Recommended for this pass.**~~ — **REJECTED**
+
+> Wired first, then reversed after the Sim proved the new epochs unreachable without new
+> income (epoch 10: 169 billion years). Kept as the record of the argument that lost.
 Each new epoch is a **first-contact beat + a re-skin of the 52 staffers + a ×16807 economy climb**. No
 new properties, no new `.tres`, no economy re-tuning. Purely a mechanical transform of the draft's
 first-52 roster slice into `EpochCatalog` (§4).
@@ -77,7 +123,7 @@ first-52 roster slice into `EpochCatalog` (§4).
   is thin as *gameplay*. Mitigation lives in a **follow-on** (Path B properties, or the per-epoch
   modifier/upgrade track in Future Features — the real "engagement half").
 
-### Path B — Full new-property epochs (the 326-property ladder).
+### Path B — Full new-property epochs (the 326-property ladder). ✅ **CHOSEN AND SHIPPED**
 Each new epoch introduces its own cohort (~6–9 new properties, capped ~12–14 rungs/epoch). The draft
 already computes the costs/incomes, but this additionally requires **~274 new `.tres` property
 resources**, extending every roster to 326, the staff-price-rank re-anchor at scale, and a full sim
@@ -135,7 +181,18 @@ strings. Validate that each produced roster is exactly 52 long and every economy
 Goal: a **distinct, recognizable staffer look for each of the 25 alien civs**, procedurally (no
 hand-authoring 25 × N portraits), building on the proven `StafferFace` pipeline.
 
-### 6.1 Approach — abstract emblem, keyed to civ + role
+> ⚠️ **§6.1, §6.2 and §6.3 below describe the REJECTED architecture — the shared ~8-archetype
+> system. Decision 2 reversed it in favour of a bespoke procedural design per civ, and bespoke
+> is what shipped.** There is no `archetype` tag in `EpochCatalog`, none in the draft JSON, and
+> no archetype draw routines. The live implementation is a `match tier` dispatch in
+> `StafferFace.gd:475 _draw_alien` to one hand-tuned routine per civilization.
+>
+> **Do not implement §6.2.** These sections are kept for the reasoning — the per-civ
+> `accent_color` palette and the `(property_index, tier, generation)` seed for
+> within-civ variation both carried forward into the bespoke routines, which is the part that
+> survived. Only the shared-silhouette-family idea died.
+
+### ~~6.1 Approach — abstract emblem, keyed to civ + role~~ *(superseded — see box above)*
 For `tier >= 2`, `draw_face` dispatches to an **alien portrait** routine instead of returning false.
 Each alien staffer is an abstract, flat-cartoon "being/emblem" composed from:
 1. **The civ's `accent_color`** (from `EpochCatalog.accent_color`) → a per-civ palette (base + a
@@ -153,7 +210,7 @@ Each alien staffer is an abstract, flat-cartoon "being/emblem" composed from:
 seeded variation — distinct enough without a bespoke design per civ. (If any flagship civ deserves a
 one-off look later, the authored-`manager_portrait` override already exists.)
 
-### 6.2 Data: add an `archetype` tag per alien epoch
+### ~~6.2 Data: add an `archetype` tag per alien epoch~~ *(NEVER BUILT — do not implement)*
 `EpochCatalog` gains an `archetype` string per alien epoch (Earth stays human). The 20 draft civs are
 freshly authored (not from the 10-category `alien_civilizations.md` taxonomy), so each needs an
 archetype assigned — a small authoring step driven by name/currency/lore (e.g. Vashti Deep-Court
@@ -205,17 +262,32 @@ and roster-length expansion are the work. Alternatively, deliver per-epoch engag
 
 ## 9. Open decisions for Tim
 
-1. **Path A vs Path B** (§3) — recommend A now (flavor + scale + portraits), B/modifiers later.
-2. **Alien portrait style** (§6.1) — abstract archetype-emblem (recommended, scalable) vs. a richer
-   per-civ authored look (expensive). Recommend abstract.
-3. **How many of the 20 to enable first** — all 20 at once, or a first batch (e.g. tiers 7–11) to
-   validate the pipeline + portraits on device before the rest.
-4. **Planet watermark** — generic/procedural fallback for tiers 7–26 (recommended) vs. commissioning
-   20 world images now.
+**Status of these four, corrected 2026-08-06 — three are decided, one is still open.**
+
+1. ~~**Path A vs Path B**~~ — **DECIDED: PATH B**, reversing this doc's own recommendation.
+   The Sim was decisive: with property count stuck at 52, epoch 7 took 31 days and epoch 10
+   took **169 billion years**. Shipped.
+2. ~~**Alien portrait style**~~ — **DECIDED: bespoke per-civ**, rejecting the recommended
+   abstract archetype system. Shipped for every tier 3–27.
+3. ~~**How many to enable first**~~ — **DECIDED: first batch tiers 7–11, then the rest.**
+   Both batches shipped. ⚠️ **The device-validation half of this decision was only honoured
+   for batch 1** — see the status box at the top.
+4. **Planet watermark — STILL OPEN.** `HeroStat.PLANET_IMAGE_PATHS` holds 6 authored world
+   SVGs (Earth → Chronophage); tiers 7–27 have no art and rely on a bounds guard. The choice
+   — generic/procedural planet tinted by the civ accent colour vs. commissioning ~20 world
+   images — has never been made. Deferred as an art-pass item; tracked in
+   `Device_Feel_Test_Checklist.md` §7.3.
 
 ---
 
-## 10. Suggested phasing (assuming Path A)
+## ~~10. Suggested phasing (assuming Path A)~~ — DEAD, Path A was reversed
+
+> Kept only as a record of the plan that was abandoned. Path B shipped instead: cohort
+> generation per epoch, bespoke portraits per civ, no `archetype` tags. The durable recipe
+> for reproducing a ladder extension lives in the project memory's civ-content-pipeline
+> entry, not here.
+
+*Original phasing follows.*
 
 - **P0 — decisions** (§9).
 - **P1 — wire the civs:** transform draft → 20 `EpochCatalog` entries; extend `EpochTest` + run

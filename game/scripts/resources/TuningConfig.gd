@@ -352,8 +352,11 @@ extends Resource
 ## AND the telegraph guarantee's force-spawn both hold their fire until it expires. WHY: deep
 ## rides sit so close to the force-spawn bound that the next event used to spawn on almost the
 ## very tick a vent resolved — a metronome, not a hazard. A small rolled breather makes the
-## spacing read as random again without touching the depth-hazard curve itself. Tick-time, so
-## the frenzy freeze pauses it like every other vent clock.
+## spacing read as random again without touching the depth-hazard curve itself. Tick-time
+## rather than OS time, so a pause or scene reload can never eat part of the breather.
+## (This comment used to say the frenzy freeze pauses it "like every other vent clock" —
+## that freeze was REMOVED 2026-07-19; the vent game now runs straight through a burn.
+## See RushMomentumState.gd:323-330.)
 @export var rush_momentum_vent_refractory_min: float = 0.4  # feel-tune
 
 ## The longest rolled post-vent quiet time (seconds). The success top-off reserves THIS much

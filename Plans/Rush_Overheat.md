@@ -4,7 +4,29 @@
 hold-forever ratchet into a push-your-luck heat system: the property "heats up" as you rush —
 that's WHY its productivity rises — but push it too hot and it shuts down temporarily.
 
-**Status:** Design agreed in conversation 2026-07-15; not yet implemented.
+**Status:** ⚠️ **SHIPPED AND THEN SUPERSEDED IN PART. Read this box before anything below
+it.** (Status corrected 2026-08-06; this doc previously read *"not yet implemented"* for a
+system that has been live on `main` since mid-July, which made it actively misleading.)
+
+The heat model in this doc **was built and merged** — one scalar, bands, continuous
+`bonus = f(heat)`, the lockout-and-re-arm penalty. It then became the foundation for
+**Rush Momentum Phase 3, Overdrive Vent Windows** (`Plans/Overdrive_Vent_Windows.md`,
+merged 2026-07-20), which replaced several mechanisms specified here.
+
+**Three things below are WRONG about the shipped game. Do not build from them:**
+
+| This doc says | The game actually does | Changed by |
+|---|---|---|
+| The overheat point is a **secretly rolled random ceiling** (`rush_heat_ceiling_min` 1.40 / `_max` 1.60) | **No random ceiling exists.** Vent Windows replaced the hidden fuse with timed vent events; unpredictability now lives in *window arrival time*, not in a hidden number. Neither knob exists in `TuningConfig.gd`. | Vent Windows |
+| A frenzy burn **freezes** heat, bonus, bleed and lockout drain | **The freeze is GONE.** The vent game runs straight through a burn — see `RushMomentumState.gd:323-330`. Tim, 2026-07-19: *"I don't like the way that frenzy and rush lock each other out."* Blowing a vent during a burn costs you the burn too, which is the drama that makes it worth doing. | Tim, 2026-07-19 |
+| The knob table (`rush_bonus_peak` 0.55, `rush_locked_drain_per_second`, `rush_rearm_seconds`, both ceiling knobs) | **None of those five names exist in `TuningConfig.gd`.** The live knobs are the `rush_momentum_*` family, documented in `Plans/Overdrive_Vent_Windows.md`. | Vent Windows |
+
+**What is still true here:** the core model (§"Core model: ONE scalar, no timers"), the
+reasoning for why heat and momentum are the same meter, the hysteresis-for-free property,
+the `bonus = f(heat)` invariant, and the decision log as a record of *why* the design went
+this way. Read it as the origin story, not the specification.
+
+**The +55% peak was never validated the way this doc required** — see Open items below.
 
 ## The problem this solves
 
@@ -38,7 +60,19 @@ every tier is a **heat range**, not a timed state. All feel questions become ban
 - Heat/bonus mapping stays a pure function `bonus = f(heat)` — one variable drives payout,
   display, and danger state, preserving the existing "cash always matches the readout" invariant.
 
-## Randomized ceiling (Tim, 2026-07-15: "the exact point of overheating should not be entirely predictable")
+## ~~Randomized ceiling~~ — SUPERSEDED, NEVER SHIPPED IN THIS FORM
+
+> **Superseded by Overdrive Vent Windows (merged 2026-07-20).** The design goal Tim stated
+> here — *"the exact point of overheating should not be entirely predictable"* — survives,
+> but the mechanism does not. There is no hidden rolled ceiling in the game. Unpredictability
+> comes from *when a vent window arrives* and how many lifts it demands. `rush_heat_ceiling_min`
+> and `rush_heat_ceiling_max` do not exist in `TuningConfig.gd`. The section is kept because
+> the guardrail reasoning below (randomness confined to the Critical band so the warning tiers
+> stay trustworthy) is the principle that carried forward into window scheduling.
+
+*Original text follows.*
+
+### Original design (Tim, 2026-07-15: "the exact point of overheating should not be entirely predictable")
 
 - The overheat ceiling is **rolled secretly per excursion**: each time heat climbs into the Hot
   band from below, roll a fresh ceiling uniformly within the Critical band (first-cut: 140%–160%).
@@ -62,7 +96,19 @@ every tier is a **heat range**, not a timed state. All feel questions become ban
    but the button must LOOK disabled — an unresponsive live-looking button reads as a bug.
 4. The true cost of overheating is the full rebuild climb from zero; the lockout itself stays short.
 
-## Frenzy interaction (Tim: freeze)
+## ~~Frenzy interaction (Tim: freeze)~~ — REMOVED FROM THE GAME 2026-07-19
+
+> **The freeze was built, then deliberately removed** (Tim, 2026-07-19: *"I don't like the
+> way that frenzy and rush lock each other out"*). Frenzy and overdrive now run
+> simultaneously — the vent game continues straight through a burn, and overheating mid-burn
+> costs you the rest of the burn. That interaction was device-verified on 2026-07-20 (§6
+> sitting E of `Device_Feel_Test_Checklist.md`, Tim: *"looks good"*) and is the peak of the
+> loop by design, not an accident. Authoritative comment: `RushMomentumState.gd:323-330`.
+>
+> The rationale below — that an unwarned overheat would gut the frenzy payoff — was answered
+> differently in the end: the vent game *warns*, so the risk is informed rather than blind.
+
+*Original text follows.*
 
 During frenzy, **heat gain pauses and the bonus freezes** at whatever depth the player entered
 with. Rationale: the overdrive tiers will tempt players to ride Critical into a frenzy, and an
@@ -79,7 +125,17 @@ for being overpowered) — it is only reachable for seconds at a time. **The rea
 bonus must be measured with the CarbAutopilot-style harness before device testing** (durable
 lesson: instrument feel bugs, don't iterate blind).
 
-## Knobs (all live in Balance Tuning)
+## ~~Knobs~~ — FIRST-CUT PROPOSALS; FIVE OF THESE NAMES DO NOT EXIST
+
+> **Do not look for these in Balance Tuning.** `rush_heat_ceiling_min`,
+> `rush_heat_ceiling_max`, `rush_bonus_peak`, `rush_locked_drain_per_second` and
+> `rush_rearm_seconds` are **not** in `TuningConfig.gd` — they were proposals that the
+> Vent Windows implementation either renamed or made unnecessary. The live knobs are the
+> `rush_momentum_*` family (`TuningConfig.gd:254` onward); `Plans/Overdrive_Vent_Windows.md`
+> documents the shipped set and their device-tuned values. Kept below as the record of what
+> was originally scoped and roughly where the first cuts sat.
+
+*Original proposal follows.*
 
 | Knob | First-cut | Meaning |
 |---|---|---|
@@ -97,11 +153,31 @@ Existing knobs (`rush_momentum_build_per_second`, `rush_momentum_bleed_per_secon
 `rush_momentum_grace_seconds`) keep their roles; `rush_momentum_max_bonus` is superseded by the
 band/bonus knobs above.
 
-## Open items
+## Open items (status reviewed 2026-08-06)
 
-- Exact haptic pattern per tier (device pass).
-- Whether the tier chip needs a sound cue (device pass).
-- Autopilot duty-cycle measurement to validate the +55% peak before Tim's device verdict.
+- **Exact haptic pattern per tier (device pass).** *Partly overtaken.* Vent Windows settled
+  the pattern as **pulse count = lift count** (`MomentumBar.gd:893 _pulse_vent_telegraph`,
+  firing at spawn rather than window-open). The knobs are live
+  (`rush_momentum_haptic_*_ms`, `TuningConfig.gd:460-473`). **Still never device-judged for
+  feel** — tracked in `Device_Feel_Test_Checklist.md` §7.5.
+- **Whether the tier chip needs a sound cue (device pass).** *Now in scope of the audio
+  work* — `Plans/Audio_System.md` (2026-08-06) covers the overdrive layer, including a
+  continuous heat-tracking tone plus discrete vent cues. This item folds into that plan's
+  Phase 3 rather than standing alone.
+- **Autopilot duty-cycle measurement to validate the +55% peak.** ⚠️ **Still genuinely open,
+  and it matters more than it looks.** The doc's own requirement was *"the realistic average
+  bonus must be measured with the CarbAutopilot-style harness **before** device testing"* —
+  device testing then happened without it. Note what the peak is: a near-doubling of a cap
+  that **had already been halved once on device for being overpowered**.
+  *Partial credit:* Vent Windows sim-measured the duty cycle at the shipped 0.7 s approach —
+  cruise **+24.9%**, skilled venter **+68.7%**, sloppy **−18.3%**, timid farmer **+11.6%** —
+  so the *system* is instrumented even though this doc's specific +55% figure never was. The
+  live ladder is uncapped (`rush_momentum_vent_bonus_step` 0.30, no ceiling), which makes a
+  fixed "peak" the wrong question now. **The live version of this concern is the vent-bonus
+  stacking cap**, tracked in `Device_Feel_Test_Checklist.md` §7.1.
+- **`rush_locked_drain_per_second` never got a first-cut number** — only "tune for 8–12 s
+  lockout." Moot as written (the knob does not exist), but the lockout duration it was meant
+  to control is real and has never been separately tuned.
 
 ## Decision log
 

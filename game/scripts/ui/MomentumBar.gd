@@ -115,6 +115,17 @@ var _dynasty: DynastyState
 ## what the player earns. All this flag does is explain WHY rush is unavailable.
 var _auto_purchase_locked := false
 
+## The last state Main pushed, remembered verbatim so the button can be painted correctly no matter
+## which order the push and this node's _ready() happen in.
+##
+## They genuinely race: _build_property_tab() builds this bar into a DETACHED VBoxContainer and
+## Main pushes the state immediately (Main.gd, right after the bar is added), but a node only runs
+## _ready() once it actually enters the tree — which is later, when the tab is mounted. So the first
+## push regularly lands while _auto_purchase_button is still null. Keeping the values here lets
+## _build_auto_purchase_button re-apply them instead of assuming locked-and-off.
+var _auto_purchase_unlocked := false
+var _auto_purchase_enabled := false
+
 ## The OVR button, pinned left of the meter (the FrenzyBar layout). Always visible; enabled
 ## only while cruising — see _process.
 var _overdrive_button: Button
@@ -291,6 +302,10 @@ func set_auto_purchase_state(unlocked: bool, enabled: bool) -> void:
 	# The rush lockout is exactly "owned AND switched on". An unowned track can have a stale
 	# `enabled` left over from a prestige that reset the legacy levels, and that must not lock rush.
 	_auto_purchase_locked = unlocked and enabled
+	# Remembered BEFORE applying, because the apply is a no-op until _ready has built the button —
+	# this is what lets _ready pick the state back up. See the fields' comment.
+	_auto_purchase_unlocked = unlocked
+	_auto_purchase_enabled = enabled
 	_apply_auto_purchase_look(unlocked, enabled)
 
 
@@ -598,8 +613,21 @@ func _build_auto_purchase_button() -> void:
 	_auto_purchase_button.add_child(SecondaryTapButton.new())
 	add_child(_auto_purchase_button)
 
-	# Start locked-and-off; Main pushes the real state via set_auto_purchase_state at startup.
-	_apply_auto_purchase_look(false, false)
+	# Paint whatever Main last pushed — NOT a hardcoded locked-and-off.
+	#
+	# This line used to read `_apply_auto_purchase_look(false, false)`, which hid the button after
+	# every prestige (Tim, 2026-08-06: "auto-buy is purchased in the estate tab, but the button is
+	# not visible on the game tab after prestige"). Main pushes the state while this bar is still
+	# detached, so that push found no button and did nothing — and then this line overwrote the
+	# truth with "locked". Because Main memoises what it has pushed, and `unlocked` never changed
+	# again, it never re-pushed and the button stayed hidden for the rest of the run.
+	#
+	# It only showed up after a prestige because on a fresh dynasty the desk is unowned at build
+	# time, so BUYING it later flipped unlocked false -> true and repainted. Post-prestige the desk
+	# is already owned when the bar is built, so that flip never comes.
+	#
+	# The fields default to false, so a genuinely fresh bar still starts locked-and-off.
+	_apply_auto_purchase_look(_auto_purchase_unlocked, _auto_purchase_enabled)
 
 
 ## One plate for the AUTO-BUY button, matching UiPalette's button geometry (3px/4px/12px) so it

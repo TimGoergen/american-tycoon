@@ -76,6 +76,11 @@ const LOCKED_ICON_ALPHA := 0.45
 const CONTENT_PAD_SIDE := 34
 const CONTENT_PAD_VERTICAL := 22
 
+## How far a finger must travel before a press on a game panel counts as a SCROLL rather than a TAP
+## (see the drag-to-scroll section at the bottom of this file). Matched to DevTuningPanel's own
+## threshold so the two button-tiled lists in the game feel the same under the thumb.
+const DRAG_SCROLL_THRESHOLD := 12.0
+
 ## The bloodline whose cleared tiers + income bonus are shown. Threaded in from Main (setup) before
 ## the first open(); read fresh on every refresh so the screen is never stale.
 var _dynasty: DynastyState
@@ -89,6 +94,13 @@ var _type_scripts: Array = []
 ## (see _show_all_games_override). Threaded in from Main via setup, like _dynasty. May be null if
 ## anything ever builds this screen without calling setup, so every read goes through the helper.
 var _tuning: TuningConfig
+
+## Drag-to-scroll bookkeeping for the current press gesture (see the section at the bottom of this
+## file). _drag_accum is the total vertical travel so far; _drag_moved latches once that travel
+## passes DRAG_SCROLL_THRESHOLD, which is what tells _on_play_pressed the gesture was a scroll and
+## not a tap. Reset on every fresh press, including presses on LOCKED rows.
+var _drag_accum := 0.0
+var _drag_moved := false
 
 ## Our own minigame host for challenge play (mirrors MinigameReviewScreen's _player) — added as a
 ## child so a run never interferes with Main's prestige host. Built in setup (it needs the tuning).
@@ -351,6 +363,11 @@ func _make_game_panel(game_key: String, type_script: Script) -> Control:
 	if not locked:
 		panel.pressed.connect(_on_play_pressed.bind(type_script))
 
+	# Drag-to-scroll. Connected for EVERY row, locked ones included: a disabled Button still swallows
+	# the touch (disabling changes the press logic, not the mouse filter), so a locked row left
+	# unwired would be a dead patch of list you cannot scroll from. See the section at the bottom.
+	panel.gui_input.connect(_on_panel_gui_input)
+
 	# Content overlay: a full-rect margin (clearing the gold frame) holding the icon + text row. All
 	# of it ignores the mouse so the underlying button receives every tap.
 	var pad := MarginContainer.new()
@@ -511,6 +528,13 @@ func _make_info_label(
 
 ## A game panel tapped: hide the list and launch its endless challenge run on our own host.
 func _on_play_pressed(type_script: Script) -> void:
+	# The player was scrolling, not choosing. Godot fires `pressed` whenever the finger comes up
+	# inside a Button, and after a flick the finger is almost always still over SOME row — so
+	# without this guard, every scroll would launch whichever challenge happened to end up under
+	# the thumb. This is the whole reason the gesture's travel is tracked.
+	if _drag_moved:
+		return
+
 	# Hide BOTH list-mode layers (backdrop + card). The backdrop is always-on and can sit ABOVE the
 	# player in child order, so leaving it visible covered the whole run with just the background
 	# image (Tim, 2026-07-22). With both hidden, the player host is the only visible layer.
@@ -533,3 +557,65 @@ func _return_to_list() -> void:
 func _on_back_pressed() -> void:
 	visible = false
 	closed.emit()
+
+
+# ---------------------------------------------------------------------------
+# Drag-to-scroll (Tim reported 2026-08-06: "the buttons block swipe scrolling")
+# ---------------------------------------------------------------------------
+# Every game row is one full-width Button (Tim, 2026-07-22 — no separate PLAY), and the rows tile the
+# whole list with only an 18px gap between them. So there is nowhere neutral to grab: a Button's
+# default MOUSE_FILTER_STOP swallows the touch before the ScrollContainer ever sees a drag, and the
+# list cannot be swiped at all.
+#
+# MOUSE_FILTER_PASS is NOT the fix here. UiPalette.allow_scroll_drag_through() deliberately skips
+# BaseButtons — a PASS button would forward its taps to the parent as well as acting on them — which
+# is why the property ladder still scrolls (its rows are mostly non-button surface) while this screen
+# cannot. Instead we pan the scroll ourselves, exactly as DevTuningPanel does for its collapsed
+# section headers, which hit this same wall on 2026-07-22.
+#
+# A short press still plays the game; once a gesture's travel passes DRAG_SCROLL_THRESHOLD it counts
+# as a scroll and that row's tap is suppressed in _on_play_pressed.
+
+
+## Route one row's input: a fresh press starts a new gesture, anything else may be a drag.
+##
+## The press reset lives HERE rather than on the Button's `button_down` signal (DevTuningPanel's
+## wiring) for one reason: locked rows are DISABLED Buttons, and a disabled Button emits no
+## button_down at all. Reading the press off the raw event instead keeps locked rows scrollable.
+func _on_panel_gui_input(event: InputEvent) -> void:
+	if event is InputEventScreenTouch and event.pressed:
+		_begin_drag_gesture()
+		return
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		_begin_drag_gesture()
+		return
+	_pan_scroll_on_drag(event)
+
+
+## Start tracking a fresh press gesture, before any travel.
+func _begin_drag_gesture() -> void:
+	_drag_accum = 0.0
+	_drag_moved = false
+
+
+## Pan the list when a press over a row turns into a drag. Never consumes the event, so a genuine
+## tap still reaches the Button's own `pressed` signal.
+func _pan_scroll_on_drag(event: InputEvent) -> void:
+	var delta_y := 0.0
+	if event is InputEventScreenDrag:
+		delta_y = event.relative.y
+	elif event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT):
+		# Desktop only. Godot's emulate_mouse_from_touch (on by default) also synthesises a mouse
+		# motion for every InputEventScreenDrag, so counting both on a phone would scroll the list
+		# at twice the speed of the finger. On mobile the ScreenDrag branch above is the real one.
+		if OS.has_feature("mobile"):
+			return
+		delta_y = event.relative.y
+	else:
+		return
+
+	# Finger down the screen (delta_y > 0) reveals EARLIER rows, so scroll_vertical decreases.
+	_scroll.scroll_vertical -= int(delta_y)
+	_drag_accum += absf(delta_y)
+	if _drag_accum >= DRAG_SCROLL_THRESHOLD:
+		_drag_moved = true

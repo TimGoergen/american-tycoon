@@ -282,11 +282,26 @@ const TIER_CHIP_FADE_OUT_SEC := 0.4
 ## button honest about "running" versus "running dry".
 const AUTO_PURCHASE_PULSE_SECONDS := 0.35
 
-## Peak brightness multiplier at the top of the pulse. `modulate` MULTIPLIES, so on the lit plate
-## (navy field, mustard frame and text) the navy barely moves while the gold frame and label blow
-## out toward white — the flare reads as the button's own outline flashing, not as the whole
-## control changing colour, and the same multiplier stays legible on the unlit mustard plate.
-const AUTO_PURCHASE_PULSE_PEAK := 1.8
+## Peak brightness multiplier at the top of the pulse. `modulate` MULTIPLIES, so a modest number
+## barely moves the lit plate's dark navy field — 1.8 was tried first and Tim's verdict was "too
+## faint to draw attention" (2026-08-07). At 3.0 the mustard frame and label saturate to white and
+## the navy field itself lifts to a bright blue, so the whole control flashes rather than just its
+## outline.
+const AUTO_PURCHASE_PULSE_PEAK := 3.0
+
+## How much the button swells at the top of the pulse (Tim, 2026-08-07). Applied as `scale`, NOT by
+## touching size: this button sits in an HBoxContainer beside the meter, so a real size change would
+## re-run the layout and shove the meter sideways on every purchase. `scale` is a draw transform —
+## the container still sees the same 210px box, and nothing moves.
+##
+## 6% on a 210px button is about 6px of growth per side, which reads at a glance without the button
+## colliding with the meter across the row's 8px separation.
+##
+## Hit-testing is unaffected in the SAFE direction: SecondaryTapButton checks get_global_rect(),
+## which ignores scale, so the tap target stays the button's true 210px box. Mid-pulse the art is a
+## few px larger than the target rather than the other way round — no phantom taps land outside the
+## button, you simply cannot hit the transient halo.
+const AUTO_PURCHASE_PULSE_SCALE := 1.06
 
 ## The READY flash's peak alpha and fade time.
 const READY_FLASH_ALPHA := 0.75
@@ -360,10 +375,17 @@ func _fade_auto_purchase_pulse(delta: float) -> void:
 	_auto_purchase_pulse_seconds = maxf(0.0, _auto_purchase_pulse_seconds - delta)
 	if _auto_purchase_pulse_seconds <= 0.0:
 		_auto_purchase_button.modulate = Color.WHITE
+		_auto_purchase_button.scale = Vector2.ONE
 		return
 	var strength := _auto_purchase_pulse_seconds / AUTO_PURCHASE_PULSE_SECONDS
 	var brightness := 1.0 + (AUTO_PURCHASE_PULSE_PEAK - 1.0) * strength
 	_auto_purchase_button.modulate = Color(brightness, brightness, brightness)
+	# Grow about the button's CENTRE. The pivot is refreshed every pulsing frame rather than set
+	# once, because the button's height is SIZE_FILL — it follows the meter row, so a layout change
+	# would otherwise leave the pivot stale and make the swell drift off-centre.
+	_auto_purchase_button.pivot_offset = _auto_purchase_button.size * 0.5
+	var swell := 1.0 + (AUTO_PURCHASE_PULSE_SCALE - 1.0) * strength
+	_auto_purchase_button.scale = Vector2(swell, swell)
 
 
 ## The OVERDRIVE (OVR) button, so a tutorial card can anchor to it. It stays disabled until the

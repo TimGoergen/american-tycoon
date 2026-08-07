@@ -161,10 +161,18 @@ func _test_purchase_pulse(bar_script: GDScript, tuning: TuningConfig) -> void:
 
 	_check("the button starts at rest (plain white modulate)", button.modulate.is_equal_approx(
 		Color.WHITE))
+	_check("...and at rest scale", button.scale.is_equal_approx(Vector2.ONE))
 
 	bar.flash_auto_purchase()
 	bar._process(0.0)  # apply the pulse without advancing it
 	_check("a purchase brightens the button", button.modulate.r > 1.0)
+	_check("a purchase also swells the button", button.scale.x > 1.0)
+	# The swell must be SCALE, never size: this button shares an HBoxContainer with the meter, so a
+	# real size change would re-run the layout and shove the meter sideways on every purchase.
+	_check("the swell leaves the layout box untouched (scale, not size)",
+		is_equal_approx(button.size.x, 210.0))
+	# Growing about the centre, not the top-left corner.
+	_check("it grows about its centre", button.pivot_offset.is_equal_approx(button.size * 0.5))
 
 	# Mid-pulse it must be dimmer than the peak but still brighter than rest — i.e. actually
 	# decaying, not latched at full brightness until it snaps off.
@@ -184,6 +192,7 @@ func _test_purchase_pulse(bar_script: GDScript, tuning: TuningConfig) -> void:
 	bar._process(1.0)
 	_check("the button returns to exactly plain white", button.modulate.is_equal_approx(
 		Color.WHITE))
+	_check("...and to exactly rest scale", button.scale.is_equal_approx(Vector2.ONE))
 
 	bar.queue_free()
 
@@ -194,4 +203,6 @@ func _test_purchase_pulse(bar_script: GDScript, tuning: TuningConfig) -> void:
 	hidden._process(0.0)
 	_check("an unowned desk's hidden button never flares",
 		hidden_button != null and hidden_button.modulate.is_equal_approx(Color.WHITE))
+	_check("...and never swells",
+		hidden_button != null and hidden_button.scale.is_equal_approx(Vector2.ONE))
 	hidden.queue_free()

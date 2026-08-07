@@ -703,6 +703,12 @@ func _pan_scroll_on_drag(event: InputEvent) -> void:
 	if event is InputEventScreenDrag:
 		delta_y = event.relative.y
 	elif event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT):
+		# Desktop only. Godot's emulate_mouse_from_touch (on by default) synthesises a mouse motion
+		# for EVERY InputEventScreenDrag, so on a phone this branch fired alongside the one above:
+		# the list panned at twice the speed of the finger and _drag_accum hit the 12px threshold
+		# after ~6px of real travel, making a tap read as a scroll far too easily.
+		if OS.has_feature("mobile"):
+			return
 		delta_y = event.relative.y
 	else:
 		return

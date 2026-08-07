@@ -1997,7 +1997,22 @@ const TUNING_BUTTON_FONT := 50
 ## TUNING_BUTTON_FONT because the locked label is two lines: at the full size the pair would not
 ## fit the button's fixed height and would grow the row, pushing the settings page's lower
 ## content off the bottom (the tab is a plain VBox with no scroll).
-const CHALLENGES_LOCKED_FONT := 32
+##
+## 32 -> 30 (2026-08-06): 32 fixed the HEIGHT but left the WIDTH ~9px short. Measured, the longer
+## line "AFTER YOUR FIRST SUCCESSION" renders 493px at size 32, while the button — half of a
+## 16px-separated row inside a panel with 24px content margins, less the plate's own 12px padding
+## a side — offers about 484px. It was clipping. At 30 the line measures ~462px and fits.
+const CHALLENGES_LOCKED_FONT := 30
+
+## The gamepad on the CHALLENGES button (Tim, 2026-08-06) — the one Settings button that leads to
+## play rather than to a screen of numbers, so it is the one that earns a picture.
+const CHALLENGES_ICON := preload("res://art/icons/gamepad.svg")
+
+## How wide the gamepad is allowed to draw. The unlocked label "CHALLENGES" measures 319px at
+## TUNING_BUTTON_FONT against ~484px of usable button width, so 64px plus the icon/text gap sits
+## comfortably inside. The LOCKED state gets no icon at all: its two-line explainer already uses
+## the full width (see CHALLENGES_LOCKED_FONT), and there is simply nowhere to put one.
+const CHALLENGES_ICON_WIDTH := 64
 
 
 ## Keep the Settings tab's CHALLENGES button matching its unlock state. Challenge Mode opens only
@@ -2012,9 +2027,16 @@ func _refresh_challenges_button() -> void:
 	if unlocked:
 		_challenges_button.text = "CHALLENGES"
 		_challenges_button.add_theme_font_size_override("font_size", TUNING_BUTTON_FONT)
+		# The gamepad rides alongside the one-line label. Not a moving-UI violation: the button
+		# keeps its exact size and place either way (fixed height, EXPAND_FILL width) — only what
+		# is printed on it changes, the same way the locked reason line comes and goes.
+		_challenges_button.icon = CHALLENGES_ICON
+		_challenges_button.add_theme_constant_override("icon_max_width", CHALLENGES_ICON_WIDTH)
 	else:
 		_challenges_button.text = "CHALLENGES\nAFTER YOUR FIRST SUCCESSION"
 		_challenges_button.add_theme_font_size_override("font_size", CHALLENGES_LOCKED_FONT)
+		# No icon while locked — the two-line explainer needs every pixel of the width.
+		_challenges_button.icon = null
 
 
 ## Give a settings button a real GRAY disabled plate. UiPalette.style_button registers a CREAM

@@ -529,6 +529,11 @@ reason: they are live in whatever build is on the phone right now.*
 
 ### 7.5 Follow-ons from shipped work
 
+- [x] ~~**Active tab icon drop shadow.**~~ **KEEP — Tim, 2026-08-06: "the tab drop shadow looks
+      good."** The lit tab's icon now casts a 6px down-right shadow at 0.35 alpha, so the active
+      tab reads as raised rather than only repainted. Built as a third layer under the existing
+      silhouette + colour pair (the same art modulated to black), riding the same parallel tween.
+      Offset and alpha are the two knobs if it ever wants adjusting.
 - [ ] **`OVERHEATED` + countdown on each frozen row** — the TWEAK from §6 sitting A
       (your pick over a bare label, "COOLING DOWN", or a voiced line). `OVERHEATED` appears
       in `PropertyRow.gd`/`Main.gd`, so the label looks shipped; **confirm the countdown

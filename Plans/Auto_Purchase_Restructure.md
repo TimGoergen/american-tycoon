@@ -83,7 +83,15 @@ Per tick, repeat `quantity` times:
 **Re-price between every purchase**, not once per tick. That is the clause that makes the run
 cross properties, and it is the difference between this rule and the old one.
 
-Ties broken by property index, so behaviour is deterministic and testable.
+**Ties break cheapest → LEAST OWNED → property index** (Tim, 2026-08-07). Cost first; among
+equal costs prefer the property you own fewest of; index only as a final determinism guarantee
+so the sims can assert exact outcomes.
+
+The least-owned term matters more than it looks. Early rungs in a cohort are often priced
+identically, and cost-then-index alone would pour every purchase into whichever one happens to
+sort first, deepening a single property while its neighbours sat untouched. Preferring the
+least-owned spreads the run across the cohort — and because buying raises that property's next
+cost, the two rules reinforce rather than fight each other.
 
 ### 1.3 The tracks
 
@@ -135,33 +143,48 @@ Two consequences worth having:
 
 ---
 
-## 2. Migration
+## 2. Migration — there isn't one
 
-This is the risky half. The branch is unmerged, but **Tim's own test save owns both tracks**,
-and the decision is to refund rather than wipe.
+**Revised 2026-08-07.** The first draft specified a refund migration. Tim: *"I'm not worried
+about it because no one is actually playing this game yet, so just do what is easiest."*
 
-### 2.1 What must happen on load
+The easiest thing turns out to be **nothing at all**, and it is also the safest — a refund is
+the one part of this plan that could fail silently, and not writing it removes that risk
+entirely rather than mitigating it.
 
-1. Read the old `acquisitions_desk` and `head_hunters` levels **before** discarding them.
-2. Credit back every gem spent on both, computed from the OLD cost curve — not the new one.
-3. Delete both entries from the saved upgrade dictionary.
-4. Grant the new `auto_purchase_unlock` **nothing** — the refund is spendable, and re-buying is
-   the player's choice.
-5. Leave `ui_auto_purchase_enabled` alone; with no unlock owned it is inert (`set_auto_purchase_state`
-   already treats "enabled but not owned" as not-locked, and the button hides).
+### 2.1 Why doing nothing is safe (verified, not assumed)
 
-**The refund must use the old curve.** The natural bug here is to compute it from
-`LegacyUpgradeCatalog` after the entries have been rewritten, which would refund the wrong
-amount silently. Capture the old base/growth as literals in the migration function, with a
-comment saying why they are hardcoded.
+Stale `acquisitions_desk` / `head_hunters` entries will sit in existing saves forever. That is
+harmless here, and the reason is specific:
+
+- `LegacyUpgrades.load_save_dict` (`:257-263`) copies **every** saved id into `levels` without
+  validating it against the catalog, so unknown ids load without error.
+- Nothing ever scans `levels` and resolves the result against `LegacyUpgradeCatalog`. The only
+  iteration over that dictionary anywhere in the project is `DynastyState.gd:576-581`, and it
+  walks a **hardcoded list of six ids**, not the dictionary's keys. Every other read goes
+  through `get_level(SPECIFIC_ID)`.
+
+So a dead id is inert: never read, never summed, never looked up. It costs a few bytes of JSON.
+
+**This is exactly the property to re-check if that ever changes.** A future "total gems
+invested" or "list everything owned" feature that iterates `levels` and calls
+`get_definition(id)` would crash on these ghosts. If someone writes that, they must filter to
+catalog-known ids — which is good practice regardless.
 
 ### 2.2 SAVE_VERSION
 
-**Bump it.** The currency-format change deliberately did not bump, but that was additive and
-presentation-only. This one *destroys* saved upgrade levels and mints currency. A version bump
-is what makes the migration run exactly once.
+**No bump.** Nothing is destroyed, rewritten, or minted; the new upgrades are simply new ids
+that default to level 0. This matches the currency-format precedent (additive change, no bump)
+rather than the v13 utility restructure (which rewrote owned levels and did need one).
 
-### 2.3 The carry-to-heir list
+### 2.3 Tim's own save
+
+He is out the gems he spent on both old tracks. That needs no code: **the dev panel already has
+a grant-Legacy tool** (`DevTuningPanel.grant_legacy_requested`), so topping the test save back
+up is a few taps. Writing a refund path to serve one save that has a dev tool for exactly this
+would be the wrong trade.
+
+### 2.4 The carry-to-heir list
 
 `DynastyState._carry_player_settings_to_heir` must be checked, not assumed. Auto-purchase's
 enabled flag is deliberately NOT carried (it is the one setting that spends). That stays true —
@@ -190,11 +213,13 @@ rules that no longer exist (flagship exclusion, tab targeting, breadth). Its two
 - the cheapest next-unit is chosen at every step, not just the first
 - purchases never leave the current epoch
 - partial fill still stops cleanly when money runs out mid-run
+- **equal-cost rungs go to the least-owned one**, and identical cost *and* count fall back to
+  index — the tie-break is what stops the mode pouring everything into one property (§1.2)
 
-### 3.3 Catalog + migration
-Replace the two old upgrades with three new entries; write the refund migration; bump
-`SAVE_VERSION`. Add a migration test — refunding the wrong amount is silent, and silent
-currency bugs are the worst kind.
+### 3.3 Catalog
+Delete the two old upgrade definitions, add the three new ones. No migration, no
+`SAVE_VERSION` bump (§2). Worth one test asserting a save containing the dead ids still loads
+and plays — cheap, and it pins the "unknown ids are inert" property §2.1 depends on.
 
 ### 3.4 UI
 - Estate: three entries where there were two, grouped so the unlock reads as the gateway.
@@ -202,9 +227,10 @@ currency bugs are the worst kind.
 - The AUTO-BUY button, its pulse, and the rush lockout are all unchanged.
 
 ### 3.5 Device pass
-Ship an APK and confirm: the refund landed and is spendable, bulk hire is free from generation
-1, the greedy rule feels like it is buying sensible things, and a maxed-ish build is fun rather
-than alarming.
+Ship an APK and confirm: bulk hire is free from generation 1, the greedy rule feels like it is
+buying sensible things (watch whether the least-owned tie-break visibly spreads purchases
+across a cohort), and a maxed-ish build is fun rather than alarming. Grant yourself Legacy from
+the dev panel to re-buy the tracks (§2.3).
 
 ---
 
@@ -218,3 +244,14 @@ than alarming.
    it, it stays and simply loses its second consumer.
 4. **`Auto_Purchase_And_Bulk_Hire.md` needs a superseded box at the top** pointing here, per the
    doc-rot rule — its Parts A/B describe a shape that will no longer exist.
+5. **The "naming trap" assertion loses its home.** `AutoPurchaseTest` currently asserts that
+   `get_flagship_index_for_unlock_tier` and `get_property_index_for_unlock_tier` are different
+   properties, so a future rename merging the pair breaks a test rather than silently un-gating
+   pacing. Dropping the flagship exclusion deletes the only caller that made that assertion
+   natural. The collision is still real and still dangerous — the assertion should move to
+   `EpochTest`, which reads one of the two lookups, rather than disappear.
+6. **Quantity may want a per-tick spend ceiling instead of a count.** Not raised in the
+   interview, noted while writing §1.2: at 31 purchases a tick the mode's *cost* varies wildly
+   depending on where the cheapest rungs sit, so the same level feels very different early and
+   late. A cap expressed as "spend up to X% of cash per tick" would be self-scaling. Mentioned
+   only because it is cheap to consider now and expensive to retrofit.

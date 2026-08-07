@@ -72,9 +72,13 @@ var _rows: Array = []
 # tab's rows ever draw (the CPU win at 326 properties).
 var _epoch_tab := 0
 var _epoch_pager_label: Label       # the big civilization / "EARTH" name
-var _epoch_pager_sub: Label         # the "Blue Collar" / "White Collar" subtitle (blank for aliens)
+var _epoch_pager_sub: Label         # the collar on Earth, "ALIEN CIVILIZATION x / y" past it
 var _epoch_prev_button: Button
 var _epoch_next_button: Button
+## Jump-to-end arrows, outside the step arrows: « to Blue Collar, » to the deepest epoch reached
+## this run (Tim, 2026-08-06). Both follow the step arrows' enabled rule, so they gray in place.
+var _epoch_first_button: Button
+var _epoch_last_button: Button
 ## Red dot on the pager's NEXT button, shown when the player has earned enough to advance but hasn't
 ## bought all of the current era's properties (the ownership gate is blocking; Tim, 2026-07-23).
 var _epoch_next_badge: Panel
@@ -994,12 +998,35 @@ func _epoch_tab_name(tab: int) -> String:
 
 
 ## The subtitle under the name: the collar for Earth, blank for aliens (the civ name stands alone).
+##
+## Kept Earth-only on purpose. NewVenturesOverlay also calls this and renders "NAME · SUB", so an
+## alien subtitle here would leak a position counter into that nudge's copy. The pager's own richer
+## subtitle lives in _epoch_pager_sub_text below.
 func _epoch_tab_sub(tab: int) -> String:
 	if tab == 0:
 		return "BLUE COLLAR"
 	if tab == 1:
 		return "WHITE COLLAR"
 	return ""
+
+
+## The subtitle the PAGER shows. Earth keeps its collar; every alien civ gets its position in the
+## run's ladder, so the alien tabs read the same way the Earth ones do instead of standing bare
+## (Tim, 2026-08-06).
+##
+## Numbering: tab = tier − 1 uniformly, and tier 3 is the first alien (EpochState.LAST_EARTH_TIER
+## is 2), so alien N sits at tab N + 1. The total is how many aliens have been MET THIS RUN —
+## EpochState.current_tier is per-generation and resets to 1 at every succession
+## (see EpochState.gd:11-13), which is exactly the "current run" this counter means.
+func _epoch_pager_sub_text(tab: int) -> String:
+	if tab <= 1:
+		return _epoch_tab_sub(tab)
+	var index := tab - 1
+	# maxi guards the display, not the model: paging is already clamped to what you have reached, so
+	# these should always agree. If a future change ever lets you look at a tab beyond the frontier,
+	# "3 / 2" would be nonsense on screen — clamping keeps the readout honest either way.
+	var met := maxi(game.epoch.current_tier - EpochState.LAST_EARTH_TIER, index)
+	return "ALIEN CIVILIZATION %d / %d" % [index, met]
 
 
 func _build_epoch_pager() -> Control:
@@ -1009,6 +1036,12 @@ func _build_epoch_pager() -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
 	box.add_child(row)
+
+	# Jump-to-end arrows sit OUTSIDE the step arrows (Tim, 2026-08-06), so the row reads
+	# «  ‹  NAME  ›  » — travel distance grows outward from the middle.
+	_epoch_first_button = _make_pager_arrow("«")
+	_epoch_first_button.pressed.connect(func() -> void: _set_epoch_tab(0))
+	row.add_child(_epoch_first_button)
 
 	_epoch_prev_button = _make_pager_arrow("‹")
 	_epoch_prev_button.pressed.connect(func() -> void: _step_epoch_tab(-1))
@@ -1048,7 +1081,13 @@ func _build_epoch_pager() -> Control:
 	row.add_child(_epoch_next_button)
 	# Red-dot badge (same style as the Estate tab's): lit while the ownership gate blocks epoch
 	# progress, driven each frame from _property_blocking_epoch_progress in _process.
+	# It stays on the SINGLE next arrow: the badge means "the next epoch is blocked", which is a
+	# statement about one step forward, not about jumping to the frontier.
 	_epoch_next_badge = _make_estate_badge(_epoch_next_button)
+
+	_epoch_last_button = _make_pager_arrow("»")
+	_epoch_last_button.pressed.connect(func() -> void: _set_epoch_tab(_epoch_tab_max()))
+	row.add_child(_epoch_last_button)
 
 	_epoch_pager_dots = EpochPagerDots.new()
 	box.add_child(_epoch_pager_dots)
@@ -1161,7 +1200,11 @@ func _set_contact_caption(ready: bool, scale_factor: float) -> void:
 func _make_pager_arrow(glyph: String) -> Button:
 	var b := Button.new()
 	b.text = glyph
-	b.custom_minimum_size = Vector2(96, UiPalette.STANDARD_BUTTON_HEIGHT)
+	# 72 wide, not the original 96: four arrows now share this row, and at 96 they left the civ name
+	# only ~650px, which wrapped long names like QUARTZITE CONGLOMERATE far more often and made the
+	# pager's height jump as you paged (Tim's call, 2026-08-06). 72px is still a large tap target at
+	# this resolution and keeps ~790px for the name — about where it was with two arrows.
+	b.custom_minimum_size = Vector2(72, UiPalette.STANDARD_BUTTON_HEIGHT)
 	b.add_theme_font_override("font", UiPalette.make_bold_font())
 	b.add_theme_font_size_override("font_size", UiPalette.FONT_DISPLAY)
 	UiPalette.style_button(b, false)
@@ -1202,12 +1245,16 @@ func _update_epoch_pager() -> void:
 	if _epoch_pager_label == null:
 		return
 	_epoch_pager_label.text = _epoch_tab_name(_epoch_tab)
-	var sub := _epoch_tab_sub(_epoch_tab)
+	var sub := _epoch_pager_sub_text(_epoch_tab)
 	_epoch_pager_sub.text = sub
 	_epoch_pager_sub.visible = sub != ""
 	var last := _epoch_tab_max()
+	# The jump arrows share the single arrows' enabled rule exactly — at tab 0 both left arrows are
+	# dead, at the frontier both right ones are. Nothing hides; they gray in place.
 	_epoch_prev_button.disabled = _epoch_tab <= 0
+	_epoch_first_button.disabled = _epoch_tab <= 0
 	_epoch_next_button.disabled = _epoch_tab >= last
+	_epoch_last_button.disabled = _epoch_tab >= last
 	# One dot per UNLOCKED tab (0..last are open, contiguous). Hide the row entirely while only
 	# one tab is open — a lone dot indicates nothing, and the arrows already read as disabled.
 	var unlocked_count := last + 1

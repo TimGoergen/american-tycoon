@@ -51,8 +51,28 @@ const BUY_GEM_WIDTH := 38
 const HOLD_INITIAL_DELAY := 0.45
 const HOLD_REPEAT_INTERVAL := 0.35
 
+## How far a finger must travel before a press on any control in this list counts as a SCROLL and
+## not a tap (see the drag-to-scroll section at the bottom of this file). Matches the threshold
+## DevTuningPanel and ChallengesScreen use, so every button-tiled list in the game agrees.
+const DRAG_SCROLL_THRESHOLD := 12.0
+
 # The live upgrade/wallet state this shop reads and spends from.
 var _upgrades: LegacyUpgrades
+
+## The list's ScrollContainer, kept so the drag-to-scroll handler can pan it (see the section at
+## the bottom of this file).
+var _scroll: ScrollContainer
+
+## Drag-to-scroll bookkeeping for the current press gesture. _drag_accum is this gesture's total
+## vertical travel; _drag_moved latches once it passes DRAG_SCROLL_THRESHOLD, and from then on the
+## gesture is a scroll: it toggles no section and — critically — spends no gems.
+var _drag_accum := 0.0
+var _drag_moved := false
+
+## Whether the current hold has already made its purchase. A tap buys on RELEASE (see the drag
+## section), so these tell the release handler that the hold pump already did the work.
+var _buy_fired_in_hold := false
+var _retain_fired_in_hold := false
 
 # The spendable-Legacy readout at the top of the panel.
 var _wallet_label: Label
@@ -194,6 +214,7 @@ func _build_ui() -> void:
 	# gives every card outline the SAME margin on the left and right.
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	column.add_child(scroll)
+	_scroll = scroll  # kept for the drag-to-scroll handler (see _pan_scroll_on_drag)
 
 	var list_margin := MarginContainer.new()
 	list_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -298,6 +319,7 @@ func _add_collapsible_section(parent: VBoxContainer, category: String, accent: C
 	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
 		header.add_theme_color_override(state, text_color)
 	header.pressed.connect(_toggle_section.bind(category))
+	header.gui_input.connect(_on_list_control_gui_input)
 	parent.add_child(header)
 
 	# Right-aligned affordability badge (Tim, 2026-06-24; always-visible + MAX, 2026-07-31).
@@ -398,6 +420,9 @@ func _make_bulk_button(icon_path: String) -> Button:
 
 ## Flip one category section between expanded and collapsed (its header was tapped).
 func _toggle_section(category: String) -> void:
+	# A scroll, not a tap: swallow the toggle so swiping the list never flips sections open or shut.
+	if _drag_moved:
+		return
 	var section: Dictionary = _sections[category]
 	section["expanded"] = not bool(section["expanded"])
 	(section["body"] as Control).visible = bool(section["expanded"])
@@ -589,6 +614,7 @@ func _add_upgrade_card(parent: VBoxContainer, definition: Dictionary, accent: Co
 	# (see _process). bind(id) passes which upgrade this button buys.
 	buy_button.button_down.connect(_on_buy_down.bind(id))
 	buy_button.button_up.connect(_on_buy_up)
+	buy_button.gui_input.connect(_on_list_control_gui_input)
 	bottom_row.add_child(buy_button)
 
 	_cards[id] = {
@@ -711,6 +737,7 @@ func _add_retention_row(entry: Dictionary) -> void:
 	# upgrade cards' hold-to-buy: the down fires the first purchase, _process repeats it.
 	button.button_down.connect(_on_retain_down.bind(index))
 	button.button_up.connect(_on_retain_up)
+	button.gui_input.connect(_on_list_control_gui_input)
 	bottom.add_child(button)
 
 	_retention_rows[index] = {"status": status, "button": button}
@@ -844,17 +871,27 @@ func refresh() -> void:
 # Buttons
 # ---------------------------------------------------------------------------
 
-## Press: buy one level now, and arm the hold so continuing to hold auto-repeats.
+## Press: arm the hold. Deliberately does NOT buy yet — see _on_buy_up.
 func _on_buy_down(id: String) -> void:
 	_held_buy_id = id
 	_hold_elapsed = 0.0
 	_hold_repeating = false
-	_attempt_buy(id)
+	_buy_fired_in_hold = false
 
 
-## Release: stop any auto-repeat.
+## Release: this is where a TAP buys.
+##
+## The purchase used to fire on press, which cannot coexist with drag-to-scroll: a swipe across the
+## list would spend gems on every buy button it crossed, and by the time a drag is detectable the
+## money is already gone. Buying on release costs the few milliseconds of a tap and makes a swipe
+## free. A HOLD still buys — the pump in _process fires at HOLD_INITIAL_DELAY — so this only acts
+## when the hold never got that far and the gesture stayed put.
 func _on_buy_up() -> void:
+	var id := _held_buy_id
 	_held_buy_id = ""
+	if id == "" or _buy_fired_in_hold or _drag_moved:
+		return
+	_attempt_buy(id)
 
 
 ## While a buy or retain button is held, keep purchasing on a calm cadence (after an
@@ -869,32 +906,43 @@ func _process(delta: float) -> void:
 		_refresh_retention_affordability()
 
 	if _held_buy_id != "":
-		_hold_elapsed += delta
-		var threshold := HOLD_REPEAT_INTERVAL if _hold_repeating else HOLD_INITIAL_DELAY
-		if _hold_elapsed >= threshold:
-			_hold_elapsed = 0.0
-			_hold_repeating = true
-			if not _attempt_buy(_held_buy_id):
-				_held_buy_id = ""  # nothing left to buy — stop repeating
+		if _drag_moved:
+			_held_buy_id = ""  # the press became a scroll — buy nothing, spend nothing
+		else:
+			_hold_elapsed += delta
+			var threshold := HOLD_REPEAT_INTERVAL if _hold_repeating else HOLD_INITIAL_DELAY
+			if _hold_elapsed >= threshold:
+				_hold_elapsed = 0.0
+				_hold_repeating = true
+				_buy_fired_in_hold = true  # the release must not buy a second time
+				if not _attempt_buy(_held_buy_id):
+					_held_buy_id = ""  # nothing left to buy — stop repeating
 
 	if _held_retain_index >= 0:
-		_retain_hold_elapsed += delta
-		var retain_threshold := HOLD_REPEAT_INTERVAL if _retain_hold_repeating else HOLD_INITIAL_DELAY
-		if _retain_hold_elapsed >= retain_threshold:
-			_retain_hold_elapsed = 0.0
-			_retain_hold_repeating = true
-			# Main performs the purchase and updates this row in place; once the button
-			# reads disabled (fully retained / unaffordable) the repeat stops itself.
-			var row: Dictionary = _retention_rows.get(_held_retain_index, {})
-			var quoted := int(row.get("levels", 0))
-			# Auto-repeat is for SINGLE-level presses only (hire mode ×1). At ×10 / BLOCK / MAX
-			# the button is already a bulk action, and repeating it three times a second would let
-			# a finger resting on the screen empty the wallet over and over. So a bulk quote buys
-			# once on press and then the hold does nothing until release. (Tim, 2026-07-31.)
-			if row.is_empty() or quoted != 1 or (row["button"] as Button).disabled:
-				_held_retain_index = -1
-			else:
-				retain_requested.emit(_held_retain_index, quoted)
+		if _drag_moved:
+			_held_retain_index = -1  # same rule as buy: a scroll never spends
+		else:
+			_retain_hold_elapsed += delta
+			var retain_threshold := HOLD_REPEAT_INTERVAL if _retain_hold_repeating else HOLD_INITIAL_DELAY
+			if _retain_hold_elapsed >= retain_threshold:
+				_retain_hold_elapsed = 0.0
+				# Main performs the purchase and updates this row in place; once the button
+				# reads disabled (fully retained / unaffordable) the repeat stops itself.
+				var row: Dictionary = _retention_rows.get(_held_retain_index, {})
+				var quoted := int(row.get("levels", 0))
+				if row.is_empty() or (row["button"] as Button).disabled:
+					_held_retain_index = -1
+				elif quoted != 1:
+					# Auto-repeat is for SINGLE-level presses only (hire mode ×1). At ×10 / MAX the
+					# button is already a bulk action, and repeating it three times a second would
+					# let a finger resting on the screen empty the wallet over and over (Tim,
+					# 2026-07-31). The hold simply idles here; the one bulk purchase happens on
+					# release, in _on_retain_up.
+					pass
+				else:
+					_retain_hold_repeating = true
+					_retain_fired_in_hold = true  # the release must not retain a second time
+					retain_requested.emit(_held_retain_index, quoted)
 
 
 ## Press on a RETAIN button: buy exactly the block this button's label just quoted, then arm the
@@ -909,12 +957,26 @@ func _on_retain_down(property_index: int) -> void:
 	_held_retain_index = property_index
 	_retain_hold_elapsed = 0.0
 	_retain_hold_repeating = false
-	retain_requested.emit(property_index, levels)
+	_retain_fired_in_hold = false
 
 
-## Release: stop the retain auto-repeat.
+## Release: this is where a TAP retains. Mirrors _on_buy_up, and for the same reason — retention is
+## the most expensive thing on this screen, so a swipe across it must never spend.
+##
+## The quote is re-read here rather than captured on press: the wallet can change under a hold (the
+## pump buys, Main updates the row in place), and the label the player last saw is the promise being
+## honoured. Buying exactly the quoted count is the existing rule that stops a mid-press gem grant
+## from overcharging.
 func _on_retain_up() -> void:
+	var index := _held_retain_index
 	_held_retain_index = -1
+	if index < 0 or _retain_fired_in_hold or _drag_moved:
+		return
+	var row: Dictionary = _retention_rows.get(index, {})
+	var levels := int(row.get("levels", 0))
+	if levels <= 0 or (row["button"] as Button).disabled:
+		return
+	retain_requested.emit(index, levels)
 
 
 ## Buy one level of an upgrade, refresh the shop, and notify Main. Returns whether the
@@ -925,3 +987,69 @@ func _attempt_buy(id: String) -> bool:
 	refresh()           # update the wallet and this card immediately
 	purchased.emit(id)  # let Main re-apply the effect to the living generation
 	return true
+
+
+# ---------------------------------------------------------------------------
+# Drag-to-scroll (2026-08-06)
+# ---------------------------------------------------------------------------
+# Every section header is a full-width Button, so with the sections collapsed — which is how they
+# all start — the headers tile the whole list and a touch has nowhere neutral to grab. A Button's
+# default MOUSE_FILTER_STOP swallows the press before the ScrollContainer sees a drag, so the list
+# could not be swiped. Same failure DevTuningPanel and ChallengesScreen hit; same fix: pan the
+# scroll ourselves and suppress the tap once the gesture is clearly a scroll.
+#
+# UiPalette.allow_scroll_drag_through() (called on the list and the staff list) cannot help: it
+# deliberately early-returns on any BaseButton, because a MOUSE_FILTER_PASS button would forward
+# its taps to the parent as well as acting on them. It rescues the card surfaces only.
+#
+# THE EXTRA STAKE ON THIS SCREEN: buy and retain used to purchase on button_down, so a swipe would
+# have spent gems on every button it crossed — and a drag is not detectable until after the press.
+# That is why _on_buy_down/_on_retain_down no longer buy; the purchase moved to release (or to the
+# hold pump). Nothing here can undo a purchase, so the only safe design is not to make one yet.
+
+
+## Route one list control's input: a fresh press starts a new gesture, anything else may be a drag.
+##
+## The press reset is read off the raw event rather than the Button's button_down signal, because
+## buy and retain buttons are routinely `disabled` (maxed, unaffordable) and a disabled Button emits
+## no button_down while still swallowing the touch. Reading the press here keeps a row of
+## unaffordable upgrades from becoming a dead patch of list you cannot scroll from.
+func _on_list_control_gui_input(event: InputEvent) -> void:
+	if event is InputEventScreenTouch and event.pressed:
+		_begin_drag_gesture()
+		return
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		_begin_drag_gesture()
+		return
+	_pan_scroll_on_drag(event)
+
+
+## Start tracking a fresh press gesture, before any travel.
+func _begin_drag_gesture() -> void:
+	_drag_accum = 0.0
+	_drag_moved = false
+
+
+## Pan the list when a press over a control turns into a drag. Never consumes the event, so a
+## genuine tap still reaches the button's own signals.
+func _pan_scroll_on_drag(event: InputEvent) -> void:
+	if _scroll == null:
+		return
+	var delta_y := 0.0
+	if event is InputEventScreenDrag:
+		delta_y = event.relative.y
+	elif event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT):
+		# Desktop only. Godot's emulate_mouse_from_touch (on by default) also synthesises a mouse
+		# motion for every InputEventScreenDrag, so counting both on a phone would pan at twice the
+		# speed of the finger and trip the threshold after half the intended travel.
+		if OS.has_feature("mobile"):
+			return
+		delta_y = event.relative.y
+	else:
+		return
+
+	# Finger down the screen (delta_y > 0) reveals EARLIER cards, so scroll_vertical decreases.
+	_scroll.scroll_vertical -= int(delta_y)
+	_drag_accum += absf(delta_y)
+	if _drag_accum >= DRAG_SCROLL_THRESHOLD:
+		_drag_moved = true

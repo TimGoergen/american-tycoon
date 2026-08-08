@@ -555,14 +555,21 @@ reason: they are live in whatever build is on the phone right now.*
       switched on, the white chevron flipping direction, the `AUTO-BUY 5/2.5s` rate readout pinned
       beside it, the animated ellipsis while nothing is affordable, the purchase pulse, and the
       bright-blue lit plate (`UiPalette.ACTIVE_BLUE`, with the label moved to cream to hold contrast).
-- [ ] **The REST of the 2026-08-07 header pass — still unverdicted.** The AUTO-BUY verdict above
-      does not cover these, and they were changed in the same sittings:
-      - the OVR button's pressure-cooker glyph at 62px (the third attempt — a puff-cloud and a
-        knobbly cloud were both rejected)
+- [x] ~~**The OVR button.**~~ **KEEP — Tim, 2026-08-08: "the OVR and auto buy button look good."**
+      Covers the exploding-cooker glyph (third attempt — a puff-cloud and a knobbly cloud were both
+      rejected) and the availability pulse: the plate breathes fill + outline only while overdrive
+      can actually be engaged, and parks at rest the moment the window closes.
+- [x] ~~**The rush bar's resized text.**~~ **KEEP w/ TWEAK — Tim, 2026-08-08: "the rush bar looks
+      good, but needs one small change."** "RUSH" a size up and the readout down to FONT_LABEL both
+      land. **TWEAK APPLIED:** the live building percentage was still at the resting size while
+      CRUISE drew 40% larger; both percentage states now share the larger size. The rule that fell
+      out of it, for any state added later: **numbers are big, words are small** — the bonus figures
+      are the bar's readout and get the size; OVERHEATED, COOLING and the auto-buy narration explain
+      why there is no number and stay small.
+- [ ] **Still unverdicted from the 2026-08-07 pass:**
       - the BUY/HIRE captions: icons 20% smaller, the "+" 20% larger, both gaps tightened
-      - the rush bar: "RUSH" a size up, the bonus readout down to FONT_LABEL — **and whether
-        OVERHEATED still lands**, since that narration shares the shrunken slot and only CRUISE was
-        given its size back (+40%)
+      - **whether OVERHEATED still lands** — that narration shares the shrunken slot and, by the
+        rule above, deliberately did NOT get its size back
       - the meter collapsing to nothing while AUTO-BUY is expanded: does losing the rush bar
         mid-session read as intentional, or as something breaking?
 - [ ] **`OVERHEATED` + countdown on each frozen row** — the TWEAK from §6 sitting A

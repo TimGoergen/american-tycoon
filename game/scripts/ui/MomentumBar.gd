@@ -304,9 +304,15 @@ var _blink_phase := 0.0
 ## only rebuilt when the state flips, not every frame.
 enum _LabelState { NORMAL, CRUISING, OVERHEATED, COOLING, AUTO_BUY }
 
-## How much larger the CRUISE readout draws than the label's resting size (Tim, 2026-08-07 —
-## "about 40% larger"). Applied in _apply_label_state; every other state keeps the base size.
-const CRUISE_LABEL_SCALE := 1.4
+## How much larger a BONUS PERCENTAGE draws than the label's resting size (Tim, 2026-08-07: cruise
+## "about 40% larger"; 2026-08-08: the building readout should match it).
+##
+## The rule that fell out of those two asks is worth stating, because it decides what any future
+## state should do: NUMBERS ARE BIG, WORDS ARE SMALL. The live bonus and the cruise figure are the
+## bar's actual readout — what the player is earning — and they get the size. OVERHEATED, COOLING
+## and the auto-buy narration are explanations of why there is no number, and they stay at the
+## resting size so they never shout over the thing they are standing in for.
+const BONUS_LABEL_SCALE := 1.4
 var _label_state_applied: int = -1
 
 ## Where the fixed vent target bar sits, as a fraction of the bar's width (~1/3 from the left,
@@ -732,8 +738,8 @@ func _ready() -> void:
 	# figure on it, rather than a giant number with a caption attached.
 	#
 	# The size set here is only the RESTING one. _apply_label_state owns it per state and re-applies
-	# it on every change — CRUISE draws 40% larger (see CRUISE_LABEL_SCALE), everything else at this
-	# size. Change it there, not here, or the two will disagree.
+	# it on every change — the two percentage states draw 40% larger (see BONUS_LABEL_SCALE), the
+	# word states at this size. Change it there, not here, or the two will disagree.
 	_label = Label.new()
 	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -1617,16 +1623,16 @@ func _apply_label_state(state: int) -> void:
 		return
 	_label_state_applied = state
 
-	# SIZE IS PART OF THE STATE, not a fixed property of the label (Tim, 2026-08-07: the cruise
-	# readout should be about 40% larger). The readout was shrunk to FONT_LABEL earlier the same day
-	# so the bar reads as a named bar with a small figure on it — but CRUISE is the one state that is
-	# an achievement rather than a status line, and at the small size it disappeared into the row.
+	# SIZE IS PART OF THE STATE, not a fixed property of the label. Both percentage states — the live
+	# bonus while rush builds, and the cruise figure — draw at the larger size; the word states stay
+	# at the resting size. See BONUS_LABEL_SCALE for the numbers-big-words-small rule.
 	#
-	# Derived from the base rather than written as a literal, so the 40% survives any future change
+	# Derived from the base rather than written as a literal, so the ratio survives any future change
 	# to the resting size. It lands off the UiPalette scale by a couple of points, which is the
 	# deliberate cost of honouring the ratio.
+	var shows_a_percentage := state == _LabelState.CRUISING or state == _LabelState.NORMAL
 	_label.add_theme_font_size_override("font_size",
-		int(round(float(UiPalette.FONT_LABEL) * CRUISE_LABEL_SCALE)) if state == _LabelState.CRUISING
+		int(round(float(UiPalette.FONT_LABEL) * BONUS_LABEL_SCALE)) if shows_a_percentage
 			else UiPalette.FONT_LABEL)
 
 	match state:

@@ -118,6 +118,17 @@ func _process(_delta: float) -> void:
 ## rects, which already carry the scroll offset). Call whenever scroll/layout changes.
 static func apply_edge_fade(scroll: ScrollContainer, items: Array) -> void:
 	var view := scroll.get_global_rect()
+	# REFUSE TO FADE AGAINST A VIEWPORT THAT HAS NOT BEEN LAID OUT. Every alpha below is a fraction
+	# of this rect, so a zero or stale height makes `above_strip` negative for every item and fades
+	# the ENTIRE LIST to nothing.
+	#
+	# That is not hypothetical: rebuilding a list inside a hidden subtree and fading it on the next
+	# frame did exactly that (Tim, 2026-08-08 — leaving a challenge run showed the screen with no
+	# games on it until the screen was touched, because a touch scrolled, which recomputed this with
+	# real geometry). Leaving the alphas untouched is always safe; the next scroll or resize repaints
+	# them correctly.
+	if view.size.y <= 0.0:
+		return
 	var bar := scroll.get_v_scroll_bar()
 	var more_above := scroll.scroll_vertical > 0
 	# The furthest scroll_vertical can go is the content height minus one page; anything

@@ -171,11 +171,13 @@ func _ready() -> void:
 ## Open the screen on its list (called by Main when the Settings CHALLENGES button is tapped).
 ## Refreshes first so the tiers/bonus are current, then shows the card (not the player).
 func open() -> void:
-	_refresh()
 	if _player != null:
 		_player.visible = false
+	# Same order as _return_to_list, and for the same reason: visible first, rows second, so the
+	# edge fade is computed against a laid-out ScrollContainer rather than a hidden one.
 	_show_list_chrome(true)
 	visible = true
+	_refresh()
 
 
 ## Show or hide the list-mode layers (the themed backdrop AND the card) together. Both are hidden
@@ -549,9 +551,14 @@ func _on_play_pressed(type_script: Script) -> void:
 func _return_to_list() -> void:
 	if _player != null:
 		_player.visible = false
-	_refresh()
+	# SHOW FIRST, REBUILD SECOND. _refresh tears down and re-adds every row and then schedules the
+	# edge fade; doing that while the card is still hidden meant the fade ran against an unlaid-out
+	# ScrollContainer (Tim, 2026-08-08 — the list came back empty until the screen was touched).
+	# apply_edge_fade now refuses that case outright, but building into a visible tree is the more
+	# honest fix: the rows are measured against the box they will actually occupy.
 	_show_list_chrome(true)
 	visible = true
+	_refresh()
 
 
 func _on_back_pressed() -> void:

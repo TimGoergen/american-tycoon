@@ -139,6 +139,27 @@ const TAB_SETTINGS := 3
 ## it UP, so we let the icon expand and cap it here at this width (icons are square).
 const TAB_ICON_SIZE := 113
 
+## The epoch pager's civilization name (Tim, 2026-08-08: "a bit smaller to fit on a single line").
+##
+## MEASURED, not chosen. The name gets 646px: 1080 less the 9px screen bezel a side, the 16px
+## universal content margin, the tab panel's 24px content margin, the four 72px pager arrows and the
+## row's four 12px separations. Against that, the longest of the 27 names — "THE PROPRIETORS
+## ABSOLUTE" — runs 861px at the old FONT_DISPLAY, and 13 of 27 wrapped. At 48 three still wrapped.
+## 44 is the first size where ALL 27 fit, with 15px to spare on the worst case.
+##
+## Autowrap stays on as a safety net rather than as routine behaviour: a longer name added later
+## should wrap rather than run off the edge, but it should also send someone back to this number.
+const EPOCH_NAME_FONT_SIZE := 44
+
+## The pager subtitle's colour — DARK_GOLD deepened (Tim, 2026-08-08: "a little darker").
+##
+## The exact shade is set by contrast rather than taste. This line sits on the tab panel, which is
+## CREAM at 0.65 alpha — so what shows through it changes with the backdrop, and gold-on-cream was
+## already the weakest text in the header. Measured against a light, a mid and a dark backdrop, the
+## old DARK_GOLD ran 3.21 / 1.85 / 1.61 and a first pass at #7C5A10 still bottomed out at 2.69.
+## #6B4D0C clears 3:1 in every case (3.32 worst) while staying recognisably gold.
+const EPOCH_SUBTITLE_COLOR := Color("#6B4D0C")
+
 # The screen-frame constants (bezel + universal content margin) live in UiPalette now, so the
 # Main screen and the full-screen overlays all frame identically (UiPalette.apply_screen_bezel
 # / make_screen_panel_style).
@@ -1055,7 +1076,7 @@ func _build_epoch_pager() -> Control:
 	_epoch_pager_label = Label.new()
 	_epoch_pager_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_epoch_pager_label.add_theme_font_override("font", UiPalette.make_bold_font())
-	_epoch_pager_label.add_theme_font_size_override("font_size", UiPalette.FONT_DISPLAY)
+	_epoch_pager_label.add_theme_font_size_override("font_size", EPOCH_NAME_FONT_SIZE)
 	_epoch_pager_label.add_theme_color_override("font_color", UiPalette.NAVY)
 	# Fill the space between the arrows and WRAP a long civilization name onto a second line rather
 	# than forcing the whole tab column wider than the screen (Tim, 2026-07-13: "QUARTZITE
@@ -1070,8 +1091,15 @@ func _build_epoch_pager() -> Control:
 	_epoch_pager_sub = Label.new()
 	_epoch_pager_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_epoch_pager_sub.add_theme_font_override("font", UiPalette.make_bold_font())
-	_epoch_pager_sub.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
-	_epoch_pager_sub.add_theme_color_override("font_color", UiPalette.DARK_GOLD)
+	# FONT_BODY, not FONT_SUBHEAD. Not asked for directly, but forced by the name shrinking to 44:
+	# at 41 the subtitle would have been within three points of the title above it and the two would
+	# have stopped reading as a heading and its caption. Dropping a step restores the hierarchy the
+	# smaller name gave up.
+	_epoch_pager_sub.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
+	# Darker than DARK_GOLD (Tim, 2026-08-08). Gold on the tab panel's translucent cream is the
+	# lowest-contrast text in the header; deepening it buys legibility without changing the hue that
+	# marks this line as the subtitle rather than part of the name.
+	_epoch_pager_sub.add_theme_color_override("font_color", EPOCH_SUBTITLE_COLOR)
 	_epoch_pager_sub.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_epoch_pager_sub.autowrap_mode = TextServer.AUTOWRAP_WORD
 	center.add_child(_epoch_pager_sub)

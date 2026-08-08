@@ -126,6 +126,17 @@ var _auto_purchase_locked := false
 var _auto_purchase_unlocked := false
 var _auto_purchase_enabled := false
 
+## True while the mode is RUNNING but cannot afford anything in the current epoch, so it is sitting
+## there buying nothing (Tim, 2026-08-07: "the auto buy feature showed that it was on, but no
+## longer was auto buying anything").
+##
+## This state is normal and often transient — the desk waits for cash like the player does — but it
+## was completely silent, and a lit button with no purchases and no explanation is indistinguishable
+## from a broken feature. It matters more since the mode became CURRENT-EPOCH-ONLY: on a deep run
+## the frontier cohort can sit far above the player's cash for a long time, where the old
+## last-viewed-tab targeting would have been quietly buying cheap rungs somewhere else.
+var _auto_purchase_idle := false
+
 ## Seconds left in the "the desk just bought something" pulse (0 = not pulsing). Counted down in
 ## _process, exactly the way PropertyRow fades its auto-purchase row marker — a countdown rather
 ## than a Tween so a purchase landing mid-pulse simply retriggers it, with no tween to kill and
@@ -335,7 +346,14 @@ func set_dynasty(dynasty: DynastyState) -> void:
 ## The bar does not go looking for either fact itself: the core has no "auto-buy" concept — it just
 ## stops being fed `rushing = true` — so the reason has to be handed down from the screen that owns
 ## the toggle. Idempotent; calling it every frame with the same values is harmless.
-func set_auto_purchase_state(unlocked: bool, enabled: bool) -> void:
+## `idle` is optional so existing callers and the sims keep working; only Main knows the economy
+## well enough to answer it.
+func set_auto_purchase_state(unlocked: bool, enabled: bool, idle: bool = false) -> void:
+	_auto_purchase_idle = idle
+	_set_auto_purchase_state_inner(unlocked, enabled)
+
+
+func _set_auto_purchase_state_inner(unlocked: bool, enabled: bool) -> void:
 	# The rush lockout is exactly "owned AND switched on". An unowned track can have a stale
 	# `enabled` left over from a prestige that reset the legacy levels, and that must not lock rush.
 	_auto_purchase_locked = unlocked and enabled
@@ -917,7 +935,12 @@ func _process(delta: float) -> void:
 		# This branch owns the readout for the whole spin-down too, which is on purpose: the bonus
 		# is still being PAID while the tail bleeds out, and the fill below still plots it honestly,
 		# but the one thing the player needs explained here is why the meter will not climb back.
-		_label.text = "NO RUSH"
+		# Which fact this slot spends its pixels on depends on what the player most needs.
+		# Normally it is the mode's COST — the lit button already says what is ON, so the label
+		# says what that costs. But when the desk is running and cannot afford anything, the
+		# urgent question stops being "why can't I rush" and becomes "why is nothing happening",
+		# and a silent lit button reads as a broken feature. So the readout answers that instead.
+		_label.text = "NOTHING TO BUY" if _auto_purchase_idle else "NO RUSH"
 		_apply_label_state(_LabelState.AUTO_BUY)
 	elif cruising and is_equal_approx(_rush_momentum.heat, _rush_momentum.cruise_heat()):
 		# Sitting exactly on the clamp: the steady, content cruise state. The bonus quotes

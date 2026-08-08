@@ -228,6 +228,8 @@ var _hire_mode_rate_label: Label
 var _auto_purchase_state_pushed := false
 var _auto_purchase_unlocked_shown := false
 var _auto_purchase_enabled_shown := false
+## Whether the bar was last told the desk is running-but-broke (see _push_auto_purchase_state).
+var _auto_purchase_idle_shown := false
 
 ## The property ladder's ScrollContainer, kept for the edge fade below
 ## (Tim, 2026-07-06; chosen over an outline, which would have nested a third frame).
@@ -3130,14 +3132,24 @@ func _push_auto_purchase_state() -> void:
 	if _momentum_bar == null:
 		return
 	var enabled: bool = game.auto_purchase.enabled
+	# IDLE: running, but the cheapest thing in the current epoch is out of reach, so the desk is
+	# sitting there buying nothing. Only Main can answer this — it is the one place that holds both
+	# the mode and the wallet. Cheap to compute (one pass over the current cohort) and only read
+	# while the mode is actually running.
+	var idle := false
+	if game.auto_purchase.is_running():
+		var cheapest := game.auto_purchase.lowest_next_cost(game)
+		idle = cheapest < 0.0 or game.economy.cash < cheapest
 	if _auto_purchase_state_pushed \
 			and unlocked == _auto_purchase_unlocked_shown \
-			and enabled == _auto_purchase_enabled_shown:
+			and enabled == _auto_purchase_enabled_shown \
+			and idle == _auto_purchase_idle_shown:
 		return
 	_auto_purchase_state_pushed = true
 	_auto_purchase_unlocked_shown = unlocked
 	_auto_purchase_enabled_shown = enabled
-	_momentum_bar.set_auto_purchase_state(unlocked, enabled)
+	_auto_purchase_idle_shown = idle
+	_momentum_bar.set_auto_purchase_state(unlocked, enabled, idle)
 	# The PROPERTY ROWS are deliberately left alone — no portrait dim.
 	#
 	# It is tempting to reuse the overheat lockout's uniform dim here, but that dim is

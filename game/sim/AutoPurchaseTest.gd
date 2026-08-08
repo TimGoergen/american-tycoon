@@ -67,6 +67,7 @@ func _initialize() -> void:
 	_test_deleted_upgrade_ids_are_inert(property_configs, tuning)
 	_test_tracks_require_the_unlock(property_configs, tuning)
 	_test_enabled_without_owned_is_fully_inert(property_configs, tuning)
+	_test_lowest_next_cost_drives_the_idle_readout(property_configs, tuning)
 
 	print("")
 	if _failures == 0:
@@ -456,3 +457,35 @@ func _test_enabled_without_owned_is_fully_inert(configs: Array, tuning: TuningCo
 	_check("...and rush is locked out again, as designed",
 		game.is_rush_locked_out_by_auto_purchase())
 	_check("...and it buys", game.auto_purchase.tick(CADENCE, game, CADENCE, 4) > 0)
+
+
+# ---------------------------------------------------------------------------
+# 11. lowest_next_cost — the input to the "NOTHING TO BUY" readout
+# ---------------------------------------------------------------------------
+
+## Main compares this against cash to decide whether the desk is running-but-broke, which is what
+## the momentum bar's readout says out loud. Worth pinning: a wrong answer here means the bar either
+## cries "nothing to buy" while buying, or stays silent while stuck — and a silent stuck desk is
+## exactly the report that prompted the readout (Tim, 2026-08-07).
+func _test_lowest_next_cost_drives_the_idle_readout(configs: Array, tuning: TuningConfig) -> void:
+	print("\n11. lowest_next_cost answers 'what is the desk waiting to afford'")
+
+	var game := _make_run(configs, tuning, PLENTY_OF_CASH)
+	var lowest := game.auto_purchase.lowest_next_cost(game)
+	_check("it reports a real price for the current epoch", lowest > 0.0)
+	_check("...and it matches an independent scan of the cohort",
+		is_equal_approx(lowest, _cheapest_cost_in_epoch(game)))
+
+	# AFFORDABILITY IS DELIBERATELY NOT PART OF THE ANSWER: the useful thing to show is the price
+	# being saved toward, which by definition is one the player cannot pay yet.
+	game.economy.cash = 0.0
+	_check("it still reports that price with an empty wallet",
+		is_equal_approx(game.auto_purchase.lowest_next_cost(game), lowest))
+
+	# Which is exactly how Main decides the desk is idle.
+	_check("broke + running = idle (the readout condition)",
+		game.auto_purchase.is_running() and game.economy.cash < lowest)
+
+	# And with money, it is not idle.
+	game.economy.cash = PLENTY_OF_CASH
+	_check("funded = not idle", game.economy.cash >= game.auto_purchase.lowest_next_cost(game))

@@ -135,6 +135,13 @@ const TAB_SETTINGS := 3
 ## it UP, so we let the icon expand and cap it here at this width (icons are square).
 const TAB_ICON_SIZE := 113
 
+## The active tab icon's drop shadow (Tim, 2026-08-06): how far down-and-right the shadow sits, and
+## how dark it gets once the tab is fully lit. Kept small — the point is to lift the lit icon off
+## its mustard plate, not to draw a second icon. 6px reads at TAB_ICON_SIZE without the shadow
+## detaching into an obvious duplicate, and 0.35 matches the alpha the tutorial card's shadow uses.
+const TAB_ICON_SHADOW_OFFSET := 6
+const TAB_ICON_SHADOW_ALPHA := 0.35
+
 ## The two action-row mode toggles read "+ <icon> × <rate>": a building for BUY, a face for HIRE.
 ## Both are monochrome navy silhouettes already in the repo — the BUY icon is the property tab's
 ## own glyph (PropertyRow.PROPERTY_ICON_SVG) and the HIRE icon is the headshot the property rows'
@@ -167,6 +174,9 @@ var _tab_icon_active: Array = []    # full-color Textures, indexed by TAB_*
 # as its always-on icon, and a full-color TextureRect overlays it and fades its opacity 0<->1 when
 # the tab gains/loses focus (Plans/Tab_Bar_Icon_Treatment.md). One overlay + one live Tween per tab.
 var _tab_icon_overlay: Array = []   # full-color overlay TextureRects, indexed by TAB_*
+## Black, offset copies of the same art sitting UNDER each color overlay — the active tab's icon
+## drop shadow. Same indexing, faded by the same tween (see _make_tab_icon_shadow).
+var _tab_icon_shadow: Array = []
 var _tab_icon_tween: Array = []     # the in-flight fade Tween per tab (killed on re-trigger)
 var _active_tab: int = TAB_PROPERTY
 var _minigame_check: CheckBox  # the Settings-tab "play the minigame" toggle
@@ -1730,6 +1740,7 @@ func _build_tab_bar(column: VBoxContainer) -> void:
 	_tab_icon_inactive = []
 	_tab_icon_active = []
 	_tab_icon_overlay = []
+	_tab_icon_shadow = []
 	_tab_icon_tween = []
 	for i in range(inactive_icons.size()):
 		_tab_icon_inactive.append(load(inactive_icons[i]))
@@ -1749,6 +1760,9 @@ func _build_tab_bar(column: VBoxContainer) -> void:
 		b.pressed.connect(_show_tab.bind(i))
 		bar.add_child(b)
 		_tab_buttons.append(b)
+		# ORDER MATTERS: the shadow goes on first so it paints UNDER the color icon. Children draw
+		# in child order, so anything added after this sits on top of it.
+		_tab_icon_shadow.append(_make_tab_icon_shadow(b, _tab_icon_active[i]))
 		# The full-color overlay that fades in when this tab is active (see _make_tab_icon_overlay).
 		_tab_icon_overlay.append(_make_tab_icon_overlay(b, _tab_icon_active[i]))
 		_tab_icon_tween.append(null)
@@ -1763,6 +1777,43 @@ func _build_tab_bar(column: VBoxContainer) -> void:
 ## and out when it leaves, so the icon appears to "light up" instead of hard-swapping. A
 ## CenterContainer fills the button and centers a fixed TAB_ICON_SIZE box — the same size and
 ## center as the Button's own expand_icon — so the color icon sits precisely on the silhouette.
+## Build the drop shadow that sits under the ACTIVE tab's icon (Tim, 2026-08-06) — the same art,
+## painted solid black at a low alpha and nudged down-right, so the lit icon lifts off its mustard
+## plate instead of lying flat on it.
+##
+## Why a second TextureRect and not a StyleBox shadow: the flagship halo (UiPalette.
+## _apply_flagship_frame) can use `shadow_size` because it shadows a BOX. An icon's shadow has to
+## follow the glyph's own silhouette, and the only thing that knows that shape is the texture's
+## alpha. Modulating the art to black keeps the alpha and throws away the color, which is exactly
+## a drop shadow.
+##
+## It uses the ACTIVE texture rather than the inactive silhouette so the shadow always matches the
+## art actually on screen, even though the two shapes are meant to register identically — if they
+## ever drift, the shadow follows what the player can see.
+func _make_tab_icon_shadow(button: Button, active_texture: Texture2D) -> TextureRect:
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	# Shift the whole centering box down-right. With FULL_RECT anchors, offsetting all four edges by
+	# the same amount moves the rect without resizing it, so the shadow stays the icon's exact size.
+	center.offset_left = TAB_ICON_SHADOW_OFFSET
+	center.offset_right = TAB_ICON_SHADOW_OFFSET
+	center.offset_top = TAB_ICON_SHADOW_OFFSET
+	center.offset_bottom = TAB_ICON_SHADOW_OFFSET
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var shadow := TextureRect.new()
+	shadow.texture = active_texture
+	shadow.custom_minimum_size = Vector2(TAB_ICON_SIZE, TAB_ICON_SIZE)
+	shadow.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	shadow.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	shadow.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Black with zero alpha: _crossfade_tab_icon raises only the alpha, so the color never changes.
+	shadow.modulate = Color(0.0, 0.0, 0.0, 0.0)
+	center.add_child(shadow)
+	button.add_child(center)
+	return shadow
+
+
 func _make_tab_icon_overlay(button: Button, active_texture: Texture2D) -> TextureRect:
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -1787,11 +1838,16 @@ func _crossfade_tab_icon(index: int, active: bool) -> void:
 	if index >= _tab_icon_overlay.size():
 		return
 	var overlay := _tab_icon_overlay[index] as TextureRect
+	var shadow := _tab_icon_shadow[index] as TextureRect
 	var running := _tab_icon_tween[index] as Tween
 	if running != null and running.is_valid():
 		running.kill()
 	var fade := create_tween()
+	# Both layers ride ONE tween, in parallel, so the shadow can never be caught lit under a
+	# faded-out icon (or the reverse) if tabs are switched fast.
+	fade.set_parallel(true)
 	fade.tween_property(overlay, "modulate:a", 1.0 if active else 0.0, 0.12)
+	fade.tween_property(shadow, "modulate:a", TAB_ICON_SHADOW_ALPHA if active else 0.0, 0.12)
 	_tab_icon_tween[index] = fade
 
 

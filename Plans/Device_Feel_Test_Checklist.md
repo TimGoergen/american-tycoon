@@ -17,7 +17,15 @@ for an idle/tycoon game.
    struck through here so the untested pile visibly shrinks.
 
 This is a living doc. When a new first-pass feature merges, add a line here so it
-doesn't silently join the untested backlog.
+doesn't silently join the untested backlog. **This has failed twice** (see both gap
+notices at the end) — the line goes in when the feature merges, not when someone later
+goes looking for what was missed.
+
+**Where to start (2026-08-06).** §1–§6 are almost entirely verdicted; the live backlog is
+**§7**, and within it **§7.1 first**. That subsection covers three economy constants that
+ship at values different from the ones Tim approved, plus one uncapped multiplier no sim
+models — all live in the current build, and two other decisions are blocked behind that
+one session. §1–§5 remain as the historical record of what was already settled and why.
 
 ---
 
@@ -260,12 +268,17 @@ items, catch/timing polish) ride along when their game is touched.
 
 ---
 
-## 6. Overdrive Vent Windows (branch `feature/overdrive-vent-windows`)
+## 6. Overdrive Vent Windows — MERGED 2026-07-20
 
-*Added 2026-07-19. This is the only section with a branch not yet on `main` — the whole
-feature is waiting on this pass. Design of record: `Plans/Overdrive_Vent_Windows.md`;
-read its "Shipped state" section for current behaviour and knob values. Install the
-branch APK, not a `main` build.*
+*Added 2026-07-19; **merged to `main` 2026-07-20 once sitting E cleared**, so the branch is
+gone and a `main` build now carries this. Design of record:
+`Plans/Overdrive_Vent_Windows.md`; read its "Shipped state" section for current behaviour
+and knob values — that doc also retains superseded design sections, so do not read it
+top-to-bottom expecting current truth.*
+
+**All five sittings are verdicted. Two follow-ons spun out of them and are tracked in §7
+rather than here** (the `OVERHEATED` countdown text from sitting A, and the vent haptic
+pulse count) — they are new work, not open questions about this pass.
 
 **The trap to avoid:** the three biggest open questions cannot be answered by playing
 well. Skilled play is already sim-validated at +74.8%. What is unvalidated is what
@@ -396,6 +409,178 @@ in, missed the third lift twice, felt like the window closed early" is actionabl
 
 ---
 
+## 7. The 27-epoch build (backfilled 2026-08-06)
+
+*Everything merged between 2026-07-21 and 2026-08-06 — the doc lapsed again across that
+window (see the second gap notice below). This is the largest single block of untested
+work the project has carried, because it includes **three economy constants that ship at
+values different from the ones Tim approved**. Those are the top of this list for a
+reason: they are live in whatever build is on the phone right now.*
+
+### 7.1 The economy deviations — highest priority, blocks other decisions
+
+- [ ] **The 5T-save device pass.** `Plans/Endgame_Economy.md` status: *"IMPLEMENTED + FIT
+      (2026-07-29), pending Tim's device pass on the 5T save."* Never done. Load the deep
+      save and answer three things: **the shop must offer a real next purchase**, **the
+      next prestige must quote a large-but-legible mint**, and **the deep epochs must
+      resist**. This is the single highest-value session available, and two other items
+      below are gated behind it.
+- [ ] **Judge `legacy_cost_steepening` s = 1.10 (you approved 1.03).** Fit-forced: at 1.03
+      the shop could not absorb billions-scale mints and the summit fell at generation 3;
+      1.12 stalled absolutely at tier 25. 1.10 is the fitted middle. The doc flags this
+      itself as *"needs Tim's eyes"* — this line is those eyes.
+- [ ] **Judge `alpha_legacy_deep` = 0.05 (you decided 0.06, recorded three times).**
+      Fit-forced: at 0.06 mints grew ×1.79/tier, faster than the decay brake; 0.05 (×1.62)
+      converges. The stated *intent* — "endgame mints read in the billions" — is claimed
+      preserved. The number you signed off on was not.
+- [ ] **Judge compounder `cost_growth` 2.8 / 2.7 (seed was 2.0 / 1.9).** A third seed
+      deviation that the plan does **not** flag among the two needing review. Rationale:
+      the early-mid shop was the generation-2 leap vector — one sim run jumped 15 tiers.
+- [ ] **Summit timing vs your target.** Sim arc puts the summit at **generation 15–17**;
+      your approved target was *"a dozen deep runs."* Above the band, and not called out
+      as a deviation anywhere. If it should come sooner, `cost_growth` toward 2.6 is the
+      lever and every knob is in the dev panel.
+- [ ] **Vent-bonus stacking cap — decide.** `rush_momentum_vent_bonus_step` is **0.30 per
+      vent with no ceiling** (`TuningConfig.gd:419`; no entry in `tuning.tres`, so the
+      script default is what ships). Across a long run this compounds rush income — roughly
+      90% of an active player's income — without limit, and **no sim models it**. Flagged
+      in `Progressive_Decay.md` as its own small tune, with the revisit trigger *"only if
+      deep pacing still feels off after this lands."* **That trigger is the 5T pass above,
+      so this is blocked, not closed.** Distinct from the epoch-depth-scaling question,
+      which you closed on 2026-07-20 (ladder stays unbounded at every epoch).
+
+### 7.2 Economy retunes — partially verified
+
+- [ ] **Progressive decay, deep bands.** Banded per-epoch steps ×0.80 (tiers 3–11) / ×0.72
+      (12–19) / ×0.65 (20–27); total ladder resistance ÷3,240 vs the old flat ÷265.
+      **Early bands device-confirmed** (Tim, 2026-07-29: *"the retune so far feels really
+      good in the first 5 or 6 epochs"*). Bands 2 and 3 have no verdict.
+- [ ] **Alien payback retune.** Live: `income(/60s) = cost × 0.25 × 0.80^(tier−1)`.
+      The named re-test was never run: *prestige once, re-enter Luminari with ~1K gems,
+      feel the Photon Exchange unit cadence.*
+- [ ] **The inverted entry step-up — verify by sim, not by feel.** A Photon Exchange unit
+      jumps 2.7B/s → ~37B/s under the retune, making the first alien purchase a large
+      income event. The plan says *"check via sim that it doesn't trivialize the remaining
+      Earth tail (probably fine… **but verify**)"* — no result was ever recorded. Note the
+      related framing question **is** settled: the old "~3× step-up over staffed Earth" is
+      demoted in the GDD to *"still a floor, no longer the sizing rule."*
+
+### 7.3 Content and structure
+
+- [ ] **Earth split — a MIGRATED mid-Earth save.** Earth is now two epochs (Blue Collar
+      tier 1, props 1–6, $75M threshold; White Collar tier 2, props 7–12). The save v12
+      migration is the risk surface: aliens shift +1, and a tier-1 save maps to Blue or
+      White by the own-all-Blue-Collar test then money. The plan asks for **early game + a
+      migrated mid-Earth save + a deep save**; none is recorded. A migration bug here is
+      silent and destroys progress, so this outranks the feel items around it.
+- [ ] **Alien portraits, tiers 13–27.** Your own decision was *"wire + portrait tiers 7–11
+      first, device-validate, then 12–26."* Batch 1 was validated; **batch 2 never was**,
+      and this doc had no line for it — the exact silent-backlog failure the gap notice
+      warns about. The code is complete: `StafferFace.gd:475 _draw_alien` dispatches a
+      bespoke routine for every tier 3–27 (`_draw_octave` through `_draw_proprietors` are
+      the ones to eyeball), and the gray-headshot fallback is now unreachable in normal
+      play. Mind the renumber: the civs drafted as 12–26 sit at game tiers 13–27.
+- [ ] **The 27-epoch ladder at depth.** 326 properties, 14-property cohorts per epoch. A
+      10T-gem dynasty reaches tier 27 in ~62 s of sim. Unfelt on hardware past the early
+      bands.
+- [ ] **Epoch pager at 27 tiers.** `EpochPagerDots` degrades gracefully by design, but
+      `Add_20_Civs_And_Alien_Portraits.md` §7 warned *"a 26-dot strip won't fit"* and
+      proposed alternatives (an "Epoch 7 / 26" readout, or a windowed dot row). Confirm the
+      shipped treatment is the one wanted at 27.
+- [ ] **Planet watermark past tier 6.** `HeroStat.PLANET_IMAGE_PATHS` holds 6 authored
+      world SVGs (Earth → Chronophage). Tiers 7–27 have no art and rely on a bounds guard.
+      **Open decision, never answered:** generic procedural planet tinted by the civ accent
+      colour, or commission ~20 world images? (An art-pass item either way.)
+- [x] ~~**Tab-bar icon treatment.**~~ **KEEP — device-confirmed 2026-07-24.** Silhouette
+      (inactive) ↔ full-colour (active) with a ~120 ms crossfade; icon colour = "you are
+      here", red dot = "something new". Note this **closes the §5 "wants real icon art"
+      TWEAK** from 2026-07-06.
+- [x] ~~**Currency format setting.**~~ **KEEP — device-confirmed 2026-08-05** (Tim: *"the
+      settings screen changes look good"*). Three formats, chosen in a grouped Settings
+      card. Caveat carried forward: adding that card **overflowed the settings tab**, which
+      is a plain VBox with no ScrollContainer, where overflow is *unreachable* rather than
+      scrollable. Recovered 308 px by pairing buttons onto shared rows; **the next control
+      added there needs the ScrollContainer instead.**
+
+### 7.4 Unmerged branches — device tests owed before merge
+
+- [x] ~~**Estate swipe-scroll + purchase timing.**~~ **KEEP — Tim, 2026-08-07: "the estate swipe
+      scroll fix looks good."** The Estate list scrolls from anywhere, and the purchase moved off
+      `button_down`: a tap buys on RELEASE, a hold still fires at 0.45 s and repeats, a swipe
+      buys nothing. That last part was the whole point — swiping across buy buttons used to spend
+      gems, and a drag is not detectable until after the press has already fired.
+- [x] ~~**AUTO-BUY button vanishing after prestige.**~~ **KEEP — Tim, 2026-08-07: "the post
+      prestige auto buy fix looks good too."** The bar now remembers the state Main pushed and
+      re-applies it when `_ready` builds the button, so a push that arrives while the bar is
+      still detached is no longer silently dropped. `sim/MomentumBarStateTest.gd` reproduces the
+      post-prestige ordering and fails against the unfixed bar.
+- [ ] **`feature/auto-purchase-and-bulk-hire`** — **RESTRUCTURED 2026-08-07, still device
+      pending** (`Plans/Auto_Purchase_Restructure.md`). The rule below is superseded: auto-buy is
+      now greedy cheapest-first over the CURRENT EPOCH, one number (purchases per round) instead
+      of the old N × X grid, with no flagship exclusion and no tab targeting. Head Hunters is
+      deleted and bulk hire is free. **What to watch first:** greedy puts ~21 units into one
+      property before it overtakes its neighbour (cohort rungs are ~×7 apart), so purchases pile
+      into a single rung — measured, 30 buys landed on just 2 properties. That is the honest
+      behaviour of the chosen rule; the question is whether it FEELS right. If not, the lever is
+      a per-property cap per tick, not the tie-break.
+      Historical detail, for the four decisions that came with the original build:
+      - **Rush-heat decay during auto-buy lockout.** Heat **decays** rather than idling —
+        the one place that plan contradicts the Roadmap on a feel question, and the reason
+        is an invariant worth preserving (an idling bar would show a bonus that isn't paid).
+        *"The one most worth a device check."*
+      - **N caps at 8** — throughput runs 1 unit/sec at level 1 to 19.2 at level 8. If it
+        feels slow, the cap is the knob, not X.
+      - **Both tracks repriced to 5,000 Legacy at level 1** (~6 full Earth runs) and are
+        **unmodelled by any sim**.
+      - Retention bulk-buy free — resolved in code, still listed open in the doc.
+- [ ] **BLOCK-era save clamp.** The BLOCK hire mode shipped and was removed 2026-08-01;
+      MAX moved down an ordinal and saves written while BLOCK existed are clamped on load.
+      **Today's test APKs carry BLOCK-era saves, and the clamp has never been exercised on
+      device.** Check a pre-removal save still opens with a sane hire mode.
+- [ ] **`feature/challenge-mode-gating`** (4 commits, **zero device verification** — its
+      Verification section asks only for headless checks). Two layout risks were reasoned
+      about but never looked at: the locked label **dropped to font 32** to stay inside the
+      138 px plate, and the un-scrolled settings VBox came close to running off screen.
+      Both are exactly the class of thing that needs a Pixel and arm's length.
+
+### 7.5 Follow-ons from shipped work
+
+- [x] ~~**Active tab icon drop shadow.**~~ **KEEP — Tim, 2026-08-06: "the tab drop shadow looks
+      good."** The lit tab's icon now casts a 6px down-right shadow at 0.35 alpha, so the active
+      tab reads as raised rather than only repainted. Built as a third layer under the existing
+      silhouette + colour pair (the same art modulated to black), riding the same parallel tween.
+      Offset and alpha are the two knobs if it ever wants adjusting.
+- [ ] **`OVERHEATED` + countdown on each frozen row** — the TWEAK from §6 sitting A
+      (your pick over a bare label, "COOLING DOWN", or a voiced line). `OVERHEATED` appears
+      in `PropertyRow.gd`/`Main.gd`, so the label looks shipped; **confirm the countdown
+      half landed**, since the bounded wait was the point.
+- [ ] **Vent haptic pulse count = lift count.** A ×2 window buzzes twice, ×3 three times.
+      `MomentumBar.gd:893 _pulse_vent_telegraph` implements it and fires at **spawn**, not
+      window-open. Never device-judged for feel.
+- [ ] **Best-streak record + the stats screen.** You wanted the deepest tier ever reached
+      shown BOTH at the overheat moment (*"TIER 9 — BEST 14"*) and persisted in a new stats
+      screen — explicitly **not** on the momentum bar and **not** in the Family Ledger.
+      `StatsScreen.gd` and `DynastyState.best_vent_streak` both exist, so this is at least
+      partly built. **Unmade decision:** scope the stats screen as a home for future stats,
+      not a one-stat page.
+- [ ] **Flagship visual treatment.** 6 px navy border, plate warmed 18% toward mustard
+      gold with a gold halo, Family Ledger icon badged top-right. Shipped on the
+      auto-purchase branch; never seen on device.
+- [ ] **Minigame on-device difficulty re-tune** — the last step of
+      `Plans/Minigame_Polish_Pass.md`, and the biggest single outstanding session in the
+      minigame set. **Every difficulty constant currently shipped is a blind first-pass
+      hypothesis**; the doc's own gate says nothing in the feel/difficulty sections is
+      final until this happens. Do ONE session via Settings → Minigame Tuning re-anchoring:
+      Match-3 score thresholds (`POINTS_PER_GEM` 10.0→9.5 changed **without** re-tuning
+      `SCORE_FULL` 300 / `SCORE_MAX` 1000 — re-anchor all three together), Timing zone/speed
+      (`ZONE_HALF_MIN` 0.06, `SPEED_RAMP` 1.06× — *"gentle, candidates to steepen"*), Catch
+      ramp/penalty (`SPAWN_INTERVAL` 0.55 flat, `MISS_PENALTY` 0.5 *"lenient"*), Memory
+      flash speed (`FLASH_ON` 0.42 s / `FLASH_GAP` 0.18 s), Balance drift (`ZONE_HALF` 0.13,
+      `DRIFT_MAX` 0.9, `DAMPING` 2.4 — un-flagged but un-playtested), Basketball
+      `TARGET_BASKETS` 6.
+
+---
+
 ## Untested-backlog ledger
 
 One line per first-pass feature awaiting device sign-off. Strike through when
@@ -423,8 +608,8 @@ merges.)
       merged) — *game tab KEEP-leaning; held open on minigame lag + rush-bar TWEAK*
 - [ ] Buy/Hire hold pacing — KEEP 2026-07-06 *(kept unstruck only until the tuned
       values are promoted from the Dev Tuning screen into shipped defaults)*
-- [ ] **Overdrive Vent Windows** (`feature/overdrive-vent-windows`, not merged) — see §6;
-      the whole branch is blocked on that pass (2026-07-19)
+- [x] ~~**Overdrive Vent Windows**~~ — **all five sittings verdicted 2026-07-20, merged.**
+      See §6. Two follow-ons spun out and live in §7.5.
 
 ### Gap notice (2026-07-19)
 
@@ -438,3 +623,25 @@ exists to prevent. Only §6 has been backfilled so far. Still unrecorded and unt
       no action needed)*
 - [ ] Legacy Bonus System across all minigames (`feature/match3-difficulty`, not merged)
 - [ ] Match-3 difficulty rework: 7×6 board, harder ceiling, combo removed (same branch)
+
+### Gap notice (2026-08-06) — it happened again, and worse
+
+This doc lapsed a **second** time, from 2026-07-21 to 2026-08-06 — a longer window than the
+first, covering more work, and this time including **live economy constants that differ from
+the values Tim approved**. Nothing merged in that window had a line here until this
+backfill. Everything from it is now recorded in **§7**.
+
+The first gap notice (2026-07-19) said the lapse *"is exactly the silent-backlog failure the
+doc exists to prevent."* Writing that sentence did not prevent the next one. So the process
+note, plainly: **the doc is only a safety net if a line is added when a feature merges, not
+when someone later goes looking.** Reconstructing §7 took two agents sweeping eight plan docs
+plus git archaeology — all of which was avoidable at the cost of one line per merge.
+
+Two structural failures worth naming, because they are not the same problem:
+
+1. **Merged work with no line here** (the ladder, Earth split, retunes, portraits). Fix: add
+   the line in the merge commit.
+2. **Values that shipped different from what was approved, with the deviation flagged only
+   inside the plan doc that caused it** (§7.1). A flag that lives where the change was made
+   is invisible to the person doing the playtesting. Fix: a seed-deviation gets a checklist
+   line, not just a paragraph — it is a device question by definition.

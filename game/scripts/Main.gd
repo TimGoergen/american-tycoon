@@ -3091,9 +3091,12 @@ func _drive_auto_purchase(delta: float) -> void:
 	# AutoPurchaseState for the rule and why it changed (Tim, 2026-08-07).
 	#
 	var quantity := dynasty.upgrades.auto_purchase_quantity()
-	# No tab argument any more: the mode works in the epoch the player is actually in, so the
-	# hidden "which tab was it aimed at" state is gone (see AutoPurchaseState._eligible_indices).
-	var units_bought := game.auto_purchase.tick(delta, game, cadence, quantity)
+	# `_epoch_tab` — the tab ON SCREEN, not game.ui_epoch_tab and not the reached epoch (Tim,
+	# 2026-08-07: "auto buy should always and only purchase properties on the currently visible
+	# tab"). Paging the ladder IS how the player aims the desk, so the live field is the honest
+	# source; ui_epoch_tab exists to restore the pager across a launch, and _set_epoch_tab keeps
+	# the two in step.
+	var units_bought := game.auto_purchase.tick(delta, game, _epoch_tab, cadence, quantity)
 	if units_bought <= 0:
 		return
 	# Mark the exact rows the desk just fed (Tim, 2026-08-01). The HERO STAT is deliberately NOT
@@ -3132,13 +3135,12 @@ func _push_auto_purchase_state() -> void:
 	if _momentum_bar == null:
 		return
 	var enabled: bool = game.auto_purchase.enabled
-	# IDLE: running, but the cheapest thing in the current epoch is out of reach, so the desk is
-	# sitting there buying nothing. Only Main can answer this — it is the one place that holds both
-	# the mode and the wallet. Cheap to compute (one pass over the current cohort) and only read
-	# while the mode is actually running.
+	# IDLE: running, but the cheapest thing ON THE VISIBLE TAB is out of reach, so the desk is
+	# sitting there buying nothing. Only Main can answer this — it is the one place holding the
+	# mode, the wallet and the tab. Cheap (one pass over that cohort) and only read while running.
 	var idle := false
 	if game.auto_purchase.is_running():
-		var cheapest := game.auto_purchase.lowest_next_cost(game)
+		var cheapest := game.auto_purchase.lowest_next_cost(game, _epoch_tab)
 		idle = cheapest < 0.0 or game.economy.cash < cheapest
 	if _auto_purchase_state_pushed \
 			and unlocked == _auto_purchase_unlocked_shown \

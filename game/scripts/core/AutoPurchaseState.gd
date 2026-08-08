@@ -72,7 +72,10 @@ var last_purchased_indices: Array[int] = []
 ##
 ## Returns the number of units actually bought this tick — 0 when the timer has not elapsed,
 ## and 0 when it has but nothing was affordable. The sims assert on this number.
-func tick(delta: float, game: GameState, cadence: float, quantity: int) -> int:
+## `tab`      — the civ tab currently on screen. Tab N is the cohort whose properties have
+##              `unlock_tier == N + 1` (matching Main._epoch_tab_of). This is the desk's aim: the
+##              player points it by paging the ladder.
+func tick(delta: float, game: GameState, tab: int, cadence: float, quantity: int) -> int:
 	if not is_running():
 		return 0
 	if game == null or cadence <= 0.0 or quantity <= 0:
@@ -87,7 +90,7 @@ func tick(delta: float, game: GameState, cadence: float, quantity: int) -> int:
 	if _time_since_last_purchase < cadence:
 		return 0
 
-	var units_bought := _buy_cheapest_repeatedly(game, quantity)
+	var units_bought := _buy_cheapest_repeatedly(game, tab, quantity)
 
 	# EMPTY-TICK RULE. If we bought nothing, the accumulator stays pinned at the cadence instead
 	# of resetting, so the very next frame in which something becomes affordable buys it
@@ -126,11 +129,13 @@ func reset_timer() -> void:
 ##
 ## Affordability is deliberately NOT part of this answer: the useful thing to show is the price
 ## the player is saving toward, which by definition is one they cannot pay yet.
-func lowest_next_cost(game: GameState) -> float:
+## Scoped to the same tab the desk buys from, so Main's NOTHING TO BUY readout answers the question
+## the player is actually asking: "why is nothing happening on the tab I am looking at?"
+func lowest_next_cost(game: GameState, tab: int) -> float:
 	if game == null:
 		return -1.0
 	var lowest := -1.0
-	for i in _eligible_indices(game):
+	for i in _eligible_indices(game, tab):
 		var cost := (game.economy.properties[i] as PropertyState).get_next_cost()
 		if lowest < 0.0 or cost < lowest:
 			lowest = cost
@@ -143,8 +148,8 @@ func lowest_next_cost(game: GameState) -> float:
 
 ## Make up to `quantity` single-unit purchases, each taking whatever is cheapest at that moment.
 ## Returns the number of units actually bought.
-func _buy_cheapest_repeatedly(game: GameState, quantity: int) -> int:
-	var eligible := _eligible_indices(game)
+func _buy_cheapest_repeatedly(game: GameState, tab: int, quantity: int) -> int:
+	var eligible := _eligible_indices(game, tab)
 	if eligible.is_empty():
 		return 0
 
@@ -153,8 +158,8 @@ func _buy_cheapest_repeatedly(game: GameState, quantity: int) -> int:
 	for _purchase in range(quantity):
 		var target := _cheapest_affordable(game, eligible)
 		if target < 0:
-			# Nothing in the epoch is affordable any more. Everything this tick could buy has
-			# been bought, so stop rather than spinning through the remaining quantity.
+			# Nothing on the tab is affordable any more. Everything this tick could buy has been
+			# bought, so stop rather than spinning through the remaining quantity.
 			break
 		if not game.try_buy(target, 1):
 			# Should not happen — _cheapest_affordable already checked the price — but a refusal
@@ -206,9 +211,18 @@ func _cheapest_affordable(game: GameState, eligible: Array[int]) -> int:
 ## The single source of truth for "would this mode ever buy this property?". Both the buying path
 ## and lowest_next_cost() go through here so they can never disagree about what the desk targets.
 ##
-## SCOPE IS THE CURRENT EPOCH (Tim, 2026-08-07), not a tab the player aimed at. The mode used to
-## target the last-viewed civ tab; that hidden state is gone, and the desk simply works in the era
-## the player is actually in.
+## SCOPE IS THE TAB THE PLAYER IS LOOKING AT (Tim, 2026-08-07, clarifying an earlier answer):
+## "Auto buy should always and only purchase properties on the currently visible tab."
+##
+## This briefly shipped as CURRENT EPOCH instead, and that was wrong in a way worth recording,
+## because it looked like a broken feature rather than a mis-scoped one. Each epoch's entry rung
+## costs about 16,807x the previous one's — that is `economy_scale` by design — so pinning the desk
+## to the frontier meant it could afford nothing there for a long stretch after every First Contact,
+## while the player sat looking at an era they had plenty of money for. The desk did nothing, said
+## nothing, and read as broken.
+##
+## The tab is the control. Paging to an era IS how the player aims the desk, which is why the scope
+## must follow what is on screen rather than where the run has reached.
 ##
 ## THERE IS NO FLAGSHIP EXCLUSION ANY MORE (Tim, 2026-08-07). The desk used to refuse the cohort's
 ## most expensive property, because owning 35 of it is the epoch-advance gate. That exclusion
@@ -216,11 +230,11 @@ func _cheapest_affordable(game: GameState, eligible: Array[int]) -> int:
 ## Main._create_game, so leaving an era is always the MAKE CONTACT tap and auto-buy could never
 ## have advanced an epoch by itself. Dropping it turns that gate from an ATTENTION gate into a
 ## MONEY gate — the player still chooses when to leave.
-func _eligible_indices(game: GameState) -> Array[int]:
+func _eligible_indices(game: GameState, tab: int) -> Array[int]:
 	var eligible: Array[int] = []
-	var tier := game.epoch.current_tier
-	for i in game.economy.get_property_indices_for_unlock_tier(tier):
-		if not game.economy.is_property_unlocked(i, tier):
+	# Tab N shows the cohort gated to unlock_tier N + 1 (Main._epoch_tab_of).
+	for i in game.economy.get_property_indices_for_unlock_tier(tab + 1):
+		if not game.economy.is_property_unlocked(i, game.epoch.current_tier):
 			continue
 		eligible.append(i)
 	return eligible

@@ -12,17 +12,25 @@ extends SceneTree
 #      one — so a run walks across properties as prices rise, which is the whole rule.
 #   2. Ties break cheapest -> LEAST OWNED -> index, so equal-priced rungs fill evenly instead of
 #      one property swallowing the tick.
-#   3. Purchases never leave the CURRENT EPOCH.
+#   3. Purchases never leave the TAB THE PLAYER IS LOOKING AT.
 #   4. Partial fill: a tick that runs out of money mid-run keeps what it bought and stops.
 #   5. An unaffordable tick buys nothing AND does not bank credit — in both directions: an empty
 #      tick stays primed (buys the instant cash arrives), and a successful tick restarts the full
 #      wait (it cannot fire twice in quick succession).
 #   6. Disabled means inert.
 #
-# REWRITTEN 2026-08-07 for the restructure. Three cases from the previous version assert rules
-# that no longer exist and are gone: the flagship exclusion (dropped — the desk may buy anything
-# in its epoch), tab targeting (replaced by current-epoch scope), and breadth (the N x X grid
+# REWRITTEN 2026-08-07 for the restructure. Two rules from the previous version are gone: the
+# flagship exclusion (dropped — the desk may buy anything on its tab) and breadth (the N x X grid
 # collapsed into a single purchase count).
+#
+# SCOPE went round a loop the same day and the detour is worth recording. Tab targeting was
+# replaced by current-epoch scope, which briefly shipped and read as the feature being BROKEN: each
+# epoch's entry rung costs ~16,807x the previous one's, so the frontier cohort is unaffordable for
+# a long stretch after every First Contact while the player sits looking at an era they can afford.
+# Tim clarified the intent — "auto buy should always and only purchase properties on the currently
+# visible tab" — so the tab is the aim again, and it is the LIVE on-screen tab, not the reached
+# epoch. Case 4 pins it hard: the run is aimed shallower than it has reached, so either mis-scoping
+# shows up as an off-tab purchase.
 #
 # The old file also carried the "naming trap" assertion — that
 # EconomyState.get_flagship_index_for_unlock_tier and get_property_index_for_unlock_tier mean
@@ -35,6 +43,12 @@ extends SceneTree
 ## The epoch the test dynasty has reached. Alien tiers are the interesting case: big cohorts,
 ## and a wide enough price spread for "cheapest" to move around during a single tick.
 const REACHED_TIER := 6
+
+## The civ tab the tests aim the desk at. Tab N is the cohort gated to unlock_tier N + 1, so tab 2
+## is tier 3 — the FIRST alien cohort. Deliberately SHALLOWER than REACHED_TIER, so a bug that
+## ignores the tab and buys the frontier instead shows up as an off-tab purchase rather than
+## passing by coincidence. That is exactly the mis-scoping that shipped briefly on 2026-08-07.
+const TARGET_TAB := 2
 
 ## Cadence used throughout. The tests drive tick() with a delta equal to the cadence so each call
 ## is exactly one buying opportunity, which keeps the timer arithmetic out of the assertions.
@@ -60,7 +74,7 @@ func _initialize() -> void:
 	_test_always_buys_the_cheapest(property_configs, tuning)
 	_test_a_run_crosses_properties(property_configs, tuning)
 	_test_ties_go_to_the_least_owned(property_configs, tuning)
-	_test_stays_in_the_current_epoch(property_configs, tuning)
+	_test_stays_on_the_targeted_tab(property_configs, tuning)
 	_test_partial_fill(property_configs, tuning)
 	_test_unaffordable_tick_banks_nothing(property_configs, tuning)
 	_test_disabled_is_inert(property_configs, tuning)
@@ -94,8 +108,8 @@ func _check(label: String, condition: bool) -> void:
 ## (tuning is re-pushed onto the catalogs on construction — see sim/CLAUDE.md).
 ##
 ## The epoch is FORCED with epoch.restore() rather than earned by simulating play: reaching tier 6
-## honestly would take a long build-out, and none of the rules under test depend on how the run
-## got there — only on which properties are in the current epoch.
+## honestly would take a long build-out, and none of the rules under test depend on how the run got
+## there — only on which properties are unlocked and which tab the desk is aimed at.
 func _make_run(configs: Array, tuning: TuningConfig, cash: float) -> GameState:
 	var dynasty := DynastyState.new(configs, tuning)
 	var game := dynasty.current
@@ -108,9 +122,10 @@ func _make_run(configs: Array, tuning: TuningConfig, cash: float) -> GameState:
 	return game
 
 
-## The property indices making up the current epoch's cohort — the mode's whole world now.
-func _epoch_indices(game: GameState) -> Array:
-	return game.economy.get_property_indices_for_unlock_tier(game.epoch.current_tier)
+## The property indices on the TARGETED tab — the mode's whole world. Keyed off TARGET_TAB, not the
+## reached epoch: the two are deliberately different so an off-tab purchase is detectable.
+func _tab_indices(game: GameState) -> Array:
+	return game.economy.get_property_indices_for_unlock_tier(TARGET_TAB + 1)
 
 
 ## Every property's units_owned, by index — a snapshot to diff a run against.
@@ -121,11 +136,11 @@ func _snapshot_units(game: GameState) -> Array[int]:
 	return counts
 
 
-## The cheapest next-unit cost in the current epoch, computed INDEPENDENTLY of AutoPurchaseState
+## The cheapest next-unit cost on the targeted tab, computed INDEPENDENTLY of AutoPurchaseState
 ## so the tests do not just re-assert the implementation against itself.
-func _cheapest_cost_in_epoch(game: GameState) -> float:
+func _cheapest_cost_on_tab(game: GameState) -> float:
 	var best := -1.0
-	for i in _epoch_indices(game):
+	for i in _tab_indices(game):
 		var cost := (game.economy.properties[i] as PropertyState).get_next_cost()
 		if best < 0.0 or cost < best:
 			best = cost
@@ -140,6 +155,13 @@ func _test_always_buys_the_cheapest(configs: Array, tuning: TuningConfig) -> voi
 	print("1. Every purchase takes the cheapest property available at that instant")
 	var game := _make_run(configs, tuning, PLENTY_OF_CASH)
 
+	# CASH SCALED TO THE TAB, not PLENTY_OF_CASH. This test measures the spend by subtracting two
+	# cash readings, and float64 carries ~16 significant digits: with 1e30 in the bank and a 1e13
+	# price, `cash_before - cash_after` rounds to exactly ZERO and every purchase looks free. The
+	# assertion failed for that reason alone once the targeted tab became shallower than the
+	# reached epoch. A million times the tab's own price is ample and keeps the subtraction honest.
+	game.economy.cash = _cheapest_cost_on_tab(game) * 1.0e6
+
 	# One purchase at a time, checking before each that the property the mode picks really is the
 	# cheapest. Doing it purchase-by-purchase is the point: a bug that sorts once and then buys
 	# down a stale list would pass a check made only at the start of the tick.
@@ -148,12 +170,16 @@ func _test_always_buys_the_cheapest(configs: Array, tuning: TuningConfig) -> voi
 	# API and cannot be fooled by a stale sort.
 	var mismatches := 0
 	for _step in range(25):
-		var expected_cost := _cheapest_cost_in_epoch(game)
+		var expected_cost := _cheapest_cost_on_tab(game)
 		var cash_before := game.economy.cash
-		game.auto_purchase.tick(CADENCE, game, CADENCE, 1)
+		game.auto_purchase.tick(CADENCE, game, TARGET_TAB, CADENCE, 1)
 		var spent := cash_before - game.economy.cash
 		if game.auto_purchase.last_purchased_indices.size() != 1 \
 				or not is_equal_approx(spent, expected_cost):
+			if mismatches == 0:
+				print("      first mismatch: expected %s, spent %s, touched %d" % [
+					Money.abbrev(expected_cost), Money.abbrev(spent),
+					game.auto_purchase.last_purchased_indices.size()])
 			mismatches += 1
 
 	_check("25 single purchases each paid exactly the cheapest price available", mismatches == 0)
@@ -178,7 +204,7 @@ func _test_a_run_crosses_properties(configs: Array, tuning: TuningConfig) -> voi
 	# A big single tick. Because every purchase re-prices, buying repeatedly should escalate the
 	# cheapest rung past its neighbours and move on — the emergent spread that replaced the old
 	# explicit "breadth" setting.
-	var bought := game.auto_purchase.tick(CADENCE, game, CADENCE, 30)
+	var bought := game.auto_purchase.tick(CADENCE, game, TARGET_TAB, CADENCE, 30)
 	_check("the tick bought all 30 units", bought == 30)
 	_check("they landed on MORE THAN ONE property (the run crossed boundaries)",
 		game.auto_purchase.last_purchased_indices.size() > 1)
@@ -218,7 +244,7 @@ func _test_ties_go_to_the_least_owned(configs: Array, tuning: TuningConfig) -> v
 	# equal prices ever appear, this check fails and tells whoever added them that the tie-break
 	# has become load-bearing and now deserves a real test.
 	var game := _make_run(configs, tuning, PLENTY_OF_CASH)
-	var indices := _epoch_indices(game)
+	var indices := _tab_indices(game)
 	_check("the epoch has several properties to rank", indices.size() >= 2)
 
 	var seen := {}
@@ -233,20 +259,24 @@ func _test_ties_go_to_the_least_owned(configs: Array, tuning: TuningConfig) -> v
 
 
 # ---------------------------------------------------------------------------
-# 4. Scope is the current epoch
+# 4. Scope is the tab on screen
 # ---------------------------------------------------------------------------
 
-func _test_stays_in_the_current_epoch(configs: Array, tuning: TuningConfig) -> void:
-	print("\n4. Purchases never leave the current epoch")
-	var game := _make_run(configs, tuning, PLENTY_OF_CASH)
-	var epoch_set := {}
-	for i in _epoch_indices(game):
-		epoch_set[i] = true
-	_check("the current epoch has a cohort to buy from", not epoch_set.is_empty())
+func _test_stays_on_the_targeted_tab(configs: Array, tuning: TuningConfig) -> void:
+	print("\n4. Purchases never leave the tab the desk is aimed at")
 
+	# Part one: with money, everything stays in the current epoch.
+	var game := _make_run(configs, tuning, PLENTY_OF_CASH)
+	var tab_set := {}
+	for i in _tab_indices(game):
+		tab_set[i] = true
+	_check("the targeted tab has a cohort to buy from", not tab_set.is_empty())
+
+	# ONE SHORT TICK on purpose. Given long enough, escalating prices WILL push the epoch out of
+	# reach and the fallback correctly kicks in — that is the feature, not a leak. This part is only
+	# asserting the preference while the epoch is comfortably affordable.
 	var before := _snapshot_units(game)
-	for _tick in range(40):
-		game.auto_purchase.tick(CADENCE, game, CADENCE, 8)
+	game.auto_purchase.tick(CADENCE, game, TARGET_TAB, CADENCE, 5)
 	var after := _snapshot_units(game)
 
 	var strayed: Array[int] = []
@@ -255,12 +285,39 @@ func _test_stays_in_the_current_epoch(configs: Array, tuning: TuningConfig) -> v
 		if after[i] == before[i]:
 			continue
 		changed += 1
-		if not epoch_set.has(i):
+		if not tab_set.has(i):
 			strayed.append(i)
 
-	_check("something in the epoch was bought (the run is meaningful)", changed > 0)
-	_check("NOTHING outside the current epoch changed (strayed: %s)" % str(strayed),
-		strayed.is_empty())
+	_check("something on the tab was bought (the run is meaningful)", changed > 0)
+	_check("nothing outside the targeted tab was touched (strayed: %s)"
+		% str(strayed), strayed.is_empty())
+
+	# Part two: THE TAB IS THE AIM, not the reached epoch. This run has reached tier 6 but is aimed
+	# at tab 2 (tier 3), and it has enough money to buy the frontier many times over — so if the
+	# desk were scoped to the epoch, or to "everything unlocked", it would show up here as a
+	# purchase outside the targeted cohort. That mis-scoping shipped briefly on 2026-08-07 and read
+	# as the feature being broken, because the frontier cohort was unaffordable while the player sat
+	# looking at an era they could afford.
+	_check("the run has reached tier %d, DEEPER than the targeted tier %d"
+		% [REACHED_TIER, TARGET_TAB + 1], game.epoch.current_tier > TARGET_TAB + 1)
+
+	var long_before := _snapshot_units(game)
+	for _tick in range(40):
+		game.auto_purchase.tick(CADENCE, game, TARGET_TAB, CADENCE, 8)
+	var long_after := _snapshot_units(game)
+
+	var off_tab: Array[int] = []
+	var on_tab := 0
+	for i in range(long_before.size()):
+		if long_after[i] == long_before[i]:
+			continue
+		if tab_set.has(i):
+			on_tab += 1
+		else:
+			off_tab.append(i)
+	_check("a long run bought plenty on the targeted tab", on_tab > 0)
+	_check("...and NEVER strayed off it, in either direction (strayed: %s)" % str(off_tab),
+		off_tab.is_empty())
 
 
 # ---------------------------------------------------------------------------
@@ -271,19 +328,22 @@ func _test_partial_fill(configs: Array, tuning: TuningConfig) -> void:
 	print("\n5. A tick that runs out of money mid-run keeps what it bought")
 	var game := _make_run(configs, tuning, 0.0)
 
-	# Fund exactly three of the cheapest purchases. The budget is MEASURED by running a probe and
-	# reading what it actually spent, not by summing get_next_cost(): try_buy prices through
-	# get_bulk_cost, whose rounding differs by a hair, and summing the other getter left the
-	# budget a fraction short — the tick then bought 2 and the test failed for a reason that had
-	# nothing to do with partial fill.
-	var probe := _make_run(configs, tuning, PLENTY_OF_CASH)
+	# Fund exactly three purchases ON THE TARGETED TAB, measured by running a probe and reading what
+	# it actually spent. Measured rather than summed because try_buy prices through get_bulk_cost,
+	# whose rounding differs from get_next_cost by a hair — summing the other getter left the budget
+	# a fraction short and the tick bought 2, failing for a reason unrelated to partial fill.
+	#
+	# The probe also starts tab-scaled rather than at PLENTY_OF_CASH, for the float64 reason in
+	# case 1: a 1e30 balance cannot represent a 1e13 withdrawal, so the measurement would be zero.
+	var probe := _make_run(configs, tuning, 0.0)
+	probe.economy.cash = _cheapest_cost_on_tab(probe) * 1.0e6
 	var probe_before := probe.economy.cash
 	for _i in range(3):
-		probe.auto_purchase.tick(CADENCE, probe, CADENCE, 1)
+		probe.auto_purchase.tick(CADENCE, probe, TARGET_TAB, CADENCE, 1)
 	var budget := probe_before - probe.economy.cash
 	game.economy.cash = budget
 
-	var bought := game.auto_purchase.tick(CADENCE, game, CADENCE, 20)
+	var bought := game.auto_purchase.tick(CADENCE, game, TARGET_TAB, CADENCE, 20)
 	_check("asking for 20 with money for 3 bought exactly 3, not 0 and not 20 (bought %d)"
 		% bought, bought == 3)
 	_check("the money was actually spent", game.economy.cash < budget)
@@ -299,19 +359,19 @@ func _test_unaffordable_tick_banks_nothing(configs: Array, tuning: TuningConfig)
 
 	var bought_while_broke := 0
 	for _i in range(10):
-		bought_while_broke += game.auto_purchase.tick(CADENCE, game, CADENCE, 4)
+		bought_while_broke += game.auto_purchase.tick(CADENCE, game, TARGET_TAB, CADENCE, 4)
 	_check("ten ticks with no money bought nothing", bought_while_broke == 0)
 
 	# Primed: the instant money arrives, the very next tick buys — no further wait.
 	game.economy.cash = PLENTY_OF_CASH
-	var bought_on_arrival := game.auto_purchase.tick(0.0, game, CADENCE, 4)
+	var bought_on_arrival := game.auto_purchase.tick(0.0, game, TARGET_TAB, CADENCE, 4)
 	_check("the first tick after cash arrives buys immediately (stayed primed)",
 		bought_on_arrival > 0)
 
 	# And the opposite: a successful tick restarts the full wait.
-	var bought_too_soon := game.auto_purchase.tick(CADENCE * 0.5, game, CADENCE, 4)
+	var bought_too_soon := game.auto_purchase.tick(CADENCE * 0.5, game, TARGET_TAB, CADENCE, 4)
 	_check("a half-cadence later it does NOT buy again", bought_too_soon == 0)
-	var bought_after_wait := game.auto_purchase.tick(CADENCE * 0.5, game, CADENCE, 4)
+	var bought_after_wait := game.auto_purchase.tick(CADENCE * 0.5, game, TARGET_TAB, CADENCE, 4)
 	_check("...and it does once the full cadence has passed", bought_after_wait > 0)
 
 
@@ -326,7 +386,7 @@ func _test_disabled_is_inert(configs: Array, tuning: TuningConfig) -> void:
 
 	var bought := 0
 	for _i in range(20):
-		bought += game.auto_purchase.tick(CADENCE, game, CADENCE, 8)
+		bought += game.auto_purchase.tick(CADENCE, game, TARGET_TAB, CADENCE, 8)
 	_check("twenty ticks while disabled bought nothing", bought == 0)
 	_check("no units were acquired anywhere", _total_units(game) == 0)
 
@@ -334,7 +394,7 @@ func _test_disabled_is_inert(configs: Array, tuning: TuningConfig) -> void:
 	game.auto_purchase.enabled = true
 	var bought_after_enable := 0
 	for _i in range(2):
-		bought_after_enable += game.auto_purchase.tick(CADENCE, game, CADENCE, 8)
+		bought_after_enable += game.auto_purchase.tick(CADENCE, game, TARGET_TAB, CADENCE, 8)
 	_check("re-enabling the mode resumes buying", bought_after_enable > 0)
 
 
@@ -444,7 +504,7 @@ func _test_enabled_without_owned_is_fully_inert(configs: Array, tuning: TuningCo
 
 	var bought := 0
 	for _i in range(20):
-		bought += game.auto_purchase.tick(CADENCE, game, CADENCE, 8)
+		bought += game.auto_purchase.tick(CADENCE, game, TARGET_TAB, CADENCE, 8)
 	_check("twenty ticks bought nothing", bought == 0)
 	_check("no units were acquired anywhere", _total_units(game) == 0)
 
@@ -456,7 +516,7 @@ func _test_enabled_without_owned_is_fully_inert(configs: Array, tuning: TuningCo
 	_check("owning the desk makes the mode run", game.auto_purchase.is_running())
 	_check("...and rush is locked out again, as designed",
 		game.is_rush_locked_out_by_auto_purchase())
-	_check("...and it buys", game.auto_purchase.tick(CADENCE, game, CADENCE, 4) > 0)
+	_check("...and it buys", game.auto_purchase.tick(CADENCE, game, TARGET_TAB, CADENCE, 4) > 0)
 
 
 # ---------------------------------------------------------------------------
@@ -471,16 +531,19 @@ func _test_lowest_next_cost_drives_the_idle_readout(configs: Array, tuning: Tuni
 	print("\n11. lowest_next_cost answers 'what is the desk waiting to afford'")
 
 	var game := _make_run(configs, tuning, PLENTY_OF_CASH)
-	var lowest := game.auto_purchase.lowest_next_cost(game)
-	_check("it reports a real price for the current epoch", lowest > 0.0)
-	_check("...and it matches an independent scan of the cohort",
-		is_equal_approx(lowest, _cheapest_cost_in_epoch(game)))
+	var lowest := game.auto_purchase.lowest_next_cost(game, TARGET_TAB)
+	_check("it reports a real price", lowest > 0.0)
+	# Scoped to the SAME tab the desk buys from, so the readout answers the question the player is
+	# actually asking: "why is nothing happening on the tab I am looking at?" A wider scan would
+	# stay quiet while the targeted tab sat unaffordable, which is the silence that started all this.
+	_check("...and it matches an independent scan of the targeted tab",
+		is_equal_approx(lowest, _cheapest_cost_on_tab(game)))
 
 	# AFFORDABILITY IS DELIBERATELY NOT PART OF THE ANSWER: the useful thing to show is the price
 	# being saved toward, which by definition is one the player cannot pay yet.
 	game.economy.cash = 0.0
 	_check("it still reports that price with an empty wallet",
-		is_equal_approx(game.auto_purchase.lowest_next_cost(game), lowest))
+		is_equal_approx(game.auto_purchase.lowest_next_cost(game, TARGET_TAB), lowest))
 
 	# Which is exactly how Main decides the desk is idle.
 	_check("broke + running = idle (the readout condition)",
@@ -488,4 +551,4 @@ func _test_lowest_next_cost_drives_the_idle_readout(configs: Array, tuning: Tuni
 
 	# And with money, it is not idle.
 	game.economy.cash = PLENTY_OF_CASH
-	_check("funded = not idle", game.economy.cash >= game.auto_purchase.lowest_next_cost(game))
+	_check("funded = not idle", game.economy.cash >= game.auto_purchase.lowest_next_cost(game, TARGET_TAB))

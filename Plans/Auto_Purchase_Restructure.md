@@ -26,7 +26,7 @@ never shipped, so there is no `main` compatibility burden).
 | Decision | Call |
 |---|---|
 | Buy rule | **Greedy cheapest-first.** Repeatedly buy the single cheapest available next-unit, re-pricing after every purchase. No "distinct property types" concept at all. |
-| Scope | **Current epoch only.** Not the last-viewed tab. |
+| Scope | ~~Current epoch only~~ → **THE TAB CURRENTLY ON SCREEN** (corrected same day, see below). |
 | Flagship exclusion | **DROPPED.** Auto-buy may buy anything in the epoch, flagship included. |
 | Track count | **Two** — quantity and cadence — plus a **separate unlock purchase**. |
 | Unlock grants | **1 unit every 3.0s.** The weakest working version. |
@@ -35,6 +35,41 @@ never shipped, so there is no `main` compatibility burden).
 | Runaway governance | **Cost curves alone.** No hard throughput ceiling. |
 | Head Hunters | **Deleted. Bulk hire becomes free.** |
 | Existing owners | **Refunded to spendable Legacy.** |
+
+### 0.2b Scope was wrong, and shipped wrong (corrected 2026-08-07)
+
+The interview answer "current epoch only" was a miscommunication, caught on device:
+
+> "I think I realize why it looks broken to me, and it's in part because I miscommunicated about
+> which team the auto buy should purchase from. Auto buy should always and only purchase
+> properties on the currently visible tab."
+
+**Why it read as broken rather than as mis-scoped.** Each epoch's entry rung costs about
+**×16,807** the previous one's — that is `economy_scale` by design. Measured: tier 1's cheapest is
+$50, tier 2's is $6M, tier 3's is $10.4T. So pinning the desk to the frontier means it can afford
+*nothing there* for a long stretch after every First Contact, while the player sits looking at an
+era they have plenty of money for. The desk did nothing, said nothing, and looked like a dead
+feature.
+
+**The tab is the control.** Paging the ladder IS how the player aims the desk, so the scope follows
+what is on screen — Main's live `_epoch_tab`, not `game.ui_epoch_tab` and not the reached epoch.
+(`ui_epoch_tab` keeps its job of restoring the pager across a launch, and therefore still decides
+where the desk points at startup; `_set_epoch_tab` keeps the two in step. Open item 3 is closed by
+this: the field is not dead.)
+
+**A fallback was built and then removed.** Before the clarification arrived, the fix in flight was
+"prefer the current epoch, drop to the cheapest thing anywhere unlocked when it is unaffordable."
+That is *not* what tab targeting means and it is gone — recorded only so nobody re-derives it as an
+improvement. With the tab as the aim, an unaffordable tab is a real answer, and the NOTHING TO BUY
+readout (§0.2c) is how the player is told.
+
+### 0.2c The desk says when it is running but broke
+
+Added 2026-08-07 from the same report: a lit AUTO-BUY button with no purchases and no explanation
+is indistinguishable from a broken feature. The momentum bar's readout now says **NOTHING TO BUY**
+in place of NO RUSH whenever the mode is running and cannot afford the cheapest rung on the visible
+tab. That slot normally spends its pixels on the mode's cost — the lit button already says what is
+on — but when nothing is happening the urgent question changes.
 
 ### 0.3 One premise corrected during the interview
 
@@ -298,9 +333,9 @@ the dev panel to re-buy the tracks (§2.3).
    the next eight) and why cadence needed growth 3.5 to compensate for having only 11 levels.
    A per-track override would let each ladder set its own shape. Not needed to ship, but it is
    the lever any future "the late levels don't matter" complaint will want.
-3. **`ui_epoch_tab` may now be dead.** It was added *for* auto-purchase's tab targeting, which
-   this plan removes. Check whether the pager still needs it before deleting; if the pager wants
-   it, it stays and simply loses its second consumer.
+3. ~~**`ui_epoch_tab` may now be dead.**~~ **CLOSED 2026-08-07** — tab targeting is back (§0.2b),
+   so the field keeps both jobs: it restores the pager across a launch, and that restored tab is
+   where the desk points at startup.
 4. **`Auto_Purchase_And_Bulk_Hire.md` needs a superseded box at the top** pointing here, per the
    doc-rot rule — its Parts A/B describe a shape that will no longer exist.
 5. **The "naming trap" assertion loses its home.** `AutoPurchaseTest` currently asserts that

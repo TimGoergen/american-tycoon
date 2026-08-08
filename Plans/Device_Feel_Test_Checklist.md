@@ -504,10 +504,26 @@ reason: they are live in whatever build is on the phone right now.*
 
 ### 7.4 Unmerged branches — device tests owed before merge
 
-- [ ] **`feature/auto-purchase-and-bulk-hire`** (8 commits, APK shipped, **device test
-      pending**). Acquisitions Desk (auto-buys N units of the X=3 cheapest affordable
-      properties on the last-viewed civ tab, 3.0 s → 1.0 s cadence) + Head Hunters (bulk
-      hire). Four open decisions in `Plans/Auto_Purchase_And_Bulk_Hire.md`:
+- [x] ~~**Estate swipe-scroll + purchase timing.**~~ **KEEP — Tim, 2026-08-07: "the estate swipe
+      scroll fix looks good."** The Estate list scrolls from anywhere, and the purchase moved off
+      `button_down`: a tap buys on RELEASE, a hold still fires at 0.45 s and repeats, a swipe
+      buys nothing. That last part was the whole point — swiping across buy buttons used to spend
+      gems, and a drag is not detectable until after the press has already fired.
+- [x] ~~**AUTO-BUY button vanishing after prestige.**~~ **KEEP — Tim, 2026-08-07: "the post
+      prestige auto buy fix looks good too."** The bar now remembers the state Main pushed and
+      re-applies it when `_ready` builds the button, so a push that arrives while the bar is
+      still detached is no longer silently dropped. `sim/MomentumBarStateTest.gd` reproduces the
+      post-prestige ordering and fails against the unfixed bar.
+- [x] ~~**`feature/auto-purchase-and-bulk-hire` — the restructured buying behaviour.**~~
+      **KEEP — Tim, 2026-08-08: "I like the auto buy behavior."** Greedy cheapest-first, one number
+      (purchases per round) instead of the old N × X grid, scoped to the VISIBLE TAB, no flagship
+      exclusion. Head Hunters deleted and bulk hire free.
+      **This closes the concentration question**, which was the branch's last open design item:
+      cohort rungs sit ~×7 apart, so the cheapest must be bought ~21 times before it overtakes its
+      neighbour — measured, 30 purchases landing on just 2 properties. That is the honest behaviour
+      of the chosen rule, and it is now confirmed as wanted rather than tolerated. The lever if it
+      ever needs one is a per-property cap per tick, NOT the tie-break.
+      Historical detail, for the four decisions that came with the original build:
       - **Rush-heat decay during auto-buy lockout.** Heat **decays** rather than idling —
         the one place that plan contradicts the Roadmap on a feel question, and the reason
         is an invariant worth preserving (an idling bar would show a bonus that isn't paid).
@@ -521,6 +537,11 @@ reason: they are live in whatever build is on the phone right now.*
       MAX moved down an ordinal and saves written while BLOCK existed are clamped on load.
       **Today's test APKs carry BLOCK-era saves, and the clamp has never been exercised on
       device.** Check a pre-removal save still opens with a sane hire mode.
+- [x] ~~**`feature/epoch-pager-improvements`.**~~ **KEEP — Tim, 2026-08-08: "the pager looks good,
+      everything is sized well and aligned properly."** Covers all four changes: the
+      `ALIEN CIVILIZATION x / y` subtitle on every alien tab, the `«  ‹  NAME  ›  »` jump arrows
+      (narrowed to 72px so the name kept its room), the civ name dropped to 44 so all 27 fit on one
+      line, and the subtitle darkened to `#6B4D0C` — the last two both measured rather than chosen.
 - [ ] **`feature/challenge-mode-gating`** (4 commits, **zero device verification** — its
       Verification section asks only for headless checks). Two layout risks were reasoned
       about but never looked at: the locked label **dropped to font 32** to stay inside the
@@ -529,6 +550,33 @@ reason: they are live in whatever build is on the phone right now.*
 
 ### 7.5 Follow-ons from shipped work
 
+- [x] ~~**Active tab icon drop shadow.**~~ **KEEP — Tim, 2026-08-06: "the tab drop shadow looks
+      good."** The lit tab's icon now casts a 6px down-right shadow at 0.35 alpha, so the active
+      tab reads as raised rather than only repainted. Built as a third layer under the existing
+      silhouette + colour pair (the same art modulated to black), riding the same parallel tween.
+      Offset and alpha are the two knobs if it ever wants adjusting.
+- [x] ~~**The AUTO-BUY button.**~~ **KEEP — Tim, 2026-08-07: "the auto buy button looks good."**
+      Covers that control specifically: the collapsed `+ ∞ 🏠` face, the expand-across-the-row when
+      switched on, the white chevron flipping direction, the `AUTO-BUY 5/2.5s` rate readout pinned
+      beside it, the animated ellipsis while nothing is affordable, the purchase pulse, and the
+      bright-blue lit plate (`UiPalette.ACTIVE_BLUE`, with the label moved to cream to hold contrast).
+- [x] ~~**The OVR button.**~~ **KEEP — Tim, 2026-08-08: "the OVR and auto buy button look good."**
+      Covers the exploding-cooker glyph (third attempt — a puff-cloud and a knobbly cloud were both
+      rejected) and the availability pulse: the plate breathes fill + outline only while overdrive
+      can actually be engaged, and parks at rest the moment the window closes.
+- [x] ~~**The rush bar's resized text.**~~ **KEEP w/ TWEAK — Tim, 2026-08-08: "the rush bar looks
+      good, but needs one small change."** "RUSH" a size up and the readout down to FONT_LABEL both
+      land. **TWEAK APPLIED:** the live building percentage was still at the resting size while
+      CRUISE drew 40% larger; both percentage states now share the larger size. The rule that fell
+      out of it, for any state added later: **numbers are big, words are small** — the bonus figures
+      are the bar's readout and get the size; OVERHEATED, COOLING and the auto-buy narration explain
+      why there is no number and stay small.
+- [x] ~~**The rest of the 2026-08-07/08 header pass.**~~ **KEEP — Tim, 2026-08-08: "all of the rush
+      / auto buy header changes look good."** Covers the BUY/HIRE captions (icons 20% smaller, "+"
+      20% larger, gaps tightened) and the meter collapsing to nothing while AUTO-BUY is expanded.
+      One narrow caveat, recorded rather than argued: **OVERHEATED is only on screen during an
+      overheat**, so unless one happened in that session it rode in on a general verdict. It is the
+      one word deliberately left at the resting size, so if any of this comes back, it is that.
 - [ ] **`OVERHEATED` + countdown on each frozen row** — the TWEAK from §6 sitting A
       (your pick over a bare label, "COOLING DOWN", or a voiced line). `OVERHEATED` appears
       in `PropertyRow.gd`/`Main.gd`, so the label looks shipped; **confirm the countdown

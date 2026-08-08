@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Solid left-pointing triangle for the AUTO-BUY button's collapsed state: the button is pinned
+       to the right of its row, so a left arrow reads as "this expands leftwards". Its right-pointing
+       twin (arrow_right.svg) marks the expanded state, where the same edge collapses back.
+
+       DRAWN PURE WHITE ON PURPOSE. The button tints it per state via the `icon_*_color` theme
+       entries — navy on the gold OFF plate, white on the navy ON plate. `modulate` MULTIPLIES, so a
+       white source can become any colour while a coloured source can only get darker. The first
+       version of these arrows was navy, which made the ON-state arrow navy-on-navy and therefore
+       invisible (Tim, 2026-08-07: "there is no arrow showing on the left edge of the button at all").
+
+       A filled triangle rather than a chevron outline, also Tim's call — at 40px a stroked chevron
+       reads as a stray mark rather than a direction. -->
+  <path d="M84 18 L84 110 L30 64 Z" fill="#FFFFFF"/>
+</svg>

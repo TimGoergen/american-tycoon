@@ -57,6 +57,13 @@ var _rush_grace_remaining: float = 0.0
 ## "consume" the current economy (EpochState).
 var epoch: EpochState
 
+## Auto-Purchase Mode — the "Acquisitions Desk" buying policy (Plans/Auto_Purchase_And_Bulk_Hire.md).
+## Headless policy, ticked by whoever drives the game (Main._process for the real game, sim/ for
+## verification) against `ui_epoch_tab`. Held here rather than in the UI so the sims can drive the
+## exact same object the game does. Its `enabled` flag is the single source of truth for whether
+## the mode is on — nothing else stores a copy (see to_save_dict / load_save_dict).
+var auto_purchase := AutoPurchaseState.new()
+
 ## Highest net worth this generation has reached. The next heir must out-earn
 ## this peak before its Legacy sprint multiplier gives way to the residual
 ## (Spec §9.4). Monotonic — only ever rises within a generation.
@@ -67,6 +74,28 @@ var peak_net_worth: float = 0.0
 ## model never reads it. Defaults to 3 = MAX (Tim, 2026-06-23 — a fresh game should
 ## start in buy-max). The literal avoids a UI-class dependency from this headless file.
 var ui_buy_mode: int = 3
+
+## The highest valid PropertyRow.HireMode ordinal (MAX). A literal rather than a reference to the
+## enum, for the same reason ui_buy_mode's default is a literal: this file is headless and must not
+## depend on a UI class. Keep it in step if HireMode ever gains or loses an entry.
+const UI_HIRE_MODE_MAX := 2
+
+## UI preference: the player's selected global staff HIRE mode (a PropertyRow.HireMode int).
+## Same arrangement as ui_buy_mode above — parked here only so it survives the save file.
+## Defaults to 0 = x1, because the bulk modes above it are gated by the Head Hunters Legacy
+## track: a fresh dynasty has not bought them, so anything else would be an invalid default.
+var ui_hire_mode: int = 0
+
+## UI preference: the civ tab the property pager last showed (tab N is the cohort whose
+## properties have unlock_tier N + 1 — Main._epoch_tab_of). Two jobs:
+##   1. The pager reopens where the player left it instead of jumping to the deepest
+##      unlocked tab every launch. Good behaviour on its own merits.
+##   2. ~~It is the tab Auto-Purchase Mode buys from.~~ **No longer true (2026-08-07.)** The
+##      mode now works in the epoch the player is actually in, so it takes no tab argument and
+##      never reads this (Plans/Auto_Purchase_Restructure.md). Job 1 above is the only remaining
+##      reason this field exists — worth confirming the pager still wants it before keeping it.
+## Stored here only so it survives the save file; the headless model never reads it at all.
+var ui_epoch_tab: int = 0
 
 ## UI preference: how every number on screen is formatted (a Money.Format value —
 ## ABBREVIATED / ALPHABET / SCIENTIFIC). Like ui_buy_mode this is parked here only so it
@@ -203,6 +232,11 @@ func tick(delta: float, extra_property_multiplier: float = 1.0) -> void:
 		# next tick anyway — but a rider mark must never outlive its tail even for one tick, so
 		# it goes here with the freeze, on the same one line of thinking.
 		clear_rush_tail_riders()
+		# First Contact is a per-run reset point, so the Acquisitions Desk starts its cadence
+		# over rather than firing a purchase on the far side of the transition with credit it
+		# banked before it. This deliberately leaves auto_purchase.enabled alone — the mode is
+		# a persistent player setting bought with a Legacy upgrade, not per-generation state.
+		auto_purchase.reset_timer()
 	_update_displayed_income()
 	# Refresh the wage's "executive compensation" floor from the passive rate just
 	# computed: a clock-in tap pays a fraction of a second of the empire's income
@@ -295,6 +329,12 @@ func tap_property(prop_index: int) -> void:
 	if prop.is_overheat_frozen:
 		return
 	if prop.is_cycle_running:
+		# THE AUTO-PURCHASE RUSH LOCKOUT (plan §A5). This is the ONLY branch that refuses:
+		# tapping a RUNNING cycle is the rush verb, and rush is the price of the mode. Tapping
+		# a STOPPED cycle (the else branch below) is how the player restarts a property, which
+		# is a core interaction and is deliberately still allowed while the mode is on.
+		if is_rush_locked_out_by_auto_purchase():
+			return
 		frenzy.on_tap()
 		# An overheat takes down the HEAT METER and the properties that were being rushed on it —
 		# not the rest of the empire (Tim 2026-07-19: the lockout was reaching properties that had
@@ -325,6 +365,12 @@ func tap_property(prop_index: int) -> void:
 ## Rushes exactly like a tap, but charges the frenzy meter at the reduced
 ## hold factor — holding is convenient, so real tapping stays superior.
 func hold_rush_property(prop_index: int) -> void:
+	# Refused OUTRIGHT while Auto-Purchase Mode is on (plan §A5). Unlike tap_property this verb
+	# has no start-a-stopped-cycle job of its own — the cycle start on line ~333 exists only so a
+	# very short cycle can still be RUSHED by the same pulse — so there is nothing here worth
+	# keeping once rush is off the table.
+	if is_rush_locked_out_by_auto_purchase():
+		return
 	var prop := economy.properties[prop_index] as PropertyState
 	# A frozen property is DOWN: the held rush is dead on it until rush_ready. This guard is
 	# LOAD-BEARING now — it used to be covered incidentally by the can_rush() gate below, but that
@@ -439,9 +485,29 @@ func clear_rush_tail_riders() -> void:
 ## can_rush() like every rush verb, so the button is fully dead during an overheat lockout (the
 ## state's own locked-out no-op is the belt to this brace, same as the rush verbs above).
 func engage_rush_overdrive() -> void:
+	# Overdrive is a rush verb, so it goes down with the rest while Auto-Purchase Mode is on.
+	if is_rush_locked_out_by_auto_purchase():
+		return
 	if not rush_momentum.can_rush():
 		return
 	rush_momentum.engage_overdrive()
+
+
+## True while Auto-Purchase Mode is switched on, which is exactly when the rush verbs refuse
+## (plan §A5: giving up rush is the price of the mode). Public and named so Main and MomentumBar
+## can gray their controls off the same answer the core refuses on, instead of each re-deriving
+## the condition and drifting from it.
+##
+## Note what this does NOT do: it does not freeze the heat meter. GameState.tick keeps calling
+## rush_momentum.tick every frame — with `rushing` false, because no verb can refill the grace
+## any more — so the heat bleeds down and pays its normal spin-down tail. Turning the mode on
+## simply IS "the player let go". Parking heat at a non-zero fill would show the player a bonus
+## they are not being paid, which breaks the system's binding invariant (plan §A5).
+## `is_running()`, not `enabled`: the flag persists in the save, so a run can load with the mode
+## switched on but the desk unowned. Asking about `enabled` alone made that save refuse every rush
+## forever while nothing was ever bought — all of the mode's cost, none of its benefit.
+func is_rush_locked_out_by_auto_purchase() -> bool:
+	return auto_purchase.is_running()
 
 
 ## Press edge on a property's rush button — the raw finger-down moment, forwarded to the vent
@@ -485,6 +551,11 @@ func try_buy_staff_level(prop_index: int) -> bool:
 
 ## Bank offline earnings for `elapsed_seconds` away (closed-form, Spec §2).
 ## Returns the result for the welcome-back screen.
+##
+## AUTO-PURCHASE DOES NOT RUN HERE, on purpose (plan §A7). Offline is its own banked-pile
+## system, and a mode that spent the pile before the player ever saw it would undermine the
+## welcome-back beat. So this deliberately never touches `auto_purchase` — the mode only
+## advances on live ticks driven by the caller.
 func apply_offline(elapsed_seconds: float) -> OfflineCalculator.OfflineResult:
 	var result := OfflineCalculator.calculate(economy, tuning, elapsed_seconds)
 	OfflineCalculator.apply(economy, result)
@@ -520,8 +591,14 @@ func to_save_dict() -> Dictionary:
 		"cash": economy.cash,
 		"peak_net_worth": peak_net_worth,
 		"buy_mode": ui_buy_mode,
+		"hire_mode": ui_hire_mode,
 		"currency_format": ui_currency_format,
 		"minigame_enabled": ui_minigame_enabled,
+		# The civ tab the pager last showed — also the tab Auto-Purchase Mode buys from.
+		"epoch_tab": ui_epoch_tab,
+		# Read straight off the policy object rather than mirrored into a second field, so
+		# there is exactly one answer to "is the mode on?".
+		"auto_purchase_enabled": auto_purchase.enabled,
 		# Which alien epoch this run has reached (1 = Earth).
 		"epoch_tier": epoch.current_tier,
 		# Per-generation book-value accumulators (Spec §9.2). Saved raw because
@@ -557,6 +634,12 @@ func load_save_dict(data: Dictionary) -> void:
 	economy.cash = float(data.get("cash", 0.0))
 	peak_net_worth = float(data.get("peak_net_worth", 0.0))
 	ui_buy_mode = int(data.get("buy_mode", 3))  # 3 = MAX; matches the fresh-game default
+	# 0 = x1, the ungated default. CLAMPED to the live HireMode range because the BLOCK mode was
+	# removed on 2026-08-01, shrinking that enum from 4 entries to 3: a save written while BLOCK
+	# existed can hold a 3 that no longer names anything. Clamping lands both the old BLOCK (2) and
+	# the old MAX (3) on the new MAX (2) — the generous direction, and harmless either way, since
+	# Main clamps again to whatever the Head Hunters track has actually unlocked.
+	ui_hire_mode = clampi(int(data.get("hire_mode", 0)), 0, UI_HIRE_MODE_MAX)
 	# Absent on every save written before this setting existed, so those saves adopt the
 	# fresh-game default, ALPHABET (Tim, 2026-08-05). A save that DOES carry the key keeps
 	# whatever the player picked — including ABBREVIATED — so an explicit choice is never
@@ -569,6 +652,13 @@ func load_save_dict(data: Dictionary) -> void:
 	)
 	# Pre-minigame saves have no flag; default to enabled (mandatory until opted out).
 	ui_minigame_enabled = bool(data.get("minigame_enabled", true))
+	# Saves written before Auto-Purchase Mode have neither key. Both defaults are the pre-feature
+	# behaviour exactly — tab 0 (which Main then re-clamps/overrides through its own pager rules)
+	# and the mode off — so an old save loads clean with no migration and no version bump.
+	# Only the lower bound is enforced here: the headless model has no notion of how many tabs
+	# the pager shows, so the upper clamp belongs to the UI (Main._epoch_tab_max).
+	ui_epoch_tab = maxi(int(data.get("epoch_tab", 0)), 0)
+	auto_purchase.enabled = bool(data.get("auto_purchase_enabled", false))
 	economy.spent_on_units_this_gen = float(data.get("spent_on_units_this_gen", 0.0))
 	economy.spent_on_staff_this_gen = float(data.get("spent_on_staff_this_gen", 0.0))
 	economy.starting_cash = float(data.get("starting_cash", 0.0))

@@ -201,36 +201,62 @@ func overheat_lockout_scale() -> float:
 ## extra-high zone and cap the multiplier.
 const MINIGAME_BONUS_BASE := 0.25
 
+## The top of the bulk-hire ladder, which everyone now has (see max_hire_mode). Must match the
+## highest ordinal of PropertyRow.HireMode — currently { ONE, TEN, MAX }, so 2. Duplicated as a
+## literal because scripts/core/ must not name a UI class; PropertyRow's enum comment points back
+## here so the pair stays in step.
+const ALL_HIRE_MODES_UNLOCKED := 2
+
 func minigame_bonus_max() -> float:
 	var per_level := _per_level(LegacyUpgradeCatalog.MINIGAME_BONUS)
 	var level := get_level(LegacyUpgradeCatalog.MINIGAME_BONUS)
 	return MINIGAME_BONUS_BASE + per_level * float(level)
 
 
-## True once the Acquisitions Desk is owned, which is what makes the auto-purchase mode
-## available to switch on at all (level 0 = the toggle stays grayed in place).
+## True once the Acquisitions Desk is owned, which is what makes the auto-purchase mode available
+## to switch on at all (unowned = the AUTO-BUY button is absent entirely).
 func auto_purchase_unlocked() -> bool:
-	return get_level(LegacyUpgradeCatalog.ACQUISITIONS_DESK) >= 1
+	return get_level(LegacyUpgradeCatalog.AUTO_PURCHASE_UNLOCK) >= 1
 
 
-## SECONDS to shave off the auto-purchase cadence (Acquisitions Desk). Additive and capped,
-## like the other utility tracks: level 1 only unlocks the mode, and every level after that
-## shortens the wait by another 0.25s. Returns 0.0 when the desk isn't owned.
-## The caller subtracts this from the tuned base cadence and clamps to the tuned minimum —
-## those two knobs live in TuningConfig, so this getter reports the magnitude only.
+## How many single-unit purchases the mode makes per round.
+##
+## The UNLOCK grants one on its own; Buying Power adds one per level. Returns 0 when the mode is
+## not owned, so a caller that forgets to check auto_purchase_unlocked() still buys nothing rather
+## than quietly running a free desk.
+func auto_purchase_quantity() -> int:
+	if not auto_purchase_unlocked():
+		return 0
+	return 1 + get_level(LegacyUpgradeCatalog.AUTO_PURCHASE_QUANTITY)
+
+
+## SECONDS to shave off the auto-purchase cadence (Standing Orders). Returns 0.0 when the mode is
+## not owned, so the unlock alone runs at the tuned base cadence.
+##
+## The caller subtracts this from the tuned base cadence and clamps to the tuned minimum — both
+## knobs live in TuningConfig, so this getter reports the magnitude only. The track's 11 levels are
+## sized to walk 3.0s down to that 0.25s floor exactly.
 func auto_purchase_cadence_scale() -> float:
-	var level := get_level(LegacyUpgradeCatalog.ACQUISITIONS_DESK)
-	if level < 1:
+	if not auto_purchase_unlocked():
 		return 0.0
-	return _per_level(LegacyUpgradeCatalog.ACQUISITIONS_DESK) * float(level - 1)
+	return _per_level(LegacyUpgradeCatalog.AUTO_PURCHASE_CADENCE) \
+		* float(get_level(LegacyUpgradeCatalog.AUTO_PURCHASE_CADENCE))
 
 
-## The deepest bulk-hire mode the player has unlocked (Head Hunters). The number indexes the
-## HireMode ladder in order: 0 = only ×1, 1 = also ×10, 2 = also MAX. It is just the purchased
-## level, but named for what it means so callers don't compare raw levels. (BLOCK sat at 2 until
-## Tim removed it on 2026-08-01; MAX took its slot and the track shortened to 2 levels.)
+## The deepest bulk-hire mode available. Now a CONSTANT: bulk hire is free for everyone since the
+## Head Hunters track was deleted (2026-08-07). Pressing HIRE 150 times is a defect, not a feature,
+## and charging gems to fix a defect is charging for a bug — the same call that made retention
+## bulk-buy free.
+##
+## Kept as a function rather than inlined at the call sites so the ladder has one owner: if a mode
+## is ever added to HireMode, this is the single place that has to learn about it.
+##
+## Returns a plain int rather than PropertyRow.HireMode.MAX on purpose. This is scripts/core/, and
+## naming a UI class from here creates a class-resolution cycle that makes unrelated core members
+## unresolvable and breaks parsing with errors pointing at innocent lines. The int contract is also
+## what callers already used, back when this returned a purchased level.
 func max_hire_mode() -> int:
-	return get_level(LegacyUpgradeCatalog.HEAD_HUNTERS)
+	return ALL_HIRE_MODES_UNLOCKED
 
 
 ## The catalog's per-level magnitude for an upgrade (0.0 if unknown).

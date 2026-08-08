@@ -64,6 +64,7 @@ func _initialize() -> void:
 	_test_partial_fill(property_configs, tuning)
 	_test_unaffordable_tick_banks_nothing(property_configs, tuning)
 	_test_disabled_is_inert(property_configs, tuning)
+	_test_deleted_upgrade_ids_are_inert(property_configs, tuning)
 
 	print("")
 	if _failures == 0:
@@ -329,3 +330,45 @@ func _test_disabled_is_inert(configs: Array, tuning: TuningConfig) -> void:
 	for _i in range(2):
 		bought_after_enable += game.auto_purchase.tick(CADENCE, game, CADENCE, 8)
 	_check("re-enabling the mode resumes buying", bought_after_enable > 0)
+
+
+# ---------------------------------------------------------------------------
+# 8. The deleted upgrade ids are inert
+# ---------------------------------------------------------------------------
+
+## The restructure deleted `acquisitions_desk` and `head_hunters` and wrote NO migration
+## (Plans/Auto_Purchase_Restructure.md §2). That decision rests on one property: a save carrying
+## unknown upgrade ids loads them without complaint and nothing ever resolves them against the
+## catalog. This test pins that property, so if a future feature starts scanning the levels
+## dictionary and calling get_definition() on each entry, it fails here rather than crashing on a
+## real player's save.
+func _test_deleted_upgrade_ids_are_inert(configs: Array, tuning: TuningConfig) -> void:
+	print("\n8. A save carrying the DELETED upgrade ids still loads and plays")
+
+	var old := DynastyState.new(configs, tuning)
+	old.upgrades.available = 50000
+	# Exactly what a pre-restructure save looks like: levels in tracks that no longer exist.
+	old.upgrades.levels["acquisitions_desk"] = 8
+	old.upgrades.levels["head_hunters"] = 2
+	var save := old.to_save_dict()
+
+	var loaded := DynastyState.new(configs, tuning)
+	loaded.load_save_dict(save)
+	_check("the save loaded without error", loaded.current != null)
+	_check("the dead ids came through untouched (harmless baggage)",
+		int(loaded.upgrades.levels.get("acquisitions_desk", 0)) == 8)
+	_check("owning the OLD desk grants nothing — the mode is locked",
+		not loaded.upgrades.auto_purchase_unlocked())
+	_check("...and its quantity is 0, so no free desk runs",
+		loaded.upgrades.auto_purchase_quantity() == 0)
+
+	# Bulk hire is free now, so it must be fully available regardless of what was owned before.
+	_check("bulk hire is unlocked for everyone", loaded.upgrades.max_hire_mode() >= 2)
+
+	# And buying the NEW unlock works on top of that save.
+	loaded.upgrades.available = 50000
+	var bought := loaded.upgrades.buy(LegacyUpgradeCatalog.AUTO_PURCHASE_UNLOCK)
+	_check("the new unlock can be bought on a migrated-from-nothing save", bought)
+	_check("...and the mode is then live at 1 purchase per round",
+		loaded.upgrades.auto_purchase_unlocked()
+			and loaded.upgrades.auto_purchase_quantity() == 1)

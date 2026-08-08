@@ -41,8 +41,18 @@ const FRENZY_INTENSITY := "frenzy_intensity"
 const FRENZY_DURATION  := "frenzy_duration"
 const COOLING_SYSTEMS  := "cooling_systems"
 const RAPID_RESTART    := "rapid_restart"
-const ACQUISITIONS_DESK := "acquisitions_desk"
-const HEAD_HUNTERS      := "head_hunters"
+# Auto-Purchase Mode (restructured 2026-08-07). `acquisitions_desk` and `head_hunters` were the
+# old pair; both are gone. Existing saves keep those dead ids in their upgrade dictionary and that
+# is harmless — LegacyUpgrades.load_save_dict copies unknown ids in without validating them, and
+# nothing anywhere scans that dictionary and resolves it against this catalog (the only iteration
+# over it, in DynastyState's v13 migration, walks a hardcoded id list). No migration needed.
+#
+# IF YOU ADD a feature that iterates upgrade levels and calls get_definition() on each — a "total
+# invested" readout, an "everything you own" list — filter to catalog-known ids or it will crash
+# on those ghosts.
+const AUTO_PURCHASE_UNLOCK   := "auto_purchase_unlock"
+const AUTO_PURCHASE_QUANTITY := "auto_purchase_quantity"
+const AUTO_PURCHASE_CADENCE  := "auto_purchase_cadence"
 
 
 # ── The catalog ───────────────────────────────────────────────────────────────
@@ -221,46 +231,62 @@ const UPGRADES := [
 		"cost_growth": 2.0,
 		"effect_per_level": 0.05,     # −5% total lockout time per level (see LegacyUpgrades getter)
 	},
+	# --- Auto-Purchase Mode: one unlock plus two upgrade axes -------------------------------------
+	# Restructured 2026-08-07 (Plans/Auto_Purchase_Restructure.md), replacing the single
+	# "Acquisitions Desk" track and deleting "Head Hunters" outright — bulk hire is now free for
+	# everyone, on the argument that pressing HIRE 150 times is a defect, not a feature, and
+	# charging gems to fix a defect is charging for a bug (the same call that made retention
+	# bulk-buy free).
+	#
+	# All three prices are PRE-multiplier. Every cost is scaled by
+	# tuning.legacy_upgrade_cost_multiplier (3.0), so 5000/3 here is what lands level 1 on exactly
+	# 5,000. The literal is rounded UP in its last digit on purpose, so the floor() in
+	# cost_for_level can never drop it to 4,999.
+	#
+	# The two ladders' base/growth were FITTED, not guessed — sim/AutoPurchaseCostStudy.gd, against
+	# a real 14-generation playout. Re-run it after any economy retune.
 	{
-		"id": ACQUISITIONS_DESK,
+		"id": AUTO_PURCHASE_UNLOCK,
 		"name": "Acquisitions Desk",
 		"category": "Operations",
-		# The buy rule is spelled out on purpose (Plans/Auto_Purchase_And_Bulk_Hire.md §A6): a mode
-		# that spends the player's money on a rule they cannot see reads as a bug, not a feature.
-		"description": "Buyers work the era you are viewing, taking its cheapest holdings first. Rushing is closed while the desk is open.",
-		# ADDITIVE and capped, like the other utility tracks: level 1 unlocks the mode, and each
-		# further level both deepens the buy (units per property) and shortens the wait between
-		# buys. Capped at 8 so peak throughput stays small against a flagship's price.
-		"max_level": 8,
-		# PREMIUM PRICING (Tim, 2026-08-01): level 1 costs 5,000 Legacy, far above every other
-		# track's opening rung. Automating the buying loop is meant to be a late, earned luxury,
-		# not an early quality-of-life pickup — a full Earth run mints on the order of hundreds of
-		# gems, so this is several epochs' worth of dynasty rather than one succession's.
-		# NOTE the odd-looking number: base_cost is PRE-multiplier. Every price is scaled by
-		# tuning.legacy_upgrade_cost_multiplier (3.0), so 5000/3 here is what lands level 1 on
-		# exactly 5,000. The literal is rounded UP in its last digit on purpose, so the floor() in
-		# cost_for_level can never drop it to 4,999.
+		# The buy rule is spelled out on purpose: a mode that spends the player's money on a rule
+		# they cannot see reads as a bug, not a feature.
+		"description": "Buyers work your current era, taking its cheapest holdings first. Rushing is closed while the desk is open.",
+		# A gateway, not a magnitude. One level, and on its own it is the weakest working version of
+		# the mode: ONE purchase every 3.0s. Everything beyond that is the two tracks below, which
+		# is what makes 5,000 a fair price for it rather than a cheap one.
+		"max_level": 1,
 		"base_cost": 1666.6666666667,
-		"cost_growth": 2.2,
-		"effect_per_level": 0.25,     # seconds shaved off the purchase cadence per level past the first
+		"cost_growth": 1.0,           # single level; growth never applies
+		"effect_per_level": 1.0,      # unlocks the mode (see LegacyUpgrades.auto_purchase_unlocked)
 	},
 	{
-		"id": HEAD_HUNTERS,
-		"name": "Head Hunters",
+		"id": AUTO_PURCHASE_QUANTITY,
+		"name": "Buying Power",
 		"category": "Operations",
-		"description": "Recruiters on retainer. Sign staff by the ten, then by the houseful.",
-		# A gate, not a magnitude: each level unlocks one more bulk-hire mode (×10, then MAX), so
-		# max_level is exactly the number of modes there are to unlock. It was 3 until Tim removed
-		# the BLOCK mode on 2026-08-01 — if a mode is ever added back, raise this in step or the
-		# top level buys nothing.
-		"max_level": 2,
-		# PREMIUM PRICING (Tim, 2026-08-01) — same 5,000 opening rung as the Acquisitions Desk, and
-		# pre-multiplier for the same reason (see that track's note). Bulk hiring is the other half
-		# of "stop pressing buttons", so the two premium tracks are deliberately priced as a matched
-		# pair rather than one being the cheap way in.
+		"description": "More buyers on the floor. Each level buys one more holding every round.",
+		# NOMINALLY 30, but the shared steepening curve is the real ceiling: by level 30 the
+		# steepening term alone is ~1e17, so nobody reaches it. Fitted depth at the summit is ~15
+		# levels, and the track never maxes — the same "uncapped on a steepening curve" shape the
+		# compounders use, which is what "cost curves alone govern the runaway" asks for.
+		"max_level": 30,
 		"base_cost": 1666.6666666667,
-		"cost_growth": 2.4,
-		"effect_per_level": 1.0,      # one unlocked hire mode per level (see LegacyUpgrades.max_hire_mode)
+		"cost_growth": 1.6,           # FITTED — see AutoPurchaseCostStudy
+		"effect_per_level": 1.0,      # +1 purchase per tick per level
+	},
+	{
+		"id": AUTO_PURCHASE_CADENCE,
+		"name": "Standing Orders",
+		"category": "Operations",
+		"description": "Faster paperwork. Each level shortens the wait between buying rounds.",
+		# Capped at 11 by PHYSICS, not by cost: 3.0s down to a 0.25s floor in 0.25s steps. Eleven
+		# levels is far too short for the steepening term to bite — at Buying Power's growth the
+		# whole ladder totalled under a billion and maxed by generation 3, i.e. the track would
+		# have been decorative. Its climb has to come from growth instead, hence 3.5 against 1.6.
+		"max_level": 11,
+		"base_cost": 1666.6666666667,
+		"cost_growth": 3.5,           # FITTED — see AutoPurchaseCostStudy
+		"effect_per_level": 0.25,     # seconds shaved off the cadence per level
 	},
 ]
 
@@ -360,18 +386,16 @@ static func describe_effect(id: String, level: int) -> String:
 			return "+%d%% safe cruise rush bonus" % int(round(per_level * 100.0 * float(shown_level)))
 		RAPID_RESTART:
 			return "−%d%% overheat lockout time" % int(round(per_level * 100.0 * float(shown_level)))
-		ACQUISITIONS_DESK:
-			# Depth is the level itself; the cadence shave only starts at level 2, and the base
-			# cadence it is shaved from is a live tuning knob, so the card quotes the shave alone.
-			if shown_level <= 1:
-				return "auto-buys 1 unit per property"
-			var shave := per_level * float(shown_level - 1)
-			return "auto-buys %d units per property, %ss faster" % [shown_level, Money.trim(shave, 2)]
-		HEAD_HUNTERS:
-			# Each level adds one mode, so the card lists every mode owned so far.
-			match shown_level:
-				1:
-					return "×10 hire unlocked"
-				_:
-					return "×10 and MAX hire unlocked"
+		AUTO_PURCHASE_UNLOCK:
+			# One level, and it says what the mode does on its own — deliberately modest, because
+			# the two tracks below are where the power is.
+			return "auto-buys 1 holding every 3s"
+		AUTO_PURCHASE_QUANTITY:
+			# The unlock already grants one purchase, so level N buys N + 1. Quoting the TOTAL
+			# rather than the increment is what the player actually wants to compare.
+			return "auto-buys %d holdings per round" % (shown_level + 1)
+		AUTO_PURCHASE_CADENCE:
+			# The base cadence being shaved from is a live tuning knob, so the card quotes the
+			# shave alone rather than a total that could quietly go stale.
+			return "%ss faster between rounds" % Money.trim(per_level * float(shown_level), 2)
 	return ""

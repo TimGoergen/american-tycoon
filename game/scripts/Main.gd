@@ -2950,34 +2950,21 @@ func _refresh_mode_buttons() -> void:
 	if _hire_mode_button == null:
 		return
 
-	# --- bulk HIRE (Head Hunters) ---
-	var max_hire := clampi(dynasty.upgrades.max_hire_mode(),
-			PropertyRow.HireMode.ONE, PropertyRow.HireMode.MAX)
-	# Clamp the standing choice down to what is unlocked, so the caption always states the mode the
-	# rows will actually act on (PropertyRow._effective_hire_mode clamps the same way).
-	_hire_mode = mini(_hire_mode, max_hire) as PropertyRow.HireMode
-	# DELIBERATE EXCEPTION TO THE NO-MOVING-UI RULE (Tim, decided 2026-08-01). The standing rule is
-	# "never hide/show controls — keep them visible with a gray disabled state" (scripts/ui/CLAUDE.md),
-	# and Tim overruled it here after being shown that the grayed version breaks on a phone: the
-	# reason a locked toggle is locked had nowhere to live but `tooltip_text` (the face carries the
-	# icon caption and cannot also carry a sentence without dropping below the low-vision text floor),
-	# and TOOLTIPS NEVER APPEAR ON TOUCH. So the grayed button said "not yet" and could never say why.
-	# An absent control is more honest than a dead one that cannot explain itself.
+	# --- bulk HIRE ---
+	# ALWAYS VISIBLE AND ALWAYS ENABLED since the Head Hunters track was deleted (2026-08-07): bulk
+	# hire is free for everyone, so there is nothing left to gate.
 	#
-	# DO NOT "fix" this back to a grayed-in-place toggle. If it is ever restored, the reason must
-	# move somewhere a touch player can actually read it.
-	#
-	# Tim made this call about the AUTO-BUY button; the HIRE toggle had the identical problem, so the
-	# same treatment is applied to both. Once bought, the toggle is permanent.
-	_hire_mode_button.visible = max_hire > PropertyRow.HireMode.ONE
-	if max_hire <= PropertyRow.HireMode.ONE:
-		# Kept in step with `visible` so a stray tap can never reach a hidden-but-live button.
-		_hire_mode_button.disabled = true
-		_hire_mode_rate_label.text = _hire_mode_caption(PropertyRow.HireMode.ONE)
-	else:
-		_hire_mode_button.disabled = false
-		_hire_mode_rate_label.text = _hire_mode_caption(_hire_mode)
-		_hire_mode_button.tooltip_text = "Staff levels each HIRE button buys."
+	# This RETIRES a deliberate exception to the no-moving-UI rule. The toggle used to be hidden
+	# until bought, because a grayed version had nowhere to explain itself — the face carries the
+	# icon caption and cannot also carry a sentence without dropping below the low-vision text
+	# floor, and tooltips never appear on touch. Making the modes free removes the problem rather
+	# than managing it: the control is simply always there, which is what the standing rule wanted
+	# all along. The equivalent exception still applies to the AUTO-BUY button, which IS still
+	# gated (see MomentumBar._apply_auto_purchase_look).
+	_hire_mode_button.visible = true
+	_hire_mode_button.disabled = false
+	_hire_mode_rate_label.text = _hire_mode_caption(_hire_mode)
+	_hire_mode_button.tooltip_text = "Staff levels each HIRE button buys."
 	_tint_mode_caption(_hire_mode_plus_label, _hire_mode_icon, _hire_mode_rate_label,
 			_hire_mode_button.disabled)
 
@@ -3045,10 +3032,7 @@ func _drive_auto_purchase(delta: float) -> void:
 	# moment, so the spread across properties is emergent rather than configured — see
 	# AutoPurchaseState for the rule and why it changed (Tim, 2026-08-07).
 	#
-	# TEMPORARY SOURCE: still read off the old Acquisitions Desk level. The restructure's own
-	# quantity track replaces this in Plans/Auto_Purchase_Restructure.md §3.3; until then the old
-	# upgrade drives the new rule so the branch stays playable between steps.
-	var quantity := dynasty.upgrades.get_level(LegacyUpgradeCatalog.ACQUISITIONS_DESK)
+	var quantity := dynasty.upgrades.auto_purchase_quantity()
 	# No tab argument any more: the mode works in the epoch the player is actually in, so the
 	# hidden "which tab was it aimed at" state is gone (see AutoPurchaseState._eligible_indices).
 	var units_bought := game.auto_purchase.tick(delta, game, cadence, quantity)

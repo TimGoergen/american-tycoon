@@ -27,6 +27,10 @@ enum BuyMode { ONE, TEN, NEXT_TIER, MAX }
 # written while BLOCK existed are clamped into range on load (GameState.load_save_dict), which
 # lands an old BLOCK or MAX on the new MAX. Head Hunters dropped to 2 levels to match, since
 # each of its levels unlocks exactly one bulk mode and there are now only two.
+## Bulk-hire ladder. All three are free to everyone since the Head Hunters track was deleted
+## (2026-08-07). If a mode is ever added here, raise LegacyUpgrades.ALL_HIRE_MODES_UNLOCKED to
+## match — core cannot name this enum (it would create a class-resolution cycle), so that constant
+## mirrors this one's top ordinal by hand.
 enum HireMode { ONE, TEN, MAX }
 
 signal buy_requested(prop_index: int, mode: BuyMode)

@@ -756,3 +756,37 @@ extends Resource
 
 ## Autosave interval in seconds.
 @export var autosave_cadence: float = 10.0
+
+
+# --- Audio (Plans/Audio_System.md) ---
+#
+# Every one of these is a FEEL knob: how long a tap run stays "hot", how often collect audio is
+# allowed to speak, how quiet the small version of a scaled sound is. They live here rather than as
+# consts for the same reason the haptic durations were promoted — the answers only come from playing
+# it on a device, and a rebuild per guess is a bad way to find them.
+
+## How long a gap in tapping resets the musical tap scale back to its root note, in seconds.
+@export var audio_tap_scale_reset_seconds: float = 1.0
+
+## Cycle payouts are summed over this window and reported as ONE sound (never one per payout — at
+## deep tiers the raw event fires dozens of times a second).
+@export var audio_collect_window_ms: float = 250.0
+
+## A hard floor on the gap between two collect sounds, whatever the windows do.
+@export var audio_collect_min_interval_ms: float = 250.0
+
+## How long after a player action the game still counts them as PRESENT. Unattended events —
+## passive collections, auto-purchases — stay silent outside this window.
+@export var audio_presence_window_ms: float = 2000.0
+
+## How quiet the smallest version of an intensity-scaled sound is, relative to its loudest.
+@export var audio_scaled_min_db: float = -10.0
+
+## The intensity at which a scaled sound starts mixing in its brighter layer.
+@export var audio_layer_threshold: float = 0.5
+
+## The income/sec change (as a fraction) that a purchase must produce to reach the FLOOR and the
+## CEILING of the purchase sound's intensity. A +2% buy sits at the floor, a +50% buy maxes out.
+## Fractions, never dollars — the same purchase must sound the same at every generation.
+@export var audio_buy_intensity_min_fraction: float = 0.02
+@export var audio_buy_intensity_max_fraction: float = 0.50

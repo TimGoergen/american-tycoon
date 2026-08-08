@@ -279,6 +279,9 @@ const SECTIONS := [
 		"buy_hold_", "hire_hold_", "offline_", "carb_",
 	]},
 	{"title": "Wage", "prefixes": ["wage_"]},
+	# Audio needs its own entry or every audio_* knob lands in the catch-all section, which is
+	# titled "Challenge Mode" and would be a confusing home for the tap-scale timing.
+	{"title": "Audio", "prefixes": ["audio_"]},
 	{"title": "Frenzy", "prefixes": ["frenzy_"]},
 	{"title": "Rush Momentum", "prefixes": ["rush_momentum_"]},
 	# Staff absorbs the retention pricing knobs (retention_*) — retention is just staff-level pricing.

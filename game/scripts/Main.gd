@@ -384,6 +384,11 @@ func _process(delta: float) -> void:
 		dynasty.tick(step)
 		_tick_accumulator -= step
 
+	# Report this frame's cycle payouts. Audio sums them over a short window and speaks at most
+	# once per window — one chime per payout is unshippable when deep tiers pay dozens a second —
+	# and stays silent entirely unless the player has done something recently.
+	Audio.note_collect(game.economy.income_this_tick, game.economy.get_passive_income_per_sec())
+
 	_drive_auto_purchase(delta)
 
 	_autosave_timer += delta
@@ -616,6 +621,14 @@ func _create_game() -> void:
 	# BEFORE any screen is built — Money.format_mode is a static every readout reads, so setting
 	# it here means the very first frame already renders in the chosen format.
 	Money.format_mode = game.ui_currency_format
+
+	# Same treatment for the three audio settings: pushed BEFORE anything can make a sound, so the
+	# first frame is already at the player's chosen levels rather than briefly at full volume.
+	# Audio no-ops entirely when there is no audio device, so this is safe headless.
+	Audio.apply_tuning(tuning)
+	Audio.set_bus_volume(Audio.BUS_MUSIC, game.ui_music_volume)
+	_apply_sfx_volume(game.ui_sfx_volume)
+	Haptics.scale = game.ui_haptics_scale
 
 
 ## Wall-clock seconds since the save was written. The dynastic save nests the
@@ -1769,6 +1782,49 @@ func _build_settings_tab() -> Control:
 		format_rows.add_child(row)
 	_style_currency_format_rows()
 
+	# SOUND (Plans/Audio_System.md §6.2). Same §8 card as the number-format group above, for the same
+	# reason: a heading plus its rows read as one unit only when a border says so.
+	var sound_card := PanelContainer.new()
+	sound_card.add_theme_stylebox_override("panel", UiPalette.make_panel_style())
+	v.add_child(sound_card)
+
+	var sound_group := VBoxContainer.new()
+	sound_group.add_theme_constant_override("separation", 12)
+	sound_card.add_child(sound_group)
+
+	var sound_heading := Label.new()
+	sound_heading.text = "Sound"
+	sound_heading.add_theme_font_size_override("font_size", 45)
+	sound_heading.add_theme_font_override("font", UiPalette.make_bold_font())
+	sound_heading.add_theme_color_override("font_color", UiPalette.NAVY)
+	sound_group.add_child(sound_heading)
+
+	var sound_caption := Label.new()
+	sound_caption.text = "Drag to set. Each one plays a sample when you let go."
+	sound_caption.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	sound_caption.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
+	sound_caption.add_theme_color_override("font_color", UiPalette.NAVY)
+	sound_group.add_child(sound_caption)
+
+	sound_group.add_child(_build_volume_row("MUSIC", game.ui_music_volume,
+		func(level: float) -> void:
+			game.ui_music_volume = level
+			Audio.set_bus_volume(Audio.BUS_MUSIC, level),
+		func() -> void: Audio.play(&"music_preview")))
+
+	sound_group.add_child(_build_volume_row("SOUND EFFECTS", game.ui_sfx_volume,
+		func(level: float) -> void:
+			game.ui_sfx_volume = level
+			_apply_sfx_volume(level),
+		func() -> void: Audio.play(&"buy_success")))
+
+	# HAPTICS is not a bus — it scales the vibration durations — so its "preview" is a buzz.
+	sound_group.add_child(_build_volume_row("HAPTICS", game.ui_haptics_scale,
+		func(level: float) -> void:
+			game.ui_haptics_scale = level
+			Haptics.scale = level,
+		func() -> void: Haptics.pulse(HAPTICS_PREVIEW_MS)))
+
 	# A spacer pushes the two tuning buttons to the bottom of the panel, clear of the options above.
 	#
 	# The page now lives in a ScrollContainer (see the end of this function), so overflow scrolls
@@ -2071,6 +2127,9 @@ func _update_estate_badge() -> void:
 ## the Family Ledger / Settings content that depends on live state when entered.
 func _show_tab(index: int) -> void:
 	_active_tab = index
+	# The musical tap run belongs to one burst of tapping. Resuming mid-climb after the player went
+	# and did something else would sound like the game lost its place (Plans/Audio_System.md §10.3).
+	Audio.reset_tap_scale()
 	# Opening the Estate tab acknowledges the claimable-Legacy badge.
 	if index == TAB_ESTATE:
 		_estate_badge_dismissed = true
@@ -2137,7 +2196,9 @@ func _sum_displayed_property_income() -> float:
 	return total
 
 
-func _on_buy_requested(prop_index: int, mode: PropertyRow.BuyMode) -> void:
+func _on_buy_requested(
+		prop_index: int, mode: PropertyRow.BuyMode, source: PropertyRow.ActionSource
+) -> void:
 	var prop := game.economy.properties[prop_index] as PropertyState
 	var count := 0
 	match mode:
@@ -2154,12 +2215,136 @@ func _on_buy_requested(prop_index: int, mode: PropertyRow.BuyMode) -> void:
 		return
 
 	var band_before := prop.get_milestone_band()
+	# Measured across the purchase so the sound can report how much the buy actually MOVED the
+	# player's income — see _buy_intensity for why that and not the price.
+	var income_before := game.economy.get_passive_income_per_sec()
 	if game.try_buy(prop_index, count):
 		_hero_stat.flash_purchase()
+		# A HOLD is one gesture and must sound like one thing: the repeats stay silent, so a held
+		# buy button gives a single confirmation rather than sixty (Plans/Audio_System.md §4.4).
+		if source == PropertyRow.ActionSource.PLAYER_TAP:
+			Audio.play_scaled(&"buy_success",
+				_buy_intensity(income_before, game.economy.get_passive_income_per_sec()))
 		# Milestone reward: fire on the crossing (not before) — a milestone is an automatic reward,
 		# not an action to direct, so a just-happened notification is the right shape.
 		if prop.get_milestone_band() > band_before:
 			_maybe_show_tip("first_milestone", _row_for_index(prop_index))
+
+
+## One labelled volume row: NAME on the left, a slider, and the value as a percentage.
+##
+## The percentage is not decoration. A slider position is a guess about a value you cannot see, and
+## this project's readability rule (large text, large targets — Tim is 49 with imperfect vision)
+## applies to knowing what you set as much as to reading it. The grabber and row are sized well past
+## the default HSlider, which is a thin line with a small handle and not a touch target.
+##
+## `on_changed` fires continuously while dragging; `on_released` fires once when the finger lifts and
+## plays the preview — the only way to set a volume is to hear it, but previewing on every pixel of
+## drag would be a stutter of overlapping samples.
+func _build_volume_row(
+		label_text: String, initial: float, on_changed: Callable, on_released: Callable
+) -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 16)
+	row.custom_minimum_size = Vector2(0, VOLUME_ROW_HEIGHT)
+
+	var name_label := Label.new()
+	name_label.text = label_text
+	name_label.custom_minimum_size = Vector2(VOLUME_LABEL_WIDTH, 0)
+	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	name_label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
+	name_label.add_theme_font_override("font", UiPalette.make_bold_font())
+	name_label.add_theme_color_override("font_color", UiPalette.NAVY)
+	row.add_child(name_label)
+
+	var value_label := Label.new()
+	value_label.custom_minimum_size = Vector2(VOLUME_VALUE_WIDTH, 0)
+	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	value_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	value_label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
+	value_label.add_theme_font_override("font", UiPalette.make_bold_font())
+	value_label.add_theme_color_override("font_color", UiPalette.NAVY)
+
+	var slider := HSlider.new()
+	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	slider.custom_minimum_size = Vector2(0, VOLUME_SLIDER_HEIGHT)
+	slider.min_value = 0.0
+	slider.max_value = 1.0
+	slider.step = 0.05
+	slider.value = initial
+	slider.add_theme_icon_override("grabber", _make_slider_grabber())
+	slider.add_theme_icon_override("grabber_highlight", _make_slider_grabber())
+	slider.value_changed.connect(func(level: float) -> void:
+		value_label.text = "%d%%" % roundi(level * 100.0)
+		on_changed.call(level))
+	# drag_ended fires for a drag; a TAP on the track moves the value without one, so the preview
+	# also has to hang off the release of a press. Both funnel through the same guarded call.
+	slider.drag_ended.connect(func(_changed: bool) -> void: _preview_volume(on_released))
+	slider.gui_input.connect(func(event: InputEvent) -> void:
+		if event is InputEventScreenTouch and not (event as InputEventScreenTouch).pressed:
+			_preview_volume(on_released))
+	row.add_child(slider)
+	row.add_child(value_label)
+
+	value_label.text = "%d%%" % roundi(initial * 100.0)
+	# NOTE the page's drag-to-scroll helper watches BaseButtons only, so it does not touch these
+	# sliders — which is what we want. A drag on a slider IS the control working, and panning the
+	# page out from under the finger at the same time would fight it.
+	return row
+
+
+## Play a slider's preview, unless the "release" was really the end of a page swipe.
+func _preview_volume(on_released: Callable) -> void:
+	if _settings_tap_was_a_swipe():
+		return
+	on_released.call()
+
+
+## The slider handle: a plain navy dot, drawn once and shared. The default theme's grabber is small
+## enough to be a poor touch target at this row height.
+func _make_slider_grabber() -> ImageTexture:
+	var size := VOLUME_GRABBER_SIZE
+	var image := Image.create(size, size, false, Image.FORMAT_RGBA8)
+	image.fill(Color(0, 0, 0, 0))
+	var radius := size * 0.5
+	for y in range(size):
+		for x in range(size):
+			var distance := Vector2(x + 0.5 - radius, y + 0.5 - radius).length()
+			if distance <= radius - 1.0:
+				image.set_pixel(x, y, UiPalette.NAVY)
+			elif distance <= radius:
+				# One soft edge pixel, so the circle does not read as a jagged square at this size.
+				image.set_pixel(x, y, Color(UiPalette.NAVY, radius - distance))
+	return ImageTexture.create_from_image(image)
+
+
+## Push the SFX slider to the three buses it governs. The player sees one control; the mix needs
+## SFX, UI and Ceremony separable so tuning a tap sound cannot wreck a succession sting (§1.2).
+func _apply_sfx_volume(level: float) -> void:
+	for bus in [Audio.BUS_SFX, Audio.BUS_UI, Audio.BUS_CEREMONY]:
+		Audio.set_bus_volume(bus, level)
+
+
+## How loud a purchase should sound, from the RELATIVE change in income/sec.
+##
+## NEVER from the price (Plans/Audio_System.md §0.4 rule 2). A $250 purchase in generation 1 and a
+## $4.2Sx purchase in generation 15 are the same event to the player — the first rung of a new
+## cohort — and must sound the same. Branching on a dollar figure would make the whole late game
+## sound identical and the whole early game inaudible.
+##
+## A buy that moves income by the floor fraction is quiet; one that moves it by the ceiling fraction
+## maxes out and brings in the brighter layer.
+func _buy_intensity(income_before: float, income_after: float) -> float:
+	if income_before <= 0.0:
+		# The first staffed property has nothing to be a fraction OF. It is unambiguously a big
+		# moment, so it gets the full sound rather than a divide-by-zero guard's default of zero.
+		return 1.0
+	var change := (income_after - income_before) / income_before
+	return clampf(
+		inverse_lerp(tuning.audio_buy_intensity_min_fraction,
+			tuning.audio_buy_intensity_max_fraction, change),
+		0.0, 1.0)
 
 
 ## Show the one-time tutorial card for `tip_id`, anchored near `target` (null = screen-centered),
@@ -2301,6 +2486,19 @@ func _refresh_locked_tabs() -> void:
 	_tab_buttons[TAB_LEDGER].disabled = not _ledger_unlocked()
 	_refresh_challenges_button()
 
+
+# --- The Settings tab's SOUND card (Plans/Audio_System.md §6.2) ---
+## Row height and control sizes for one volume slider. All well past the default HSlider, which is a
+## thin line with a small handle — not a touch target, and not readable at arm's length.
+const VOLUME_ROW_HEIGHT := 84
+const VOLUME_SLIDER_HEIGHT := 44
+const VOLUME_GRABBER_SIZE := 52
+## Fixed columns so the three sliders start and end at the same x and read as one group.
+const VOLUME_LABEL_WIDTH := 300
+const VOLUME_VALUE_WIDTH := 110
+## How long the haptics slider's preview buzz lasts. Between the vent pulse (80 ms) and the overheat
+## thud (200 ms) — long enough to feel at a low slider setting, short enough not to be startling.
+const HAPTICS_PREVIEW_MS := 120.0
 
 ## Font size (px) of the tall bottom-of-Settings entry buttons (BALANCE TUNING, CHALLENGES, HELP …),
 ## large enough to fill their 40%-taller plate (Tim, 2026-06-26).
@@ -2466,7 +2664,13 @@ func _ledger_unlocked() -> bool:
 
 
 func _on_tap_requested(prop_index: int) -> void:
+	# RUSHING a running cycle is the tap that feeds the musical scale; STARTING an idle cycle is a
+	# different act and gets no note (Plans/Audio_System.md §4.1). Read before the call, because
+	# tap_property is what changes it.
+	var was_running := (game.economy.properties[prop_index] as PropertyState).is_cycle_running
 	game.tap_property(prop_index)
+	if was_running:
+		Audio.play_tap_note()
 
 
 func _on_hold_rush_requested(prop_index: int) -> void:
@@ -2503,7 +2707,9 @@ func _on_rush_released(prop_index: int) -> void:
 ##
 ## try_buy_staff_levels is partial-fill and returns how many levels it actually bought; nothing
 ## here needs the number, because the row repaints itself from the live state next frame.
-func _on_hire_requested(prop_index: int, mode: PropertyRow.HireMode) -> void:
+func _on_hire_requested(
+		prop_index: int, mode: PropertyRow.HireMode, _source: PropertyRow.ActionSource
+) -> void:
 	var count := PropertyRow.resolve_hire_count(
 			mode, game.economy, prop_index, game.epoch.current_tier)
 	if count <= 0:
@@ -2513,10 +2719,15 @@ func _on_hire_requested(prop_index: int, mode: PropertyRow.HireMode) -> void:
 
 func _on_wage_tapped() -> void:
 	game.tap_wage()
+	Audio.play_tap_note()
 
 
 func _on_wage_hold_tapped() -> void:
 	game.hold_tap_wage()
+	# HOLDS HOLD ONE NOTE (Tim, 2026-08-08). Climbing here would make holding sound better than
+	# tapping, which inverts what the scale is for — and an auto-tap running up the scale and
+	# pinning at the top is exactly the sound that stops being fun at minute fifteen.
+	Audio.play(&"tap_note")
 
 
 func _on_pop_requested() -> void:

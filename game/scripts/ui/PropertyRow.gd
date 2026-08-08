@@ -33,7 +33,20 @@ enum BuyMode { ONE, TEN, NEXT_TIER, MAX }
 ## mirrors this one's top ordinal by hand.
 enum HireMode { ONE, TEN, MAX }
 
-signal buy_requested(prop_index: int, mode: BuyMode)
+## WHO asked for this action. Audio is the reason it exists (Plans/Audio_System.md §4.4): a HOLD is
+## ONE gesture and must sound like one thing, not like sixty purchases — but until now the codebase
+## simply discarded "who initiated this", and the distinguishing state lived only in this file's
+## private _buy_hold_repeating.
+##
+## There is deliberately no AUTO_PURCHASE value: the Acquisitions Desk buys inside AutoPurchaseState,
+## in core, and never reaches these signals at all. Auto-buys are silent by construction rather than
+## by a check, which is the stronger guarantee.
+enum ActionSource {
+	PLAYER_TAP,   ## A discrete press.
+	HOLD_REPEAT,  ## A repeat pumped out while the button stays held.
+}
+
+signal buy_requested(prop_index: int, mode: BuyMode, source: ActionSource)
 signal tap_requested(prop_index: int)
 signal hold_rush_requested(prop_index: int)
 ## Fired the moment a rush HOLD that actually auto-rushed ends, so Rush Momentum can stop
@@ -57,7 +70,7 @@ signal rush_released(prop_index: int)
 ## BuyMode: the row emits the MODE and Main resolves it to a level count (via this row's
 ## resolve_hire_count) before spending. The mode sent is the EFFECTIVE one — already clamped
 ## to what the player's Head Hunters level allows (see _effective_hire_mode).
-signal hire_requested(prop_index: int, mode: HireMode)
+signal hire_requested(prop_index: int, mode: HireMode, source: ActionSource)
 
 var prop_index: int = -1
 
@@ -739,7 +752,8 @@ func _ready() -> void:
 	_buy_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_buy_button.custom_minimum_size = Vector2(0, BUTTON_ROW_HEIGHT)
 	UiPalette.style_button(_buy_button, true)  # red: buying is a spend action (§8)
-	_buy_button.pressed.connect(func() -> void: buy_requested.emit(prop_index, _buy_mode))
+	_buy_button.pressed.connect(func() -> void:
+		buy_requested.emit(prop_index, _buy_mode, ActionSource.PLAYER_TAP))
 	var buy_labels := _add_split_button_labels(_buy_button)
 	_buy_caption_label = buy_labels[0]
 	_buy_cost_label = buy_labels[1]
@@ -1076,7 +1090,7 @@ func _fire_secondary_action(control_id: String) -> void:
 		"rush":
 			tap_requested.emit(prop_index)  # start an idle cycle, or land one rush
 		"buy":
-			buy_requested.emit(prop_index, _buy_mode)
+			buy_requested.emit(prop_index, _buy_mode, ActionSource.PLAYER_TAP)
 		"hire":
 			_on_hire_pressed()
 
@@ -1160,7 +1174,7 @@ func _pump_held_buy(delta: float) -> void:
 		_buy_hold_accumulator = 0.0
 		_buy_hold_repeating = true
 		if not _buy_button.disabled:
-			buy_requested.emit(prop_index, _buy_mode)
+			buy_requested.emit(prop_index, _buy_mode, ActionSource.HOLD_REPEAT)
 
 
 ## Holding the STAFF button keeps performing its current action on a calm cadence (Tim, 2026-07-01):
@@ -1182,7 +1196,7 @@ func _pump_held_hire(delta: float) -> void:
 		_hire_hold_accumulator = 0.0
 		_hire_hold_repeating = true
 		if not _hire_button.disabled:
-			_on_hire_pressed()
+			_on_hire_pressed(ActionSource.HOLD_REPEAT)
 
 
 ## True while a HELD action is engaged on this row: auto-rush (held past RUSH_ENGAGE_SEC), or
@@ -1767,8 +1781,8 @@ func _apply_ownership_styling(owned: bool, frozen: bool) -> void:
 ## The staff button's `pressed` handler. One action only — buy up the ladder — so no state
 ## dispatch (the pre-redesign HIRE/UPGRADE/LEVEL-UP state machine is gone). HOW MANY rungs is
 ## the current hire mode's business, and Main resolves that from the mode we send.
-func _on_hire_pressed() -> void:
-	hire_requested.emit(prop_index, _effective_hire_mode())
+func _on_hire_pressed(source: ActionSource = ActionSource.PLAYER_TAP) -> void:
+	hire_requested.emit(prop_index, _effective_hire_mode(), source)
 
 
 ## Update the staff button for the property's sequential ladder (GDD §6.1, epoch-depth

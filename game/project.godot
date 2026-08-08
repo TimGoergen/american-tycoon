@@ -18,6 +18,16 @@ run/main_scene="res://Main.tscn"
 config/features=PackedStringArray("4.5", "Mobile")
 config/icon="res://art/branding/american_tycoon_logo.png"
 
+[autoload]
+
+; The project's first and only autoload. Audio needs AudioStreamPlayer NODES that survive Main being
+; rebuilt on every succession and tuning-apply, which a static class cannot own.
+Audio="*res://scripts/audio/Audio.gd"
+
+[audio]
+
+buses/default_bus_layout="res://audio/default_bus_layout.tres"
+
 [display]
 
 window/size/viewport_width=1080

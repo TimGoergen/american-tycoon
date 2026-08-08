@@ -1813,12 +1813,11 @@ func _style_tier_chip(text: String, plate_color: Color, text_color: Color) -> vo
 	_tier_chip.add_theme_stylebox_override("panel", plate)
 
 
-## Haptic tap, mobile only — desktop must stay silent (Input.vibrate_handheld is a no-op on most
-## desktops anyway, but the explicit guard documents the intent and costs nothing). Takes the
-## tuning knob's float directly; a knob dialed to 0 (or below) disables that pulse.
+## Haptic tap. Takes the tuning knob's float directly; a knob dialed to 0 (or below) disables that
+## pulse, and so does the player's haptics slider — see Haptics.pulse, which also carries the
+## mobile-only guard this function used to hold.
 func _vibrate(duration_ms: float) -> void:
-	if duration_ms >= 1.0 and OS.has_feature("mobile"):
-		Input.vibrate_handheld(int(duration_ms))
+	Haptics.pulse(duration_ms)
 
 
 ## The vent telegraph's haptic: ONE PULSE PER REQUIRED LIFT (Tim 2026-07-20). A x2 window buzzes

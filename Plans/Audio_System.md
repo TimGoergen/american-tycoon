@@ -1,6 +1,7 @@
 # Audio System — Implementation Plan
 
-**Status:** Planned, not started. Written 2026-08-06 from an interview with Tim.
+**Status:** Phase 0 and Phase 1 BUILT (2026-08-08), awaiting Tim's device verdict. Phases 2-5 not
+started. Written 2026-08-06 from an interview with Tim.
 **Graduates:** GDD §12 (Art & Audio Direction), §13 M3 milestone entry "audio implementation
 (exotica/muzak per §12)", and GDD §11 open item "Sound & haptics design — remaining open:
 haptics and per-event sound mapping."
@@ -36,9 +37,11 @@ unmerged work that this plan's event map depends on:
 | `feature/auto-purchase-and-bulk-hire` | **Acquisitions Desk** (auto-buy) and **Head Hunters** (bulk hire). The interview decision "auto-buys are silent" (§4.4) is unimplementable until this merges — the code has no auto-buy at all today. |
 | `feature/civs-12-26` | The 27-tier epoch ladder. §3.2's era-band → track mapping assumes 27 tiers. |
 
-**Recommendation:** land audio *after* both merge, or accept that the auto-buy silencing
-and the deep-band music mapping are follow-ups. Building the audio branch off `main`
-today would produce an event map that goes stale on the next merge.
+**RESOLVED 2026-08-08 — both branches are merged to `main`,** so this dependency is discharged and
+the event map below is current. One correction to §4.4 fell out of it: the Acquisitions Desk buys
+inside `AutoPurchaseState`, in core, and never reaches `buy_requested` at all. **Auto-buys are silent
+by construction rather than by a check**, which is a stronger guarantee than the plan asked for — so
+the source enum shipped with two values (`PLAYER_TAP`, `HOLD_REPEAT`) and no `AUTO_PURCHASE`.
 
 ### 0.3 Decisions taken (Tim, 2026-08-06 interview)
 
@@ -627,11 +630,11 @@ Each phase is independently mergeable, device-testable, and leaves the game in a
 state. Branch names follow the project's `feature/**` convention (every push builds and
 ships a Firebase APK).
 
-### Phase 0 — `feature/settings-scrollcontainer`
+### Phase 0 — `feature/settings-scrollcontainer` — BUILT 2026-08-08
 Wrap the settings page in a `ScrollContainer` (§6.1). No audio. Small, isolated, unblocks
 everything downstream. Ship and device-check that nothing reflowed.
 
-### Phase 1 — `feature/audio-core-slice` ← **the vertical slice (decision 14)**
+### Phase 1 — `feature/audio-core-slice` — BUILT 2026-08-08 ← **the vertical slice (decision 14)**
 The whole path, end to end, for exactly three events.
 
 - `Audio` autoload + bus layout + voice pool + `audio_events.tres`
@@ -646,7 +649,18 @@ The whole path, end to end, for exactly three events.
 
 **Exit criterion:** Tim plays 20 minutes on device and judges whether the core loop feels
 better with sound than without. This is the decision point for everything after it. If the
-tap scale is annoying at minute 15, that is a finding worth the whole phase.
+tap scale is annoying at minute 15, that is a finding worth the whole phase. **PENDING.**
+
+Two gates landed with it, both with teeth (each was checked by breaking the code and watching it
+fail): `sim/AudioSettingsTest.gd` asserts generically that EVERY `ui_` preference surviving a save
+also survives a succession — the §6.4 bug class, protecting the three older settings too — and
+`sim/AudioCoreTest.gd` force-enables the autoload headless (the bus layout loads fine without an
+audio device) to pin muted-costs-nothing, the fixed voice pool, the tap scale, and rule 2: the same
+payout RATIO eighteen orders of magnitude apart must produce the same intensity.
+
+Phase 0 turned out to be load-bearing exactly as predicted: with the SOUND card added, the settings
+content measures taller than the viewport. Without the ScrollContainer the bottom buttons would have
+been unreachable, not merely clipped.
 
 ### Phase 2 — `feature/audio-music`
 Five band tracks, band mapping, crossfades, idle fade (§3.3), ceremony-safe transition
@@ -700,6 +714,20 @@ content exists together is the first time the mix can actually be judged.
 ---
 
 ## 10. Open questions for Tim
+
+### Answered 2026-08-08
+
+- **§10.2 — does a HELD wage tap climb the scale? NO: a hold holds one note** (Tim). Climbing would
+  make holding sound better than tapping, which inverts what the scale is for, and a held auto-tap
+  running up the scale to pin at the top is exactly the sound that stops being fun at minute 15.
+- **§10.3 — does the tap scale reset on tab change? YES** (Tim, taking the plan's lean). A climb that
+  resumed after the player went and did something else reads as the game losing its place.
+- **Asset sourcing for Phase 1 — synthesized placeholders** (Tim). `tools/generate_placeholder_audio.py`
+  writes the five samples as PCM: nothing downloaded, no licensing, and the feel test is real because
+  the timing and the pitch relationships are real. Sourced samples replace them by editing
+  `game/config/audio_events.tres` — no code change, which is the property §1.4 was built for.
+
+### Still open
 
 1. **Music sourcing route (§7.2)** — commission one melody with five arrangements, or ship
    the fallback (five related tracks + a shared re-instrumented motif sting)? This is the

@@ -351,13 +351,22 @@ const AUTO_PURCHASE_WIDTH := 244
 const AUTO_PURCHASE_INFINITY_ICON := preload("res://art/icons/infinity.svg")
 const AUTO_PURCHASE_PROPERTY_ICON := preload("res://art/icons/tab_property_inactive.svg")
 
-## Wanted VISIBLE height of those two glyphs, and the boxes that achieve it. The boxes are derived
-## from measured art: infinity's glyph fills 40 of its 96px canvas (0.417) and the property icon 279
-## of its 324 (0.861), so equal boxes would draw the infinity at less than half the building's
-## height. Dividing by each fraction is what makes them match optically.
+## The caption's reference VISIBLE height, and the per-glyph multipliers Tim set on 2026-08-07 once
+## he saw them together: the infinity at 60% of it, the property icon 20% above it. They are no
+## longer the same size on purpose — matched optical height made the infinity read as the loud part
+## of the pair, when the building is the noun and the infinity is the modifier.
 const AUTO_PURCHASE_CAPTION_ICON_HEIGHT := 40.0
-const AUTO_PURCHASE_INFINITY_BOX := int(AUTO_PURCHASE_CAPTION_ICON_HEIGHT * 96.0 / 40.0)   # 96
-const AUTO_PURCHASE_PROPERTY_BOX := int(AUTO_PURCHASE_CAPTION_ICON_HEIGHT * 324.0 / 279.0)  # 46
+const AUTO_PURCHASE_INFINITY_SCALE := 0.6
+const AUTO_PURCHASE_PROPERTY_SCALE := 1.2
+
+## The boxes that achieve those heights, derived from MEASURED art rather than canvas size:
+## infinity's glyph fills 40 of its 96px canvas (0.417) and the property icon 279 of its 324
+## (0.861). Dividing each wanted height by its own fraction is what makes the pair land where it is
+## meant to — equal boxes would draw the infinity at less than half the building's height.
+const AUTO_PURCHASE_INFINITY_BOX := int(
+	AUTO_PURCHASE_CAPTION_ICON_HEIGHT * AUTO_PURCHASE_INFINITY_SCALE * 96.0 / 40.0)    # 57
+const AUTO_PURCHASE_PROPERTY_BOX := int(
+	AUTO_PURCHASE_CAPTION_ICON_HEIGHT * AUTO_PURCHASE_PROPERTY_SCALE * 324.0 / 279.0)  # 55
 
 ## Gap between the caption's three parts, and how far it is held off the plate's frame.
 const AUTO_PURCHASE_CAPTION_GAP := 4

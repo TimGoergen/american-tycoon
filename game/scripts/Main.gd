@@ -2277,16 +2277,14 @@ const CHALLENGES_ICON := preload("res://art/icons/gamepad.svg")
 ## dependable on device, and this art does not change without someone editing this line anyway.
 const CHALLENGES_ICON_REGION := Rect2(5, 37, 118, 58)
 
-## How far the gamepad stays clear of the button's top and bottom edges. Small on purpose — Tim,
-## 2026-08-08: "large enough to almost fill the button".
-const CHALLENGES_ICON_INSET := 10.0
+## How far the gamepad stays clear of the button's top and bottom edges. 10 → 26 (Tim, 2026-08-08:
+## "smaller, to have a margin between it and the button edges"), which draws it 86px tall inside the
+## 138px plate. The inset sets the icon's HEIGHT; its width follows from the art's 118:58 aspect.
+const CHALLENGES_ICON_INSET := 26.0
 
-## Where the label's centre sits along the button, as a fraction of its width. 0.75 centres it in
-## the RIGHT HALF — "to the right of centre" (Tim, 2026-08-08) — which leaves the whole left half as
-## the gap the gamepad is centred in, and keeps the text clear of the right edge rather than hard
-## against it. The LOCKED state ignores all of this: its two-line explainer stays centred across the
-## full width and gets no icon (see CHALLENGES_LOCKED_FONT).
-const CHALLENGES_LABEL_CENTRE_FRACTION := 0.75
+## The gap between the gamepad and the word beside it. Wide enough that they read as an icon AND a
+## label rather than as one run-together mark.
+const CHALLENGES_ICON_TEXT_GAP := 28.0
 
 
 ## Build the gamepad AND the label overlay on the CHALLENGES button, once.
@@ -2333,11 +2331,15 @@ func _ensure_challenges_icon() -> void:
 	_challenges_button.resized.connect(_layout_challenges_button)
 
 
-## Place the label in the right half of the button and centre the gamepad in the gap to its left.
+## Lay the gamepad and the word out as ONE centred group: [gamepad][gap][CHALLENGES], with the pair
+## together centred on the button (Tim, 2026-08-08).
 ##
-## Both positions are derived from the measured string width rather than from fixed insets, so they
-## stay correct if the label or its font size ever changes. The gamepad is sized from the button's
-## HEIGHT (less a small inset) and takes whatever width its 118:58 aspect needs.
+## Centring the GROUP rather than either piece is what keeps the button looking balanced — centring
+## the text alone would push the icon off to one side and leave a lopsided plate. The group's width
+## comes from the measured string, so it stays right if the label or its font size ever changes.
+##
+## The gamepad is sized from the button's HEIGHT (less CHALLENGES_ICON_INSET top and bottom) and
+## takes whatever width its 118:58 aspect needs.
 func _layout_challenges_button() -> void:
 	if _challenges_icon == null or _challenges_button == null:
 		return
@@ -2345,18 +2347,20 @@ func _layout_challenges_button() -> void:
 	if button_size.x <= 0.0:
 		return  # not laid out yet; the resized signal will bring us back
 
-	var text_width: float = UiPalette.make_bold_font().get_string_size(
-		_challenges_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, TUNING_BUTTON_FONT).x
-	_challenges_label.size = Vector2(text_width, button_size.y)
-	_challenges_label.position = Vector2(
-		button_size.x * CHALLENGES_LABEL_CENTRE_FRACTION - text_width * 0.5, 0.0)
-
 	var icon_height := button_size.y - CHALLENGES_ICON_INSET * 2.0
 	var icon_width := icon_height * (CHALLENGES_ICON_REGION.size.x / CHALLENGES_ICON_REGION.size.y)
-	# Centred in the space between the button's left edge and the label's left edge.
-	var gap_centre := _challenges_label.position.x * 0.5
+	var text_width: float = UiPalette.make_bold_font().get_string_size(
+		_challenges_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, TUNING_BUTTON_FONT).x
+
+	var group_width := icon_width + CHALLENGES_ICON_TEXT_GAP + text_width
+	var group_left := (button_size.x - group_width) * 0.5
+
 	_challenges_icon.size = Vector2(icon_width, icon_height)
-	_challenges_icon.position = Vector2(gap_centre - icon_width * 0.5, CHALLENGES_ICON_INSET)
+	_challenges_icon.position = Vector2(group_left, CHALLENGES_ICON_INSET)
+
+	_challenges_label.size = Vector2(text_width, button_size.y)
+	_challenges_label.position = Vector2(
+		group_left + icon_width + CHALLENGES_ICON_TEXT_GAP, 0.0)
 
 
 ## Keep the Settings tab's CHALLENGES button matching its unlock state. Challenge Mode opens only

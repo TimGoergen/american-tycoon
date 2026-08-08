@@ -841,6 +841,18 @@ func _apply_auto_purchase_look(unlocked: bool, enabled: bool) -> void:
 			"font_hover_pressed_color"]:
 		_auto_purchase_button.add_theme_color_override(state, label_color)
 
+	# THE ARROW IS TINTED, NOT RECOLOURED IN THE ART. Both chevrons ship pure white, and the button
+	# multiplies them to whatever the current plate needs: navy on the gold OFF plate, white on the
+	# navy ON plate. Shipping them navy is what made the ON arrow invisible — navy on navy (Tim,
+	# 2026-08-07: "there is no arrow showing on the left edge of the button at all").
+	#
+	# White for ON is Tim's call rather than matching the mustard label: the arrow is a direction
+	# marker, not a second label, and full white separates it from the text sharing the plate.
+	var arrow_color := Color.WHITE if enabled else UiPalette.NAVY
+	for state in ["icon_normal_color", "icon_hover_color", "icon_pressed_color",
+			"icon_focus_color", "icon_hover_pressed_color"]:
+		_auto_purchase_button.add_theme_color_override(state, arrow_color)
+
 	_auto_purchase_button.tooltip_text = \
 			"Auto-buy is ON — properties buy themselves, but rush is unavailable." if enabled \
 			else "Auto-buy is OFF — tap to let properties buy themselves (rush turns off)."

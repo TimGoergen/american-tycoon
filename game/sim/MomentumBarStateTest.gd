@@ -70,6 +70,7 @@ func _run() -> void:
 	await _test_untold_bar_starts_hidden(bar_script, tuning)
 	await _test_purchase_pulse(bar_script, tuning)
 	await _test_expands_while_running(bar_script, tuning)
+	await _test_cycle_wave(bar_script, tuning)
 
 	print("")
 	if _failures == 0:
@@ -114,9 +115,17 @@ func _find_arrow_rect(bar: Control) -> TextureRect:
 	for child in button.get_children():
 		for grandchild in (child as Node).get_children():
 			var rect := grandchild as TextureRect
-			if rect != null and rect.is_visible_in_tree():
-				return rect
+			# Skip the cycle wave: it is a TextureRect too, it is the button's FIRST child, and it
+			# is painted from a GradientTexture2D rather than an art asset. Without this the arrow
+			# assertions silently began measuring the wave instead.
+			if rect == null or not rect.is_visible_in_tree():
+				continue
+			if rect.texture is GradientTexture2D:
+				continue  # the cycle wave, not the chevron
+			return rect
 	return null
+
+
 
 
 ## The Label node (not just its text) whose text starts with `prefix`, for measuring where it starts.
@@ -134,7 +143,7 @@ func _find_label_node(node: Node, prefix: String) -> Label:
 func _first_visible_texture(node: Node) -> Texture2D:
 	for child in node.get_children():
 		var rect := child as TextureRect
-		if rect != null and rect.is_visible_in_tree():
+		if rect != null and rect.is_visible_in_tree() and not (rect.texture is GradientTexture2D):
 			return rect.texture
 		var found := _first_visible_texture(child)
 		if found != null:
@@ -381,3 +390,92 @@ func _test_expands_while_running(bar_script: GDScript, tuning: TuningConfig) -> 
 	_check("...and hands the face back to the icon caption", button.text == "")
 
 	bar.queue_free()
+
+
+## The cycle wave: a bright band crossing the button once per purchase cycle, so the cadence upgrade
+## is something the player can watch rather than only read (Tim, 2026-08-07).
+##
+## Asserted on MOVEMENT and TIMING, not on appearance. A band that never moved, or moved while the
+## mode was off, or took the wrong time to cross, would all look entirely reasonable in the source.
+func _test_cycle_wave(bar_script: GDScript, tuning: TuningConfig) -> void:
+	print("\n5. A bright wave crosses the button once per purchase cycle")
+
+	var bar: Control = await _mount_bar(bar_script, tuning, true, true, false)
+	bar.custom_minimum_size = Vector2(1000, 99)
+	await process_frame
+
+	# Switched OFF, there must be no wave at all — it is the sign the desk is running.
+	bar._process(0.1)
+	var host := _find_wave_host(bar)
+	_check("the wave host exists", host != null)
+	if host == null:
+		bar.queue_free()
+		return
+	_check("switched OFF the wave is hidden", not host.visible)
+
+	# Switched on at a two-second cadence: it appears and it travels.
+	bar.set_auto_purchase_state(true, true, false, 5, 2.0)
+	await process_frame
+	await process_frame
+	bar._process(0.0)
+	_check("switched ON the wave shows", host.visible)
+
+	var band := _find_wave_band(bar)
+	_check("the band exists", band != null)
+	if band == null:
+		bar.queue_free()
+		return
+
+	var start_x := band.position.x
+	bar._process(0.5)   # a quarter of the 2s cycle
+	var quarter_x := band.position.x
+	_check("the band moves left to right as the cycle runs", quarter_x > start_x)
+
+	bar._process(0.5)   # halfway
+	_check("...and keeps travelling", band.position.x > quarter_x)
+
+	# A full period returns it to where it began: one pass per cycle, not a drift.
+	# ONE FULL PERIOD RETURNS TO THE SAME PLACE. Compared against a fresh reading rather than the
+	# `start_x` taken earlier, for two reasons: the button's width settles over a few frames after
+	# it expands (so an older x can be stale by a band-width), and the awaited frames have already
+	# advanced the sweep, so the phase at capture was never zero to begin with. Taken back-to-back
+	# with no frame between, the only thing that can move the band is the period itself.
+	var before_period := band.position.x
+	bar._process(2.0)
+	_check("one full cadence returns it to the same point in the sweep",
+		is_equal_approx(band.position.x, before_period))
+
+	# A purchase re-aligns the sweep, so the wave cannot drift against what the desk is doing.
+	bar._process(0.7)
+	_check("mid-sweep it has moved off the start",
+		not is_equal_approx(band.position.x, -band.size.x))
+	bar.flash_auto_purchase()
+	bar._process(0.0)
+	_check("a purchase resets the sweep to its start",
+		is_equal_approx(band.position.x, -band.size.x))
+
+	bar.queue_free()
+
+
+## The wave's clipping host — the first invisible-when-off Control added to the button.
+func _find_wave_host(bar: Control) -> Control:
+	var button: Button = bar.get_auto_purchase_button()
+	if button == null:
+		return null
+	for child in button.get_children():
+		var ctrl := child as Control
+		if ctrl != null and ctrl.clip_contents:
+			return ctrl
+	return null
+
+
+## The sliding band inside that host.
+func _find_wave_band(bar: Control) -> TextureRect:
+	var host := _find_wave_host(bar)
+	if host == null:
+		return null
+	for child in host.get_children():
+		var rect := child as TextureRect
+		if rect != null:
+			return rect
+	return null

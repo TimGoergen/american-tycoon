@@ -152,6 +152,14 @@ var _auto_purchase_caption_icons: Array = []
 ## right edge of the chevron.
 var _auto_purchase_rate_label: Label
 
+## The cycle wave and its clipping host. Shown only while the mode is running; the host clips, the
+## band inside it slides.
+var _auto_purchase_wave_host: Control
+var _auto_purchase_wave: TextureRect
+## Seconds into the current sweep. Re-zeroed on every actual purchase so the wave stays married to
+## what the desk is doing rather than drifting against it.
+var _auto_purchase_wave_seconds := 0.0
+
 ## The edge chevron. An overlay TextureRect rather than the Button's `icon`, so its box is exactly
 ## AUTO_PURCHASE_ARROW_SIZE and the rate readout beside it can rely on that — see
 ## _build_auto_purchase_caption for why the Button's own icon could not be trusted to stay put.
@@ -407,6 +415,16 @@ const AUTO_PURCHASE_ARROW_GAP := 10
 const AUTO_PURCHASE_ARROW_GUTTER := \
 	AUTO_PURCHASE_ARROW_INSET + AUTO_PURCHASE_ARROW_SIZE + AUTO_PURCHASE_ARROW_GAP
 
+## The cycle wave: how bright the band gets at its centre, and how wide it is as a fraction of the
+## button. Wide and faint on purpose — it is a heartbeat behind the face, not a highlight sweeping
+## over it, and it has to stay legible under the text and icons that draw on top.
+const AUTO_PURCHASE_WAVE_ALPHA := 0.30
+const AUTO_PURCHASE_WAVE_WIDTH_FRAC := 0.40
+
+## Cadence to sweep at when Main has not pushed one yet. Matches the tuned base cadence, so the very
+## first frames look like the slowest desk rather than a stalled one.
+const AUTO_PURCHASE_WAVE_FALLBACK_SECONDS := 3.0
+
 ## The idle animation: a redrawing ellipsis in place of a static "NOTHING TO BUY" (Tim,
 ## 2026-08-07). Seconds each dot count holds before the next — three steps, so a full cycle is
 ## three times this. Slow on purpose: it is a thinking indicator, not an alarm.
@@ -482,6 +500,10 @@ func flash_auto_purchase() -> void:
 	if _auto_purchase_button == null or not _auto_purchase_button.visible:
 		return
 	_auto_purchase_pulse_seconds = AUTO_PURCHASE_PULSE_SECONDS
+	# Re-align the cycle wave to the purchase that just happened. Free-running on the cadence would
+	# drift against reality — the accumulator is clamped and an unaffordable tick stays primed — and
+	# a sweep that claims to show the cycle has to actually agree with it.
+	_auto_purchase_wave_seconds = 0.0
 
 
 ## Ease the AUTO-BUY pulse back to rest. Called once per frame from _process; free on the
@@ -953,6 +975,45 @@ func _apply_auto_purchase_look(unlocked: bool, enabled: bool) -> void:
 ##
 ## Right-aligned to sit opposite the chevron, matching where the status text lands when expanded.
 func _build_auto_purchase_caption() -> void:
+	# THE CYCLE WAVE, added FIRST so every other layer draws over it (Tim, 2026-08-07: "a visible
+	# bright wave that passes across the background of the button once per auto buy cycle").
+	#
+	# It makes the cadence legible. The Standing Orders track is otherwise an invisible upgrade —
+	# the desk simply buys "more often" — and a sweep timed to the cycle turns that into something
+	# the player can watch speed up. The rate readout says 2.5s; the wave shows it.
+	#
+	# A moved gradient rather than a per-frame _draw: one texture, one position update, and
+	# clip_contents on the host keeps it inside the plate no matter where the band is.
+	_auto_purchase_wave_host = Control.new()
+	_auto_purchase_wave_host.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_auto_purchase_wave_host.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_auto_purchase_wave_host.clip_contents = true
+	_auto_purchase_wave_host.visible = false
+	_auto_purchase_button.add_child(_auto_purchase_wave_host)
+
+	var gradient := Gradient.new()
+	# Transparent at both ends so the band has no hard edge — a solid rectangle sliding past reads
+	# as a graphical fault, a soft one reads as light moving.
+	gradient.set_offset(0, 0.0)
+	gradient.set_color(0, Color(1.0, 1.0, 1.0, 0.0))
+	gradient.set_offset(1, 1.0)
+	gradient.set_color(1, Color(1.0, 1.0, 1.0, 0.0))
+	gradient.add_point(0.5, Color(1.0, 1.0, 1.0, AUTO_PURCHASE_WAVE_ALPHA))
+
+	var wave_texture := GradientTexture2D.new()
+	wave_texture.gradient = gradient
+	wave_texture.width = 128
+	wave_texture.height = 1
+	wave_texture.fill_from = Vector2(0.0, 0.0)
+	wave_texture.fill_to = Vector2(1.0, 0.0)
+
+	_auto_purchase_wave = TextureRect.new()
+	_auto_purchase_wave.texture = wave_texture
+	_auto_purchase_wave.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_auto_purchase_wave.stretch_mode = TextureRect.STRETCH_SCALE
+	_auto_purchase_wave.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_auto_purchase_wave_host.add_child(_auto_purchase_wave)
+
 	# THE CHEVRON, drawn as an overlay rather than through the Button's `icon` property.
 	#
 	# It began as Button.icon with expand_icon + icon_max_width, and that could not be positioned
@@ -1066,6 +1127,35 @@ func _tint_auto_purchase_caption(color: Color) -> void:
 		_auto_purchase_rate_label.add_theme_color_override("font_color", color)
 
 
+## Slide the cycle wave across the button, one full pass per purchase cycle.
+##
+## The band starts entirely off the left edge and ends entirely off the right, so the sweep reads as
+## something crossing the button rather than appearing and vanishing inside it. Free on every frame
+## the mode is not running.
+func _animate_auto_purchase_wave(delta: float) -> void:
+	if _auto_purchase_wave_host == null:
+		return
+	if not _auto_purchase_enabled or not _auto_purchase_unlocked:
+		_auto_purchase_wave_host.visible = false
+		return
+
+	_auto_purchase_wave_host.visible = true
+	var period := _auto_purchase_cadence
+	if period <= 0.0:
+		period = AUTO_PURCHASE_WAVE_FALLBACK_SECONDS
+	_auto_purchase_wave_seconds = fmod(_auto_purchase_wave_seconds + delta, period)
+
+	var host_width := _auto_purchase_wave_host.size.x
+	var host_height := _auto_purchase_wave_host.size.y
+	if host_width <= 0.0:
+		return
+	var band := host_width * AUTO_PURCHASE_WAVE_WIDTH_FRAC
+	_auto_purchase_wave.size = Vector2(band, host_height)
+	# From fully off the left to fully off the right across one period.
+	_auto_purchase_wave.position = Vector2(
+		lerpf(-band, host_width, _auto_purchase_wave_seconds / period), 0.0)
+
+
 ## Redraw the idle ellipsis. Free on every frame the desk is not idle, and it rewrites the button's
 ## text only when the dot count actually changes — a Button reassigns its text unconditionally and
 ## re-lays out its face, which is wasted work sixty times a second for a label that changes twice a
@@ -1154,6 +1244,7 @@ func _auto_purchase_idle_dots() -> String:
 func _process(delta: float) -> void:
 	_fade_auto_purchase_pulse(delta)
 	_animate_auto_purchase_idle(delta)
+	_animate_auto_purchase_wave(delta)
 	var locked_out := _rush_momentum.is_locked_out()
 	var cruising := _rush_momentum.is_cruising()
 	# Overdrive DISPLAY mode: the engaged flag, not heat position — the instant the player opts

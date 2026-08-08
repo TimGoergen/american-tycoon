@@ -74,6 +74,21 @@ func _run() -> void:
 		quit(1)
 
 
+## Find the text of the first VISIBLE Label anywhere under `root_node` whose text starts with
+## `prefix`. The rate readout is an internal part of the AUTO-BUY button's face rather than part of
+## the bar's public surface, so the test reaches for it by shape instead of widening the API just to
+## be observable.
+func _find_label_text_containing(root_node: Node, prefix: String) -> String:
+	for child in root_node.get_children():
+		var label := child as Label
+		if label != null and label.visible and label.text.begins_with(prefix):
+			return label.text
+		var found := _find_label_text_containing(child, prefix)
+		if found != "":
+			return found
+	return ""
+
+
 ## Assert helper: prints a pass/fail line and counts failures.
 func _check(label: String, condition: bool) -> void:
 	print("  [%s] %s" % ["PASS" if condition else "FAIL", label])
@@ -260,6 +275,18 @@ func _test_expands_while_running(bar_script: GDScript, tuning: TuningConfig) -> 
 	# Running but broke: the count gives way to the reason nothing is happening.
 	bar.set_auto_purchase_state(true, true, true, 5)
 	_check("running but unable to afford anything says so", button.text == "NOTHING TO BUY")
+
+	# The expanded face also carries a rate readout on its LEFT, opposite the status text: what it
+	# buys per round and how often. Found by type rather than by a getter, since it is an internal
+	# piece of the button's face rather than part of the bar's API.
+	bar.set_auto_purchase_state(true, true, false, 5, 2.5)
+	var rate_text := _find_label_text_containing(bar, "AUTO-BUY 5/")
+	_check("the expanded face reports its rate as AUTO-BUY 5/2.5s", rate_text == "AUTO-BUY 5/2.5s")
+
+	# Before Main has pushed numbers it must not read "AUTO-BUY 0/0s".
+	bar.set_auto_purchase_state(true, true, false, 0, 0.0)
+	_check("with no numbers yet it falls back to the bare name",
+		_find_label_text_containing(bar, "AUTO-BUY") == "AUTO-BUY")
 
 	# And switching off puts the row back exactly as it was.
 	bar.set_auto_purchase_state(true, false, false, 5)

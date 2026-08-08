@@ -148,6 +148,14 @@ var _auto_purchase_caption: HBoxContainer
 var _auto_purchase_caption_plus: Label
 var _auto_purchase_caption_icons: Array = []
 
+## The expanded face's rate readout ("AUTO-BUY 5/2.5s"). Shown only while expanded, left-aligned
+## opposite the right-aligned status text.
+var _auto_purchase_rate_label: Label
+
+## Seconds between purchase rounds, pushed in by Main — the only place that knows it, since the
+## cadence is the tuned base less the upgrade's shave, clamped to a tuned floor.
+var _auto_purchase_cadence := 0.0
+
 ## Seconds left in the "the desk just bought something" pulse (0 = not pulsing). Counted down in
 ## _process, exactly the way PropertyRow fades its auto-purchase row marker — a countdown rather
 ## than a Tween so a purchase landing mid-pulse simply retriggers it, with no tween to kill and
@@ -340,7 +348,9 @@ const OVERDRIVE_ICON_SIZE := 62
 ## direction rather than two different icons.
 const AUTO_PURCHASE_ARROW_COLLAPSED := preload("res://art/icons/arrow_left.svg")
 const AUTO_PURCHASE_ARROW_EXPANDED := preload("res://art/icons/arrow_right.svg")
-const AUTO_PURCHASE_ARROW_SIZE := 40
+## 40 → 56, a 40% increase (Tim, 2026-08-07). Still well inside the 99px row height, and still a
+## downscale from the 128px art so it stays crisp.
+const AUTO_PURCHASE_ARROW_SIZE := 56
 
 ## The AUTO-BUY button's resting width — slightly wider than the old 210 to carry the chevron
 ## alongside its label (Tim, 2026-08-07).
@@ -407,9 +417,10 @@ func set_dynasty(dynasty: DynastyState) -> void:
 ## `idle` and `quantity` are optional so existing callers and the sims keep working; only Main knows
 ## the economy and the upgrade levels well enough to answer them.
 func set_auto_purchase_state(unlocked: bool, enabled: bool, idle: bool = false,
-		quantity: int = 0) -> void:
+		quantity: int = 0, cadence: float = 0.0) -> void:
 	_auto_purchase_idle = idle
 	_auto_purchase_quantity = quantity
+	_auto_purchase_cadence = cadence
 	_set_auto_purchase_state_inner(unlocked, enabled)
 
 
@@ -947,6 +958,23 @@ func _build_auto_purchase_caption() -> void:
 	_auto_purchase_caption.add_child(_make_caption_icon(
 		AUTO_PURCHASE_PROPERTY_ICON, AUTO_PURCHASE_PROPERTY_BOX))
 
+	# The EXPANDED face's rate readout — "AUTO-BUY 5/2.5s": what it buys per round, and how often
+	# (Tim, 2026-08-07). Left-aligned, so it sits well left of centre with the status text holding
+	# the right edge and the chevron the left; the expanded button is wide enough that three things
+	# can share it without crowding.
+	#
+	# A sibling of the caption inside the SAME MarginContainer, which hands every child the identical
+	# rect — so this one aligns itself left while the caption aligns right, and neither needs to know
+	# the other exists. Only one of the two is ever visible anyway.
+	_auto_purchase_rate_label = Label.new()
+	_auto_purchase_rate_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_auto_purchase_rate_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_auto_purchase_rate_label.add_theme_font_size_override("font_size", UiPalette.FONT_BUTTON)
+	_auto_purchase_rate_label.add_theme_font_override("font", UiPalette.make_bold_font())
+	_auto_purchase_rate_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_auto_purchase_rate_label.visible = false
+	margin.add_child(_auto_purchase_rate_label)
+
 
 ## One icon in the AUTO-BUY caption, fitted into a square box and vertically centred.
 func _make_caption_icon(texture: Texture2D, box: int) -> TextureRect:
@@ -968,6 +996,10 @@ func _tint_auto_purchase_caption(color: Color) -> void:
 		_auto_purchase_caption_plus.add_theme_color_override("font_color", color)
 	for icon in _auto_purchase_caption_icons:
 		(icon as TextureRect).modulate = color
+	# The rate readout is the same face, just the expanded one — it takes the same colour so the
+	# button never shows two different "label" tints at once.
+	if _auto_purchase_rate_label != null:
+		_auto_purchase_rate_label.add_theme_color_override("font_color", color)
 
 
 ## Grow the button across the row while the mode runs, and collapse it back when it stops.
@@ -994,12 +1026,29 @@ func _apply_auto_purchase_expansion(expanded: bool) -> void:
 	# right-aligned, so the swap happens in place with the chevron holding the other edge.
 	if _auto_purchase_caption != null:
 		_auto_purchase_caption.visible = not expanded
+	if _auto_purchase_rate_label != null:
+		_auto_purchase_rate_label.visible = expanded
+		_auto_purchase_rate_label.text = _auto_purchase_rate_text()
 	_auto_purchase_button.text = _auto_purchase_face_text(expanded)
 
 
 ## What the button says. Collapsed it names itself; expanded it reports what the desk is DOING —
 ## the count it buys per round, or that it cannot buy at all. The expanded button has the width to
 ## carry a sentence, and a mode that spends money on its own should say what it is spending.
+## The expanded face's rate readout: "AUTO-BUY 5/2.5s" — five holdings every two and a half seconds.
+##
+## Both halves are the upgrade tracks made visible, which is the point: the player buys Buying Power
+## and Standing Orders separately, and this is the one place the two show up as a single sentence
+## about what the desk is actually doing.
+##
+## Falls back to the bare name if Main has not pushed numbers yet, so the button never reads
+## "AUTO-BUY 0/0s" during the frame before the first push lands.
+func _auto_purchase_rate_text() -> String:
+	if _auto_purchase_quantity <= 0 or _auto_purchase_cadence <= 0.0:
+		return "AUTO-BUY"
+	return "AUTO-BUY %d/%ss" % [_auto_purchase_quantity, Money.trim(_auto_purchase_cadence, 2)]
+
+
 func _auto_purchase_face_text(expanded: bool) -> String:
 	if not expanded:
 		return ""  # collapsed shows the icon caption instead (see _build_auto_purchase_caption)

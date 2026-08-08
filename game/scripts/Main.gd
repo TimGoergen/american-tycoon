@@ -3121,9 +3121,7 @@ func _on_auto_purchase_toggle_requested() -> void:
 func _drive_auto_purchase(delta: float) -> void:
 	if not game.auto_purchase.enabled or not dynasty.upgrades.auto_purchase_unlocked():
 		return
-	var cadence := clampf(
-			tuning.auto_purchase_base_cadence - dynasty.upgrades.auto_purchase_cadence_scale(),
-			tuning.auto_purchase_min_cadence, tuning.auto_purchase_base_cadence)
+	var cadence := _auto_purchase_cadence()
 	# How many single-unit purchases this tick. Each one takes whatever is cheapest at that
 	# moment, so the spread across properties is emergent rather than configured — see
 	# AutoPurchaseState for the rule and why it changed (Tim, 2026-08-07).
@@ -3153,6 +3151,19 @@ func _drive_auto_purchase(delta: float) -> void:
 	# the player's cash goes quiet rather than blinking on forever.
 	if _momentum_bar != null:
 		_momentum_bar.flash_auto_purchase()
+
+
+## Seconds between auto-purchase rounds: the tuned base less the Standing Orders shave, floored at
+## the tuned minimum.
+##
+## Extracted so the DRIVER and the READOUT cannot drift. The expanded AUTO-BUY button now prints
+## this number ("AUTO-BUY 5/2.5s"), and a button that advertised a different cadence from the one
+## actually being ticked would be the worst kind of wrong — plausible, and invisible until someone
+## timed it with a stopwatch.
+func _auto_purchase_cadence() -> float:
+	return clampf(
+			tuning.auto_purchase_base_cadence - dynasty.upgrades.auto_purchase_cadence_scale(),
+			tuning.auto_purchase_min_cadence, tuning.auto_purchase_base_cadence)
 
 
 ## Push Auto-Purchase Mode's state into the momentum bar, which owns the mode's ON/OFF button and
@@ -3189,11 +3200,12 @@ func _push_auto_purchase_state() -> void:
 	_auto_purchase_unlocked_shown = unlocked
 	_auto_purchase_enabled_shown = enabled
 	_auto_purchase_idle_shown = idle
-	# Quantity rides along so the expanded button can report "BUYING ×N" rather than merely that
-	# the mode is on. Not part of the memo above: it only changes when an upgrade is bought, which
-	# always changes `unlocked` or comes through _on_upgrade_purchased's own re-push.
+	# Quantity and cadence ride along so the expanded button can report what the desk is actually
+	# doing — "BUYING ×N" and "AUTO-BUY N/Ts" — rather than merely that the mode is on. Neither is
+	# part of the memo above: both change only when an upgrade is bought, which always changes
+	# `unlocked` or comes through _on_upgrade_purchased's own re-push.
 	_momentum_bar.set_auto_purchase_state(unlocked, enabled, idle,
-			dynasty.upgrades.auto_purchase_quantity())
+			dynasty.upgrades.auto_purchase_quantity(), _auto_purchase_cadence())
 	# The PROPERTY ROWS are deliberately left alone — no portrait dim.
 	#
 	# It is tempting to reuse the overheat lockout's uniform dim here, but that dim is

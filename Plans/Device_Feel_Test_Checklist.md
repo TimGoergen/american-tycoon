@@ -550,6 +550,21 @@ reason: they are live in whatever build is on the phone right now.*
       tab reads as raised rather than only repainted. Built as a third layer under the existing
       silhouette + colour pair (the same art modulated to black), riding the same parallel tween.
       Offset and alpha are the two knobs if it ever wants adjusting.
+- [x] ~~**The AUTO-BUY button.**~~ **KEEP — Tim, 2026-08-07: "the auto buy button looks good."**
+      Covers that control specifically: the collapsed `+ ∞ 🏠` face, the expand-across-the-row when
+      switched on, the white chevron flipping direction, the `AUTO-BUY 5/2.5s` rate readout pinned
+      beside it, the animated ellipsis while nothing is affordable, the purchase pulse, and the
+      bright-blue lit plate (`UiPalette.ACTIVE_BLUE`, with the label moved to cream to hold contrast).
+- [ ] **The REST of the 2026-08-07 header pass — still unverdicted.** The AUTO-BUY verdict above
+      does not cover these, and they were changed in the same sittings:
+      - the OVR button's pressure-cooker glyph at 62px (the third attempt — a puff-cloud and a
+        knobbly cloud were both rejected)
+      - the BUY/HIRE captions: icons 20% smaller, the "+" 20% larger, both gaps tightened
+      - the rush bar: "RUSH" a size up, the bonus readout down to FONT_LABEL — **and whether
+        OVERHEATED still lands**, since that narration shares the shrunken slot and only CRUISE was
+        given its size back (+40%)
+      - the meter collapsing to nothing while AUTO-BUY is expanded: does losing the rush bar
+        mid-session read as intentional, or as something breaking?
 - [ ] **`OVERHEATED` + countdown on each frozen row** — the TWEAK from §6 sitting A
       (your pick over a bare label, "COOLING DOWN", or a voiced line). `OVERHEATED` appears
       in `PropertyRow.gd`/`Main.gd`, so the label looks shipped; **confirm the countdown

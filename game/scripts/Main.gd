@@ -170,12 +170,9 @@ const MODE_CAPTION_PREFIX_SEPARATION := 1
 ## only, in _make_mode_button; the rate keeps the caption size it shares with the TURBO readout.
 const MODE_CAPTION_PLUS_SCALE := 1.2
 
-## Fixed width of the BUY and HIRE toggles (Tim, 2026-08-07 — "less wide, with moderately small
-## margins"). Derived, not chosen, and re-checked after every caption tweak. Currently the widest
-## caption is "+ <icon> NEXT" = "+" 28 (at the 20%-larger plus size) + gap 1 + icon 46 + gap 6 +
-## "NEXT" 105 = 186, plus the plate's 12px content margin a side = 210. The 6px of slack is the
-## whole margin budget beyond the plate's own — measure again before shrinking this.
-const MODE_BUTTON_WIDTH := 216
+## Fixed width of the BUY and HIRE toggles. Shared with the collapsed AUTO-BUY button through
+## UiPalette so the three cannot drift apart — see UiPalette.HEADER_BUTTON_WIDTH for the derivation.
+const MODE_BUTTON_WIDTH := UiPalette.HEADER_BUTTON_WIDTH
 
 # The screen-frame constants (bezel + universal content margin) live in UiPalette now, so the
 # Main screen and the full-screen overlays all frame identically (UiPalette.apply_screen_bezel

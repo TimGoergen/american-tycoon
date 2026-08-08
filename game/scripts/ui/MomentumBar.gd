@@ -148,9 +148,14 @@ var _auto_purchase_caption: HBoxContainer
 var _auto_purchase_caption_plus: Label
 var _auto_purchase_caption_icons: Array = []
 
-## The expanded face's rate readout ("AUTO-BUY 5/2.5s"). Shown only while expanded, left-aligned
-## opposite the right-aligned status text.
+## The expanded face's rate readout ("AUTO-BUY 5/2.5s"). Shown only while expanded, pinned to the
+## right edge of the chevron.
 var _auto_purchase_rate_label: Label
+
+## The edge chevron. An overlay TextureRect rather than the Button's `icon`, so its box is exactly
+## AUTO_PURCHASE_ARROW_SIZE and the rate readout beside it can rely on that — see
+## _build_auto_purchase_caption for why the Button's own icon could not be trusted to stay put.
+var _auto_purchase_arrow: TextureRect
 
 ## Seconds between purchase rounds, pushed in by Main — the only place that knows it, since the
 ## cadence is the tuned base less the upgrade's shave, clamped to a tuned floor.
@@ -356,9 +361,10 @@ const AUTO_PURCHASE_ARROW_EXPANDED := preload("res://art/icons/arrow_right.svg")
 ## downscale from the 128px art so it stays crisp.
 const AUTO_PURCHASE_ARROW_SIZE := 56
 
-## The AUTO-BUY button's resting width — slightly wider than the old 210 to carry the chevron
-## alongside its label (Tim, 2026-08-07).
-const AUTO_PURCHASE_WIDTH := 244
+## The AUTO-BUY button's resting width. Shared with the BUY/HIRE toggles below it (Tim, 2026-08-07:
+## "equal to the width of the staff buy mode button"), so the three fixed controls in the income
+## header line up as a set. One constant, not three numbers — see UiPalette.HEADER_BUTTON_WIDTH.
+const AUTO_PURCHASE_WIDTH := UiPalette.HEADER_BUTTON_WIDTH
 
 ## The collapsed face: "+ ∞ <property>" (Tim, 2026-08-07) — what the mode does, in the same grammar
 ## the BUY/HIRE toggles use, instead of the word AUTO-BUY.
@@ -383,13 +389,23 @@ const AUTO_PURCHASE_PROPERTY_BOX := int(
 	AUTO_PURCHASE_CAPTION_ICON_HEIGHT * AUTO_PURCHASE_PROPERTY_SCALE * 324.0 / 279.0)  # 55
 
 ## Gap between the caption's three parts, and how far it is held off the plate's frame.
-const AUTO_PURCHASE_CAPTION_GAP := 4
-const AUTO_PURCHASE_CAPTION_INSET := 14
+##
+## Both were tightened when the button narrowed to match the mode toggles (Tim, 2026-08-07). At the
+## old 244 there was room to spare; at 216 the three glyphs plus the chevron do not fit with the
+## original spacing — measured, the caption began at x=62 while the arrow ran to 68, i.e. six pixels
+## of overlap. SPACING gave way rather than the icons, because the icon sizes are Tim's and the
+## spacing is mine.
+const AUTO_PURCHASE_CAPTION_GAP := 2
+const AUTO_PURCHASE_CAPTION_INSET := 8
 
-## Where the rate readout starts: past the chevron the Button draws at its left edge. That glyph
-## sits inside the plate's 12px content margin and is AUTO_PURCHASE_ARROW_SIZE wide, so the text
-## begins just beyond it — pinned to the arrow rather than to the button (Tim, 2026-08-07).
-const AUTO_PURCHASE_ARROW_GUTTER := 12 + AUTO_PURCHASE_ARROW_SIZE + 10
+## Where the chevron sits, and where the rate readout starts: immediately past it. Because the arrow
+## is an overlay of a FIXED box (not the Button's own icon, which would not stay the size it was
+## told), this gutter is exact — the text is pinned to the arrow's right edge, not merely placed
+## somewhere left of centre (Tim, 2026-08-07).
+const AUTO_PURCHASE_ARROW_INSET := 10
+const AUTO_PURCHASE_ARROW_GAP := 10
+const AUTO_PURCHASE_ARROW_GUTTER := \
+	AUTO_PURCHASE_ARROW_INSET + AUTO_PURCHASE_ARROW_SIZE + AUTO_PURCHASE_ARROW_GAP
 
 ## The idle animation: a redrawing ellipsis in place of a static "NOTHING TO BUY" (Tim,
 ## 2026-08-07). Seconds each dot count holds before the next — three steps, so a full cycle is
@@ -784,15 +800,9 @@ func _ready() -> void:
 func _build_auto_purchase_button() -> void:
 	_auto_purchase_button = Button.new()
 	_auto_purchase_button.text = "AUTO-BUY"
-	# Chevron pinned to the LEFT edge, label right-aligned against the opposite edge (Tim,
-	# 2026-08-07). The gap between them is the point: it is what makes the button look like a panel
-	# that can open, rather than a label with a picture next to it.
-	_auto_purchase_button.icon = AUTO_PURCHASE_ARROW_COLLAPSED
-	_auto_purchase_button.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	# The chevron is an OVERLAY, not the Button's own `icon` (see _build_auto_purchase_caption).
+	# Only the status text uses the Button itself, right-aligned against the far edge.
 	_auto_purchase_button.alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_auto_purchase_button.expand_icon = true
-	_auto_purchase_button.add_theme_constant_override("icon_max_width", AUTO_PURCHASE_ARROW_SIZE)
-	_auto_purchase_button.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	# FONT_BUTTON, not OVR's FONT_HEADLINE: three letters can afford to be huge, eight cannot
 	# without either shrinking the meter or wrapping. This is still the standard action-button size,
 	# well above the readability floor (§1b).
@@ -923,10 +933,10 @@ func _apply_auto_purchase_look(unlocked: bool, enabled: bool) -> void:
 	# drawn as pictures, so it should read as the label does on either plate.
 	_tint_auto_purchase_caption(label_color)
 
-	var arrow_color := Color.WHITE if enabled else UiPalette.NAVY
-	for state in ["icon_normal_color", "icon_hover_color", "icon_pressed_color",
-			"icon_focus_color", "icon_hover_pressed_color"]:
-		_auto_purchase_button.add_theme_color_override(state, arrow_color)
+	# One modulate on the overlay, rather than five icon_*_color theme overrides — the arrow is no
+	# longer the Button's icon, so it no longer inherits the Button's per-state icon colours.
+	if _auto_purchase_arrow != null:
+		_auto_purchase_arrow.modulate = Color.WHITE if enabled else UiPalette.NAVY
 
 	_auto_purchase_button.tooltip_text = \
 			"Auto-buy is ON — properties buy themselves, but rush is unavailable." if enabled \
@@ -943,6 +953,36 @@ func _apply_auto_purchase_look(unlocked: bool, enabled: bool) -> void:
 ##
 ## Right-aligned to sit opposite the chevron, matching where the status text lands when expanded.
 func _build_auto_purchase_caption() -> void:
+	# THE CHEVRON, drawn as an overlay rather than through the Button's `icon` property.
+	#
+	# It began as Button.icon with expand_icon + icon_max_width, and that could not be positioned
+	# reliably: on the expanded button `expand_icon` scaled the glyph to the available HEIGHT (~75px)
+	# rather than honouring the 56px cap, so it overran the gutter reserved for the rate readout and
+	# the text drew partly behind it (Tim, 2026-08-07 — twice, because the first fix moved the text
+	# and left the arrow free to grow into it). Measured: the label sat at x=78, correctly clear of a
+	# 56px arrow, and the arrow was simply wider than it was told to be.
+	#
+	# As a TextureRect in a fixed box the geometry is exact and AUTO_PURCHASE_ARROW_GUTTER is a real
+	# promise: the arrow cannot grow past the space the text starts after.
+	var arrow_margin := MarginContainer.new()
+	arrow_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	arrow_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	arrow_margin.add_theme_constant_override("margin_left", AUTO_PURCHASE_ARROW_INSET)
+	_auto_purchase_button.add_child(arrow_margin)
+
+	_auto_purchase_arrow = TextureRect.new()
+	_auto_purchase_arrow.texture = AUTO_PURCHASE_ARROW_COLLAPSED
+	_auto_purchase_arrow.custom_minimum_size = Vector2(
+		AUTO_PURCHASE_ARROW_SIZE, AUTO_PURCHASE_ARROW_SIZE)
+	_auto_purchase_arrow.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_auto_purchase_arrow.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_auto_purchase_arrow.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	# Shrink on BOTH axes so the box is exactly the arrow, centred vertically and pinned left.
+	_auto_purchase_arrow.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	_auto_purchase_arrow.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_auto_purchase_arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	arrow_margin.add_child(_auto_purchase_arrow)
+
 	var margin := MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
 	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1054,12 +1094,14 @@ func _apply_auto_purchase_expansion(expanded: bool) -> void:
 		_meter.custom_minimum_size.x = 0.0
 		_auto_purchase_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_auto_purchase_button.custom_minimum_size.x = 0.0
-		_auto_purchase_button.icon = AUTO_PURCHASE_ARROW_EXPANDED
+		if _auto_purchase_arrow != null:
+			_auto_purchase_arrow.texture = AUTO_PURCHASE_ARROW_EXPANDED
 	else:
 		_meter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_auto_purchase_button.size_flags_horizontal = Control.SIZE_FILL
 		_auto_purchase_button.custom_minimum_size.x = AUTO_PURCHASE_WIDTH
-		_auto_purchase_button.icon = AUTO_PURCHASE_ARROW_COLLAPSED
+		if _auto_purchase_arrow != null:
+			_auto_purchase_arrow.texture = AUTO_PURCHASE_ARROW_COLLAPSED
 	# The two faces take turns: icons while collapsed, status text once expanded. Both are
 	# right-aligned, so the swap happens in place with the chevron holding the other edge.
 	if _auto_purchase_caption != null:

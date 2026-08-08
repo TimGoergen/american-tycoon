@@ -1,36 +1,43 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
-  <!-- OVERDRIVE reads as a pressure release: a billowing puff with two smaller ones breaking away
-       from it. Built as TWO STACKED LAYERS rather than stroked shapes — a navy layer of slightly
-       larger circles behind a cream layer of the same centres — so the outline traces the union of
-       the cloud instead of every circle's own edge. Stroking each circle would draw seams through
-       the middle of the billow, which is what killed the first attempt.
-       No red: tapering jets under the cloud read as legs at icon size, not as steam. -->
+  <defs>
+    <linearGradient id="cookerBody" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%"   stop-color="#8C939C"/>
+      <stop offset="35%"  stop-color="#D8DCE2"/>
+      <stop offset="100%" stop-color="#7F868F"/>
+    </linearGradient>
+  </defs>
 
-  <!-- Outline layer (navy, +5px on every radius). -->
-  <g fill="#1D2D50">
-    <circle cx="46" cy="76" r="27"/>
-    <circle cx="84" cy="72" r="29"/>
-    <circle cx="64" cy="50" r="25"/>
-    <circle cx="102" cy="34" r="14"/>
-    <circle cx="28" cy="36" r="11"/>
+  <!-- OVERDRIVE as a pressure cooker about to let go (Tim, 2026-08-07 — the previous puff-cloud
+       "looked like a cloud with a couple of knobs"). The read at 62px comes from the SILHOUETTE:
+       a squat steel pot, a lid wider than the pot, a valve on top, and steam escaping hard.
+       Everything is steel and navy so it holds up on the red OVR plate, with the one red element
+       reserved for the gauge needle in the danger zone — the "about to blow" beat. -->
+
+  <!-- Steam escaping the valve: two angled jets and a cap puff. Cream, so it separates from both
+       the steel below and the red plate behind. -->
+  <g fill="#F4ECD8" stroke="#1D2D50" stroke-width="4" stroke-linejoin="round">
+    <path d="M56 26 L44 8 L52 6 L62 22 Z"/>
+    <path d="M72 26 L84 8 L76 6 L66 22 Z"/>
+    <ellipse cx="64" cy="24" rx="15" ry="8"/>
   </g>
 
-  <!-- Fill layer (cream), same centres. -->
-  <g fill="#F4ECD8">
-    <circle cx="46" cy="76" r="22"/>
-    <circle cx="84" cy="72" r="24"/>
-    <circle cx="64" cy="50" r="20"/>
-  </g>
+  <!-- Valve stem on the lid. -->
+  <rect x="57" y="32" width="14" height="12" fill="#1D2D50"/>
 
-  <!-- The two breakaway puffs stay a shade cooler, so they read as trailing wisps rather than as
-       part of the main billow. -->
-  <g fill="#C7CBD1">
-    <circle cx="102" cy="34" r="9"/>
-    <circle cx="28" cy="36" r="6"/>
-  </g>
+  <!-- Lid: deliberately wider than the pot so the silhouette breaks at the shoulder, which is what
+       makes this read as a sealed vessel rather than a mug. -->
+  <rect x="20" y="42" width="88" height="14" rx="7"
+        fill="url(#cookerBody)" stroke="#1D2D50" stroke-width="5"/>
 
-  <!-- NO HIGHLIGHT. A lighter cap across the top of the billow was tried and it drew a hard
-       horizontal seam through the cloud at icon size — it read as a crack, not as light. The flat
-       cream against the navy outline carries the shape on its own. -->
-  <circle cx="54" cy="62" r="9" fill="#FFFFFF" opacity="0.35"/>
+  <!-- Body: squat, slightly tapered, with side handles. -->
+  <path d="M30 56 L98 56 L92 104 A6 6 0 0 1 86 110 L42 110 A6 6 0 0 1 36 104 Z"
+        fill="url(#cookerBody)" stroke="#1D2D50" stroke-width="5" stroke-linejoin="round"/>
+  <rect x="8"  y="64" width="22" height="12" rx="6" fill="#1D2D50"/>
+  <rect x="98" y="64" width="22" height="12" rx="6" fill="#1D2D50"/>
+
+  <!-- Pressure gauge, pegged into the red. The one warm element in the icon, and the only thing
+       that says "about to" rather than merely "hot". -->
+  <circle cx="64" cy="82" r="17" fill="#F4ECD8" stroke="#1D2D50" stroke-width="5"/>
+  <path d="M64 82 L76 72" stroke="#B5402A" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="64" cy="82" r="4" fill="#1D2D50"/>
 </svg>

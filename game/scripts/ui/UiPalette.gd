@@ -88,6 +88,17 @@ const FONT_SMALL := 26        # the smallest text allowed — the readability fl
 ## buy-mode (56), Plan the Estate (72), and DEV tuning (64): average 62 × 1.6 ≈ 99.
 const STANDARD_BUTTON_HEIGHT := 99
 
+## Width shared by the income header's fixed-width controls: the BUY and HIRE mode toggles, and the
+## AUTO-BUY button in its collapsed state (Tim, 2026-08-07 — "reduce the width of the auto buy
+## button to be equal to the width of the staff buy mode button").
+##
+## It lives HERE, in the module both rows already share, rather than as two numbers kept in step by
+## hand — "equal" is the requirement, so one constant is the only way it stays true. Derived from
+## the widest mode caption: "+ <icon> NEXT" = 28 + 1 + 46 + 6 + 105 = 186, plus the plate's 12px
+## content margin a side = 210, rounded up for a small even margin. Re-measure before shrinking it;
+## see Main._make_mode_button and MomentumBar._build_auto_purchase_caption for what has to fit.
+const HEADER_BUTTON_WIDTH := 216
+
 ## Corner radius (px, 1080-wide design space) for UI that hugs the phone's rounded screen
 ## corners — the income panel's top corners and the outer bottom corners of the edge tab
 ## buttons — so they nest inside the Pixel's screen curve instead of squaring into it.

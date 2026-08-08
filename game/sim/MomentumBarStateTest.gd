@@ -95,6 +95,53 @@ func _find_label_text_containing(root_node: Node, prefix: String) -> String:
 	return ""
 
 
+## The AUTO-BUY chevron's current texture. It is the first TextureRect under the button whose box is
+## square — the caption's two glyphs are square too, but they live under a hidden container while the
+## button is expanded, and this is only ever asked while expanded or collapsed with the caption
+## present, so the arrow's own container being visible is what distinguishes it.
+func _find_arrow_texture(bar: Control) -> Texture2D:
+	var button: Button = bar.get_auto_purchase_button()
+	if button == null:
+		return null
+	return _first_visible_texture(button)
+
+
+## The chevron's TextureRect itself, for measuring where it ends.
+func _find_arrow_rect(bar: Control) -> TextureRect:
+	var button: Button = bar.get_auto_purchase_button()
+	if button == null:
+		return null
+	for child in button.get_children():
+		for grandchild in (child as Node).get_children():
+			var rect := grandchild as TextureRect
+			if rect != null and rect.is_visible_in_tree():
+				return rect
+	return null
+
+
+## The Label node (not just its text) whose text starts with `prefix`, for measuring where it starts.
+func _find_label_node(node: Node, prefix: String) -> Label:
+	for child in node.get_children():
+		var label := child as Label
+		if label != null and label.is_visible_in_tree() and label.text.begins_with(prefix):
+			return label
+		var found := _find_label_node(child, prefix)
+		if found != null:
+			return found
+	return null
+
+
+func _first_visible_texture(node: Node) -> Texture2D:
+	for child in node.get_children():
+		var rect := child as TextureRect
+		if rect != null and rect.is_visible_in_tree():
+			return rect.texture
+		var found := _first_visible_texture(child)
+		if found != null:
+			return found
+	return null
+
+
 ## Assert helper: prints a pass/fail line and counts failures.
 func _check(label: String, condition: bool) -> void:
 	print("  [%s] %s" % ["PASS" if condition else "FAIL", label])
@@ -267,7 +314,10 @@ func _test_expands_while_running(bar_script: GDScript, tuning: TuningConfig) -> 
 	# — a Button renders one string and one icon, and the icon slot is spent on the edge chevron, so
 	# the caption is an overlay and the two faces take turns.
 	_check("...and carries no text, leaving the icon caption to speak", button.text == "")
-	var collapsed_icon := button.icon
+	# The chevron is an OVERLAY TextureRect, not the Button's `icon` — it was moved off the Button so
+	# its box could be trusted to stay the size it was told (the icon grew past its cap and drew over
+	# the rate readout). Found by shape for the same reason the rate label is.
+	var collapsed_icon := _find_arrow_texture(bar)
 
 	# Switched on with a known purchase count: it takes the row and reports what it is doing.
 	bar.set_auto_purchase_state(true, true, false, 5)
@@ -275,7 +325,8 @@ func _test_expands_while_running(bar_script: GDScript, tuning: TuningConfig) -> 
 		button.size_flags_horizontal == Control.SIZE_EXPAND_FILL)
 	_check("...and drops its fixed minimum so the meter can collapse",
 		is_equal_approx(button.custom_minimum_size.x, 0.0))
-	_check("...flips the chevron to point the other way", button.icon != collapsed_icon)
+	_check("...flips the chevron to point the other way",
+		_find_arrow_texture(bar) != collapsed_icon)
 	_check("...and reports the live purchase count", button.text == "BUYING ×5")
 
 	# Running but broke: the count gives way to a redrawing ellipsis — the desk is not broken and
@@ -304,12 +355,29 @@ func _test_expands_while_running(bar_script: GDScript, tuning: TuningConfig) -> 
 	_check("with no numbers yet it falls back to the bare name",
 		_find_label_text_containing(bar, "AUTO-BUY") == "AUTO-BUY")
 
+	# GEOMETRY: the rate readout must start past the chevron, not under it. This failed twice —
+	# first because the readout was inset like the caption and drew through the arrow, then because
+	# the arrow was the Button's own icon and `expand_icon` grew it past the cap it was given, back
+	# over the text. Measured rather than reasoned about, because both times the code READ correct.
+	bar.custom_minimum_size = Vector2(1000, 99)
+	bar.set_auto_purchase_state(true, true, false, 5, 2.5)
+	await process_frame
+	await process_frame
+	var arrow := _find_arrow_rect(bar)
+	var rate := _find_label_node(bar, "AUTO-BUY 5/")
+	if arrow == null or rate == null:
+		_check("the chevron and the rate readout are both present to measure", false)
+	else:
+		var arrow_right := arrow.global_position.x + arrow.size.x
+		_check("the rate readout starts past the chevron's right edge (arrow ends %.0f, text starts %.0f)"
+			% [arrow_right, rate.global_position.x], rate.global_position.x >= arrow_right)
+
 	# And switching off puts the row back exactly as it was.
 	bar.set_auto_purchase_state(true, false, false, 5)
 	_check("switched off again it collapses back",
 		button.size_flags_horizontal == Control.SIZE_FILL
 			and is_equal_approx(button.custom_minimum_size.x, declared_width))
-	_check("...restores the original chevron", button.icon == collapsed_icon)
+	_check("...restores the original chevron", _find_arrow_texture(bar) == collapsed_icon)
 	_check("...and hands the face back to the icon caption", button.text == "")
 
 	bar.queue_free()

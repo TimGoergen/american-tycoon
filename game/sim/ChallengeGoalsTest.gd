@@ -55,6 +55,7 @@ func _initialize() -> void:
 	_test_configure_from_tuning_gotcha(tuning)
 	_test_met_minigames(tuning)
 	_test_met_minigame_key_vocabulary()
+	_test_reset_clears_met_minigames(tuning)
 
 	print("")
 	if _failures == 0:
@@ -654,3 +655,37 @@ func _test_met_minigame_key_vocabulary() -> void:
 		print("      ChallengeGoals keys no minigame reports: %s" % str(missing_from_types))
 	_check("every live display_name() is a ChallengeGoals.GAME_KEYS entry", missing_from_goals.is_empty())
 	_check("every ChallengeGoals.GAME_KEYS entry is some minigame's display_name()", missing_from_types.is_empty())
+
+
+## The dev Reset must clear minigame encounter progress (Tim, 2026-08-08), and it already does —
+## because `met_minigames` rides inside the DYNASTY SAVE, and Reset deletes that file outright.
+##
+## That is the whole mechanism, so this pins it rather than testing the button: a fresh dynasty has
+## met nothing, and the encounter set is carried in the save dict rather than in a user:// file of
+## its own. If someone later moves it beside ChallengeScores or TutorialProgress — both of which
+## survive a save delete and need their own explicit clear in _on_dev_reset_dynasty_requested —
+## this fails instead of Reset quietly ceasing to clear it.
+func _test_reset_clears_met_minigames(tuning: TuningConfig) -> void:
+	print("\nDev Reset clears minigame encounter progress")
+	var configs := ConfigLoader.load_property_configs()
+
+	var dynasty := DynastyState.new(configs, tuning)
+	dynasty.note_minigame_met("Match Three")
+	dynasty.note_minigame_met("Micro Basketball")
+	_check("a dynasty that has met games reports them met",
+		dynasty.has_met_minigame("Match Three") and dynasty.has_met_minigame("Micro Basketball"))
+
+	# THE MECHANISM: the encounter set is in the dynasty save, so deleting that file takes it.
+	var save := dynasty.to_save_dict()
+	_check("the encounter set is carried IN the dynasty save (this is what Reset deletes)",
+		save.has("met_minigames")
+			and (save["met_minigames"] as Dictionary).has("Match Three"))
+
+	# What Reset leaves behind: no save at all, i.e. a dynasty built from nothing.
+	var after_reset := DynastyState.new(configs, tuning)
+	var still_met: Array[String] = []
+	for key in ChallengeGoals.GAME_KEYS:
+		if after_reset.has_met_minigame(String(key)):
+			still_met.append(String(key))
+	_check("a dynasty built with no save has met NOTHING, so every cabinet re-locks (%s)"
+		% ("clean" if still_met.is_empty() else str(still_met)), still_met.is_empty())

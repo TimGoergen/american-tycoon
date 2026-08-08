@@ -139,10 +139,18 @@ replaying transitions until it comes up — the workflow this gate would make wo
 
 ---
 
-## Open question for Tim
+## ~~Open question for Tim~~ — CLOSED 2026-08-08
 
-**Should the dev Reset clear the encounter set?** `Main.gd:2101-2109` currently clears
-`ChallengeScores` and `TutorialProgress`. §8 says "only wiping the full game save" clears
-encounters, and the set lives in the dynasty save — so a save wipe already handles it. The dev
-Reset is a different, narrower path. Recommendation: leave it alone, so Reset stays a scores/tips
-reset rather than quietly becoming a save wipe.
+**Should the dev Reset clear the encounter set?** **YES, and it already did** (Tim: "dev reset
+clears minigames progress"). No code change was needed.
+
+The question rested on a false premise. It described the dev Reset as "a different, narrower path"
+than a save wipe, and recommended leaving the encounter set alone so Reset would not "quietly become
+a save wipe" — but `_on_dev_reset_dynasty_requested` calls `SaveManager.delete_save_file()` on its
+first line. It always was one. `met_minigames` lives in the dynasty save, so the delete takes it and
+every cabinet re-locks; the explicit `ChallengeScores.clear()` and `TutorialProgress.clear()` calls
+beside it exist only because those two live in their own `user://` files and would otherwise survive.
+
+`sim/ChallengeGoalsTest.gd` now pins the mechanism — the encounter set is asserted to ride in the
+dynasty save dict, so moving it to a file of its own fails a test rather than silently stopping
+Reset from clearing it.

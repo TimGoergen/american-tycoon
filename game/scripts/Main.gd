@@ -2448,6 +2448,19 @@ func _on_dev_reset_dynasty_requested() -> void:
 	# Tutorial progress also lives in its own user:// file (prestige-independent), so wipe it too
 	# to make onboarding re-testable from a clean state (Tim, 2026-07-23).
 	TutorialProgress.clear()
+	# MINIGAME ENCOUNTER PROGRESS NEEDS NO LINE HERE, and that is deliberate rather than an omission
+	# (Tim, 2026-08-08: "dev reset clears minigames progress").
+	#
+	# `met_minigames` — which games the bloodline has actually met, and so which Challenge Mode
+	# cabinets are unlocked — rides inside the DYNASTY SAVE, and the delete above takes the whole
+	# file. A fresh DynastyState starts with an empty set, so every cabinet re-locks. The two calls
+	# above exist only because those two live in their OWN user:// files and would otherwise survive.
+	#
+	# Plans/Challenge_Mode_Gating.md left this open and recommended NOT clearing it, "so Reset stays
+	# a scores/tips reset rather than quietly becoming a save wipe" — but Reset deletes the save on
+	# its first line, so it always was one. sim/ChallengeGoalsTest.gd pins the encounter set to the
+	# dynasty save, so moving it to a file of its own would break a test rather than silently make
+	# Reset stop clearing it.
 	get_tree().reload_current_scene()
 
 

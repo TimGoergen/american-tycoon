@@ -20,9 +20,10 @@ extends Control
 ## A purchase just succeeded for this upgrade id. Main re-applies effects + saves.
 signal purchased(upgrade_id: String)
 
-## The player asked to retain (buy one more tier of) a property's staffer (GDD §6.3).
-## Main spends the Legacy, records it, then re-feeds the entries.
-signal retain_requested(property_index: int)
+## Emitted when the player presses a retention row's buy button. `levels` is the count the
+## button quoted on its face — Main buys exactly that, never a recomputed number, so a gem
+## grant landing between paint and press can never charge more than the label promised.
+signal retain_requested(property_index: int, levels: int)
 
 
 # Type sizes — large for at-a-glance phone reading (UI notes §1). The title/wallet are a
@@ -50,8 +51,28 @@ const BUY_GEM_WIDTH := 38
 const HOLD_INITIAL_DELAY := 0.45
 const HOLD_REPEAT_INTERVAL := 0.35
 
+## How far a finger must travel before a press on any control in this list counts as a SCROLL and
+## not a tap (see the drag-to-scroll section at the bottom of this file). Matches the threshold
+## DevTuningPanel and ChallengesScreen use, so every button-tiled list in the game agrees.
+const DRAG_SCROLL_THRESHOLD := 12.0
+
 # The live upgrade/wallet state this shop reads and spends from.
 var _upgrades: LegacyUpgrades
+
+## The list's ScrollContainer, kept so the drag-to-scroll handler can pan it (see the section at
+## the bottom of this file).
+var _scroll: ScrollContainer
+
+## Drag-to-scroll bookkeeping for the current press gesture. _drag_accum is this gesture's total
+## vertical travel; _drag_moved latches once it passes DRAG_SCROLL_THRESHOLD, and from then on the
+## gesture is a scroll: it toggles no section and — critically — spends no gems.
+var _drag_accum := 0.0
+var _drag_moved := false
+
+## Whether the current hold has already made its purchase. A tap buys on RELEASE (see the drag
+## section), so these tell the release handler that the hold pump already did the work.
+var _buy_fired_in_hold := false
+var _retain_fired_in_hold := false
 
 # The spendable-Legacy readout at the top of the panel.
 var _wallet_label: Label
@@ -81,7 +102,7 @@ const HOUSEHOLD_STAFF_CATEGORY := "Household Staff"
 
 ## The latest retention entry snapshot Main passed to set_retention_entries — kept so the Household
 ## Staff header can report its "+x affordable" count and total gems invested, like every other
-## category. Each entry carries "cost", "can_afford", and "gems_spent".
+## category. Each entry carries "best_levels", "retained_levels", "levels", and "gems_spent".
 var _retention_entries: Array = []
 
 # Hold-to-buy state: which upgrade's buy button is currently held (""=none), and the
@@ -193,6 +214,7 @@ func _build_ui() -> void:
 	# gives every card outline the SAME margin on the left and right.
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	column.add_child(scroll)
+	_scroll = scroll  # kept for the drag-to-scroll handler (see _pan_scroll_on_drag)
 
 	var list_margin := MarginContainer.new()
 	list_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -297,6 +319,7 @@ func _add_collapsible_section(parent: VBoxContainer, category: String, accent: C
 	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
 		header.add_theme_color_override(state, text_color)
 	header.pressed.connect(_toggle_section.bind(category))
+	header.gui_input.connect(_on_list_control_gui_input)
 	parent.add_child(header)
 
 	# Right-aligned affordability badge (Tim, 2026-06-24; always-visible + MAX, 2026-07-31).
@@ -397,6 +420,9 @@ func _make_bulk_button(icon_path: String) -> Button:
 
 ## Flip one category section between expanded and collapsed (its header was tapped).
 func _toggle_section(category: String) -> void:
+	# A scroll, not a tap: swallow the toggle so swiping the list never flips sections open or shut.
+	if _drag_moved:
+		return
 	var section: Dictionary = _sections[category]
 	section["expanded"] = not bool(section["expanded"])
 	(section["body"] as Control).visible = bool(section["expanded"])
@@ -484,14 +510,16 @@ func _update_section_count(category: String) -> void:
 	var total_count := 0
 	if category == HOUSEHOLD_STAFF_CATEGORY:
 		# Household Staff has no catalog upgrades — count the retention entries with a level still
-		# left to buy (cost >= 0) and how many of those the player can afford right now.
+		# left to buy and how many of those the player can afford right now. "Still left to buy"
+		# is the level fields, not the price; "affordable" is levels > 0, since Main already
+		# partial-filled that quote against the wallet.
 		for entry_variant in _retention_entries:
 			var entry := entry_variant as Dictionary
 			total_count += 1
-			if int(entry["cost"]) < 0:
+			if int(entry["retained_levels"]) >= int(entry["best_levels"]):
 				continue  # this staffer is already retained to the bloodline's best level
 			non_maxed_count += 1
-			if bool(entry["can_afford"]):
+			if int(entry.get("levels", 0)) > 0:
 				affordable_count += 1
 	else:
 		for id in section["upgrade_ids"]:
@@ -586,6 +614,7 @@ func _add_upgrade_card(parent: VBoxContainer, definition: Dictionary, accent: Co
 	# (see _process). bind(id) passes which upgrade this button buys.
 	buy_button.button_down.connect(_on_buy_down.bind(id))
 	buy_button.button_up.connect(_on_buy_up)
+	buy_button.gui_input.connect(_on_list_control_gui_input)
 	bottom_row.add_child(buy_button)
 
 	_cards[id] = {
@@ -601,9 +630,24 @@ func _add_upgrade_card(parent: VBoxContainer, definition: Dictionary, accent: Co
 
 ## Rebuild the Household Staff rows from Main's snapshot of the bloodline's staff-ladder
 ## achievements vs. the dynasty's retained ladder LEVELS. Each entry:
-##   { index, property_name, staffer_name, best_levels, retained_levels, cost, can_afford }
-## cost < 0 means there is nothing to buy (never staffed, or already retained to the
-## bloodline's best level).
+##   { index, property_name, staffer_name, best_levels, retained_levels, levels, cost,
+##     gems_spent, next_level_cost (optional) }
+##
+## THIS SCREEN COMPUTES NOTHING. `levels` and `cost` are the whole quote, and Main derives them
+## from the GLOBAL HIRE MODE toggle (×1 / ×10 / BLOCK / MAX) — the same toggle that drives staff
+## hiring on the property tab — already partial-filled against the wallet and clamped to the
+## bloodline's earned ceiling, exactly like every other bulk buy in the game:
+##   levels = how many retention levels one press will buy (0 = nothing to buy)
+##   cost   = the exact gem cost of exactly those `levels`
+## They must be produced together, from the same pair of core calls, so the quote on the label
+## can never disagree with the charge. Both are read with a default of 0, so an older snapshot
+## paints the button disabled rather than quoting a price nobody computed.
+##
+## When `levels` is 0 the button greys in place and says why, and the two reasons are told apart
+## from the level fields, not from the price: retained_levels >= best_levels means the bloodline's
+## earned ceiling is reached; otherwise the wallet cannot cover even one level. In that second
+## case the optional `next_level_cost` (the price of the single next level) lets the button name
+## the shortfall; without it the button says only that it is unaffordable, never a wrong number.
 func set_retention_entries(entries: Array) -> void:
 	_retention_entries = entries
 	_refresh_staff_section_header()  # its invested total + affordable badge track this snapshot
@@ -646,8 +690,10 @@ func update_retention_entries(entries: Array) -> void:
 	_refresh_staff_section_header()  # in-place path: keep the header total + badge current too
 
 
-## One Household Staff card: property + current staffer on top, the now/retained tiers
-## and a RETAIN button (or "RETAINED" when fully retained / unstaffed) beneath.
+## One Household Staff card: property + current staffer on top, the now/retained tiers and a
+## single buy button beside them. ONE button (Tim, 2026-07-31): its count follows the global
+## hire-mode toggle, so a second bulk button would only repeat what the toggle already says —
+## and with many properties the extra row height was a lot of added scrolling.
 func _add_retention_row(entry: Dictionary) -> void:
 	var index := int(entry["index"])
 
@@ -680,9 +726,10 @@ func _add_retention_row(entry: Dictionary) -> void:
 	bottom.add_child(status)
 
 	var button := Button.new()
-	# Flexible width (was a fixed 440 that overflowed the framed viewport), matching the
-	# upgrade cards' RETAIN/BUY buttons. ~35% shorter (Tim, 2026-06-28); a smaller font so the
-	# two-line "RETAIN LVL n / n Gems" still fits the shorter button.
+	# 240 is a MINIMUM, not a fixed width (a fixed 440 once overflowed the framed viewport):
+	# a long bulk quote like "RETAIN ×10 → LVL 22" grows the button past it, and the status
+	# label beside it gives up the space because it is the one set to EXPAND_FILL. The smaller
+	# font keeps that two-line quote on two comfortable lines (Tim, 2026-06-28).
 	button.custom_minimum_size = Vector2(240, 80)
 	button.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
 	UiPalette.style_button(button, true)  # red: spends Legacy
@@ -690,46 +737,86 @@ func _add_retention_row(entry: Dictionary) -> void:
 	# upgrade cards' hold-to-buy: the down fires the first purchase, _process repeats it.
 	button.button_down.connect(_on_retain_down.bind(index))
 	button.button_up.connect(_on_retain_up)
+	button.gui_input.connect(_on_list_control_gui_input)
 	bottom.add_child(button)
 
 	_retention_rows[index] = {"status": status, "button": button}
 	_apply_retention_entry(entry)
 
 
-## Paint one Household Staff row's live values (status line + RETAIN button) from its
-## entry. Shared by the initial build and the in-place update so they can never disagree.
+## Paint one Household Staff row's live values (status line + RETAIN button) from its entry.
+## Shared by the initial build and the in-place update so they can never disagree.
+##
+## THE BUTTON'S LABEL IS THE SPEND PREVIEW: it names both the level the press will REACH and the
+## exact total it will charge, because retention is the endgame's open gem sink and one tap must
+## never silently drain a fortune. Both numbers come straight off the snapshot (see
+## set_retention_entries), which produced them from the same core calls the purchase itself uses.
+##
+## The button never hides (standing UI rule) — with nothing to buy it greys in place saying why:
+##   • "FULLY RETAINED"        — already at the bloodline's earned ceiling.
+##   • "RETAIN / NEED n Gems"  — levels remain but the wallet can't cover even one; n is the
+##                               price of that next level, shown only when the snapshot supplies
+##                               it as `next_level_cost`.
+##   • "RETAIN / CAN'T AFFORD" — same case, but with no price to quote. Saying less is right:
+##                               a number this screen guessed at would be worse than no number.
 func _apply_retention_entry(entry: Dictionary) -> void:
 	var row: Dictionary = _retention_rows[int(entry["index"])]
 	var status := row["status"] as Label
 	# "Best" is the deepest level any generation ever reached — retention shops against
 	# the bloodline's record, not the living (resettable) ladder. LVL numbers match the
 	# property row's readout, so the two screens agree.
-	status.text = "Best LVL %d  ·  Retained LVL %d" % [
-		int(entry["best_levels"]), int(entry["retained_levels"])
-	]
+	var best_levels := int(entry["best_levels"])
+	var retained_levels := int(entry["retained_levels"])
+	status.text = "Best LVL %d  ·  Retained LVL %d" % [best_levels, retained_levels]
+
 	var button := row["button"] as Button
-	var cost := int(entry["cost"])
-	if cost < 0:
-		# Nothing to buy: already retained up to the bloodline's best level.
-		button.text = "RETAINED"
+	# Default to 0 so a snapshot missing these fields disables the button rather than quoting a
+	# price nobody computed (see set_retention_entries for the contract).
+	var levels := int(entry.get("levels", 0))
+	var cost := int(entry.get("cost", 0))
+
+	# The quote was priced against the wallet as it stood when the snapshot was built. If gems
+	# have left the wallet since, honour the wallet, not the stale quote — a button that offers
+	# to spend money the player no longer has is the one failure this preview exists to prevent.
+	# This can only ever SHRINK a quote to nothing; a wallet that GREW leaves the button
+	# under-promising until Main re-feeds the snapshot, which is the harmless direction.
+	if _upgrades != null and cost > _upgrades.available:
+		levels = 0
+
+	if levels > 0:
+		button.text = "RETAIN ×%d → LVL %d\n%s Gems" % [
+			levels, retained_levels + levels, Money.abbrev(cost)
+		]
+		button.disabled = false
+	elif retained_levels >= best_levels:
+		button.text = "FULLY RETAINED"
 		button.disabled = true
 	else:
-		button.text = "RETAIN LVL %d\n%s Gems" % [int(entry["retained_levels"]) + 1, Money.abbrev(cost)]
-		button.disabled = not bool(entry["can_afford"])
+		# Levels remain to buy; the wallet just can't reach the first one.
+		var next_cost := int(entry.get("next_level_cost", 0))
+		if next_cost > 0:
+			button.text = "RETAIN\nNEED %s Gems" % Money.abbrev(next_cost)
+		else:
+			button.text = "RETAIN\nCAN'T AFFORD"
+		button.disabled = true
+
+	# Remember the quoted count so the press emits THIS number — the one on the label — rather
+	# than letting Main re-derive a possibly different (larger) one.
+	row["levels"] = levels
 
 
-## Re-derive every retention entry's can_afford from the LIVE wallet and re-render the rows
-## and the section header. The entries' COSTS are stable while the tab is open (they only
-## change when a level is bought, which rebuilds the snapshot anyway) — affordability is the
-## one field that can go stale on its own, so the wallet watcher in _process fixes exactly
-## that field rather than needing Main to rebuild the whole snapshot.
+## Re-render the retention rows and the section header against the LIVE wallet, called by the
+## wallet watcher in _process when gems arrive or leave while the tab is open.
+##
+## This pass cannot recompute a quote: `levels` depends on the hire mode and the core's cost
+## curve, which this screen deliberately does not reach into. All it does is re-run
+## _apply_retention_entry, whose wallet clamp shrinks a quote the wallet can no longer cover
+## down to a disabled button. Main re-feeds the snapshot to grow one back.
 func _refresh_retention_affordability() -> void:
 	if _retention_entries.is_empty():
 		return
 	for entry_variant in _retention_entries:
 		var entry := entry_variant as Dictionary
-		var cost := int(entry["cost"])
-		entry["can_afford"] = cost >= 0 and _upgrades.available >= cost
 		if _retention_rows.has(int(entry["index"])):
 			_apply_retention_entry(entry)
 	_refresh_staff_section_header()
@@ -758,12 +845,26 @@ func refresh() -> void:
 			(controls["level_label"] as Label).text = "Level %d" % level
 		else:
 			(controls["level_label"] as Label).text = "Level %d / %d" % [level, max_level]
-		(controls["effect_label"] as Label).text = LegacyUpgradeCatalog.describe_effect(id, level)
+		var effect_label := controls["effect_label"] as Label
+		effect_label.text = LegacyUpgradeCatalog.describe_effect(id, level)
 
 		var buy_button := controls["buy_button"] as Button
+		var required := _upgrades.requirement_for(id)
+		var blocked := required != "" and not _upgrades.requirement_met(id)
 		if _upgrades.is_maxed(id):
 			buy_button.icon = null
 			buy_button.text = "MAXED"
+			buy_button.disabled = true
+		elif blocked:
+			# SAY WHY. A gray button that cannot explain itself is the exact failure that forced the
+			# hire-mode toggle to hide instead of gray (tooltips never appear on touch), so a locked
+			# card states its prerequisite in the line that would otherwise describe its effect.
+			# The price is deliberately still shown: knowing what it will cost is part of deciding
+			# whether to buy the thing it depends on.
+			effect_label.text = "Requires %s" % LegacyUpgradeCatalog.get_definition(
+				required).get("name", "an earlier upgrade")
+			buy_button.icon = GEM_TEX
+			buy_button.text = "  %s" % Money.abbrev(_upgrades.get_next_cost(id))
 			buy_button.disabled = true
 		else:
 			var cost := _upgrades.get_next_cost(id)
@@ -784,17 +885,27 @@ func refresh() -> void:
 # Buttons
 # ---------------------------------------------------------------------------
 
-## Press: buy one level now, and arm the hold so continuing to hold auto-repeats.
+## Press: arm the hold. Deliberately does NOT buy yet — see _on_buy_up.
 func _on_buy_down(id: String) -> void:
 	_held_buy_id = id
 	_hold_elapsed = 0.0
 	_hold_repeating = false
-	_attempt_buy(id)
+	_buy_fired_in_hold = false
 
 
-## Release: stop any auto-repeat.
+## Release: this is where a TAP buys.
+##
+## The purchase used to fire on press, which cannot coexist with drag-to-scroll: a swipe across the
+## list would spend gems on every buy button it crossed, and by the time a drag is detectable the
+## money is already gone. Buying on release costs the few milliseconds of a tap and makes a swipe
+## free. A HOLD still buys — the pump in _process fires at HOLD_INITIAL_DELAY — so this only acts
+## when the hold never got that far and the gesture stayed put.
 func _on_buy_up() -> void:
+	var id := _held_buy_id
 	_held_buy_id = ""
+	if id == "" or _buy_fired_in_hold or _drag_moved:
+		return
+	_attempt_buy(id)
 
 
 ## While a buy or retain button is held, keep purchasing on a calm cadence (after an
@@ -809,42 +920,77 @@ func _process(delta: float) -> void:
 		_refresh_retention_affordability()
 
 	if _held_buy_id != "":
-		_hold_elapsed += delta
-		var threshold := HOLD_REPEAT_INTERVAL if _hold_repeating else HOLD_INITIAL_DELAY
-		if _hold_elapsed >= threshold:
-			_hold_elapsed = 0.0
-			_hold_repeating = true
-			if not _attempt_buy(_held_buy_id):
-				_held_buy_id = ""  # nothing left to buy — stop repeating
+		if _drag_moved:
+			_held_buy_id = ""  # the press became a scroll — buy nothing, spend nothing
+		else:
+			_hold_elapsed += delta
+			var threshold := HOLD_REPEAT_INTERVAL if _hold_repeating else HOLD_INITIAL_DELAY
+			if _hold_elapsed >= threshold:
+				_hold_elapsed = 0.0
+				_hold_repeating = true
+				_buy_fired_in_hold = true  # the release must not buy a second time
+				if not _attempt_buy(_held_buy_id):
+					_held_buy_id = ""  # nothing left to buy — stop repeating
 
 	if _held_retain_index >= 0:
-		_retain_hold_elapsed += delta
-		var retain_threshold := HOLD_REPEAT_INTERVAL if _retain_hold_repeating else HOLD_INITIAL_DELAY
-		if _retain_hold_elapsed >= retain_threshold:
-			_retain_hold_elapsed = 0.0
-			_retain_hold_repeating = true
-			# Main performs the purchase and updates this row in place; once the button
-			# reads disabled (fully retained / unaffordable) the repeat stops itself.
-			var row: Dictionary = _retention_rows.get(_held_retain_index, {})
-			if row.is_empty() or (row["button"] as Button).disabled:
-				_held_retain_index = -1
-			else:
-				retain_requested.emit(_held_retain_index)
+		if _drag_moved:
+			_held_retain_index = -1  # same rule as buy: a scroll never spends
+		else:
+			_retain_hold_elapsed += delta
+			var retain_threshold := HOLD_REPEAT_INTERVAL if _retain_hold_repeating else HOLD_INITIAL_DELAY
+			if _retain_hold_elapsed >= retain_threshold:
+				_retain_hold_elapsed = 0.0
+				# Main performs the purchase and updates this row in place; once the button
+				# reads disabled (fully retained / unaffordable) the repeat stops itself.
+				var row: Dictionary = _retention_rows.get(_held_retain_index, {})
+				var quoted := int(row.get("levels", 0))
+				if row.is_empty() or (row["button"] as Button).disabled:
+					_held_retain_index = -1
+				elif quoted != 1:
+					# Auto-repeat is for SINGLE-level presses only (hire mode ×1). At ×10 / MAX the
+					# button is already a bulk action, and repeating it three times a second would
+					# let a finger resting on the screen empty the wallet over and over (Tim,
+					# 2026-07-31). The hold simply idles here; the one bulk purchase happens on
+					# release, in _on_retain_up.
+					pass
+				else:
+					_retain_hold_repeating = true
+					_retain_fired_in_hold = true  # the release must not retain a second time
+					retain_requested.emit(_held_retain_index, quoted)
 
 
-## Press on a RETAIN button: buy the first level immediately, then arm the auto-repeat
-## (mirrors _on_buy_down). Holding retains level after level at the hold-to-buy cadence —
-## deep retention is many steps, so tapping each one would be a chore (Tim, 2026-07-04).
+## Press on a RETAIN button: buy exactly the block this button's label just quoted, then arm the
+## auto-repeat (mirrors _on_buy_down). At ×1 holding retains level after level at the hold-to-buy
+## cadence — deep retention is many steps, so tapping each one would be a chore (Tim, 2026-07-04).
+## At a bulk hire mode the pump in _process declines to repeat; see the comment there.
 func _on_retain_down(property_index: int) -> void:
+	var row: Dictionary = _retention_rows.get(property_index, {})
+	var levels := int(row.get("levels", 0))
+	if levels <= 0:
+		return  # nothing quoted (disabled, or a snapshot without the quote fields)
 	_held_retain_index = property_index
 	_retain_hold_elapsed = 0.0
 	_retain_hold_repeating = false
-	retain_requested.emit(property_index)
+	_retain_fired_in_hold = false
 
 
-## Release: stop the retain auto-repeat.
+## Release: this is where a TAP retains. Mirrors _on_buy_up, and for the same reason — retention is
+## the most expensive thing on this screen, so a swipe across it must never spend.
+##
+## The quote is re-read here rather than captured on press: the wallet can change under a hold (the
+## pump buys, Main updates the row in place), and the label the player last saw is the promise being
+## honoured. Buying exactly the quoted count is the existing rule that stops a mid-press gem grant
+## from overcharging.
 func _on_retain_up() -> void:
+	var index := _held_retain_index
 	_held_retain_index = -1
+	if index < 0 or _retain_fired_in_hold or _drag_moved:
+		return
+	var row: Dictionary = _retention_rows.get(index, {})
+	var levels := int(row.get("levels", 0))
+	if levels <= 0 or (row["button"] as Button).disabled:
+		return
+	retain_requested.emit(index, levels)
 
 
 ## Buy one level of an upgrade, refresh the shop, and notify Main. Returns whether the
@@ -855,3 +1001,69 @@ func _attempt_buy(id: String) -> bool:
 	refresh()           # update the wallet and this card immediately
 	purchased.emit(id)  # let Main re-apply the effect to the living generation
 	return true
+
+
+# ---------------------------------------------------------------------------
+# Drag-to-scroll (2026-08-06)
+# ---------------------------------------------------------------------------
+# Every section header is a full-width Button, so with the sections collapsed — which is how they
+# all start — the headers tile the whole list and a touch has nowhere neutral to grab. A Button's
+# default MOUSE_FILTER_STOP swallows the press before the ScrollContainer sees a drag, so the list
+# could not be swiped. Same failure DevTuningPanel and ChallengesScreen hit; same fix: pan the
+# scroll ourselves and suppress the tap once the gesture is clearly a scroll.
+#
+# UiPalette.allow_scroll_drag_through() (called on the list and the staff list) cannot help: it
+# deliberately early-returns on any BaseButton, because a MOUSE_FILTER_PASS button would forward
+# its taps to the parent as well as acting on them. It rescues the card surfaces only.
+#
+# THE EXTRA STAKE ON THIS SCREEN: buy and retain used to purchase on button_down, so a swipe would
+# have spent gems on every button it crossed — and a drag is not detectable until after the press.
+# That is why _on_buy_down/_on_retain_down no longer buy; the purchase moved to release (or to the
+# hold pump). Nothing here can undo a purchase, so the only safe design is not to make one yet.
+
+
+## Route one list control's input: a fresh press starts a new gesture, anything else may be a drag.
+##
+## The press reset is read off the raw event rather than the Button's button_down signal, because
+## buy and retain buttons are routinely `disabled` (maxed, unaffordable) and a disabled Button emits
+## no button_down while still swallowing the touch. Reading the press here keeps a row of
+## unaffordable upgrades from becoming a dead patch of list you cannot scroll from.
+func _on_list_control_gui_input(event: InputEvent) -> void:
+	if event is InputEventScreenTouch and event.pressed:
+		_begin_drag_gesture()
+		return
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		_begin_drag_gesture()
+		return
+	_pan_scroll_on_drag(event)
+
+
+## Start tracking a fresh press gesture, before any travel.
+func _begin_drag_gesture() -> void:
+	_drag_accum = 0.0
+	_drag_moved = false
+
+
+## Pan the list when a press over a control turns into a drag. Never consumes the event, so a
+## genuine tap still reaches the button's own signals.
+func _pan_scroll_on_drag(event: InputEvent) -> void:
+	if _scroll == null:
+		return
+	var delta_y := 0.0
+	if event is InputEventScreenDrag:
+		delta_y = event.relative.y
+	elif event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT):
+		# Desktop only. Godot's emulate_mouse_from_touch (on by default) also synthesises a mouse
+		# motion for every InputEventScreenDrag, so counting both on a phone would pan at twice the
+		# speed of the finger and trip the threshold after half the intended travel.
+		if OS.has_feature("mobile"):
+			return
+		delta_y = event.relative.y
+	else:
+		return
+
+	# Finger down the screen (delta_y > 0) reveals EARLIER cards, so scroll_vertical decreases.
+	_scroll.scroll_vertical -= int(delta_y)
+	_drag_accum += absf(delta_y)
+	if _drag_accum >= DRAG_SCROLL_THRESHOLD:
+		_drag_moved = true

@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="potSteel" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%"   stop-color="#8C939C"/>
+      <stop offset="35%"  stop-color="#D8DCE2"/>
+      <stop offset="100%" stop-color="#7F868F"/>
+    </linearGradient>
+    <linearGradient id="blastFill" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="#F0D49A"/>
+      <stop offset="100%" stop-color="#E3B23C"/>
+    </linearGradient>
+  </defs>
+
+  <!-- OVERDRIVE: a pressure cooker MID-EXPLOSION (Tim, 2026-08-07 — the intact cooker "seemed
+       simplistic... it should be more indicative of an explosion").
+       Read order at 62px, back to front: a jagged blast star, the lid blown clear and tumbling,
+       then the pot still on the ground. The lid being SEPARATED from the pot is what makes this an
+       explosion rather than a cooker with decoration behind it — a gap the eye reads instantly.
+       Gold blast on the red OVR plate: warm-on-warm would vanish, so it carries a heavy navy
+       outline and the pot stays cold steel to hold the contrast. -->
+
+  <!-- Blast star: 8 spikes around the pot's mouth. -->
+  <polygon points="64,8 73.6,34.9 99.4,22.6 87.1,48.4 114,58 87.1,67.6 99.4,93.4 73.6,81.1
+                   64,108 54.4,81.1 28.6,93.4 40.9,67.6 14,58 40.9,48.4 28.6,22.6 54.4,34.9"
+           fill="url(#blastFill)" stroke="#1D2D50" stroke-width="5" stroke-linejoin="round"/>
+
+  <!-- Inner flash: a paler core so the burst has depth rather than reading as a flat cog. -->
+  <polygon points="64,30 71,50 92,58 71,66 64,86 57,66 36,58 57,50"
+           fill="#F4ECD8" opacity="0.85"/>
+
+  <!-- The pot, sitting low and open — no lid on it any more. -->
+  <path d="M36 74 L92 74 L87 108 A6 6 0 0 1 81 114 L47 114 A6 6 0 0 1 41 108 Z"
+        fill="url(#potSteel)" stroke="#1D2D50" stroke-width="5" stroke-linejoin="round"/>
+  <rect x="18" y="80" width="20" height="11" rx="5" fill="#1D2D50"/>
+  <rect x="90" y="80" width="20" height="11" rx="5" fill="#1D2D50"/>
+  <!-- Open mouth: a dark ellipse so the pot reads as uncovered, not merely short. -->
+  <ellipse cx="64" cy="74" rx="28" ry="7" fill="#1D2D50"/>
+
+  <!-- The lid, blown clear and tumbling away up-right, with its handle still on it. -->
+  <g transform="rotate(38 96 24)">
+    <rect x="70" y="18" width="52" height="12" rx="6"
+          fill="url(#potSteel)" stroke="#1D2D50" stroke-width="5"/>
+    <rect x="90" y="8" width="12" height="10" rx="4" fill="#1D2D50"/>
+  </g>
+</svg>

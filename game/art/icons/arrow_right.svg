@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Solid right-pointing twin of arrow_left.svg, marking the AUTO-BUY button's EXPANDED state:
+       the button now spans the row, and this edge is where it collapses back to. Mirrored path,
+       identical weight, so the two read as one control changing direction rather than two icons.
+
+       Pure white for the same reason as its twin — the button tints it per state, and this is the
+       one that sits on the navy ON plate, so it must be able to become white. See arrow_left.svg. -->
+  <path d="M44 18 L44 110 L98 64 Z" fill="#FFFFFF"/>
+</svg>

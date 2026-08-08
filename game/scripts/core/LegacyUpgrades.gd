@@ -64,8 +64,32 @@ func get_next_cost(id: String) -> int:
 
 ## True if the upgrade can still be bought AND the player can afford the next level.
 func can_buy(id: String) -> bool:
+	if not requirement_met(id):
+		return false
 	var cost := get_next_cost(id)
 	return cost >= 0 and available >= cost
+
+
+## True when this upgrade's prerequisite (if it has one) is owned.
+##
+## Added 2026-08-07 for the auto-purchase restructure. Buying Power and Standing Orders only do
+## anything once the Acquisitions Desk is owned — auto_purchase_quantity() returns 0 while the mode
+## is locked — so without this a player could spend 5,000 gems on an upgrade that grants literally
+## nothing, with no way to tell. That is a refund request, not a design.
+##
+## Enforced in can_buy rather than in the UI so every path obeys it: the shop's buy button, the
+## sims' greedy shopper, and anything written later all go through the same gate.
+func requirement_met(id: String) -> bool:
+	var required := requirement_for(id)
+	return required == "" or get_level(required) >= 1
+
+
+## The upgrade id this one depends on, or "" if it stands alone.
+func requirement_for(id: String) -> String:
+	var definition := LegacyUpgradeCatalog.get_definition(id)
+	if definition.is_empty():
+		return ""
+	return String(definition.get("requires", ""))
 
 
 ## True once the upgrade has reached its maximum level.
@@ -201,10 +225,62 @@ func overheat_lockout_scale() -> float:
 ## extra-high zone and cap the multiplier.
 const MINIGAME_BONUS_BASE := 0.25
 
+## The top of the bulk-hire ladder, which everyone now has (see max_hire_mode). Must match the
+## highest ordinal of PropertyRow.HireMode — currently { ONE, TEN, MAX }, so 2. Duplicated as a
+## literal because scripts/core/ must not name a UI class; PropertyRow's enum comment points back
+## here so the pair stays in step.
+const ALL_HIRE_MODES_UNLOCKED := 2
+
 func minigame_bonus_max() -> float:
 	var per_level := _per_level(LegacyUpgradeCatalog.MINIGAME_BONUS)
 	var level := get_level(LegacyUpgradeCatalog.MINIGAME_BONUS)
 	return MINIGAME_BONUS_BASE + per_level * float(level)
+
+
+## True once the Acquisitions Desk is owned, which is what makes the auto-purchase mode available
+## to switch on at all (unowned = the AUTO-BUY button is absent entirely).
+func auto_purchase_unlocked() -> bool:
+	return get_level(LegacyUpgradeCatalog.AUTO_PURCHASE_UNLOCK) >= 1
+
+
+## How many single-unit purchases the mode makes per round.
+##
+## The UNLOCK grants one on its own; Buying Power adds one per level. Returns 0 when the mode is
+## not owned, so a caller that forgets to check auto_purchase_unlocked() still buys nothing rather
+## than quietly running a free desk.
+func auto_purchase_quantity() -> int:
+	if not auto_purchase_unlocked():
+		return 0
+	return 1 + get_level(LegacyUpgradeCatalog.AUTO_PURCHASE_QUANTITY)
+
+
+## SECONDS to shave off the auto-purchase cadence (Standing Orders). Returns 0.0 when the mode is
+## not owned, so the unlock alone runs at the tuned base cadence.
+##
+## The caller subtracts this from the tuned base cadence and clamps to the tuned minimum — both
+## knobs live in TuningConfig, so this getter reports the magnitude only. The track's 11 levels are
+## sized to walk 3.0s down to that 0.25s floor exactly.
+func auto_purchase_cadence_scale() -> float:
+	if not auto_purchase_unlocked():
+		return 0.0
+	return _per_level(LegacyUpgradeCatalog.AUTO_PURCHASE_CADENCE) \
+		* float(get_level(LegacyUpgradeCatalog.AUTO_PURCHASE_CADENCE))
+
+
+## The deepest bulk-hire mode available. Now a CONSTANT: bulk hire is free for everyone since the
+## Head Hunters track was deleted (2026-08-07). Pressing HIRE 150 times is a defect, not a feature,
+## and charging gems to fix a defect is charging for a bug — the same call that made retention
+## bulk-buy free.
+##
+## Kept as a function rather than inlined at the call sites so the ladder has one owner: if a mode
+## is ever added to HireMode, this is the single place that has to learn about it.
+##
+## Returns a plain int rather than PropertyRow.HireMode.MAX on purpose. This is scripts/core/, and
+## naming a UI class from here creates a class-resolution cycle that makes unrelated core members
+## unresolvable and breaks parsing with errors pointing at innocent lines. The int contract is also
+## what callers already used, back when this returned a purchased level.
+func max_hire_mode() -> int:
+	return ALL_HIRE_MODES_UNLOCKED
 
 
 ## The catalog's per-level magnitude for an upgrade (0.0 if unknown).

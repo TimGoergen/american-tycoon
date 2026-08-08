@@ -87,11 +87,23 @@ cross properties, and it is the difference between this rule and the old one.
 equal costs prefer the property you own fewest of; index only as a final determinism guarantee
 so the sims can assert exact outcomes.
 
-The least-owned term matters more than it looks. Early rungs in a cohort are often priced
-identically, and cost-then-index alone would pour every purchase into whichever one happens to
-sort first, deepening a single property while its neighbours sat untouched. Preferring the
-least-owned spreads the run across the cohort — and because buying raises that property's next
-cost, the two rules reinforce rather than fight each other.
+~~The least-owned term matters more than it looks. Early rungs in a cohort are often priced
+identically…~~ **CORRECTED 2026-08-07 — that justification was wrong.** Measured: every cohort's
+rungs sit on a geometric ladder roughly ×7 apart, and no two properties in tiers 1, 3 or 6 share
+a price. Ties never arise from shipped data, so the least-owned term never fires. It is kept as
+a cheap safety net — two comparisons, a deterministic outcome, and it starts mattering the moment
+future content puts two rungs at one price. `AutoPurchaseTest` now asserts that no such pair
+exists, so the day one appears the test fails and says the rule has gone live untested.
+
+**What the ×7 spacing means for the rule — measured, and worth a decision.** The cheapest rung
+must be bought about 21 times before its price overtakes its neighbour, so a greedy run is
+heavily weighted toward the cheap end. Measured on a tier-6 cohort: **30 purchases in one tick
+landed on just 2 properties, 21 units of them into the cheapest.**
+
+That is not a bug — it is what "buy the most affordable" means on a geometric ladder — but it is
+a different picture from "spreads across the cohort", and it is worth seeing before the UI is
+built. If broader coverage is wanted, the lever is a per-property cap per tick, not the
+tie-break.
 
 ### 1.3 The tracks
 

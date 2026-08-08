@@ -1,42 +1,52 @@
 class_name AutoPurchaseState
 
-# Auto-Purchase Mode — the "Acquisitions Desk" buying policy.
-# Design of record: Plans/Auto_Purchase_And_Bulk_Hire.md §A2-§A4.
+# Auto-Purchase Mode — the buying policy.
+# Design of record: Plans/Auto_Purchase_Restructure.md (which supersedes the §A2-§A4 rule in
+# Plans/Auto_Purchase_And_Bulk_Hire.md).
 #
-# While the mode is enabled, the game periodically spends cash on the player's behalf:
-# every CADENCE seconds it buys up to N units each of the X cheapest properties it can
-# afford, on ONE targeted civ tab. That is the whole rule, and it is deliberately small —
-# the player pays for it by giving up rush (§A5), so the mode has to stay legible.
+# While the mode is enabled, the game periodically spends cash on the player's behalf: every
+# CADENCE seconds it makes up to QUANTITY purchases, and every one of those purchases takes
+# whichever property in the CURRENT EPOCH is cheapest at that instant. That is the whole rule.
 #
-# This class is headless policy ONLY, exactly like the rest of scripts/core/: it holds no
-# Node, touches no UI, and knows nothing about who is driving it. Main._process drives it
-# for the real game and sim/ drives it for verification, so the two can never drift.
-# It is deliberately NOT a Node: Main._process already returns early while a modal is up,
-# so hanging the policy off that call site makes it inherit the frozen-economy rule for
-# free. A self-ticking Node would not, and could quietly buy things behind the Will screen.
+# THE RULE CHANGED ON 2026-08-07 (Tim). It used to be "N units each of the X cheapest
+# properties", two numbers describing a grid. Tim removed the second idea outright:
 #
-# Three behaviours in here are load-bearing rather than incidental. Each is commented at
-# the point it happens:
-#   1. The cohort FLAGSHIP is excluded structurally (see _collect_eligible_indices).
-#   2. Purchases are sized with get_max_affordable, never a flat N (see tick).
-#   3. An empty tick does NOT burn the cadence (see tick).
+#   "I do not want to have logic about how many different property types it may attempt to
+#    purchase from. Rather, I just want the logic to be that it will purchase the x most
+#    affordable properties ordered by cost, which may cross property type boundaries as the
+#    prices rise from each subsequent purchase."
+#
+# So there is one number now — how many purchases this tick — and the spread across properties
+# is EMERGENT rather than configured: buying a unit raises that property's next price, so a run
+# of purchases naturally walks onto its neighbours as it goes. Re-pricing between every single
+# purchase is what produces that, and it is the load-bearing detail of this file.
+#
+# This class is headless policy ONLY, exactly like the rest of scripts/core/: it holds no Node,
+# touches no UI, and knows nothing about who is driving it. Main._process drives it for the real
+# game and sim/ drives it for verification, so the two can never drift. It is deliberately NOT a
+# Node: Main._process already returns early while a modal is up, so hanging the policy off that
+# call site makes it inherit the frozen-economy rule for free. A self-ticking Node would not, and
+# could quietly buy things behind the Will screen.
 
 
-## True while the player has the mode switched on. Persisted by the caller alongside the
-## other UI-mode flags; this object itself never touches the save file.
+## True while the player has the mode switched on. Persisted by the caller alongside the other
+## UI-mode flags; this object itself never touches the save file.
 var enabled: bool = false
 
-## Seconds of tick time banked since the last purchase. Once this reaches the cadence the
-## next tick fires. Clamped so it can never exceed one full cadence — see tick() for why.
+## Seconds of tick time banked since the last purchase. Once this reaches the cadence the next
+## tick fires. Clamped so it can never exceed one full cadence — see tick() for why.
 var _time_since_last_purchase: float = 0.0
 
-## The property indices bought into by the most recent tick that bought anything — the UI
-## reads this to mark the exact rows the desk just fed (Tim, 2026-08-01: he wanted to see
-## WHERE the money went, rather than a headline flash that would strobe at this cadence).
+## The DISTINCT property indices bought into by the most recent buying tick — the UI reads this
+## to mark the exact rows the desk just fed (Tim, 2026-08-01: he wanted to see WHERE the money
+## went, rather than a headline flash that would strobe at this cadence).
 ##
-## Deliberately a plain record rather than a signal: this class is headless policy with no
-## scene tree, and the sims drive it too. Rewritten in place on every buying tick, so a
-## reader must consume it right after tick() returns a non-zero count.
+## Distinct, not one entry per purchase: a tick now makes many single-unit buys and will often
+## hit the same property repeatedly, and the reader wants rows to mark, not a purchase log.
+##
+## Deliberately a plain record rather than a signal: this class is headless policy with no scene
+## tree, and the sims drive it too. Rewritten in place on every buying tick, so a reader must
+## consume it right after tick() returns a non-zero count.
 var last_purchased_indices: Array[int] = []
 
 
@@ -46,48 +56,45 @@ var last_purchased_indices: Array[int] = []
 
 ## Advance the mode by `delta` seconds and buy if it is time to.
 ##
-## `tab`      — the civ tab the player has the mode pointed at. Tab N is the cohort whose
-##              properties have `unlock_tier == N + 1` (matching Main._epoch_tab_of).
-## `cadence`  — seconds between purchase ticks (shrinks as the upgrade levels up).
-## `units`    — N, the units to buy per property per tick (the upgrade level, 1..8).
-## `breadth`  — X, how many DISTINCT properties to buy into per tick.
+## `cadence`  — seconds between purchase ticks (shrinks as the cadence upgrade levels up).
+## `quantity` — how many single-unit purchases to make this tick (the quantity upgrade).
 ##
-## Returns the number of UNITS actually bought this tick — 0 when the timer has not
-## elapsed, and 0 when it has but nothing was affordable. The sims assert on this number.
-func tick(delta: float, game: GameState, tab: int, cadence: float, units: int, breadth: int) -> int:
+## Returns the number of units actually bought this tick — 0 when the timer has not elapsed,
+## and 0 when it has but nothing was affordable. The sims assert on this number.
+func tick(delta: float, game: GameState, cadence: float, quantity: int) -> int:
 	if not enabled:
 		return 0
-	if game == null or cadence <= 0.0 or units <= 0 or breadth <= 0:
+	if game == null or cadence <= 0.0 or quantity <= 0:
 		return 0
 
 	_time_since_last_purchase += delta
-	# Never bank more than one cadence of credit. Without this clamp, a long frame hitch or
-	# a spell with no affordable property would let the accumulator run up and then release
-	# a burst of back-to-back ticks. The mode is meant to be a steady drip, not a flush.
+	# Never bank more than one cadence of credit. Without this clamp, a long frame hitch or a
+	# spell with no affordable property would let the accumulator run up and then release a burst
+	# of back-to-back ticks. The mode is meant to be a steady drip, not a flush.
 	if _time_since_last_purchase > cadence:
 		_time_since_last_purchase = cadence
 	if _time_since_last_purchase < cadence:
 		return 0
 
-	var units_bought := _buy_cheapest(game, tab, units, breadth)
+	var units_bought := _buy_cheapest_repeatedly(game, quantity)
 
-	# EMPTY-TICK RULE (plan §A3). If we bought nothing, the accumulator stays pinned at the
-	# cadence instead of resetting, so the very next frame in which something becomes
-	# affordable buys it immediately. Otherwise a player who is 1 cent short when the timer
-	# fires would wait a whole further cadence for no reason the player can see.
-	# The wait only restarts once a purchase actually happened.
+	# EMPTY-TICK RULE. If we bought nothing, the accumulator stays pinned at the cadence instead
+	# of resetting, so the very next frame in which something becomes affordable buys it
+	# immediately. Otherwise a player who is one cent short when the timer fires would wait a
+	# whole further cadence for no reason they can see. The wait only restarts once a purchase
+	# actually happened.
 	if units_bought > 0:
 		_time_since_last_purchase -= cadence
 	return units_bought
 
 
-## Clear the banked timer so a fresh run never inherits a primed accumulator from the last
-## one (called on succession and on First Contact, alongside the other per-run resets).
+## Clear the banked timer so a fresh run never inherits a primed accumulator from the last one
+## (called on succession and on First Contact, alongside the other per-run resets).
 ##
-## This deliberately does NOT touch `enabled`. The mode is unlocked by a Legacy upgrade,
-## which survives succession by definition — switching the mode off every time the player
-## prestiges would keep turning off something they paid for, which reads as a bug. It is a
-## persistent player setting, like the buy mode, not per-generation state.
+## This deliberately does NOT touch `enabled`. The mode is unlocked by a Legacy upgrade, which
+## survives succession by definition — switching the mode off every time the player prestiges
+## would keep turning off something they paid for, which reads as a bug. It is a persistent
+## player setting, like the buy mode, not per-generation state.
 func reset_timer() -> void:
 	_time_since_last_purchase = 0.0
 
@@ -96,17 +103,16 @@ func reset_timer() -> void:
 # Queries for the UI
 # ---------------------------------------------------------------------------
 
-## The cheapest next-unit price among the properties this mode is willing to buy on `tab`,
-## or -1.0 if the tab has nothing it would ever touch (all locked, or flagship-only).
+## The cheapest next-unit price in the current epoch, or -1.0 if there is nothing to buy.
 ## The UI uses this to tell the player what the desk is waiting to afford.
 ##
-## Affordability is deliberately NOT part of this answer: the useful thing to show is the
-## price the player is saving toward, which by definition is one they cannot pay yet.
-func lowest_next_cost(game: GameState, tab: int) -> float:
+## Affordability is deliberately NOT part of this answer: the useful thing to show is the price
+## the player is saving toward, which by definition is one they cannot pay yet.
+func lowest_next_cost(game: GameState) -> float:
 	if game == null:
 		return -1.0
 	var lowest := -1.0
-	for i in _collect_eligible_indices(game, tab, false):
+	for i in _eligible_indices(game):
 		var cost := (game.economy.properties[i] as PropertyState).get_next_cost()
 		if lowest < 0.0 or cost < lowest:
 			lowest = cost
@@ -117,77 +123,86 @@ func lowest_next_cost(game: GameState, tab: int) -> float:
 # Internals
 # ---------------------------------------------------------------------------
 
-## Rank this tab's buyable properties by CURRENT next-unit cost and buy into the cheapest
-## `breadth` of them. Returns the total units bought.
-func _buy_cheapest(game: GameState, tab: int, units: int, breadth: int) -> int:
-	var candidates := _collect_eligible_indices(game, tab, true)
-	if candidates.is_empty():
+## Make up to `quantity` single-unit purchases, each taking whatever is cheapest at that moment.
+## Returns the number of units actually bought.
+func _buy_cheapest_repeatedly(game: GameState, quantity: int) -> int:
+	var eligible := _eligible_indices(game)
+	if eligible.is_empty():
 		return 0
-
-	# Rank by the price RIGHT NOW, every tick, never cached. This is what makes the mode
-	# self-balancing: hammering the cheapest rung escalates its own price until a sibling
-	# becomes the cheapest, so the spending spreads across the low end instead of tunnelling
-	# into one row. Caching the ranking would lose that for free (plan §A2).
-	candidates.sort_custom(func(a: int, b: int) -> bool:
-		return (game.economy.properties[a] as PropertyState).get_next_cost() \
-			< (game.economy.properties[b] as PropertyState).get_next_cost()
-	)
 
 	var units_bought := 0
 	last_purchased_indices.clear()
-	for rank in range(mini(breadth, candidates.size())):
-		var prop_index: int = candidates[rank]
-		var prop := game.economy.properties[prop_index] as PropertyState
-
-		# Buy min(N, what we can actually pay for) rather than a flat N. GameState.try_buy is
-		# all-or-nothing — it prices the whole block and refuses outright if cash falls short —
-		# so asking for a flat N would make the mode do NOTHING whenever the player can afford
-		# 5 of 8 units, which reads as a bug. get_max_affordable computes the honest number
-		# using the same rounding as the cost curve (plan §A2).
-		var affordable := prop.get_max_affordable(game.economy.cash, units)
-		var count := mini(units, affordable)
-		if count <= 0:
-			# Cash ran out on an earlier property in this same tick. Everything after it in the
-			# ranking is more expensive, so there is nothing left to find.
+	for _purchase in range(quantity):
+		var target := _cheapest_affordable(game, eligible)
+		if target < 0:
+			# Nothing in the epoch is affordable any more. Everything this tick could buy has
+			# been bought, so stop rather than spinning through the remaining quantity.
 			break
-		if game.try_buy(prop_index, count):
-			# try_buy has already deducted the cost, so the next iteration's affordability
-			# check reads the reduced balance. That re-check is why this is a loop and not a
-			# batch: the cheapest property can legitimately consume the whole tick's budget.
-			units_bought += count
-			last_purchased_indices.append(prop_index)
+		if not game.try_buy(target, 1):
+			# Should not happen — _cheapest_affordable already checked the price — but a refusal
+			# must end the tick rather than loop forever asking for something that is declined.
+			break
+		units_bought += 1
+		# ONE unit at a time, deliberately. Buying a block would price the whole block up front
+		# against the CURRENT cheapest property, which is exactly the behaviour Tim removed: the
+		# run is supposed to re-price after every single purchase so it walks onto whichever
+		# property has become the cheapest, crossing properties as it goes.
+		if not last_purchased_indices.has(target):
+			last_purchased_indices.append(target)
 	return units_bought
 
 
-## The single source of truth for "would this mode ever buy this property?".
-## Both tick() and lowest_next_cost() go through here so they can never disagree about
-## what the desk is targeting.
+## The index of the cheapest property the player can pay for right now, or -1 if none.
 ##
-## `require_affordable` adds the one filter that differs between the two callers: the buying
-## path only wants properties it can pay for this instant, while the UI query wants the
-## price of the thing being saved for.
-func _collect_eligible_indices(game: GameState, tab: int, require_affordable: bool) -> Array[int]:
-	# Tab N shows the cohort gated to unlock_tier N + 1 (Main._epoch_tab_of).
-	var unlock_tier := tab + 1
+## Ties break cheapest -> LEAST OWNED -> lowest index (Tim, 2026-08-07).
+##
+## HONEST NOTE ON THE LEAST-OWNED TERM: it was specified on the assumption that a cohort's early
+## rungs are often priced identically. Measured 2026-08-07, that is FALSE — every cohort sits on a
+## geometric ladder roughly x7 apart and no two properties share a price, so this term never fires
+## against shipped data. It is kept as a safety net: it costs two comparisons, keeps the outcome
+## deterministic, and starts mattering the moment any future content puts two rungs at one price.
+## sim/AutoPurchaseTest.gd asserts that no such pair exists, so if one ever appears the test fails
+## and says so rather than letting an untested rule quietly go live.
+##
+## Index is the final term purely so the outcome is deterministic and the sims can assert exact
+## sequences.
+func _cheapest_affordable(game: GameState, eligible: Array[int]) -> int:
+	var cash := game.economy.cash
+	var best := -1
+	var best_cost := 0.0
+	var best_owned := 0
+	for i in eligible:
+		var prop := game.economy.properties[i] as PropertyState
+		var cost := prop.get_next_cost()
+		if cash < cost:
+			continue
+		var owned := prop.units_owned
+		if best < 0 or cost < best_cost \
+				or (cost == best_cost and owned < best_owned):
+			best = i
+			best_cost = cost
+			best_owned = owned
+	return best
 
-	# EXCLUDE THE COHORT FLAGSHIP — structural, not incidental.
-	# The epoch advance for tiers 3+ requires owning 35 units of the cohort flagship
-	# (Plans/Epoch_Advance_Rework.md; enforced in EpochState). That stacking phase exists
-	# precisely to give the flagship playtime, and it is the game's main pacing gate.
-	# "The X cheapest" already misses the flagship while X stays small — but that is a
-	# consequence of a tuning value, not a guarantee. Excluding it BY INDEX means a later
-	# increase to breadth can never silently automate the pacing gate away.
-	var flagship_index := game.economy.get_flagship_index_for_unlock_tier(unlock_tier)
 
+## The single source of truth for "would this mode ever buy this property?". Both the buying path
+## and lowest_next_cost() go through here so they can never disagree about what the desk targets.
+##
+## SCOPE IS THE CURRENT EPOCH (Tim, 2026-08-07), not a tab the player aimed at. The mode used to
+## target the last-viewed civ tab; that hidden state is gone, and the desk simply works in the era
+## the player is actually in.
+##
+## THERE IS NO FLAGSHIP EXCLUSION ANY MORE (Tim, 2026-08-07). The desk used to refuse the cohort's
+## most expensive property, because owning 35 of it is the epoch-advance gate. That exclusion
+## protected less than its comment claimed: `EpochState.auto_advance` is turned off in
+## Main._create_game, so leaving an era is always the MAKE CONTACT tap and auto-buy could never
+## have advanced an epoch by itself. Dropping it turns that gate from an ATTENTION gate into a
+## MONEY gate — the player still chooses when to leave.
+func _eligible_indices(game: GameState) -> Array[int]:
 	var eligible: Array[int] = []
-	for i in game.economy.get_property_indices_for_unlock_tier(unlock_tier):
-		if i == flagship_index:
+	var tier := game.epoch.current_tier
+	for i in game.economy.get_property_indices_for_unlock_tier(tier):
+		if not game.economy.is_property_unlocked(i, tier):
 			continue
-		if not game.economy.is_property_unlocked(i, game.epoch.current_tier):
-			continue
-		if require_affordable:
-			var prop := game.economy.properties[i] as PropertyState
-			if game.economy.cash < prop.get_next_cost():
-				continue
 		eligible.append(i)
 	return eligible

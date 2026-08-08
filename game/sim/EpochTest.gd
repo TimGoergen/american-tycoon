@@ -283,6 +283,30 @@ func _test_staff_retention(configs: Array, tuning: TuningConfig) -> void:
 			and dynasty.staff_retention.cost_for_level(flagship_3, 1)
 				== dynasty.staff_retention.cost_for_level(flagship_last, 1))
 
+	# THE NAMING TRAP — rehomed here 2026-08-07 from sim/AutoPurchaseTest.gd.
+	#
+	# EconomyState has two lookups whose names both say "flagship" and they mean OPPOSITE things:
+	#   - get_property_index_for_unlock_tier(tier)  -> the cohort's CHEAPEST member, its entry rung
+	#     and the First Contact trade-deal anchor. It is the one used a few lines above, and the one
+	#     this suite has always called "the flagship".
+	#   - get_flagship_index_for_unlock_tier(tier)  -> the cohort's MOST EXPENSIVE property, which is
+	#     what the 35-unit epoch-advance gate reads (GameState.can_advance_epoch).
+	#
+	# Both names are right for their own job; only the naming collides. This assertion lived in
+	# AutoPurchaseTest because auto-purchase had to exclude the expensive one — that exclusion was
+	# dropped in the restructure (Plans/Auto_Purchase_Restructure.md), which would have deleted the
+	# guard along with its host. The collision is still real and still dangerous, so it moved to the
+	# suite that reads one of the pair: a future rename merging them breaks a test rather than
+	# silently changing which property gates epoch advance.
+	var entry_rung := game.economy.get_property_index_for_unlock_tier(3)
+	var gate_flagship := game.economy.get_flagship_index_for_unlock_tier(3)
+	_check("the cohort's entry rung and its epoch-advance gate are DIFFERENT properties "
+		+ "(entry %d, gate %d)" % [entry_rung, gate_flagship], entry_rung != gate_flagship)
+	_check("...and the gate one is the more expensive of the two",
+		entry_rung >= 0 and gate_flagship >= 0
+			and (game.economy.properties[gate_flagship] as PropertyState).get_next_cost()
+				> (game.economy.properties[entry_rung] as PropertyState).get_next_cost())
+
 	# Pass on with only 3 of the 5 levels retained. The heir is born at the 3 retained
 	# levels — no units — and the bloodline records the ancestor's best (5) forever.
 	dynasty.perform_succession()

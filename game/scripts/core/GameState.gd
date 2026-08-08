@@ -90,11 +90,11 @@ var ui_hire_mode: int = 0
 ## properties have unlock_tier N + 1 — Main._epoch_tab_of). Two jobs:
 ##   1. The pager reopens where the player left it instead of jumping to the deepest
 ##      unlocked tab every launch. Good behaviour on its own merits.
-##   2. It is the tab Auto-Purchase Mode buys from. Without persistence the mode would be
-##      silently re-aimed at the frontier after every app restart, which defeats the whole
-##      "point the desk at an era" control (plan §A4 / Correction 1).
-## Stored here only so it survives the save file; the headless model never reads it except
-## as the tab argument the caller passes to auto_purchase.tick().
+##   2. ~~It is the tab Auto-Purchase Mode buys from.~~ **No longer true (2026-08-07.)** The
+##      mode now works in the epoch the player is actually in, so it takes no tab argument and
+##      never reads this (Plans/Auto_Purchase_Restructure.md). Job 1 above is the only remaining
+##      reason this field exists — worth confirming the pager still wants it before keeping it.
+## Stored here only so it survives the save file; the headless model never reads it at all.
 var ui_epoch_tab: int = 0
 
 ## UI preference: how every number on screen is formatted (a Money.Format value —

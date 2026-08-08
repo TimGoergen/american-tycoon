@@ -3041,12 +3041,17 @@ func _drive_auto_purchase(delta: float) -> void:
 	var cadence := clampf(
 			tuning.auto_purchase_base_cadence - dynasty.upgrades.auto_purchase_cadence_scale(),
 			tuning.auto_purchase_min_cadence, tuning.auto_purchase_base_cadence)
-	# Units bought per property per tick (N) is simply the upgrade's level.
-	var units := dynasty.upgrades.get_level(LegacyUpgradeCatalog.ACQUISITIONS_DESK)
-	# The tab is read from the SAVED field rather than Main's _epoch_tab so the mode and the save
-	# can never disagree about which era it is aimed at; _set_epoch_tab keeps them in step.
-	var units_bought := game.auto_purchase.tick(delta, game, game.ui_epoch_tab, cadence, units,
-			tuning.auto_purchase_breadth)
+	# How many single-unit purchases this tick. Each one takes whatever is cheapest at that
+	# moment, so the spread across properties is emergent rather than configured — see
+	# AutoPurchaseState for the rule and why it changed (Tim, 2026-08-07).
+	#
+	# TEMPORARY SOURCE: still read off the old Acquisitions Desk level. The restructure's own
+	# quantity track replaces this in Plans/Auto_Purchase_Restructure.md §3.3; until then the old
+	# upgrade drives the new rule so the branch stays playable between steps.
+	var quantity := dynasty.upgrades.get_level(LegacyUpgradeCatalog.ACQUISITIONS_DESK)
+	# No tab argument any more: the mode works in the epoch the player is actually in, so the
+	# hidden "which tab was it aimed at" state is gone (see AutoPurchaseState._eligible_indices).
+	var units_bought := game.auto_purchase.tick(delta, game, cadence, quantity)
 	if units_bought <= 0:
 		return
 	# Mark the exact rows the desk just fed (Tim, 2026-08-01). The HERO STAT is deliberately NOT

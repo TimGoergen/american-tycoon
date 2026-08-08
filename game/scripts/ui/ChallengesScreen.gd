@@ -40,9 +40,13 @@ const ICON_MEMORY := preload("res://art/icons/memory_pads.svg")
 const ICON_BALANCE := preload("res://art/icons/book.svg")
 const ICON_TIMING := preload("res://art/icons/lock.svg")
 
-## Height reserved for one game panel. Tall enough for the name + tier line beside the icon with
-## breathing room (low-vision rule). Six of these scroll if the card is short.
-const PANEL_HEIGHT := 180
+## Height reserved for one game panel. 180 → 160 (Tim, 2026-08-08), reclaiming the space the locked
+## rows' third line used to need.
+##
+## The ICON is now the binding constraint, not the text: every row is two lines again (57 + 45 + 6
+## separation = 108px), which needs 152 with the 22px vertical pads, while the 112px icon needs 156.
+## 160 leaves a little over that so the icon never touches the pad.
+const PANEL_HEIGHT := 160
 
 ## The game icon's square size on the left of each panel (was 132; 15% smaller per Tim, 2026-07-22).
 const ICON_SIZE := 112
@@ -64,9 +68,20 @@ const PANEL_CORNER_RADIUS := 26
 const PANEL_LOCKED_FILL := UiPalette.LIGHT_GRAY
 const PANEL_LOCKED_BORDER := UiPalette.MID_GRAY
 
-## The reason shown on a locked row's third text line. Kept at body size (not fine print) — see
-## _make_game_panel for the height arithmetic that proves three lines still fit the 180px row.
+## The reason a locked game cannot be played. Shown as a TEMPORARY CHIP when the player taps a
+## locked row (Tim, 2026-08-08), not as a permanent third line on every locked row.
+##
+## The grey plate already says "not available"; the third line spent a line of every locked row, on
+## every visit, answering a question the player only asks at the moment they try. A chip answers it
+## then and gets out of the way.
 const LOCKED_REASON_TEXT := "MEET THIS GAME AT A TRANSITION"
+
+## How long that chip stays up, and how much of that time it spends fading out. Long enough to read
+## a five-word line without being long enough to still be there on the next tap.
+const LOCKED_CHIP_SECONDS := 2.2
+const LOCKED_CHIP_FADE_SECONDS := 0.5
+## How far the chip sits above the bottom of the screen — clear of the BACK button below the card.
+const LOCKED_CHIP_BOTTOM_GAP := 190
 
 ## How far a locked game's icon fades toward its gray plate. The Button's disabled state dims only
 ## the Button's OWN icon/text; our icon is a separate child TextureRect, so it must be dimmed here.
@@ -123,6 +138,11 @@ var _rows_column: VBoxContainer
 ## again on return, so the covered list doesn't keep drawing behind the opaque player.
 var _list_view: Control
 
+## The temporary "why is this locked" chip and its remaining time on screen. Built once and reused;
+## see _build_locked_chip.
+var _locked_chip: PanelContainer
+var _locked_chip_seconds := 0.0
+
 
 ## Hand the screen its data. Called once by Main at build time. Main calls this BEFORE add_child, so
 ## _player is added to this node before _ready runs and adds the backdrop + card — i.e. _player is NOT
@@ -166,6 +186,8 @@ func _ready() -> void:
 
 	_list_view = _build_card()
 	add_child(_list_view)
+	# Added AFTER the card so it paints over the list rather than under it.
+	_build_locked_chip()
 
 
 ## Open the screen on its list (called by Main when the Settings CHALLENGES button is tapped).
@@ -388,7 +410,10 @@ func _make_game_panel(game_key: String, type_script: Script) -> Control:
 	# Drag-to-scroll. Connected for EVERY row, locked ones included: a disabled Button still swallows
 	# the touch (disabling changes the press logic, not the mouse filter), so a locked row left
 	# unwired would be a dead patch of list you cannot scroll from. See the section at the bottom.
-	panel.gui_input.connect(_on_panel_gui_input)
+	# `locked` rides along so a tap on a refused row can raise the chip. A disabled Button emits no
+	# `pressed`, but it still receives gui_input — which is the same property the drag-to-scroll
+	# handler relies on to keep locked rows scrollable.
+	panel.gui_input.connect(_on_panel_gui_input.bind(locked))
 
 	# Content overlay: a full-rect margin (clearing the gold frame) holding the icon + text row. All
 	# of it ignores the mouse so the underlying button receives every tap.
@@ -421,17 +446,14 @@ func _make_game_panel(game_key: String, type_script: Script) -> Control:
 	# Right: name, cleared tier + earned contribution, and the next goal. In its own EXPAND_FILL column
 	# so the text fills the panel width beside the icon. Colors are cream/gold with a dark outline so
 	# they read over the green plate (Tim, 2026-07-22 contrast).
-	# A locked row carries a third line, so its lines sit 4px apart instead of 6 to keep the column
-	# comfortably inside the plate. The height arithmetic, using this project's font (measured line
-	# boxes: 57px at FONT_SUBHEAD 41, 45px at FONT_BODY 32):
-	#   unlocked, 2 lines: 57 + 45 + 6        = 108px
-	#   locked,   3 lines: 57 + 45 + 45 + 4+4 = 155px
-	# Both fit the 164px of clear plate inside the 8px border, so the third line never reaches the
-	# frame. The ROW height itself cannot move either way: it is pinned by the Button's
-	# custom_minimum_size of PANEL_HEIGHT, and a Button is not a Container — these overlay children
-	# are positioned by anchors and contribute nothing to the Button's minimum size.
+	# EVERY ROW IS TWO LINES NOW (Tim, 2026-08-08). Locked rows used to carry a third line saying why
+	# they were locked, which forced tighter line spacing and a taller row for a message that was on
+	# screen permanently to explain a state the grey plate already communicated. It moved to a chip
+	# that appears only when the player actually taps a locked row — the moment they are asking.
+	# Measured line boxes in this project's font: 57px at FONT_SUBHEAD 41, 45px at FONT_BODY 32, so
+	# 57 + 45 + 6 = 108px of text against 116px of clear space inside the pads.
 	var info := VBoxContainer.new()
-	info.add_theme_constant_override("separation", 4 if locked else 6)
+	info.add_theme_constant_override("separation", 6)
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	info.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -445,9 +467,6 @@ func _make_game_panel(game_key: String, type_script: Script) -> Control:
 			game_key, UiPalette.FONT_SUBHEAD, UiPalette.INK_NAVY, true, UiPalette.CREAM))
 		info.add_child(_make_info_label(
 			tier_text, UiPalette.FONT_BODY, UiPalette.NAVY, true, UiPalette.CREAM))
-		# The reason, at full body size — a locked row must say WHY, legibly, not in fine print.
-		info.add_child(_make_info_label(
-			LOCKED_REASON_TEXT, UiPalette.FONT_BODY, UiPalette.INK_NAVY, true, UiPalette.CREAM))
 	else:
 		info.add_child(_make_info_label(game_key, UiPalette.FONT_SUBHEAD, UiPalette.CREAM, true))
 		info.add_child(_make_info_label(tier_text, UiPalette.FONT_BODY, UiPalette.MUSTARD_GOLD, true))
@@ -609,14 +628,84 @@ func _on_back_pressed() -> void:
 ## The press reset lives HERE rather than on the Button's `button_down` signal (DevTuningPanel's
 ## wiring) for one reason: locked rows are DISABLED Buttons, and a disabled Button emits no
 ## button_down at all. Reading the press off the raw event instead keeps locked rows scrollable.
-func _on_panel_gui_input(event: InputEvent) -> void:
+func _on_panel_gui_input(event: InputEvent, locked: bool = false) -> void:
 	if event is InputEventScreenTouch and event.pressed:
 		_begin_drag_gesture()
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 		_begin_drag_gesture()
 		return
+
+	# A TAP ON A LOCKED ROW raises the reason chip. Read on RELEASE and only when the gesture never
+	# became a scroll, so swiping the list past a locked row does not fire it — the same rule the
+	# unlocked rows use to decide whether a press was a tap or a scroll.
+	#
+	# This is the only feedback a locked row gives, so it has to be the tap that produces it: the
+	# Button is disabled, which means no press animation, no `pressed` signal, and otherwise nothing
+	# at all happens when the player prods it.
+	var released: bool = (event is InputEventScreenTouch and not event.pressed) \
+			or (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT \
+				and not event.pressed)
+	if locked and released and not _drag_moved:
+		_show_locked_chip()
+		return
+
 	_pan_scroll_on_drag(event)
+
+
+## Build the locked-reason chip: a cream plate that appears near the bottom of the card when a
+## locked row is tapped, then fades.
+##
+## Anchored to the SCREEN rather than to the row that was tapped. A chip pinned to the row would
+## have to dodge the list's scrolling and the edge fade, and it would sit wherever the finger
+## already is — under it, on a phone. Bottom-centre is unobstructed, is where the eye goes after a
+## refused tap, and is the same place for every row, so it reads as the screen answering rather than
+## as a per-row annotation.
+func _build_locked_chip() -> void:
+	_locked_chip = PanelContainer.new()
+	_locked_chip.add_theme_stylebox_override("panel", UiPalette.make_panel_style())
+	_locked_chip.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	_locked_chip.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_locked_chip.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_locked_chip.offset_bottom = -LOCKED_CHIP_BOTTOM_GAP
+	_locked_chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_locked_chip.visible = false
+	add_child(_locked_chip)
+
+	var label := Label.new()
+	label.text = LOCKED_REASON_TEXT
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
+	label.add_theme_font_override("font", UiPalette.make_bold_font())
+	label.add_theme_color_override("font_color", UiPalette.NAVY)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_locked_chip.add_child(label)
+
+
+## Raise the chip. Re-tapping restarts it rather than stacking, so a player prodding several locked
+## rows sees one steady message instead of a flicker.
+func _show_locked_chip() -> void:
+	if _locked_chip == null:
+		return
+	_locked_chip.visible = true
+	_locked_chip.modulate.a = 1.0
+	_locked_chip_seconds = LOCKED_CHIP_SECONDS
+	set_process(true)
+
+
+func _process(delta: float) -> void:
+	if _locked_chip_seconds <= 0.0:
+		set_process(false)
+		return
+	_locked_chip_seconds -= delta
+	if _locked_chip_seconds <= 0.0:
+		_locked_chip.visible = false
+		_locked_chip.modulate.a = 1.0
+		set_process(false)
+		return
+	# Hold, then fade over the last stretch — a chip that starts fading immediately reads as though
+	# it is already leaving before it has been read.
+	_locked_chip.modulate.a = minf(1.0, _locked_chip_seconds / LOCKED_CHIP_FADE_SECONDS)
 
 
 ## Start tracking a fresh press gesture, before any travel.

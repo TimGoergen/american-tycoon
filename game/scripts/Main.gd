@@ -236,6 +236,9 @@ var _settings_page: Control
 ## refreshed every frame alongside the gated nav tabs — Challenge Mode is unavailable until the
 ## first succession (Plans/Challenge_Mode_Gating.md, Roadmap §5).
 var _challenges_button: Button
+## The gamepad drawn on it — an overlay rather than the Button's own icon, so it can sit centred in
+## the gap left of the label. See _ensure_challenges_icon.
+var _challenges_icon: TextureRect
 
 ## Red-dot badge on the Estate tab button: shown when the current run has earned claimable
 ## Legacy (a succession right now would yield ≥1), and cleared the moment the player opens
@@ -2257,11 +2260,53 @@ const CHALLENGES_LOCKED_FONT := 30
 ## play rather than to a screen of numbers, so it is the one that earns a picture.
 const CHALLENGES_ICON := preload("res://art/icons/gamepad.svg")
 
-## How wide the gamepad is allowed to draw. The unlocked label "CHALLENGES" measures 319px at
-## TUNING_BUTTON_FONT against ~484px of usable button width, so 64px plus the icon/text gap sits
-## comfortably inside. The LOCKED state gets no icon at all: its two-line explainer already uses
-## the full width (see CHALLENGES_LOCKED_FONT), and there is simply nowhere to put one.
-const CHALLENGES_ICON_WIDTH := 64
+## How wide the gamepad draws. 64 → 76 (Tim, 2026-08-08: "a little bigger"). The unlocked label
+## "CHALLENGES" measures 319px at TUNING_BUTTON_FONT against ~484px of usable button width, so the
+## icon still sits inside the gap it is centred in. The LOCKED state gets no icon at all: its
+## two-line explainer already uses the full width (see CHALLENGES_LOCKED_FONT).
+const CHALLENGES_ICON_WIDTH := 76
+
+
+## Build the gamepad overlay on the CHALLENGES button, once.
+##
+## AN OVERLAY, NOT `Button.icon`, because Tim asked for the icon to sit centred between the button's
+## left edge and its text (2026-08-08) and a Button cannot place it there: `icon_alignment` offers
+## the left edge, the centre, or beside the text — never the middle of the gap. So the icon is a
+## child positioned by hand, and the Button keeps only its centred label.
+func _ensure_challenges_icon() -> void:
+	if _challenges_icon != null or _challenges_button == null:
+		return
+	_challenges_icon = TextureRect.new()
+	_challenges_icon.texture = CHALLENGES_ICON
+	_challenges_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_challenges_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_challenges_icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	_challenges_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_challenges_button.add_child(_challenges_icon)
+	# The button's width is not known until the settings tab lays out, and the midpoint depends on
+	# it — so recompute whenever the box changes rather than only when the label does.
+	_challenges_button.resized.connect(_position_challenges_icon)
+
+
+## Centre the gamepad in the space to the LEFT of the label.
+##
+## The label is centred in the button, so its left edge sits at (width − text width) / 2, and the
+## midpoint of the gap before it is half of that. Measuring the string is what makes this exact:
+## the gap changes with the label, and guessing a fixed inset would drift the moment the text or
+## its font size did.
+func _position_challenges_icon() -> void:
+	if _challenges_icon == null or _challenges_button == null:
+		return
+	var button_width := _challenges_button.size.x
+	if button_width <= 0.0:
+		return  # not laid out yet; the resized signal will bring us back
+	var text_width: float = UiPalette.make_bold_font().get_string_size(
+		_challenges_button.text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, TUNING_BUTTON_FONT).x
+	var gap_centre := maxf(0.0, (button_width - text_width) * 0.5) * 0.5
+	_challenges_icon.size = Vector2(CHALLENGES_ICON_WIDTH, CHALLENGES_ICON_WIDTH)
+	_challenges_icon.position = Vector2(
+		gap_centre - CHALLENGES_ICON_WIDTH * 0.5,
+		(_challenges_button.size.y - CHALLENGES_ICON_WIDTH) * 0.5)
 
 
 ## Keep the Settings tab's CHALLENGES button matching its unlock state. Challenge Mode opens only
@@ -2279,13 +2324,15 @@ func _refresh_challenges_button() -> void:
 		# The gamepad rides alongside the one-line label. Not a moving-UI violation: the button
 		# keeps its exact size and place either way (fixed height, EXPAND_FILL width) — only what
 		# is printed on it changes, the same way the locked reason line comes and goes.
-		_challenges_button.icon = CHALLENGES_ICON
-		_challenges_button.add_theme_constant_override("icon_max_width", CHALLENGES_ICON_WIDTH)
+		_ensure_challenges_icon()
+		_challenges_icon.visible = true
+		_position_challenges_icon()
 	else:
 		_challenges_button.text = "CHALLENGES\nAFTER YOUR FIRST SUCCESSION"
 		_challenges_button.add_theme_font_size_override("font_size", CHALLENGES_LOCKED_FONT)
 		# No icon while locked — the two-line explainer needs every pixel of the width.
-		_challenges_button.icon = null
+		if _challenges_icon != null:
+			_challenges_icon.visible = false
 
 
 ## Give a settings button a real GRAY disabled plate. UiPalette.style_button registers a CREAM

@@ -63,6 +63,7 @@ func _run() -> void:
 	await _test_owned_push_before_ready_shows_button(bar_script, tuning)
 	await _test_untold_bar_starts_hidden(bar_script, tuning)
 	await _test_purchase_pulse(bar_script, tuning)
+	await _test_expands_while_running(bar_script, tuning)
 
 	print("")
 	if _failures == 0:
@@ -152,7 +153,12 @@ func _test_untold_bar_starts_hidden(bar_script: GDScript, tuning: TuningConfig) 
 func _test_purchase_pulse(bar_script: GDScript, tuning: TuningConfig) -> void:
 	print("\n3. The AUTO-BUY button flares on a purchase and returns to rest")
 
-	var bar: Control = await _mount_bar(bar_script, tuning, true, true, true)
+	# Mounted OWNED but SWITCHED OFF, so the button is at its collapsed, declared width. Switched on
+	# it expands to fill the row (SIZE_EXPAND_FILL), and its width becomes whatever the layout
+	# hands it — which would make the "scale, not size" assertion below meaningless. The pulse
+	# itself does not care: flash_auto_purchase only requires the button to be VISIBLE, and an
+	# owned desk's button is visible whether the mode is running or not.
+	var bar: Control = await _mount_bar(bar_script, tuning, true, true, false)
 	var button: Button = bar.get_auto_purchase_button()
 	if button == null:
 		_check("the owned button exists (pulse cannot be tested without it)", false)
@@ -169,8 +175,13 @@ func _test_purchase_pulse(bar_script: GDScript, tuning: TuningConfig) -> void:
 	_check("a purchase also swells the button", button.scale.x > 1.0)
 	# The swell must be SCALE, never size: this button shares an HBoxContainer with the meter, so a
 	# real size change would re-run the layout and shove the meter sideways on every purchase.
+	#
+	# Compared against the bar's OWN declared width rather than a literal. This assertion used to
+	# hardcode 210 and failed the day the button was widened to 244 — a true statement about a
+	# stale number, which is the least useful kind of test failure.
+	var declared_width: float = float(bar_script.get_script_constant_map()["AUTO_PURCHASE_WIDTH"])
 	_check("the swell leaves the layout box untouched (scale, not size)",
-		is_equal_approx(button.size.x, 210.0))
+		is_equal_approx(button.size.x, declared_width))
 	# Growing about the centre, not the top-left corner.
 	_check("it grows about its centre", button.pivot_offset.is_equal_approx(button.size * 0.5))
 
@@ -206,3 +217,53 @@ func _test_purchase_pulse(bar_script: GDScript, tuning: TuningConfig) -> void:
 	_check("...and never swells",
 		hidden_button != null and hidden_button.scale.is_equal_approx(Vector2.ONE))
 	hidden.queue_free()
+
+
+## The AUTO-BUY button takes over the row while the mode runs (Tim, 2026-08-07), covering the rush
+## instrument — honest, because the core refuses every rush while the desk is on, so what it covers
+## is dead space.
+##
+## Asserted on the LAYOUT CONTRACT (size flags, declared minimum, icon, face text) rather than on
+## pixel widths: this bar is mounted bare on the root with no parent sizing it, so measured widths
+## would describe the harness rather than the design.
+func _test_expands_while_running(bar_script: GDScript, tuning: TuningConfig) -> void:
+	print("\n4. The button expands across the row while the mode runs")
+
+	var declared_width: float = float(bar_script.get_script_constant_map()["AUTO_PURCHASE_WIDTH"])
+	var bar: Control = await _mount_bar(bar_script, tuning, true, true, false)
+	var button: Button = bar.get_auto_purchase_button()
+	if button == null:
+		_check("the owned button exists", false)
+		bar.queue_free()
+		return
+
+	# Collapsed: fixed width, left chevron, and it names itself.
+	_check("switched OFF it holds its declared width",
+		is_equal_approx(button.custom_minimum_size.x, declared_width))
+	_check("...does not compete for row space",
+		button.size_flags_horizontal == Control.SIZE_FILL)
+	_check("...and reads AUTO-BUY", button.text == "AUTO-BUY")
+	var collapsed_icon := button.icon
+
+	# Switched on with a known purchase count: it takes the row and reports what it is doing.
+	bar.set_auto_purchase_state(true, true, false, 5)
+	_check("switched ON it claims the leftover row width",
+		button.size_flags_horizontal == Control.SIZE_EXPAND_FILL)
+	_check("...and drops its fixed minimum so the meter can collapse",
+		is_equal_approx(button.custom_minimum_size.x, 0.0))
+	_check("...flips the chevron to point the other way", button.icon != collapsed_icon)
+	_check("...and reports the live purchase count", button.text == "BUYING ×5")
+
+	# Running but broke: the count gives way to the reason nothing is happening.
+	bar.set_auto_purchase_state(true, true, true, 5)
+	_check("running but unable to afford anything says so", button.text == "NOTHING TO BUY")
+
+	# And switching off puts the row back exactly as it was.
+	bar.set_auto_purchase_state(true, false, false, 5)
+	_check("switched off again it collapses back",
+		button.size_flags_horizontal == Control.SIZE_FILL
+			and is_equal_approx(button.custom_minimum_size.x, declared_width))
+	_check("...restores the original chevron", button.icon == collapsed_icon)
+	_check("...and reads AUTO-BUY again", button.text == "AUTO-BUY")
+
+	bar.queue_free()

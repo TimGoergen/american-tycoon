@@ -137,6 +137,10 @@ var _auto_purchase_enabled := false
 ## last-viewed-tab targeting would have been quietly buying cheap rungs somewhere else.
 var _auto_purchase_idle := false
 
+## Purchases the desk makes per round, pushed in by Main. Shown on the expanded button ("BUYING ×5")
+## so the mode reports what it is actually doing rather than merely that it is on.
+var _auto_purchase_quantity := 0
+
 ## Seconds left in the "the desk just bought something" pulse (0 = not pulsing). Counted down in
 ## _process, exactly the way PropertyRow fades its auto-purchase row marker — a countdown rather
 ## than a Tween so a purchase landing mid-pulse simply retriggers it, with no tween to kill and
@@ -314,6 +318,23 @@ const AUTO_PURCHASE_PULSE_PEAK := 3.0
 ## button, you simply cannot hit the transient halo.
 const AUTO_PURCHASE_PULSE_SCALE := 1.06
 
+## The OVR button's steam-burst glyph, replacing the word "OVR" (Tim, 2026-08-07). Drawn at 62 in a
+## 99px square button: comfortably inside the plate's 12px content margins, and below the art's
+## 128px native size so it downscales rather than blurring up.
+const OVERDRIVE_ICON := preload("res://art/icons/steam_burst.svg")
+const OVERDRIVE_ICON_SIZE := 62
+
+## The AUTO-BUY button's edge chevrons. LEFT while collapsed ("this expands leftwards"), RIGHT once
+## expanded ("this collapses back"). Same weight and size, so it reads as one control changing
+## direction rather than two different icons.
+const AUTO_PURCHASE_ARROW_COLLAPSED := preload("res://art/icons/arrow_left.svg")
+const AUTO_PURCHASE_ARROW_EXPANDED := preload("res://art/icons/arrow_right.svg")
+const AUTO_PURCHASE_ARROW_SIZE := 40
+
+## The AUTO-BUY button's resting width — slightly wider than the old 210 to carry the chevron
+## alongside its label (Tim, 2026-08-07).
+const AUTO_PURCHASE_WIDTH := 244
+
 ## The READY flash's peak alpha and fade time.
 const READY_FLASH_ALPHA := 0.75
 const READY_FLASH_FADE_SEC := 0.5
@@ -346,10 +367,12 @@ func set_dynasty(dynasty: DynastyState) -> void:
 ## The bar does not go looking for either fact itself: the core has no "auto-buy" concept — it just
 ## stops being fed `rushing = true` — so the reason has to be handed down from the screen that owns
 ## the toggle. Idempotent; calling it every frame with the same values is harmless.
-## `idle` is optional so existing callers and the sims keep working; only Main knows the economy
-## well enough to answer it.
-func set_auto_purchase_state(unlocked: bool, enabled: bool, idle: bool = false) -> void:
+## `idle` and `quantity` are optional so existing callers and the sims keep working; only Main knows
+## the economy and the upgrade levels well enough to answer them.
+func set_auto_purchase_state(unlocked: bool, enabled: bool, idle: bool = false,
+		quantity: int = 0) -> void:
 	_auto_purchase_idle = idle
+	_auto_purchase_quantity = quantity
 	_set_auto_purchase_state_inner(unlocked, enabled)
 
 
@@ -438,11 +461,19 @@ func _ready() -> void:
 	# once rather than having to explain itself the instant it appears. The red action plate
 	# (§8: red = spend/act) marks it as the opt-in gamble, apart from gold TURBO.
 	_overdrive_button = Button.new()
-	_overdrive_button.text = "OVR"
-	# FONT_HEADLINE, not FONT_BUTTON: three letters can afford to be huge, and the button is
-	# the meter row's one action so it should land at a glance (Tim's vision, §1b).
-	_overdrive_button.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
-	_overdrive_button.add_theme_font_override("font", UiPalette.make_bold_font())
+	# A STEAM BURST, not the letters "OVR" (Tim, 2026-08-07). The row reads faster as pictures:
+	# this button and TURBO beside it are now both square icon buttons of identical size, so the
+	# two "act" controls are a matched pair instead of one word and one glyph.
+	#
+	# `expand_icon` + `icon_max_width` is the same treatment the tab bar uses — a Button draws its
+	# icon at native size otherwise, with no way to scale it up.
+	_overdrive_button.icon = OVERDRIVE_ICON
+	_overdrive_button.expand_icon = true
+	_overdrive_button.add_theme_constant_override("icon_max_width", OVERDRIVE_ICON_SIZE)
+	_overdrive_button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# Mipmapped: the art is 128px native and draws around 62, and an unfiltered 2x downscale
+	# aliases (the rule the tab icons and the gamepad already follow).
+	_overdrive_button.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	UiPalette.style_button(_overdrive_button, true)
 	# When overdrive can't engage (no live rush hold, or locked out) the button grays its
 	# OUTLINE too, exactly like the frenzy pop button — "can't trigger" must read at a glance
@@ -454,9 +485,10 @@ func _ready() -> void:
 	disabled_plate.set_corner_radius_all(4)
 	disabled_plate.set_content_margin_all(12)
 	_overdrive_button.add_theme_stylebox_override("disabled", disabled_plate)
-	# Fill the row's height (the meter's 0.7 × standard-button height) rather than forcing the
-	# whole momentum row taller than the meter; the minimum WIDTH keeps the tap target generous
-	# now that the label is only three letters.
+	# SQUARE, and identical to the TURBO pop button beside it (both STANDARD_BUTTON_HEIGHT wide) —
+	# Tim's "as narrow as possible while still fully containing all labels and icons". For an
+	# icon-only button that floor IS its own height, so square is the answer and the two act
+	# buttons match by construction rather than by a number kept in step by hand.
 	_overdrive_button.custom_minimum_size = Vector2(UiPalette.STANDARD_BUTTON_HEIGHT, 0)
 	_overdrive_button.size_flags_vertical = Control.SIZE_FILL
 	_overdrive_button.pressed.connect(func() -> void: overdrive_requested.emit())
@@ -543,21 +575,30 @@ func _ready() -> void:
 	# Left: the meter's name. White (Tim 2026-07-15) so it reads over the dark purple fill (the
 	# caption sits at the left edge, filled first as heat climbs).
 	var caption := Label.new()
-	caption.text = "RUSH MOMENTUM"
+	# "RUSH", not "RUSH MOMENTUM", and a size up (Tim, 2026-08-07). The bar is what it is called;
+	# the second word was doing no work and was crowding the readout beside it. Growing the NAME
+	# while shrinking the NUMBER below is deliberate — it reverses the old hierarchy, which shouted
+	# a percentage at the player and whispered what the percentage was for.
+	caption.text = "RUSH"
 	caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	caption.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
+	caption.add_theme_font_size_override("font_size", UiPalette.FONT_CARD_BODY)
 	caption.add_theme_font_override("font", UiPalette.make_bold_font())
 	caption.add_theme_color_override("font_color", Color.WHITE)
 	caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(caption)
 
-	# Right: the live bonus, large and bold. Takes the remaining width and right-aligns so it hugs
-	# the frame's right edge while the caption stays pinned left.
+	# Right: the live bonus. Takes the remaining width and right-aligns so it hugs the frame's right
+	# edge — which is exactly where the AUTO-BUY button begins — while the caption stays pinned left.
+	#
+	# FONT_LABEL (28), down from FONT_HEADLINE (52), at Tim's request: "almost as small as the
+	# status text". NOTE this slot is shared — the same label carries OVERHEATED, COOLING and the
+	# cruise readout, so those all shrink with it. That is the intended trade: the row now reads as
+	# a named bar with a small figure on it, rather than a giant number with a caption attached.
 	_label = Label.new()
 	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_label.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
+	_label.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
 	_label.add_theme_font_override("font", UiPalette.make_bold_font())
 	_label.add_theme_color_override("font_color", Color.WHITE)
 	_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -673,6 +714,15 @@ func _ready() -> void:
 func _build_auto_purchase_button() -> void:
 	_auto_purchase_button = Button.new()
 	_auto_purchase_button.text = "AUTO-BUY"
+	# Chevron pinned to the LEFT edge, label right-aligned against the opposite edge (Tim,
+	# 2026-08-07). The gap between them is the point: it is what makes the button look like a panel
+	# that can open, rather than a label with a picture next to it.
+	_auto_purchase_button.icon = AUTO_PURCHASE_ARROW_COLLAPSED
+	_auto_purchase_button.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_auto_purchase_button.alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_auto_purchase_button.expand_icon = true
+	_auto_purchase_button.add_theme_constant_override("icon_max_width", AUTO_PURCHASE_ARROW_SIZE)
+	_auto_purchase_button.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	# FONT_BUTTON, not OVR's FONT_HEADLINE: three letters can afford to be huge, eight cannot
 	# without either shrinking the meter or wrapping. This is still the standard action-button size,
 	# well above the readability floor (§1b).
@@ -701,7 +751,7 @@ func _build_auto_purchase_button() -> void:
 	# Fixed width so the button NEVER resizes between its ON and OFF states and never expands into
 	# the meter: 210px comfortably fits "AUTO-BUY" at FONT_BUTTON bold plus the plate's 12px content
 	# margins, with slack for the font's hinting. Height fills the row like OVR does.
-	_auto_purchase_button.custom_minimum_size = Vector2(210, 0)
+	_auto_purchase_button.custom_minimum_size = Vector2(AUTO_PURCHASE_WIDTH, 0)
 	_auto_purchase_button.size_flags_vertical = Control.SIZE_FILL
 	_auto_purchase_button.pressed.connect(
 			func() -> void: auto_purchase_toggle_requested.emit())
@@ -740,8 +790,18 @@ func _make_auto_plate(bg: Color, border: Color, border_width: int) -> StyleBoxFl
 	return plate
 
 
-## Paint the AUTO-BUY button. Once the track is owned the button is a permanent fixture whose FACE
-## TEXT and SIZE never change — only the plate and the label color flip between OFF and ON.
+## Paint the AUTO-BUY button.
+##
+## IT NOW CHANGES SIZE (Tim, 2026-08-07). Switched ON, the button takes the whole row apart from the
+## OVR square, covering the meter; switched OFF it collapses back to its own width. That is a
+## deliberate, requested piece of moving UI, and it is honest rather than decorative: while the mode
+## runs the core refuses every rush, so the rush instrument underneath is dead space. The button
+## covering it says so more plainly than any label could.
+##
+## Mechanically the growth is a SIZE-FLAG swap, not an animation or a computed width: expanded, the
+## button takes SIZE_EXPAND_FILL and the meter drops to SIZE_FILL at zero minimum, so the HBox hands
+## the button everything the OVR square and the two 8px separations do not need. That lands at ~88%
+## of the row, and it cannot overflow the way a hardcoded "90% of width" could.
 ##
 ## DELIBERATE EXCEPTION TO THE NO-MOVING-UI RULE (Tim, decided 2026-08-01, having been shown that
 ## it breaks his own standing "never hide/show controls — gray them in place" rule; see
@@ -769,6 +829,8 @@ func _apply_auto_purchase_look(unlocked: bool, enabled: bool) -> void:
 	if not unlocked:
 		return
 
+	_apply_auto_purchase_expansion(enabled)
+
 	var plate := _auto_plate_on if enabled else _auto_plate_off
 	var label_color := UiPalette.MUSTARD_GOLD if enabled else UiPalette.NAVY
 	# All three interactive plates share the one look: this is a state indicator first and a button
@@ -782,6 +844,42 @@ func _apply_auto_purchase_look(unlocked: bool, enabled: bool) -> void:
 	_auto_purchase_button.tooltip_text = \
 			"Auto-buy is ON — properties buy themselves, but rush is unavailable." if enabled \
 			else "Auto-buy is OFF — tap to let properties buy themselves (rush turns off)."
+
+
+## Grow the button across the row while the mode runs, and collapse it back when it stops.
+##
+## The meter is left VISIBLE with a zero minimum rather than hidden: an HBoxContainer gives a hidden
+## child no space at all, but it also stops laying it out, and the chip stack is anchored to the
+## meter. Squeezing it to zero keeps that anchoring valid and means one flag flips back and the row
+## is exactly as it was.
+func _apply_auto_purchase_expansion(expanded: bool) -> void:
+	if _auto_purchase_button == null or _meter == null:
+		return
+	if expanded:
+		_meter.size_flags_horizontal = Control.SIZE_FILL
+		_meter.custom_minimum_size.x = 0.0
+		_auto_purchase_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_auto_purchase_button.custom_minimum_size.x = 0.0
+		_auto_purchase_button.icon = AUTO_PURCHASE_ARROW_EXPANDED
+	else:
+		_meter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_auto_purchase_button.size_flags_horizontal = Control.SIZE_FILL
+		_auto_purchase_button.custom_minimum_size.x = AUTO_PURCHASE_WIDTH
+		_auto_purchase_button.icon = AUTO_PURCHASE_ARROW_COLLAPSED
+	_auto_purchase_button.text = _auto_purchase_face_text(expanded)
+
+
+## What the button says. Collapsed it names itself; expanded it reports what the desk is DOING —
+## the count it buys per round, or that it cannot buy at all. The expanded button has the width to
+## carry a sentence, and a mode that spends money on its own should say what it is spending.
+func _auto_purchase_face_text(expanded: bool) -> String:
+	if not expanded:
+		return "AUTO-BUY"
+	if _auto_purchase_idle:
+		return "NOTHING TO BUY"
+	if _auto_purchase_quantity > 0:
+		return "BUYING ×%d" % _auto_purchase_quantity
+	return "AUTO-BUY ON"
 
 
 func _process(delta: float) -> void:

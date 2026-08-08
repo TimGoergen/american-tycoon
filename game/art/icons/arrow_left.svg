@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Left-pointing chevron for the AUTO-BUY button's collapsed state: the button is pinned to the
+       right of its row, so a left arrow reads as "this expands leftwards". Its right-pointing twin
+       (arrow_right.svg) marks the expanded state, where the same edge would collapse back.
+       Drawn at 128 rather than the 48 of arrow_up/arrow_down so it downscales cleanly into the
+       button without needing a custom svg/scale in the .import. -->
+  <path d="M78 20 L86 28 L50 64 L86 100 L78 108 L34 64 Z"
+        fill="#1D2D50" stroke="#1D2D50" stroke-width="6" stroke-linejoin="round"/>
+</svg>

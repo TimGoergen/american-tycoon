@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- OVERDRIVE reads as a pressure release: a billowing puff with two smaller ones breaking away
+       from it. Built as TWO STACKED LAYERS rather than stroked shapes — a navy layer of slightly
+       larger circles behind a cream layer of the same centres — so the outline traces the union of
+       the cloud instead of every circle's own edge. Stroking each circle would draw seams through
+       the middle of the billow, which is what killed the first attempt.
+       No red: tapering jets under the cloud read as legs at icon size, not as steam. -->
+
+  <!-- Outline layer (navy, +5px on every radius). -->
+  <g fill="#1D2D50">
+    <circle cx="46" cy="76" r="27"/>
+    <circle cx="84" cy="72" r="29"/>
+    <circle cx="64" cy="50" r="25"/>
+    <circle cx="102" cy="34" r="14"/>
+    <circle cx="28" cy="36" r="11"/>
+  </g>
+
+  <!-- Fill layer (cream), same centres. -->
+  <g fill="#F4ECD8">
+    <circle cx="46" cy="76" r="22"/>
+    <circle cx="84" cy="72" r="24"/>
+    <circle cx="64" cy="50" r="20"/>
+  </g>
+
+  <!-- The two breakaway puffs stay a shade cooler, so they read as trailing wisps rather than as
+       part of the main billow. -->
+  <g fill="#C7CBD1">
+    <circle cx="102" cy="34" r="9"/>
+    <circle cx="28" cy="36" r="6"/>
+  </g>
+
+  <!-- NO HIGHLIGHT. A lighter cap across the top of the billow was tried and it drew a hard
+       horizontal seam through the cloud at icon size — it read as a crack, not as light. The flat
+       cream against the navy outline carries the shape on its own. -->
+  <circle cx="54" cy="62" r="9" fill="#FFFFFF" opacity="0.35"/>
+</svg>

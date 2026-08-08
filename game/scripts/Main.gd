@@ -158,6 +158,11 @@ const MODE_ICON_VISIBLE_HEIGHT := 50.0
 const BUY_MODE_ICON_BOX := int(MODE_ICON_VISIBLE_HEIGHT * 324.0 / 279.0)   # 58
 const HIRE_MODE_ICON_BOX := int(MODE_ICON_VISIBLE_HEIGHT * 96.0 / 86.0)    # 55
 
+## Fixed width of the BUY and HIRE toggles (Tim, 2026-08-07 — "less wide, with moderately small
+## margins"). Derived, not chosen: the widest caption is "+ <icon> NEXT" at 199px measured at
+## FONT_SUBHEAD, plus the plate's 12px content margin a side = 223. See _make_mode_button.
+const MODE_BUTTON_WIDTH := 236
+
 # The screen-frame constants (bezel + universal content margin) live in UiPalette now, so the
 # Main screen and the full-screen overlays all frame identically (UiPalette.apply_screen_bezel
 # / make_screen_panel_style).
@@ -847,8 +852,9 @@ func _build_property_tab() -> Control:
 	_push_auto_purchase_state()
 
 	# Action row: the TURBO button (its background is the frenzy meter) plus the two global
-	# mode toggles, BUY and HIRE. TURBO stays the dominant control at twice either toggle's
-	# width; the toggles split the rest evenly.
+	# mode toggles, BUY and HIRE. The toggles are now FIXED at MODE_BUTTON_WIDTH (Tim, 2026-08-07),
+	# so TURBO is the row's only expanding child and simply takes everything they leave — it is
+	# still the dominant control, but by construction rather than by a ratio kept in balance.
 	var action_row := HBoxContainer.new()
 	action_row.add_theme_constant_override("separation", 10)
 	v.add_child(action_row)
@@ -857,8 +863,10 @@ func _build_property_tab() -> Control:
 	_frenzy_bar.setup(game.frenzy, tuning)
 	_frenzy_bar.pop_requested.connect(_on_pop_requested)
 	_frenzy_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	# TURBO 2.0 against 1.0 + 1.0: it keeps half the row and stays twice as wide as either
-	# toggle, which is the split that survived adding the third control (was 2.0 vs 1.0 alone).
+	# The stretch ratio is left at 2.0 but no longer decides anything: with both toggles fixed,
+	# TURBO is the only child competing for the leftover width, so a ratio has nothing to weigh
+	# against. Kept rather than deleted so the balance is already right if a second expanding
+	# control ever joins this row.
 	_frenzy_bar.size_flags_stretch_ratio = 2.0
 	action_row.add_child(_frenzy_bar)
 
@@ -2922,8 +2930,21 @@ func _currency_format_name(mode: int) -> String:
 ## the buy-mode toggle it takes a SecondaryTapButton, so a second finger can flip it mid-rush.
 func _make_mode_button(icon_path: String, icon_box: int) -> Array:
 	var b := Button.new()
-	b.custom_minimum_size = Vector2(0, UiPalette.STANDARD_BUTTON_HEIGHT)
-	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# SIZED TO ITS CAPTION, not stretched (Tim, 2026-08-07: the toggles should be "less wide", with
+	# moderately small margins). They used to be SIZE_EXPAND_FILL against TURBO's 2.0 ratio, which
+	# handed each of them about 265px — far more than the caption needs. Fixing the width gives the
+	# surplus to the frenzy meter, which actually uses it.
+	#
+	# The number is measured, not guessed: at FONT_SUBHEAD the widest caption is "+ <icon> NEXT" —
+	# "+" 24 + gap 6 + icon 58 + gap 6 + "NEXT" 105 = 199, plus the plate's 12px content margin a
+	# side = 223. MODE_BUTTON_WIDTH rounds that up to leave a small, even margin. Both toggles share
+	# it so they stay visually identical even though the HIRE icon is 3px narrower.
+	#
+	# A FIXED width also protects the row from the mode cycling: the reason the buy caption reads
+	# "NEXT" and not "NEXT TIER" was that a longer caption shifted the layout as modes changed
+	# (Tim, 2026-07-07). Sized for the widest caption, nothing moves whatever the mode says.
+	b.custom_minimum_size = Vector2(MODE_BUTTON_WIDTH, UiPalette.STANDARD_BUTTON_HEIGHT)
+	b.size_flags_horizontal = Control.SIZE_FILL
 	b.text = ""  # the visible caption is the overlay below, not the Button's own string
 	UiPalette.style_button(b, false)
 	# The locked plate grays the OUTLINE too, not just the fill — the same treatment the TURBO pop
@@ -3151,7 +3172,11 @@ func _push_auto_purchase_state() -> void:
 	_auto_purchase_unlocked_shown = unlocked
 	_auto_purchase_enabled_shown = enabled
 	_auto_purchase_idle_shown = idle
-	_momentum_bar.set_auto_purchase_state(unlocked, enabled, idle)
+	# Quantity rides along so the expanded button can report "BUYING ×N" rather than merely that
+	# the mode is on. Not part of the memo above: it only changes when an upgrade is bought, which
+	# always changes `unlocked` or comes through _on_upgrade_purchased's own re-push.
+	_momentum_bar.set_auto_purchase_state(unlocked, enabled, idle,
+			dynasty.upgrades.auto_purchase_quantity())
 	# The PROPERTY ROWS are deliberately left alone — no portrait dim.
 	#
 	# It is tempting to reuse the overheat lockout's uniform dim here, but that dim is

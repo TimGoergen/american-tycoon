@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="padBody" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#2C4272"/>
+      <stop offset="100%" stop-color="#16223D"/>
+    </linearGradient>
+    <linearGradient id="padGold" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#F0D49A"/>
+      <stop offset="100%" stop-color="#E3B23C"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Controller body: a wide waisted slab with two grips dropping from the ends. Drawn as one
+       path so the outline reads as a single silhouette at small sizes. -->
+  <path d="M34 40
+           L94 40
+           A26 26 0 0 1 120 66
+           L120 74
+           A18 18 0 0 1 102 92
+           A14 14 0 0 1 90 85
+           L84 74
+           L44 74
+           L38 85
+           A14 14 0 0 1 26 92
+           A18 18 0 0 1 8 74
+           L8 66
+           A26 26 0 0 1 34 40 Z"
+        fill="url(#padBody)" stroke="#0D1830" stroke-width="5" stroke-linejoin="round"/>
+
+  <!-- Top highlight: a soft cream sheen across the shoulder, the same trick the other icons use
+       to keep a flat fill from reading as a dead shape. -->
+  <path d="M36 46 L92 46 A20 20 0 0 1 110 58 L18 58 A20 20 0 0 1 36 46 Z"
+        fill="#F4ECD8" opacity="0.16"/>
+
+  <!-- D-pad, left. Cream cross on the navy body for maximum contrast at icon size. -->
+  <path d="M30 52 L44 52 L44 60 L52 60 L52 74 L44 74 L44 82 L30 82 L30 74 L22 74 L22 60 L30 60 Z"
+        fill="#F4ECD8" stroke="#0D1830" stroke-width="3.5" stroke-linejoin="round"/>
+
+  <!-- Face buttons, right: a diamond of four. Gold pair on the diagonal, red pair to break the
+       monotone the way the ketchup accent does elsewhere. -->
+  <circle cx="94" cy="55" r="8" fill="url(#padGold)" stroke="#8A5A12" stroke-width="3"/>
+  <circle cx="110" cy="68" r="8" fill="#B5402A" stroke="#5E1C10" stroke-width="3"/>
+  <circle cx="94" cy="81" r="8" fill="url(#padGold)" stroke="#8A5A12" stroke-width="3"/>
+  <circle cx="78" cy="68" r="8" fill="#B5402A" stroke="#5E1C10" stroke-width="3"/>
+
+  <!-- Centre detail: a small gold bar, reading as the select/start strip. -->
+  <rect x="59" y="60" width="10" height="5" rx="2.5" fill="#E3B23C" stroke="#8A5A12" stroke-width="2"/>
+</svg>

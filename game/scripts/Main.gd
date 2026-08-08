@@ -232,6 +232,17 @@ var _currency_format_markers: Array[Label] = []
 ## The Settings tab's normal page — hidden while the embedded Balance Tuning panel
 ## (_dev_panel) is swapped into the tab's slot, restored on its Close.
 var _settings_page: Control
+## The Settings tab's CHALLENGES button. Kept as a member so its locked/unlocked state can be
+## refreshed every frame alongside the gated nav tabs — Challenge Mode is unavailable until the
+## first succession (Plans/Challenge_Mode_Gating.md, Roadmap §5).
+var _challenges_button: Button
+## The gamepad drawn on it — an overlay rather than the Button's own icon, so it can sit centred in
+## the gap left of the label. See _ensure_challenges_icon.
+var _challenges_icon: TextureRect
+
+## The unlocked CHALLENGES label, drawn as an overlay rather than as the Button's own text so it can
+## sit right of centre with the gamepad centred in the gap beside it. See _ensure_challenges_icon.
+var _challenges_label: Label
 
 ## Red-dot badge on the Estate tab button: shown when the current run has earned claimable
 ## Legacy (a succession right now would yield ≥1), and cleared the moment the player opens
@@ -820,6 +831,9 @@ func _build_ui() -> void:
 	_minigame_screen.setup(tuning)
 	_minigame_screen.finished.connect(_on_minigame_finished)
 	_minigame_screen.legacy_bonus_earned.connect(_on_legacy_bonus_earned)
+	# The screen reports which game a REAL transition dealt; the dynasty records it (the host has
+	# no dynasty handle by design — it reports, Main credits, exactly like challenge_finished).
+	_minigame_screen.minigame_met.connect(_on_minigame_met)
 	add_child(_minigame_screen)
 
 	# The Minigame Tuning review screen (Settings): a full-screen list that opens any minigame
@@ -1743,8 +1757,9 @@ func _build_settings_tab() -> Control:
 
 	# Bottom-of-screen tuning buttons: 40% taller than the standard button, with a label
 	# large enough to fill that extra height (Tim, 2026-06-26).
+	# (TUNING_BUTTON_FONT is a class-level const — see next to CHALLENGES_LOCKED_FONT — because the
+	# CHALLENGES button's refresh, outside this function, restores it when the button unlocks.)
 	var tuning_button_height := int(UiPalette.STANDARD_BUTTON_HEIGHT * 1.4)
-	const TUNING_BUTTON_FONT := 50
 	var bottom_buttons := VBoxContainer.new()
 	bottom_buttons.add_theme_constant_override("separation", 16)
 	v.add_child(bottom_buttons)
@@ -1768,28 +1783,38 @@ func _build_settings_tab() -> Control:
 	bottom_buttons.add_child(
 		_make_settings_button("MINIGAME TUNING", tuning_button_height, TUNING_BUTTON_FONT, _on_minigame_tuning_pressed))
 
-	# CHALLENGES + STATS share a row, challenges first (Tim's order).
+	# CHALLENGES takes a WHOLE ROW of its own (Tim, 2026-08-08). It is the only player-facing entry
+	# among these six — the rest are dev tools and reference screens — and the full width is what lets
+	# it carry a gamepad big enough to read as a picture rather than as a bullet point. STATS moved
+	# down to join ABOUT and HELP, so this costs no extra row.
+	#
 	# Challenges opens the player-facing CHALLENGES screen (Plans/Challenge_Mode.md §3.4) — beat
 	# your best in each minigame for a permanent global income bonus. This is the real home for
 	# Challenge Mode; the CHALLENGE toggle under Minigame Tuning is now only a developer shortcut.
-	# Stats opens the Statistics modal (Best Vent Streak and other bloodline numbers, Tim 2026-07-20).
-	var challenge_stats_row := HBoxContainer.new()
-	challenge_stats_row.add_theme_constant_override("separation", 16)
-	challenge_stats_row.add_child(
-		_make_settings_button("CHALLENGES", tuning_button_height, TUNING_BUTTON_FONT, _on_challenges_pressed))
-	challenge_stats_row.add_child(
-		_make_settings_button("STATS", tuning_button_height, TUNING_BUTTON_FONT, _on_stats_pressed))
-	bottom_buttons.add_child(challenge_stats_row)
+	#
+	# CHALLENGES is gated until the first succession (Roadmap §5): it is kept in place and grayed,
+	# never hidden, with the reason printed on its own second line. _refresh_challenges_button below
+	# keeps that state current.
+	_challenges_button = _make_settings_button(
+		"CHALLENGES", tuning_button_height, TUNING_BUTTON_FONT, _on_challenges_pressed)
+	_style_locked_settings_button(_challenges_button)
+	_refresh_challenges_button()
+	bottom_buttons.add_child(_challenges_button)
 
-	# ABOUT + HELP share a row. About opens the logo/name/version/credits modal (Tim, 2026-07-09);
-	# Help opens the tutorial glossary + Replay action (Plans/Tutorial_Onboarding_Plan.md).
-	var about_help_row := HBoxContainer.new()
-	about_help_row.add_theme_constant_override("separation", 16)
-	about_help_row.add_child(
+	# STATS + ABOUT + HELP share the last row — three short labels across, which all three carry
+	# comfortably. Stats opens the Statistics modal (Best Vent Streak and other bloodline numbers,
+	# Tim 2026-07-20); About opens the logo/name/version/credits modal (Tim, 2026-07-09); Help opens
+	# the tutorial glossary + Replay action (Plans/Tutorial_Onboarding_Plan.md). STATS leads because
+	# it is the one of the three a player opens during a run.
+	var reference_row := HBoxContainer.new()
+	reference_row.add_theme_constant_override("separation", 16)
+	reference_row.add_child(
+		_make_settings_button("STATS", tuning_button_height, TUNING_BUTTON_FONT, _on_stats_pressed))
+	reference_row.add_child(
 		_make_settings_button("ABOUT", tuning_button_height, TUNING_BUTTON_FONT, _on_about_pressed))
-	about_help_row.add_child(
+	reference_row.add_child(
 		_make_settings_button("HELP", tuning_button_height, TUNING_BUTTON_FONT, _on_help_pressed))
-	bottom_buttons.add_child(about_help_row)
+	bottom_buttons.add_child(reference_row)
 
 	stack.add_child(v)
 	_settings_page = v
@@ -2220,6 +2245,158 @@ func _hire_control_of(row: PropertyRow) -> Control:
 func _refresh_locked_tabs() -> void:
 	_tab_buttons[TAB_ESTATE].disabled = not _estate_unlocked()
 	_tab_buttons[TAB_LEDGER].disabled = not _ledger_unlocked()
+	_refresh_challenges_button()
+
+
+## Font size (px) of the tall bottom-of-Settings entry buttons (BALANCE TUNING, CHALLENGES, HELP …),
+## large enough to fill their 40%-taller plate (Tim, 2026-06-26).
+const TUNING_BUTTON_FONT := 50
+
+## Font size (px) of the CHALLENGES button's label while it is LOCKED. Smaller than the unlocked
+## TUNING_BUTTON_FONT because the locked label is two lines: at the full size the pair would not
+## fit the button's fixed height and would grow the row, pushing the settings page's lower
+## content off the bottom (the tab is a plain VBox with no scroll).
+##
+## 32 -> 30 (2026-08-06): 32 fixed the HEIGHT but left the WIDTH ~9px short, against the ~484px a
+## HALF-row button offered. 30 -> 40 (2026-08-08): the button now takes a whole row, so width stopped
+## being the binding constraint — the longer line "AFTER YOUR FIRST SUCCESSION" needs only ~616px of
+## the ~960px available. HEIGHT binds instead: two lines at 40 stack ~100px inside a 138px plate.
+const CHALLENGES_LOCKED_FONT := 40
+
+## The gamepad on the CHALLENGES button (Tim, 2026-08-06) — the one Settings button that leads to
+## play rather than to a screen of numbers, so it is the one that earns a picture.
+const CHALLENGES_ICON := preload("res://art/icons/gamepad.svg")
+
+## The gamepad's OPAQUE region inside gamepad.svg's 128² canvas, measured with
+## get_image().get_used_rect(). The art is wide and short — 118×58, filling only 45% of the canvas
+## height — so drawing the whole texture into a box leaves most of that box as transparent air, and
+## an icon asked to "almost fill the button" would come out less than half the height requested.
+##
+## The region is CROPPED OUT with an AtlasTexture at build time so the box height IS the drawn
+## height. Hardcoded rather than measured at runtime: get_image() on an imported texture is not
+## dependable on device, and this art does not change without someone editing this line anyway.
+const CHALLENGES_ICON_REGION := Rect2(5, 37, 118, 58)
+
+## How far the gamepad stays clear of the button's top and bottom edges. 10 → 26 (Tim, 2026-08-08:
+## "smaller, to have a margin between it and the button edges"), which draws it 86px tall inside the
+## 138px plate. The inset sets the icon's HEIGHT; its width follows from the art's 118:58 aspect.
+const CHALLENGES_ICON_INSET := 26.0
+
+## The gap between the gamepad and the word beside it. Wide enough that they read as an icon AND a
+## label rather than as one run-together mark.
+const CHALLENGES_ICON_TEXT_GAP := 28.0
+
+
+## Build the gamepad AND the label overlay on the CHALLENGES button, once.
+##
+## OVERLAYS, NOT the Button's own `icon` and `text`, because neither can be placed where Tim asked
+## (2026-08-08): `icon_alignment` offers the left edge, the centre, or beside the text — never the
+## middle of the gap — and `alignment` offers left, centre or right, never "centred in the right
+## half". Both are therefore children positioned by hand in _layout_challenges_button.
+##
+## The button's own `text` is left EMPTY while unlocked so it cannot draw underneath the overlay. It
+## still carries the two-line explainer while LOCKED, where a plain centred label is exactly right
+## and no icon is shown.
+func _ensure_challenges_icon() -> void:
+	if _challenges_icon != null or _challenges_button == null:
+		return
+
+	_challenges_icon = TextureRect.new()
+	# Cropped to the art's opaque region so the box height is the height the gamepad actually draws.
+	var cropped := AtlasTexture.new()
+	cropped.atlas = CHALLENGES_ICON
+	cropped.region = CHALLENGES_ICON_REGION
+	_challenges_icon.texture = cropped
+	_challenges_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_challenges_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_challenges_icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	_challenges_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_challenges_button.add_child(_challenges_icon)
+
+	_challenges_label = Label.new()
+	_challenges_label.text = "CHALLENGES"
+	_challenges_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_challenges_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_challenges_label.add_theme_font_size_override("font_size", TUNING_BUTTON_FONT)
+	_challenges_label.add_theme_font_override("font", UiPalette.make_bold_font())
+	# NAVY matches what style_button gives these plates, and matching it is all the overlay has to
+	# do: that colour deliberately holds across hover/pressed/focus, so a fixed one cannot fall out
+	# of step with the button underneath it.
+	_challenges_label.add_theme_color_override("font_color", UiPalette.NAVY)
+	_challenges_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_challenges_button.add_child(_challenges_label)
+
+	# The button's width is not known until the settings tab lays out, and every position below
+	# depends on it — so recompute whenever the box changes rather than only when the label does.
+	_challenges_button.resized.connect(_layout_challenges_button)
+
+
+## Lay the gamepad and the word out as ONE centred group: [gamepad][gap][CHALLENGES], with the pair
+## together centred on the button (Tim, 2026-08-08).
+##
+## Centring the GROUP rather than either piece is what keeps the button looking balanced — centring
+## the text alone would push the icon off to one side and leave a lopsided plate. The group's width
+## comes from the measured string, so it stays right if the label or its font size ever changes.
+##
+## The gamepad is sized from the button's HEIGHT (less CHALLENGES_ICON_INSET top and bottom) and
+## takes whatever width its 118:58 aspect needs.
+func _layout_challenges_button() -> void:
+	if _challenges_icon == null or _challenges_button == null:
+		return
+	var button_size := _challenges_button.size
+	if button_size.x <= 0.0:
+		return  # not laid out yet; the resized signal will bring us back
+
+	var icon_height := button_size.y - CHALLENGES_ICON_INSET * 2.0
+	var icon_width := icon_height * (CHALLENGES_ICON_REGION.size.x / CHALLENGES_ICON_REGION.size.y)
+	var text_width: float = UiPalette.make_bold_font().get_string_size(
+		_challenges_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, TUNING_BUTTON_FONT).x
+
+	var group_width := icon_width + CHALLENGES_ICON_TEXT_GAP + text_width
+	var group_left := (button_size.x - group_width) * 0.5
+
+	_challenges_icon.size = Vector2(icon_width, icon_height)
+	_challenges_icon.position = Vector2(group_left, CHALLENGES_ICON_INSET)
+
+	_challenges_label.size = Vector2(text_width, button_size.y)
+	_challenges_label.position = Vector2(
+		group_left + icon_width + CHALLENGES_ICON_TEXT_GAP, 0.0)
+
+
+## Keep the Settings tab's CHALLENGES button matching its unlock state. Challenge Mode opens only
+## after the first succession (Roadmap §5) — the same signal the Family Ledger tab uses. Per the
+## no-moving-UI rule the button stays exactly where it is and grays in place, printing the reason
+## on a second line so it never depends on a tooltip (invisible on touch).
+func _refresh_challenges_button() -> void:
+	if _challenges_button == null:
+		return
+	var unlocked := _ledger_unlocked()
+	_challenges_button.disabled = not unlocked
+	if unlocked:
+		# EMPTY, because the overlay label draws the word instead — see _ensure_challenges_icon.
+		_challenges_button.text = ""
+		# The gamepad rides alongside the one-line label. Not a moving-UI violation: the button
+		# keeps its exact size and place either way (fixed height, EXPAND_FILL width) — only what
+		# is printed on it changes, the same way the locked reason line comes and goes.
+		_ensure_challenges_icon()
+		_challenges_icon.visible = true
+		_challenges_label.visible = true
+		_layout_challenges_button()
+	else:
+		_challenges_button.text = "CHALLENGES\nAFTER YOUR FIRST SUCCESSION"
+		_challenges_button.add_theme_font_size_override("font_size", CHALLENGES_LOCKED_FONT)
+		# Locked draws through the Button's own centred text, so both overlays step aside.
+		if _challenges_icon != null:
+			_challenges_icon.visible = false
+			_challenges_label.visible = false
+
+
+## Give a settings button a real GRAY disabled plate. UiPalette.style_button registers a CREAM
+## disabled plate, which still reads as a live control with merely faded text — the "unresponsive
+## live-looking button looks like a bug" failure. This is the same LIGHT_GRAY / MID_GRAY treatment
+## the locked nav tabs use (_style_tab_button), so every locked control in the game matches.
+func _style_locked_settings_button(button: Button) -> void:
+	button.add_theme_stylebox_override("disabled", UiPalette.make_unowned_panel_style())
 
 
 ## The Estate tab is available once the player can prestige (so "Plan the Estate", which lives in
@@ -2332,7 +2509,13 @@ func _on_stats_closed() -> void:
 
 ## Challenges pressed: open the player-facing CHALLENGES screen. It reads the bloodline's cleared
 ## tiers on open; the economy freezes while it (or a challenge run inside it) is up — see _process.
+##
+## Refuses outright before the first succession (Roadmap §5). The button is already grayed then, so
+## this is the belt-and-braces half: the core refuses and the UI grays, rather than the gate living
+## in only one of the two.
 func _on_challenges_pressed() -> void:
+	if not _ledger_unlocked():
+		return
 	_challenges_screen.open()
 
 
@@ -2368,6 +2551,19 @@ func _on_dev_reset_dynasty_requested() -> void:
 	# Tutorial progress also lives in its own user:// file (prestige-independent), so wipe it too
 	# to make onboarding re-testable from a clean state (Tim, 2026-07-23).
 	TutorialProgress.clear()
+	# MINIGAME ENCOUNTER PROGRESS NEEDS NO LINE HERE, and that is deliberate rather than an omission
+	# (Tim, 2026-08-08: "dev reset clears minigames progress").
+	#
+	# `met_minigames` — which games the bloodline has actually met, and so which Challenge Mode
+	# cabinets are unlocked — rides inside the DYNASTY SAVE, and the delete above takes the whole
+	# file. A fresh DynastyState starts with an empty set, so every cabinet re-locks. The two calls
+	# above exist only because those two live in their OWN user:// files and would otherwise survive.
+	#
+	# Plans/Challenge_Mode_Gating.md left this open and recommended NOT clearing it, "so Reset stays
+	# a scores/tips reset rather than quietly becoming a save wipe" — but Reset deletes the save on
+	# its first line, so it always was one. sim/ChallengeGoalsTest.gd pins the encounter set to the
+	# dynasty save, so moving it to a file of its own would break a test rather than silently make
+	# Reset stop clearing it.
 	get_tree().reload_current_scene()
 
 
@@ -2707,6 +2903,23 @@ func _on_legacy_bonus_earned(amount: int) -> void:
 	if amount <= 0:
 		return
 	dynasty.upgrades.grant_bonus(amount)
+	SaveManager.save_dict_to_file(dynasty.to_save_dict())
+
+
+## A real transition just dealt a minigame, so the bloodline has now MET it (Roadmap §8 /
+## Plans/Challenge_Mode_Gating.md). Recording it here unlocks that game on the CHALLENGES screen.
+##
+## Only genuine transitions reach this: MinigameScreen emits it from the random-deal branch of
+## start_game, so a REVIEW round (which passes an explicit type) does not count, and Challenge
+## Mode itself never enters start_game at all — it uses start_challenge. That last part is what
+## keeps the rule from being circular, and it holds by construction rather than by a check here.
+##
+## Saved immediately rather than waiting for the autosave: meeting a game is a permanent bloodline
+## record, and a transition is exactly the moment a player might background the app.
+func _on_minigame_met(game_key: String) -> void:
+	if dynasty.has_met_minigame(game_key):
+		return  # Already known — skip the save write entirely.
+	dynasty.note_minigame_met(game_key)
 	SaveManager.save_dict_to_file(dynasty.to_save_dict())
 
 

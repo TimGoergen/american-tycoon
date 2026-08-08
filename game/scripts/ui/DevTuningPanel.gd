@@ -173,6 +173,7 @@ const DESCRIPTIONS := {
 	"challenge_timer_start_seconds": "Challenge keep-alive run timer's starting seconds — a run begins with this on the clock and drains until scoring tops it up (Wave 2).",
 	"challenge_timer_cap_seconds": "Challenge keep-alive run timer's max seconds — top-ups never bank the clock past this (Wave 2).",
 	"challenge_miss_penalty_ratio": "Fraction of a hit's time-gain a MISS costs the keep-alive timer (0.5 = half): a dropped Catch coin / failed Timing lock drains this x what the hit would have added.",
+	"challenge_show_all_games": "1 shows every minigame on the CHALLENGES screen, ignoring which ones you have met (testing aid; display only — it never marks a game as met).",
 	"basketball_tier_base_cost": "Micro Basketball Challenge: baskets each tier costs for tiers 1-5 (the escalating cost's base). At 1, tier 5 = 5 baskets.",
 	"basketball_tier_cost_increment": "Micro Basketball Challenge: baskets added to each tier's cost every 5 tiers (escalating cost climbs).",
 	"basketball_tier_cost_cap": "Micro Basketball Challenge: the most baskets a single tier can cost (escalation caps here).",
@@ -702,6 +703,12 @@ func _pan_scroll_on_drag(event: InputEvent) -> void:
 	if event is InputEventScreenDrag:
 		delta_y = event.relative.y
 	elif event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT):
+		# Desktop only. Godot's emulate_mouse_from_touch (on by default) synthesises a mouse motion
+		# for EVERY InputEventScreenDrag, so on a phone this branch fired alongside the one above:
+		# the list panned at twice the speed of the finger and _drag_accum hit the 12px threshold
+		# after ~6px of real travel, making a tap read as a scroll far too easily.
+		if OS.has_feature("mobile"):
+			return
 		delta_y = event.relative.y
 	else:
 		return

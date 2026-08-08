@@ -569,6 +569,14 @@ extends Resource
 ## have added, so missing hurts proportionally to the hit it replaced. Plans/Challenge_Mode.md.
 @export var challenge_miss_penalty_ratio: float = 0.5  # feel-tune
 
+## 1 = the CHALLENGES screen shows EVERY minigame regardless of which ones the bloodline has met
+## at a transition; 0 = only the met ones (the shipped rule, Roadmap §8). A dev/testing switch: six
+## games are dealt at random, so reaching one specific game otherwise means replaying transitions
+## until it comes up. DISPLAY ONLY — it never writes to the met set, so turning it off restores the
+## real progress. A 0/1 float rather than a bool because the Balance Tuning panel only renders int
+## and float properties (same convention as carb_debug_overlay).
+@export var challenge_show_all_games: float = 0.0
+
 # --- Challenge Mode: the two low-ceiling games' ESCALATING per-tier cost (Plans/Challenge_Mode.md) ---
 # Micro Basketball (baskets sunk) and Memory Match (climbs completed) have a small get_score() ceiling,
 # so a flat STEP is a bad fit. Instead each tier costs min(base + floor((tier-1)/5) x increment, cap) in

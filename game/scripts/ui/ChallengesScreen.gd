@@ -18,6 +18,10 @@ extends ColorRect
 # it up to Main (which holds the dynasty, credits the tier, saves, and hands feedback back via
 # show_challenge_credit). All display numbers are read LIVE from the dynasty + ChallengeGoals on every
 # open() and after every credited run, so returning from a run shows the new tier at once.
+#
+# Only games the bloodline has actually MET at a transition can be played here (Plans/
+# Challenge_Mode_Gating.md Part B). A game you have not met still gets its row — grayed in place,
+# with the reason on it — so the list keeps reading as a trophy case rather than a shrinking menu.
 
 ## Emitted when the player closes the whole screen (◀ BACK). Main hides it (the game runs behind it).
 signal closed
@@ -36,9 +40,37 @@ const ICON_MEMORY := preload("res://art/icons/memory_pads.svg")
 const ICON_BALANCE := preload("res://art/icons/book.svg")
 const ICON_TIMING := preload("res://art/icons/lock.svg")
 
-## Height reserved for one game panel. Tall enough for the name + tier line beside the icon with
-## breathing room (low-vision rule). Six of these scroll if the card is short.
-const PANEL_HEIGHT := 180
+# --- The single BONUS row in the header (Tim, 2026-08-08). ---
+const BONUS_GEM_ICON := preload("res://art/icons/legacy_gem.svg")
+const BONUS_DOLLAR_ICON := preload("res://art/icons/dollar_bill.svg")
+
+## Gap between an icon and the amount beside it.
+const BONUS_ROW_GAP := 10
+
+## Both icon boxes are derived so the two icons DRAW THE SAME HEIGHT (48px) — the amounts sit at
+## FONT_HEADLINE, and an icon a touch shorter than the digits reads as their unit rather than as a
+## second number. The boxes differ because the art does:
+##
+##   legacy_gem.svg  — a 504² canvas whose opaque art fills only 422/504 of the height (0.837), so
+##                     the box must be 48 / 0.837 ≈ 58 to draw 48px of gem.
+##   dollar_bill.svg — 83×57 with NO transparent padding, so its box IS its aspect at 48 tall.
+##
+## Measured with get_image().get_used_rect(); guessing from canvas size would draw the gem ~16% short.
+##
+## Both boxes are then padded to the SAME 70px width. The gem only needs 58, but matching the widths
+## is what keeps BONUS exactly on the row's centre line: the two amounts split the slack evenly, so
+## the word only stays put if the ends are symmetric. The extra 12px is transparent air beside an
+## aspect-centred gem — it does not change how big the gem draws.
+const BONUS_GEM_BOX := Vector2(70, 58)
+const BONUS_DOLLAR_BOX := Vector2(70, 48)
+
+## Height reserved for one game panel. 180 → 160 (Tim, 2026-08-08), reclaiming the space the locked
+## rows' third line used to need.
+##
+## The ICON is now the binding constraint, not the text: every row is two lines again (57 + 45 + 6
+## separation = 108px), which needs 152 with the 22px vertical pads, while the 112px icon needs 156.
+## 160 leaves a little over that so the icon never touches the pad.
+const PANEL_HEIGHT := 160
 
 ## The game icon's square size on the left of each panel (was 132; 15% smaller per Tim, 2026-07-22).
 const ICON_SIZE := 112
@@ -50,9 +82,43 @@ const PANEL_GREEN_PRESSED := Color("#33702C")
 const PANEL_BORDER_WIDTH := 8
 const PANEL_CORNER_RADIUS := 26
 
+## The LOCKED plate (a game the bloodline has not met yet). Same shape as the live plate — same
+## corner radius, same border width — so only the COLOUR changes and the row keeps its place in the
+## list. The colours are the project's standing locked-control language, borrowed from the locked
+## tab treatment in Main.gd (LIGHT_GRAY fill, MID_GRAY border), so a locked challenge reads the same
+## way a locked tab does. A disabled Button draws ONLY its `disabled` stylebox, so without this the
+## panel would keep the live green plate while refusing taps — an unresponsive live-looking control,
+## which reads as a bug.
+const PANEL_LOCKED_FILL := UiPalette.LIGHT_GRAY
+const PANEL_LOCKED_BORDER := UiPalette.MID_GRAY
+
+## The reason a locked game cannot be played. Shown as a TEMPORARY CHIP when the player taps a
+## locked row (Tim, 2026-08-08), not as a permanent third line on every locked row.
+##
+## The grey plate already says "not available"; the third line spent a line of every locked row, on
+## every visit, answering a question the player only asks at the moment they try. A chip answers it
+## then and gets out of the way.
+const LOCKED_REASON_TEXT := "MEET THIS GAME AT A TRANSITION"
+
+## How long that chip stays up, and how much of that time it spends fading out. Long enough to read
+## a five-word line without being long enough to still be there on the next tap.
+const LOCKED_CHIP_SECONDS := 2.2
+const LOCKED_CHIP_FADE_SECONDS := 0.5
+## How far the chip sits above the bottom of the screen — clear of the BACK button below the card.
+const LOCKED_CHIP_BOTTOM_GAP := 190
+
+## How far a locked game's icon fades toward its gray plate. The Button's disabled state dims only
+## the Button's OWN icon/text; our icon is a separate child TextureRect, so it must be dimmed here.
+const LOCKED_ICON_ALPHA := 0.45
+
 ## Inner padding between the gold border and the panel content, so nothing touches the outline.
 const CONTENT_PAD_SIDE := 34
 const CONTENT_PAD_VERTICAL := 22
+
+## How far a finger must travel before a press on a game panel counts as a SCROLL rather than a TAP
+## (see the drag-to-scroll section at the bottom of this file). Matched to DevTuningPanel's own
+## threshold so the two button-tiled lists in the game feel the same under the thumb.
+const DRAG_SCROLL_THRESHOLD := 12.0
 
 ## The bloodline whose cleared tiers + income bonus are shown. Threaded in from Main (setup) before
 ## the first open(); read fresh on every refresh so the screen is never stale.
@@ -62,6 +128,18 @@ var _dynasty: DynastyState
 ## matched to its ChallengeGoals key by the type's display_name() — the same string ChallengeGoals
 ## and DynastyState key challenges by.
 var _type_scripts: Array = []
+
+## The balance-tuning knobs, kept so the list can read the `challenge_show_all_games` dev override
+## (see _show_all_games_override). Threaded in from Main via setup, like _dynasty. May be null if
+## anything ever builds this screen without calling setup, so every read goes through the helper.
+var _tuning: TuningConfig
+
+## Drag-to-scroll bookkeeping for the current press gesture (see the section at the bottom of this
+## file). _drag_accum is the total vertical travel so far; _drag_moved latches once that travel
+## passes DRAG_SCROLL_THRESHOLD, which is what tells _on_play_pressed the gesture was a scroll and
+## not a tap. Reset on every fresh press, including presses on LOCKED rows.
+var _drag_accum := 0.0
+var _drag_moved := false
 
 ## Our own minigame host for challenge play (mirrors MinigameReviewScreen's _player) — added as a
 ## child so a run never interferes with Main's prestige host. Built in setup (it needs the tuning).
@@ -73,7 +151,10 @@ var _backdrop: TextureRect
 var _baked_backdrop_size: Vector2 = Vector2.ZERO
 
 ## The prominent total-bonus readout in the header, refreshed with the rows so it always matches.
+## One row: [gem] _legacy_bonus_label ... _total_bonus_label ("BONUS") ... _income_bonus_label [$].
 var _total_bonus_label: Label
+var _legacy_bonus_label: Label
+var _income_bonus_label: Label
 
 ## The scroll holding the game panels, and the column inside it (rebuilt on each refresh so every
 ## tier/bonus is current). The scroll is kept so the edge fade can measure what it is clipping.
@@ -84,6 +165,11 @@ var _rows_column: VBoxContainer
 ## again on return, so the covered list doesn't keep drawing behind the opaque player.
 var _list_view: Control
 
+## The temporary "why is this locked" chip and its remaining time on screen. Built once and reused;
+## see _build_locked_chip.
+var _locked_chip: PanelContainer
+var _locked_chip_seconds := 0.0
+
 
 ## Hand the screen its data. Called once by Main at build time. Main calls this BEFORE add_child, so
 ## _player is added to this node before _ready runs and adds the backdrop + card — i.e. _player is NOT
@@ -92,6 +178,7 @@ var _list_view: Control
 func setup(dynasty: DynastyState, type_scripts: Array, tuning: TuningConfig) -> void:
 	_dynasty = dynasty
 	_type_scripts = type_scripts
+	_tuning = tuning
 
 	# Our own minigame host, set up exactly like MinigameReviewScreen's. Whether it lands above or
 	# below the backdrop/card depends on setup-vs-_ready ordering, so we swap by visibility, not z-order.
@@ -126,16 +213,20 @@ func _ready() -> void:
 
 	_list_view = _build_card()
 	add_child(_list_view)
+	# Added AFTER the card so it paints over the list rather than under it.
+	_build_locked_chip()
 
 
 ## Open the screen on its list (called by Main when the Settings CHALLENGES button is tapped).
 ## Refreshes first so the tiers/bonus are current, then shows the card (not the player).
 func open() -> void:
-	_refresh()
 	if _player != null:
 		_player.visible = false
+	# Same order as _return_to_list, and for the same reason: visible first, rows second, so the
+	# edge fade is computed against a laid-out ScrollContainer rather than a hidden one.
 	_show_list_chrome(true)
 	visible = true
+	_refresh()
 
 
 ## Show or hide the list-mode layers (the themed backdrop AND the card) together. Both are hidden
@@ -217,15 +308,40 @@ func _build_card() -> Control:
 
 	# The prominent running-totals readout — BOTH reward tracks, on two lines (e.g.
 	# "INCOME  +3.2%" / "LEGACY  +2.0%"), large and gold so they read as the headline reward.
+	# ONE ROW, BOTH TRACKS (Tim, 2026-08-08): [gem] legacy% ····· BONUS ····· income% [dollar].
+	#
+	# It replaces two stacked "INCOME +x% / LEGACY +y%" lines. Each currency is named by its own icon
+	# rather than by a word, which is what lets the pair fit on one line and read at a glance — the
+	# gem and the dollar bill are already the game's vocabulary for these two things, on the Estate
+	# wallet and on every property row. "BONUS" in the middle says what both numbers are.
+	var bonus_row := HBoxContainer.new()
+	bonus_row.add_theme_constant_override("separation", BONUS_ROW_GAP)
+	column.add_child(bonus_row)
+
+	bonus_row.add_child(_make_bonus_icon(BONUS_GEM_ICON, BONUS_GEM_BOX))
+	_legacy_bonus_label = _make_bonus_amount(HORIZONTAL_ALIGNMENT_LEFT)
+	bonus_row.add_child(_legacy_bonus_label)
+
+	# The word takes NO slack — the two amounts do, in equal shares (see _make_bonus_amount), which
+	# pins BONUS to the row's centre. Letting the word expand instead would work too, but then it
+	# would drift sideways every time one amount grew a digit and the other did not.
 	_total_bonus_label = Label.new()
+	_total_bonus_label.text = "BONUS"
 	_total_bonus_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_total_bonus_label.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
+	_total_bonus_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_total_bonus_label.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
 	_total_bonus_label.add_theme_font_override("font", UiPalette.make_bold_font())
-	_total_bonus_label.add_theme_color_override("font_color", UiPalette.DARK_GOLD)
-	column.add_child(_total_bonus_label)
+	_total_bonus_label.add_theme_color_override("font_color", UiPalette.NAVY)
+	bonus_row.add_child(_total_bonus_label)
+
+	_income_bonus_label = _make_bonus_amount(HORIZONTAL_ALIGNMENT_RIGHT)
+	bonus_row.add_child(_income_bonus_label)
+	bonus_row.add_child(_make_bonus_icon(BONUS_DOLLAR_ICON, BONUS_DOLLAR_BOX))
 
 	var explainer := Label.new()
-	explainer.text = "Tap a game to play. Beat your best to climb its tier ladder — every 5th tier pays a permanent bonus, income or Legacy."
+	# Two deliberate lines, so it does not autowrap into a ragged three. AUTOWRAP stays on as the
+	# safety net for a narrow device, where the second line would wrap rather than clip.
+	explainer.text = "Tap a game to play, beat your best to climb the tier ladder.\nEvery 5th tier pays a permanent bonus."
 	explainer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	explainer.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	explainer.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
@@ -254,6 +370,15 @@ func _build_card() -> Control:
 	_rows_column = VBoxContainer.new()
 	_rows_column.add_theme_constant_override("separation", 18)
 	_rows_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# RECOMPUTE THE FADE WHENEVER THE LIST ACTUALLY LAYS OUT, rather than guessing when that will
+	# be. `sort_children` fires the instant this VBox has positioned its children — which is the
+	# only moment the fade's arithmetic has valid geometry to work from.
+	#
+	# This replaces a deferred call that was a guess and got it wrong twice: rebuilt rows sit at
+	# position 0 until the container sorts, so a fade computed before that reads every row as being
+	# in the same place and hands out nonsense alphas (Tim, 2026-08-08 — the list came back empty
+	# after a run, then again after leaving and re-entering the screen).
+	_rows_column.sort_children.connect(_update_edge_fade)
 	_scroll.add_child(_rows_column)
 
 	return card
@@ -272,10 +397,22 @@ func _refresh() -> void:
 	# Both running totals, one per track, on two lines so each reward is legible on its own.
 	var income_pct := _dynasty.get_challenge_income_bonus() * 100.0
 	var legacy_pct := _dynasty.get_challenge_legacy_bonus() * 100.0
-	_total_bonus_label.text = "INCOME  +%.1f%%\nLEGACY  +%.1f%%" % [income_pct, legacy_pct]
+	_legacy_bonus_label.text = "+%.1f%%" % legacy_pct
+	_income_bonus_label.text = "+%.1f%%" % income_pct
 
 	for child in _rows_column.get_children():
+		# REMOVED IMMEDIATELY, not just queued. queue_free() leaves the old rows in the tree until
+		# the end of the frame, so the container sorts the OLD and NEW sets together and the fade
+		# fires against a list that is briefly twice as long as it should be. Orphaning them first
+		# makes the rebuild atomic; queue_free still does the actual freeing.
+		_rows_column.remove_child(child)
 		child.queue_free()
+
+	# A rebuilt list starts at the top. Without this the scroll keeps whatever offset the player
+	# left behind — which can be past the end of a shorter list, leaving them looking at blank space
+	# and concluding the games are missing.
+	if _scroll != null:
+		_scroll.scroll_vertical = 0
 
 	# One panel per game, keyed by the type's display_name() — the exact string ChallengeGoals and
 	# DynastyState use, so the panel's tier/bonus lookups line up with the catalog and the save.
@@ -289,6 +426,37 @@ func _refresh() -> void:
 	_update_edge_fade.call_deferred()
 
 
+## One currency icon for the BONUS row, in a fixed box sized so its VISIBLE art matches its partner's
+## (see BONUS_GEM_BOX). Mouse-ignored: the header is not tappable and should never eat a swipe.
+func _make_bonus_icon(texture: Texture2D, box: Vector2) -> TextureRect:
+	var icon := TextureRect.new()
+	icon.texture = texture
+	icon.custom_minimum_size = box
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	# LINEAR: both icons shrink a long way from their native size (the gem is 504px square).
+	icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return icon
+
+
+## One bonus amount, hugging the edge its icon is on. Text is filled in by _refresh.
+##
+## EXPAND_FILL on BOTH amounts, so the row's leftover width splits evenly between them and the word
+## between them cannot drift. Each label is wider than its number as a result; the alignment is what
+## pulls the digits back against their own icon.
+func _make_bonus_amount(alignment: int) -> Label:
+	var label := Label.new()
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.horizontal_alignment = alignment
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
+	label.add_theme_font_override("font", UiPalette.make_bold_font())
+	label.add_theme_color_override("font_color", UiPalette.DARK_GOLD)
+	return label
+
+
 ## Build one large, tappable game PANEL: the whole panel is the button (no separate PLAY). It wears the
 ## green plate, carries the game's icon on the left, and shows the name + earned tier/bonus + next goal.
 func _make_game_panel(game_key: String, type_script: Script) -> Control:
@@ -297,6 +465,13 @@ func _make_game_panel(game_key: String, type_script: Script) -> Control:
 	# panel just names the tier — no per-game bonus breakdown or next-goal line.
 	var cleared_tier := int(_dynasty.challenge_highest_tiers.get(game_key, 0))
 	var tier_text := "MAX TIER" if cleared_tier >= ChallengeGoals.MAX_TIER else "TIER %d" % cleared_tier
+
+	# Only games the bloodline has actually MET at a transition are playable here (Plans/
+	# Challenge_Mode_Gating.md Part B). An unmet game is never hidden — it stays in place, grayed,
+	# with the reason on its own line — so the list still reads as a trophy case of what is left to
+	# find. The dev override unlocks the ROW ONLY; it deliberately writes nothing back (see
+	# _show_all_games_override).
+	var locked := not _show_all_games_override() and not _dynasty.has_met_minigame(game_key)
 
 	# The whole panel is one Button (Tim, 2026-07-22 — no separate PLAY). Its content is overlaid as
 	# mouse-ignoring children so every tap on the panel lands on the button.
@@ -307,9 +482,22 @@ func _make_game_panel(game_key: String, type_script: Script) -> Control:
 	panel.add_theme_stylebox_override("normal", _make_plate_style(false))
 	panel.add_theme_stylebox_override("hover", _make_plate_style(false))
 	panel.add_theme_stylebox_override("focus", _make_plate_style(false))
-	panel.add_theme_stylebox_override("disabled", _make_plate_style(false))
+	panel.add_theme_stylebox_override("disabled", _make_locked_plate_style())
 	panel.add_theme_stylebox_override("pressed", _make_plate_style(true))  # a touch darker on press
-	panel.pressed.connect(_on_play_pressed.bind(type_script))
+	# Two independent locks, because one unresponsive-but-live-looking panel is worse than none:
+	# `disabled` stops the Button emitting `pressed` at all, and a locked row never connects the
+	# handler in the first place. (`_on_play_pressed` has exactly one caller — this line.)
+	panel.disabled = locked
+	if not locked:
+		panel.pressed.connect(_on_play_pressed.bind(type_script))
+
+	# Drag-to-scroll. Connected for EVERY row, locked ones included: a disabled Button still swallows
+	# the touch (disabling changes the press logic, not the mouse filter), so a locked row left
+	# unwired would be a dead patch of list you cannot scroll from. See the section at the bottom.
+	# `locked` rides along so a tap on a refused row can raise the chip. A disabled Button emits no
+	# `pressed`, but it still receives gui_input — which is the same property the drag-to-scroll
+	# handler relies on to keep locked rows scrollable.
+	panel.gui_input.connect(_on_panel_gui_input.bind(locked))
 
 	# Content overlay: a full-rect margin (clearing the gold frame) holding the icon + text row. All
 	# of it ignores the mouse so the underlying button receives every tap.
@@ -335,11 +523,19 @@ func _make_game_panel(game_key: String, type_script: Script) -> Control:
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if locked:
+		icon.modulate.a = LOCKED_ICON_ALPHA
 	row.add_child(icon)
 
 	# Right: name, cleared tier + earned contribution, and the next goal. In its own EXPAND_FILL column
 	# so the text fills the panel width beside the icon. Colors are cream/gold with a dark outline so
 	# they read over the green plate (Tim, 2026-07-22 contrast).
+	# EVERY ROW IS TWO LINES NOW (Tim, 2026-08-08). Locked rows used to carry a third line saying why
+	# they were locked, which forced tighter line spacing and a taller row for a message that was on
+	# screen permanently to explain a state the grey plate already communicated. It moved to a chip
+	# that appears only when the player actually taps a locked row — the moment they are asking.
+	# Measured line boxes in this project's font: 57px at FONT_SUBHEAD 41, 45px at FONT_BODY 32, so
+	# 57 + 45 + 6 = 108px of text against 116px of clear space inside the pads.
 	var info := VBoxContainer.new()
 	info.add_theme_constant_override("separation", 6)
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -347,8 +543,17 @@ func _make_game_panel(game_key: String, type_script: Script) -> Control:
 	info.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(info)
 
-	info.add_child(_make_info_label(game_key, UiPalette.FONT_SUBHEAD, UiPalette.CREAM, true))
-	info.add_child(_make_info_label(tier_text, UiPalette.FONT_BODY, UiPalette.MUSTARD_GOLD, true))
+	# Text colours flip with the plate: cream/gold outlined in navy reads over the green plate, while
+	# dark navy outlined in cream reads over the pale gray locked plate. Both keep a full-size outline
+	# so the text stays crisp against the plate (low-vision rule).
+	if locked:
+		info.add_child(_make_info_label(
+			game_key, UiPalette.FONT_SUBHEAD, UiPalette.INK_NAVY, true, UiPalette.CREAM))
+		info.add_child(_make_info_label(
+			tier_text, UiPalette.FONT_BODY, UiPalette.NAVY, true, UiPalette.CREAM))
+	else:
+		info.add_child(_make_info_label(game_key, UiPalette.FONT_SUBHEAD, UiPalette.CREAM, true))
+		info.add_child(_make_info_label(tier_text, UiPalette.FONT_BODY, UiPalette.MUSTARD_GOLD, true))
 
 	return panel
 
@@ -362,6 +567,34 @@ func _make_plate_style(pressed: bool) -> StyleBoxFlat:
 	style.set_border_width_all(PANEL_BORDER_WIDTH)
 	style.border_color = UiPalette.MUSTARD_GOLD
 	return style
+
+
+## The LOCKED panel look, drawn for a game the bloodline has not met. Built by copying the live plate
+## and recolouring it, so the two can never drift apart in shape — identical corner radius and border
+## width, gray fill and gray border instead of green and gold. Same duplicate-and-recolour idiom the
+## locked tabs use (Main.gd).
+func _make_locked_plate_style() -> StyleBoxFlat:
+	var style := _make_plate_style(false)
+	style.bg_color = PANEL_LOCKED_FILL
+	style.border_color = PANEL_LOCKED_BORDER
+	return style
+
+
+## The developer's "show every game" knob from Balance Tuning, a 0/1 float read as `> 0.5` (the house
+## idiom for a boolean knob — see PropertyRow.gd). It exists because with six games dealt at random,
+## testing one specific game would otherwise mean replaying transitions until it comes up.
+##
+## THIS IS A DISPLAY OVERRIDE ONLY. It unlocks the ROWS on this screen and nothing else: it must never
+## cause a game to be recorded as met, or one testing session would permanently unlock everything and
+## the gate could never be seen again. This screen only ever READS the encounter set, so please keep
+## it that way — do not add a write here.
+##
+## _tuning is null if the screen was somehow built without setup(), in which case there is no knob to
+## read and the honest answer is "no override".
+func _show_all_games_override() -> bool:
+	if _tuning == null:
+		return false
+	return _tuning.challenge_show_all_games > 0.5
 
 
 ## Map a game's display_name() key to its Challenge icon. Basketball and Match Three reuse the games'
@@ -392,15 +625,22 @@ func _update_edge_fade() -> void:
 	ScrollEdgeArrows.apply_edge_fade(_scroll, _rows_column.get_children())
 
 
-## One text line inside a game panel. `emphasize` faux-bolds it (used for the game name). A dark navy
-## outline is always applied so the light text reads over the patterned green plate (low-vision rule).
-func _make_info_label(text: String, font_size: int, color: Color, emphasize: bool) -> Label:
+## One text line inside a game panel. `emphasize` faux-bolds it (used for the game name). An outline is
+## always applied so the text reads over the plate behind it (low-vision rule); it defaults to dark navy
+## for the light text on the green plate, and a locked row passes CREAM instead for its dark text on the
+## pale gray plate.
+func _make_info_label(
+		text: String,
+		font_size: int,
+		color: Color,
+		emphasize: bool,
+		outline_color: Color = UiPalette.INK_NAVY) -> Label:
 	var label := Label.new()
 	label.text = text
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.add_theme_font_size_override("font_size", font_size)
 	label.add_theme_color_override("font_color", color)
-	label.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
+	label.add_theme_color_override("font_outline_color", outline_color)
 	label.add_theme_constant_override("outline_size", 5)
 	if emphasize:
 		label.add_theme_font_override("font", UiPalette.make_bold_font())
@@ -413,6 +653,13 @@ func _make_info_label(text: String, font_size: int, color: Color, emphasize: boo
 
 ## A game panel tapped: hide the list and launch its endless challenge run on our own host.
 func _on_play_pressed(type_script: Script) -> void:
+	# The player was scrolling, not choosing. Godot fires `pressed` whenever the finger comes up
+	# inside a Button, and after a flick the finger is almost always still over SOME row — so
+	# without this guard, every scroll would launch whichever challenge happened to end up under
+	# the thumb. This is the whole reason the gesture's travel is tracked.
+	if _drag_moved:
+		return
+
 	# Hide BOTH list-mode layers (backdrop + card). The backdrop is always-on and can sit ABOVE the
 	# player in child order, so leaving it visible covered the whole run with just the background
 	# image (Tim, 2026-07-22). With both hidden, the player host is the only visible layer.
@@ -427,11 +674,148 @@ func _on_play_pressed(type_script: Script) -> void:
 func _return_to_list() -> void:
 	if _player != null:
 		_player.visible = false
-	_refresh()
+	# SHOW FIRST, REBUILD SECOND. _refresh tears down and re-adds every row and then schedules the
+	# edge fade; doing that while the card is still hidden meant the fade ran against an unlaid-out
+	# ScrollContainer (Tim, 2026-08-08 — the list came back empty until the screen was touched).
+	# apply_edge_fade now refuses that case outright, but building into a visible tree is the more
+	# honest fix: the rows are measured against the box they will actually occupy.
 	_show_list_chrome(true)
 	visible = true
+	_refresh()
 
 
 func _on_back_pressed() -> void:
 	visible = false
 	closed.emit()
+
+
+# ---------------------------------------------------------------------------
+# Drag-to-scroll (Tim reported 2026-08-06: "the buttons block swipe scrolling")
+# ---------------------------------------------------------------------------
+# Every game row is one full-width Button (Tim, 2026-07-22 — no separate PLAY), and the rows tile the
+# whole list with only an 18px gap between them. So there is nowhere neutral to grab: a Button's
+# default MOUSE_FILTER_STOP swallows the touch before the ScrollContainer ever sees a drag, and the
+# list cannot be swiped at all.
+#
+# MOUSE_FILTER_PASS is NOT the fix here. UiPalette.allow_scroll_drag_through() deliberately skips
+# BaseButtons — a PASS button would forward its taps to the parent as well as acting on them — which
+# is why the property ladder still scrolls (its rows are mostly non-button surface) while this screen
+# cannot. Instead we pan the scroll ourselves, exactly as DevTuningPanel does for its collapsed
+# section headers, which hit this same wall on 2026-07-22.
+#
+# A short press still plays the game; once a gesture's travel passes DRAG_SCROLL_THRESHOLD it counts
+# as a scroll and that row's tap is suppressed in _on_play_pressed.
+
+
+## Route one row's input: a fresh press starts a new gesture, anything else may be a drag.
+##
+## The press reset lives HERE rather than on the Button's `button_down` signal (DevTuningPanel's
+## wiring) for one reason: locked rows are DISABLED Buttons, and a disabled Button emits no
+## button_down at all. Reading the press off the raw event instead keeps locked rows scrollable.
+func _on_panel_gui_input(event: InputEvent, locked: bool = false) -> void:
+	if event is InputEventScreenTouch and event.pressed:
+		_begin_drag_gesture()
+		return
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		_begin_drag_gesture()
+		return
+
+	# A TAP ON A LOCKED ROW raises the reason chip. Read on RELEASE and only when the gesture never
+	# became a scroll, so swiping the list past a locked row does not fire it — the same rule the
+	# unlocked rows use to decide whether a press was a tap or a scroll.
+	#
+	# This is the only feedback a locked row gives, so it has to be the tap that produces it: the
+	# Button is disabled, which means no press animation, no `pressed` signal, and otherwise nothing
+	# at all happens when the player prods it.
+	var released: bool = (event is InputEventScreenTouch and not event.pressed) \
+			or (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT \
+				and not event.pressed)
+	if locked and released and not _drag_moved:
+		_show_locked_chip()
+		return
+
+	_pan_scroll_on_drag(event)
+
+
+## Build the locked-reason chip: a cream plate that appears near the bottom of the card when a
+## locked row is tapped, then fades.
+##
+## Anchored to the SCREEN rather than to the row that was tapped. A chip pinned to the row would
+## have to dodge the list's scrolling and the edge fade, and it would sit wherever the finger
+## already is — under it, on a phone. Bottom-centre is unobstructed, is where the eye goes after a
+## refused tap, and is the same place for every row, so it reads as the screen answering rather than
+## as a per-row annotation.
+func _build_locked_chip() -> void:
+	_locked_chip = PanelContainer.new()
+	_locked_chip.add_theme_stylebox_override("panel", UiPalette.make_panel_style())
+	_locked_chip.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	_locked_chip.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_locked_chip.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_locked_chip.offset_bottom = -LOCKED_CHIP_BOTTOM_GAP
+	_locked_chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_locked_chip.visible = false
+	add_child(_locked_chip)
+
+	var label := Label.new()
+	label.text = LOCKED_REASON_TEXT
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
+	label.add_theme_font_override("font", UiPalette.make_bold_font())
+	label.add_theme_color_override("font_color", UiPalette.NAVY)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_locked_chip.add_child(label)
+
+
+## Raise the chip. Re-tapping restarts it rather than stacking, so a player prodding several locked
+## rows sees one steady message instead of a flicker.
+func _show_locked_chip() -> void:
+	if _locked_chip == null:
+		return
+	_locked_chip.visible = true
+	_locked_chip.modulate.a = 1.0
+	_locked_chip_seconds = LOCKED_CHIP_SECONDS
+	set_process(true)
+
+
+func _process(delta: float) -> void:
+	if _locked_chip_seconds <= 0.0:
+		set_process(false)
+		return
+	_locked_chip_seconds -= delta
+	if _locked_chip_seconds <= 0.0:
+		_locked_chip.visible = false
+		_locked_chip.modulate.a = 1.0
+		set_process(false)
+		return
+	# Hold, then fade over the last stretch — a chip that starts fading immediately reads as though
+	# it is already leaving before it has been read.
+	_locked_chip.modulate.a = minf(1.0, _locked_chip_seconds / LOCKED_CHIP_FADE_SECONDS)
+
+
+## Start tracking a fresh press gesture, before any travel.
+func _begin_drag_gesture() -> void:
+	_drag_accum = 0.0
+	_drag_moved = false
+
+
+## Pan the list when a press over a row turns into a drag. Never consumes the event, so a genuine
+## tap still reaches the Button's own `pressed` signal.
+func _pan_scroll_on_drag(event: InputEvent) -> void:
+	var delta_y := 0.0
+	if event is InputEventScreenDrag:
+		delta_y = event.relative.y
+	elif event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT):
+		# Desktop only. Godot's emulate_mouse_from_touch (on by default) also synthesises a mouse
+		# motion for every InputEventScreenDrag, so counting both on a phone would scroll the list
+		# at twice the speed of the finger. On mobile the ScreenDrag branch above is the real one.
+		if OS.has_feature("mobile"):
+			return
+		delta_y = event.relative.y
+	else:
+		return
+
+	# Finger down the screen (delta_y > 0) reveals EARLIER rows, so scroll_vertical decreases.
+	_scroll.scroll_vertical -= int(delta_y)
+	_drag_accum += absf(delta_y)
+	if _drag_accum >= DRAG_SCROLL_THRESHOLD:
+		_drag_moved = true

@@ -64,6 +64,8 @@ compounders' job). All fit the utility-track family (capped, additive, restructu
 
 ## 5. Challenge Mode gated until after the first prestige (Tim, 2026-07-29)
 
+> **GRADUATED 2026-08-06 → `Plans/Challenge_Mode_Gating.md` Part A.**
+
 **Take:** good sequencing and cheap to build — it guarantees the minigames are first
 experienced in their real context (transitions, with stakes) before free play, and it
 matches the progressive-unlock philosophy already shipped (Estate/Ledger tabs). Gate
@@ -368,6 +370,10 @@ Consequences worth building around:
   certainly not (offline is its own banked-pile system), but say so explicitly.
 
 ## 8. Challenge Mode shows only games you have met (Tim, 2026-07-31)
+
+> **GRADUATED 2026-08-06 → `Plans/Challenge_Mode_Gating.md` Part B.** One gap the capture below
+> did not cover: an existing save has no encounter set, so an empty default would show every game
+> locked to a player who had already met them all. Resolved by seeding from `challenge_highest_tiers`.
 
 Tim's ask: on the CHALLENGES screen, only the minigames the player has actually encountered
 are available. Plus a new Balance Tuning option to show ALL games, for testing.

@@ -154,14 +154,22 @@ const HIRE_MODE_ICON_SVG := "res://art/icons/headshot.svg"
 ## makes for the pair. Both boxes stay at or below the icon's native IMPORTED size (the building
 ## imports at 324px with svg/scale=4, the face at 96px), so neither is upscaled into a blocky
 ## mess. See PropertyRow.MATCHED_ICON_VISIBLE_HEIGHT for the row-side twin of this number.
-const MODE_ICON_VISIBLE_HEIGHT := 50.0
-const BUY_MODE_ICON_BOX := int(MODE_ICON_VISIBLE_HEIGHT * 324.0 / 279.0)   # 58
-const HIRE_MODE_ICON_BOX := int(MODE_ICON_VISIBLE_HEIGHT * 96.0 / 86.0)    # 55
+## 50 → 40, a 20% reduction (Tim, 2026-08-07). Both boxes below are DERIVED from it, so the two
+## icons keep landing at the same visible height however this moves.
+const MODE_ICON_VISIBLE_HEIGHT := 40.0
+const BUY_MODE_ICON_BOX := int(MODE_ICON_VISIBLE_HEIGHT * 324.0 / 279.0)   # 46
+const HIRE_MODE_ICON_BOX := int(MODE_ICON_VISIBLE_HEIGHT * 96.0 / 86.0)    # 44
+
+## Gaps inside a mode button's caption. The "+" hugs its icon; the rate sits a normal gap away.
+## 6 → 2 on the first gap is Tim's "reduce by 60%" (2026-08-07), rounded to a whole pixel.
+const MODE_CAPTION_SEPARATION := 6
+const MODE_CAPTION_PREFIX_SEPARATION := 2
 
 ## Fixed width of the BUY and HIRE toggles (Tim, 2026-08-07 — "less wide, with moderately small
-## margins"). Derived, not chosen: the widest caption is "+ <icon> NEXT" at 199px measured at
-## FONT_SUBHEAD, plus the plate's 12px content margin a side = 223. See _make_mode_button.
-const MODE_BUTTON_WIDTH := 236
+## margins"). Derived, not chosen, and RE-derived after the icon shrank 20% and the "+" gap closed:
+## the widest caption is "+ <icon> NEXT" = "+" 24 + gap 2 + icon 46 + gap 6 + "NEXT" 105 = 183 at
+## FONT_SUBHEAD, plus the plate's 12px content margin a side = 207. See _make_mode_button.
+const MODE_BUTTON_WIDTH := 216
 
 # The screen-frame constants (bezel + universal content margin) live in UiPalette now, so the
 # Main screen and the full-screen overlays all frame identically (UiPalette.apply_screen_bezel
@@ -2964,12 +2972,21 @@ func _make_mode_button(icon_path: String, icon_box: int) -> Array:
 	b.add_child(center)
 
 	var caption := HBoxContainer.new()
-	caption.add_theme_constant_override("separation", 6)
+	caption.add_theme_constant_override("separation", MODE_CAPTION_SEPARATION)
 	caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	center.add_child(caption)
 
+	# The "+" and the icon are TIGHTER than the icon and the rate (Tim, 2026-08-07: close that first
+	# gap by 60%). An HBoxContainer has one separation for every gap, so the pair that needs its own
+	# spacing gets its own container: "+ <icon>" binds as a unit, and the rate sits a normal gap
+	# away from it. That reads as "plus one building, ten at a time" rather than three loose parts.
+	var prefix := HBoxContainer.new()
+	prefix.add_theme_constant_override("separation", MODE_CAPTION_PREFIX_SEPARATION)
+	prefix.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	caption.add_child(prefix)
+
 	var plus := _make_mode_caption_label("+")
-	caption.add_child(plus)
+	prefix.add_child(plus)
 
 	# The IMPORTED texture, never the raw .svg source: the export filter strips sources, and a
 	# runtime read of one crashed the device build (see PropertyRow._crisp_icon_texture).
@@ -2981,7 +2998,7 @@ func _make_mode_button(icon_path: String, icon_box: int) -> Array:
 	icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	caption.add_child(icon)
+	prefix.add_child(icon)
 
 	var rate := _make_mode_caption_label("×1")
 	caption.add_child(rate)

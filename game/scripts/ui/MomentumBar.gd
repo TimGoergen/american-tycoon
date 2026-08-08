@@ -141,6 +141,13 @@ var _auto_purchase_idle := false
 ## so the mode reports what it is actually doing rather than merely that it is on.
 var _auto_purchase_quantity := 0
 
+## The collapsed face's icon caption ("+ ∞ <property>"), and the parts that need re-tinting when the
+## plate flips. Shown only while COLLAPSED: expanded, the button reports its status as text instead,
+## and a Button can only render one string — so the two faces take turns rather than share.
+var _auto_purchase_caption: HBoxContainer
+var _auto_purchase_caption_plus: Label
+var _auto_purchase_caption_icons: Array = []
+
 ## Seconds left in the "the desk just bought something" pulse (0 = not pulsing). Counted down in
 ## _process, exactly the way PropertyRow fades its auto-purchase row marker — a countdown rather
 ## than a Tween so a purchase landing mid-pulse simply retriggers it, with no tween to kill and
@@ -338,6 +345,23 @@ const AUTO_PURCHASE_ARROW_SIZE := 40
 ## The AUTO-BUY button's resting width — slightly wider than the old 210 to carry the chevron
 ## alongside its label (Tim, 2026-08-07).
 const AUTO_PURCHASE_WIDTH := 244
+
+## The collapsed face: "+ ∞ <property>" (Tim, 2026-08-07) — what the mode does, in the same grammar
+## the BUY/HIRE toggles use, instead of the word AUTO-BUY.
+const AUTO_PURCHASE_INFINITY_ICON := preload("res://art/icons/infinity.svg")
+const AUTO_PURCHASE_PROPERTY_ICON := preload("res://art/icons/tab_property_inactive.svg")
+
+## Wanted VISIBLE height of those two glyphs, and the boxes that achieve it. The boxes are derived
+## from measured art: infinity's glyph fills 40 of its 96px canvas (0.417) and the property icon 279
+## of its 324 (0.861), so equal boxes would draw the infinity at less than half the building's
+## height. Dividing by each fraction is what makes them match optically.
+const AUTO_PURCHASE_CAPTION_ICON_HEIGHT := 40.0
+const AUTO_PURCHASE_INFINITY_BOX := int(AUTO_PURCHASE_CAPTION_ICON_HEIGHT * 96.0 / 40.0)   # 96
+const AUTO_PURCHASE_PROPERTY_BOX := int(AUTO_PURCHASE_CAPTION_ICON_HEIGHT * 324.0 / 279.0)  # 46
+
+## Gap between the caption's three parts, and how far it is held off the plate's frame.
+const AUTO_PURCHASE_CAPTION_GAP := 4
+const AUTO_PURCHASE_CAPTION_INSET := 14
 
 ## The READY flash's peak alpha and fade time.
 const READY_FLASH_ALPHA := 0.75
@@ -766,6 +790,7 @@ func _build_auto_purchase_button() -> void:
 	# Same reason OVR needs one: the player may well flip this mid-rush-hold, and on a phone that
 	# tap is a SECOND finger — which Godot never turns into a mouse click on its own.
 	_auto_purchase_button.add_child(SecondaryTapButton.new())
+	_build_auto_purchase_caption()
 	add_child(_auto_purchase_button)
 
 	# Paint whatever Main last pushed — NOT a hardcoded locked-and-off.
@@ -856,6 +881,10 @@ func _apply_auto_purchase_look(unlocked: bool, enabled: bool) -> void:
 	#
 	# White for ON is Tim's call rather than matching the mustard label: the arrow is a direction
 	# marker, not a second label, and full white separates it from the text sharing the plate.
+	# The icon caption is tinted with the LABEL colour, not the arrow's: it is the face's text, just
+	# drawn as pictures, so it should read as the label does on either plate.
+	_tint_auto_purchase_caption(label_color)
+
 	var arrow_color := Color.WHITE if enabled else UiPalette.NAVY
 	for state in ["icon_normal_color", "icon_hover_color", "icon_pressed_color",
 			"icon_focus_color", "icon_hover_pressed_color"]:
@@ -864,6 +893,72 @@ func _apply_auto_purchase_look(unlocked: bool, enabled: bool) -> void:
 	_auto_purchase_button.tooltip_text = \
 			"Auto-buy is ON — properties buy themselves, but rush is unavailable." if enabled \
 			else "Auto-buy is OFF — tap to let properties buy themselves (rush turns off)."
+
+
+## Build the collapsed face: "+ ∞ 🏠" — plus, infinity, property (Tim, 2026-08-07), replacing the
+## word AUTO-BUY. It states what the mode DOES rather than what it is called, in the same
+## "+ <icon> <rate>" grammar the BUY and HIRE toggles below it already use.
+##
+## An overlay rather than the Button's own `text`, because a Button can render one string and one
+## icon — and that icon slot is already spent on the edge chevron. The overlay is mouse-ignoring, so
+## every tap still reaches the button underneath.
+##
+## Right-aligned to sit opposite the chevron, matching where the status text lands when expanded.
+func _build_auto_purchase_caption() -> void:
+	var margin := MarginContainer.new()
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Clear the plate's own 12px content margin so the caption never touches the frame.
+	margin.add_theme_constant_override("margin_right", AUTO_PURCHASE_CAPTION_INSET)
+	margin.add_theme_constant_override("margin_left", AUTO_PURCHASE_CAPTION_INSET)
+	_auto_purchase_button.add_child(margin)
+
+	_auto_purchase_caption = HBoxContainer.new()
+	_auto_purchase_caption.alignment = BoxContainer.ALIGNMENT_END
+	_auto_purchase_caption.add_theme_constant_override("separation", AUTO_PURCHASE_CAPTION_GAP)
+	_auto_purchase_caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	margin.add_child(_auto_purchase_caption)
+
+	var plus := Label.new()
+	plus.text = "+"
+	plus.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	plus.add_theme_font_size_override("font_size", UiPalette.FONT_BUTTON)
+	plus.add_theme_font_override("font", UiPalette.make_bold_font())
+	plus.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_auto_purchase_caption.add_child(plus)
+	_auto_purchase_caption_plus = plus
+
+	# Both boxes are sized from MEASURED art, not from the canvas: infinity's visible glyph fills
+	# only 41.7% of its 96px canvas (it is wide and short) while the property icon fills 86.1% of
+	# its 324px one. Dividing the wanted visible height by each fraction is what lands the two at the
+	# SAME optical size — using the raw canvas would draw the infinity less than half the height of
+	# the building. Same correction the BUY/HIRE captions make (Main.MODE_ICON_VISIBLE_HEIGHT).
+	_auto_purchase_caption.add_child(_make_caption_icon(
+		AUTO_PURCHASE_INFINITY_ICON, AUTO_PURCHASE_INFINITY_BOX))
+	_auto_purchase_caption.add_child(_make_caption_icon(
+		AUTO_PURCHASE_PROPERTY_ICON, AUTO_PURCHASE_PROPERTY_BOX))
+
+
+## One icon in the AUTO-BUY caption, fitted into a square box and vertically centred.
+func _make_caption_icon(texture: Texture2D, box: int) -> TextureRect:
+	var icon := TextureRect.new()
+	icon.texture = texture
+	icon.custom_minimum_size = Vector2(box, box)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_auto_purchase_caption_icons.append(icon)
+	return icon
+
+
+## Tint the caption to match whichever plate is showing, exactly as the label colour does.
+func _tint_auto_purchase_caption(color: Color) -> void:
+	if _auto_purchase_caption_plus != null:
+		_auto_purchase_caption_plus.add_theme_color_override("font_color", color)
+	for icon in _auto_purchase_caption_icons:
+		(icon as TextureRect).modulate = color
 
 
 ## Grow the button across the row while the mode runs, and collapse it back when it stops.
@@ -886,6 +981,10 @@ func _apply_auto_purchase_expansion(expanded: bool) -> void:
 		_auto_purchase_button.size_flags_horizontal = Control.SIZE_FILL
 		_auto_purchase_button.custom_minimum_size.x = AUTO_PURCHASE_WIDTH
 		_auto_purchase_button.icon = AUTO_PURCHASE_ARROW_COLLAPSED
+	# The two faces take turns: icons while collapsed, status text once expanded. Both are
+	# right-aligned, so the swap happens in place with the chevron holding the other edge.
+	if _auto_purchase_caption != null:
+		_auto_purchase_caption.visible = not expanded
 	_auto_purchase_button.text = _auto_purchase_face_text(expanded)
 
 
@@ -894,7 +993,7 @@ func _apply_auto_purchase_expansion(expanded: bool) -> void:
 ## carry a sentence, and a mode that spends money on its own should say what it is spending.
 func _auto_purchase_face_text(expanded: bool) -> String:
 	if not expanded:
-		return "AUTO-BUY"
+		return ""  # collapsed shows the icon caption instead (see _build_auto_purchase_caption)
 	if _auto_purchase_idle:
 		return "NOTHING TO BUY"
 	if _auto_purchase_quantity > 0:

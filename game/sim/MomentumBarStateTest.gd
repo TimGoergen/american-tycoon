@@ -242,7 +242,10 @@ func _test_expands_while_running(bar_script: GDScript, tuning: TuningConfig) -> 
 		is_equal_approx(button.custom_minimum_size.x, declared_width))
 	_check("...does not compete for row space",
 		button.size_flags_horizontal == Control.SIZE_FILL)
-	_check("...and reads AUTO-BUY", button.text == "AUTO-BUY")
+	# Collapsed the face is the ICON caption ("+ ∞ <property>"), so the Button's own string is empty
+	# — a Button renders one string and one icon, and the icon slot is spent on the edge chevron, so
+	# the caption is an overlay and the two faces take turns.
+	_check("...and carries no text, leaving the icon caption to speak", button.text == "")
 	var collapsed_icon := button.icon
 
 	# Switched on with a known purchase count: it takes the row and reports what it is doing.
@@ -264,6 +267,6 @@ func _test_expands_while_running(bar_script: GDScript, tuning: TuningConfig) -> 
 		button.size_flags_horizontal == Control.SIZE_FILL
 			and is_equal_approx(button.custom_minimum_size.x, declared_width))
 	_check("...restores the original chevron", button.icon == collapsed_icon)
-	_check("...and reads AUTO-BUY again", button.text == "AUTO-BUY")
+	_check("...and hands the face back to the icon caption", button.text == "")
 
 	bar.queue_free()

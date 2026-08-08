@@ -229,6 +229,46 @@ func buy_staff_retention(property_index: int) -> bool:
 	return true
 
 
+## The highest retention level a property can currently be bought up to: the best any
+## generation of the bloodline ever reached there. Shared by the bulk-buy path and the
+## spend preview so the button's quote and the purchase can never disagree.
+func retention_ceiling(property_index: int) -> int:
+	var prop := current.economy.properties[property_index] as PropertyState
+	return maxi(prop.staff_level, staff_retention.get_ladder_high(property_index))
+
+
+## How many retention levels the wallet could buy on a property right now, capped at the
+## bloodline's earned ceiling. This is what "RETAIN MAX" would purchase.
+func max_affordable_retention_levels(property_index: int) -> int:
+	return staff_retention.max_affordable_levels(
+		property_index, upgrades.available, retention_ceiling(property_index)
+	)
+
+
+## The exact Legacy price of retaining the next `count` levels — the number the bulk-buy
+## button shows BEFORE the player commits. Retention is the endgame's open gem sink, so a
+## one-tap bulk buy must never spend a fortune the player couldn't see coming (Roadmap §3).
+func retention_cost_for_levels(property_index: int, count: int) -> int:
+	return staff_retention.bulk_cost_for_levels(property_index, count)
+
+
+## Buy up to `count` more retention levels in one action, returning how many were actually
+## bought. Deliberately PARTIAL-FILL (buys 7 of 10 rather than refusing outright), matching
+## how the bulk property and staff buys behave — a bulk button that silently does nothing
+## because the last level is a point short reads as broken.
+##
+## This loops the single-level buy_staff_retention() rather than reimplementing the
+## deduction: one purchase path means the wallet accounting and the ladder-high ceiling
+## can never drift between the single and bulk versions.
+func buy_staff_retention_levels(property_index: int, count: int) -> int:
+	var bought := 0
+	while bought < count:
+		if not buy_staff_retention(property_index):
+			break
+		bought += 1
+	return bought
+
+
 ## Copy the retention pricing knobs from tuning into the (tuning-free) StaffRetention.
 ## Called on construction and again on load, since load rebuilds the object.
 func _configure_retention_pricing() -> void:
@@ -387,10 +427,15 @@ func _new_generation() -> GameState:
 ## A succession builds a brand-new GameState, so anything living on GameState that is a player
 ## CHOICE rather than dynastic state silently reverts to its default every prestige. Tim caught
 ## this on the number-format setting (2026-08-05: "I think the currency formatting option I chose
-## reset after prestige") — and it was never format-specific: the buy mode and the minigame
-## opt-out were being dropped the same way. It hid well, because Main keeps its own UI mirrors,
-## so the CONTROLS still showed the old choice while GameState had already reverted; the loss
-## only surfaced on the next launch, once the reverted value had been written to the save.
+## reset after prestige") — and it was never format-specific: the buy mode, the hire mode, the
+## targeted epoch tab and the minigame opt-out were all being dropped the same way. It hid well,
+## because Main keeps its own UI mirrors, so the CONTROLS still showed the old choice while
+## GameState had already reverted; the loss only surfaced on the next launch, once the reverted
+## value had been written to the save.
+##
+## These are settings, not achievements — and for anything gated behind a Legacy upgrade the
+## distinction has teeth, because the upgrade itself survives succession by definition. Letting
+## a mode switch itself off every generation would keep disabling something bought with gems.
 ##
 ## `current` is null on the very first call (the constructor builds generation one before there
 ## is anything to inherit from), so there is nothing to carry and the heir keeps its defaults.
@@ -398,8 +443,16 @@ func _carry_player_settings_to_heir(heir: GameState) -> void:
 	if current == null:
 		return
 	heir.ui_buy_mode = current.ui_buy_mode
+	heir.ui_hire_mode = current.ui_hire_mode
 	heir.ui_minigame_enabled = current.ui_minigame_enabled
+	heir.ui_epoch_tab = current.ui_epoch_tab
 	heir.ui_currency_format = current.ui_currency_format
+	# AUTO-PURCHASE IS DELIBERATELY NOT CARRIED — the heir wakes with the desk switched OFF
+	# (Tim, 2026-08-01). It is the one setting here that SPENDS money rather than describing a
+	# preference, and an heir owns almost nothing: the opening capital plus any Trust Fund. Left
+	# on, the desk would skim that seed before the player could aim it, and it would also hold
+	# rush shut during the fast early climb, which is exactly when rush is worth most. The track
+	# stays bought, so switching it back on is one tap whenever the generation is ready for it.
 
 
 ## Seed an heir with the staff-ladder levels the dynasty has paid (in Legacy) to retain

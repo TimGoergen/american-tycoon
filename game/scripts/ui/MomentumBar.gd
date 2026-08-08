@@ -37,6 +37,30 @@ extends HBoxContainer
 #     drains from the right in proportion to the re-arm countdown — the gray's movement IS the
 #     re-arm timer, and the READY flash lands on a fully normal-looking bar.
 #
+#   • AUTO-BUY lockout (Plans/Auto_Purchase_And_Bulk_Hire.md §A5): while the Acquisitions Desk
+#     mode is on, the core refuses the rush verb entirely — that trade-off is what stops the mode
+#     being strictly dominant. This bar is where the player is told WHY: the readout reads
+#     NO RUSH, the OVR button wears its existing gray "can't trigger" plate, and the bubbles
+#     and streaks (both of which claim an active rush) go quiet. Deliberately NOT a per-row
+#     banner: a global rush shutdown that painted all 14 property rows read as the whole property
+#     tab being dead (Overdrive_Vent_Windows.md:375-391).
+#
+#     THE TOGGLE ITSELF LIVES HERE TOO (Tim 2026-07-31), pinned to the bar's RIGHT end so the row
+#     reads [OVR][meter][AUTO-BUY] — the switch that costs you rush sits on the rush instrument,
+#     mirroring OVR across the meter. It used to be a button on its own row in Main; that row is
+#     gone. The lit button is the ONLY on-screen indicator that the mode is running (Tim declined a
+#     separate one), which is why its ON state is a full contrast flip rather than a subtle tint.
+#
+#     The readout says NO RUSH, not "AUTO-BUY ON" (Tim 2026-07-31): the lit button one inch to the
+#     right already says what is ON, so repeating it would spend the meter's biggest text on a fact
+#     the player can already see. What the button CANNOT say is what the mode costs — so the label
+#     says that instead, and the two halves of the trade sit side by side.
+#
+#     There is NO frozen/idle heat state here and there must never be one. Turning the mode on
+#     simply is "the player let go", so heat decays on the ordinary spin-down path and the
+#     ordinary cruise/build fill plots that tail — the bar keeps showing exactly what is still
+#     being earned, right down to zero. The lockout is a change of EXPLANATION, not of arithmetic.
+#
 # Vent resolutions still land as timed chips ABOVE the bar: green "VENTED — PEAK +X%!" plus
 # the white flash on success; red "VENT MISSED!" with the unfinished pips strobing on a miss.
 # The miss chip KEEPS its own pip row (VentPipRow) even though the bar now draws pips too:
@@ -65,6 +89,12 @@ extends HBoxContainer
 ## to GameState.engage_rush_overdrive() — the same seam as FrenzyBar.pop_requested.
 signal overdrive_requested
 
+## The player tapped AUTO-BUY: flip the Acquisitions Desk mode. The bar is a DISPLAY — it changes
+## no game state on this press. Main owns the flag, flips it, and pushes the result back through
+## set_auto_purchase_state, so the button's look can never disagree with the mode that is actually
+## running (the same request/paint split as overdrive_requested above).
+signal auto_purchase_toggle_requested
+
 var _rush_momentum: RushMomentumState
 var _tuning: TuningConfig
 
@@ -73,9 +103,108 @@ var _tuning: TuningConfig
 ## through the scene tree, so this UI-only dependency stays an explicit hand-off, not a lookup.
 var _dynasty: DynastyState
 
+## True while the Acquisitions Desk (auto-purchase) mode is switched on AND owned, which is exactly
+## when the core refuses the rush verb (Plans/Auto_Purchase_And_Bulk_Hire.md §A5). Pushed in by Main
+## via set_auto_purchase_state rather than read off the core, because it is a UI-mode fact
+## (a toggle the player flipped), not part of the heat instrument — the same hand-off shape as
+## set_dynasty above.
+##
+## This flag changes NOTHING about the fill math. Auto-buy on simply IS "the player let go", so
+## heat bleeds away on the ordinary spin-down path and the ordinary cruise/build fill already
+## plots that tail — which keeps this bar's binding invariant intact: whatever the bar shows IS
+## what the player earns. All this flag does is explain WHY rush is unavailable.
+var _auto_purchase_locked := false
+
+## The last state Main pushed, remembered verbatim so the button can be painted correctly no matter
+## which order the push and this node's _ready() happen in.
+##
+## They genuinely race: _build_property_tab() builds this bar into a DETACHED VBoxContainer and
+## Main pushes the state immediately (Main.gd, right after the bar is added), but a node only runs
+## _ready() once it actually enters the tree — which is later, when the tab is mounted. So the first
+## push regularly lands while _auto_purchase_button is still null. Keeping the values here lets
+## _build_auto_purchase_button re-apply them instead of assuming locked-and-off.
+var _auto_purchase_unlocked := false
+var _auto_purchase_enabled := false
+
+## True while the mode is RUNNING but cannot afford anything in the current epoch, so it is sitting
+## there buying nothing (Tim, 2026-08-07: "the auto buy feature showed that it was on, but no
+## longer was auto buying anything").
+##
+## This state is normal and often transient — the desk waits for cash like the player does — but it
+## was completely silent, and a lit button with no purchases and no explanation is indistinguishable
+## from a broken feature. It matters more since the mode became CURRENT-EPOCH-ONLY: on a deep run
+## the frontier cohort can sit far above the player's cash for a long time, where the old
+## last-viewed-tab targeting would have been quietly buying cheap rungs somewhere else.
+var _auto_purchase_idle := false
+
+## Purchases the desk makes per round, pushed in by Main. Shown on the expanded button ("BUYING ×5")
+## so the mode reports what it is actually doing rather than merely that it is on.
+var _auto_purchase_quantity := 0
+
+## The collapsed face's icon caption ("+ ∞ <property>"), and the parts that need re-tinting when the
+## plate flips. Shown only while COLLAPSED: expanded, the button reports its status as text instead,
+## and a Button can only render one string — so the two faces take turns rather than share.
+var _auto_purchase_caption: HBoxContainer
+var _auto_purchase_caption_plus: Label
+var _auto_purchase_caption_icons: Array = []
+
+## The expanded face's rate readout ("AUTO-BUY 5/2.5s"). Shown only while expanded, pinned to the
+## right edge of the chevron.
+var _auto_purchase_rate_label: Label
+
+## The OVR button's animated plate, and the two colours it pulses around. The plate is a duplicate
+## of the palette's action-button look, so only these two values are ever touched.
+var _overdrive_plate: StyleBoxFlat
+var _overdrive_plate_bg := Color.WHITE
+var _overdrive_plate_border := Color.WHITE
+## Seconds into the availability pulse. Re-zeroed when the button becomes available, so the pulse
+## always opens on the same beat rather than wherever a free-running clock happened to be.
+var _overdrive_pulse_seconds := 0.0
+var _overdrive_was_available := false
+
+## The cycle wave and its clipping host. Shown only while the mode is running; the host clips, the
+## band inside it slides.
+var _auto_purchase_wave_host: Control
+var _auto_purchase_wave: TextureRect
+## Seconds into the current sweep. Re-zeroed on every actual purchase so the wave stays married to
+## what the desk is doing rather than drifting against it.
+var _auto_purchase_wave_seconds := 0.0
+
+## The edge chevron. An overlay TextureRect rather than the Button's `icon`, so its box is exactly
+## AUTO_PURCHASE_ARROW_SIZE and the rate readout beside it can rely on that — see
+## _build_auto_purchase_caption for why the Button's own icon could not be trusted to stay put.
+var _auto_purchase_arrow: TextureRect
+
+## Seconds between purchase rounds, pushed in by Main — the only place that knows it, since the
+## cadence is the tuned base less the upgrade's shave, clamped to a tuned floor.
+var _auto_purchase_cadence := 0.0
+
+## How long the desk has been sitting idle, driving the ellipsis animation. Reset the moment idle
+## begins so the cycle always starts at one dot rather than wherever the clock happened to be.
+var _auto_purchase_idle_seconds := 0.0
+
+## Seconds left in the "the desk just bought something" pulse (0 = not pulsing). Counted down in
+## _process, exactly the way PropertyRow fades its auto-purchase row marker — a countdown rather
+## than a Tween so a purchase landing mid-pulse simply retriggers it, with no tween to kill and
+## no way to strand the button at half brightness.
+var _auto_purchase_pulse_seconds := 0.0
+
 ## The OVR button, pinned left of the meter (the FrenzyBar layout). Always visible; enabled
 ## only while cruising — see _process.
 var _overdrive_button: Button
+
+## The AUTO-BUY toggle, pinned right of the meter — OVR's mirror image across the bar (Tim
+## 2026-07-31). ABSENT until the Acquisitions Desk track is bought, then a permanent fixture whose
+## size never changes and whose plate is the only thing that flips. The hide-until-unlocked part is
+## a deliberate, Tim-approved exception to the no-moving-UI rule — see _apply_auto_purchase_look
+## for the full reasoning before changing it.
+var _auto_purchase_button: Button
+
+## The AUTO-BUY button's two "unlocked" plates, built once in _ready and swapped in whole when the
+## mode flips. Kept as fields rather than rebuilt per call because set_auto_purchase_state is
+## idempotent and Main is free to call it on every toggle/load without churning allocations.
+var _auto_plate_off: StyleBoxFlat
+var _auto_plate_on: StyleBoxFlat
 
 ## The display-only meter. All the overlays below live inside it.
 var _meter: ProgressBar
@@ -173,7 +302,17 @@ var _blink_phase := 0.0
 
 ## Which label state is currently applied (see _LabelState), so the color/outline overrides are
 ## only rebuilt when the state flips, not every frame.
-enum _LabelState { NORMAL, CRUISING, OVERHEATED, COOLING }
+enum _LabelState { NORMAL, CRUISING, OVERHEATED, COOLING, AUTO_BUY }
+
+## How much larger a BONUS PERCENTAGE draws than the label's resting size (Tim, 2026-08-07: cruise
+## "about 40% larger"; 2026-08-08: the building readout should match it).
+##
+## The rule that fell out of those two asks is worth stating, because it decides what any future
+## state should do: NUMBERS ARE BIG, WORDS ARE SMALL. The live bonus and the cruise figure are the
+## bar's actual readout — what the player is earning — and they get the size. OVERHEATED, COOLING
+## and the auto-buy narration are explanations of why there is no number, and they stay at the
+## resting size so they never shout over the thing they are standing in for.
+const BONUS_LABEL_SCALE := 1.4
 var _label_state_applied: int = -1
 
 ## Where the fixed vent target bar sits, as a fraction of the bar's width (~1/3 from the left,
@@ -200,6 +339,125 @@ const CHIP_STACK_SEPARATION := 6.0
 const TIER_CHIP_FADE_IN_SEC := 0.12
 const TIER_CHIP_FADE_OUT_SEC := 0.4
 
+## The AUTO-BUY button's "it just bought something" pulse (Tim, 2026-08-07). The button's plate
+## says the mode is ON, but a mode that is on and a mode that is actually spending look identical —
+## this is the difference.
+##
+## 0.35s, comfortably shorter than the desk's fastest cadence (1.0s at a maxed Acquisitions Desk),
+## so even at full speed the button returns to rest between purchases and reads as a slow blink
+## rather than a flicker. An unaffordable tick buys nothing and pulses nothing, which makes the
+## button honest about "running" versus "running dry".
+const AUTO_PURCHASE_PULSE_SECONDS := 0.35
+
+## Peak brightness multiplier at the top of the pulse. `modulate` MULTIPLIES, so a modest number
+## barely moves the lit plate's dark navy field — 1.8 was tried first and Tim's verdict was "too
+## faint to draw attention" (2026-08-07). At 3.0 the mustard frame and label saturate to white and
+## the navy field itself lifts to a bright blue, so the whole control flashes rather than just its
+## outline.
+const AUTO_PURCHASE_PULSE_PEAK := 3.0
+
+## How much the button swells at the top of the pulse (Tim, 2026-08-07). Applied as `scale`, NOT by
+## touching size: this button sits in an HBoxContainer beside the meter, so a real size change would
+## re-run the layout and shove the meter sideways on every purchase. `scale` is a draw transform —
+## the container still sees the same 210px box, and nothing moves.
+##
+## 6% on a 210px button is about 6px of growth per side, which reads at a glance without the button
+## colliding with the meter across the row's 8px separation.
+##
+## Hit-testing is unaffected in the SAFE direction: SecondaryTapButton checks get_global_rect(),
+## which ignores scale, so the tap target stays the button's true 210px box. Mid-pulse the art is a
+## few px larger than the target rather than the other way round — no phantom taps land outside the
+## button, you simply cannot hit the transient halo.
+const AUTO_PURCHASE_PULSE_SCALE := 1.06
+
+## The OVR button's steam-burst glyph, replacing the word "OVR" (Tim, 2026-08-07). Drawn at 62 in a
+## 99px square button: comfortably inside the plate's 12px content margins, and below the art's
+## 128px native size so it downscales rather than blurring up.
+const OVERDRIVE_ICON := preload("res://art/icons/steam_burst.svg")
+const OVERDRIVE_ICON_SIZE := 62
+
+## The AUTO-BUY button's edge chevrons. LEFT while collapsed ("this expands leftwards"), RIGHT once
+## expanded ("this collapses back"). Same weight and size, so it reads as one control changing
+## direction rather than two different icons.
+const AUTO_PURCHASE_ARROW_COLLAPSED := preload("res://art/icons/arrow_left.svg")
+const AUTO_PURCHASE_ARROW_EXPANDED := preload("res://art/icons/arrow_right.svg")
+## 40 → 56, a 40% increase (Tim, 2026-08-07). Still well inside the 99px row height, and still a
+## downscale from the 128px art so it stays crisp.
+const AUTO_PURCHASE_ARROW_SIZE := 56
+
+## The AUTO-BUY button's resting width. Shared with the BUY/HIRE toggles below it (Tim, 2026-08-07:
+## "equal to the width of the staff buy mode button"), so the three fixed controls in the income
+## header line up as a set. One constant, not three numbers — see UiPalette.HEADER_BUTTON_WIDTH.
+const AUTO_PURCHASE_WIDTH := UiPalette.HEADER_BUTTON_WIDTH
+
+## The collapsed face: "+ ∞ <property>" (Tim, 2026-08-07) — what the mode does, in the same grammar
+## the BUY/HIRE toggles use, instead of the word AUTO-BUY.
+const AUTO_PURCHASE_INFINITY_ICON := preload("res://art/icons/infinity.svg")
+const AUTO_PURCHASE_PROPERTY_ICON := preload("res://art/icons/tab_property_inactive.svg")
+
+## The caption's reference VISIBLE height, and the per-glyph multipliers Tim set on 2026-08-07 once
+## he saw them together: the infinity at 60% of it, the property icon 20% above it. They are no
+## longer the same size on purpose — matched optical height made the infinity read as the loud part
+## of the pair, when the building is the noun and the infinity is the modifier.
+const AUTO_PURCHASE_CAPTION_ICON_HEIGHT := 40.0
+const AUTO_PURCHASE_INFINITY_SCALE := 0.6
+const AUTO_PURCHASE_PROPERTY_SCALE := 1.2
+
+## The boxes that achieve those heights, derived from MEASURED art rather than canvas size:
+## infinity's glyph fills 40 of its 96px canvas (0.417) and the property icon 279 of its 324
+## (0.861). Dividing each wanted height by its own fraction is what makes the pair land where it is
+## meant to — equal boxes would draw the infinity at less than half the building's height.
+const AUTO_PURCHASE_INFINITY_BOX := int(
+	AUTO_PURCHASE_CAPTION_ICON_HEIGHT * AUTO_PURCHASE_INFINITY_SCALE * 96.0 / 40.0)    # 57
+const AUTO_PURCHASE_PROPERTY_BOX := int(
+	AUTO_PURCHASE_CAPTION_ICON_HEIGHT * AUTO_PURCHASE_PROPERTY_SCALE * 324.0 / 279.0)  # 55
+
+## Gap between the caption's three parts, and how far it is held off the plate's frame.
+##
+## Both were tightened when the button narrowed to match the mode toggles (Tim, 2026-08-07). At the
+## old 244 there was room to spare; at 216 the three glyphs plus the chevron do not fit with the
+## original spacing — measured, the caption began at x=62 while the arrow ran to 68, i.e. six pixels
+## of overlap. SPACING gave way rather than the icons, because the icon sizes are Tim's and the
+## spacing is mine.
+const AUTO_PURCHASE_CAPTION_GAP := 2
+const AUTO_PURCHASE_CAPTION_INSET := 8
+
+## Where the chevron sits, and where the rate readout starts: immediately past it. Because the arrow
+## is an overlay of a FIXED box (not the Button's own icon, which would not stay the size it was
+## told), this gutter is exact — the text is pinned to the arrow's right edge, not merely placed
+## somewhere left of centre (Tim, 2026-08-07).
+const AUTO_PURCHASE_ARROW_INSET := 10
+const AUTO_PURCHASE_ARROW_GAP := 10
+const AUTO_PURCHASE_ARROW_GUTTER := \
+	AUTO_PURCHASE_ARROW_INSET + AUTO_PURCHASE_ARROW_SIZE + AUTO_PURCHASE_ARROW_GAP
+
+## The OVR availability pulse (Tim, 2026-08-07): OVERDRIVE can only be engaged in a narrow window —
+## cruising, at the cruise clamp, and not locked out — and a button that merely stopped being grey
+## was easy to miss while the player was watching the meter. A breathing plate is visible in
+## peripheral vision, which is where the button actually is at that moment.
+##
+## One full breath per period. Slow enough to read as "ready" rather than as an alarm.
+const OVERDRIVE_PULSE_SECONDS := 1.1
+## How far the plate lightens, and how far its outline travels toward gold, at the top of a breath.
+const OVERDRIVE_PULSE_LIGHTEN := 0.28
+const OVERDRIVE_PULSE_BORDER_MIX := 0.85
+
+## The cycle wave: how bright the band gets at its centre, and how wide it is as a fraction of the
+## button. Wide and faint on purpose — it is a heartbeat behind the face, not a highlight sweeping
+## over it, and it has to stay legible under the text and icons that draw on top.
+const AUTO_PURCHASE_WAVE_ALPHA := 0.30
+const AUTO_PURCHASE_WAVE_WIDTH_FRAC := 0.40
+
+## Cadence to sweep at when Main has not pushed one yet. Matches the tuned base cadence, so the very
+## first frames look like the slowest desk rather than a stalled one.
+const AUTO_PURCHASE_WAVE_FALLBACK_SECONDS := 3.0
+
+## The idle animation: a redrawing ellipsis in place of a static "NOTHING TO BUY" (Tim,
+## 2026-08-07). Seconds each dot count holds before the next — three steps, so a full cycle is
+## three times this. Slow on purpose: it is a thinking indicator, not an alarm.
+const AUTO_PURCHASE_IDLE_DOT_SECONDS := 0.45
+const AUTO_PURCHASE_IDLE_MAX_DOTS := 3
+
 ## The READY flash's peak alpha and fade time.
 const READY_FLASH_ALPHA := 0.75
 const READY_FLASH_FADE_SEC := 0.5
@@ -220,11 +478,109 @@ func set_dynasty(dynasty: DynastyState) -> void:
 	_dynasty = dynasty
 
 
+## Paint the AUTO-BUY button and the bar's lockout presentation in one call.
+## `unlocked` — the player owns the Acquisitions Desk legacy track (level >= 1).
+## `enabled`  — the mode is currently switched ON.
+##
+## One call rather than two setters because the two facts are never independent on screen: the
+## button's three looks and the bar's lockout narration are all read off this same pair, and a bar
+## that had been told only half of it would paint a state that does not exist (an "on" mode the
+## player does not own).
+##
+## The bar does not go looking for either fact itself: the core has no "auto-buy" concept — it just
+## stops being fed `rushing = true` — so the reason has to be handed down from the screen that owns
+## the toggle. Idempotent; calling it every frame with the same values is harmless.
+## `idle` and `quantity` are optional so existing callers and the sims keep working; only Main knows
+## the economy and the upgrade levels well enough to answer them.
+func set_auto_purchase_state(unlocked: bool, enabled: bool, idle: bool = false,
+		quantity: int = 0, cadence: float = 0.0) -> void:
+	# Restart the ellipsis whenever idle BEGINS, so it always opens on one dot.
+	if idle and not _auto_purchase_idle:
+		_auto_purchase_idle_seconds = 0.0
+	_auto_purchase_idle = idle
+	_auto_purchase_quantity = quantity
+	_auto_purchase_cadence = cadence
+	_set_auto_purchase_state_inner(unlocked, enabled)
+
+
+func _set_auto_purchase_state_inner(unlocked: bool, enabled: bool) -> void:
+	# The rush lockout is exactly "owned AND switched on". An unowned track can have a stale
+	# `enabled` left over from a prestige that reset the legacy levels, and that must not lock rush.
+	_auto_purchase_locked = unlocked and enabled
+	# Remembered BEFORE applying, because the apply is a no-op until _ready has built the button —
+	# this is what lets _ready pick the state back up. See the fields' comment.
+	_auto_purchase_unlocked = unlocked
+	_auto_purchase_enabled = enabled
+	_apply_auto_purchase_look(unlocked, enabled)
+
+
+## The Acquisitions Desk just bought something — flare the button (Tim, 2026-08-07).
+##
+## Called by Main only on a tick that actually acquired units, so a tick that could not afford
+## anything stays dark. That distinction is the whole value of the pulse: "on" and "on and
+## spending" otherwise look the same.
+##
+## Retriggering mid-pulse simply restarts the countdown; there is no tween to collide with.
+func flash_auto_purchase() -> void:
+	# Nothing to paint before _ready, and a hidden button (desk unowned) must never flash — it
+	# cannot have bought anything, and modulating a hidden control would be pure waste.
+	if _auto_purchase_button == null or not _auto_purchase_button.visible:
+		return
+	_auto_purchase_pulse_seconds = AUTO_PURCHASE_PULSE_SECONDS
+	# Re-align the cycle wave to the purchase that just happened. Free-running on the cadence would
+	# drift against reality — the accumulator is clamped and an unaffordable tick stays primed — and
+	# a sweep that claims to show the cycle has to actually agree with it.
+	_auto_purchase_wave_seconds = 0.0
+
+
+## Ease the AUTO-BUY pulse back to rest. Called once per frame from _process; free on the
+## overwhelming majority of frames, when nothing is pulsing.
+##
+## Mirrors PropertyRow._fade_auto_purchase_marker: linear decay off a countdown, and an explicit
+## reset to plain white on the final frame so the button can never be left tinted.
+func _fade_auto_purchase_pulse(delta: float) -> void:
+	if _auto_purchase_pulse_seconds <= 0.0:
+		return
+	if _auto_purchase_button == null:
+		_auto_purchase_pulse_seconds = 0.0
+		return
+	_auto_purchase_pulse_seconds = maxf(0.0, _auto_purchase_pulse_seconds - delta)
+	if _auto_purchase_pulse_seconds <= 0.0:
+		_auto_purchase_button.modulate = Color.WHITE
+		_auto_purchase_button.scale = Vector2.ONE
+		return
+	var strength := _auto_purchase_pulse_seconds / AUTO_PURCHASE_PULSE_SECONDS
+	var brightness := 1.0 + (AUTO_PURCHASE_PULSE_PEAK - 1.0) * strength
+	_auto_purchase_button.modulate = Color(brightness, brightness, brightness)
+	# Grow about the button's CENTRE. The pivot is refreshed every pulsing frame rather than set
+	# once, because the button's height is SIZE_FILL — it follows the meter row, so a layout change
+	# would otherwise leave the pivot stale and make the swell drift off-centre.
+	_auto_purchase_button.pivot_offset = _auto_purchase_button.size * 0.5
+	var swell := 1.0 + (AUTO_PURCHASE_PULSE_SCALE - 1.0) * strength
+	_auto_purchase_button.scale = Vector2(swell, swell)
+
+
 ## The OVERDRIVE (OVR) button, so a tutorial card can anchor to it. It stays disabled until the
 ## player reaches the cruise clamp, so `not get_overdrive_button().disabled` is exactly the
 ## "rush has met cruise control" moment the overdrive tip fires on.
+##
+## CAUTION for tutorial callers: the button is ALSO force-disabled for the whole time auto-purchase
+## mode is on, so a player who leaves that mode on would never satisfy `not disabled` and would
+## never be shown the overdrive tip. Anything gating a one-time tip on this button must treat the
+## auto-buy lockout as "not yet", not as "never" (Plans/Auto_Purchase_And_Bulk_Hire.md §A5).
 func get_overdrive_button() -> Button:
 	return _overdrive_button
+
+
+## The AUTO-BUY toggle, so a tutorial card can anchor to it (the same role get_overdrive_button
+## plays for OVR).
+##
+## CAUTION for tutorial callers: this button is HIDDEN, not merely grayed, until the Acquisitions
+## Desk is owned (see _apply_auto_purchase_look). Any tip anchored here must gate on
+## `get_auto_purchase_button().visible`, or the card will point at a node that occupies no space.
+## No tip currently anchors to it.
+func get_auto_purchase_button() -> Button:
+	return _auto_purchase_button
 
 
 func _ready() -> void:
@@ -236,12 +592,31 @@ func _ready() -> void:
 	# once rather than having to explain itself the instant it appears. The red action plate
 	# (§8: red = spend/act) marks it as the opt-in gamble, apart from gold TURBO.
 	_overdrive_button = Button.new()
-	_overdrive_button.text = "OVR"
-	# FONT_HEADLINE, not FONT_BUTTON: three letters can afford to be huge, and the button is
-	# the meter row's one action so it should land at a glance (Tim's vision, §1b).
-	_overdrive_button.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
-	_overdrive_button.add_theme_font_override("font", UiPalette.make_bold_font())
+	# A STEAM BURST, not the letters "OVR" (Tim, 2026-08-07). The row reads faster as pictures:
+	# this button and TURBO beside it are now both square icon buttons of identical size, so the
+	# two "act" controls are a matched pair instead of one word and one glyph.
+	#
+	# `expand_icon` + `icon_max_width` is the same treatment the tab bar uses — a Button draws its
+	# icon at native size otherwise, with no way to scale it up.
+	_overdrive_button.icon = OVERDRIVE_ICON
+	_overdrive_button.expand_icon = true
+	_overdrive_button.add_theme_constant_override("icon_max_width", OVERDRIVE_ICON_SIZE)
+	_overdrive_button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# Mipmapped: the art is 128px native and draws around 62, and an unfiltered 2x downscale
+	# aliases (the rule the tab icons and the gamepad already follow).
+	_overdrive_button.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	UiPalette.style_button(_overdrive_button, true)
+	# A plate of our own for the AVAILABLE pulse (Tim, 2026-08-07). DUPLICATED from whatever
+	# style_button just produced rather than rebuilt from scratch, so the pulse can never drift from
+	# the palette's action-button look — only its two colours are animated.
+	#
+	# `normal` and `hover` only. `pressed` keeps its own darker plate: the press is a distinct beat
+	# and the pulse must not eat the feedback that the tap landed.
+	_overdrive_plate = (_overdrive_button.get_theme_stylebox("normal") as StyleBoxFlat).duplicate()
+	_overdrive_plate_bg = _overdrive_plate.bg_color
+	_overdrive_plate_border = _overdrive_plate.border_color
+	_overdrive_button.add_theme_stylebox_override("normal", _overdrive_plate)
+	_overdrive_button.add_theme_stylebox_override("hover", _overdrive_plate)
 	# When overdrive can't engage (no live rush hold, or locked out) the button grays its
 	# OUTLINE too, exactly like the frenzy pop button — "can't trigger" must read at a glance
 	# (Tim 2026-07-15). The standard disabled plate keeps the navy frame; swap ours for gray.
@@ -252,9 +627,10 @@ func _ready() -> void:
 	disabled_plate.set_corner_radius_all(4)
 	disabled_plate.set_content_margin_all(12)
 	_overdrive_button.add_theme_stylebox_override("disabled", disabled_plate)
-	# Fill the row's height (the meter's 0.7 × standard-button height) rather than forcing the
-	# whole momentum row taller than the meter; the minimum WIDTH keeps the tap target generous
-	# now that the label is only three letters.
+	# SQUARE, and identical to the TURBO pop button beside it (both STANDARD_BUTTON_HEIGHT wide) —
+	# Tim's "as narrow as possible while still fully containing all labels and icons". For an
+	# icon-only button that floor IS its own height, so square is the answer and the two act
+	# buttons match by construction rather than by a number kept in step by hand.
 	_overdrive_button.custom_minimum_size = Vector2(UiPalette.STANDARD_BUTTON_HEIGHT, 0)
 	_overdrive_button.size_flags_vertical = Control.SIZE_FILL
 	_overdrive_button.pressed.connect(func() -> void: overdrive_requested.emit())
@@ -289,6 +665,8 @@ func _ready() -> void:
 	# Keep a handle on the fill stylebox so the mode/depth coloring can mutate its bg_color
 	# per frame instead of rebuilding styleboxes (see _process).
 	_fill_style = _meter.get_theme_stylebox("fill") as StyleBoxFlat
+
+	_build_auto_purchase_button()
 
 	# The overdrive instrument overlay, custom-drawn (the same approach as MomentumStreaks).
 	# Added FIRST among the meter's overlays so the bubbles, streaks, and text labels all draw
@@ -339,21 +717,34 @@ func _ready() -> void:
 	# Left: the meter's name. White (Tim 2026-07-15) so it reads over the dark purple fill (the
 	# caption sits at the left edge, filled first as heat climbs).
 	var caption := Label.new()
-	caption.text = "RUSH MOMENTUM"
+	# "RUSH", not "RUSH MOMENTUM", and a size up (Tim, 2026-08-07). The bar is what it is called;
+	# the second word was doing no work and was crowding the readout beside it. Growing the NAME
+	# while shrinking the NUMBER below is deliberate — it reverses the old hierarchy, which shouted
+	# a percentage at the player and whispered what the percentage was for.
+	caption.text = "RUSH"
 	caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	caption.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
+	caption.add_theme_font_size_override("font_size", UiPalette.FONT_CARD_BODY)
 	caption.add_theme_font_override("font", UiPalette.make_bold_font())
 	caption.add_theme_color_override("font_color", Color.WHITE)
 	caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(caption)
 
-	# Right: the live bonus, large and bold. Takes the remaining width and right-aligns so it hugs
-	# the frame's right edge while the caption stays pinned left.
+	# Right: the live bonus. Takes the remaining width and right-aligns so it hugs the frame's right
+	# edge — which is exactly where the AUTO-BUY button begins — while the caption stays pinned left.
+	#
+	# FONT_LABEL (28), down from FONT_HEADLINE (52), at Tim's request: "almost as small as the
+	# status text". NOTE this slot is shared — the same label carries OVERHEATED, COOLING and the
+	# cruise readout. That is the intended trade: the row now reads as a named bar with a small
+	# figure on it, rather than a giant number with a caption attached.
+	#
+	# The size set here is only the RESTING one. _apply_label_state owns it per state and re-applies
+	# it on every change — the two percentage states draw 40% larger (see BONUS_LABEL_SCALE), the
+	# word states at this size. Change it there, not here, or the two will disagree.
 	_label = Label.new()
 	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_label.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
+	_label.add_theme_font_size_override("font_size", UiPalette.FONT_LABEL)
 	_label.add_theme_font_override("font", UiPalette.make_bold_font())
 	_label.add_theme_color_override("font_color", Color.WHITE)
 	_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -463,7 +854,478 @@ func _ready() -> void:
 	_rush_momentum.vent_missed.connect(_on_vent_missed)
 
 
+## Build the AUTO-BUY toggle at the bar's RIGHT end, mirroring the OVR button on the left
+## (Tim 2026-07-31). Called from _ready AFTER the meter has been added, because HBoxContainer lays
+## its children out in child order and the row must read [OVR][meter][AUTO-BUY].
+func _build_auto_purchase_button() -> void:
+	_auto_purchase_button = Button.new()
+	_auto_purchase_button.text = "AUTO-BUY"
+	# The chevron is an OVERLAY, not the Button's own `icon` (see _build_auto_purchase_caption).
+	# Only the status text uses the Button itself, right-aligned against the far edge.
+	_auto_purchase_button.alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	# FONT_BUTTON, not OVR's FONT_HEADLINE: three letters can afford to be huge, eight cannot
+	# without either shrinking the meter or wrapping. This is still the standard action-button size,
+	# well above the readability floor (§1b).
+	_auto_purchase_button.add_theme_font_size_override("font_size", UiPalette.FONT_BUTTON)
+	_auto_purchase_button.add_theme_font_override("font", UiPalette.make_bold_font())
+	# The STANDARD (gold) plate, not OVR's red action plate: red is reserved for spend/act (§8) and
+	# this button spends nothing — it flips a mode. Keeping the two neighbors different colors also
+	# stops the row reading as a pair of matching triggers.
+	UiPalette.style_button(_auto_purchase_button, false)
+
+	# The unlocked pair of plates, swapped whole by _apply_auto_purchase_look.
+	_auto_plate_off = _make_auto_plate(UiPalette.MUSTARD_GOLD, UiPalette.NAVY, 3)
+	# LIT: the plate INVERTS — a bright blue field, thick mustard frame, mustard text. A contrast flip
+	# (rather than a brighter shade of the off-state) is what makes "the mode is running" legible from
+	# across the room, which matters more here than anywhere else on the screen: since the separate
+	# indicator was declined, this button is the only thing telling the player the mode is on.
+	#
+	# The field was NAVY until 2026-08-07 (Tim: "brighter and more saturated blue"). Navy read as a
+	# darker version of off rather than as a different state — and now that the expanded button
+	# spans the row, its colour is the largest single signal on the screen.
+	_auto_plate_on = _make_auto_plate(UiPalette.ACTIVE_BLUE, UiPalette.MUSTARD_GOLD, 5)
+
+	# The gray "can't tap" plate, exactly the OVR treatment. Kept even though the locked button is now
+	# HIDDEN rather than grayed (see _apply_auto_purchase_look): `disabled` still tracks `visible`, so
+	# this plate is what a hidden button would wear, and it costs one stylebox to keep the two states
+	# from ever disagreeing if the button is shown while still locked.
+	_auto_purchase_button.add_theme_stylebox_override(
+			"disabled", _make_auto_plate(UiPalette.CREAM, UiPalette.MID_GRAY, 3))
+
+	# Fixed width so the button NEVER resizes between its ON and OFF states and never expands into
+	# the meter: 210px comfortably fits "AUTO-BUY" at FONT_BUTTON bold plus the plate's 12px content
+	# margins, with slack for the font's hinting. Height fills the row like OVR does.
+	_auto_purchase_button.custom_minimum_size = Vector2(AUTO_PURCHASE_WIDTH, 0)
+	_auto_purchase_button.size_flags_vertical = Control.SIZE_FILL
+	_auto_purchase_button.pressed.connect(
+			func() -> void: auto_purchase_toggle_requested.emit())
+	# Same reason OVR needs one: the player may well flip this mid-rush-hold, and on a phone that
+	# tap is a SECOND finger — which Godot never turns into a mouse click on its own.
+	_auto_purchase_button.add_child(SecondaryTapButton.new())
+	_build_auto_purchase_caption()
+	add_child(_auto_purchase_button)
+
+	# Paint whatever Main last pushed — NOT a hardcoded locked-and-off.
+	#
+	# This line used to read `_apply_auto_purchase_look(false, false)`, which hid the button after
+	# every prestige (Tim, 2026-08-06: "auto-buy is purchased in the estate tab, but the button is
+	# not visible on the game tab after prestige"). Main pushes the state while this bar is still
+	# detached, so that push found no button and did nothing — and then this line overwrote the
+	# truth with "locked". Because Main memoises what it has pushed, and `unlocked` never changed
+	# again, it never re-pushed and the button stayed hidden for the rest of the run.
+	#
+	# It only showed up after a prestige because on a fresh dynasty the desk is unowned at build
+	# time, so BUYING it later flipped unlocked false -> true and repainted. Post-prestige the desk
+	# is already owned when the bar is built, so that flip never comes.
+	#
+	# The fields default to false, so a genuinely fresh bar still starts locked-and-off.
+	_apply_auto_purchase_look(_auto_purchase_unlocked, _auto_purchase_enabled)
+
+
+## One plate for the AUTO-BUY button, matching UiPalette's button geometry (3px/4px/12px) so it
+## sits flush with every other button in the game. Border width is a parameter only so the LIT
+## state can wear a heavier frame.
+func _make_auto_plate(bg: Color, border: Color, border_width: int) -> StyleBoxFlat:
+	var plate := StyleBoxFlat.new()
+	plate.bg_color = bg
+	plate.border_color = border
+	plate.set_border_width_all(border_width)
+	plate.set_corner_radius_all(4)
+	plate.set_content_margin_all(12)
+	return plate
+
+
+## Paint the AUTO-BUY button.
+##
+## IT NOW CHANGES SIZE (Tim, 2026-08-07). Switched ON, the button takes the whole row apart from the
+## OVR square, covering the meter; switched OFF it collapses back to its own width. That is a
+## deliberate, requested piece of moving UI, and it is honest rather than decorative: while the mode
+## runs the core refuses every rush, so the rush instrument underneath is dead space. The button
+## covering it says so more plainly than any label could.
+##
+## Mechanically the growth is a SIZE-FLAG swap, not an animation or a computed width: expanded, the
+## button takes SIZE_EXPAND_FILL and the meter drops to SIZE_FILL at zero minimum, so the HBox hands
+## the button everything the OVR square and the two 8px separations do not need. That lands at ~88%
+## of the row, and it cannot overflow the way a hardcoded "90% of width" could.
+##
+## DELIBERATE EXCEPTION TO THE NO-MOVING-UI RULE (Tim, decided 2026-08-01, having been shown that
+## it breaks his own standing "never hide/show controls — gray them in place" rule; see
+## scripts/ui/CLAUDE.md). Until the Acquisitions Desk is bought the button is ABSENT, not grayed.
+##
+## Why Tim overruled the rule here: a grayed control has to explain itself somewhere, and the only
+## place left on this button was `tooltip_text` — the face is full at a legible size and shrinking it
+## would break the low-vision floor. TOOLTIPS NEVER APPEAR ON TOUCH. So on the device the grayed
+## button said "not yet" and could never say why, which is the exact failure the no-moving-UI rule
+## exists to prevent, arriving by a different road. An absent control is more honest than a dead one
+## that cannot state its own reason.
+##
+## DO NOT "fix" this back to a grayed-in-place button. Doing so would restore an unexplainable
+## control on a phone. If it is ever restored, the reason must move somewhere touch can read it.
+func _apply_auto_purchase_look(unlocked: bool, enabled: bool) -> void:
+	if _auto_purchase_button == null:
+		return  # set_auto_purchase_state can legitimately arrive before _ready
+
+	# The bar is an HBoxContainer and the meter is SIZE_EXPAND_FILL, so a hidden button simply
+	# hands its 210px to the meter: the row reads [OVR][meter] until the track is bought, then
+	# [OVR][meter][AUTO-BUY] permanently. Nothing here or in Main indexes this bar's children.
+	_auto_purchase_button.visible = unlocked
+	# Kept in step with `visible` so a stray tap can never reach a hidden-but-live button.
+	_auto_purchase_button.disabled = not unlocked
+	if not unlocked:
+		return
+
+	_apply_auto_purchase_expansion(enabled)
+
+	var plate := _auto_plate_on if enabled else _auto_plate_off
+	# CREAM on the lit plate, not mustard. Measured against the new brighter blue field: mustard
+	# lands at 2.89:1, under the 3:1 floor for large text, where on the old navy it was 6.93:1.
+	# Cream restores it to 4.81:1. The mustard FRAME stays — a 5px border is a graphical element,
+	# not something anyone has to read, and gold-on-blue is the state's identity.
+	var label_color := UiPalette.CREAM if enabled else UiPalette.NAVY
+	# All three interactive plates share the one look: this is a state indicator first and a button
+	# second, so a hover or a held press must not momentarily read as the other mode.
+	for state in ["normal", "hover", "pressed"]:
+		_auto_purchase_button.add_theme_stylebox_override(state, plate)
+	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color",
+			"font_hover_pressed_color"]:
+		_auto_purchase_button.add_theme_color_override(state, label_color)
+
+	# THE ARROW IS TINTED, NOT RECOLOURED IN THE ART. Both chevrons ship pure white, and the button
+	# multiplies them to whatever the current plate needs: navy on the gold OFF plate, white on the
+	# navy ON plate. Shipping them navy is what made the ON arrow invisible — navy on navy (Tim,
+	# 2026-08-07: "there is no arrow showing on the left edge of the button at all").
+	#
+	# White for ON is Tim's call rather than matching the mustard label: the arrow is a direction
+	# marker, not a second label, and full white separates it from the text sharing the plate.
+	# The icon caption is tinted with the LABEL colour, not the arrow's: it is the face's text, just
+	# drawn as pictures, so it should read as the label does on either plate.
+	_tint_auto_purchase_caption(label_color)
+
+	# One modulate on the overlay, rather than five icon_*_color theme overrides — the arrow is no
+	# longer the Button's icon, so it no longer inherits the Button's per-state icon colours.
+	if _auto_purchase_arrow != null:
+		_auto_purchase_arrow.modulate = Color.WHITE if enabled else UiPalette.NAVY
+
+	_auto_purchase_button.tooltip_text = \
+			"Auto-buy is ON — properties buy themselves, but rush is unavailable." if enabled \
+			else "Auto-buy is OFF — tap to let properties buy themselves (rush turns off)."
+
+
+## Build the collapsed face: "+ ∞ 🏠" — plus, infinity, property (Tim, 2026-08-07), replacing the
+## word AUTO-BUY. It states what the mode DOES rather than what it is called, in the same
+## "+ <icon> <rate>" grammar the BUY and HIRE toggles below it already use.
+##
+## An overlay rather than the Button's own `text`, because a Button can render one string and one
+## icon — and that icon slot is already spent on the edge chevron. The overlay is mouse-ignoring, so
+## every tap still reaches the button underneath.
+##
+## Right-aligned to sit opposite the chevron, matching where the status text lands when expanded.
+func _build_auto_purchase_caption() -> void:
+	# THE CYCLE WAVE, added FIRST so every other layer draws over it (Tim, 2026-08-07: "a visible
+	# bright wave that passes across the background of the button once per auto buy cycle").
+	#
+	# It makes the cadence legible. The Standing Orders track is otherwise an invisible upgrade —
+	# the desk simply buys "more often" — and a sweep timed to the cycle turns that into something
+	# the player can watch speed up. The rate readout says 2.5s; the wave shows it.
+	#
+	# A moved gradient rather than a per-frame _draw: one texture, one position update, and
+	# clip_contents on the host keeps it inside the plate no matter where the band is.
+	_auto_purchase_wave_host = Control.new()
+	_auto_purchase_wave_host.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_auto_purchase_wave_host.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_auto_purchase_wave_host.clip_contents = true
+	_auto_purchase_wave_host.visible = false
+	_auto_purchase_button.add_child(_auto_purchase_wave_host)
+
+	var gradient := Gradient.new()
+	# Transparent at both ends so the band has no hard edge — a solid rectangle sliding past reads
+	# as a graphical fault, a soft one reads as light moving.
+	gradient.set_offset(0, 0.0)
+	gradient.set_color(0, Color(1.0, 1.0, 1.0, 0.0))
+	gradient.set_offset(1, 1.0)
+	gradient.set_color(1, Color(1.0, 1.0, 1.0, 0.0))
+	gradient.add_point(0.5, Color(1.0, 1.0, 1.0, AUTO_PURCHASE_WAVE_ALPHA))
+
+	var wave_texture := GradientTexture2D.new()
+	wave_texture.gradient = gradient
+	wave_texture.width = 128
+	wave_texture.height = 1
+	wave_texture.fill_from = Vector2(0.0, 0.0)
+	wave_texture.fill_to = Vector2(1.0, 0.0)
+
+	_auto_purchase_wave = TextureRect.new()
+	_auto_purchase_wave.texture = wave_texture
+	_auto_purchase_wave.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_auto_purchase_wave.stretch_mode = TextureRect.STRETCH_SCALE
+	_auto_purchase_wave.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_auto_purchase_wave_host.add_child(_auto_purchase_wave)
+
+	# THE CHEVRON, drawn as an overlay rather than through the Button's `icon` property.
+	#
+	# It began as Button.icon with expand_icon + icon_max_width, and that could not be positioned
+	# reliably: on the expanded button `expand_icon` scaled the glyph to the available HEIGHT (~75px)
+	# rather than honouring the 56px cap, so it overran the gutter reserved for the rate readout and
+	# the text drew partly behind it (Tim, 2026-08-07 — twice, because the first fix moved the text
+	# and left the arrow free to grow into it). Measured: the label sat at x=78, correctly clear of a
+	# 56px arrow, and the arrow was simply wider than it was told to be.
+	#
+	# As a TextureRect in a fixed box the geometry is exact and AUTO_PURCHASE_ARROW_GUTTER is a real
+	# promise: the arrow cannot grow past the space the text starts after.
+	var arrow_margin := MarginContainer.new()
+	arrow_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	arrow_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	arrow_margin.add_theme_constant_override("margin_left", AUTO_PURCHASE_ARROW_INSET)
+	_auto_purchase_button.add_child(arrow_margin)
+
+	_auto_purchase_arrow = TextureRect.new()
+	_auto_purchase_arrow.texture = AUTO_PURCHASE_ARROW_COLLAPSED
+	_auto_purchase_arrow.custom_minimum_size = Vector2(
+		AUTO_PURCHASE_ARROW_SIZE, AUTO_PURCHASE_ARROW_SIZE)
+	_auto_purchase_arrow.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_auto_purchase_arrow.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_auto_purchase_arrow.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	# Shrink on BOTH axes so the box is exactly the arrow, centred vertically and pinned left.
+	_auto_purchase_arrow.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	_auto_purchase_arrow.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_auto_purchase_arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	arrow_margin.add_child(_auto_purchase_arrow)
+
+	var margin := MarginContainer.new()
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Clear the plate's own 12px content margin so the caption never touches the frame.
+	margin.add_theme_constant_override("margin_right", AUTO_PURCHASE_CAPTION_INSET)
+	margin.add_theme_constant_override("margin_left", AUTO_PURCHASE_CAPTION_INSET)
+	_auto_purchase_button.add_child(margin)
+
+	_auto_purchase_caption = HBoxContainer.new()
+	_auto_purchase_caption.alignment = BoxContainer.ALIGNMENT_END
+	_auto_purchase_caption.add_theme_constant_override("separation", AUTO_PURCHASE_CAPTION_GAP)
+	_auto_purchase_caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	margin.add_child(_auto_purchase_caption)
+
+	var plus := Label.new()
+	plus.text = "+"
+	plus.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	plus.add_theme_font_size_override("font_size", UiPalette.FONT_BUTTON)
+	plus.add_theme_font_override("font", UiPalette.make_bold_font())
+	plus.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_auto_purchase_caption.add_child(plus)
+	_auto_purchase_caption_plus = plus
+
+	# Both boxes are sized from MEASURED art, not from the canvas: infinity's visible glyph fills
+	# only 41.7% of its 96px canvas (it is wide and short) while the property icon fills 86.1% of
+	# its 324px one. Dividing the wanted visible height by each fraction is what lands the two at the
+	# SAME optical size — using the raw canvas would draw the infinity less than half the height of
+	# the building. Same correction the BUY/HIRE captions make (Main.MODE_ICON_VISIBLE_HEIGHT).
+	_auto_purchase_caption.add_child(_make_caption_icon(
+		AUTO_PURCHASE_INFINITY_ICON, AUTO_PURCHASE_INFINITY_BOX))
+	_auto_purchase_caption.add_child(_make_caption_icon(
+		AUTO_PURCHASE_PROPERTY_ICON, AUTO_PURCHASE_PROPERTY_BOX))
+
+	# The EXPANDED face's rate readout — "AUTO-BUY 5/2.5s": what it buys per round, and how often
+	# (Tim, 2026-08-07). PINNED TO THE CHEVRON'S RIGHT EDGE, not merely left-aligned in the button.
+	#
+	# It needs its OWN margin container rather than sharing the caption's: the caption is inset a
+	# uniform 14 a side, and the chevron the Button draws occupies roughly the first 68px (the
+	# plate's 12px content margin plus the 56px glyph). Left-aligning inside the shared inset put the
+	# text straight through the arrow. This container starts where the arrow ends.
+	var rate_margin := MarginContainer.new()
+	rate_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	rate_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rate_margin.add_theme_constant_override("margin_left", AUTO_PURCHASE_ARROW_GUTTER)
+	rate_margin.add_theme_constant_override("margin_right", AUTO_PURCHASE_CAPTION_INSET)
+	_auto_purchase_button.add_child(rate_margin)
+
+	_auto_purchase_rate_label = Label.new()
+	_auto_purchase_rate_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_auto_purchase_rate_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_auto_purchase_rate_label.add_theme_font_size_override("font_size", UiPalette.FONT_BUTTON)
+	_auto_purchase_rate_label.add_theme_font_override("font", UiPalette.make_bold_font())
+	_auto_purchase_rate_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_auto_purchase_rate_label.visible = false
+	rate_margin.add_child(_auto_purchase_rate_label)
+
+
+## One icon in the AUTO-BUY caption, fitted into a square box and vertically centred.
+func _make_caption_icon(texture: Texture2D, box: int) -> TextureRect:
+	var icon := TextureRect.new()
+	icon.texture = texture
+	icon.custom_minimum_size = Vector2(box, box)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_auto_purchase_caption_icons.append(icon)
+	return icon
+
+
+## Tint the caption to match whichever plate is showing, exactly as the label colour does.
+func _tint_auto_purchase_caption(color: Color) -> void:
+	if _auto_purchase_caption_plus != null:
+		_auto_purchase_caption_plus.add_theme_color_override("font_color", color)
+	for icon in _auto_purchase_caption_icons:
+		(icon as TextureRect).modulate = color
+	# The rate readout is the same face, just the expanded one — it takes the same colour so the
+	# button never shows two different "label" tints at once.
+	if _auto_purchase_rate_label != null:
+		_auto_purchase_rate_label.add_theme_color_override("font_color", color)
+
+
+## Breathe the OVR plate while overdrive can actually be engaged, and hold it still otherwise.
+##
+## Both the FILL and the OUTLINE move: the outline is what carries at a glance on a small button
+## against a busy row, and the fill is what reads when the eye does land on it.
+##
+## Mutates the two colours of one owned StyleBoxFlat rather than swapping styleboxes per frame —
+## no allocation, and the plate keeps every other property the palette gave it.
+func _pulse_overdrive_availability(delta: float) -> void:
+	if _overdrive_plate == null or _overdrive_button == null:
+		return
+	var available := not _overdrive_button.disabled
+
+	if not available:
+		# Park it exactly at rest. Leaving a disabled button mid-breath would freeze it at an
+		# arbitrary brightness, which reads as a rendering fault rather than as "not yet".
+		if _overdrive_was_available:
+			_overdrive_plate.bg_color = _overdrive_plate_bg
+			_overdrive_plate.border_color = _overdrive_plate_border
+		_overdrive_was_available = false
+		return
+
+	if not _overdrive_was_available:
+		_overdrive_pulse_seconds = 0.0
+	_overdrive_was_available = true
+
+	_overdrive_pulse_seconds = fmod(_overdrive_pulse_seconds + delta, OVERDRIVE_PULSE_SECONDS)
+	# 0 → 1 → 0 across the period: a breath, not a sawtooth that snaps back at the top.
+	var phase := _overdrive_pulse_seconds / OVERDRIVE_PULSE_SECONDS
+	var strength := 0.5 - 0.5 * cos(phase * TAU)
+	_overdrive_plate.bg_color = _overdrive_plate_bg.lightened(
+		OVERDRIVE_PULSE_LIGHTEN * strength)
+	_overdrive_plate.border_color = _overdrive_plate_border.lerp(
+		UiPalette.MUSTARD_GOLD, OVERDRIVE_PULSE_BORDER_MIX * strength)
+
+
+## Slide the cycle wave across the button, one full pass per purchase cycle.
+##
+## The band starts entirely off the left edge and ends entirely off the right, so the sweep reads as
+## something crossing the button rather than appearing and vanishing inside it. Free on every frame
+## the mode is not running.
+func _animate_auto_purchase_wave(delta: float) -> void:
+	if _auto_purchase_wave_host == null:
+		return
+	if not _auto_purchase_enabled or not _auto_purchase_unlocked:
+		_auto_purchase_wave_host.visible = false
+		return
+
+	_auto_purchase_wave_host.visible = true
+	var period := _auto_purchase_cadence
+	if period <= 0.0:
+		period = AUTO_PURCHASE_WAVE_FALLBACK_SECONDS
+	_auto_purchase_wave_seconds = fmod(_auto_purchase_wave_seconds + delta, period)
+
+	var host_width := _auto_purchase_wave_host.size.x
+	var host_height := _auto_purchase_wave_host.size.y
+	if host_width <= 0.0:
+		return
+	var band := host_width * AUTO_PURCHASE_WAVE_WIDTH_FRAC
+	_auto_purchase_wave.size = Vector2(band, host_height)
+	# From fully off the left to fully off the right across one period.
+	_auto_purchase_wave.position = Vector2(
+		lerpf(-band, host_width, _auto_purchase_wave_seconds / period), 0.0)
+
+
+## Redraw the idle ellipsis. Free on every frame the desk is not idle, and it rewrites the button's
+## text only when the dot count actually changes — a Button reassigns its text unconditionally and
+## re-lays out its face, which is wasted work sixty times a second for a label that changes twice a
+## second.
+func _animate_auto_purchase_idle(delta: float) -> void:
+	if not _auto_purchase_idle or not _auto_purchase_enabled or _auto_purchase_button == null:
+		return
+	var before := _auto_purchase_idle_dots()
+	_auto_purchase_idle_seconds += delta
+	var after := _auto_purchase_idle_dots()
+	if after != before:
+		_auto_purchase_button.text = after
+
+
+## Grow the button across the row while the mode runs, and collapse it back when it stops.
+##
+## The meter is left VISIBLE with a zero minimum rather than hidden: an HBoxContainer gives a hidden
+## child no space at all, but it also stops laying it out, and the chip stack is anchored to the
+## meter. Squeezing it to zero keeps that anchoring valid and means one flag flips back and the row
+## is exactly as it was.
+func _apply_auto_purchase_expansion(expanded: bool) -> void:
+	if _auto_purchase_button == null or _meter == null:
+		return
+	if expanded:
+		_meter.size_flags_horizontal = Control.SIZE_FILL
+		_meter.custom_minimum_size.x = 0.0
+		_auto_purchase_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_auto_purchase_button.custom_minimum_size.x = 0.0
+		if _auto_purchase_arrow != null:
+			_auto_purchase_arrow.texture = AUTO_PURCHASE_ARROW_EXPANDED
+	else:
+		_meter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_auto_purchase_button.size_flags_horizontal = Control.SIZE_FILL
+		_auto_purchase_button.custom_minimum_size.x = AUTO_PURCHASE_WIDTH
+		if _auto_purchase_arrow != null:
+			_auto_purchase_arrow.texture = AUTO_PURCHASE_ARROW_COLLAPSED
+	# The two faces take turns: icons while collapsed, status text once expanded. Both are
+	# right-aligned, so the swap happens in place with the chevron holding the other edge.
+	if _auto_purchase_caption != null:
+		_auto_purchase_caption.visible = not expanded
+	if _auto_purchase_rate_label != null:
+		_auto_purchase_rate_label.visible = expanded
+		_auto_purchase_rate_label.text = _auto_purchase_rate_text()
+	_auto_purchase_button.text = _auto_purchase_face_text(expanded)
+
+
+## What the button says. Collapsed it names itself; expanded it reports what the desk is DOING —
+## the count it buys per round, or that it cannot buy at all. The expanded button has the width to
+## carry a sentence, and a mode that spends money on its own should say what it is spending.
+## The expanded face's rate readout: "AUTO-BUY 5/2.5s" — five holdings every two and a half seconds.
+##
+## Both halves are the upgrade tracks made visible, which is the point: the player buys Buying Power
+## and Standing Orders separately, and this is the one place the two show up as a single sentence
+## about what the desk is actually doing.
+##
+## Falls back to the bare name if Main has not pushed numbers yet, so the button never reads
+## "AUTO-BUY 0/0s" during the frame before the first push lands.
+func _auto_purchase_rate_text() -> String:
+	if _auto_purchase_quantity <= 0 or _auto_purchase_cadence <= 0.0:
+		return "AUTO-BUY"
+	return "AUTO-BUY %d/%ss" % [_auto_purchase_quantity, Money.trim(_auto_purchase_cadence, 2)]
+
+
+func _auto_purchase_face_text(expanded: bool) -> String:
+	if not expanded:
+		return ""  # collapsed shows the icon caption instead (see _build_auto_purchase_caption)
+	if _auto_purchase_idle:
+		return _auto_purchase_idle_dots()
+	if _auto_purchase_quantity > 0:
+		return "BUYING ×%d" % _auto_purchase_quantity
+	return "AUTO-BUY ON"
+
+
+## The idle ellipsis, one to three dots on a slow cycle (Tim, 2026-08-07, replacing the static
+## "NOTHING TO BUY"). The desk is not broken and it is not finished — it is waiting for money, and a
+## redrawing ellipsis is the universal shorthand for exactly that. It also keeps the button quiet:
+## a sentence in that slot competed with the rate readout beside it for the same glance.
+##
+## Animated from the bar's own _process rather than a Tween or Timer, matching how every other live
+## element on this bar is driven, and so it simply stops existing when the state leaves idle.
+func _auto_purchase_idle_dots() -> String:
+	var step := int(_auto_purchase_idle_seconds / AUTO_PURCHASE_IDLE_DOT_SECONDS)
+	return ".".repeat(step % AUTO_PURCHASE_IDLE_MAX_DOTS + 1)
+
+
 func _process(delta: float) -> void:
+	_fade_auto_purchase_pulse(delta)
+	_animate_auto_purchase_idle(delta)
+	_animate_auto_purchase_wave(delta)
 	var locked_out := _rush_momentum.is_locked_out()
 	var cruising := _rush_momentum.is_cruising()
 	# Overdrive DISPLAY mode: the engaged flag, not heat position — the instant the player opts
@@ -569,19 +1431,60 @@ func _process(delta: float) -> void:
 	# plate any other time. The >= (not ==) covers the re-press-while-still-hot case: heat
 	# bleeding DOWN toward the clamp is already at cruise depth, so the gamble is available
 	# immediately rather than after the cooldown dips below and climbs back.
+	# Auto-purchase mode forces it gray on top of all that: the core refuses engage_rush_overdrive
+	# outright while the mode is on, and a live-looking button whose taps are quietly ignored reads
+	# as a bug (Plans/Rush_Overheat.md:61-62). It grays IN PLACE using the disabled plate built in
+	# _ready — no new look, and nothing hides or moves.
 	var at_cruise_depth: bool = _rush_momentum.heat >= _rush_momentum.cruise_heat() \
 			or is_equal_approx(_rush_momentum.heat, _rush_momentum.cruise_heat())
-	_overdrive_button.disabled = not (cruising and at_cruise_depth)
+	_overdrive_button.disabled = _auto_purchase_locked or not (cruising and at_cruise_depth)
+	# Breathe the plate the moment it becomes tappable. Driven here, immediately after the decision,
+	# so the pulse can never disagree with the button's own enabled state.
+	_pulse_overdrive_availability(delta)
 
 	# The label: the live bonus normally; "CRUISE +X%" while the clamp is holding steady; the
-	# lockout narration while shut down. is_rearming is checked FIRST — it is a sub-state of
-	# is_locked_out (both true during the re-arm delay).
+	# lockout narration while shut down; "NO RUSH" while the Acquisitions Desk has rush
+	# switched off. is_rearming is checked FIRST — it is a sub-state of is_locked_out (both true
+	# during the re-arm delay).
+	#
+	# PRECEDENCE — the overheat states OUTRANK the auto-buy state, deliberately (both can be true
+	# at once: an overheat that is already draining when the player flips auto-buy on, or a miss
+	# landing on a hold that was live at the flip). The rule is "the state with a running clock
+	# wins", because only that state can LIE:
+	#   • OVERHEATED/COOLING is a bounded countdown that keeps running regardless of auto-buy —
+	#     the drain drains, the re-arm re-arms, rush_ready still fires. Hiding it behind NO RUSH
+	#     would strand the player with no idea how long the shutdown lasts.
+	#   • The reverse would be worse still if we ranked auto-buy first and it happened to also
+	#     show a countdown: a timer that is not counting down is a lie, and that is the exact
+	#     failure this ordering exists to avoid.
+	#   • NO RUSH has no clock to falsify. Deferring it costs only the couple of seconds the
+	#     lockout takes, and it is still true — and still shown — the instant the lockout clears.
+	# So a shutdown that happens during auto-buy narrates itself to completion, lands its READY
+	# flash, and then falls through to NO RUSH, which is the honest reason from then on.
+	# (Nothing is lost by deferring it: the lit AUTO-BUY button at the end of this row keeps saying
+	# the mode is on for the whole lockout, so the player is never left guessing about the mode —
+	# only about which of the two reasons rush is currently unavailable, and the timed one wins.)
 	if _rush_momentum.is_rearming():
 		_label.text = "COOLING…"
 		_apply_label_state(_LabelState.COOLING)
 	elif locked_out:
 		_label.text = "OVERHEATED"
 		_apply_label_state(_LabelState.OVERHEATED)
+	elif _auto_purchase_locked:
+		# The REASON, not the symptom: "rush is off because you turned auto-buy on". A control that
+		# states a fact without explaining it already failed a device review once (the frozen-row
+		# verdict, Plans/Overdrive_Vent_Windows.md:493-500), and "+0%" alone would be exactly that.
+		#
+		# This branch owns the readout for the whole spin-down too, which is on purpose: the bonus
+		# is still being PAID while the tail bleeds out, and the fill below still plots it honestly,
+		# but the one thing the player needs explained here is why the meter will not climb back.
+		# Which fact this slot spends its pixels on depends on what the player most needs.
+		# Normally it is the mode's COST — the lit button already says what is ON, so the label
+		# says what that costs. But when the desk is running and cannot afford anything, the
+		# urgent question stops being "why can't I rush" and becomes "why is nothing happening",
+		# and a silent lit button reads as a broken feature. So the readout answers that instead.
+		_label.text = "NOTHING TO BUY" if _auto_purchase_idle else "NO RUSH"
+		_apply_label_state(_LabelState.AUTO_BUY)
 	elif cruising and is_equal_approx(_rush_momentum.heat, _rush_momentum.cruise_heat()):
 		# Sitting exactly on the clamp: the steady, content cruise state. The bonus quotes
 		# effective_cruise_bonus() (base +25% plus Cooling Systems levels), never a hardcoded
@@ -601,8 +1504,11 @@ func _process(delta: float) -> void:
 		_apply_label_state(_LabelState.NORMAL)
 
 	# A locked meter is not accruing anything: hide the carbonation while it drains/re-arms so the
-	# shutdown reads as dead air, not business as usual.
-	_bubbles.visible = not locked_out
+	# shutdown reads as dead air, not business as usual. Auto-buy mode gets the same treatment for
+	# the same reason — the bubbles are the "value building automatically" cue, and with rush
+	# refused the meter can only go DOWN. Bubbling over a bleeding-out tail would say the opposite
+	# of what the fill is doing.
+	_bubbles.visible = not locked_out and not _auto_purchase_locked
 
 	# The SPINNING DOWN chip: up for exactly as long as a released hold is still paying a
 	# decaying bonus. This is the ONLY signal that bailing is different from blowing up (Tim
@@ -614,6 +1520,14 @@ func _process(delta: float) -> void:
 	# shows: the chip's job is not to add a figure but to say WHY that figure is falling — the
 	# machine is easing off, not blowing up. Hidden during a lockout regardless, so a stale chip
 	# can never sit over the overheat display.
+	#
+	# It is deliberately NOT suppressed by the auto-buy lockout, even though the bubbles and
+	# streaks are. Those two imply an ACTIVE rush and would be false; this chip states that a
+	# real, decaying bonus is still being paid, which is exactly what is happening — switching
+	# auto-buy on IS letting go, and the tail pays out to zero as usual. It also becomes the only
+	# place the tail's NUMBER appears, since the readout beside it is spending those pixels on the
+	# cost ("NO RUSH") — so the two divide the work cleanly: chip quotes what is still being
+	# paid, label says why it will not climb back.
 	var spinning_down: bool = _rush_momentum.is_spinning_down() and not locked_out
 	_spindown_chip.visible = spinning_down
 	if spinning_down:
@@ -622,8 +1536,11 @@ func _process(delta: float) -> void:
 
 	# The salmon streaks mark the overdrive ride itself now: with the fill pinned full, they are
 	# the motion cue that the bar has switched into its minigame instrument. Never while merely
-	# cruising or locked out.
-	_streaks.visible = overdrive
+	# cruising or locked out — and never while auto-buy has rush switched off, where a "you are
+	# riding the danger zone" cue would be plainly false. (The core refuses engage_rush_overdrive
+	# while the mode is on, so this should already be false; the belt-and-braces term guarantees
+	# it rather than trusting a second system's ordering.)
+	_streaks.visible = overdrive and not _auto_purchase_locked
 
 	_update_fill_color(delta, locked_out, overdrive)
 
@@ -705,6 +1622,19 @@ func _apply_label_state(state: int) -> void:
 	if state == _label_state_applied:
 		return
 	_label_state_applied = state
+
+	# SIZE IS PART OF THE STATE, not a fixed property of the label. Both percentage states — the live
+	# bonus while rush builds, and the cruise figure — draw at the larger size; the word states stay
+	# at the resting size. See BONUS_LABEL_SCALE for the numbers-big-words-small rule.
+	#
+	# Derived from the base rather than written as a literal, so the ratio survives any future change
+	# to the resting size. It lands off the UiPalette scale by a couple of points, which is the
+	# deliberate cost of honouring the ratio.
+	var shows_a_percentage := state == _LabelState.CRUISING or state == _LabelState.NORMAL
+	_label.add_theme_font_size_override("font_size",
+		int(round(float(UiPalette.FONT_LABEL) * BONUS_LABEL_SCALE)) if shows_a_percentage
+			else UiPalette.FONT_LABEL)
+
 	match state:
 		_LabelState.CRUISING:
 			# Calm teal: the "settled in, safe forever" color — deliberately nothing like the
@@ -723,6 +1653,19 @@ func _apply_label_state(state: int) -> void:
 			_label.add_theme_color_override("font_color", UiPalette.PALE_GOLD)
 			_label.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
 			_label.add_theme_constant_override("outline_size", 6)
+		_LabelState.AUTO_BUY:
+			# CREAM on a heavy INK_NAVY outline — the same "readable over anything" treatment the
+			# OVERHEATED state gets, because this text has to survive the identical range of
+			# backgrounds: the dark purple fill while the tail is still high, and the pale track
+			# once it has bled to nothing.
+			#
+			# Cream (not red, not gold, not teal) on purpose: this is neither a failure, an
+			# act-now prompt, nor a reward — it is the machine standing down because the player
+			# chose it. Cream is the panel/paper color, the most neutral voice in the palette, and
+			# it is the same "inert" family as the disabled OVR plate this state also lights up.
+			_label.add_theme_color_override("font_color", UiPalette.CREAM)
+			_label.add_theme_color_override("font_outline_color", UiPalette.INK_NAVY)
+			_label.add_theme_constant_override("outline_size", 8)
 		_:
 			_label.add_theme_color_override("font_color", Color.WHITE)
 			_label.remove_theme_color_override("font_outline_color")

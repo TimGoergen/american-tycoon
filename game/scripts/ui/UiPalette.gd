@@ -19,6 +19,15 @@ const MONEY_GREEN := Color("#7DA87B")
 ## MONEY_GREEN — the cash-on-hand total and the Family Ledger's dynasty total (Tim, 2026-06-28).
 const DARK_MONEY_GREEN := Color("#5E7E5C")
 const INK_NAVY := Color("#0D1830")
+
+## The AUTO-BUY button's field while the mode is RUNNING (Tim, 2026-08-07 — "brighter and more
+## saturated blue"). A real blue rather than another navy: the point is that a mode which spends the
+## player's money on its own should be unmistakable from across the room, and navy-on-navy read as
+## merely a darker version of off.
+##
+## Chosen to stay dark enough for the mustard frame and label to keep their contrast — push it much
+## brighter and the gold starts to sink into it rather than sit on it.
+const ACTIVE_BLUE := Color("#2A5FD6")
 const BRICK := Color("#8E2F1E")
 const PALE_GOLD := Color("#F0D49A")
 ## Warm orange — the middle stop of the minigame spectrum bar's red→orange→yellow climb toward
@@ -87,6 +96,17 @@ const FONT_SMALL := 26        # the smallest text allowed — the readability fl
 ## 2026-06-22). Set to 160% of the average of the four buttons it replaces — turbo (56),
 ## buy-mode (56), Plan the Estate (72), and DEV tuning (64): average 62 × 1.6 ≈ 99.
 const STANDARD_BUTTON_HEIGHT := 99
+
+## Width shared by the income header's fixed-width controls: the BUY and HIRE mode toggles, and the
+## AUTO-BUY button in its collapsed state (Tim, 2026-08-07 — "reduce the width of the auto buy
+## button to be equal to the width of the staff buy mode button").
+##
+## It lives HERE, in the module both rows already share, rather than as two numbers kept in step by
+## hand — "equal" is the requirement, so one constant is the only way it stays true. Derived from
+## the widest mode caption: "+ <icon> NEXT" = 28 + 1 + 46 + 6 + 105 = 186, plus the plate's 12px
+## content margin a side = 210, rounded up for a small even margin. Re-measure before shrinking it;
+## see Main._make_mode_button and MomentumBar._build_auto_purchase_caption for what has to fit.
+const HEADER_BUTTON_WIDTH := 216
 
 ## Corner radius (px, 1080-wide design space) for UI that hugs the phone's rounded screen
 ## corners — the income panel's top corners and the outer bottom corners of the edge tab
@@ -172,6 +192,86 @@ static func make_bold_font() -> FontVariation:
 ## Cream plate with a navy border — the standard card/panel (§8).
 static func make_panel_style() -> StyleBoxFlat:
 	return _make_plate(CREAM, NAVY)
+
+
+# --- Flagship plates -------------------------------------------------------------------------
+# The FLAGSHIP of an epoch's cohort is the property the era actually turns on: owning 35 units of
+# it advances the epoch (Epoch Advance Rework), and auto-purchase deliberately never buys it. Until
+# now nothing on screen said which row that was. These plates mark it (Tim, 2026-07-31): "a more
+# bold outline, a family ledger icon in the top right corner, and the background slightly glowing."
+# The icon half lives in PropertyRow; the outline + glow are here.
+
+## Twice the standard plate's 3px border. Same NAVY as every other frame — this is the SAME frame
+## language, just carrying more weight, rather than a new color that would read as a new kind of
+## thing. This weight is ALSO what marks the unowned flagship, which carries no gold at all (see
+## make_unowned_flagship_panel_style).
+const FLAGSHIP_BORDER_WIDTH := 6
+## How far the halo bleeds out past the plate's edge. This shadow IS the "glow" — a warmer
+## background alone is too quiet to find while scrolling a ladder.
+## 10 -> 16 (Tim, 2026-07-31: "glow is too subtle"). Most of that correction lands HERE rather than
+## in the background blend below: the halo is the part that is visible in peripheral vision while
+## the ladder is moving, and unlike the background it cannot cost the navy body text any contrast.
+const FLAGSHIP_GLOW_SIZE := 16
+## Alpha of that halo. 0.35 -> 0.62 (same pass). Still short of opaque on purpose: Tim's original
+## word was "slightly glowing" and this is a correction, not a reversal — it should read as warm
+## lighting spilling off the panel, not as a highlight marker painted on top of it.
+const FLAGSHIP_GLOW_ALPHA := 0.62
+## How far the OWNED plate's background is pulled toward MUSTARD_GOLD. 0.18 -> 0.30 (same pass):
+## obvious beside a plain cream row without tipping the plate into "this is a gold button".
+## Contrast check for the raise: NAVY on cream-lerp-gold at 0.30 is #EFDBA9, which is 9.6:1 against
+## #1D2D50 — far above the 4.5:1 bar, so the body text is not what limits this number. What limits
+## it is the row's own MUSTARD_GOLD hire button: push much past 0.30 and the plate starts reading
+## as the same material as the button sitting on it.
+const FLAGSHIP_WARM_BLEND := 0.30
+## Alpha of the UNOWNED flagship's halo. Its halo is DARK_GRAY, not gold (see below), and a neutral
+## shadow needs more opacity than a warm one to read as lift rather than as smudge.
+const FLAGSHIP_UNOWNED_GLOW_ALPHA := 0.55
+
+
+## Warm cream plate with a heavy navy border and a gold halo — the OWNED flagship rung.
+static func make_flagship_panel_style() -> StyleBoxFlat:
+	var style := _make_plate(CREAM.lerp(MUSTARD_GOLD, FLAGSHIP_WARM_BLEND), NAVY)
+	_apply_flagship_frame(style, Color(MUSTARD_GOLD, FLAGSHIP_GLOW_ALPHA))
+	return style
+
+
+## The flagship rung the player has not bought yet — and it must read as UNOWNED FIRST (Tim,
+## 2026-07-31: "unowned flagship shouldn't be gold-framed"). So it carries NO gold whatsoever: plain
+## LIGHT_GRAY fill and the ordinary MID_GRAY border of every other locked rung, exactly as
+## make_unowned_panel_style. Its earlier DARK_GOLD border and gold-warmed fill are gone.
+##
+## It is still the rung the player is saving toward, so it still has to be findable — but the
+## distinction is now carried entirely by WEIGHT rather than by color: the same heavy
+## FLAGSHIP_BORDER_WIDTH frame, a neutral DARK_GRAY halo lifting the plate off the ladder, and the
+## Family Ledger badge (drawn by PropertyRow). Keeping even a little gold warmth here was the
+## alternative and was rejected: any gold on the plate re-states the "this one is special/valuable"
+## signal that made it stop reading as locked in the first place, and a half-measure would just be a
+## quieter version of the thing Tim asked to remove.
+static func make_unowned_flagship_panel_style() -> StyleBoxFlat:
+	var style := _make_plate(LIGHT_GRAY, MID_GRAY)
+	_apply_flagship_frame(style, Color(DARK_GRAY, FLAGSHIP_UNOWNED_GLOW_ALPHA))
+	return style
+
+
+## Turn a plate built by _make_plate into a flagship plate: heavier border + an outer halo in
+## `halo_color` (gold when owned, neutral gray when not — see the two callers above).
+##
+## LAYOUT NOTE — this is what keeps the no-moving-UI rule. The content margin is deliberately left
+## at _make_plate's 12. In Godot, StyleBox.get_margin() returns the CONTENT margin whenever one is
+## set (>= 0) and only falls back to the border width when it is not: the two are ALTERNATIVES,
+## not a sum. So the content box is inset 12px from the panel's outer edge whether the border is
+## 3px or 6px, and a PanelContainer's minimum size — which is built from those same margins — is
+## identical either way. The thicker border simply eats 3px of the padding it was already sitting
+## inside; nothing on the row moves, resizes, or reflows. (Dropping the margin to 9 to "compensate"
+## for the border would in fact shift every control 3px OUTWARD and shrink the panel — the exact
+## thing to avoid.)
+##
+## The halo is a StyleBoxFlat SHADOW, drawn outside the box. Unlike expand_margin, a shadow
+## contributes nothing to minimum size or layout — it is pure paint.
+static func _apply_flagship_frame(style: StyleBoxFlat, halo_color: Color) -> void:
+	style.set_border_width_all(FLAGSHIP_BORDER_WIDTH)
+	style.shadow_color = halo_color
+	style.shadow_size = FLAGSHIP_GLOW_SIZE
 
 
 ## Vertical gap that floats each tab's content panel between the hero stat above and the

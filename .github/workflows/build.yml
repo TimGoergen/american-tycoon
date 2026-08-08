@@ -262,12 +262,19 @@ jobs:
           mv dist/american_tycoon_win.exe  "dist/american_tycoon_${SHA}_win.exe"
           mv dist/american_tycoon.apk      "dist/american_tycoon_${SHA}.apk"
 
+      # The exe is only ever consumed by the windows-installer job, which is main-only.
+      # On feature branches nothing downloads it, so uploading it there stores ~44 MB
+      # per push that no one will ever fetch.
       - name: Upload Windows exe
+        if: github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
           name: windows-exe
           path: dist/american_tycoon_*_win.exe
           if-no-files-found: error
+          # Build intermediate: consumed by the installer job minutes later, never by a
+          # human. The 90-day default is storage held for no reason.
+          retention-days: 7
 
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
@@ -275,6 +282,9 @@ jobs:
           name: android-apk
           path: dist/american_tycoon_*.apk
           if-no-files-found: error
+          # Kept slightly longer than the exe: this is the artifact worth grabbing by hand
+          # if a Firebase upload fails and a build needs re-distributing.
+          retention-days: 14
 
   # ── Job 2: Wrap Windows exe in Inno Setup installer ──────────────────────────
   # Inno Setup 6 is pre-installed on GitHub Windows runners.
@@ -319,6 +329,9 @@ jobs:
           name: windows-installer
           path: dist\american_tycoon_setup_*.exe
           if-no-files-found: error
+          # Short: the release job attaches this installer to a GitHub pre-release moments
+          # later, and the release is the durable copy. The artifact is just the handoff.
+          retention-days: 7
 
   # ── Job 3: Publish GitHub pre-release with both artifacts ────────────────────
   release:

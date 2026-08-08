@@ -338,13 +338,146 @@ Phase 1 on them.
    hours in front of a player.
 3. **Trim the long files.** `CoinPouring3` (8.3 s), `Vent Exhale` (8.8 s), `Pacer Beeps`
    (4.4 s), and `Elevator` (2.5 s) are all sources to cut from, not files to ship.
-4. **Licensing.** Every pack ships a license document — `EULA.txt` for the bundle-style
-   packs, `Royalty-Free License (Link).pdf` for the music/Foley packs, plus
-   `Important - Read Me.pdf` for the two GDM freebies. **These have not been read yet.**
-   Each one needs reviewing for commercial-release and redistribution terms before a file
-   ships in an APK, and `game/audio/CREDITS.md` (plan §7.1) should be started with the
-   first file copied in, not retrofitted.
+4. **Licensing — reviewed 2026-08-07, see §9.** All three licensors permit commercial
+   mobile release; nothing in the selection is blocked. **One live obligation:** Tao & Sound
+   requires **attribution**, and it covers 18 of the 26 SFX. `game/audio/CREDITS.md`
+   (plan §7.1) should be started with the first file copied in, not retrofitted, and the
+   ABOUT screen needs a credits line. Audio files stay in the public repo (§9.5, decided).
 5. **Audition before committing.** Every pick here is reasoned from filename and duration.
    The `tap_scale` choice in particular carries the most risk per the plan's own Phase 1
    exit criterion ("is the tap scale still pleasant at minute 15?") and deserves listening
    to first, before any code is written.
+
+---
+
+## 9. Licensing review
+
+**Reviewed 2026-08-07. This is a reading of the license documents, not legal advice.**
+
+Despite 14 packs there are only **three licensors** and **four distinct documents** (the
+`EULA.txt` is byte-identical across six packs; the `Royalty-Free License (Link).pdf` is
+byte-identical across seven — verified by MD5).
+
+### 9.1 Who licenses what
+
+| Licensor | Packs | Commercial mobile release | Attribution |
+|---|---|---|---|
+| **Tao & Sound** (`EULA.txt` → taoandsound.com/ASEULA.htm) | Building & Crafting, Buttons, Horror, Puzzle, Space, Western | **Permitted** | **REQUIRED** |
+| **Ovani Sound** (`Royalty-Free License (Link).pdf` → ovanisound.com terms) | Corporate, Eastern, Ethereal, Foley Sports, Hip Hop, Jazz, Sci-Fi Horror Vol. 2 | **Permitted** | Not required |
+| **GameDev Market** (Humble Bundle; `Important - Read Me.pdf`) | Inventory SFX, Magic Spells SFX | **Permitted** | Not required |
+
+**Bottom line: nothing in the recommended selection is blocked from commercial release.**
+All three licensors explicitly allow paid/monetized distribution with no revenue cap, no
+team-size limit, and no per-title cap (with the GDM caveat in §9.4).
+
+### 9.2 Tao & Sound requires credit — and it covers most of the SFX
+
+The shipped `EULA.txt` points to the full agreement, which states:
+
+> "The END USER shall credit the authorship of the Asset within the electronic application
+> or digital medium where the Asset is used, whenever reasonably possible."
+
+**18 of the 26 recommended SFX come from Tao & Sound packs** (Western, Building, Space,
+Puzzle, Buttons). A mobile game with an existing Settings → ABOUT screen has no argument
+that crediting is not "reasonably possible", so this is a real obligation, not a courtesy.
+
+Practically: the ABOUT screen needs a credits line, and `game/audio/CREDITS.md` needs to
+exist from the first file copied in.
+
+Also from that agreement, worth knowing:
+- Use must be **integrated into an application with purpose beyond playing the audio** —
+  trivially satisfied by a game.
+- **No AI/ML training** on the assets without consent.
+- No use in a **logo, trademark, or service mark**.
+- The `EULA.txt` ties the licence to the purchase invoice: *"By retaining this invoice,
+  you have a perpetual, non-transferable license."* **Keep the store invoices.** They are
+  the proof of licence, and support is conditioned on producing them.
+
+### 9.3 Ovani Sound — cleanest of the three
+
+Covers all five recommended music-band tracks plus the Foley Sports and Sci-Fi Horror SFX.
+
+> "This license grants all commercial or personal use" … "We welcome and encourage the use
+> of our music in your games, films, or products for sale."
+> "Credits for the use of Sound FX and Music packs are not required but are highly appreciated."
+
+The mandatory-credit exception applies only to their *Voices* series, which is not used here.
+Prohibited: redistributing/selling the content on its own, standalone soundboard/player
+apps, AI training, and falsely claiming authorship.
+
+### 9.4 GameDev Market — the only one with residual ambiguity
+
+Their terms page blocks automated retrieval (HTTP 403), so this rests on the bundle's own
+read-me plus secondary sources. The read-me is explicit:
+
+> "At the moment our license states that each asset can only be used in one project, however
+> we are in the process of removing this clause, so for the purpose of any Humble Bundle
+> purchases, all assets can be used in multiple projects."
+
+Current GDM terms reportedly carry "no restriction on the number of projects," but older
+purchases may sit under the one-project version.
+
+**Why this does not actually matter here:** American Tycoon is one project, so even the
+most restrictive reading is satisfied. The only live constraint is that these two packs'
+files must **not** be reused in Critter Quitters or Blob Chain without re-checking.
+
+Only **two** files in the §4 list come from GDM — `CoinPouring3.mp3` (`welcome_back`) and
+`Generic Spell (summon) 1.mp3` (`legacy_purchase`). Both have non-GDM substitutes already
+listed in §3.3 (layer `Coins Bag 2.wav` under `Strong Accept.wav`), so the dependency can
+be dropped entirely if the ambiguity is unwelcome.
+
+### 9.5 The public-repo problem — the one genuine conflict
+
+`TimGoergen/american-tycoon` is a **public** GitHub repository (verified 2026-08-07).
+
+Both licensors that cover the bulk of the selection restrict distributing the audio
+on its own:
+
+- **Ovani:** *"You agree not to distribute, sell, or sublicense the Content on its own or
+  separated from Attached Media."*
+- **Tao & Sound:** prohibits allowing any user *"to extract the Asset or derivative works
+  for use outside of that context."*
+
+Committing raw `.wav`/`.ogg` files to a public repo lets anyone download the individual
+sound files without the game — which is a plausible reading of exactly what both clauses
+forbid. Shipping them compiled inside an APK is unambiguously fine; the exposure is the
+**source tree**, not the build.
+
+This is genuinely ambiguous rather than a clear breach — the files sit in a game project,
+not a sample-pack listing — but it is the one place the licences and the current repo setup
+actually pull against each other, and it is worth resolving deliberately.
+
+Options, cheapest first:
+
+1. **Accept it.** Defensible; many public game repos ship licensed audio. Lowest effort,
+   non-zero risk, and the risk is the vendor's to raise.
+2. **Keep audio out of git; fetch at build time.** The existing GitHub Actions pipeline
+   pulls the files from a private location before export. Preserves the public repo, keeps
+   raw assets off it. Most work.
+3. **Make the repo private.** Removes the question entirely. Affects nothing else in the
+   pipeline — releases and Firebase distribution work the same.
+4. **Ask the vendors.** Both have support channels; a written yes is worth more than this
+   analysis.
+
+### DECIDED (Tim, 2026-08-07): option 1 — keep the audio in the public repo.
+
+Tim stated for the record that **he is not currently committed to ever publishing this game
+commercially**. That materially lowers the stakes: every clause reviewed above is concerned
+with commercial redistribution of the assets, and an unpublished hobby project sits well
+inside all three licences. The four options above are kept for the record, not as open
+questions. **Do not re-litigate this.**
+
+Two things remain true regardless of that decision, and are NOT covered by it:
+
+1. **The Tao & Sound attribution requirement (§9.2) still applies.** It is conditioned on
+   using the asset in an application, not on selling one. 18 of the 26 recommended SFX are
+   Tao & Sound. The ABOUT screen credits line and `game/audio/CREDITS.md` are still needed.
+2. **If the game ever does head toward commercial release, this decision should be
+   revisited before that happens** — not because the licences change, but because unwinding
+   audio out of git history after the fact is far more work than the choice would have been.
+   A pointer here is cheaper than rediscovering the question later.
+
+### 9.6 Packs recommended for dropping — no licence issue either way
+
+Hip Hop, Eastern, and Jazz (Ovani) and Horror (Tao & Sound) were set aside in §7 on
+creative grounds. Nothing in their licences prevents use; they are simply the wrong music.

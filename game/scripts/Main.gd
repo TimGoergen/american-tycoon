@@ -232,6 +232,11 @@ var _currency_format_markers: Array[Label] = []
 ## The Settings tab's normal page — hidden while the embedded Balance Tuning panel
 ## (_dev_panel) is swapped into the tab's slot, restored on its Close.
 var _settings_page: Control
+
+## Swipe-scrolling for the Settings page, whose surface is tiled with buttons that would otherwise
+## swallow the drag. Every press handler on that page checks `.moved` before acting, so a swipe
+## ending over a control does not also activate it.
+var _settings_drag: DragToScroll
 ## The Settings tab's CHALLENGES button. Kept as a member so its locked/unlocked state can be
 ## refreshed every frame alongside the gated nav tabs — Challenge Mode is unavailable until the
 ## first succession (Plans/Challenge_Mode_Gating.md, Roadmap §5).
@@ -1619,8 +1624,19 @@ func _make_settings_button(label: String, height: int, font_size: int, on_presse
 	button.add_theme_font_size_override("font_size", font_size)
 	UiPalette.style_button(button, false)
 	button.text = label
-	button.pressed.connect(on_pressed)
+	# Guarded centrally rather than at each of the six call sites: a swipe across the Settings page
+	# ends with a release over whatever button it finished on, and every one of these opens a screen.
+	button.pressed.connect(func() -> void:
+		if _settings_tap_was_a_swipe():
+			return
+		on_pressed.call())
 	return button
+
+
+## True when the press that just fired was really the end of a scroll gesture, so the handler that
+## called this should do nothing. Safe before the page is built (`_settings_drag` is null then).
+func _settings_tap_was_a_swipe() -> bool:
+	return _settings_drag != null and _settings_drag.moved
 
 
 ## Settings tab: player options. Today the prestige-minigame toggle and the dev panel
@@ -1668,7 +1684,13 @@ func _build_settings_tab() -> Control:
 		"unchecked", load("res://art/icons/checkbox_unchecked.svg")
 	)
 	_minigame_check.button_pressed = game.ui_minigame_enabled
-	_minigame_check.toggled.connect(func(on: bool) -> void: game.ui_minigame_enabled = on)
+	# A CheckBox toggles on RELEASE, so a swipe that ends on it would flip the setting. Put the
+	# value back rather than just returning — the toggle has already happened by the time we hear.
+	_minigame_check.toggled.connect(func(on: bool) -> void:
+		if _settings_tap_was_a_swipe():
+			_minigame_check.set_pressed_no_signal(game.ui_minigame_enabled)
+			return
+		game.ui_minigame_enabled = on)
 	v.add_child(_minigame_check)
 
 	# Tutorial-tips toggle — the master on/off for the one-time coach cards. Persisted in
@@ -1683,7 +1705,11 @@ func _build_settings_tab() -> Control:
 	_tutorial_check.add_theme_icon_override("checked", load("res://art/icons/checkbox_checked.svg"))
 	_tutorial_check.add_theme_icon_override("unchecked", load("res://art/icons/checkbox_unchecked.svg"))
 	_tutorial_check.button_pressed = TutorialProgress.is_enabled()
-	_tutorial_check.toggled.connect(func(on: bool) -> void: TutorialProgress.set_enabled(on))
+	_tutorial_check.toggled.connect(func(on: bool) -> void:
+		if _settings_tap_was_a_swipe():
+			_tutorial_check.set_pressed_no_signal(TutorialProgress.is_enabled())
+			return
+		TutorialProgress.set_enabled(on))
 	v.add_child(_tutorial_check)
 
 	# Number format (Plans/Currency_Format_Setting.md): THREE always-visible rows, one per mode,
@@ -1745,12 +1771,9 @@ func _build_settings_tab() -> Control:
 
 	# A spacer pushes the two tuning buttons to the bottom of the panel, clear of the options above.
 	#
-	# CAUTION for whoever adds the next setting: this page is a plain VBox, NOT a ScrollContainer,
-	# so content that does not fit is not merely clipped — it is unreachable, and this spacer's
-	# EXPAND_FILL hides the problem by silently collapsing to nothing first. Adding the
-	# number-format card pushed the bottom buttons off screen exactly this way (Tim, 2026-08-05).
-	# Pairing those buttons bought back two rows, but the durable fix is to host the page in a
-	# ScrollContainer; do that rather than shaving another control when this next overflows.
+	# The page now lives in a ScrollContainer (see the end of this function), so overflow scrolls
+	# instead of going unreachable. This spacer still earns its place: while the content is SHORTER
+	# than the screen it holds the buttons down at the bottom, which is where they have always sat.
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(spacer)
@@ -1816,8 +1839,39 @@ func _build_settings_tab() -> Control:
 		_make_settings_button("HELP", tuning_button_height, TUNING_BUTTON_FONT, _on_help_pressed))
 	bottom_buttons.add_child(reference_row)
 
-	stack.add_child(v)
-	_settings_page = v
+	# THE PAGE SCROLLS (Plans/Audio_System.md §6.1 Phase 0). It used to be a bare VBox, where content
+	# that did not fit was not clipped but UNREACHABLE — and the spacer above hid the problem by
+	# collapsing to nothing first, so the page looked fine right up until a control was off-screen.
+	# The number-format card hit this in 2026-08-05 and was paid for by pairing buttons onto shared
+	# rows; there is no third rearrangement left to make, and the audio card is three sliders.
+	#
+	# `v` keeps its EXPAND_FILL spacer, which needs the page to be at least a screenful tall or it
+	# collapses and the bottom buttons ride up under the settings. So the VBox is given a MINIMUM
+	# height of one viewport (below), and grows past it when the content is genuinely taller — short
+	# content still pins the buttons to the bottom, tall content scrolls.
+	var settings_scroll := ScrollContainer.new()
+	settings_scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	settings_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	settings_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
+	# The VBox was anchored FULL_RECT while it was the page itself. Inside a scroll the container
+	# does the positioning, and an anchored child fights it.
+	v.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	settings_scroll.add_child(v)
+	settings_scroll.resized.connect(
+		func() -> void: v.custom_minimum_size.y = settings_scroll.size.y)
+
+	# Swipe-scrolling: the page is tiled with buttons and checkboxes, each of which swallows the
+	# touch it is pressed with, so without this the page can only be scrolled from the thin gaps
+	# between controls. Every press handler on this page checks `_settings_drag.moved` first, so a
+	# swipe that ends over a button does not also press it.
+	_settings_drag = DragToScroll.new(settings_scroll)
+	_settings_drag.watch_buttons_under(v)
+
+	stack.add_child(settings_scroll)
+	# The SCROLL is the page as far as show/hide is concerned — hiding the VBox inside it would
+	# leave an empty scroll behind.
+	_settings_page = settings_scroll
 
 	# The Balance Tuning panel, hidden until its button swaps it in. Main applies its
 	# edits by saving overrides + reloading the scene, and routes its save-wipe action.
@@ -3078,7 +3132,10 @@ func _build_currency_format_row(mode: int) -> Button:
 	var row := Button.new()
 	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.custom_minimum_size = Vector2(0, UiPalette.STANDARD_BUTTON_HEIGHT)
-	row.pressed.connect(_on_currency_format_selected.bind(mode))
+	row.pressed.connect(func() -> void:
+		if _settings_tap_was_a_swipe():
+			return
+		_on_currency_format_selected(mode))
 
 	# One horizontal strip pinned to the row's full rect, inset so the text clears the plate's
 	# border. MOUSE_FILTER_IGNORE throughout so taps land on the Button underneath, not the Labels.

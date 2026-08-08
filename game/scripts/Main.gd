@@ -72,9 +72,13 @@ var _rows: Array = []
 # tab's rows ever draw (the CPU win at 326 properties).
 var _epoch_tab := 0
 var _epoch_pager_label: Label       # the big civilization / "EARTH" name
-var _epoch_pager_sub: Label         # the "Blue Collar" / "White Collar" subtitle (blank for aliens)
+var _epoch_pager_sub: Label         # the collar on Earth, "ALIEN CIVILIZATION x / y" past it
 var _epoch_prev_button: Button
 var _epoch_next_button: Button
+## Jump-to-end arrows, outside the step arrows: « to Blue Collar, » to the deepest epoch reached
+## this run (Tim, 2026-08-06). Both follow the step arrows' enabled rule, so they gray in place.
+var _epoch_first_button: Button
+var _epoch_last_button: Button
 ## Red dot on the pager's NEXT button, shown when the player has earned enough to advance but hasn't
 ## bought all of the current era's properties (the ownership gate is blocking; Tim, 2026-07-23).
 var _epoch_next_badge: Panel
@@ -149,7 +153,7 @@ const TAB_ICON_SHADOW_ALPHA := 0.35
 const PROPERTY_ICON_SVG := PropertyRow.PROPERTY_ICON_SVG
 const HIRE_MODE_ICON_SVG := "res://art/icons/headshot.svg"
 ## Box side each icon is fitted into, chosen so the two icons' VISIBLE art lands at the same
-## ~50px height even though each SVG canvas carries a different amount of transparent padding
+## height even though each SVG canvas carries a different amount of transparent padding
 ## (the building fills 279/324 of its canvas, the face 86/96) — the same correction PropertyRow
 ## makes for the pair. Both boxes stay at or below the icon's native IMPORTED size (the building
 ## imports at 324px with svg/scale=4, the face at 96px), so neither is upscaled into a blocky
@@ -173,6 +177,27 @@ const MODE_CAPTION_PLUS_SCALE := 1.2
 ## Fixed width of the BUY and HIRE toggles. Shared with the collapsed AUTO-BUY button through
 ## UiPalette so the three cannot drift apart — see UiPalette.HEADER_BUTTON_WIDTH for the derivation.
 const MODE_BUTTON_WIDTH := UiPalette.HEADER_BUTTON_WIDTH
+
+## The epoch pager's civilization name (Tim, 2026-08-08: "a bit smaller to fit on a single line").
+##
+## MEASURED, not chosen. The name gets 646px: 1080 less the 9px screen bezel a side, the 16px
+## universal content margin, the tab panel's 24px content margin, the four 72px pager arrows and the
+## row's four 12px separations. Against that, the longest of the 27 names — "THE PROPRIETORS
+## ABSOLUTE" — runs 861px at the old FONT_DISPLAY, and 13 of 27 wrapped. At 48 three still wrapped.
+## 44 is the first size where ALL 27 fit, with 15px to spare on the worst case.
+##
+## Autowrap stays on as a safety net rather than as routine behaviour: a longer name added later
+## should wrap rather than run off the edge, but it should also send someone back to this number.
+const EPOCH_NAME_FONT_SIZE := 44
+
+## The pager subtitle's colour — DARK_GOLD deepened (Tim, 2026-08-08: "a little darker").
+##
+## The exact shade is set by contrast rather than taste. This line sits on the tab panel, which is
+## CREAM at 0.65 alpha — so what shows through it changes with the backdrop, and gold-on-cream was
+## already the weakest text in the header. Measured against a light, a mid and a dark backdrop, the
+## old DARK_GOLD ran 3.21 / 1.85 / 1.61 and a first pass at #7C5A10 still bottomed out at 2.69.
+## #6B4D0C clears 3:1 in every case (3.32 worst) while staying recognisably gold.
+const EPOCH_SUBTITLE_COLOR := Color("#6B4D0C")
 
 # The screen-frame constants (bezel + universal content margin) live in UiPalette now, so the
 # Main screen and the full-screen overlays all frame identically (UiPalette.apply_screen_bezel
@@ -1113,12 +1138,35 @@ func _epoch_tab_name(tab: int) -> String:
 
 
 ## The subtitle under the name: the collar for Earth, blank for aliens (the civ name stands alone).
+##
+## Kept Earth-only on purpose. NewVenturesOverlay also calls this and renders "NAME · SUB", so an
+## alien subtitle here would leak a position counter into that nudge's copy. The pager's own richer
+## subtitle lives in _epoch_pager_sub_text below.
 func _epoch_tab_sub(tab: int) -> String:
 	if tab == 0:
 		return "BLUE COLLAR"
 	if tab == 1:
 		return "WHITE COLLAR"
 	return ""
+
+
+## The subtitle the PAGER shows. Earth keeps its collar; every alien civ gets its position in the
+## run's ladder, so the alien tabs read the same way the Earth ones do instead of standing bare
+## (Tim, 2026-08-06).
+##
+## Numbering: tab = tier − 1 uniformly, and tier 3 is the first alien (EpochState.LAST_EARTH_TIER
+## is 2), so alien N sits at tab N + 1. The total is how many aliens have been MET THIS RUN —
+## EpochState.current_tier is per-generation and resets to 1 at every succession
+## (see EpochState.gd:11-13), which is exactly the "current run" this counter means.
+func _epoch_pager_sub_text(tab: int) -> String:
+	if tab <= 1:
+		return _epoch_tab_sub(tab)
+	var index := tab - 1
+	# maxi guards the display, not the model: paging is already clamped to what you have reached, so
+	# these should always agree. If a future change ever lets you look at a tab beyond the frontier,
+	# "3 / 2" would be nonsense on screen — clamping keeps the readout honest either way.
+	var met := maxi(game.epoch.current_tier - EpochState.LAST_EARTH_TIER, index)
+	return "ALIEN CIVILIZATION %d / %d" % [index, met]
 
 
 func _build_epoch_pager() -> Control:
@@ -1128,6 +1176,12 @@ func _build_epoch_pager() -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
 	box.add_child(row)
+
+	# Jump-to-end arrows sit OUTSIDE the step arrows (Tim, 2026-08-06), so the row reads
+	# «  ‹  NAME  ›  » — travel distance grows outward from the middle.
+	_epoch_first_button = _make_pager_arrow("«")
+	_epoch_first_button.pressed.connect(func() -> void: _set_epoch_tab(0))
+	row.add_child(_epoch_first_button)
 
 	_epoch_prev_button = _make_pager_arrow("‹")
 	_epoch_prev_button.pressed.connect(func() -> void: _step_epoch_tab(-1))
@@ -1141,7 +1195,7 @@ func _build_epoch_pager() -> Control:
 	_epoch_pager_label = Label.new()
 	_epoch_pager_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_epoch_pager_label.add_theme_font_override("font", UiPalette.make_bold_font())
-	_epoch_pager_label.add_theme_font_size_override("font_size", UiPalette.FONT_DISPLAY)
+	_epoch_pager_label.add_theme_font_size_override("font_size", EPOCH_NAME_FONT_SIZE)
 	_epoch_pager_label.add_theme_color_override("font_color", UiPalette.NAVY)
 	# Fill the space between the arrows and WRAP a long civilization name onto a second line rather
 	# than forcing the whole tab column wider than the screen (Tim, 2026-07-13: "QUARTZITE
@@ -1156,8 +1210,15 @@ func _build_epoch_pager() -> Control:
 	_epoch_pager_sub = Label.new()
 	_epoch_pager_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_epoch_pager_sub.add_theme_font_override("font", UiPalette.make_bold_font())
-	_epoch_pager_sub.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
-	_epoch_pager_sub.add_theme_color_override("font_color", UiPalette.DARK_GOLD)
+	# FONT_BODY, not FONT_SUBHEAD. Not asked for directly, but forced by the name shrinking to 44:
+	# at 41 the subtitle would have been within three points of the title above it and the two would
+	# have stopped reading as a heading and its caption. Dropping a step restores the hierarchy the
+	# smaller name gave up.
+	_epoch_pager_sub.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
+	# Darker than DARK_GOLD (Tim, 2026-08-08). Gold on the tab panel's translucent cream is the
+	# lowest-contrast text in the header; deepening it buys legibility without changing the hue that
+	# marks this line as the subtitle rather than part of the name.
+	_epoch_pager_sub.add_theme_color_override("font_color", EPOCH_SUBTITLE_COLOR)
 	_epoch_pager_sub.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_epoch_pager_sub.autowrap_mode = TextServer.AUTOWRAP_WORD
 	center.add_child(_epoch_pager_sub)
@@ -1167,7 +1228,13 @@ func _build_epoch_pager() -> Control:
 	row.add_child(_epoch_next_button)
 	# Red-dot badge (same style as the Estate tab's): lit while the ownership gate blocks epoch
 	# progress, driven each frame from _property_blocking_epoch_progress in _process.
+	# It stays on the SINGLE next arrow: the badge means "the next epoch is blocked", which is a
+	# statement about one step forward, not about jumping to the frontier.
 	_epoch_next_badge = _make_estate_badge(_epoch_next_button)
+
+	_epoch_last_button = _make_pager_arrow("»")
+	_epoch_last_button.pressed.connect(func() -> void: _set_epoch_tab(_epoch_tab_max()))
+	row.add_child(_epoch_last_button)
 
 	_epoch_pager_dots = EpochPagerDots.new()
 	box.add_child(_epoch_pager_dots)
@@ -1280,7 +1347,11 @@ func _set_contact_caption(ready: bool, scale_factor: float) -> void:
 func _make_pager_arrow(glyph: String) -> Button:
 	var b := Button.new()
 	b.text = glyph
-	b.custom_minimum_size = Vector2(96, UiPalette.STANDARD_BUTTON_HEIGHT)
+	# 72 wide, not the original 96: four arrows now share this row, and at 96 they left the civ name
+	# only ~650px, which wrapped long names like QUARTZITE CONGLOMERATE far more often and made the
+	# pager's height jump as you paged (Tim's call, 2026-08-06). 72px is still a large tap target at
+	# this resolution and keeps ~790px for the name — about where it was with two arrows.
+	b.custom_minimum_size = Vector2(72, UiPalette.STANDARD_BUTTON_HEIGHT)
 	b.add_theme_font_override("font", UiPalette.make_bold_font())
 	b.add_theme_font_size_override("font_size", UiPalette.FONT_DISPLAY)
 	UiPalette.style_button(b, false)
@@ -1325,12 +1396,16 @@ func _update_epoch_pager() -> void:
 	if _epoch_pager_label == null:
 		return
 	_epoch_pager_label.text = _epoch_tab_name(_epoch_tab)
-	var sub := _epoch_tab_sub(_epoch_tab)
+	var sub := _epoch_pager_sub_text(_epoch_tab)
 	_epoch_pager_sub.text = sub
 	_epoch_pager_sub.visible = sub != ""
 	var last := _epoch_tab_max()
+	# The jump arrows share the single arrows' enabled rule exactly — at tab 0 both left arrows are
+	# dead, at the frontier both right ones are. Nothing hides; they gray in place.
 	_epoch_prev_button.disabled = _epoch_tab <= 0
+	_epoch_first_button.disabled = _epoch_tab <= 0
 	_epoch_next_button.disabled = _epoch_tab >= last
+	_epoch_last_button.disabled = _epoch_tab >= last
 	# One dot per UNLOCKED tab (0..last are open, contiguous). Hide the row entirely while only
 	# one tab is open — a lone dot indicates nothing, and the arrows already read as disabled.
 	var unlocked_count := last + 1

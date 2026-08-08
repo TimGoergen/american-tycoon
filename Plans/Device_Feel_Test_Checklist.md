@@ -537,6 +537,11 @@ reason: they are live in whatever build is on the phone right now.*
       MAX moved down an ordinal and saves written while BLOCK existed are clamped on load.
       **Today's test APKs carry BLOCK-era saves, and the clamp has never been exercised on
       device.** Check a pre-removal save still opens with a sane hire mode.
+- [x] ~~**`feature/epoch-pager-improvements`.**~~ **KEEP — Tim, 2026-08-08: "the pager looks good,
+      everything is sized well and aligned properly."** Covers all four changes: the
+      `ALIEN CIVILIZATION x / y` subtitle on every alien tab, the `«  ‹  NAME  ›  »` jump arrows
+      (narrowed to 72px so the name kept its room), the civ name dropped to 44 so all 27 fit on one
+      line, and the subtitle darkened to `#6B4D0C` — the last two both measured rather than chosen.
 - [ ] **`feature/challenge-mode-gating`** (4 commits, **zero device verification** — its
       Verification section asks only for headless checks). Two layout risks were reasoned
       about but never looked at: the locked label **dropped to font 32** to stay inside the

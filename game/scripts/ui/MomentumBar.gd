@@ -152,6 +152,16 @@ var _auto_purchase_caption_icons: Array = []
 ## right edge of the chevron.
 var _auto_purchase_rate_label: Label
 
+## The OVR button's animated plate, and the two colours it pulses around. The plate is a duplicate
+## of the palette's action-button look, so only these two values are ever touched.
+var _overdrive_plate: StyleBoxFlat
+var _overdrive_plate_bg := Color.WHITE
+var _overdrive_plate_border := Color.WHITE
+## Seconds into the availability pulse. Re-zeroed when the button becomes available, so the pulse
+## always opens on the same beat rather than wherever a free-running clock happened to be.
+var _overdrive_pulse_seconds := 0.0
+var _overdrive_was_available := false
+
 ## The cycle wave and its clipping host. Shown only while the mode is running; the host clips, the
 ## band inside it slides.
 var _auto_purchase_wave_host: Control
@@ -415,6 +425,17 @@ const AUTO_PURCHASE_ARROW_GAP := 10
 const AUTO_PURCHASE_ARROW_GUTTER := \
 	AUTO_PURCHASE_ARROW_INSET + AUTO_PURCHASE_ARROW_SIZE + AUTO_PURCHASE_ARROW_GAP
 
+## The OVR availability pulse (Tim, 2026-08-07): OVERDRIVE can only be engaged in a narrow window —
+## cruising, at the cruise clamp, and not locked out — and a button that merely stopped being grey
+## was easy to miss while the player was watching the meter. A breathing plate is visible in
+## peripheral vision, which is where the button actually is at that moment.
+##
+## One full breath per period. Slow enough to read as "ready" rather than as an alarm.
+const OVERDRIVE_PULSE_SECONDS := 1.1
+## How far the plate lightens, and how far its outline travels toward gold, at the top of a breath.
+const OVERDRIVE_PULSE_LIGHTEN := 0.28
+const OVERDRIVE_PULSE_BORDER_MIX := 0.85
+
 ## The cycle wave: how bright the band gets at its centre, and how wide it is as a fraction of the
 ## button. Wide and faint on purpose — it is a heartbeat behind the face, not a highlight sweeping
 ## over it, and it has to stay legible under the text and icons that draw on top.
@@ -579,6 +600,17 @@ func _ready() -> void:
 	# aliases (the rule the tab icons and the gamepad already follow).
 	_overdrive_button.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	UiPalette.style_button(_overdrive_button, true)
+	# A plate of our own for the AVAILABLE pulse (Tim, 2026-08-07). DUPLICATED from whatever
+	# style_button just produced rather than rebuilt from scratch, so the pulse can never drift from
+	# the palette's action-button look — only its two colours are animated.
+	#
+	# `normal` and `hover` only. `pressed` keeps its own darker plate: the press is a distinct beat
+	# and the pulse must not eat the feedback that the tap landed.
+	_overdrive_plate = (_overdrive_button.get_theme_stylebox("normal") as StyleBoxFlat).duplicate()
+	_overdrive_plate_bg = _overdrive_plate.bg_color
+	_overdrive_plate_border = _overdrive_plate.border_color
+	_overdrive_button.add_theme_stylebox_override("normal", _overdrive_plate)
+	_overdrive_button.add_theme_stylebox_override("hover", _overdrive_plate)
 	# When overdrive can't engage (no live rush hold, or locked out) the button grays its
 	# OUTLINE too, exactly like the frenzy pop button — "can't trigger" must read at a glance
 	# (Tim 2026-07-15). The standard disabled plate keeps the navy frame; swap ours for gray.
@@ -1135,6 +1167,41 @@ func _tint_auto_purchase_caption(color: Color) -> void:
 		_auto_purchase_rate_label.add_theme_color_override("font_color", color)
 
 
+## Breathe the OVR plate while overdrive can actually be engaged, and hold it still otherwise.
+##
+## Both the FILL and the OUTLINE move: the outline is what carries at a glance on a small button
+## against a busy row, and the fill is what reads when the eye does land on it.
+##
+## Mutates the two colours of one owned StyleBoxFlat rather than swapping styleboxes per frame —
+## no allocation, and the plate keeps every other property the palette gave it.
+func _pulse_overdrive_availability(delta: float) -> void:
+	if _overdrive_plate == null or _overdrive_button == null:
+		return
+	var available := not _overdrive_button.disabled
+
+	if not available:
+		# Park it exactly at rest. Leaving a disabled button mid-breath would freeze it at an
+		# arbitrary brightness, which reads as a rendering fault rather than as "not yet".
+		if _overdrive_was_available:
+			_overdrive_plate.bg_color = _overdrive_plate_bg
+			_overdrive_plate.border_color = _overdrive_plate_border
+		_overdrive_was_available = false
+		return
+
+	if not _overdrive_was_available:
+		_overdrive_pulse_seconds = 0.0
+	_overdrive_was_available = true
+
+	_overdrive_pulse_seconds = fmod(_overdrive_pulse_seconds + delta, OVERDRIVE_PULSE_SECONDS)
+	# 0 → 1 → 0 across the period: a breath, not a sawtooth that snaps back at the top.
+	var phase := _overdrive_pulse_seconds / OVERDRIVE_PULSE_SECONDS
+	var strength := 0.5 - 0.5 * cos(phase * TAU)
+	_overdrive_plate.bg_color = _overdrive_plate_bg.lightened(
+		OVERDRIVE_PULSE_LIGHTEN * strength)
+	_overdrive_plate.border_color = _overdrive_plate_border.lerp(
+		UiPalette.MUSTARD_GOLD, OVERDRIVE_PULSE_BORDER_MIX * strength)
+
+
 ## Slide the cycle wave across the button, one full pass per purchase cycle.
 ##
 ## The band starts entirely off the left edge and ends entirely off the right, so the sweep reads as
@@ -1365,6 +1432,9 @@ func _process(delta: float) -> void:
 	var at_cruise_depth: bool = _rush_momentum.heat >= _rush_momentum.cruise_heat() \
 			or is_equal_approx(_rush_momentum.heat, _rush_momentum.cruise_heat())
 	_overdrive_button.disabled = _auto_purchase_locked or not (cruising and at_cruise_depth)
+	# Breathe the plate the moment it becomes tappable. Driven here, immediately after the decision,
+	# so the pulse can never disagree with the button's own enabled state.
+	_pulse_overdrive_availability(delta)
 
 	# The label: the live bonus normally; "CRUISE +X%" while the clamp is holding steady; the
 	# lockout narration while shut down; "NO RUSH" while the Acquisitions Desk has rush

@@ -71,6 +71,7 @@ func _run() -> void:
 	await _test_purchase_pulse(bar_script, tuning)
 	await _test_expands_while_running(bar_script, tuning)
 	await _test_cycle_wave(bar_script, tuning)
+	await _test_overdrive_availability_pulse(bar_script, tuning)
 
 	print("")
 	if _failures == 0:
@@ -479,3 +480,66 @@ func _find_wave_band(bar: Control) -> TextureRect:
 		if rect != null:
 			return rect
 	return null
+
+
+## The OVR availability pulse: the plate breathes only while overdrive can actually be engaged
+## (Tim, 2026-08-07). That window is narrow — cruising, at the clamp, not locked out — and a button
+## that merely stopped being grey was easy to miss.
+##
+## Asserted on the plate's own colours, because that is the whole feature. A pulse that ran while
+## the button was disabled, or that froze mid-breath when the window closed, would both look
+## perfectly reasonable in the source.
+func _test_overdrive_availability_pulse(bar_script: GDScript, tuning: TuningConfig) -> void:
+	print("\n6. The OVR plate breathes only while overdrive is available")
+
+	var bar: Control = await _mount_bar(bar_script, tuning, true, true, false)
+	var ovr: Button = bar.get_overdrive_button()
+	_check("the OVR button exists", ovr != null)
+	if ovr == null:
+		bar.queue_free()
+		return
+
+	# A fresh bar is not cruising, so the button starts disabled and the plate must sit at rest.
+	var plate := ovr.get_theme_stylebox("normal") as StyleBoxFlat
+	_check("its plate is a StyleBoxFlat we can read", plate != null)
+	if plate == null:
+		bar.queue_free()
+		return
+
+	_check("the button starts unavailable", ovr.disabled)
+	var rest_bg := plate.bg_color
+	var rest_border := plate.border_color
+	bar._process(0.4)
+	bar._process(0.4)
+	_check("while unavailable the plate does not move",
+		plate.bg_color.is_equal_approx(rest_bg)
+			and plate.border_color.is_equal_approx(rest_border))
+
+	# Force the availability the real game reaches by cruising at the clamp. Reaching it honestly
+	# would mean simulating a rush hold; the pulse only cares that the button is enabled.
+	ovr.disabled = false
+	bar._pulse_overdrive_availability(0.0)
+	_check("at the start of a breath it is still at rest",
+		plate.bg_color.is_equal_approx(rest_bg))
+
+	bar._pulse_overdrive_availability(0.55)   # half of the 1.1s period — the top of the breath
+	var lit_bg := plate.bg_color
+	var lit_border := plate.border_color
+	_check("mid-breath the fill has lightened", lit_bg != rest_bg)
+	_check("...and the outline has moved toward gold", lit_border != rest_border)
+
+	bar._pulse_overdrive_availability(0.55)   # back to the bottom
+	_check("a full period returns it to rest",
+		plate.bg_color.is_equal_approx(rest_bg)
+			and plate.border_color.is_equal_approx(rest_border))
+
+	# Closing the window must PARK it, not freeze it wherever the breath happened to be.
+	bar._pulse_overdrive_availability(0.55)
+	_check("mid-breath again before disabling", plate.bg_color != rest_bg)
+	ovr.disabled = true
+	bar._pulse_overdrive_availability(0.0)
+	_check("losing availability parks the plate back at rest, not mid-breath",
+		plate.bg_color.is_equal_approx(rest_bg)
+			and plate.border_color.is_equal_approx(rest_border))
+
+	bar.queue_free()

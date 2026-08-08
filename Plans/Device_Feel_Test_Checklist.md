@@ -514,15 +514,15 @@ reason: they are live in whatever build is on the phone right now.*
       re-applies it when `_ready` builds the button, so a push that arrives while the bar is
       still detached is no longer silently dropped. `sim/MomentumBarStateTest.gd` reproduces the
       post-prestige ordering and fails against the unfixed bar.
-- [ ] **`feature/auto-purchase-and-bulk-hire`** — **RESTRUCTURED 2026-08-07, still device
-      pending** (`Plans/Auto_Purchase_Restructure.md`). The rule below is superseded: auto-buy is
-      now greedy cheapest-first over the CURRENT EPOCH, one number (purchases per round) instead
-      of the old N × X grid, with no flagship exclusion and no tab targeting. Head Hunters is
-      deleted and bulk hire is free. **What to watch first:** greedy puts ~21 units into one
-      property before it overtakes its neighbour (cohort rungs are ~×7 apart), so purchases pile
-      into a single rung — measured, 30 buys landed on just 2 properties. That is the honest
-      behaviour of the chosen rule; the question is whether it FEELS right. If not, the lever is
-      a per-property cap per tick, not the tie-break.
+- [x] ~~**`feature/auto-purchase-and-bulk-hire` — the restructured buying behaviour.**~~
+      **KEEP — Tim, 2026-08-08: "I like the auto buy behavior."** Greedy cheapest-first, one number
+      (purchases per round) instead of the old N × X grid, scoped to the VISIBLE TAB, no flagship
+      exclusion. Head Hunters deleted and bulk hire free.
+      **This closes the concentration question**, which was the branch's last open design item:
+      cohort rungs sit ~×7 apart, so the cheapest must be bought ~21 times before it overtakes its
+      neighbour — measured, 30 purchases landing on just 2 properties. That is the honest behaviour
+      of the chosen rule, and it is now confirmed as wanted rather than tolerated. The lever if it
+      ever needs one is a per-property cap per tick, NOT the tie-break.
       Historical detail, for the four decisions that came with the original build:
       - **Rush-heat decay during auto-buy lockout.** Heat **decays** rather than idling —
         the one place that plan contradicts the Roadmap on a feel question, and the reason
@@ -566,12 +566,12 @@ reason: they are live in whatever build is on the phone right now.*
       out of it, for any state added later: **numbers are big, words are small** — the bonus figures
       are the bar's readout and get the size; OVERHEATED, COOLING and the auto-buy narration explain
       why there is no number and stay small.
-- [ ] **Still unverdicted from the 2026-08-07 pass:**
-      - the BUY/HIRE captions: icons 20% smaller, the "+" 20% larger, both gaps tightened
-      - **whether OVERHEATED still lands** — that narration shares the shrunken slot and, by the
-        rule above, deliberately did NOT get its size back
-      - the meter collapsing to nothing while AUTO-BUY is expanded: does losing the rush bar
-        mid-session read as intentional, or as something breaking?
+- [x] ~~**The rest of the 2026-08-07/08 header pass.**~~ **KEEP — Tim, 2026-08-08: "all of the rush
+      / auto buy header changes look good."** Covers the BUY/HIRE captions (icons 20% smaller, "+"
+      20% larger, gaps tightened) and the meter collapsing to nothing while AUTO-BUY is expanded.
+      One narrow caveat, recorded rather than argued: **OVERHEATED is only on screen during an
+      overheat**, so unless one happened in that session it rode in on a general verdict. It is the
+      one word deliberately left at the resting size, so if any of this comes back, it is that.
 - [ ] **`OVERHEATED` + countdown on each frozen row** — the TWEAK from §6 sitting A
       (your pick over a bare label, "COOLING DOWN", or a voiced line). `OVERHEATED` appears
       in `PropertyRow.gd`/`Main.gd`, so the label looks shipped; **confirm the countdown

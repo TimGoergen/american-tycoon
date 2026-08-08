@@ -1,5 +1,24 @@
 # Auto-Purchase Mode & Bulk Hire — Implementation Plan
 
+> ⚠️ **PARTLY SUPERSEDED — read `Plans/Auto_Purchase_Restructure.md` first (2026-08-07/08).**
+>
+> The features shipped, but the buying rule and the upgrade shape in **Part A** were rebuilt, and
+> **Part B's** Head Hunters track was deleted outright. What this doc still describes correctly is
+> the *reasoning*: why the two features ship together, the rush-lockout argument (§A5, unchanged and
+> device-confirmed), and the retention UX work.
+>
+> **What is WRONG here now:**
+>
+> | This doc says | The game does |
+> |---|---|
+> | Buys **N units each of the X cheapest** properties — an N × X grid | Makes **one number** of single-unit purchases, each taking whatever is cheapest at that instant, re-priced between every purchase |
+> | Targets the **last-viewed civ tab**, read from the saved `ui_epoch_tab` | Targets the **tab currently on screen** (Main's live `_epoch_tab`) |
+> | **Never buys the cohort flagship** — a structural pacing guard | No flagship exclusion. `auto_advance` is off, so leaving an era is always the MAKE CONTACT tap; the exclusion only ever stopped the desk *satisfying* the 35-unit gate |
+> | One **Acquisitions Desk** track, 8 levels, level 1 unlocks the mode | A separate **unlock**, plus **Buying Power** (purchases per round) and **Standing Orders** (cadence) — both requiring the unlock |
+> | **Head Hunters** gates bulk hire | Deleted. Bulk hire is free for everyone |
+>
+> Its "Open decisions for Tim" section is also closed — see the restructure plan §0.1.
+
 Graduates **Roadmap §7** (auto-property-purchase via a Legacy upgrade) and **Roadmap §2/§3**
 (bulk hire, bulk staff retention) into a build. Branch: `feature/auto-purchase-and-bulk-hire`.
 

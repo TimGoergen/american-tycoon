@@ -314,7 +314,18 @@ and plays — cheap, and it pins the "unknown ids are inert" property §2.1 depe
 - Hire-mode buttons: always visible; the hidden-until-unlocked exception is deleted.
 - The AUTO-BUY button, its pulse, and the rush lockout are all unchanged.
 
-### 3.5 Device pass
+### 3.5 Device pass — DONE 2026-08-08
+Tim: *"I like the auto buy behavior"*, *"the OVR and auto buy button look good"*, *"the rush bar
+looks good"*, *"all of the rush / auto buy header changes look good"*.
+
+**The concentration question is closed** — greedy puts ~21 units into one property before its price
+overtakes the neighbour (measured: 30 purchases across 2 properties), and that is wanted rather than
+tolerated. The lever if it ever needs one is a per-property cap per tick, not the tie-break.
+
+One tweak came out of the pass and is applied: the live building percentage now matches the cruise
+percentage in size (§ the numbers-big-words-small rule in `MomentumBar.BONUS_LABEL_SCALE`).
+
+*Original checklist follows.*
 Ship an APK and confirm: bulk hire is free from generation 1, the greedy rule feels like it is
 buying sensible things (watch whether the least-owned tie-break visibly spreads purchases
 across a cohort), and a maxed-ish build is fun rather than alarming. Grant yourself Legacy from
@@ -336,8 +347,10 @@ the dev panel to re-buy the tracks (§2.3).
 3. ~~**`ui_epoch_tab` may now be dead.**~~ **CLOSED 2026-08-07** — tab targeting is back (§0.2b),
    so the field keeps both jobs: it restores the pager across a launch, and that restored tab is
    where the desk points at startup.
-4. **`Auto_Purchase_And_Bulk_Hire.md` needs a superseded box at the top** pointing here, per the
-   doc-rot rule — its Parts A/B describe a shape that will no longer exist.
+4. ~~**`Auto_Purchase_And_Bulk_Hire.md` needs a superseded box at the top**~~ — **DONE 2026-08-08.**
+   A box at its head lists, row by row, what that doc says versus what the game does, and points
+   here. Its Parts A/B are kept for the reasoning that survived (chiefly the §A5 rush-lockout
+   argument, which is unchanged and device-confirmed).
 5. **The "naming trap" assertion loses its home.** `AutoPurchaseTest` currently asserts that
    `get_flagship_index_for_unlock_tier` and `get_property_index_for_unlock_tier` are different
    properties, so a future rename merging the pair breaks a test rather than silently un-gating

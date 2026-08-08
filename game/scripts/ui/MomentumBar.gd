@@ -156,6 +156,10 @@ var _auto_purchase_rate_label: Label
 ## cadence is the tuned base less the upgrade's shave, clamped to a tuned floor.
 var _auto_purchase_cadence := 0.0
 
+## How long the desk has been sitting idle, driving the ellipsis animation. Reset the moment idle
+## begins so the cycle always starts at one dot rather than wherever the clock happened to be.
+var _auto_purchase_idle_seconds := 0.0
+
 ## Seconds left in the "the desk just bought something" pulse (0 = not pulsing). Counted down in
 ## _process, exactly the way PropertyRow fades its auto-purchase row marker — a countdown rather
 ## than a Tween so a purchase landing mid-pulse simply retriggers it, with no tween to kill and
@@ -382,6 +386,17 @@ const AUTO_PURCHASE_PROPERTY_BOX := int(
 const AUTO_PURCHASE_CAPTION_GAP := 4
 const AUTO_PURCHASE_CAPTION_INSET := 14
 
+## Where the rate readout starts: past the chevron the Button draws at its left edge. That glyph
+## sits inside the plate's 12px content margin and is AUTO_PURCHASE_ARROW_SIZE wide, so the text
+## begins just beyond it — pinned to the arrow rather than to the button (Tim, 2026-08-07).
+const AUTO_PURCHASE_ARROW_GUTTER := 12 + AUTO_PURCHASE_ARROW_SIZE + 10
+
+## The idle animation: a redrawing ellipsis in place of a static "NOTHING TO BUY" (Tim,
+## 2026-08-07). Seconds each dot count holds before the next — three steps, so a full cycle is
+## three times this. Slow on purpose: it is a thinking indicator, not an alarm.
+const AUTO_PURCHASE_IDLE_DOT_SECONDS := 0.45
+const AUTO_PURCHASE_IDLE_MAX_DOTS := 3
+
 ## The READY flash's peak alpha and fade time.
 const READY_FLASH_ALPHA := 0.75
 const READY_FLASH_FADE_SEC := 0.5
@@ -418,6 +433,9 @@ func set_dynasty(dynasty: DynastyState) -> void:
 ## the economy and the upgrade levels well enough to answer them.
 func set_auto_purchase_state(unlocked: bool, enabled: bool, idle: bool = false,
 		quantity: int = 0, cadence: float = 0.0) -> void:
+	# Restart the ellipsis whenever idle BEGINS, so it always opens on one dot.
+	if idle and not _auto_purchase_idle:
+		_auto_purchase_idle_seconds = 0.0
 	_auto_purchase_idle = idle
 	_auto_purchase_quantity = quantity
 	_auto_purchase_cadence = cadence
@@ -959,13 +977,19 @@ func _build_auto_purchase_caption() -> void:
 		AUTO_PURCHASE_PROPERTY_ICON, AUTO_PURCHASE_PROPERTY_BOX))
 
 	# The EXPANDED face's rate readout — "AUTO-BUY 5/2.5s": what it buys per round, and how often
-	# (Tim, 2026-08-07). Left-aligned, so it sits well left of centre with the status text holding
-	# the right edge and the chevron the left; the expanded button is wide enough that three things
-	# can share it without crowding.
+	# (Tim, 2026-08-07). PINNED TO THE CHEVRON'S RIGHT EDGE, not merely left-aligned in the button.
 	#
-	# A sibling of the caption inside the SAME MarginContainer, which hands every child the identical
-	# rect — so this one aligns itself left while the caption aligns right, and neither needs to know
-	# the other exists. Only one of the two is ever visible anyway.
+	# It needs its OWN margin container rather than sharing the caption's: the caption is inset a
+	# uniform 14 a side, and the chevron the Button draws occupies roughly the first 68px (the
+	# plate's 12px content margin plus the 56px glyph). Left-aligning inside the shared inset put the
+	# text straight through the arrow. This container starts where the arrow ends.
+	var rate_margin := MarginContainer.new()
+	rate_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	rate_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rate_margin.add_theme_constant_override("margin_left", AUTO_PURCHASE_ARROW_GUTTER)
+	rate_margin.add_theme_constant_override("margin_right", AUTO_PURCHASE_CAPTION_INSET)
+	_auto_purchase_button.add_child(rate_margin)
+
 	_auto_purchase_rate_label = Label.new()
 	_auto_purchase_rate_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	_auto_purchase_rate_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -973,7 +997,7 @@ func _build_auto_purchase_caption() -> void:
 	_auto_purchase_rate_label.add_theme_font_override("font", UiPalette.make_bold_font())
 	_auto_purchase_rate_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_auto_purchase_rate_label.visible = false
-	margin.add_child(_auto_purchase_rate_label)
+	rate_margin.add_child(_auto_purchase_rate_label)
 
 
 ## One icon in the AUTO-BUY caption, fitted into a square box and vertically centred.
@@ -1000,6 +1024,20 @@ func _tint_auto_purchase_caption(color: Color) -> void:
 	# button never shows two different "label" tints at once.
 	if _auto_purchase_rate_label != null:
 		_auto_purchase_rate_label.add_theme_color_override("font_color", color)
+
+
+## Redraw the idle ellipsis. Free on every frame the desk is not idle, and it rewrites the button's
+## text only when the dot count actually changes — a Button reassigns its text unconditionally and
+## re-lays out its face, which is wasted work sixty times a second for a label that changes twice a
+## second.
+func _animate_auto_purchase_idle(delta: float) -> void:
+	if not _auto_purchase_idle or not _auto_purchase_enabled or _auto_purchase_button == null:
+		return
+	var before := _auto_purchase_idle_dots()
+	_auto_purchase_idle_seconds += delta
+	var after := _auto_purchase_idle_dots()
+	if after != before:
+		_auto_purchase_button.text = after
 
 
 ## Grow the button across the row while the mode runs, and collapse it back when it stops.
@@ -1053,14 +1091,27 @@ func _auto_purchase_face_text(expanded: bool) -> String:
 	if not expanded:
 		return ""  # collapsed shows the icon caption instead (see _build_auto_purchase_caption)
 	if _auto_purchase_idle:
-		return "NOTHING TO BUY"
+		return _auto_purchase_idle_dots()
 	if _auto_purchase_quantity > 0:
 		return "BUYING ×%d" % _auto_purchase_quantity
 	return "AUTO-BUY ON"
 
 
+## The idle ellipsis, one to three dots on a slow cycle (Tim, 2026-08-07, replacing the static
+## "NOTHING TO BUY"). The desk is not broken and it is not finished — it is waiting for money, and a
+## redrawing ellipsis is the universal shorthand for exactly that. It also keeps the button quiet:
+## a sentence in that slot competed with the rate readout beside it for the same glance.
+##
+## Animated from the bar's own _process rather than a Tween or Timer, matching how every other live
+## element on this bar is driven, and so it simply stops existing when the state leaves idle.
+func _auto_purchase_idle_dots() -> String:
+	var step := int(_auto_purchase_idle_seconds / AUTO_PURCHASE_IDLE_DOT_SECONDS)
+	return ".".repeat(step % AUTO_PURCHASE_IDLE_MAX_DOTS + 1)
+
+
 func _process(delta: float) -> void:
 	_fade_auto_purchase_pulse(delta)
+	_animate_auto_purchase_idle(delta)
 	var locked_out := _rush_momentum.is_locked_out()
 	var cruising := _rush_momentum.is_cruising()
 	# Overdrive DISPLAY mode: the engaged flag, not heat position — the instant the player opts

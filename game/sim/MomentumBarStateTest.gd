@@ -37,6 +37,12 @@ extends SceneTree
 
 var _failures := 0
 
+## Mirrors MomentumBar.AUTO_PURCHASE_IDLE_DOT_SECONDS. Duplicated rather than read off the script,
+## because the whole point of the ellipsis assertions is to step the clock by one dwell — if this
+## drifts from the bar's own value the test starts checking nothing, so a mismatch here should be
+## noticed. Bump both together.
+const AUTO_PURCHASE_IDLE_DOT_SECONDS_FOR_TEST := 0.45
+
 
 func _initialize() -> void:
 	# _initialize cannot itself await, so the body runs as a coroutine off it.
@@ -272,9 +278,19 @@ func _test_expands_while_running(bar_script: GDScript, tuning: TuningConfig) -> 
 	_check("...flips the chevron to point the other way", button.icon != collapsed_icon)
 	_check("...and reports the live purchase count", button.text == "BUYING ×5")
 
-	# Running but broke: the count gives way to the reason nothing is happening.
+	# Running but broke: the count gives way to a redrawing ellipsis — the desk is not broken and
+	# not finished, it is waiting for money.
 	bar.set_auto_purchase_state(true, true, true, 5)
-	_check("running but unable to afford anything says so", button.text == "NOTHING TO BUY")
+	_check("running but unable to afford anything shows an ellipsis, starting at one dot",
+		button.text == ".")
+	# It must actually ANIMATE. Driven from _process, so stepping the clock past a dot's dwell time
+	# has to change the face; a static "..." would pass a "shows dots" check and still be wrong.
+	bar._process(AUTO_PURCHASE_IDLE_DOT_SECONDS_FOR_TEST)
+	_check("...and redraws itself as time passes", button.text == "..")
+	bar._process(AUTO_PURCHASE_IDLE_DOT_SECONDS_FOR_TEST)
+	_check("...through to three dots", button.text == "...")
+	bar._process(AUTO_PURCHASE_IDLE_DOT_SECONDS_FOR_TEST)
+	_check("...then cycles back to one", button.text == ".")
 
 	# The expanded face also carries a rate readout on its LEFT, opposite the status text: what it
 	# buys per round and how often. Found by type rather than by a getter, since it is an internal

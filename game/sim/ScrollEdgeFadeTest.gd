@@ -96,6 +96,36 @@ func _run() -> void:
 	for ghost in ghosts:
 		(ghost as Control).free()
 	unlaid.free()
+
+	# THE SECOND HALF OF THE BUG, and the reason the guard alone was not enough: a scroll that has
+	# ALREADY been laid out keeps its size across a rebuild, so the guard never fires — but the newly
+	# added rows all sit at position 0 until the container sorts them, and a fade computed in that
+	# window hands out nonsense. ChallengesScreen answers it by recomputing on `sort_children`, which
+	# fires exactly when positions become valid. This proves that pattern actually corrects a bad
+	# alpha rather than merely running.
+	column.sort_children.connect(func() -> void: fade_script.apply_edge_fade(scroll, items))
+
+	# Rebuild the list the way _refresh does, and poison the alphas before the sort lands.
+	for item in items:
+		column.remove_child(item as Node)
+		(item as Control).free()
+	items.clear()
+	for i in range(3):
+		var fresh := ColorRect.new()
+		fresh.custom_minimum_size = Vector2(0, 60)
+		fresh.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		fresh.modulate.a = 0.0          # what a fade against unsorted rows leaves behind
+		column.add_child(fresh)
+		items.append(fresh)
+	await process_frame
+	await process_frame
+
+	var repaired := true
+	for item in items:
+		if not is_equal_approx((item as Control).modulate.a, 1.0):
+			repaired = false
+	_check("recomputing on sort_children repaints a rebuilt list that was faded out", repaired)
+
 	scroll.queue_free()
 
 	print("")

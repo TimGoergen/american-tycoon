@@ -296,6 +296,15 @@ func _build_card() -> Control:
 	_rows_column = VBoxContainer.new()
 	_rows_column.add_theme_constant_override("separation", 18)
 	_rows_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# RECOMPUTE THE FADE WHENEVER THE LIST ACTUALLY LAYS OUT, rather than guessing when that will
+	# be. `sort_children` fires the instant this VBox has positioned its children — which is the
+	# only moment the fade's arithmetic has valid geometry to work from.
+	#
+	# This replaces a deferred call that was a guess and got it wrong twice: rebuilt rows sit at
+	# position 0 until the container sorts, so a fade computed before that reads every row as being
+	# in the same place and hands out nonsense alphas (Tim, 2026-08-08 — the list came back empty
+	# after a run, then again after leaving and re-entering the screen).
+	_rows_column.sort_children.connect(_update_edge_fade)
 	_scroll.add_child(_rows_column)
 
 	return card
@@ -317,7 +326,18 @@ func _refresh() -> void:
 	_total_bonus_label.text = "INCOME  +%.1f%%\nLEGACY  +%.1f%%" % [income_pct, legacy_pct]
 
 	for child in _rows_column.get_children():
+		# REMOVED IMMEDIATELY, not just queued. queue_free() leaves the old rows in the tree until
+		# the end of the frame, so the container sorts the OLD and NEW sets together and the fade
+		# fires against a list that is briefly twice as long as it should be. Orphaning them first
+		# makes the rebuild atomic; queue_free still does the actual freeing.
+		_rows_column.remove_child(child)
 		child.queue_free()
+
+	# A rebuilt list starts at the top. Without this the scroll keeps whatever offset the player
+	# left behind — which can be past the end of a shorter list, leaving them looking at blank space
+	# and concluding the games are missing.
+	if _scroll != null:
+		_scroll.scroll_vertical = 0
 
 	# One panel per game, keyed by the type's display_name() — the exact string ChallengeGoals and
 	# DynastyState use, so the panel's tier/bonus lookups line up with the catalog and the save.

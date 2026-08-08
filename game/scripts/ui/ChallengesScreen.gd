@@ -40,6 +40,30 @@ const ICON_MEMORY := preload("res://art/icons/memory_pads.svg")
 const ICON_BALANCE := preload("res://art/icons/book.svg")
 const ICON_TIMING := preload("res://art/icons/lock.svg")
 
+# --- The single BONUS row in the header (Tim, 2026-08-08). ---
+const BONUS_GEM_ICON := preload("res://art/icons/legacy_gem.svg")
+const BONUS_DOLLAR_ICON := preload("res://art/icons/dollar_bill.svg")
+
+## Gap between an icon and the amount beside it.
+const BONUS_ROW_GAP := 10
+
+## Both icon boxes are derived so the two icons DRAW THE SAME HEIGHT (48px) — the amounts sit at
+## FONT_HEADLINE, and an icon a touch shorter than the digits reads as their unit rather than as a
+## second number. The boxes differ because the art does:
+##
+##   legacy_gem.svg  — a 504² canvas whose opaque art fills only 422/504 of the height (0.837), so
+##                     the box must be 48 / 0.837 ≈ 58 to draw 48px of gem.
+##   dollar_bill.svg — 83×57 with NO transparent padding, so its box IS its aspect at 48 tall.
+##
+## Measured with get_image().get_used_rect(); guessing from canvas size would draw the gem ~16% short.
+##
+## Both boxes are then padded to the SAME 70px width. The gem only needs 58, but matching the widths
+## is what keeps BONUS exactly on the row's centre line: the two amounts split the slack evenly, so
+## the word only stays put if the ends are symmetric. The extra 12px is transparent air beside an
+## aspect-centred gem — it does not change how big the gem draws.
+const BONUS_GEM_BOX := Vector2(70, 58)
+const BONUS_DOLLAR_BOX := Vector2(70, 48)
+
 ## Height reserved for one game panel. 180 → 160 (Tim, 2026-08-08), reclaiming the space the locked
 ## rows' third line used to need.
 ##
@@ -127,7 +151,10 @@ var _backdrop: TextureRect
 var _baked_backdrop_size: Vector2 = Vector2.ZERO
 
 ## The prominent total-bonus readout in the header, refreshed with the rows so it always matches.
+## One row: [gem] _legacy_bonus_label ... _total_bonus_label ("BONUS") ... _income_bonus_label [$].
 var _total_bonus_label: Label
+var _legacy_bonus_label: Label
+var _income_bonus_label: Label
 
 ## The scroll holding the game panels, and the column inside it (rebuilt on each refresh so every
 ## tier/bonus is current). The scroll is kept so the edge fade can measure what it is clipping.
@@ -281,15 +308,40 @@ func _build_card() -> Control:
 
 	# The prominent running-totals readout — BOTH reward tracks, on two lines (e.g.
 	# "INCOME  +3.2%" / "LEGACY  +2.0%"), large and gold so they read as the headline reward.
+	# ONE ROW, BOTH TRACKS (Tim, 2026-08-08): [gem] legacy% ····· BONUS ····· income% [dollar].
+	#
+	# It replaces two stacked "INCOME +x% / LEGACY +y%" lines. Each currency is named by its own icon
+	# rather than by a word, which is what lets the pair fit on one line and read at a glance — the
+	# gem and the dollar bill are already the game's vocabulary for these two things, on the Estate
+	# wallet and on every property row. "BONUS" in the middle says what both numbers are.
+	var bonus_row := HBoxContainer.new()
+	bonus_row.add_theme_constant_override("separation", BONUS_ROW_GAP)
+	column.add_child(bonus_row)
+
+	bonus_row.add_child(_make_bonus_icon(BONUS_GEM_ICON, BONUS_GEM_BOX))
+	_legacy_bonus_label = _make_bonus_amount(HORIZONTAL_ALIGNMENT_LEFT)
+	bonus_row.add_child(_legacy_bonus_label)
+
+	# The word takes NO slack — the two amounts do, in equal shares (see _make_bonus_amount), which
+	# pins BONUS to the row's centre. Letting the word expand instead would work too, but then it
+	# would drift sideways every time one amount grew a digit and the other did not.
 	_total_bonus_label = Label.new()
+	_total_bonus_label.text = "BONUS"
 	_total_bonus_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_total_bonus_label.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
+	_total_bonus_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_total_bonus_label.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
 	_total_bonus_label.add_theme_font_override("font", UiPalette.make_bold_font())
-	_total_bonus_label.add_theme_color_override("font_color", UiPalette.DARK_GOLD)
-	column.add_child(_total_bonus_label)
+	_total_bonus_label.add_theme_color_override("font_color", UiPalette.NAVY)
+	bonus_row.add_child(_total_bonus_label)
+
+	_income_bonus_label = _make_bonus_amount(HORIZONTAL_ALIGNMENT_RIGHT)
+	bonus_row.add_child(_income_bonus_label)
+	bonus_row.add_child(_make_bonus_icon(BONUS_DOLLAR_ICON, BONUS_DOLLAR_BOX))
 
 	var explainer := Label.new()
-	explainer.text = "Tap a game to play. Beat your best to climb its tier ladder — every 5th tier pays a permanent bonus, income or Legacy."
+	# Two deliberate lines, so it does not autowrap into a ragged three. AUTOWRAP stays on as the
+	# safety net for a narrow device, where the second line would wrap rather than clip.
+	explainer.text = "Tap a game to play, beat your best to climb the tier ladder.\nEvery 5th tier pays a permanent bonus."
 	explainer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	explainer.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	explainer.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
@@ -345,7 +397,8 @@ func _refresh() -> void:
 	# Both running totals, one per track, on two lines so each reward is legible on its own.
 	var income_pct := _dynasty.get_challenge_income_bonus() * 100.0
 	var legacy_pct := _dynasty.get_challenge_legacy_bonus() * 100.0
-	_total_bonus_label.text = "INCOME  +%.1f%%\nLEGACY  +%.1f%%" % [income_pct, legacy_pct]
+	_legacy_bonus_label.text = "+%.1f%%" % legacy_pct
+	_income_bonus_label.text = "+%.1f%%" % income_pct
 
 	for child in _rows_column.get_children():
 		# REMOVED IMMEDIATELY, not just queued. queue_free() leaves the old rows in the tree until
@@ -371,6 +424,37 @@ func _refresh() -> void:
 
 	# Positions aren't known until the list lays out, so update the edge fade on the next frame.
 	_update_edge_fade.call_deferred()
+
+
+## One currency icon for the BONUS row, in a fixed box sized so its VISIBLE art matches its partner's
+## (see BONUS_GEM_BOX). Mouse-ignored: the header is not tappable and should never eat a swipe.
+func _make_bonus_icon(texture: Texture2D, box: Vector2) -> TextureRect:
+	var icon := TextureRect.new()
+	icon.texture = texture
+	icon.custom_minimum_size = box
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	# LINEAR: both icons shrink a long way from their native size (the gem is 504px square).
+	icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return icon
+
+
+## One bonus amount, hugging the edge its icon is on. Text is filled in by _refresh.
+##
+## EXPAND_FILL on BOTH amounts, so the row's leftover width splits evenly between them and the word
+## between them cannot drift. Each label is wider than its number as a result; the alignment is what
+## pulls the digits back against their own icon.
+func _make_bonus_amount(alignment: int) -> Label:
+	var label := Label.new()
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.horizontal_alignment = alignment
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
+	label.add_theme_font_override("font", UiPalette.make_bold_font())
+	label.add_theme_color_override("font_color", UiPalette.DARK_GOLD)
+	return label
 
 
 ## Build one large, tappable game PANEL: the whole panel is the button (no separate PLAY). It wears the

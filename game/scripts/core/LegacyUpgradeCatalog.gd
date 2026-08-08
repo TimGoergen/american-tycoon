@@ -265,6 +265,10 @@ const UPGRADES := [
 		"name": "Buying Power",
 		"category": "Operations",
 		"description": "More buyers on the floor. Each level buys one more holding every round.",
+		# Useless without the desk — auto_purchase_quantity() returns 0 while the mode is locked —
+		# so LegacyUpgrades.can_buy refuses it until the unlock is owned. Without that gate this is
+		# 5,000 gems for nothing, which is a refund request rather than a design.
+		"requires": AUTO_PURCHASE_UNLOCK,
 		# NOMINALLY 30, but the shared steepening curve is the real ceiling: by level 30 the
 		# steepening term alone is ~1e17, so nobody reaches it. Fitted depth at the summit is ~15
 		# levels, and the track never maxes — the same "uncapped on a steepening curve" shape the
@@ -279,6 +283,7 @@ const UPGRADES := [
 		"name": "Standing Orders",
 		"category": "Operations",
 		"description": "Faster paperwork. Each level shortens the wait between buying rounds.",
+		"requires": AUTO_PURCHASE_UNLOCK,   # same gate as Buying Power, same reason
 		# Capped at 11 by PHYSICS, not by cost: 3.0s down to a 0.25s floor in 0.25s steps. Eleven
 		# levels is far too short for the steepening term to bite — at Buying Power's growth the
 		# whole ladder totalled under a billion and maxed by generation 3, i.e. the track would

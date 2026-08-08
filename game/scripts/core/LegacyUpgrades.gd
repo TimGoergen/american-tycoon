@@ -64,8 +64,32 @@ func get_next_cost(id: String) -> int:
 
 ## True if the upgrade can still be bought AND the player can afford the next level.
 func can_buy(id: String) -> bool:
+	if not requirement_met(id):
+		return false
 	var cost := get_next_cost(id)
 	return cost >= 0 and available >= cost
+
+
+## True when this upgrade's prerequisite (if it has one) is owned.
+##
+## Added 2026-08-07 for the auto-purchase restructure. Buying Power and Standing Orders only do
+## anything once the Acquisitions Desk is owned — auto_purchase_quantity() returns 0 while the mode
+## is locked — so without this a player could spend 5,000 gems on an upgrade that grants literally
+## nothing, with no way to tell. That is a refund request, not a design.
+##
+## Enforced in can_buy rather than in the UI so every path obeys it: the shop's buy button, the
+## sims' greedy shopper, and anything written later all go through the same gate.
+func requirement_met(id: String) -> bool:
+	var required := requirement_for(id)
+	return required == "" or get_level(required) >= 1
+
+
+## The upgrade id this one depends on, or "" if it stands alone.
+func requirement_for(id: String) -> String:
+	var definition := LegacyUpgradeCatalog.get_definition(id)
+	if definition.is_empty():
+		return ""
+	return String(definition.get("requires", ""))
 
 
 ## True once the upgrade has reached its maximum level.

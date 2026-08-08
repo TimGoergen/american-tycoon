@@ -65,6 +65,7 @@ func _initialize() -> void:
 	_test_unaffordable_tick_banks_nothing(property_configs, tuning)
 	_test_disabled_is_inert(property_configs, tuning)
 	_test_deleted_upgrade_ids_are_inert(property_configs, tuning)
+	_test_tracks_require_the_unlock(property_configs, tuning)
 
 	print("")
 	if _failures == 0:
@@ -372,3 +373,45 @@ func _test_deleted_upgrade_ids_are_inert(configs: Array, tuning: TuningConfig) -
 	_check("...and the mode is then live at 1 purchase per round",
 		loaded.upgrades.auto_purchase_unlocked()
 			and loaded.upgrades.auto_purchase_quantity() == 1)
+
+
+# ---------------------------------------------------------------------------
+# 9. The two tracks require the unlock
+# ---------------------------------------------------------------------------
+
+## Buying Power and Standing Orders do nothing while the mode is locked — auto_purchase_quantity()
+## returns 0 — so buying one first would be 5,000 gems for literally no effect. The prerequisite is
+## enforced in LegacyUpgrades.can_buy rather than in the shop UI, so every path obeys it: the buy
+## button, the sims' greedy shopper, and anything written later.
+func _test_tracks_require_the_unlock(configs: Array, tuning: TuningConfig) -> void:
+	print("\n9. Buying Power and Standing Orders cannot be bought before the unlock")
+
+	var dynasty := DynastyState.new(configs, tuning)
+	dynasty.upgrades.available = 1000000
+
+	for id in [LegacyUpgradeCatalog.AUTO_PURCHASE_QUANTITY,
+			LegacyUpgradeCatalog.AUTO_PURCHASE_CADENCE]:
+		_check("%s reports its requirement" % id,
+			dynasty.upgrades.requirement_for(id) == LegacyUpgradeCatalog.AUTO_PURCHASE_UNLOCK)
+		_check("%s cannot be bought while the desk is unowned" % id,
+			not dynasty.upgrades.can_buy(id))
+		_check("...and attempting it actually fails (not just greyed in the UI)",
+			not dynasty.upgrades.buy(id))
+
+	var wallet_before := dynasty.upgrades.available
+	_check("a blocked attempt spent nothing", wallet_before == 1000000)
+
+	# Own the desk, and both open up.
+	_check("the unlock itself has no prerequisite",
+		dynasty.upgrades.requirement_for(LegacyUpgradeCatalog.AUTO_PURCHASE_UNLOCK) == "")
+	dynasty.upgrades.buy(LegacyUpgradeCatalog.AUTO_PURCHASE_UNLOCK)
+	_check("with the desk owned, Buying Power is buyable",
+		dynasty.upgrades.can_buy(LegacyUpgradeCatalog.AUTO_PURCHASE_QUANTITY))
+	_check("...and Standing Orders too",
+		dynasty.upgrades.can_buy(LegacyUpgradeCatalog.AUTO_PURCHASE_CADENCE))
+
+	# And the effect actually lands: quantity is 1 (unlock) + purchased levels.
+	dynasty.upgrades.buy(LegacyUpgradeCatalog.AUTO_PURCHASE_QUANTITY)
+	dynasty.upgrades.buy(LegacyUpgradeCatalog.AUTO_PURCHASE_QUANTITY)
+	_check("two Buying Power levels take the round to 3 purchases",
+		dynasty.upgrades.auto_purchase_quantity() == 3)

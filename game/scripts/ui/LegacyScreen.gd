@@ -845,12 +845,26 @@ func refresh() -> void:
 			(controls["level_label"] as Label).text = "Level %d" % level
 		else:
 			(controls["level_label"] as Label).text = "Level %d / %d" % [level, max_level]
-		(controls["effect_label"] as Label).text = LegacyUpgradeCatalog.describe_effect(id, level)
+		var effect_label := controls["effect_label"] as Label
+		effect_label.text = LegacyUpgradeCatalog.describe_effect(id, level)
 
 		var buy_button := controls["buy_button"] as Button
+		var required := _upgrades.requirement_for(id)
+		var blocked := required != "" and not _upgrades.requirement_met(id)
 		if _upgrades.is_maxed(id):
 			buy_button.icon = null
 			buy_button.text = "MAXED"
+			buy_button.disabled = true
+		elif blocked:
+			# SAY WHY. A gray button that cannot explain itself is the exact failure that forced the
+			# hire-mode toggle to hide instead of gray (tooltips never appear on touch), so a locked
+			# card states its prerequisite in the line that would otherwise describe its effect.
+			# The price is deliberately still shown: knowing what it will cost is part of deciding
+			# whether to buy the thing it depends on.
+			effect_label.text = "Requires %s" % LegacyUpgradeCatalog.get_definition(
+				required).get("name", "an earlier upgrade")
+			buy_button.icon = GEM_TEX
+			buy_button.text = "  %s" % Money.abbrev(_upgrades.get_next_cost(id))
 			buy_button.disabled = true
 		else:
 			var cost := _upgrades.get_next_cost(id)

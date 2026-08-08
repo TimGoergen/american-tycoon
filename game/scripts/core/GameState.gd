@@ -503,8 +503,11 @@ func engage_rush_overdrive() -> void:
 ## any more — so the heat bleeds down and pays its normal spin-down tail. Turning the mode on
 ## simply IS "the player let go". Parking heat at a non-zero fill would show the player a bonus
 ## they are not being paid, which breaks the system's binding invariant (plan §A5).
+## `is_running()`, not `enabled`: the flag persists in the save, so a run can load with the mode
+## switched on but the desk unowned. Asking about `enabled` alone made that save refuse every rush
+## forever while nothing was ever bought — all of the mode's cost, none of its benefit.
 func is_rush_locked_out_by_auto_purchase() -> bool:
-	return auto_purchase.enabled
+	return auto_purchase.is_running()
 
 
 ## Press edge on a property's rush button — the raw finger-down moment, forwarded to the vent

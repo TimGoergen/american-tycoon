@@ -70,6 +70,10 @@ var _frenzy: FrenzyState
 ## from this shared state: an overheat downs only the properties that were being rushed, so the
 ## row keys that dim off its OWN is_overheat_frozen flag instead (Tim 2026-07-19).
 var _rush_momentum: RushMomentumState
+## Auto-Purchase Mode, read-only, for one job: while it is RUNNING the core refuses every rush
+## (GameState.hold_rush_property), so this row must not present one. Held live rather than pushed
+## so the presentation can never lag the refusal by a frame.
+var _auto_purchase: AutoPurchaseState
 ## The generation's reached epoch — the highest staffer tier any property may be hired
 ## or upgraded to right now. Read live so the hire button unlocks the moment a new
 ## civilization is contacted (EpochState.current_tier).
@@ -451,13 +455,17 @@ var _ownership_style_applied := -1
 
 ## Call before adding to the tree.
 func setup(p_index: int, prop: PropertyState, economy: EconomyState, frenzy: FrenzyState,
-		epoch: EpochState, rush_momentum: RushMomentumState) -> void:
+		epoch: EpochState, rush_momentum: RushMomentumState,
+		auto_purchase: AutoPurchaseState) -> void:
 	prop_index = p_index
 	_prop = prop
 	_economy = economy
 	_frenzy = frenzy
 	_epoch = epoch
 	_rush_momentum = rush_momentum
+	# Held read-only, exactly like rush_momentum: the row reads the live flag each frame rather
+	# than having a copy pushed at it, so it can never present a rush the core is refusing.
+	_auto_purchase = auto_purchase
 
 
 ## Accessors so a tutorial coach card can anchor to a SPECIFIC control on this row (its buy button,
@@ -1296,13 +1304,27 @@ func _refresh(delta: float) -> void:
 	# down; everyone else keeps rushing through the lockout for income and frenzy (see
 	# GameState.tap_property), so their portraits must keep looking alive.
 	var rush_locked := frozen
+	# AUTO-BUY ALSO REFUSES EVERY RUSH (Tim, 2026-08-07: "when auto buy is enabled and you hold down
+	# a staffer portrait, the rush visualization occurs even though the property isn't actually
+	# cycling that fast or generating income at that rate").
+	#
+	# The core has always refused the verb here — GameState.hold_rush_property returns immediately —
+	# but this row derived its rush LOOK from the local press alone, so the finger produced a vivid
+	# fill, a boosted income readout and frenzy fizz while nothing was landing. That is precisely the
+	# desync the system's binding invariant forbids: whatever the row shows IS what the player earns.
+	#
+	# Deliberately kept OUT of `rush_locked` above, which drives the gray portrait dim. That dim is
+	# per-property and keyed on an overheat freeze, because a GLOBAL dim made the whole tab read dead
+	# (Tim 2026-07-19) — and auto-buy's lockout is global, so folding it in would resurrect exactly
+	# that. The lie is the thing being fixed; the dim is a separate call.
+	var rush_refused_by_auto_buy := _auto_purchase != null and _auto_purchase.is_running()
 	_manager_circle.modulate = Color(0.55, 0.55, 0.55) if rush_locked else Color.WHITE
 	# The infinity "rushing" icon shows whether the primary Button or a secondary finger holds it
 	# — hidden during lockout, when holding produces no rushes. The vent presentation hold (see
 	# _vent_presentation_hold below) keeps it up through the vent gesture's finger lifts too:
 	# this reads LAST frame's _rush_hold_seconds (the current-frame update happens further down),
 	# which is exactly the frozen value the hold maintains, so the icon never flickers mid-vent.
-	var show_rush_icon := interactive and not rush_locked \
+	var show_rush_icon := interactive and not rush_locked and not rush_refused_by_auto_buy \
 			and (_manager_circle.is_held() or _secondary_held("rush")
 					or _vent_presentation_hold())
 	_manager_circle.set_state(
@@ -1352,8 +1374,11 @@ func _refresh(delta: float) -> void:
 	# looked at the Button, so a rushed row didn't always present as rushing).
 	# Also forced OFF while rush is locked out (Rush Overheat): the finger may still be down, but
 	# no rushes are landing, so the boosted readout / vivid green / frenzy fizz would all be lies.
+	# `rush_refused_by_auto_buy` is the second suppressor: same reasoning as the overheat lockout —
+	# the finger may be down, but no rushes are landing, so the boosted readout, vivid green and
+	# frenzy fizz would all be lies.
 	var rush_held := (_manager_circle.is_held() or _secondary_held("rush")) \
-			and _prop.units_owned > 0 and not rush_locked
+			and _prop.units_owned > 0 and not rush_locked and not rush_refused_by_auto_buy
 	# The ENGAGED flag: held long enough to count as a real hold (see RUSH_ENGAGE_SEC).
 	# Every rush-presentation element below keys off THIS, never the raw press, so a
 	# single tap changes nothing on screen (Tim, 2026-07-08).

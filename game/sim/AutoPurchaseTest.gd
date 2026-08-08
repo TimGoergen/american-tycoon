@@ -66,6 +66,7 @@ func _initialize() -> void:
 	_test_disabled_is_inert(property_configs, tuning)
 	_test_deleted_upgrade_ids_are_inert(property_configs, tuning)
 	_test_tracks_require_the_unlock(property_configs, tuning)
+	_test_enabled_without_owned_is_fully_inert(property_configs, tuning)
 
 	print("")
 	if _failures == 0:
@@ -100,6 +101,9 @@ func _make_run(configs: Array, tuning: TuningConfig, cash: float) -> GameState:
 	game.epoch.restore(REACHED_TIER)
 	game.economy.cash = cash
 	game.auto_purchase.enabled = true
+	# BOTH halves. `enabled` is the player's switch; `unlocked` is whether the desk is owned, pushed
+	# in by Main. The mode only runs when both are true — see case 10 for why they are separate.
+	game.auto_purchase.unlocked = true
 	return game
 
 
@@ -415,3 +419,40 @@ func _test_tracks_require_the_unlock(configs: Array, tuning: TuningConfig) -> vo
 	dynasty.upgrades.buy(LegacyUpgradeCatalog.AUTO_PURCHASE_QUANTITY)
 	_check("two Buying Power levels take the round to 3 purchases",
 		dynasty.upgrades.auto_purchase_quantity() == 3)
+
+
+# ---------------------------------------------------------------------------
+# 10. Switched on but not owned is inert — including the rush lockout
+# ---------------------------------------------------------------------------
+
+## `enabled` PERSISTS IN THE SAVE. `unlocked` does not — it is pushed in from the dynasty every
+## frame. So a run can legitimately load with the mode switched on and the desk unowned: after the
+## 2026-08-07 restructure deleted the old track, or after any future change to what grants it.
+##
+## The rush lockout used to ask only about `enabled`, which meant such a save REFUSED EVERY RUSH
+## FOREVER while never buying anything — all of the mode's cost and none of its benefit, with
+## nothing on screen to explain it. Both halves now go through is_running(), and this pins it.
+func _test_enabled_without_owned_is_fully_inert(configs: Array, tuning: TuningConfig) -> void:
+	print("\n10. Switched on but NOT owned buys nothing AND does not lock rush")
+
+	var game := _make_run(configs, tuning, PLENTY_OF_CASH)
+	game.auto_purchase.unlocked = false      # the desk is not owned
+	game.auto_purchase.enabled = true        # ...but the saved switch says on
+
+	_check("the mode does not consider itself running", not game.auto_purchase.is_running())
+
+	var bought := 0
+	for _i in range(20):
+		bought += game.auto_purchase.tick(CADENCE, game, CADENCE, 8)
+	_check("twenty ticks bought nothing", bought == 0)
+	_check("no units were acquired anywhere", _total_units(game) == 0)
+
+	# THE IMPORTANT HALF: rushing must still work. This is what was broken.
+	_check("rush is NOT locked out", not game.is_rush_locked_out_by_auto_purchase())
+
+	# And owning it flips both back on together.
+	game.auto_purchase.unlocked = true
+	_check("owning the desk makes the mode run", game.auto_purchase.is_running())
+	_check("...and rush is locked out again, as designed",
+		game.is_rush_locked_out_by_auto_purchase())
+	_check("...and it buys", game.auto_purchase.tick(CADENCE, game, CADENCE, 4) > 0)

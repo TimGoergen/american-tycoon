@@ -950,7 +950,7 @@ func _build_property_tab() -> Control:
 		# game.rush_momentum is passed so the row can present the rush control as disabled while
 		# rushing is locked out after an overheat (Rush Overheat, Tim 2026-07-15) — read-only.
 		row.setup(i, game.economy.properties[i] as PropertyState, game.economy, game.frenzy,
-				game.epoch, game.rush_momentum)
+				game.epoch, game.rush_momentum, game.auto_purchase)
 		row.buy_requested.connect(_on_buy_requested)
 		row.tap_requested.connect(_on_tap_requested)
 		row.hold_rush_requested.connect(_on_hold_rush_requested)
@@ -3121,9 +3121,14 @@ func _drive_auto_purchase(delta: float) -> void:
 ## MomentumBar._apply_auto_purchase_look) and whether the mode is running.
 ## Pushed only when one of them changes, not every frame — hence the three tracking fields.
 func _push_auto_purchase_state() -> void:
+	var unlocked := dynasty.upgrades.auto_purchase_unlocked()
+	# Push ownership into the headless model BEFORE the memo check and before the null guard below.
+	# The model needs it to answer is_running(), which gates both the buying and the rush lockout,
+	# and neither of those may wait on a UI node existing or on something having changed.
+	game.auto_purchase.unlocked = unlocked
+
 	if _momentum_bar == null:
 		return
-	var unlocked := dynasty.upgrades.auto_purchase_unlocked()
 	var enabled: bool = game.auto_purchase.enabled
 	if _auto_purchase_state_pushed \
 			and unlocked == _auto_purchase_unlocked_shown \

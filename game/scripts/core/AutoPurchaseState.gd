@@ -33,6 +33,17 @@ class_name AutoPurchaseState
 ## UI-mode flags; this object itself never touches the save file.
 var enabled: bool = false
 
+## True while the Acquisitions Desk is actually OWNED. Pushed in by the caller (Main) because the
+## upgrade lives on the dynasty, which this headless model deliberately knows nothing about.
+##
+## THIS IS NOT REDUNDANT WITH `enabled`, and the pair being conflated was a real defect. `enabled`
+## persists in the save, so a run could load with the mode switched on but the desk unowned — after
+## a restructure that deleted the old track, or any future change to what grants it. The old
+## `is_rush_locked_out_by_auto_purchase()` asked only about `enabled`, which meant that save
+## REFUSED EVERY RUSH FOREVER while no auto-buying happened: the cost of the mode with none of the
+## benefit, and nothing on screen to explain it. Both halves now go through is_running().
+var unlocked: bool = false
+
 ## Seconds of tick time banked since the last purchase. Once this reaches the cadence the next
 ## tick fires. Clamped so it can never exceed one full cadence — see tick() for why.
 var _time_since_last_purchase: float = 0.0
@@ -62,7 +73,7 @@ var last_purchased_indices: Array[int] = []
 ## Returns the number of units actually bought this tick — 0 when the timer has not elapsed,
 ## and 0 when it has but nothing was affordable. The sims assert on this number.
 func tick(delta: float, game: GameState, cadence: float, quantity: int) -> int:
-	if not enabled:
+	if not is_running():
 		return 0
 	if game == null or cadence <= 0.0 or quantity <= 0:
 		return 0
@@ -86,6 +97,13 @@ func tick(delta: float, game: GameState, cadence: float, quantity: int) -> int:
 	if units_bought > 0:
 		_time_since_last_purchase -= cadence
 	return units_bought
+
+
+## True only when the mode is BOTH switched on and owned — i.e. when it is actually going to buy
+## things. Everything that costs the player something for having the mode on (the rush lockout, and
+## every rush visual the UI suppresses because of it) must ask THIS, never `enabled` alone.
+func is_running() -> bool:
+	return enabled and unlocked
 
 
 ## Clear the banked timer so a fresh run never inherits a primed accumulator from the last one

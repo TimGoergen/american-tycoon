@@ -837,11 +837,15 @@ func _build_auto_purchase_button() -> void:
 
 	# The unlocked pair of plates, swapped whole by _apply_auto_purchase_look.
 	_auto_plate_off = _make_auto_plate(UiPalette.MUSTARD_GOLD, UiPalette.NAVY, 3)
-	# LIT: the plate INVERTS — navy field, thick mustard frame, mustard text. A contrast flip (rather
-	# than a brighter shade of the off-state) is what makes "the mode is running" legible from across
-	# the room, which matters more here than anywhere else on the screen: since the separate
+	# LIT: the plate INVERTS — a bright blue field, thick mustard frame, mustard text. A contrast flip
+	# (rather than a brighter shade of the off-state) is what makes "the mode is running" legible from
+	# across the room, which matters more here than anywhere else on the screen: since the separate
 	# indicator was declined, this button is the only thing telling the player the mode is on.
-	_auto_plate_on = _make_auto_plate(UiPalette.NAVY, UiPalette.MUSTARD_GOLD, 5)
+	#
+	# The field was NAVY until 2026-08-07 (Tim: "brighter and more saturated blue"). Navy read as a
+	# darker version of off rather than as a different state — and now that the expanded button
+	# spans the row, its colour is the largest single signal on the screen.
+	_auto_plate_on = _make_auto_plate(UiPalette.ACTIVE_BLUE, UiPalette.MUSTARD_GOLD, 5)
 
 	# The gray "can't tap" plate, exactly the OVR treatment. Kept even though the locked button is now
 	# HIDDEN rather than grayed (see _apply_auto_purchase_look): `disabled` still tracks `visible`, so
@@ -935,7 +939,11 @@ func _apply_auto_purchase_look(unlocked: bool, enabled: bool) -> void:
 	_apply_auto_purchase_expansion(enabled)
 
 	var plate := _auto_plate_on if enabled else _auto_plate_off
-	var label_color := UiPalette.MUSTARD_GOLD if enabled else UiPalette.NAVY
+	# CREAM on the lit plate, not mustard. Measured against the new brighter blue field: mustard
+	# lands at 2.89:1, under the 3:1 floor for large text, where on the old navy it was 6.93:1.
+	# Cream restores it to 4.81:1. The mustard FRAME stays — a 5px border is a graphical element,
+	# not something anyone has to read, and gold-on-blue is the state's identity.
+	var label_color := UiPalette.CREAM if enabled else UiPalette.NAVY
 	# All three interactive plates share the one look: this is a state indicator first and a button
 	# second, so a hover or a held press must not momentarily read as the other mode.
 	for state in ["normal", "hover", "pressed"]:

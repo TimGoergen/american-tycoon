@@ -19,6 +19,15 @@ const MONEY_GREEN := Color("#7DA87B")
 ## MONEY_GREEN — the cash-on-hand total and the Family Ledger's dynasty total (Tim, 2026-06-28).
 const DARK_MONEY_GREEN := Color("#5E7E5C")
 const INK_NAVY := Color("#0D1830")
+
+## The AUTO-BUY button's field while the mode is RUNNING (Tim, 2026-08-07 — "brighter and more
+## saturated blue"). A real blue rather than another navy: the point is that a mode which spends the
+## player's money on its own should be unmistakable from across the room, and navy-on-navy read as
+## merely a darker version of off.
+##
+## Chosen to stay dark enough for the mustard frame and label to keep their contrast — push it much
+## brighter and the gold starts to sink into it rather than sit on it.
+const ACTIVE_BLUE := Color("#2A5FD6")
 const BRICK := Color("#8E2F1E")
 const PALE_GOLD := Color("#F0D49A")
 ## Warm orange — the middle stop of the minigame spectrum bar's red→orange→yellow climb toward

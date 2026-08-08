@@ -267,9 +267,16 @@ Delete the two old upgrade definitions, add the three new ones. No migration, no
 `SAVE_VERSION` bump (§2). Worth one test asserting a save containing the dead ids still loads
 and plays — cheap, and it pins the "unknown ids are inert" property §2.1 depends on.
 
-### 3.4 UI
-- Estate: three entries where there were two, grouped so the unlock reads as the gateway.
-- Hire-mode buttons: always visible, delete the hidden-until-unlocked exception.
+### 3.4 UI — DONE 2026-08-07
+- Estate: three entries where there were two. **Grouping turned out to be the wrong tool.** The
+  step was written as a presentation problem — arrange the list so the unlock reads as the
+  gateway — but nothing actually STOPPED a player buying Buying Power or Standing Orders first,
+  and `auto_purchase_quantity()` returns 0 while the mode is locked. That was 5,000 gems for no
+  effect. So the gateway is real now: definitions may carry a `requires` id, `can_buy` refuses
+  anything whose prerequisite is unowned, and a locked card replaces its effect line with
+  "Requires Acquisitions Desk" while still showing the price. The field is general, so any future
+  dependent upgrade inherits both the gate and the copy.
+- Hire-mode buttons: always visible; the hidden-until-unlocked exception is deleted.
 - The AUTO-BUY button, its pulse, and the rush lockout are all unchanged.
 
 ### 3.5 Device pass

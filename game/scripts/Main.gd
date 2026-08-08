@@ -161,14 +161,20 @@ const BUY_MODE_ICON_BOX := int(MODE_ICON_VISIBLE_HEIGHT * 324.0 / 279.0)   # 46
 const HIRE_MODE_ICON_BOX := int(MODE_ICON_VISIBLE_HEIGHT * 96.0 / 86.0)    # 44
 
 ## Gaps inside a mode button's caption. The "+" hugs its icon; the rate sits a normal gap away.
-## 6 → 2 on the first gap is Tim's "reduce by 60%" (2026-08-07), rounded to a whole pixel.
+## The first gap went 6 → 2 ("reduce by 60%") and then 2 → 1 ("cut it in half"), both Tim,
+## 2026-08-07. One pixel is the floor — at 0 the glyphs touch.
 const MODE_CAPTION_SEPARATION := 6
-const MODE_CAPTION_PREFIX_SEPARATION := 2
+const MODE_CAPTION_PREFIX_SEPARATION := 1
+
+## How much larger the "+" draws than the rate beside it (Tim, 2026-08-07). Applied to the plus
+## only, in _make_mode_button; the rate keeps the caption size it shares with the TURBO readout.
+const MODE_CAPTION_PLUS_SCALE := 1.2
 
 ## Fixed width of the BUY and HIRE toggles (Tim, 2026-08-07 — "less wide, with moderately small
-## margins"). Derived, not chosen, and RE-derived after the icon shrank 20% and the "+" gap closed:
-## the widest caption is "+ <icon> NEXT" = "+" 24 + gap 2 + icon 46 + gap 6 + "NEXT" 105 = 183 at
-## FONT_SUBHEAD, plus the plate's 12px content margin a side = 207. See _make_mode_button.
+## margins"). Derived, not chosen, and re-checked after every caption tweak. Currently the widest
+## caption is "+ <icon> NEXT" = "+" 28 (at the 20%-larger plus size) + gap 1 + icon 46 + gap 6 +
+## "NEXT" 105 = 186, plus the plate's 12px content margin a side = 210. The 6px of slack is the
+## whole margin budget beyond the plate's own — measure again before shrinking this.
 const MODE_BUTTON_WIDTH := 216
 
 # The screen-frame constants (bezel + universal content margin) live in UiPalette now, so the
@@ -2986,6 +2992,11 @@ func _make_mode_button(icon_path: String, icon_box: int) -> Array:
 	caption.add_child(prefix)
 
 	var plus := _make_mode_caption_label("+")
+	# The "+" alone runs 20% larger than the rate beside it (Tim, 2026-08-07). They share
+	# _make_mode_caption_label, so the size is overridden here rather than in the helper — the rate
+	# must stay at the caption size it was matched to the TURBO readout at.
+	plus.add_theme_font_size_override("font_size",
+		int(round(float(UiPalette.FONT_SUBHEAD) * MODE_CAPTION_PLUS_SCALE)))
 	prefix.add_child(plus)
 
 	# The IMPORTED texture, never the raw .svg source: the export filter strips sources, and a

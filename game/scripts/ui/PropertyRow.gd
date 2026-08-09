@@ -1082,9 +1082,9 @@ func _on_touch_released(index: int) -> void:
 ##   • Being RUSHED — the held finger restarts it, so the boosted rate is genuinely delivered for as
 ##     long as the hold lasts, and the readout quotes it (sub-second) or the rush-shortened lump.
 ##   • Owned but UNSTAFFED, with a sub-second cycle — nothing restarts it. One tap buys exactly one
-##     cycle and then it stops, so the honest unit is the TAP. This replaces the per-SECOND form
-##     only: a longer unstaffed cycle already reads as its lump plus its wait, which is honest about
-##     the tap AND tells the player how long the payout takes, so it is left alone.
+##     cycle and then it stops, so the figure is shown BARE: no unit, because there is no rate. This
+##     replaces the per-SECOND form only; a longer unstaffed cycle already reads as its lump plus its
+##     wait, which is honest about the tap AND tells the player how long the payout takes.
 ##   • STAFFED — the staffer restarts it forever, so a per-second rate is a real throughput. Sub-
 ##     second cycles read as a rate; longer ones read as their lump plus the wait, because money
 ##     arriving every 4 minutes is not a per-second trickle.
@@ -1119,7 +1119,10 @@ func _format_income_readout(
 		# how long the payout takes — replacing that with "/ tap" would throw the wait away to fix a
 		# problem it never had.
 		if is_owned and not is_staffed:
-			return Money.of(per_cycle).display().trim_prefix("$") + " / tap"
+			# BARE, with no unit at all (Tim, 2026-08-09). "/ tap" was accurate but still framed the
+			# figure as a rate-of-something, and the row already says how the money arrives — the
+			# portrait is the only way to run this property. A naked amount is the payout, full stop.
+			return Money.of(per_cycle).display().trim_prefix("$")
 		return Money.of(per_cycle / effective_length).display().trim_prefix("$") + " / s"
 	return "%s / %s" % [
 		Money.of(per_cycle).display().trim_prefix("$"), _format_cycle_duration(effective_length)]

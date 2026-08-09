@@ -6,7 +6,8 @@ extends SceneTree
 #
 # WHY THIS EXISTS. The project's binding invariant is that whatever the row shows IS what the player
 # earns. The label satisfied that literally and still misled, which is a failure the invariant does
-# not catch on its own: it quoted a per-SECOND rate for a property that only pays when TAPPED.
+# not catch on its own: it quoted a per-SECOND RATE for a property that produces no rate at all —
+# one that pays a fixed lump each time it is tapped and then stops.
 #
 # Tim, at Luminari with Efficiency upgrades and an ~0.18 s cycle (2026-08-09): "the income display on
 # that property says 11.4T/s, but tapping the staff portrait only gains around 2T... the disconnect
@@ -40,7 +41,7 @@ func _run() -> void:
 		return
 	_row = row_script.new()
 
-	_check_unstaffed_reads_per_tap()
+	_check_unstaffed_shows_a_bare_amount()
 	_check_staffed_reads_as_a_rate()
 	_check_rushing_still_reads_as_a_rate()
 	_check_unowned_preview_is_unchanged()
@@ -57,13 +58,12 @@ func _run() -> void:
 
 
 ## Tim's case, in the numbers he reported.
-func _check_unstaffed_reads_per_tap() -> void:
-	print("-- owned but unstaffed: the honest unit is the TAP --")
+func _check_unstaffed_shows_a_bare_amount() -> void:
+	print("-- owned but unstaffed: no rate, because there is no rate --")
 	# ~2T a cycle, an 0.18 s cycle: the rate would read ~11T/s, which is the misleading figure.
 	var text := _readout(2.0e12, 0.18, 0.0, true, false)
-	_check("an unstaffed row reads per TAP, not per second (got '%s')" % text,
-		text.ends_with("/ tap"))
-	_check("...and quotes what one tap actually pays (got '%s')" % text, text.begins_with("2"))
+	_check("an unstaffed row shows NO rate at all (got '%s')" % text, not text.contains("/"))
+	_check("...just the amount one tap pays (got '%s')" % text, text.begins_with("2"))
 
 	# The gap this closes: state the rate that WOULD have been shown, so the test records the size
 	# of the lie rather than just the fix.
@@ -87,7 +87,7 @@ func _check_staffed_reads_as_a_rate() -> void:
 	# Unchanged rule (Tim, 2026-07-13): money arriving every few minutes is not a per-second trickle.
 	var slow := _readout(2.0e12, 260.0, 0.0, true, true)
 	_check("a staffed long cycle still reads as a lump plus its wait (got '%s')" % slow,
-		not slow.ends_with("/ s") and not slow.ends_with("/ tap"))
+		slow.contains("/") and not slow.ends_with("/ s"))
 
 
 func _check_rushing_still_reads_as_a_rate() -> void:
@@ -96,15 +96,15 @@ func _check_rushing_still_reads_as_a_rate() -> void:
 	# hold lasts the boosted rate is honest. This must beat the per-tap rule, or the readout would
 	# flip to "/ tap" mid-rush and understate what the finger is actually earning.
 	var rushed := _readout(2.0e12, 0.18, 8.0, true, false)
-	_check("an unstaffed row being rushed reads as a rate, not per tap (got '%s')" % rushed,
+	_check("an unstaffed row being rushed reads as a rate, not a bare amount (got '%s')" % rushed,
 		rushed.ends_with("/ s"))
 
 
 func _check_unowned_preview_is_unchanged() -> void:
 	print("\n-- unowned: the buy-in preview is not income and keeps its old shape --")
 	var preview := _readout(5.0e9, 0.18, 0.0, false, false)
-	_check("an unowned row does NOT claim a per-tap value (got '%s')" % preview,
-		not preview.ends_with("/ tap"))
+	_check("an unowned row still shows its preview as a rate (got '%s')" % preview,
+		preview.ends_with("/ s"))
 
 
 func _readout(per_cycle: float, length: float, rushed_fps: float, owned: bool, staffed: bool) -> String:

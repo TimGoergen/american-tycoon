@@ -94,14 +94,20 @@ def sequence(parts):
 def seamless_loop(frequency, seconds, harmonics=(1.0,), tremolo_hz=0.0, tremolo_depth=0.0):
     """A LOOPING tone with no click at the seam.
 
-    A loop clicks unless the waveform arrives back at its starting phase, so the buffer length is
-    rounded to a whole number of cycles of `frequency` rather than to `seconds`. Every harmonic is an
-    integer multiple, so they all land on the seam too; the tremolo is given a whole number of its
-    own cycles for the same reason. This is the entire trick, and it is why these are generated
-    rather than trimmed by hand.
+    A loop clicks unless the waveform arrives back at its exact starting phase. So the buffer length
+    is fixed first, and then the FREQUENCY is nudged to whichever nearby value fits a whole number of
+    cycles into that buffer. Every harmonic is an integer multiple of it, so they all land on the
+    seam too, and the tremolo gets a whole number of its own cycles for the same reason.
+
+    THE WRONG WAY, which shipped on 2026-08-09 and clicked once a second: round the PERIOD to whole
+    samples and multiply up. A period of 400.909 samples rounded to 401 puts the buffer 0.02 cycles
+    past the seam, and at 110 Hz that is a jump of thirty times a normal sample-to-sample step —
+    inaudible as a pitch error, obvious as a crackle (Tim: "there are crackles in it"). The seam is
+    now asserted numerically at the bottom of this file rather than assumed.
     """
-    period = SAMPLE_RATE / frequency
-    total = int(round(seconds * SAMPLE_RATE / period)) * int(round(period))
+    total = int(round(seconds * SAMPLE_RATE))
+    cycles = max(1, round(frequency * total / SAMPLE_RATE))
+    frequency = cycles * SAMPLE_RATE / total       # the nearest exactly-loopable frequency
     tremolo_cycles = max(1, round(tremolo_hz * total / SAMPLE_RATE)) if tremolo_hz > 0 else 0
 
     samples = []
@@ -243,5 +249,26 @@ def write_vent_cues():
     ]))
 
 
+def verify_loops():
+    """Assert every loop actually loops. A seam click is inaudible as a defect in isolation and
+    obvious as a crackle once the sound is held for seconds, so it gets checked rather than trusted."""
+    for name in ["heat_loop", "urgency_loop"]:
+        path = os.path.join(OUT_DIR, name + ".wav")
+        with wave.open(path, "rb") as handle:
+            count = handle.getnframes()
+            data = struct.unpack("<%dh" % count, handle.readframes(count))
+        # The seam is just one more sample-to-sample transition, so the honest comparator is the
+        # LARGEST step the waveform already makes on its own — not the average, which a bright
+        # harmonic exceeds constantly. Against the average, a perfectly good loop looks broken.
+        steps = [abs(data[i + 1] - data[i]) for i in range(count - 1)]
+        jump = abs(data[0] - data[-1])
+        biggest = max(steps)
+        status = "clean" if jump <= biggest else "CLICKS"
+        print("  loop seam %-14s jump=%d vs largest normal step %d -> %s" % (name, jump, biggest, status))
+        if status != "clean":
+            raise SystemExit("%s does not loop cleanly" % name)
+
+
 if __name__ == "__main__":
     main()
+    verify_loops()

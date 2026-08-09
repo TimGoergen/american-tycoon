@@ -346,6 +346,42 @@ func _check_vent_cues_exist() -> void:
 		open_cue.volume_db > tick.volume_db)
 
 
+## A LOOP THAT DOES NOT MEET ITSELF CLICKS, once per lap, for as long as it plays.
+##
+## This shipped (2026-08-09). The generator rounded each wave's PERIOD to whole samples instead of
+## fitting whole cycles into the buffer, which left the loop 0.02 cycles short of home — a jump of
+## thirty times a normal sample step at the seam. Inaudible as a pitch error; obvious as a crackle
+## once the drone is held for seconds at a time (Tim: "there are crackles in it").
+##
+## Checked HERE, on the imported resource, rather than only in the generator: the generator asserts
+## what it wrote, and this asserts what the game will actually play. A future sourced sample, dropped
+## in by hand, gets the same scrutiny for free.
+##
+## The comparator is the LARGEST step the waveform already makes on its own. The seam is simply one
+## more sample-to-sample transition, so anything within that range is normal motion — measuring
+## against the average instead makes a perfectly good loop look broken (which it did, on the first
+## attempt at this check).
+func _check_loop_is_seamless(label: String, stream: AudioStreamWAV) -> void:
+	var bytes := stream.data
+	var frames := bytes.size() / 2
+	if frames < 3:
+		_check("%s loop has audio to check" % label, false)
+		return
+
+	var biggest_step := 0
+	var previous := bytes.decode_s16(0)
+	var first := previous
+	for i in range(1, frames):
+		var sample := bytes.decode_s16(i * 2)
+		biggest_step = maxi(biggest_step, absi(sample - previous))
+		previous = sample
+	var seam: int = absi(first - previous)   # last sample back round to the first
+
+	_check("the %s loop meets itself cleanly (seam %d vs largest normal step %d)"
+			% [label, seam, biggest_step],
+		seam <= biggest_step)
+
+
 ## THE CONTINUOUS BED (plan §5.1). Held sounds have failure modes one-shots do not: they can be
 ## left running forever, and they can be started twice.
 func _check_overdrive_bed() -> void:
@@ -359,6 +395,8 @@ func _check_overdrive_bed() -> void:
 	_check("they ride the MUSIC bus, so the music slider governs the drone", heat.bus == &"Music")
 	_check("both loop, or the bed would fall silent mid-ride",
 		(heat.stream as AudioStreamWAV).loop_mode != AudioStreamWAV.LOOP_DISABLED)
+	_check_loop_is_seamless("heat", heat.stream as AudioStreamWAV)
+	_check_loop_is_seamless("urgency", urgency.stream as AudioStreamWAV)
 	_check("they start SILENT rather than audible", heat.volume_db < -40.0)
 	_check("nothing plays before a ride begins", not heat.playing)
 

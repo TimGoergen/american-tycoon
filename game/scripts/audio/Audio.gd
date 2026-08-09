@@ -45,7 +45,24 @@ const VOICES_PER_BUS := {
 ##
 ## Pentatonic because every note in it agrees with every other — a player hammering the button in no
 ## particular rhythm cannot produce a wrong note.
-const TAP_SCALE_SEMITONES := [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24]
+##
+## The set runs an octave BELOW the sample's authored pitch as well as above it. Extending downward
+## rather than piling more octaves on top keeps the top of the range at ~1.7 kHz: a sine blip up at
+## three octaves is shrill, and shrill is what a repeated sound cannot afford to be.
+const TAP_SCALE_SEMITONES := [-12, -10, -8, -5, -3, 0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24]
+
+## How many of those degrees one lap of the figure moves through. The lap is the FAST movement; the
+## window it occupies drifts slowly across the full set, which is the slow one (see _degree_at).
+const TAP_WINDOW_SIZE := 8
+
+## How far the window moves between laps, in scale degrees.
+##
+## TWO, not one, and the reason is the seam. A lap ends one degree above its window's root, so a
+## drift of one would open the next lap on the pitch that just played — an audible stutter every
+## fourteen taps, which is exactly the repeated-note artifact the turns are shaped to avoid. Drifting
+## by two lands the new lap one step ABOVE the note that just played, so the seam becomes one more
+## step of the rise instead of a repeat.
+const TAP_WINDOW_DRIFT := 2
 
 ## Fade applied to the master bus when the app loses focus (plan §3.4). Short enough to be gone
 ## before the app is backgrounded, long enough not to click.
@@ -74,9 +91,10 @@ var _bus_levels: Dictionary = {}
 ## cheap return, so the gates need no audio stubs (plan §0.4 rule 4).
 var _enabled := true
 
-## How far into the current tap run we are, and when it last advanced. The position is an index into
-## the rise-and-fall figure, not a scale degree — see _degree_at.
+## How far into the current lap we are, which lap the slow window drift is on, and when the run last
+## advanced. Neither counter is a scale degree — see _degree_at.
 var _tap_position := 0
+var _tap_lap := 0
 var _tap_last_ms := 0
 
 ## The msec clock reading of the last thing the PLAYER did (an SFX or UI sound). Collect audio and
@@ -168,42 +186,71 @@ func play_tap_note() -> void:
 		return
 	var now := Time.get_ticks_msec()
 	if now - _tap_last_ms > int(_tap_scale_reset_seconds * 1000.0):
+		# A fresh burst restarts the FAST figure at its root, but leaves the slow window drift where
+		# it was — so two bursts a minute apart do not sound like the same three seconds replayed.
+		# Only an explicit reset_tap_scale (a tab change) puts everything back to the start.
 		_tap_position = 0
 	else:
-		_tap_position = (_tap_position + 1) % _tap_run_length()
+		_tap_position += 1
+		if _tap_position >= _tap_run_length():
+			_tap_position = 0
+			_tap_lap = (_tap_lap + 1) % maxi(1, _tap_window_travel() * 2)
 	_tap_last_ms = now
 
-	var semitones: int = TAP_SCALE_SEMITONES[_degree_at(_tap_position)]
+	var semitones: int = TAP_SCALE_SEMITONES[_degree_at(_tap_position, _tap_lap)]
 	# Equal temperament: each semitone is a factor of 2^(1/12).
 	_play_event(&"tap_note", 1.0, false, pow(2.0, semitones / 12.0))
 
 
-## How many taps a full rise-and-fall takes before the figure comes back around.
-##
-## Both ends are visited ONCE per lap — the turn at the top does not sound the top note twice, and
-## nor does the turn at the bottom — so the lap is two passes minus the two shared ends.
+## How many taps one lap of the figure takes. Both ends are visited ONCE — the turn at the top does
+## not sound the top note twice, nor does the turn at the bottom — so a lap is two passes across the
+## window minus its two shared ends.
 func _tap_run_length() -> int:
-	return (TAP_SCALE_SEMITONES.size() - 1) * 2
+	return (TAP_WINDOW_SIZE - 1) * 2
 
 
-## Which scale degree tap number `position` plays: up the scale, then back down, then up again.
+## How many drift steps the window has before it runs out of scale above it.
+func _tap_window_travel() -> int:
+	return (TAP_SCALE_SEMITONES.size() - TAP_WINDOW_SIZE) / TAP_WINDOW_DRIFT
+
+
+## Which scale degree this tap plays. TWO movements at once, one fast and one slow.
 ##
-## IT USED TO CLIMB AND STICK, capping at the top note and repeating it for as long as the player
-## kept tapping — so a sustained run became one note hammered over and over (Tim, 2026-08-08: "it
-## becomes a single highly repetitive sound"). Rising and falling instead means the pitch is always
-## moving, and over the two-octave set a full lap takes twenty taps, which is long enough that fast
-## tapping reads as a rolling figure rather than as a short loop.
-func _degree_at(position: int) -> int:
-	var top := TAP_SCALE_SEMITONES.size() - 1
-	if position <= top:
-		return position          # climbing
-	return _tap_run_length() - position   # falling back toward the root
+## THE FAST ONE, within a lap: up the window and back down. It used to climb and then STICK at the
+## top note for as long as tapping continued, so a sustained run became one note hammered over and
+## over (Tim, 2026-08-08: "it becomes a single highly repetitive sound").
+##
+## THE SLOW ONE, across laps: the window's starting degree advances by one each lap, and itself rises
+## and falls across the scale. So the figure keeps its shape while the register it sits in wanders —
+## which is what stops a long run from being a single fourteen-tap loop played forever (Tim: "I like
+## the idea of rotating the starting degree each lap"). The window drifts one degree per ~14 taps and
+## takes 14 laps to come home, so nothing repeats exactly for around two hundred taps.
+##
+## Rotating the WINDOW rather than the scale itself is deliberate: rotating a fixed pitch set wraps
+## the top note round to the bottom mid-figure, which puts an octave leap in the middle of what
+## should be a smooth rise. A sliding window transposes the whole shape instead, so every lap has the
+## same clean contour in a different register.
+func _degree_at(position: int, lap: int) -> int:
+	var window_start := _ping_pong(lap, _tap_window_travel()) * TAP_WINDOW_DRIFT
+	return window_start + _ping_pong(position, TAP_WINDOW_SIZE - 1)
+
+
+## Fold `index` into a there-and-back walk over 0..top, so it rises, turns, falls, and turns again.
+## Both ends appear once per cycle rather than twice, which is what keeps the turns from repeating a
+## note — the exact thing that made the old capped version so repetitive.
+func _ping_pong(index: int, top: int) -> int:
+	if top <= 0:
+		return 0
+	var period := top * 2
+	var position := posmod(index, period)
+	return position if position <= top else period - position
 
 
 ## Drop the tap scale back to its root. Called when the player changes tabs — a scale that resumed
 ## mid-climb after you went and did something else reads as a bug rather than as a reward.
 func reset_tap_scale() -> void:
 	_tap_position = 0
+	_tap_lap = 0
 	# A sentinel far in the past, NOT 0. The clock is milliseconds since the engine started, so 0
 	# means "at launch" — which in the first second of runtime still reads as RECENT, and the next
 	# tap would climb instead of restarting at the root. Only visible in a test or in the first

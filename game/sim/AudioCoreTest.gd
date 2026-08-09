@@ -161,35 +161,76 @@ func _check_tap_scale() -> void:
 	_audio.reset_tap_scale()
 	_check("reset_tap_scale drops it to the root", int(_audio.get("_tap_position")) == 0)
 
-	# THE COMPLAINT, PINNED. The figure used to climb and then repeat the top note for as long as
-	# tapping continued, which is what made a sustained run "a single highly repetitive sound"
-	# (Tim, 2026-08-08). What matters is not the exact contour but that the pitch KEEPS MOVING.
+	# THE COMPLAINT, PINNED — in two parts, because there were two complaints.
+	#
+	# First: the figure used to climb and then repeat the top note for as long as tapping continued,
+	# which made a sustained run "a single highly repetitive sound". Second: even once it rose and
+	# fell, every lap was identical, so a long run was one short loop played over and over ("I like
+	# the idea of rotating the starting degree each lap"). Both are about the same thing — the pitch
+	# must keep moving — so both are asserted on the actual sequence of notes rather than on the
+	# mechanism that produces them.
 	var scale: Array = _audio.get_script().get_script_constant_map()["TAP_SCALE_SEMITONES"]
-	var lap: int = _audio.call("_tap_run_length")
-	var degrees: Array[int] = []
-	for i in range(lap * 3):
-		degrees.append(int(_audio.call("_degree_at", i % lap)))
+	var lap_length: int = _audio.call("_tap_run_length")
+	var lap_count: int = maxi(1, int(_audio.call("_tap_window_travel")) * 2)
+
+	# Play out a full cycle of the slow drift, exactly as sustained tapping would.
+	var notes: Array[int] = []
+	for lap in range(lap_count):
+		for position in range(lap_length):
+			notes.append(int(scale[int(_audio.call("_degree_at", position, lap))]))
 
 	var longest_repeat := 1
 	var current_repeat := 1
-	for i in range(1, degrees.size()):
-		current_repeat = current_repeat + 1 if degrees[i] == degrees[i - 1] else 1
+	for i in range(1, notes.size()):
+		current_repeat = current_repeat + 1 if notes[i] == notes[i - 1] else 1
 		longest_repeat = maxi(longest_repeat, current_repeat)
-	_check("a long run NEVER repeats a note (longest identical stretch: %d)" % longest_repeat,
+	_check("no note is ever played twice in a row (longest identical stretch: %d)" % longest_repeat,
 		longest_repeat == 1)
 
+	# NO TWO CONSECUTIVE LAPS ARE THE SAME. This is the rotation, stated as what you would hear.
+	var identical_neighbours := 0
+	for lap in range(lap_count - 1):
+		var a := notes.slice(lap * lap_length, (lap + 1) * lap_length)
+		var b := notes.slice((lap + 1) * lap_length, (lap + 2) * lap_length)
+		if a == b:
+			identical_neighbours += 1
+	_check("consecutive laps are never identical (%d repeats found)" % identical_neighbours,
+		identical_neighbours == 0)
+
+	# And the drift covers the whole scale rather than hovering in one register.
 	var distinct := {}
-	for degree in degrees:
-		distinct[degree] = true
-	_check("it uses the whole scale (%d of %d degrees)" % [distinct.size(), scale.size()],
+	for note in notes:
+		distinct[note] = true
+	_check("the drift reaches every degree of the scale (%d of %d)" % [distinct.size(), scale.size()],
 		distinct.size() == scale.size())
 
-	# It must genuinely turn around rather than jump from the top back to the root.
-	_check("the run rises to the top and falls back (top at %d of a %d-tap lap)"
-			% [scale.size() - 1, lap],
-		int(_audio.call("_degree_at", scale.size() - 1)) == scale.size() - 1
-			and int(_audio.call("_degree_at", scale.size())) == scale.size() - 2)
-	_check("the lap is long enough not to read as a short loop (%d taps)" % lap, lap >= 16)
+	# It must come home, or "cycle" would be the wrong word for it.
+	_check("the cycle returns to where it started (%d taps)" % notes.size(),
+		int(_audio.call("_degree_at", 0, 0)) == int(_audio.call("_degree_at", 0, lap_count % lap_count)))
+	_check("the full cycle is long enough not to read as a loop (%d taps)" % notes.size(),
+		notes.size() >= 100)
+
+	# The window must SLIDE, not rotate: a rotated pitch set wraps its top note round to the bottom
+	# mid-figure, putting an octave leap inside what should be a smooth rise.
+	var biggest_leap := 0
+	for i in range(1, notes.size()):
+		biggest_leap = maxi(biggest_leap, absi(notes[i] - notes[i - 1]))
+	# Within a lap every step is one scale degree. At a lap seam the window has moved, and the size of
+	# that seam depends on which way: drifting UP lands one step above the note that just played,
+	# drifting back DOWN can fall by as much as a sixth. A sixth is an ordinary melodic interval and
+	# is left alone deliberately.
+	#
+	# A COARSE BOUND, honestly labelled. It says the figure never leaps by an octave, which is a
+	# property worth keeping but is not what caught anything: both wrong constructions tried during
+	# development (rotating a fixed pitch set, and advancing the figure's phase along with the window)
+	# were caught by the repeated-note and whole-scale checks above, not by this one. It earns its
+	# place as a guard against a future change, not as a record of a past bug.
+	_check("no leap as large as an octave anywhere in the cycle (largest: %d semitones)" % biggest_leap,
+		biggest_leap < 12)
+
+	# Print one lap and the lap after it, so the melody is inspectable rather than merely asserted.
+	print("      lap 0: %s" % str(notes.slice(0, lap_length)))
+	print("      lap 1: %s" % str(notes.slice(lap_length, lap_length * 2)))
 
 
 ## RULE 2: nothing may branch on a dollar MAGNITUDE.

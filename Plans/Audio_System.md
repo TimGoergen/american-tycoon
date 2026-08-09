@@ -335,9 +335,22 @@ have some kind of movement in the cycle over time"*). The figure now **rises to 
 back**, over two octaves, so a lap is twenty taps and the pitch is always moving. Fast tapping reads
 as a rolling figure rather than as a note stuck on repeat.
 
-If a longer run still wants more variety, the next lever is to rotate the starting degree each lap
-so consecutive laps are not identical — cheap to add, deliberately not done yet, because the fix
-above may well be enough. Fixed scale, not keyed to the current track (decision 6) — so it is one sample set
+**AND THE DRIFT, same day** (Tim: *"I like the idea of rotating the starting degree each lap"*). The
+rise-and-fall now happens inside a **window of 8 degrees that slides across a 16-note set**, moving
+two degrees per lap and itself rising and falling. So there are two movements at once: the fast one
+inside a lap (14 taps, ~2 seconds of hard tapping) and the slow one across laps (8 laps, 112 taps,
+~20 seconds). Nothing repeats exactly until the whole cycle comes home.
+
+Two details that took a wrong turn each, recorded so they are not re-tried:
+
+- **The window slides; it does not rotate.** Rotating a fixed pitch set wraps the top note round to
+  the bottom mid-figure, putting an octave-plus drop inside what should be a smooth rise.
+- **The drift is two degrees, not one.** A lap ends one degree above its window's root, so a drift of
+  one opens the next lap on the pitch that just played — a stutter every 14 taps, which is the exact
+  artifact the turns are shaped to avoid. Two lands the new lap one step above it instead.
+
+Seams are a single scale step while the window climbs and up to a sixth while it falls back. The
+sixth is left alone: it is an ordinary melodic interval, not an artifact. Fixed scale, not keyed to the current track (decision 6) — so it is one sample set
 pitch-shifted, or a small bank of pre-pitched samples.
 
 Implementation note: pitch-shift a single sample via `AudioStreamPlayer.pitch_scale` using

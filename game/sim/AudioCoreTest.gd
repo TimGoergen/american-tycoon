@@ -63,6 +63,7 @@ func _run() -> void:
 	_check_tap_scale()
 	_check_collect_is_relative()
 	_check_collect_needs_presence()
+	_check_one_sound_per_gesture()
 
 	# Tear the voices down before quitting: they are children of an autoload this test brought up by
 	# hand, and leaving them alive prints leak warnings that would look like a product problem.
@@ -218,6 +219,48 @@ func _check_collect_needs_presence() -> void:
 	_audio.call("_process", 0.016)
 	_check("the same payout window DOES sound while the player is present",
 		_any_voice_armed(BUS_SFX))
+
+
+## ONE SOUND PER GESTURE, AND IT COMES FIRST.
+##
+## The rule "a hold sounds like one thing, not sixty" was first implemented as "silence the repeats",
+## which quietly put the single sound at the END of the gesture — the release-fired purchase was the
+## only audible one, so pressing and holding for half a second meant the confirmation arrived when
+## the finger lifted (Tim, 2026-08-08: a noticeable delay between clicking buy and hearing it).
+##
+## PropertyRow is loaded through an assembled path: naming a UI class statically from a sim can
+## create a class-resolution cycle that breaks parsing in unrelated files.
+func _check_one_sound_per_gesture() -> void:
+	print("
+-- one purchase sound per gesture, at its START --")
+	var row_script: GDScript = load("res://scripts/ui/" + "PropertyRow.gd")
+	if row_script == null:
+		_check("PropertyRow.gd loads", false)
+		return
+	var row = row_script.new()
+
+	# PLAYER_TAP is the value Main sounds on; HOLD_REPEAT is the silent one.
+	var sources: Array = []
+	for i in range(5):
+		sources.append(row.call("_next_buy_source"))
+	var audible: int = row_script.get_script_constant_map()["ActionSource"]["PLAYER_TAP"]
+	_check("the FIRST purchase of a gesture is the audible one", sources[0] == audible)
+	var later_audible := 0
+	for i in range(1, sources.size()):
+		if sources[i] == audible:
+			later_audible += 1
+	_check("every later purchase in the same gesture is silent (%d audible)" % later_audible,
+		later_audible == 0)
+
+	# Ending the gesture re-arms it, or the second tap of a double-tap would be silent.
+	row.set("_buy_gesture_acted", false)
+	_check("a fresh gesture is audible again", row.call("_next_buy_source") == audible)
+
+	# The hire path carries the same semantics, so its first action is the audible one too.
+	_check("hire follows the same rule", row.call("_next_hire_source") == audible)
+	_check("...and its repeats do not", row.call("_next_hire_source") != audible)
+
+	row.free()
 
 
 # --- Observing plays ----------------------------------------------------------------------------

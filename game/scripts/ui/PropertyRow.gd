@@ -109,12 +109,17 @@ var _hold_accumulator := 0.0
 ## TuningConfig (buy_hold_* / hire_hold_*) so they can be felt out on device via the balance screen.
 var _buy_hold_accumulator := 0.0
 var _buy_hold_repeating := false
+## Whether THIS press-and-hold gesture has already produced a purchase. It decides which purchase
+## reports itself as the gesture's first — see _next_buy_source.
+var _buy_gesture_acted := false
 
 ## Hold-to-repeat state for the STAFF button (Tim, 2026-07-01): holding it keeps hiring/upgrading —
 ## and then leveling up the staffer — until the player releases, on its own hire_hold_* pacing
 ## (separate from the buy button's, Tim 2026-07-03).
 var _hire_hold_accumulator := 0.0
 var _hire_hold_repeating := false
+## The hire equivalent of _buy_gesture_acted.
+var _hire_gesture_acted := false
 
 # --- Concurrent multi-touch (Tim, 2026-07-02) ------------------------------------------------------
 # Godot converts only the FIRST finger of a touch gesture into a mouse event (project setting
@@ -753,7 +758,7 @@ func _ready() -> void:
 	_buy_button.custom_minimum_size = Vector2(0, BUTTON_ROW_HEIGHT)
 	UiPalette.style_button(_buy_button, true)  # red: buying is a spend action (§8)
 	_buy_button.pressed.connect(func() -> void:
-		buy_requested.emit(prop_index, _buy_mode, ActionSource.PLAYER_TAP))
+		buy_requested.emit(prop_index, _buy_mode, _next_buy_source()))
 	var buy_labels := _add_split_button_labels(_buy_button)
 	_buy_caption_label = buy_labels[0]
 	_buy_cost_label = buy_labels[1]
@@ -961,8 +966,10 @@ func _release_all_holds() -> void:
 	_rush_hold_seconds = 0.0
 	_buy_hold_accumulator = 0.0
 	_buy_hold_repeating = false
+	_buy_gesture_acted = false
 	_hire_hold_accumulator = 0.0
 	_hire_hold_repeating = false
+	_hire_gesture_acted = false
 
 
 ## Mark this row as one Auto-Purchase Mode just bought into. Main calls it immediately after the
@@ -1090,7 +1097,7 @@ func _fire_secondary_action(control_id: String) -> void:
 		"rush":
 			tap_requested.emit(prop_index)  # start an idle cycle, or land one rush
 		"buy":
-			buy_requested.emit(prop_index, _buy_mode, ActionSource.PLAYER_TAP)
+			buy_requested.emit(prop_index, _buy_mode, _next_buy_source())
 		"hire":
 			_on_hire_pressed()
 
@@ -1166,6 +1173,10 @@ func _pump_held_buy(delta: float) -> void:
 	if not _buy_button.button_pressed and not _secondary_held("buy"):
 		_buy_hold_accumulator = 0.0
 		_buy_hold_repeating = false
+		# The gesture is over, so the next press starts a fresh one and gets its feedback. Safe to
+		# do here rather than on button_down: this runs in _process, and the release-fired `pressed`
+		# has already been emitted by the time the next frame sees the button unheld.
+		_buy_gesture_acted = false
 		return
 	_buy_hold_accumulator += delta
 	var threshold := _prop.tuning.buy_hold_repeat_interval if _buy_hold_repeating \
@@ -1174,7 +1185,7 @@ func _pump_held_buy(delta: float) -> void:
 		_buy_hold_accumulator = 0.0
 		_buy_hold_repeating = true
 		if not _buy_button.disabled:
-			buy_requested.emit(prop_index, _buy_mode, ActionSource.HOLD_REPEAT)
+			buy_requested.emit(prop_index, _buy_mode, _next_buy_source())
 
 
 ## Holding the STAFF button keeps performing its current action on a calm cadence (Tim, 2026-07-01):
@@ -1188,6 +1199,7 @@ func _pump_held_hire(delta: float) -> void:
 	if not _hire_button.button_pressed and not _secondary_held("hire"):
 		_hire_hold_accumulator = 0.0
 		_hire_hold_repeating = false
+		_hire_gesture_acted = false   # gesture over — see the note in _pump_held_buy
 		return
 	_hire_hold_accumulator += delta
 	var threshold := _prop.tuning.hire_hold_repeat_interval if _hire_hold_repeating \
@@ -1196,7 +1208,7 @@ func _pump_held_hire(delta: float) -> void:
 		_hire_hold_accumulator = 0.0
 		_hire_hold_repeating = true
 		if not _hire_button.disabled:
-			_on_hire_pressed(ActionSource.HOLD_REPEAT)
+			_on_hire_pressed()
 
 
 ## True while a HELD action is engaged on this row: auto-rush (held past RUSH_ENGAGE_SEC), or
@@ -1778,11 +1790,35 @@ func _apply_ownership_styling(owned: bool, frozen: bool) -> void:
 		add_theme_stylebox_override("panel", owned_plate)
 
 
+## Which source the NEXT buy of this gesture should report.
+##
+## THE FIRST purchase of a gesture is the one that gets the feedback, whether it came from a quick
+## tap or from the first pump of a hold — everything after it is a repeat.
+##
+## This was originally written the other way round (repeats silent, the release-fired purchase
+## audible), and that put the ONLY sound at the END of the gesture: press, hold half a second, and
+## the confirmation arrived when the finger lifted. Feedback belongs at the start of an action, not
+## its finish (Tim, 2026-08-08: "a noticeable delay between clicking the buy button and the sound").
+func _next_buy_source() -> ActionSource:
+	if _buy_gesture_acted:
+		return ActionSource.HOLD_REPEAT
+	_buy_gesture_acted = true
+	return ActionSource.PLAYER_TAP
+
+
+## The hire equivalent of _next_buy_source.
+func _next_hire_source() -> ActionSource:
+	if _hire_gesture_acted:
+		return ActionSource.HOLD_REPEAT
+	_hire_gesture_acted = true
+	return ActionSource.PLAYER_TAP
+
+
 ## The staff button's `pressed` handler. One action only — buy up the ladder — so no state
 ## dispatch (the pre-redesign HIRE/UPGRADE/LEVEL-UP state machine is gone). HOW MANY rungs is
 ## the current hire mode's business, and Main resolves that from the mode we send.
-func _on_hire_pressed(source: ActionSource = ActionSource.PLAYER_TAP) -> void:
-	hire_requested.emit(prop_index, _effective_hire_mode(), source)
+func _on_hire_pressed() -> void:
+	hire_requested.emit(prop_index, _effective_hire_mode(), _next_hire_source())
 
 
 ## Update the staff button for the property's sequential ladder (GDD §6.1, epoch-depth

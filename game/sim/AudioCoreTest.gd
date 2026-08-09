@@ -61,10 +61,8 @@ func _run() -> void:
 	_check_cooldown()
 	_check_voice_pool_is_bounded()
 	_check_tap_scale()
-	_check_collect_is_relative()
-	_check_collect_needs_presence()
+	await _check_buy_intensity_is_relative()
 	_check_one_sound_per_gesture()
-	await _check_collect_cannot_sustain_itself()
 
 	# Tear the voices down before quitting: they are children of an autoload this test brought up by
 	# hand, and leaving them alive prints leak warnings that would look like a product problem.
@@ -87,7 +85,7 @@ func _run() -> void:
 func _check_catalog() -> void:
 	print("-- catalog --")
 	var events: Dictionary = _audio.get("_events")
-	for id in [&"tap_note", &"buy_success", &"collect", &"music_preview"]:
+	for id in [&"tap_note", &"buy_success", &"music_preview"]:
 		_check("'%s' is in the catalog with a sample" % id,
 			events.has(id) and (events[id] as AudioEvent).stream != null)
 	# The tap sample is pitched by the scale, so a random detune on top would simply be out of tune.
@@ -171,96 +169,48 @@ func _check_tap_scale() -> void:
 	_check("reset_tap_scale drops it to the root", int(_audio.get("_tap_step")) == 0)
 
 
-## RULE 2, the one this whole test exists for: nothing may branch on a dollar magnitude.
-func _check_collect_is_relative() -> void:
-	print("\n-- intensity comes from ratios, never magnitudes --")
-	# The same RATIO at wildly different scales must give the same answer. These two windows are
-	# eighteen orders of magnitude apart: generation 1, and a deep late-game estate.
-	var early: float = _audio.call("_collect_intensity", 500.0, 1000.0)
-	var late: float = _audio.call("_collect_intensity", 500.0e18, 1000.0e18)
-	_check("a small window and a colossal one at the same ratio sound identical (%.3f vs %.3f)"
-			% [early, late],
+## RULE 2: nothing may branch on a dollar MAGNITUDE.
+##
+## Purchase loudness is the only intensity-scaled sound left — cycle-end audio was removed on Tim's
+## call (2026-08-08: "only when the user taps to purchase") — so this is where the rule is pinned. It
+## is the rule most likely to be broken by a well-meaning edit, because scaling by the PRICE is the
+## obvious thing to write and it is wrong at every generation except the one it was tested at.
+##
+## Main owns the calculation, so it is exercised through Main: the helper reads its floor and ceiling
+## from a tuning knob.
+func _check_buy_intensity_is_relative() -> void:
+	print("
+-- purchase intensity comes from ratios, never magnitudes --")
+	var main: Node = (load("res://Main.tscn") as PackedScene).instantiate()
+	root.add_child(main)
+	for i in range(4):
+		await process_frame
+
+	# The SAME fractional gain, eighteen orders of magnitude apart: generation 1, and a deep estate.
+	var early: float = main.call("_buy_intensity", 1_000.0, 1_200.0)
+	var late: float = main.call("_buy_intensity", 1_000.0e18, 1_200.0e18)
+	_check("a +20%% buy sounds the same at any scale (%.3f vs %.3f)" % [early, late],
 		is_equal_approx(early, late))
 
-	# And the ratio itself has to matter, or the previous check would pass on a constant.
-	var passive: float = _audio.call("_collect_intensity", 250.0, 1000.0)   # ~1x expected: idle
-	var burst: float = _audio.call("_collect_intensity", 1000.0, 1000.0)    # ~4x expected: a rush
-	_check("a passive window sits at the floor (%.3f)" % passive, is_zero_approx(passive))
-	_check("a burst maxes out (%.3f)" % burst, is_equal_approx(burst, 1.0))
-	_check("a burst is louder than idle", burst > passive)
+	# The fraction has to matter, or the check above would pass on a constant.
+	var tiny: float = main.call("_buy_intensity", 1_000.0, 1_005.0)     # +0.5%
+	var huge: float = main.call("_buy_intensity", 1_000.0, 2_000.0)     # +100%
+	_check("a marginal buy sits at the floor (%.3f)" % tiny, is_zero_approx(tiny))
+	_check("a doubling maxes out (%.3f)" % huge, is_equal_approx(huge, 1.0))
+	_check("bigger relative gains are louder", huge > tiny)
 
-	# Nothing to divide by must not become a divide by zero.
-	_check("no income yields no sound rather than an error",
-		is_zero_approx(_audio.call("_collect_intensity", 100.0, 0.0)))
+	# A colossal ABSOLUTE price that barely moves income must stay quiet. This is the whole point:
+	# price-scaled audio would make this the loudest sound in the game.
+	var expensive_but_marginal: float = main.call("_buy_intensity", 1.0e24, 1.0e24 * 1.005)
+	_check("a buy costing a trillion that moves income 0.5%% is QUIET (%.3f)" % expensive_but_marginal,
+		is_zero_approx(expensive_but_marginal))
 
+	# The first staffed property has no prior income to be a fraction of; it is unambiguously big.
+	_check("the very first income counts as a full-intensity moment",
+		is_equal_approx(main.call("_buy_intensity", 0.0, 5.0), 1.0))
 
-## RULE 1: unattended events stay silent. This is what makes a full soundtrack survivable.
-func _check_collect_needs_presence() -> void:
-	print("\n-- unattended payouts are silent --")
-	# Nobody has touched anything for a long time.
-	_audio.set("_last_interaction_ms", Time.get_ticks_msec() - 60_000)
-	_check("the player reads as absent", not _audio.player_is_present())
-
-	_audio.set("_collect_last_played_ms", -100_000)
-	_audio.note_collect(1000.0, 1.0)
-	_audio.set("_collect_window_opened_ms", Time.get_ticks_msec() - 10_000)
-	_disarm_all()
-	_audio.call("_process", 0.016)
-	_check("a payout window while absent makes NO sound", not _any_voice_armed(BUS_SFX))
-	_check("...and the window is consumed rather than left to pile up",
-		is_zero_approx(float(_audio.get("_collect_accum"))))
-
-	# Now the player is here.
-	_audio.set("_last_interaction_ms", Time.get_ticks_msec())
-	_audio.set("_collect_last_played_ms", -100_000)
-	(_audio.get("_last_played_ms") as Dictionary)[&"collect"] = -100_000
-	_audio.note_collect(1000.0, 1.0)
-	_audio.set("_collect_window_opened_ms", Time.get_ticks_msec() - 10_000)
-	_disarm_all()
-	_audio.call("_process", 0.016)
-	_check("the same payout window DOES sound while the player is present",
-		_any_voice_armed(BUS_SFX))
-
-
-## THE COLLECT SOUND MUST NOT KEEP ITSELF ALIVE.
-##
-## Presence was first inferred from the bus alone, and collect rides the SFX bus — so every collect
-## sound renewed the window that had permitted it. The window never closed: one purchase, and every
-## staffed property blipped at the end of every cycle for the rest of the session (Tim, 2026-08-08).
-##
-## It is a circular-permission bug, which is a shape worth a test rather than a comment: the fix is
-## one flag, and a future event added on the SFX bus without thinking about it would reopen it.
-func _check_collect_cannot_sustain_itself() -> void:
-	print("
--- the collect sound cannot renew its own permission --")
-	var events: Dictionary = _audio.get("_events")
-	var collect: AudioEvent = events.get(&"collect")
-	_check("collect is marked as NOT counting for presence",
-		collect != null and not collect.counts_as_presence)
-
-	# The player acts. Then the game plays a collect on its own.
-	#
-	# ASSERT ON THE TIMESTAMP ITSELF, not on player_is_present() after winding the clock back — the
-	# first version of this test did the latter, overwriting _last_interaction_ms AFTER the collect
-	# and therefore passing perfectly well against the broken code. What matters is whether collect
-	# MOVED the mark, so that is what gets measured.
-	_audio.set("_last_interaction_ms", Time.get_ticks_msec())
-	var mark_before: int = int(_audio.get("_last_interaction_ms"))
-	_check("the player reads as present right after acting", _audio.player_is_present())
-
-	# Wait long enough that a renewal would be visible as a different number.
+	main.queue_free()
 	await process_frame
-	await process_frame
-	(_audio.get("_last_played_ms") as Dictionary)[&"collect"] = -100_000
-	_audio.play_scaled(&"collect", 1.0)
-	var mark_after: int = int(_audio.get("_last_interaction_ms"))
-	_check("a collect sound does NOT move the presence mark (%d -> %d)" % [mark_before, mark_after],
-		mark_after == mark_before)
-
-	# And a real player action still counts, or the fix would have gone too far.
-	(_audio.get("_last_played_ms") as Dictionary)[&"buy_success"] = -100_000
-	_audio.play(&"buy_success")
-	_check("a purchase DOES mark the player present", _audio.player_is_present())
 
 
 ## ONE SOUND PER GESTURE, AND IT COMES FIRST.

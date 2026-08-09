@@ -692,11 +692,11 @@ sourcing.
 - [ ] **Purchase feedback tracks the MOMENT, not the price.** An early cheap buy and a late enormous
       one that move income by a similar fraction should sound the same. A big jump should bring in
       the brighter layer audibly.
-- [ ] **Collect audio is not fatiguing** with a wide portfolio at deep tiers, where dozens of
-      payouts land per second. It should speak at most a few times a second, and only while you are
-      actually touching the screen.
-- [ ] **Idle really is silent.** Put the phone down mid-session. Passive cycle collections and
-      auto-purchases must make NO sound at all.
+- [ ] **A completing cycle makes NO sound**, ever — under any portfolio, at any tier, whether or not
+      you have just tapped something. Cycle-end audio was removed on Tim's call (2026-08-08); if you
+      hear anything at the end of a cycle, that is a regression.
+- [ ] **Idle really is silent.** Put the phone down mid-session. Nothing whatsoever should sound:
+      no cycle payouts, no auto-purchases.
 - [ ] **A held buy sounds like one gesture,** not sixty purchases.
 - [ ] **A held wage tap holds ONE note** rather than climbing (Tim's call, §10.2).
 - [ ] **The tap scale restarts at the root** after a pause and after a tab change.

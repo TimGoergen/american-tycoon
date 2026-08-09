@@ -29,7 +29,7 @@ import wave
 
 SAMPLE_RATE = 44100
 # Peak amplitude for a generated sample, as a fraction of full scale. Deliberately well below 1.0:
-# these get mixed together (a tap can land on top of a purchase on top of a collect) and per-event
+# these get mixed together (a tap run can land on top of a purchase) and per-event
 # volumes in audio_events.tres trim further. Headroom now is cheaper than clipping later.
 PEAK = 0.5
 
@@ -38,7 +38,6 @@ OUT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 # Equal-temperament note frequencies used below, so the tones sit in a real scale rather than on
 # arbitrary numbers. A4 = 440.
 NOTES = {
-    "G4": 392.00,
     "C5": 523.25,
     "E5": 659.25,
     "G5": 783.99,
@@ -108,8 +107,8 @@ def main():
     # where they are less obvious than the muddy ones you get shifting down a long way.
     write_wav("tap_note.wav", tone(NOTES["C5"], 0.14, harmonics=(1.0, 0.28, 0.08), curve=5.0))
 
-    # PURCHASE -- a rising two-note confirmation. Rising because a purchase is a step forward; the
-    # collect blip below deliberately does not rise, so the two never sound like the same event.
+    # PURCHASE -- a rising two-note confirmation. Rising because a purchase is a step forward, and
+    # distinct from the tap note, which is a single pitched blip.
     write_wav("buy_success.wav", sequence([
         (0.000, tone(NOTES["G5"], 0.16, harmonics=(1.0, 0.35, 0.12), curve=4.0)),
         (0.085, tone(NOTES["C6"], 0.34, harmonics=(1.0, 0.30, 0.10), curve=3.0)),
@@ -123,10 +122,6 @@ def main():
         (0.000, tone(NOTES["E6"], 0.14, harmonics=(1.0, 0.4, 0.2, 0.1), curve=4.0)),
         (0.085, tone(NOTES["C6"] * 2.0, 0.30, harmonics=(1.0, 0.35, 0.15), curve=3.0)),
     ]))
-
-    # COLLECT -- soft, low, short. This one plays most often, so it is the one most able to become
-    # irritating: no rise, few harmonics, and short enough to sit under everything else.
-    write_wav("collect.wav", tone(NOTES["G4"], 0.09, harmonics=(1.0, 0.15), curve=6.0))
 
     # MUSIC SLIDER PREVIEW -- a small arpeggiated major chord standing in for the muzak of Phase 2.
     # The music slider needs something on the Music bus to audition, or it is a knob with no feedback.

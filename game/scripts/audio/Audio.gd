@@ -79,19 +79,9 @@ var _tap_last_ms := 0
 ## the Phase 2 idle fade both key off this — it is the codified form of rule 1.
 var _last_interaction_ms := 0
 
-## Collect aggregation (plan §4.3). Payouts are summed over a short window and reported as ONE
-## sound; the raw event fires dozens of times a second at deep tiers and a chime per payout is
-## unshippable.
-var _collect_accum := 0.0
-var _collect_income_per_sec := 0.0
-var _collect_window_opened_ms := 0
-var _collect_last_played_ms := 0
-
 ## Tunable knobs, pushed in by Main from TuningConfig so audio timing is adjustable in the dev panel
 ## like everything else. Defaults here match TuningConfig's and keep Audio usable before any push.
 var _tap_scale_reset_seconds := 1.0
-var _collect_window_ms := 250.0
-var _collect_min_interval_ms := 250.0
 var _presence_window_ms := 2000.0
 var _scaled_min_db := -10.0
 var _layer_threshold := 0.5
@@ -195,20 +185,6 @@ func reset_tap_scale() -> void:
 	_tap_last_ms = -1_000_000
 
 
-## Report one cycle payout. NOT one sound per call — see _process for the aggregation, and §4.3 for
-## why: at deep tiers this fires dozens of times a second.
-##
-## `income_per_sec` is what makes the result relative: the window is judged against what the player's
-## current portfolio was already producing, so a burst sounds like a burst at every scale.
-func note_collect(payout: float, income_per_sec: float) -> void:
-	if not _enabled:
-		return
-	if _collect_accum <= 0.0:
-		_collect_window_opened_ms = Time.get_ticks_msec()
-	_collect_accum += payout
-	_collect_income_per_sec = income_per_sec
-
-
 ## Set one player-facing level, 0..1 linear. The SFX slider drives three buses (§1.2).
 func set_bus_volume(bus: StringName, linear: float) -> void:
 	if not _enabled:
@@ -229,57 +205,27 @@ func apply_tuning(tuning: TuningConfig) -> void:
 	if tuning == null:
 		return
 	_tap_scale_reset_seconds = tuning.audio_tap_scale_reset_seconds
-	_collect_window_ms = tuning.audio_collect_window_ms
-	_collect_min_interval_ms = tuning.audio_collect_min_interval_ms
 	_presence_window_ms = tuning.audio_presence_window_ms
 	_scaled_min_db = tuning.audio_scaled_min_db
 	_layer_threshold = tuning.audio_layer_threshold
 
 
-## True when the player has done something recently enough that the game should still be making
-## noise on their behalf. This is rule 1 in one place: everything that fires WITHOUT the player —
-## passive cycle collections, auto-purchases — asks this before making a sound.
+## True when the player has done something recently enough for the game to still be making noise on
+## their behalf. Rule 1 in one place.
+##
+## NOTHING CONSULTS THIS YET. It is kept because Phase 2's idle fade (plan §3.3) is built on exactly
+## this signal — fade the music out after a stretch of no interaction, bring it back on the next one —
+## and because the tracking is two lines that would otherwise be rediscovered.
+##
+## A TRAP WORTH REMEMBERING if a sound is ever added that fires WITHOUT the player: presence is
+## inferred from the bus, so such a sound would refresh the very window that permitted it and hold it
+## open forever. That is precisely what the collect sound did before it was removed (Tim, 2026-08-08),
+## and it is why every sound in the catalog today is a direct response to a press.
 func player_is_present() -> bool:
 	return Time.get_ticks_msec() - _last_interaction_ms <= int(_presence_window_ms)
 
 
 # --- Internals ---------------------------------------------------------------------------------
-
-## Flush the aggregated collect window.
-func _process(_delta: float) -> void:
-	if not _enabled or _collect_accum <= 0.0:
-		return
-	var now := Time.get_ticks_msec()
-	if now - _collect_window_opened_ms < int(_collect_window_ms):
-		return
-
-	var aggregate := _collect_accum
-	var income_per_sec := _collect_income_per_sec
-	_collect_accum = 0.0
-
-	# SILENT WHEN UNATTENDED (rule 1). A property finishing its cycle while nobody is touching the
-	# screen is the game running, not the player acting — and this is precisely what makes a full
-	# soundtrack survivable: the music carries the idle state, SFX are reserved for presence.
-	if not player_is_present():
-		return
-	if now - _collect_last_played_ms < int(_collect_min_interval_ms):
-		return
-	_collect_last_played_ms = now
-	play_scaled(&"collect", _collect_intensity(aggregate, income_per_sec))
-
-
-## How loud an aggregated collect should be, from a RATIO and never from a dollar figure (rule 2).
-##
-## The window is compared against what the portfolio produces on its own over the same span. Purely
-## passive income lands at about 1.0 and sits at the floor; a rush pushing several properties through
-## their cycles at once lands well above it. So the sound reports "faster than usual", which is the
-## only thing about a payout the player can actually act on — and a $250 window at generation 1
-## sounds exactly like a $4.2Sx window at generation 15, as it should.
-func _collect_intensity(aggregate: float, income_per_sec: float) -> float:
-	var expected := income_per_sec * (_collect_window_ms / 1000.0)
-	if expected <= 0.0:
-		return 0.0
-	return clampf(inverse_lerp(1.0, 3.0, aggregate / expected), 0.0, 1.0)
 
 
 func _play_event(event_id: StringName, intensity: float, scaled: bool, pitch := 1.0) -> void:
@@ -298,13 +244,10 @@ func _play_event(event_id: StringName, intensity: float, scaled: bool, pitch := 
 		return
 	_last_played_ms[event_id] = now
 
-	# PRESENCE. SFX and UI mean the player did something; ceremony and music happen TO them, so they
-	# must not count, or a cutscene would keep the collect sounds alive by itself.
-	#
-	# The per-event flag closes the same hole from the other side: `collect` rides the SFX bus but is
-	# the game reporting ITSELF, so it must never renew the window that let it play. Without that it
-	# is a self-sustaining loop — see AudioEvent.counts_as_presence.
-	if event.counts_as_presence and (event.bus == BUS_SFX or event.bus == BUS_UI):
+	# PRESENCE. SFX and UI are things the player did; ceremony and music happen TO them and must not
+	# count. See player_is_present for why this inference is only safe while every sound is a direct
+	# response to a press.
+	if event.bus == BUS_SFX or event.bus == BUS_UI:
 		_last_interaction_ms = now
 
 	var volume_db := event.volume_db

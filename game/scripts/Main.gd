@@ -384,11 +384,6 @@ func _process(delta: float) -> void:
 		dynasty.tick(step)
 		_tick_accumulator -= step
 
-	# Report this frame's cycle payouts. Audio sums them over a short window and speaks at most
-	# once per window — one chime per payout is unshippable when deep tiers pay dozens a second —
-	# and stays silent entirely unless the player has done something recently.
-	Audio.note_collect(game.economy.income_this_tick, game.economy.get_passive_income_per_sec())
-
 	_drive_auto_purchase(delta)
 
 	_autosave_timer += delta

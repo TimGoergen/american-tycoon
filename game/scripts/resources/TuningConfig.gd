@@ -768,15 +768,8 @@ extends Resource
 ## How long a gap in tapping resets the musical tap scale back to its root note, in seconds.
 @export var audio_tap_scale_reset_seconds: float = 1.0
 
-## Cycle payouts are summed over this window and reported as ONE sound (never one per payout — at
-## deep tiers the raw event fires dozens of times a second).
-@export var audio_collect_window_ms: float = 250.0
-
-## A hard floor on the gap between two collect sounds, whatever the windows do.
-@export var audio_collect_min_interval_ms: float = 250.0
-
-## How long after a player action the game still counts them as PRESENT. Unattended events —
-## passive collections, auto-purchases — stay silent outside this window.
+## How long after a player action the game still counts them as PRESENT. Phase 2's idle music fade
+## is what will consume this; nothing reads it today (see Audio.player_is_present).
 @export var audio_presence_window_ms: float = 2000.0
 
 ## How quiet the smallest version of an intensity-scaled sound is, relative to its loudest.

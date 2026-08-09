@@ -15,7 +15,6 @@ commit it.
 | `sfx/tap_note.wav` | Generated — `tools/generate_placeholder_audio.py` | Original work, no third-party content | No |
 | `sfx/buy_success.wav` | Generated — `tools/generate_placeholder_audio.py` | Original work, no third-party content | No |
 | `sfx/buy_success_bright.wav` | Generated — `tools/generate_placeholder_audio.py` | Original work, no third-party content | No |
-| `sfx/collect.wav` | Generated — `tools/generate_placeholder_audio.py` | Original work, no third-party content | No |
 | `sfx/music_preview.wav` | Generated — `tools/generate_placeholder_audio.py` | Original work, no third-party content | No |
 
 **These are placeholders.** They are synthesized sine tones with amplitude envelopes, written

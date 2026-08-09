@@ -62,7 +62,7 @@ Every row below is a decision, not a suggestion. Do not relitigate.
 | 11 | Bespoke ceremony audio | **Succession/obituary**, **First Contact / epoch arrival**, **Legacy upgrade purchase**. *Final Dollar deliberately excluded* (M4, not built) |
 | 12 | Sequencing | **Vertical slice first**, then phased |
 | 13 | Auto-purchase sound | **Silent — visual only** (the green count-chip wash already covers it) |
-| 14 | First slice | **Tap → buy → collect** |
+| 14 | First slice | **Tap → buy → collect** (collect later dropped — see §4.3) |
 | 15 | UI sounds | **Tabs and major actions only** |
 | 16 | Hard constraint | **Battery/CPU** — streaming vs in-memory, voice-count limits |
 | 17 | Earth musical style | **Department-store muzak** |
@@ -360,23 +360,27 @@ Staff hire splits on `PropertyState.gd:247 add_staff_level()` — `staff_level =
 **first hire** (a distinct, more satisfying sound; it also starts the cycle at `:250`),
 anything above is a level-up.
 
-### 4.3 Collect — the fatigue trap
+### 4.3 Cycle payouts — NO AUDIO (Tim, 2026-08-08)
 
-`_collect()` fires for **every property, every cycle**, and cycle lengths go down to
-0.54 s at the fast end of the ladder. With a wide portfolio this is dozens of payouts per
-second. A "cha-ching" per payout is unshippable.
+**Reversed.** This section originally specified aggregated collect audio: sum payouts over a ~250 ms
+window, play one sound scaled to the aggregate, and stay silent unless the player had acted within
+~2 s. It was built that way in Phase 1 and removed the same day.
 
-Rules:
-- Collect audio is **aggregated, not per-event**. Accumulate payouts over a window
-  (proposed 250 ms) and play **one** sound whose intensity reflects the aggregate relative
-  to current income/sec.
-- **Hard cooldown** of `audio_collect_min_interval_ms` (proposed 250 ms) regardless.
-- **Passive collections while the player is not interacting are silent** — rule 0.4.1
-  again. A property finishing its cycle unattended is the game running, not the player
-  acting. Only collections within ~2 s of a player interaction sound.
+Tim, on hearing it: *"I don't like the idea of sound at the end of a cycle, only when the user taps
+to purchase."* So **a cycle completing is never audible**, at all, under any circumstances — the
+aggregation, the window, and the `collect` sample are gone rather than merely quiet.
 
-That last rule is the one that makes decision 1 (full soundtrack) survivable: the music
-carries the idle state, and SFX are reserved for presence.
+Which makes the section's original worry moot, and it is worth keeping the reasoning because it
+generalizes: `_collect()` fires for every property every cycle, and cycle lengths reach 0.54 s, so a
+wide portfolio pays out dozens of times a second. There was never a volume at which that is pleasant.
+The 2-second presence window was an attempt to have it both ways, and the simpler answer turned out
+to be the right one — **the player's actions make sound; the machine running does not.**
+
+That decision also removed a bug this design made possible. Presence was inferred from the BUS (SFX
+and UI count as the player acting), and the collect sound played on the SFX bus — so each collect
+renewed the very window that permitted it, and the window never closed. One purchase and every
+staffed property blipped forever. Any future sound that fires WITHOUT the player has the same trap
+waiting for it; see the note on `Audio.player_is_present`.
 
 ### 4.4 Auto-purchase — silent (decision 13)
 
@@ -642,8 +646,8 @@ The whole path, end to end, for exactly three events.
 - The settings card, all three sliders, persistence **including
   `_carry_player_settings_to_heir`** (§6.4)
 - `TuningConfig` `audio_*` knobs + `DevTuningPanel` SECTIONS entry
-- **Three sounds only:** the tap scale, purchase-succeeded (relative-scaled), and
-  aggregated collect
+- **Two sounds** (was three): the tap scale and purchase-succeeded (relative-scaled). Aggregated
+  collect was built, heard, and removed — see §4.3
 - The `BuySource` enum refactor (§4.4) — needed now, because the collect and hold-repeat
   rules depend on it
 

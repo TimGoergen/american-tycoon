@@ -419,6 +419,17 @@ func _check_the_count_fits_the_window() -> void:
 			% (100.0 * longest_count / shortest_window),
 		longest_count < shortest_window * 0.6)
 
+	# THE HAPTIC RIDES THE SAME BEATS (Tim, 2026-08-09), so the bump must fit BETWEEN them. The tuned
+	# vent pulse is longer than the spacing; at full length the buzzes would run together into one
+	# continuous vibration and the count would stop counting.
+	var bump_ms: float = bar_consts["VENT_COUNT_HAPTIC_MS"]
+	_check("the haptic bump fits between beats (%.0f ms bump, %.0f ms apart)"
+			% [bump_ms, spacing * 1000.0],
+		bump_ms < spacing * 1000.0)
+	_check("...and is shorter than the tuned vent pulse it is derived from (%.0f vs %.0f ms)"
+			% [bump_ms, tuning.rush_momentum_haptic_vent_ms],
+		bump_ms <= tuning.rush_momentum_haptic_vent_ms)
+
 
 ## THE CONTINUOUS BED (plan §5.1). Held sounds have failure modes one-shots do not: they can be
 ## left running forever, and they can be started twice.

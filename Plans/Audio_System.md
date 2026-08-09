@@ -497,7 +497,7 @@ All signals already exist on `RushMomentumState`:
 
 | Signal | Decl | Audio |
 |---|---|---|
-| `vent_incoming(approach_seconds, required_lifts)` | `:159` | **NO AUDIO** — see the note below. The haptic telegraph still fires here, unchanged |
+| `vent_incoming(approach_seconds, required_lifts)` | `:159` | **SILENT AND STILL** — no sound, no buzz. See the note below |
 | `vent_window_opened(required_lifts, duration)` | `:163` | The "now" cue. This is the single most important sound in the game |
 | `vent_lift_registered(lifts_done, required_lifts)` | `:166` | Ascending confirmation per lift — the player hears progress toward the requirement |
 | `vent_succeeded(new_tier, new_peak_bonus)` | `:170` | Reward sting, intensity scaled by new tier |
@@ -516,9 +516,20 @@ so a marker three-quarters of a second early asks the player to hold an interval
 punishes them for missing it. **Sound now marks the ACT.** The count ticks fire at
 `vent_window_opened`, straight after the "now" cue.
 
-The haptic telegraph stays at spawn, unchanged and device-tuned. Touch says *coming, this many*;
-sound says *now, this many*. That is not a breach of the lockstep rule — that rule forbids two
-channels claiming the same EVENT at different moments, and these two report different events.
+**The haptic moved too, the same day.** The first pass left the buzz at spawn on the grounds that it
+was device-tuned and meant something different. Tim, playing it: *"the haptic bump is still occurring
+at the beginning of the sweep rather than when the vent mechanic begins."* The split was the problem,
+not the timing of either half — so both channels now fire together at the window, in genuine lockstep,
+and vent spawn has no feedback at all beyond the approach bar sweeping.
+
+This REVERSES the rationale recorded on 2026-07-20, which argued a window-open buzz would land "too
+late to help". That reasoning predates the audio: with a sound already marking the window, a buzz
+0.7 s earlier stopped being a warning and became an interval to memorise. The old comment is replaced
+rather than left standing, so the next reader does not reinstate it.
+
+The count's haptic is shortened to 40 ms, from the tuned 80 ms: at 70 ms spacing a full-length pulse
+would run into the next and the count would stop counting. It takes the SMALLER of the two values, so
+a zeroed vent-haptic knob still means no haptics.
 
 The count is paced fast (0.09 s lead, 0.07 s apart) so even the maximum three lifts finish in 0.23 s,
 about half the shortest window. A count that outlasted its window would read as something to wait

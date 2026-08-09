@@ -39,10 +39,13 @@ const VOICES_PER_BUS := {
 	BUS_MUSIC: 2,
 }
 
-## The tap scale (plan §4.1, decision 2 and 6). Semitone offsets of a C major pentatonic across an
-## octave and a half. FIXED, deliberately not keyed to the current music track: the point is that a
-## burst of tapping always sounds like the same tune, whatever era you are in.
-const TAP_SCALE_SEMITONES := [0, 2, 4, 7, 9, 12, 14, 16, 19, 21]
+## The tap scale (plan §4.1, decision 2 and 6). Semitone offsets of a C major pentatonic across two
+## octaves. FIXED, deliberately not keyed to the current music track: the point is that a burst of
+## tapping always sounds like the same tune, whatever era you are in.
+##
+## Pentatonic because every note in it agrees with every other — a player hammering the button in no
+## particular rhythm cannot produce a wrong note.
+const TAP_SCALE_SEMITONES := [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24]
 
 ## Fade applied to the master bus when the app loses focus (plan §3.4). Short enough to be gone
 ## before the app is backgrounded, long enough not to click.
@@ -71,8 +74,9 @@ var _bus_levels: Dictionary = {}
 ## cheap return, so the gates need no audio stubs (plan §0.4 rule 4).
 var _enabled := true
 
-## Where the tap scale has climbed to, and when it last advanced.
-var _tap_step := 0
+## How far into the current tap run we are, and when it last advanced. The position is an index into
+## the rise-and-fall figure, not a scale degree — see _degree_at.
+var _tap_position := 0
 var _tap_last_ms := 0
 
 ## The msec clock reading of the last thing the PLAYER did (an SFX or UI sound). Collect audio and
@@ -164,20 +168,42 @@ func play_tap_note() -> void:
 		return
 	var now := Time.get_ticks_msec()
 	if now - _tap_last_ms > int(_tap_scale_reset_seconds * 1000.0):
-		_tap_step = 0
+		_tap_position = 0
 	else:
-		_tap_step = mini(_tap_step + 1, TAP_SCALE_SEMITONES.size() - 1)
+		_tap_position = (_tap_position + 1) % _tap_run_length()
 	_tap_last_ms = now
 
-	var semitones: int = TAP_SCALE_SEMITONES[_tap_step]
+	var semitones: int = TAP_SCALE_SEMITONES[_degree_at(_tap_position)]
 	# Equal temperament: each semitone is a factor of 2^(1/12).
 	_play_event(&"tap_note", 1.0, false, pow(2.0, semitones / 12.0))
+
+
+## How many taps a full rise-and-fall takes before the figure comes back around.
+##
+## Both ends are visited ONCE per lap — the turn at the top does not sound the top note twice, and
+## nor does the turn at the bottom — so the lap is two passes minus the two shared ends.
+func _tap_run_length() -> int:
+	return (TAP_SCALE_SEMITONES.size() - 1) * 2
+
+
+## Which scale degree tap number `position` plays: up the scale, then back down, then up again.
+##
+## IT USED TO CLIMB AND STICK, capping at the top note and repeating it for as long as the player
+## kept tapping — so a sustained run became one note hammered over and over (Tim, 2026-08-08: "it
+## becomes a single highly repetitive sound"). Rising and falling instead means the pitch is always
+## moving, and over the two-octave set a full lap takes twenty taps, which is long enough that fast
+## tapping reads as a rolling figure rather than as a short loop.
+func _degree_at(position: int) -> int:
+	var top := TAP_SCALE_SEMITONES.size() - 1
+	if position <= top:
+		return position          # climbing
+	return _tap_run_length() - position   # falling back toward the root
 
 
 ## Drop the tap scale back to its root. Called when the player changes tabs — a scale that resumed
 ## mid-climb after you went and did something else reads as a bug rather than as a reward.
 func reset_tap_scale() -> void:
-	_tap_step = 0
+	_tap_position = 0
 	# A sentinel far in the past, NOT 0. The clock is milliseconds since the engine started, so 0
 	# means "at launch" — which in the first second of runtime still reads as RECENT, and the next
 	# tap would climb instead of restarting at the root. Only visible in a test or in the first

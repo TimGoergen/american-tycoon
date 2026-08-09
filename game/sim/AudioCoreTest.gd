@@ -141,32 +141,55 @@ func _check_voice_pool_is_bounded() -> void:
 
 
 func _check_tap_scale() -> void:
-	print("\n-- the tap scale --")
+	print("
+-- the tap scale --")
 	_audio.reset_tap_scale()
-	_check("it starts at the root", int(_audio.get("_tap_step")) == 0)
+	_check("it starts at the root", int(_audio.get("_tap_position")) == 0)
 
 	for i in range(4):
 		_audio.play_tap_note()
-	_check("four taps climb four steps (step %d)" % int(_audio.get("_tap_step")),
-		int(_audio.get("_tap_step")) == 3)
+	_check("four taps advance four steps (position %d)" % int(_audio.get("_tap_position")),
+		int(_audio.get("_tap_position")) == 3)
 
-	# It must PIN at the top rather than run off the end of the scale.
-	for i in range(50):
-		_audio.play_tap_note()
-	var scale: Array = _audio.get_script().get_script_constant_map()["TAP_SCALE_SEMITONES"]
-	var top: int = scale.size() - 1
-	_check("a long run pins at the top of the range (step %d of %d)" % [int(_audio.get("_tap_step")), top],
-		int(_audio.get("_tap_step")) == top)
-
-	# A gap in the tapping drops it back to the root: the run belongs to one burst.
+	# A pause drops it back to the root: the run belongs to one burst of tapping.
 	_audio.set("_tap_last_ms", Time.get_ticks_msec() - 10_000)
 	_audio.play_tap_note()
-	_check("a pause resets the climb to the root", int(_audio.get("_tap_step")) == 0)
+	_check("a pause resets the run to the root", int(_audio.get("_tap_position")) == 0)
 
-	# And a tab change does the same, so a climb never resumes after the player went elsewhere.
+	# And a tab change does the same, so a run never resumes after the player went elsewhere.
 	_audio.play_tap_note()
 	_audio.reset_tap_scale()
-	_check("reset_tap_scale drops it to the root", int(_audio.get("_tap_step")) == 0)
+	_check("reset_tap_scale drops it to the root", int(_audio.get("_tap_position")) == 0)
+
+	# THE COMPLAINT, PINNED. The figure used to climb and then repeat the top note for as long as
+	# tapping continued, which is what made a sustained run "a single highly repetitive sound"
+	# (Tim, 2026-08-08). What matters is not the exact contour but that the pitch KEEPS MOVING.
+	var scale: Array = _audio.get_script().get_script_constant_map()["TAP_SCALE_SEMITONES"]
+	var lap: int = _audio.call("_tap_run_length")
+	var degrees: Array[int] = []
+	for i in range(lap * 3):
+		degrees.append(int(_audio.call("_degree_at", i % lap)))
+
+	var longest_repeat := 1
+	var current_repeat := 1
+	for i in range(1, degrees.size()):
+		current_repeat = current_repeat + 1 if degrees[i] == degrees[i - 1] else 1
+		longest_repeat = maxi(longest_repeat, current_repeat)
+	_check("a long run NEVER repeats a note (longest identical stretch: %d)" % longest_repeat,
+		longest_repeat == 1)
+
+	var distinct := {}
+	for degree in degrees:
+		distinct[degree] = true
+	_check("it uses the whole scale (%d of %d degrees)" % [distinct.size(), scale.size()],
+		distinct.size() == scale.size())
+
+	# It must genuinely turn around rather than jump from the top back to the root.
+	_check("the run rises to the top and falls back (top at %d of a %d-tap lap)"
+			% [scale.size() - 1, lap],
+		int(_audio.call("_degree_at", scale.size() - 1)) == scale.size() - 1
+			and int(_audio.call("_degree_at", scale.size())) == scale.size() - 2)
+	_check("the lap is long enough not to read as a short loop (%d taps)" % lap, lap >= 16)
 
 
 ## RULE 2: nothing may branch on a dollar MAGNITUDE.

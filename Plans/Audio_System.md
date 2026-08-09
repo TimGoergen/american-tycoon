@@ -325,10 +325,19 @@ no signal today and needs one added.
 | **Cycle payout** | `PropertyState.gd:557 _collect()` — single chokepoint for *every* payout, passive and rushed | **new hook** |
 | **Count milestone** | `Main.gd:1848` (`if prop.get_milestone_band() > band_before:`) — already computed for the tutorial tip | call site exists |
 
-**The tap scale (decision 2, 6).** A fixed pentatonic set (C-D-E-G-A across ~1.5 octaves),
-climbing one step per tap, decaying back to the root after
-`audio_tap_scale_reset_seconds` (proposed 1.0 s) of no tapping, capped at the top of the
-range. Fixed scale, not keyed to the current track (decision 6) — so it is one sample set
+**The tap scale (decision 2, 6).** A fixed pentatonic set (C-D-E-G-A), advancing one step per tap
+and dropping back to the root after `audio_tap_scale_reset_seconds` (1.0 s) of no tapping.
+
+**REVISED 2026-08-08.** This originally said "capped at the top of the range", and that cap was the
+problem: a sustained run climbed ten notes and then hammered the top note for as long as tapping
+continued (Tim: *"it becomes a single highly repetitive sound... it would be nice for the sound to
+have some kind of movement in the cycle over time"*). The figure now **rises to the top and falls
+back**, over two octaves, so a lap is twenty taps and the pitch is always moving. Fast tapping reads
+as a rolling figure rather than as a note stuck on repeat.
+
+If a longer run still wants more variety, the next lever is to rotate the starting degree each lap
+so consecutive laps are not identical — cheap to add, deliberately not done yet, because the fix
+above may well be enough. Fixed scale, not keyed to the current track (decision 6) — so it is one sample set
 pitch-shifted, or a small bank of pre-pitched samples.
 
 Implementation note: pitch-shift a single sample via `AudioStreamPlayer.pitch_scale` using

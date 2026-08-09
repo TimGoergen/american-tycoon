@@ -204,6 +204,22 @@ const SOLID_BAR_THRESHOLD_SEC := 0.25
 ## rush; solid is reserved for genuinely strobe-fast laps.
 const RUSHED_SOLID_THRESHOLD_SEC := 0.4
 
+## THE COMPLETION PULSE, for cycles too short to animate honestly (Tim, 2026-08-09: "if a property
+## has a cycle that is too short, then it never looks like it fills up... you see an instantaneous
+## flash of the income bar about a third full, and then nothing").
+##
+## Photon Exchange with Efficiency Experts at level 10 runs a 0.139 s cycle. Pinned, the bar sprints
+## at PIN_FILL_PER_SEC = 3.0 bars/sec, so in 0.139 s it reaches 0.42 — a third of the way — and then
+## the cycle ENDS, the pin releases, and the bar snapped back to empty. Every payout looked like a
+## failed fill.
+##
+## So a completed cycle now owns a fixed-length flourish on ITS OWN clock rather than the economy's:
+## fill the rest of the way, hold a beat at full, then drop. It runs only where a real payout
+## happened, so the bar still never shows a cycle the player did not earn — it just takes long enough
+## to be seen. Roughly a quarter of a second all told.
+const COMPLETION_FILL_PER_SEC := 5.0
+const COMPLETION_HOLD_SEC := 0.12
+
 ## How fast the bar fills the rest of the way when it BECOMES pinned (fractions of the
 ## full bar per second): a quick sprint to the right edge, then hold — snapping straight
 ## to solid read as sudden (Tim, 2026-07-07). 3.0 = the remaining lap in ⅓s at most.
@@ -270,6 +286,12 @@ var _rush_button_was_down := false
 ## True once the current rush hold has fired at least one auto-rush pulse; drives the
 ## rush_hold_released signal on release (see _pump_held_rush).
 var _rush_hold_pulsed := false
+
+## Whether the property's cycle was running LAST frame. The running → stopped edge is what starts
+## the completion pulse: it fires exactly when an unstaffed cycle has paid out and halted.
+var _was_cycle_running := false
+## Seconds left of the pulse's hold-at-full, once the fill has arrived there.
+var _completion_hold_remaining := 0.0
 
 ## The displayed bar's eased sweep rate (bars/sec) — see SWEEP_EASE_TAU.
 var _sweep_rate := 0.0
@@ -1074,6 +1096,26 @@ func _on_touch_released(index: int) -> void:
 		_primary_finger = -1
 
 
+## Advance the completion pulse by one frame: fill to the right edge, hold there a beat, then let go.
+##
+## Deliberately its own clock. The bar's normal motion is derived from the economy — cycle_progress
+## over the effective length — and that is right for any cycle long enough to watch. Below roughly a
+## fifth of a second the arithmetic is still correct and the RESULT is useless: too few frames pass
+## for the fill to arrive, so the player sees a stub of a bar and then nothing. A payout the player
+## cannot see is, to them, a payout that did not happen.
+##
+## Releasing the flag is what ends it: the next frame mirrors the true (zero) progress, so the bar
+## drops to empty and the row is ready for the next tap.
+func _advance_completion_pulse(delta: float) -> void:
+	if _displayed_cycle_fraction < 1.0:
+		_displayed_cycle_fraction = minf(
+			_displayed_cycle_fraction + delta * COMPLETION_FILL_PER_SEC, 1.0)
+		return
+	_completion_hold_remaining -= delta
+	if _completion_hold_remaining <= 0.0:
+		_finish_lap_pending = false
+
+
 ## The income readout over the cycle bar, as text. Pure: same inputs, same string, no node access —
 ## which is what lets the rule below be tested directly instead of by squinting at a screenshot.
 ##
@@ -1536,10 +1578,21 @@ func _refresh(delta: float) -> void:
 	# A frozen row is never pinned "humming at full" — the machine is down, so the frozen
 	# branch below holds the bar exactly where the core stopped it instead.
 	var pinned := (bar_is_solid or rushed_solid) and not frozen
-	if _was_pinned and not pinned:
+
+	# A cycle just PAID OUT AND STOPPED — the unstaffed case, since a staffed property restarts
+	# itself and never takes this edge. Owe the bar a visible finish (see COMPLETION_FILL_PER_SEC).
+	if _was_cycle_running and not _prop.is_cycle_running and owned and not frozen:
+		_finish_lap_pending = true
+		_completion_hold_remaining = COMPLETION_HOLD_SEC
+	_was_cycle_running = _prop.is_cycle_running
+
+	if _was_pinned and not pinned and not _finish_lap_pending:
 		# Unpinning (rush released, usually): restart the visible lap from empty and let
 		# the easing below chase the real progress — holding at full would freeze the
 		# bar until the next natural completion.
+		#
+		# Skipped when a finish is owed: that is the completion pulse, and zeroing the bar here is
+		# precisely the snap-back that made a short cycle look like it never filled.
 		_displayed_cycle_fraction = 0.0
 		_finish_lap_pending = false
 	_was_pinned = pinned
@@ -1570,8 +1623,13 @@ func _refresh(delta: float) -> void:
 		# hard-reset the eased sweep to natural — so the "constant" rushed sweep was
 		# actually a sawtooth re-accelerating from scratch every lap (caught red-handed
 		# by Tim's debug-overlay data, 2026-07-08: swp cycled 17→283 within each lap).
-		_displayed_cycle_fraction = true_fraction
-		_finish_lap_pending = false
+		if _finish_lap_pending and _prop.units_owned > 0:
+			# THE COMPLETION PULSE. The cycle is over and the core has already paid; this is the
+			# flourish that lets the player SEE it happened, on a clock slow enough to register.
+			_advance_completion_pulse(delta)
+		else:
+			_displayed_cycle_fraction = true_fraction
+			_finish_lap_pending = false
 		# Park the eased sweep at the natural rate so a later start doesn't inherit
 		# a stale rushed rate (or a zero) from long ago.
 		if effective_length > 0.0:

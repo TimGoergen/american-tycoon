@@ -459,6 +459,14 @@ const AUTO_PURCHASE_IDLE_DOT_SECONDS := 0.45
 const AUTO_PURCHASE_IDLE_MAX_DOTS := 3
 
 ## The READY flash's peak alpha and fade time.
+## How far each vent lift steps up the confirmation pitch, in semitones. A whole tone: audibly a
+## step, small enough that a five-lift window does not end up shrill.
+const VENT_LIFT_SEMITONES := 2.0
+
+## The vent tier at which the success sting reaches full intensity. Beyond it the sound stops
+## growing — the ladder keeps going, but a sound that never stops getting bigger has nowhere to go.
+const VENT_SUCCESS_FULL_TIER := 5.0
+
 const READY_FLASH_ALPHA := 0.75
 const READY_FLASH_FADE_SEC := 0.5
 
@@ -1383,6 +1391,20 @@ func _process(delta: float) -> void:
 	_displayed_fill = BarSmoothing.approach(_displayed_fill, target_fill, delta)
 	_meter.value = _displayed_fill
 
+	# THE OVERDRIVE BED (Plans/Audio_System.md §5.1, decision 9). Driven from the value the bar is
+	# ABOUT to show — reusing _displayed_fill rather than recomputing a normal form in the audio
+	# layer, because there is no stored one: the fill means heat/cruise while building and
+	# heat/ceiling in overdrive, and two derivations would eventually disagree. The project's
+	# invariant is that what the bar shows IS what the player gets, and the tone is part of that
+	# promise rather than a second opinion on it.
+	#
+	# CRUISE COUNTS AS A RIDE. It has no signal of its own — the UI polls is_cruising() every frame —
+	# so the bed follows the same poll. Hearing the difference between a calm cruise and a hot
+	# overdrive is what makes the choice between them audible, which supports the measured design
+	# intent that cruise is a genuine alternative rather than a consolation prize.
+	Audio.set_heat_active((overdrive or cruising) and not locked_out)
+	Audio.set_heat(_displayed_fill)
+
 	# Feed the overdrive instrument. Everything it shows is DERIVED FRESH each frame from the
 	# core's live getters — that per-frame derivation IS the orphan watchdog: an approach or
 	# window the core silently tore down (release-disengage, overheat, First Contact reset)
@@ -1678,6 +1700,7 @@ func _apply_label_state(state: int) -> void:
 ## this handler only adds the long haptic thump so the failure lands physically as well as
 ## visually.
 func _on_overheated(ended_vent_tier: int) -> void:
+	Audio.play(&"overheat")
 	_vibrate(_tuning.rush_momentum_haptic_overheat_ms)
 	# The death chip: how high this run got, and the bloodline best it is measured against (Tim
 	# 2026-07-20). Reuses the vent-success chip's shape (see _on_vent_succeeded) in a hot ketchup
@@ -1697,6 +1720,7 @@ func _on_overheated(ended_vent_tier: int) -> void:
 ## short haptic tick) so re-availability is unmissable — the label reverts to "+0%" on its own
 ## via _process now that is_locked_out() is false.
 func _on_rush_ready() -> void:
+	Audio.play(&"rush_ready")
 	_vibrate(_tuning.rush_momentum_haptic_ready_ms)
 	_ready_flash.color = Color(1, 1, 1, READY_FLASH_ALPHA)
 	var tween := create_tween()
@@ -1732,6 +1756,10 @@ func _on_vent_incoming(approach_seconds: float, required_lifts: int) -> void:
 ## _process) — no chip: the old held-open gold "VENT!" plate is retired, replaced by the
 ## approaching red bar the player has been watching for the whole approach.
 func _on_vent_window_opened(_required_lifts: int, duration: float) -> void:
+	# THE "NOW" CUE — the single most important sound in the game (Plans/Audio_System.md §5.2). The
+	# window is short and the eye may be anywhere; this is what makes the gesture playable without
+	# staring at the bar.
+	Audio.play(&"vent_open")
 	_vent_window_duration = maxf(duration, 0.001)
 	# The countdown starts full this instant — same reasoning as the approach clock above.
 	_window_display = _vent_window_duration
@@ -1742,6 +1770,9 @@ func _on_vent_window_opened(_required_lifts: int, duration: float) -> void:
 ## A gesture lift landed: the in-bar pip display fills one more (the ×2/×3 vents need the
 ## player to KNOW each lift registered). _process feeds the tally to the instrument.
 func _on_vent_lift_registered(lifts_done: int, _required_lifts: int) -> void:
+	# ASCENDING CONFIRMATION: one step up the scale per lift, so progress toward the requirement is
+	# audible without reading the pips. Same pitch trick as the tap scale.
+	Audio.play_pitched(&"vent_lift", pow(2.0, (lifts_done - 1) * VENT_LIFT_SEMITONES / 12.0))
 	_window_lifts_done = lifts_done
 
 
@@ -1750,6 +1781,10 @@ func _on_vent_lift_registered(lifts_done: int, _required_lifts: int) -> void:
 ## core's ladder), in celebratory money-green, plus the same full-meter white flash the READY
 ## moment uses — success should feel like a payoff, not mere survival.
 func _on_vent_succeeded(new_tier: int, new_peak_bonus: float) -> void:
+	# Scaled by the TIER reached — a count of successful vents this ride, not a money figure, so the
+	# no-absolute-magnitudes rule is respected by construction.
+	Audio.play_scaled(&"vent_success",
+		clampf(inverse_lerp(1.0, VENT_SUCCESS_FULL_TIER, float(new_tier)), 0.0, 1.0))
 	# "UP TO", not "PEAK" (Tim, 2026-07-20). This number is current_peak_bonus() — the CEILING of
 	# the ladder you have just unlocked, i.e. what you would earn riding at the hard backstop — not
 	# what you are earning right now. The bar's own "+X%" and the spin-down chip both report the LIVE
@@ -1776,6 +1811,7 @@ func _on_vent_succeeded(new_tier: int, new_peak_bonus: float) -> void:
 ## count with the landed ones solid and the unfinished ones strobing red, held for the chip's
 ## timed life while the OVERHEATED presentation plays underneath.
 func _on_vent_missed(lifts_done: int, required_lifts: int) -> void:
+	Audio.play(&"vent_miss")
 	_vent_pips.show_miss(required_lifts, lifts_done)
 	_show_tier_chip("VENT MISSED!", UiPalette.KETCHUP_RED, UiPalette.PALE_GOLD)
 
@@ -1834,15 +1870,25 @@ func _vibrate(duration_ms: float) -> void:
 ## being torn down mid-train (screen change, First Contact reset).
 func _pulse_vent_telegraph(required_lifts: int) -> void:
 	var pulse_ms: float = _tuning.rush_momentum_haptic_vent_ms
-	if pulse_ms < 1.0 or not OS.has_feature("mobile"):
-		return  # knob disabled, or desktop — no train to play
+	# NO EARLY RETURN for desktop or a zeroed haptic knob any more. This train now carries the AUDIO
+	# ticks too, and audio must not be silently switched off by a haptics setting or by the platform —
+	# Haptics.pulse already declines on desktop and at a zero duration, which is the right place for
+	# that decision (Plans/Audio_System.md §5.2).
+	#
+	# One tick per required lift, at the SAME moments as the buzzes: the plan calls this lockstep a
+	# hard requirement, because the telegraph fires at vent SPAWN rather than at window-open, and a
+	# sound arriving at a different moment than the haptic would actively mislead.
 	var pulses: int = maxi(required_lifts, 1)
 	var gap_ms: float = maxf(_tuning.rush_momentum_haptic_vent_gap_ms, 0.0)
+	var step_ms: float = maxf(pulse_ms, 1.0) + gap_ms
 	for i in range(pulses):
+		Audio.play(&"vent_tick")
 		_vibrate(pulse_ms)
 		if i == pulses - 1:
 			return
-		await get_tree().create_timer((pulse_ms + gap_ms) / 1000.0).timeout
+		await get_tree().create_timer(step_ms / 1000.0).timeout
+		# The tree can be torn down mid-train (a succession, a tuning apply). Re-checking after every
+		# await is the pattern the haptic train already used and the reason it never errored.
 		if not is_inside_tree():
 			return
 

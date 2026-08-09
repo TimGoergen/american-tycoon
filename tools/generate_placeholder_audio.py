@@ -38,6 +38,13 @@ OUT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 # Equal-temperament note frequencies used below, so the tones sit in a real scale rather than on
 # arbitrary numbers. A4 = 440.
 NOTES = {
+    "A2": 110.00,
+    "E3": 164.81,
+    "A3": 220.00,
+    "C4": 261.63,
+    "E4": 329.63,
+    "A4": 440.00,
+    "A5": 880.00,
     "C5": 523.25,
     "E5": 659.25,
     "G5": 783.99,
@@ -82,6 +89,45 @@ def sequence(parts):
         for i, value in enumerate(chunk):
             out[start + i] += value
     return out
+
+
+def seamless_loop(frequency, seconds, harmonics=(1.0,), tremolo_hz=0.0, tremolo_depth=0.0):
+    """A LOOPING tone with no click at the seam.
+
+    A loop clicks unless the waveform arrives back at its starting phase, so the buffer length is
+    rounded to a whole number of cycles of `frequency` rather than to `seconds`. Every harmonic is an
+    integer multiple, so they all land on the seam too; the tremolo is given a whole number of its
+    own cycles for the same reason. This is the entire trick, and it is why these are generated
+    rather than trimmed by hand.
+    """
+    period = SAMPLE_RATE / frequency
+    total = int(round(seconds * SAMPLE_RATE / period)) * int(round(period))
+    tremolo_cycles = max(1, round(tremolo_hz * total / SAMPLE_RATE)) if tremolo_hz > 0 else 0
+
+    samples = []
+    for i in range(total):
+        t = i / SAMPLE_RATE
+        value = 0.0
+        for index, level in enumerate(harmonics):
+            value += level * math.sin(2.0 * math.pi * frequency * (index + 1) * t)
+        if tremolo_cycles:
+            phase = 2.0 * math.pi * tremolo_cycles * i / total
+            value *= 1.0 - tremolo_depth + tremolo_depth * (0.5 + 0.5 * math.sin(phase))
+        samples.append(value)
+    return samples
+
+
+def noise_burst(seconds, curve=6.0):
+    """A short pseudo-random burst, for the percussive cues. Deterministic: the same file every run,
+    so a regenerate never silently changes what the game sounds like."""
+    total = int(seconds * SAMPLE_RATE)
+    state = 12345
+    samples = []
+    for i in range(total):
+        state = (1103515245 * state + 12345) % 2147483648
+        value = (state / 1073741824.0) - 1.0
+        samples.append(value * envelope(i, total, 0.002, curve))
+    return samples
 
 
 def write_wav(name, samples):
@@ -129,6 +175,71 @@ def main():
         (0.000, tone(NOTES["C5"], 0.55, harmonics=(1.0, 0.5, 0.25, 0.12), curve=2.5, attack=0.01)),
         (0.090, tone(NOTES["E5"], 0.50, harmonics=(1.0, 0.5, 0.25, 0.12), curve=2.5, attack=0.01)),
         (0.180, tone(NOTES["G5"], 0.48, harmonics=(1.0, 0.5, 0.25, 0.12), curve=2.5, attack=0.01)),
+    ]))
+
+    write_rush_layer()
+    write_vent_cues()
+
+
+def write_rush_layer():
+    """The two continuous OVERDRIVE layers (Plans/Audio_System.md §5.1).
+
+    Both loop forever while a ride is on; the game pitches the base drone with heat and fades the
+    urgency layer in over the top of the band. They are quiet and harmonically simple on purpose —
+    this is the one sound in the game that is held rather than struck, so anything with character
+    becomes something to endure.
+    """
+    write_wav("heat_loop.wav", seamless_loop(
+        NOTES["A2"], 1.0, harmonics=(1.0, 0.45, 0.18, 0.07)))
+    # Faster, brighter, and pulsing: the approach to overheat should be audible before it is visible.
+    write_wav("urgency_loop.wav", seamless_loop(
+        NOTES["E3"], 1.0, harmonics=(1.0, 0.6, 0.35, 0.2, 0.1),
+        tremolo_hz=9.0, tremolo_depth=0.55))
+
+
+def write_vent_cues():
+    """The vent gesture's seven beats (§5.2)."""
+    # TELEGRAPH TICK — one per required lift, in lockstep with the haptic pulse train. Dry and
+    # short: it is counting, not announcing.
+    write_wav("vent_tick.wav", tone(NOTES["A4"], 0.05, harmonics=(1.0, 0.5), curve=8.0))
+
+    # THE WINDOW OPENS — "the single most important sound in the game" (§5.2). A rising two-note
+    # call, bright enough to cut through the drone that is playing underneath it.
+    write_wav("vent_open.wav", sequence([
+        (0.000, tone(NOTES["E5"], 0.10, harmonics=(1.0, 0.5, 0.25), curve=5.0)),
+        (0.060, tone(NOTES["C6"], 0.26, harmonics=(1.0, 0.45, 0.22), curve=3.5)),
+    ]))
+
+    # EACH LIFT REGISTERED — the game pitches this up per lift, so the player HEARS progress toward
+    # the requirement without looking at the pips.
+    write_wav("vent_lift.wav", tone(NOTES["A4"], 0.09, harmonics=(1.0, 0.35), curve=6.0))
+
+    # SUCCESS — a three-note flourish, the only sound in the set that resolves upward and lands.
+    write_wav("vent_success.wav", sequence([
+        (0.000, tone(NOTES["C5"], 0.12, harmonics=(1.0, 0.4, 0.2), curve=5.0)),
+        (0.070, tone(NOTES["E5"], 0.12, harmonics=(1.0, 0.4, 0.2), curve=5.0)),
+        (0.140, tone(NOTES["A5"], 0.40,
+                     harmonics=(1.0, 0.5, 0.25, 0.12), curve=2.8)),
+    ]))
+
+    # MISSED — falling, and unresolved. It fires just before the overheat, so it is the "you blew
+    # it" beat rather than the punishment itself.
+    write_wav("vent_miss.wav", sequence([
+        (0.000, tone(NOTES["E4"], 0.10, harmonics=(1.0, 0.4), curve=5.0)),
+        (0.070, tone(NOTES["C4"], 0.28, harmonics=(1.0, 0.3), curve=3.5)),
+    ]))
+
+    # OVERHEAT — the punishment: a low thud with a noise transient on it, the only percussive sound
+    # in the game. Nothing musical, because nothing about it is a reward.
+    write_wav("overheat.wav", sequence([
+        (0.000, noise_burst(0.09, curve=7.0)),
+        (0.000, tone(NOTES["A2"], 0.45, harmonics=(1.0, 0.25, 0.1), curve=3.0)),
+    ]))
+
+    # RE-ARM — the system is live again. Deliberately small: it is permission to play, not applause.
+    write_wav("rush_ready.wav", sequence([
+        (0.000, tone(NOTES["A4"], 0.08, harmonics=(1.0, 0.3), curve=6.0)),
+        (0.055, tone(NOTES["E5"], 0.20, harmonics=(1.0, 0.35), curve=4.0)),
     ]))
 
 

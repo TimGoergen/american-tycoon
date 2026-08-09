@@ -16,6 +16,15 @@ commit it.
 | `sfx/buy_success.wav` | Generated — `tools/generate_placeholder_audio.py` | Original work, no third-party content | No |
 | `sfx/buy_success_bright.wav` | Generated — `tools/generate_placeholder_audio.py` | Original work, no third-party content | No |
 | `sfx/music_preview.wav` | Generated — `tools/generate_placeholder_audio.py` | Original work, no third-party content | No |
+| `sfx/heat_loop.wav` | Generated — `tools/generate_placeholder_audio.py` | Original work, no third-party content | No |
+| `sfx/urgency_loop.wav` | Generated — `tools/generate_placeholder_audio.py` | Original work, no third-party content | No |
+| `sfx/vent_tick.wav` | Generated — `tools/generate_placeholder_audio.py` | Original work, no third-party content | No |
+| `sfx/vent_open.wav` | Generated — `tools/generate_placeholder_audio.py` | Original work, no third-party content | No |
+| `sfx/vent_lift.wav` | Generated — `tools/generate_placeholder_audio.py` | Original work, no third-party content | No |
+| `sfx/vent_success.wav` | Generated — `tools/generate_placeholder_audio.py` | Original work, no third-party content | No |
+| `sfx/vent_miss.wav` | Generated — `tools/generate_placeholder_audio.py` | Original work, no third-party content | No |
+| `sfx/overheat.wav` | Generated — `tools/generate_placeholder_audio.py` | Original work, no third-party content | No |
+| `sfx/rush_ready.wav` | Generated — `tools/generate_placeholder_audio.py` | Original work, no third-party content | No |
 
 **These are placeholders.** They are synthesized sine tones with amplitude envelopes, written
 directly as PCM by the script above — no sampled or third-party material of any kind, so there is

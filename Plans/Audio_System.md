@@ -1,7 +1,8 @@
 # Audio System — Implementation Plan
 
-**Status:** Phase 0 and Phase 1 BUILT (2026-08-08), awaiting Tim's device verdict. Phases 2-5 not
-started. Written 2026-08-06 from an interview with Tim.
+**Status:** Phases 0, 1 and 3 BUILT (2026-08-08/09). Tim on the Phase 1 slice: "the sound on buy and
+tap are good". Phase 3 (overdrive) was brought forward ahead of Phase 2 because rush is central to
+how he plays. Phases 2, 4, 5 not started. Written 2026-08-06 from an interview with Tim.
 **Graduates:** GDD §12 (Art & Audio Direction), §13 M3 milestone entry "audio implementation
 (exotica/muzak per §12)", and GDD §11 open item "Sound & haptics design — remaining open:
 haptics and per-event sound mapping."
@@ -694,12 +695,17 @@ rule. Music slider becomes meaningful.
 
 **Exit criterion:** a multi-epoch device session without music fatigue.
 
-### Phase 3 — `feature/audio-overdrive`
+### Phase 3 — BUILT 2026-08-09, ahead of Phase 2 — `feature/audio-overdrive`
+
+**Brought forward on Tim's report:** with tap and buy working, "it just seems very sparse still
+because rush is a big part of how I play and it doesn't have its own sound yet." Rush is the skill
+mechanic, so the slice was thin without it — and none of it depends on the music Phase 2 adds. The
+one part deferred is music ducking (§5.3), which has nothing to duck yet.
 Continuous heat tone, urgency layer, all vent cues in lockstep with the haptic pulse train,
 cruise-vs-overdrive timbre split, music ducking.
 
 **Exit criterion:** Tim can hit vent windows with the screen dimmed / not looking directly
-at the bar. That is the test that proves the feature.
+at the bar. That is the test that proves the feature. **PENDING.**
 
 ### Phase 4 — `feature/audio-ceremony`
 Succession/obituary (`WillScreen.gd:285` `show_obituary`, `:317` `show_will`, `:341`

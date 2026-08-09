@@ -55,6 +55,7 @@ func _run() -> void:
 	_audio.call("_build_voice_pools")
 	for bus in [&"Music", BUS_SFX, &"UI", &"Ceremony"]:
 		_audio.set_bus_volume(bus, 1.0)
+	_audio.call("_build_heat_layer")
 
 	_check_catalog()
 	_check_mute_costs_nothing()
@@ -63,6 +64,8 @@ func _run() -> void:
 	_check_tap_scale()
 	await _check_buy_intensity_is_relative()
 	_check_one_sound_per_gesture()
+	_check_vent_cues_exist()
+	await _check_overdrive_bed()
 
 	# Tear the voices down before quitting: they are children of an autoload this test brought up by
 	# hand, and leaving them alive prints leak warnings that would look like a product problem.
@@ -317,6 +320,84 @@ func _check_one_sound_per_gesture() -> void:
 	_check("...and its repeats do not", row.call("_next_hire_source") != audible)
 
 	row.free()
+
+
+## Every beat of the vent gesture needs a sound, or the gesture is only playable by eye.
+func _check_vent_cues_exist() -> void:
+	print("
+-- the vent gesture's beats --")
+	var events: Dictionary = _audio.get("_events")
+	for id in [&"vent_tick", &"vent_open", &"vent_lift", &"vent_success", &"vent_miss",
+			&"overheat", &"rush_ready"]:
+		_check("'%s' has a sample" % id,
+			events.has(id) and (events[id] as AudioEvent).stream != null)
+
+	# vent_lift is PITCHED per lift, so a random detune on top would make a counted sequence sound
+	# out of tune rather than like counting.
+	var lift: AudioEvent = events.get(&"vent_lift")
+	_check("the lift confirmation has no random detune",
+		lift != null and is_zero_approx(lift.pitch_variance))
+
+	# The window cue must be the loudest thing in the set: it is the one the player has to react to.
+	var open_cue: AudioEvent = events.get(&"vent_open")
+	var tick: AudioEvent = events.get(&"vent_tick")
+	_check("the window cue is louder than the telegraph ticks (%.1f vs %.1f dB)"
+			% [open_cue.volume_db, tick.volume_db],
+		open_cue.volume_db > tick.volume_db)
+
+
+## THE CONTINUOUS BED (plan §5.1). Held sounds have failure modes one-shots do not: they can be
+## left running forever, and they can be started twice.
+func _check_overdrive_bed() -> void:
+	print("
+-- the overdrive bed --")
+	var heat: AudioStreamPlayer = _audio.get("_heat_player")
+	var urgency: AudioStreamPlayer = _audio.get("_urgency_player")
+	_check("both layers exist", heat != null and urgency != null)
+	if heat == null or urgency == null:
+		return
+	_check("they ride the MUSIC bus, so the music slider governs the drone", heat.bus == &"Music")
+	_check("both loop, or the bed would fall silent mid-ride",
+		(heat.stream as AudioStreamWAV).loop_mode != AudioStreamWAV.LOOP_DISABLED)
+	_check("they start SILENT rather than audible", heat.volume_db < -40.0)
+	_check("nothing plays before a ride begins", not heat.playing)
+
+	# A ride starts.
+	_audio.set_heat_active(true)
+	_audio.set_heat(0.0)
+	_check("engaging starts the bed", heat.playing)
+	var cold_pitch := heat.pitch_scale
+	_check("the urgency layer is silent while heat is low (%.0f dB)" % urgency.volume_db,
+		urgency.volume_db < -40.0)
+
+	# Heat climbs.
+	_audio.set_heat(1.0)
+	_check("the drone RISES with heat (%.3f -> %.3f)" % [cold_pitch, heat.pitch_scale],
+		heat.pitch_scale > cold_pitch)
+	_check("...by a musical interval, not a siren (%.2f = %.1f semitones)"
+			% [heat.pitch_scale, 12.0 * log(heat.pitch_scale) / log(2.0)],
+		heat.pitch_scale <= 2.0)
+	_check("the urgency layer arrives at the top of the band (%.0f dB)" % urgency.volume_db,
+		urgency.volume_db > -40.0)
+
+	# Half way up, the urgency layer must still be out of the way — it announces the ceiling, and an
+	# alarm that sounds in the middle of the band is an alarm the player learns to ignore.
+	_audio.set_heat(0.5)
+	_check("...and stays silent through the middle of the band (%.0f dB)" % urgency.volume_db,
+		urgency.volume_db < -40.0)
+
+	# Idempotence: the drive is a per-frame call, so re-asserting the same state must be free.
+	_audio.set_heat_active(true)
+	_check("re-engaging an already-running bed does not restart it", heat.playing)
+
+	# And it must actually STOP, not linger at -60 dB decoding forever.
+	_audio.set_heat_active(false)
+	for i in range(90):
+		await process_frame
+		if not heat.playing:
+			break
+	_check("ending the ride stops the streams rather than muting them", not heat.playing)
+	_check("...and the urgency layer stops with it", not urgency.playing)
 
 
 # --- Observing plays ----------------------------------------------------------------------------

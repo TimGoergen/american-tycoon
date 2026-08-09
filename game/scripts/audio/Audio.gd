@@ -64,6 +64,31 @@ const TAP_WINDOW_SIZE := 8
 ## step of the rise instead of a repeat.
 const TAP_WINDOW_DRIFT := 2
 
+# --- The overdrive layer (plan §5.1, decision 9) ---------------------------------------------
+
+## The two continuous streams a ride is made of, held as their own players rather than borrowed from
+## a pool: they start once, run for the whole ride, and are never stolen mid-ride by a tap sound.
+const HEAT_LOOP_PATH := "res://audio/sfx/heat_loop.wav"
+const URGENCY_LOOP_PATH := "res://audio/sfx/urgency_loop.wav"
+
+## How far the drone rises from cold to the top of the band, in semitones. About a fifth: enough that
+## the ear tracks the climb without the tone becoming a whistle at the ceiling.
+const HEAT_PITCH_SEMITONES := 7.0
+
+## Where in the band the urgency layer starts fading in. The top quarter, so the approach to overheat
+## is audible BEFORE it is visible — which is the one thing this layer exists to do.
+const URGENCY_ENTERS_AT := 0.75
+
+## Loudness of each layer at full. Both sit well under the one-shots: this is a bed, and a bed that
+## competes with the cues would bury the vent window, which is the sound that actually matters.
+const HEAT_VOLUME_DB := -14.0
+const URGENCY_VOLUME_DB := -16.0
+
+## How long the layers take to arrive and to leave. Fading rather than cutting, because a drone that
+## snaps on is a click and a drone that snaps off sounds like a crash.
+const HEAT_FADE_IN_SECONDS := 0.25
+const HEAT_FADE_OUT_SECONDS := 0.45
+
 ## Fade applied to the master bus when the app loses focus (plan §3.4). Short enough to be gone
 ## before the app is backgrounded, long enough not to click.
 const FOCUS_FADE_SECONDS := 0.2
@@ -90,6 +115,14 @@ var _bus_levels: Dictionary = {}
 ## False when there is no usable audio at all — a headless sim run. Every public method turns into a
 ## cheap return, so the gates need no audio stubs (plan §0.4 rule 4).
 var _enabled := true
+
+## The overdrive bed: two dedicated players, and the fade tween that owns their volume.
+var _heat_player: AudioStreamPlayer
+var _urgency_player: AudioStreamPlayer
+var _heat_active := false
+var _heat_fade: Tween
+## Last normalized heat pushed in, so the pitch/urgency mix can be recomputed when the layer starts.
+var _heat_normalized := 0.0
 
 ## How far into the current lap we are, which lap the slow window drift is on, and when the run last
 ## advanced. Neither counter is a scale degree — see _degree_at.
@@ -123,6 +156,7 @@ func _ready() -> void:
 
 	_load_catalog()
 	_build_voice_pools()
+	_build_heat_layer()
 	for bus in [BUS_MUSIC, BUS_SFX, BUS_UI, BUS_CEREMONY]:
 		_bus_levels[bus] = 1.0
 
@@ -159,6 +193,37 @@ func _build_voice_pools() -> void:
 		_next_voice[bus] = 0
 
 
+## Build the two continuous overdrive streams. Allocated once at boot like everything else, and
+## started only when a ride begins.
+func _build_heat_layer() -> void:
+	_heat_player = _make_loop_player(HEAT_LOOP_PATH)
+	_urgency_player = _make_loop_player(URGENCY_LOOP_PATH)
+
+
+func _make_loop_player(path: String) -> AudioStreamPlayer:
+	var player := AudioStreamPlayer.new()
+	var stream: AudioStreamWAV = load(path)
+	# LOOPING IS SET HERE, not in the .import file. Two reasons, and the second is the important one:
+	# the WAV importer's loop setting did not survive a re-import, and `*.import` is gitignored in
+	# this repo (the audio ones are force-added), so a setting held only there is one clean checkout
+	# away from reverting to the default. A drone that stops looping fails SILENTLY — the bed just
+	# ends a second into every ride — which is the worst way for a setting to go missing.
+	#
+	# The samples are generated with a whole number of wave cycles precisely so this seam is
+	# inaudible (see seamless_loop in tools/generate_placeholder_audio.py).
+	stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	stream.loop_begin = 0
+	stream.loop_end = stream.data.size() / 2   # 16-bit mono: two bytes per frame
+	player.stream = stream
+	# The MUSIC bus, not SFX (plan §5.3). A player who turned music off is saying they want the game
+	# quiet, and a continuous drone is the least quiet thing here — it must obey that slider.
+	player.bus = BUS_MUSIC
+	player.process_mode = Node.PROCESS_MODE_ALWAYS
+	player.volume_db = -60.0
+	add_child(player)
+	return player
+
+
 # --- Public surface ----------------------------------------------------------------------------
 
 ## Play a sound. Fire and forget — never awaited, never fails loudly, never blocks an economy path.
@@ -172,6 +237,16 @@ func play(event_id: StringName) -> void:
 ## mixed in on top, so a large moment is more of the same sound rather than a different one.
 func play_scaled(event_id: StringName, intensity: float) -> void:
 	_play_event(event_id, clampf(intensity, 0.0, 1.0), true)
+
+
+## Play a sound at a deliberate pitch, where the pitch itself carries meaning — the vent-lift
+## confirmation steps up one whole tone per lift, so the player hears progress toward the
+## requirement. `pitch` is a ratio: 2^(semitones/12).
+##
+## Separate from play() rather than an optional argument, because a caller reaching for this is
+## making a musical decision and should have to say so.
+func play_pitched(event_id: StringName, pitch: float) -> void:
+	_play_event(event_id, 1.0, false, pitch)
 
 
 ## Play the next note of the tap scale (plan §4.1). Every manual tap climbs one step; the climb
@@ -256,6 +331,64 @@ func reset_tap_scale() -> void:
 	# tap would climb instead of restarting at the root. Only visible in a test or in the first
 	# moments of a session, but "0 means long ago" is the kind of assumption that is simply false.
 	_tap_last_ms = -1_000_000
+
+
+## Track the ride's heat, 0..1 across the band the BAR is showing (plan §5.1).
+##
+## Takes the normalized value rather than computing it, because there is no stored normal form — the
+## view derives it, and it means different things in different modes (heat/cruise while building,
+## heat/ceiling in overdrive). Recomputing it here would let the tone and the bar disagree, and the
+## project's invariant is that what the bar shows IS what the player gets. The sound has to be part
+## of that promise, not a second opinion on it.
+func set_heat(normalized: float) -> void:
+	if not _enabled or _heat_player == null:
+		return
+	_heat_normalized = clampf(normalized, 0.0, 1.0)
+	if not _heat_active:
+		return
+	# Equal temperament again, so the climb is musical rather than a siren.
+	_heat_player.pitch_scale = pow(2.0, (_heat_normalized * HEAT_PITCH_SEMITONES) / 12.0)
+	_urgency_player.volume_db = _urgency_db_for(_heat_normalized)
+
+
+## Start or stop the ride's bed. Idempotent: calling it every frame with the same value is free,
+## which is what lets the caller drive it from a per-frame update without tracking edges itself.
+func set_heat_active(active: bool) -> void:
+	if not _enabled or _heat_player == null or active == _heat_active:
+		return
+	_heat_active = active
+
+	if _heat_fade != null and _heat_fade.is_valid():
+		_heat_fade.kill()
+	_heat_fade = create_tween().set_parallel(true)
+
+	if active:
+		if not _heat_player.playing:
+			_heat_player.play()
+		if not _urgency_player.playing:
+			_urgency_player.play()
+		set_heat(_heat_normalized)
+		_heat_fade.tween_property(_heat_player, "volume_db", HEAT_VOLUME_DB, HEAT_FADE_IN_SECONDS)
+		_heat_fade.tween_property(
+			_urgency_player, "volume_db", _urgency_db_for(_heat_normalized), HEAT_FADE_IN_SECONDS)
+		return
+
+	_heat_fade.tween_property(_heat_player, "volume_db", -60.0, HEAT_FADE_OUT_SECONDS)
+	_heat_fade.tween_property(_urgency_player, "volume_db", -60.0, HEAT_FADE_OUT_SECONDS)
+	# STOP the streams once they are inaudible rather than leaving them running at -60 dB. A stopped
+	# stream decodes nothing, and a ride is over far more often than it is on.
+	_heat_fade.chain().tween_callback(func() -> void:
+		if not _heat_active:
+			_heat_player.stop()
+			_urgency_player.stop())
+
+
+## The urgency layer's level at a given heat: silent until the top of the band, then up to full.
+func _urgency_db_for(normalized: float) -> float:
+	if normalized < URGENCY_ENTERS_AT:
+		return -60.0
+	var amount := inverse_lerp(URGENCY_ENTERS_AT, 1.0, normalized)
+	return lerpf(-60.0, URGENCY_VOLUME_DB, clampf(amount, 0.0, 1.0))
 
 
 ## Set one player-facing level, 0..1 linear. The SFX slider drives three buses (§1.2).

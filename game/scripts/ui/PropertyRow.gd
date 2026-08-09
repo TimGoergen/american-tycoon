@@ -1074,6 +1074,57 @@ func _on_touch_released(index: int) -> void:
 		_primary_finger = -1
 
 
+## The income readout over the cycle bar, as text. Pure: same inputs, same string, no node access —
+## which is what lets the rule below be tested directly instead of by squinting at a screenshot.
+##
+## THREE CASES, and the distinction that matters is WHO RESTARTS THE CYCLE.
+##
+##   • Being RUSHED — the held finger restarts it, so the boosted rate is genuinely delivered for as
+##     long as the hold lasts, and the readout quotes it (sub-second) or the rush-shortened lump.
+##   • Owned but UNSTAFFED, with a sub-second cycle — nothing restarts it. One tap buys exactly one
+##     cycle and then it stops, so the honest unit is the TAP. This replaces the per-SECOND form
+##     only: a longer unstaffed cycle already reads as its lump plus its wait, which is honest about
+##     the tap AND tells the player how long the payout takes, so it is left alone.
+##   • STAFFED — the staffer restarts it forever, so a per-second rate is a real throughput. Sub-
+##     second cycles read as a rate; longer ones read as their lump plus the wait, because money
+##     arriving every 4 minutes is not a per-second trickle.
+##
+## The unstaffed case was added 2026-08-09. It used to fall through to the sub-second rate, which
+## advertised a throughput the row could not reach without a staffer — and the gap grew with every
+## Efficiency upgrade, since those shorten the cycle without changing what one tap pays. Tim, with an
+## 0.18 s cycle: "the income display on that property says 11.4T/s, but tapping the staff portrait
+## only gains around 2T... the disconnect between an income label specific to seconds but the actual
+## income for a single cycle is much less." The two figures were both correct; the label was simply
+## answering a question the player was not asking.
+##
+## Note the hero-panel headline already drew this distinction — an idle unstaffed row contributes
+## ZERO to it (Tim, 2026-07-13) — so this brings the row's own label in line with what the header
+## had been saying about it all along.
+func _format_income_readout(
+		per_cycle: float, effective_length: float, rushed_fractions_per_second: float,
+		is_owned: bool, is_staffed: bool
+) -> String:
+	# The leading "$" is shown as the dollar-bill icon just left of the label (see _income_icon),
+	# so strip it off every amount before it goes into the text (Tim, 2026-07-09).
+	if rushed_fractions_per_second > 0.0:
+		var rushed_cycle_time := 1.0 / rushed_fractions_per_second
+		if rushed_cycle_time <= PER_SECOND_READOUT_THRESHOLD_SEC:
+			return Money.of(per_cycle * rushed_fractions_per_second).display().trim_prefix("$") + " / s"
+		return "%s / %s" % [
+			Money.of(per_cycle).display().trim_prefix("$"), _format_cycle_duration(rushed_cycle_time)]
+
+	if effective_length > 0.0 and effective_length <= PER_SECOND_READOUT_THRESHOLD_SEC:
+		# The per-tap form replaces the per-SECOND form ONLY. A long cycle already reads as its lump
+		# plus its wait ("2T / 4.3m"), which is both honest about what a tap pays and useful about
+		# how long the payout takes — replacing that with "/ tap" would throw the wait away to fix a
+		# problem it never had.
+		if is_owned and not is_staffed:
+			return Money.of(per_cycle).display().trim_prefix("$") + " / tap"
+		return Money.of(per_cycle / effective_length).display().trim_prefix("$") + " / s"
+	return "%s / %s" % [
+		Money.of(per_cycle).display().trim_prefix("$"), _format_cycle_duration(effective_length)]
+
+
 ## Which of this row's three interactive controls, if any, sits under a global point — "" if none.
 ## Respects each control's current eligibility (a disabled Buy/Hire, or a non-interactive portrait, is
 ## not a target), so a secondary finger can only ever trigger what a primary finger could.
@@ -1430,23 +1481,8 @@ func _refresh(delta: float) -> void:
 	if rush_engaged and effective_length > 0.0:
 		rushed_fractions_per_second = 1.0 / effective_length \
 				+ _prop.tuning.hold_rush_per_second * _prop.tuning.rush_pct * _prop.rush_power_multiplier
-	# The leading "$" is now shown as the dollar-bill icon just left of the label (see
-	# _income_icon), so strip it off every amount before it goes into the text (Tim, 2026-07-09).
-	if rushed_fractions_per_second > 0.0:
-		# While rushing, the cycle completes every 1/rushed_fractions_per_second seconds. Apply the
-		# SAME rule as an un-rushed cycle: a sub-second effective cycle reads as a per-second RATE,
-		# but a cycle longer than a second reads as the per-cycle payout WITH its (rush-shortened)
-		# duration — the money lands in lumps that far apart, so "16 T / 2s" is honest where "8.1 T/s"
-		# implies a smooth per-second trickle it never delivers (Tim, 2026-07-13).
-		var rushed_cycle_time := 1.0 / rushed_fractions_per_second
-		if rushed_cycle_time <= PER_SECOND_READOUT_THRESHOLD_SEC:
-			_income_label.text = Money.of(per_cycle * rushed_fractions_per_second).display().trim_prefix("$") + " / s"
-		else:
-			_income_label.text = "%s / %s" % [Money.of(per_cycle).display().trim_prefix("$"), _format_cycle_duration(rushed_cycle_time)]
-	elif effective_length > 0.0 and effective_length <= PER_SECOND_READOUT_THRESHOLD_SEC:
-		_income_label.text = Money.of(per_cycle / effective_length).display().trim_prefix("$") + " / s"
-	else:
-		_income_label.text = "%s / %s" % [Money.of(per_cycle).display().trim_prefix("$"), _format_cycle_duration(effective_length)]
+	_income_label.text = _format_income_readout(
+		per_cycle, effective_length, rushed_fractions_per_second, owned, staffed)
 	# Cache the per-second equivalent of whatever the label just showed (rush-boosted
 	# while held) — Main sums these across rows for the hero panel's income headline
 	# (Tim, 2026-07-07), so the headline always equals the sum of the visible rows.

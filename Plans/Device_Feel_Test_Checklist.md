@@ -710,3 +710,17 @@ sourcing.
       the bottom buttons are now reached by scrolling — swipe from over a button, not just from the
       gaps, and confirm a swipe does not also press whatever it ends on.
 - [ ] **Battery draw over 30 minutes, audio on vs off.** The stated hard constraint.
+
+### Before reporting audio latency: check the audio route
+
+**Settled 2026-08-08.** Tim reported "a quarter to half second delay" before a sound was heard. It
+was **Bluetooth earbuds**, which add 150-300 ms of their own — switching to the phone's speaker cut
+it to "very small though not gone", which is normal Android output latency plus, for the purchase
+sound, the press-to-release time of the tap itself (Godot Buttons fire `pressed` on RELEASE, and the
+purchase legitimately belongs there — moving it to press would mean a swipe down the ladder buys
+things).
+
+So the first question about any audio-timing complaint is **what is it playing through**, not what
+the code is doing. The diagnostic that isolated it in one step: does the TAP sound lag too? The tap
+fires directly off the touch with no purchase logic in between, so a lag on both is the shared output
+path and everything above `play()` is exonerated.

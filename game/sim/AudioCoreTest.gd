@@ -64,6 +64,7 @@ func _run() -> void:
 	_check_collect_is_relative()
 	_check_collect_needs_presence()
 	_check_one_sound_per_gesture()
+	await _check_collect_cannot_sustain_itself()
 
 	# Tear the voices down before quitting: they are children of an autoload this test brought up by
 	# hand, and leaving them alive prints leak warnings that would look like a product problem.
@@ -219,6 +220,47 @@ func _check_collect_needs_presence() -> void:
 	_audio.call("_process", 0.016)
 	_check("the same payout window DOES sound while the player is present",
 		_any_voice_armed(BUS_SFX))
+
+
+## THE COLLECT SOUND MUST NOT KEEP ITSELF ALIVE.
+##
+## Presence was first inferred from the bus alone, and collect rides the SFX bus — so every collect
+## sound renewed the window that had permitted it. The window never closed: one purchase, and every
+## staffed property blipped at the end of every cycle for the rest of the session (Tim, 2026-08-08).
+##
+## It is a circular-permission bug, which is a shape worth a test rather than a comment: the fix is
+## one flag, and a future event added on the SFX bus without thinking about it would reopen it.
+func _check_collect_cannot_sustain_itself() -> void:
+	print("
+-- the collect sound cannot renew its own permission --")
+	var events: Dictionary = _audio.get("_events")
+	var collect: AudioEvent = events.get(&"collect")
+	_check("collect is marked as NOT counting for presence",
+		collect != null and not collect.counts_as_presence)
+
+	# The player acts. Then the game plays a collect on its own.
+	#
+	# ASSERT ON THE TIMESTAMP ITSELF, not on player_is_present() after winding the clock back — the
+	# first version of this test did the latter, overwriting _last_interaction_ms AFTER the collect
+	# and therefore passing perfectly well against the broken code. What matters is whether collect
+	# MOVED the mark, so that is what gets measured.
+	_audio.set("_last_interaction_ms", Time.get_ticks_msec())
+	var mark_before: int = int(_audio.get("_last_interaction_ms"))
+	_check("the player reads as present right after acting", _audio.player_is_present())
+
+	# Wait long enough that a renewal would be visible as a different number.
+	await process_frame
+	await process_frame
+	(_audio.get("_last_played_ms") as Dictionary)[&"collect"] = -100_000
+	_audio.play_scaled(&"collect", 1.0)
+	var mark_after: int = int(_audio.get("_last_interaction_ms"))
+	_check("a collect sound does NOT move the presence mark (%d -> %d)" % [mark_before, mark_after],
+		mark_after == mark_before)
+
+	# And a real player action still counts, or the fix would have gone too far.
+	(_audio.get("_last_played_ms") as Dictionary)[&"buy_success"] = -100_000
+	_audio.play(&"buy_success")
+	_check("a purchase DOES mark the player present", _audio.player_is_present())
 
 
 ## ONE SOUND PER GESTURE, AND IT COMES FIRST.

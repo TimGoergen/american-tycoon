@@ -28,6 +28,7 @@ script = ExtResource("1_cjeps")
 id = &"collect"
 stream = ExtResource("5_c7cy5")
 volume_db = -10.0
+counts_as_presence = false
 pitch_variance = 0.03
 
 [sub_resource type="Resource" id="Resource_t411q"]

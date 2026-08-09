@@ -300,7 +300,11 @@ func _play_event(event_id: StringName, intensity: float, scaled: bool, pitch := 
 
 	# PRESENCE. SFX and UI mean the player did something; ceremony and music happen TO them, so they
 	# must not count, or a cutscene would keep the collect sounds alive by itself.
-	if event.bus == BUS_SFX or event.bus == BUS_UI:
+	#
+	# The per-event flag closes the same hole from the other side: `collect` rides the SFX bus but is
+	# the game reporting ITSELF, so it must never renew the window that let it play. Without that it
+	# is a self-sustaining loop — see AudioEvent.counts_as_presence.
+	if event.counts_as_presence and (event.bus == BUS_SFX or event.bus == BUS_UI):
 		_last_interaction_ms = now
 
 	var volume_db := event.volume_db

@@ -497,7 +497,7 @@ All signals already exist on `RushMomentumState`:
 
 | Signal | Decl | Audio |
 |---|---|---|
-| `vent_incoming(approach_seconds, required_lifts)` | `:159` | Pulse train, **in lockstep with `MomentumBar.gd:893 _pulse_vent_telegraph`** — one audible tick per required lift, same timing as the haptic |
+| `vent_incoming(approach_seconds, required_lifts)` | `:159` | **NO AUDIO** — see the note below. The haptic telegraph still fires here, unchanged |
 | `vent_window_opened(required_lifts, duration)` | `:163` | The "now" cue. This is the single most important sound in the game |
 | `vent_lift_registered(lifts_done, required_lifts)` | `:166` | Ascending confirmation per lift — the player hears progress toward the requirement |
 | `vent_succeeded(new_tier, new_peak_bonus)` | `:170` | Reward sting, intensity scaled by new tier |
@@ -505,9 +505,26 @@ All signals already exist on `RushMomentumState`:
 | `overheated(ended_vent_tier)` | `:185` | Failure thud; heat layer fades out |
 | `rush_ready` | `:190` | Re-arm chime; system is live again |
 
-The pulse-train lockstep is a hard requirement, not a nicety: `_pulse_vent_telegraph` fires
-at **spawn**, not window-open (rationale documented at `MomentumBar.gd:768-776`), and
-audio that fires at a different moment than the haptic would actively mislead.
+**REVISED 2026-08-09 — the count is heard at the WINDOW, not at the spawn.** This section
+originally had the audible tick train riding the haptic telegraph in lockstep at vent spawn. Built
+that way and played, Tim found the interval itself was the difficulty: *"the warning mark happens
+before the cycle starts, so you have to know how long to wait after that before you are actually
+paying the vent mechanic."*
+
+He is right, and the numbers say so — the approach is 0.7 s and the window decays to a 0.45 s floor,
+so a marker three-quarters of a second early asks the player to hold an interval in their head and
+punishes them for missing it. **Sound now marks the ACT.** The count ticks fire at
+`vent_window_opened`, straight after the "now" cue.
+
+The haptic telegraph stays at spawn, unchanged and device-tuned. Touch says *coming, this many*;
+sound says *now, this many*. That is not a breach of the lockstep rule — that rule forbids two
+channels claiming the same EVENT at different moments, and these two report different events.
+
+The count is paced fast (0.09 s lead, 0.07 s apart) so even the maximum three lifts finish in 0.23 s,
+about half the shortest window. A count that outlasted its window would read as something to wait
+through at exactly the moment the player must already be moving; `sim/AudioCoreTest.gd` asserts the
+relationship from the real constants, so raising `MAX_VENT_LIFTS` or lowering the duration floor
+fails a test rather than quietly breaking the mechanic.
 
 ### 5.3 Music interaction
 

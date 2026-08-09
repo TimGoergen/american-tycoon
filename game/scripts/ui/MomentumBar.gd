@@ -459,6 +459,11 @@ const AUTO_PURCHASE_IDLE_DOT_SECONDS := 0.45
 const AUTO_PURCHASE_IDLE_MAX_DOTS := 3
 
 ## The READY flash's peak alpha and fade time.
+## How long after the window-open cue the lift count starts, and how far apart its ticks sit.
+## Five lifts take LEAD + 4 x SPACING = 0.37 s, comfortably inside the 0.45 s shortest window.
+const VENT_COUNT_TICK_LEAD_SEC := 0.09
+const VENT_COUNT_TICK_SPACING_SEC := 0.07
+
 ## How far each vent lift steps up the confirmation pitch, in semitones. A whole tone: audibly a
 ## step, small enough that a five-lift window does not end up shrill.
 const VENT_LIFT_SEMITONES := 2.0
@@ -1755,11 +1760,12 @@ func _on_vent_incoming(approach_seconds: float, required_lifts: int) -> void:
 ## presentation is in-bar now (pips + countdown via the instrument overlay, driven per frame by
 ## _process) — no chip: the old held-open gold "VENT!" plate is retired, replaced by the
 ## approaching red bar the player has been watching for the whole approach.
-func _on_vent_window_opened(_required_lifts: int, duration: float) -> void:
+func _on_vent_window_opened(required_lifts: int, duration: float) -> void:
 	# THE "NOW" CUE — the single most important sound in the game (Plans/Audio_System.md §5.2). The
 	# window is short and the eye may be anywhere; this is what makes the gesture playable without
 	# staring at the bar.
 	Audio.play(&"vent_open")
+	_play_vent_count_ticks(required_lifts)
 	_vent_window_duration = maxf(duration, 0.001)
 	# The countdown starts full this instant — same reasoning as the approach clock above.
 	_window_display = _vent_window_duration
@@ -1816,6 +1822,37 @@ func _on_vent_missed(lifts_done: int, required_lifts: int) -> void:
 	_show_tier_chip("VENT MISSED!", UiPalette.KETCHUP_RED, UiPalette.PALE_GOLD)
 
 
+## Count out the required lifts, at the instant the window OPENS.
+##
+## THIS USED TO SOUND AT VENT SPAWN, alongside the haptic telegraph, and Tim found the gap it left
+## was the hard part of the mechanic (2026-08-09): "the warning mark happens before the cycle starts,
+## so you have to know how long to wait after that before you are actually paying the vent mechanic."
+## He is right — a marker 0.7 s before the thing it marks asks the player to hold an interval in their
+## head, and the window can be as short as 0.45 s, so mistiming it costs the ride.
+##
+## So the audio marks the ACT, not the approach. The haptic telegraph still fires at spawn, unchanged
+## and device-tuned: touch says "coming, this many", sound says "now, this many". They report the same
+## demand at the two different moments each is good for, which is why splitting them here does not
+## breach the lockstep rule — that rule forbids two channels claiming the same EVENT at different
+## times, not two channels covering different events.
+##
+## Paced fast on purpose. At VENT_COUNT_TICK_SPACING even five lifts finish inside the shortest
+## window the ladder ever produces, so the count can never read as something to wait through — the
+## player should be moving on the first tick.
+func _play_vent_count_ticks(required_lifts: int) -> void:
+	# A beat after the "now" cue, so the count reads as following it rather than smearing its attack.
+	await get_tree().create_timer(VENT_COUNT_TICK_LEAD_SEC).timeout
+	if not is_inside_tree():
+		return
+	for i in range(maxi(required_lifts, 1)):
+		Audio.play(&"vent_tick")
+		if i == required_lifts - 1:
+			return
+		await get_tree().create_timer(VENT_COUNT_TICK_SPACING_SEC).timeout
+		if not is_inside_tree():
+			return
+
+
 ## Show the tier chip: set its text/colors, ease it in, hold, fade out. A new chip request while
 ## the old chip is still up simply restarts the sequence with the new text. The end-of-fade
 ## cleanup also retires the miss pips + strobe, so a miss chip tidies itself up and the next
@@ -1870,25 +1907,15 @@ func _vibrate(duration_ms: float) -> void:
 ## being torn down mid-train (screen change, First Contact reset).
 func _pulse_vent_telegraph(required_lifts: int) -> void:
 	var pulse_ms: float = _tuning.rush_momentum_haptic_vent_ms
-	# NO EARLY RETURN for desktop or a zeroed haptic knob any more. This train now carries the AUDIO
-	# ticks too, and audio must not be silently switched off by a haptics setting or by the platform —
-	# Haptics.pulse already declines on desktop and at a zero duration, which is the right place for
-	# that decision (Plans/Audio_System.md §5.2).
-	#
-	# One tick per required lift, at the SAME moments as the buzzes: the plan calls this lockstep a
-	# hard requirement, because the telegraph fires at vent SPAWN rather than at window-open, and a
-	# sound arriving at a different moment than the haptic would actively mislead.
+	if pulse_ms < 1.0 or not OS.has_feature("mobile"):
+		return  # knob disabled, or desktop — no train to play
 	var pulses: int = maxi(required_lifts, 1)
 	var gap_ms: float = maxf(_tuning.rush_momentum_haptic_vent_gap_ms, 0.0)
-	var step_ms: float = maxf(pulse_ms, 1.0) + gap_ms
 	for i in range(pulses):
-		Audio.play(&"vent_tick")
 		_vibrate(pulse_ms)
 		if i == pulses - 1:
 			return
-		await get_tree().create_timer(step_ms / 1000.0).timeout
-		# The tree can be torn down mid-train (a succession, a tuning apply). Re-checking after every
-		# await is the pattern the haptic train already used and the reason it never errored.
+		await get_tree().create_timer((pulse_ms + gap_ms) / 1000.0).timeout
 		if not is_inside_tree():
 			return
 

@@ -65,6 +65,7 @@ func _run() -> void:
 	await _check_buy_intensity_is_relative()
 	_check_one_sound_per_gesture()
 	_check_vent_cues_exist()
+	_check_the_count_fits_the_window()
 	await _check_overdrive_bed()
 
 	# Tear the voices down before quitting: they are children of an autoload this test brought up by
@@ -380,6 +381,43 @@ func _check_loop_is_seamless(label: String, stream: AudioStreamWAV) -> void:
 	_check("the %s loop meets itself cleanly (seam %d vs largest normal step %d)"
 			% [label, seam, biggest_step],
 		seam <= biggest_step)
+
+
+## THE LIFT COUNT MUST FIT INSIDE THE WINDOW IT IS COUNTING FOR.
+##
+## The count ticks moved from vent SPAWN to window-OPEN (Tim, 2026-08-09: a marker 0.7 s before the
+## thing it marks makes the player hold an interval in their head). That fixes the timing but creates
+## a new way to be wrong: a count that outlasts its window would read as something to wait through,
+## at the exact moment the player must already be moving.
+##
+## So the relationship is asserted from the REAL constants on both sides — the bar's tick pacing, the
+## core's hard cap on lifts, and the tuning's shortest possible window. Raising MAX_VENT_LIFTS or
+## lowering the duration floor breaks this test rather than quietly breaking the mechanic.
+func _check_the_count_fits_the_window() -> void:
+	print("
+-- the lift count fits inside the shortest window --")
+	var bar_script: GDScript = load("res://scripts/ui/" + "MomentumBar.gd")
+	var rush_script: GDScript = load("res://scripts/core/" + "RushMomentumState.gd")
+	var tuning: TuningConfig = load("res://config/tuning.tres")
+	if bar_script == null or rush_script == null or tuning == null:
+		_check("the constants are readable", false)
+		return
+
+	var bar_consts := bar_script.get_script_constant_map()
+	var lead: float = bar_consts["VENT_COUNT_TICK_LEAD_SEC"]
+	var spacing: float = bar_consts["VENT_COUNT_TICK_SPACING_SEC"]
+	var max_lifts: int = rush_script.get_script_constant_map()["MAX_VENT_LIFTS"]
+	var shortest_window: float = tuning.rush_momentum_vent_duration_floor
+
+	var longest_count := lead + float(max_lifts - 1) * spacing
+	_check("the fullest count (%d lifts, %.0f ms) finishes inside the shortest window (%.0f ms)"
+			% [max_lifts, longest_count * 1000.0, shortest_window * 1000.0],
+		longest_count < shortest_window)
+
+	# And with room to act, not merely to hear it — the count is a prompt, not the gesture.
+	_check("...with most of the window still left to play (%.0f%% used)"
+			% (100.0 * longest_count / shortest_window),
+		longest_count < shortest_window * 0.6)
 
 
 ## THE CONTINUOUS BED (plan §5.1). Held sounds have failure modes one-shots do not: they can be

@@ -218,6 +218,7 @@ def main():
     write_ceremony()
     write_remaining_cues()
     write_minigame_cues()
+    write_basketball_cues()
     write_music()
 
 
@@ -498,6 +499,64 @@ def write_minigame_cues():
         (0.000, tone(NOTES["G4"], 0.14, harmonics=(1.0, 0.35), curve=4.5)),
         (0.100, tone(NOTES["E4"], 0.16, harmonics=(1.0, 0.3), curve=4.0)),
         (0.200, tone(NOTES["C4"], 0.45, harmonics=(1.0, 0.3, 0.12), curve=2.8)),
+    ]))
+
+
+def write_basketball_cues():
+    """Basketball's own vocabulary (Tim, 2026-08-09), layered OVER the shared beats.
+
+    The impacts get VARIANTS because one shot can bounce a dozen times and a single sample would be
+    the most fatiguing thing in the build. They are deliberately noise-based rather than tonal: a
+    bounce is a thud, and a pitched thud starts sounding like a melody nobody wrote."""
+    # THE BALL. Grab is barely there; the launch is a short whoosh that the game scales by pull force.
+    write_wav("bball_grab.wav", noise_burst(0.045, curve=9.0))
+    write_wav("bball_launch.wav", sequence([
+        (0.000, noise_burst(0.10, curve=5.0)),
+        (0.000, glide(NOTES["A3"], NOTES["E4"], 0.16, harmonics=(1.0, 0.3), curve=4.0)),
+    ]))
+    # A tap that never became a throw: the ball simply drops. Small and slightly deflating.
+    write_wav("bball_fizzle.wav", glide(NOTES["E4"], NOTES["A3"], 0.14,
+                                        harmonics=(1.0, 0.25), curve=5.0))
+
+    # IMPACTS, four variants each. The game picks one at random per bounce and scales it by speed.
+    for index in range(1, 5):
+        # Wall/ceiling: a harder, brighter knock than the floor.
+        write_wav("bball_wall_%d.wav" % index, sequence([
+            (0.000, noise_burst(0.05 + 0.004 * index, curve=8.0)),
+            (0.000, tone(NOTES["A3"] * (1.0 + 0.05 * index), 0.06, harmonics=(1.0, 0.5), curve=9.0)),
+        ]))
+        # Floor: lower and rounder — the ball meeting the boards.
+        write_wav("bball_floor_%d.wav" % index, sequence([
+            (0.000, noise_burst(0.06 + 0.005 * index, curve=7.0)),
+            (0.000, tone(NOTES["F2"] * (1.0 + 0.04 * index), 0.10, harmonics=(1.0, 0.4, 0.15), curve=6.0)),
+        ]))
+    # Settling to rest: the last, smallest contact.
+    write_wav("bball_settle.wav", noise_burst(0.05, curve=10.0))
+
+    # THE RIM: metal. A short bright ring over the knock, which is what makes a rim-out unmistakable.
+    write_wav("bball_rim.wav", sequence([
+        (0.000, noise_burst(0.04, curve=9.0)),
+        (0.000, tone(NOTES["E5"] * 2.0, 0.22, harmonics=(1.0, 0.6, 0.35, 0.2), curve=4.0)),
+    ]))
+
+    # THE BASKET. Score is the net; swish is the net with nothing else touched, and is the payoff
+    # sound of the whole game — the one thing here allowed to sound expensive.
+    write_wav("bball_score.wav", sequence([
+        (0.000, noise_burst(0.09, curve=6.0)),
+        (0.030, tone(NOTES["C5"], 0.20, harmonics=(1.0, 0.4, 0.18), curve=4.0)),
+    ]))
+    write_wav("bball_swish.wav", sequence([
+        (0.000, noise_burst(0.13, curve=4.5)),
+        (0.040, tone(NOTES["E5"], 0.22, harmonics=(1.0, 0.45, 0.2), curve=3.5)),
+        (0.120, tone(NOTES["A5"], 0.45, harmonics=(1.0, 0.5, 0.28, 0.14), curve=2.6)),
+    ]))
+
+    # THE GEM: passing through it is a promise; earning it is the game's rarest outcome.
+    write_wav("bball_gem_through.wav", tone(NOTES["E5"] * 2.0, 0.12, harmonics=(1.0, 0.4), curve=5.0))
+    write_wav("bball_gem_earned.wav", sequence([
+        (0.000, tone(NOTES["A4"], 0.12, harmonics=(1.0, 0.45, 0.2), curve=4.0)),
+        (0.080, tone(NOTES["E5"], 0.12, harmonics=(1.0, 0.45, 0.2), curve=4.0)),
+        (0.160, tone(NOTES["A5"], 0.50, harmonics=(1.0, 0.5, 0.3, 0.15), curve=2.4)),
     ]))
 
 

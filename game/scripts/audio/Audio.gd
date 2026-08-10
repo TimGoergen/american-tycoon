@@ -130,6 +130,26 @@ const CUES := {
 	&"minigame_best":      {"bus": BUS_CEREMONY, "db": -3.0, "cooldown": 500.0, "variance": 0.0},
 	&"minigame_over":      {"bus": BUS_UI, "db": -4.0, "cooldown": 500.0, "variance": 0.0},
 
+	# --- Basketball -------------------------------------------------------------------------------
+	# The first game to get its own vocabulary. These LAYER over the shared beats rather than
+	# replacing them (Tim, 2026-08-09): minigame_score still says "that counted", and these say what
+	# the object did — the net, the rim, the ball. It keeps six games recognisably one game.
+	#
+	# The bounces carry pitch variance and want VARIANTS most of all: one shot can bounce a dozen
+	# times, each quieter than the last, and a single unvaried sample would be the most fatiguing
+	# thing in the build.
+	&"bball_grab":        {"bus": BUS_SFX, "db": -16.0, "cooldown": 60.0, "variance": 0.05},
+	&"bball_launch":      {"bus": BUS_SFX, "db": -6.0, "cooldown": 60.0, "variance": 0.04},
+	&"bball_fizzle":      {"bus": BUS_SFX, "db": -14.0, "cooldown": 80.0, "variance": 0.05},
+	&"bball_wall":        {"bus": BUS_SFX, "db": -12.0, "cooldown": 40.0, "variance": 0.09},
+	&"bball_floor":       {"bus": BUS_SFX, "db": -11.0, "cooldown": 40.0, "variance": 0.09},
+	&"bball_settle":      {"bus": BUS_SFX, "db": -18.0, "cooldown": 120.0, "variance": 0.06},
+	&"bball_rim":         {"bus": BUS_SFX, "db": -8.0, "cooldown": 50.0, "variance": 0.06},
+	&"bball_score":       {"bus": BUS_SFX, "db": -5.0, "cooldown": 120.0, "variance": 0.0},
+	&"bball_swish":       {"bus": BUS_SFX, "db": -3.0, "cooldown": 120.0, "variance": 0.0},
+	&"bball_gem_through": {"bus": BUS_SFX, "db": -8.0, "cooldown": 120.0, "variance": 0.0},
+	&"bball_gem_earned":  {"bus": BUS_CEREMONY, "db": -4.0, "cooldown": 400.0, "variance": 0.0},
+
 	# --- Settings previews (played when a slider is released) --------------------------------------
 	&"music_preview":    {"bus": BUS_MUSIC, "db": -4.0, "cooldown": 200.0, "variance": 0.0},
 }

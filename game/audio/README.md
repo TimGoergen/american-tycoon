@@ -99,6 +99,22 @@ Bus decides which slider governs a sound, and whether it counts as the player be
 | `minigame_best` | Ceremony | -3 | 500 ms | The run passes the stored high score. Once per run. |
 | `minigame_over` | UI | -4 | 500 ms | A round or challenge run ends. |
 
+### Basketball
+
+| Cue / filename | Bus | dB | Cooldown | Fires when |
+|---|---|---|---|---|
+| `bball_grab` | SFX | -16 | 60 ms | A finger takes the ball and the slingshot drag begins. |
+| `bball_launch` | SFX | -6 | 60 ms | The throw is released. Scaled by the SAME pull force the aim wedge shows, so a lob and a cannon shot sound as different as they look. |
+| `bball_fizzle` | SFX | -14 | 80 ms | Released under the minimum pull — not a throw; the ball just drops. |
+| `bball_wall` | SFX | -12 | 40 ms | The ball bounces off a side wall or the ceiling. Scaled by impact speed. |
+| `bball_floor` | SFX | -11 | 40 ms | The ball lands on the floor. Scaled by impact speed. |
+| `bball_settle` | SFX | -18 | 120 ms | The ball stops rolling and becomes throwable again. |
+| `bball_rim` | SFX | -8 | 50 ms | Clipping a rim post — the rim-out. |
+| `bball_score` | SFX | -5 | 120 ms | A made basket. LAYERS over the shared `minigame_score`. |
+| `bball_swish` | SFX | -3 | 120 ms | A clean centred drop — the gold SWISH! Also layers over `minigame_score`. |
+| `bball_gem_through` | SFX | -8 | 120 ms | The ball passes through the Legacy gem. A promise, not yet a payout. |
+| `bball_gem_earned` | Ceremony | -4 | 400 ms | The shot that passed through the gem also scored — the game's rarest outcome, and the only one that pays Legacy. |
+
 ### Ceremony — the story beats
 
 | Cue / filename | Bus | dB | Cooldown | Fires when |
@@ -159,7 +175,7 @@ tuning, and a wobble on top is simply out of tune.
 
 ## The minigames
 
-The six games share the beats above — begin, score, miss, countdown, new best, over — and each
+**Basketball is done; the other five are not.** The six games share the beats above — begin, score, miss, countdown, new best, over — and each
 game's own vocabulary (a swish, a match, a caught coin, a flipped pad) is a LATER PASS, deliberately.
 Getting the shared layer right first means every game already sounds like it belongs to this game
 before any of them sounds like itself.

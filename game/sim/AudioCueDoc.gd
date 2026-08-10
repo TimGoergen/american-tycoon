@@ -62,6 +62,17 @@ const TRIGGERS := {
 	&"minigame_countdown": "One per second over the last few seconds of the clock, on the same tick the timer pops.",
 	&"minigame_best": "The run passes the stored high score. Once per run.",
 	&"minigame_over": "A round or challenge run ends.",
+	&"bball_grab": "A finger takes the ball and the slingshot drag begins.",
+	&"bball_launch": "The throw is released. Scaled by the SAME pull force the aim wedge shows, so a lob and a cannon shot sound as different as they look.",
+	&"bball_fizzle": "Released under the minimum pull — not a throw; the ball just drops.",
+	&"bball_wall": "The ball bounces off a side wall or the ceiling. Scaled by impact speed.",
+	&"bball_floor": "The ball lands on the floor. Scaled by impact speed.",
+	&"bball_settle": "The ball stops rolling and becomes throwable again.",
+	&"bball_rim": "Clipping a rim post — the rim-out.",
+	&"bball_score": "A made basket. LAYERS over the shared `minigame_score`.",
+	&"bball_swish": "A clean centred drop — the gold SWISH! Also layers over `minigame_score`.",
+	&"bball_gem_through": "The ball passes through the Legacy gem. A promise, not yet a payout.",
+	&"bball_gem_earned": "The shot that passed through the gem also scored — the game's rarest outcome, and the only one that pays Legacy.",
 	&"music_preview": "Releasing the MUSIC slider in Settings.",
 }
 
@@ -156,13 +167,16 @@ func _cue_tables(cues: Dictionary, constants: Dictionary) -> String:
 		"Challenge Mode": [&"challenge_start", &"challenge_credit", &"challenge_tier"],
 		"Minigames — the shared beats": [&"minigame_begin", &"minigame_score", &"minigame_miss",
 			&"minigame_countdown", &"minigame_best", &"minigame_over"],
+		"Basketball": [&"bball_grab", &"bball_launch", &"bball_fizzle", &"bball_wall",
+			&"bball_floor", &"bball_settle", &"bball_rim", &"bball_score", &"bball_swish",
+			&"bball_gem_through", &"bball_gem_earned"],
 		"Ceremony — the story beats": [&"ceremony_obituary", &"ceremony_will", &"ceremony_heir",
 			&"ceremony_contact", &"ceremony_contact_reveal", &"legacy_purchase", &"welcome_back",
 			&"prestige_confirm"],
 		"Settings": [&"music_preview"],
 	}
 	var order := ["The core loop", "Rush and overdrive", "Interface", "Denials (reserved)",
-		"Challenge Mode", "Minigames — the shared beats", "Ceremony — the story beats", "Settings"]
+		"Challenge Mode", "Minigames — the shared beats", "Basketball", "Ceremony — the story beats", "Settings"]
 
 	var text := "## The cues\n\nBus decides which slider governs a sound, and whether it counts as"
 	text += " the player being *present* (SFX and UI do; Ceremony and Music do not).\n"
@@ -232,7 +246,7 @@ tuning, and a wobble on top is simply out of tune.
 
 ## The minigames
 
-The six games share the beats above — begin, score, miss, countdown, new best, over — and each
+**Basketball is done; the other five are not.** The six games share the beats above — begin, score, miss, countdown, new best, over — and each
 game's own vocabulary (a swish, a match, a caught coin, a flipped pad) is a LATER PASS, deliberately.
 Getting the shared layer right first means every game already sounds like it belongs to this game
 before any of them sounds like itself.

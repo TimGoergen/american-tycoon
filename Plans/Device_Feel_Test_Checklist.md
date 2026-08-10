@@ -425,10 +425,21 @@ reason: they are live in whatever build is on the phone right now.*
       next prestige must quote a large-but-legible mint**, and **the deep epochs must
       resist**. This is the single highest-value session available, and two other items
       below are gated behind it.
+> Provenance for everything in this subsection — what was fitted, by which study, and against which
+> seed — is consolidated in `docs/Tuning_Record.md`.
+
 - [ ] **Judge `legacy_cost_steepening` s = 1.10 (you approved 1.03).** Fit-forced: at 1.03
       the shop could not absorb billions-scale mints and the summit fell at generation 3;
       1.12 stalled absolutely at tier 25. 1.10 is the fitted middle. The doc flags this
       itself as *"needs Tim's eyes"* — this line is those eyes.
+- [ ] **How fast do YOU vent?** `sim/VentBonusStudy.gd` (2026-08-10) shows the overdrive ladder is
+      self-limiting only below roughly **0.15s per lift** — the window floors at 0.45s and the lift
+      demand caps at 3, so a fast player is not limited by the mechanic at all. At an unhurried 0.30s
+      the run ends around +205%; at a quick 0.18s it reaches +775% (×8.8 on rushed income); faster
+      than 0.15s it never ends. **Ride overdrive as hard as you can and report the peak bonus you
+      actually reach** — that single number says which column of that table you are, and whether the
+      endless ladder needs a cap after all.
+
 - [ ] **Judge `alpha_legacy_deep` = 0.05 (you decided 0.06, recorded three times).**
       Fit-forced: at 0.06 mints grew ×1.79/tier, faster than the decay brake; 0.05 (×1.62)
       converges. The stated *intent* — "endgame mints read in the billions" — is claimed

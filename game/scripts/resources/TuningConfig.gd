@@ -1,4 +1,8 @@
 class_name TuningConfig
+# PROVENANCE: docs/Tuning_Record.md records where each number came from — which were FITTED by a
+# named study (do not change those freely; re-run the study), which are feel-tunes, and the two that
+# currently ship at values DIFFERENT from the ones Tim seeded. The comments below say what a knob
+# does; that document says how much rests on it.
 extends Resource
 
 # Single source of truth for all numeric tuning constants (Mechanics Spec §12).

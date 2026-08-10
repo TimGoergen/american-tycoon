@@ -25,6 +25,10 @@ gray-headshot fallback is now unreachable in normal play.
    N+1. The 20 civs listed here as tiers 7–26 are **game tiers 8–27**; the "batch 2" cohort
    described as 12–26 is **game tiers 13–27**.
 
+**The one gap this box used to name is now closed:** batch 2's portraits were device-validated on
+2026-08-10 via `sim/PortraitSheet.gd` (see §9.3). The remaining open item is the planet watermark
+(§9.4), which is an art decision, not a validation gap.
+
 **What is still true and worth keeping:** §1 (the authored draft content and its field list,
 including that `staff_income_multiplier` is a flat injected `1.0`, *"a constant to inject, not
 content to author"*), §3's Path A/B analysis as the record of *why* B won, §7's UI dependency
@@ -140,6 +144,10 @@ decision**. The rest of this plan assumes Path A; §8 notes what Path B would ad
 
 ## 4. Content transform (Path A) — draft JSON → EpochCatalog
 
+> **SUPERSEDED — Path A was reversed; Path B shipped.** Kept as the record of what was
+> considered. See the status box at the top of this file.
+
+
 A one-time, scriptable transform (or a careful hand-port) of draft tiers 7–26 into 20 new
 `EpochCatalog.EPOCHS` dictionaries:
 
@@ -164,6 +172,9 @@ strings. Validate that each produced roster is exactly 52 long and every economy
 
 ## 5. Scaling & save safety (Path A)
 
+> **SUPERSEDED — Path A was reversed.** Kept for the save-safety reasoning, which still holds.
+
+
 - **Append-only:** new epochs are tiers 7–26; existing tiers, property indices, and saves are
   untouched. The epoch gate is forward-only (a run already past a gate isn't retro-locked).
 - **Float headroom:** fine through tier 26 (§2).
@@ -177,6 +188,11 @@ strings. Validate that each produced roster is exactly 52 long and every economy
 ---
 
 ## 6. Face generator — Phase 2: alien staffer portraits (the heart of Tim's ask)
+
+> **§6.1–§6.3 SUPERSEDED — they describe the REJECTED shared-archetype system.** What shipped is
+> a bespoke procedural design per civilization (`StafferFace._draw_alien` dispatches one `_draw_*`
+> per civ). Anyone implementing §6.2 today would build the wrong thing.
+
 
 Goal: a **distinct, recognizable staffer look for each of the 25 alien civs**, procedurally (no
 hand-authoring 25 × N portraits), building on the proven `StafferFace` pipeline.
@@ -270,8 +286,12 @@ and roster-length expansion are the work. Alternatively, deliver per-epoch engag
 2. ~~**Alien portrait style**~~ — **DECIDED: bespoke per-civ**, rejecting the recommended
    abstract archetype system. Shipped for every tier 3–27.
 3. ~~**How many to enable first**~~ — **DECIDED: first batch tiers 7–11, then the rest.**
-   Both batches shipped. ⚠️ **The device-validation half of this decision was only honoured
-   for batch 1** — see the status box at the top.
+   Both batches shipped, and the validation half is now **honoured for both (2026-08-10)**:
+   `sim/PortraitSheet.gd` renders all 25 alien civs — four staffers each, on their real accent
+   discs — and checks what a machine can decide (every civ draws something, varies between its
+   staffers, looks unlike every other civ, and stays inside the disc the ManagerCircle clips to).
+   All pass. It writes per-civ strips plus a contact sheet for the human half.
+   ⚠️ It needs a REAL RENDERER: `--rendering-driver opengl3`, not `--headless`.
 4. **Planet watermark — STILL OPEN.** `HeroStat.PLANET_IMAGE_PATHS` holds 6 authored world
    SVGs (Earth → Chronophage); tiers 7–27 have no art and rely on a bounds guard. The choice
    — generic/procedural planet tinted by the civ accent colour vs. commissioning ~20 world

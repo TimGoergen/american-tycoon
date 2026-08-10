@@ -1,6 +1,7 @@
 # Audio System — Implementation Plan
 
-**Status:** Phases 0, 1, 3 and 4 BUILT (2026-08-08/09); 0/1/3 merged to `main` at `24c5e70`. Tim on the Phase 1 slice: "the sound on buy and
+**Status:** Phases 0-4 BUILT (2026-08-08/09); 0/1/3 merged to `main` at `24c5e70`. Only Phase 5
+(UI + mix pass) remains, plus replacing every placeholder sample with sourced audio. Tim on the Phase 1 slice: "the sound on buy and
 tap are good". Phase 3 (overdrive) was brought forward ahead of Phase 2 because rush is central to
 how he plays. Phases 2, 4, 5 not started. Written 2026-08-06 from an interview with Tim.
 **Graduates:** GDD §12 (Art & Audio Direction), §13 M3 milestone entry "audio implementation
@@ -717,11 +718,14 @@ Phase 0 turned out to be load-bearing exactly as predicted: with the SOUND card 
 content measures taller than the viewport. Without the ScrollContainer the bottom buttons would have
 been unreachable, not merely clipped.
 
-### Phase 2 — `feature/audio-music`
+### Phase 2 — BUILT 2026-08-09 — `feature/audio-music`
 Five band tracks, band mapping, crossfades, idle fade (§3.3), ceremony-safe transition
 rule. Music slider becomes meaningful.
 
-**Exit criterion:** a multi-epoch device session without music fatigue.
+**Exit criterion:** a multi-epoch device session without music fatigue. **PENDING**, and it needs
+real tracks to mean anything — the five files in `game/audio/music/` are 8-second generated chord
+loops that exist so the machinery could be built and heard. `game/audio/music/README.md` is the drop
+sheet: exact filenames, format, and what the game does with them.
 
 ### Phase 3 — BUILT 2026-08-09, ahead of Phase 2 — `feature/audio-overdrive`
 

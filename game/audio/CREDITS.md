@@ -38,6 +38,11 @@ directly as PCM by the script above — no sampled or third-party material of an
 nothing to license and nothing to attribute. They exist so Phase 1 can be judged on a device; the
 timing and pitch relationships are real even though the tone quality is plain.
 
+## Music
+
+Tracks live in `music/`, one per era band — see `music/README.md` for names, format and what the
+game does with them. The five files there now are generated placeholders, not music.
+
 ## When sourcing real samples
 
 Verify the license **at download time** and write the row immediately. Do not trust a summary

@@ -622,6 +622,9 @@ func _create_game() -> void:
 	# Audio no-ops entirely when there is no audio device, so this is safe headless.
 	Audio.apply_tuning(tuning)
 	Audio.set_bus_volume(Audio.BUS_MUSIC, game.ui_music_volume)
+	# Start on the band this save is already in, with no transition — a load should land in its era,
+	# not crossfade into it from nothing.
+	Audio.set_music_band(Audio.band_for_tier(game.epoch.current_tier))
 	_apply_sfx_volume(game.ui_sfx_volume)
 	Haptics.scale = game.ui_haptics_scale
 
@@ -2924,6 +2927,11 @@ func _on_contact_made(new_tier: int) -> void:
 func _on_contact_dismissed() -> void:
 	var tier := _pending_contact_tier
 	_pending_contact_tier = 0
+	# THE BAND CHANGE WAITS FOR THE OVERLAY (Plans/Audio_System.md §3.1). Crossfading while the card
+	# is up would put the new track's first bar underneath that beat's own sting and ruin both, so
+	# the music turns over here rather than on contact_made. Note this runs BEFORE the Earth-promotion
+	# early return below: tier 2 is its own band, and a quiet card is still a band change.
+	Audio.set_music_band(Audio.band_for_tier(tier))
 	# The Earth→Earth promotion beat (White Collar, tier 2) is a quiet card only for now —
 	# no trade-deal minigame (Tim, 2026-07-27). SEAM: when the promotion minigame gets its
 	# own moving-up copy (planned follow-up, Plans/Earth_Split_Epochs.md), remove this guard.

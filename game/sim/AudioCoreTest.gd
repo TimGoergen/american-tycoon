@@ -56,6 +56,7 @@ func _run() -> void:
 	for bus in [&"Music", BUS_SFX, &"UI", &"Ceremony"]:
 		_audio.set_bus_volume(bus, 1.0)
 	_audio.call("_build_heat_layer")
+	_audio.call("_build_music_players")
 
 	_check_catalog()
 	_check_mute_costs_nothing()
@@ -66,6 +67,8 @@ func _run() -> void:
 	_check_one_sound_per_gesture()
 	_check_vent_cues_exist()
 	_check_ceremony_beats()
+	_check_band_mapping()
+	await _check_music_mix()
 	_check_the_count_fits_the_window()
 	await _check_overdrive_bed()
 
@@ -425,6 +428,103 @@ func _check_ceremony_beats() -> void:
 			shortest_cooldown = minf(shortest_cooldown, event.cooldown_ms)
 	_check("their cooldowns are long enough to prevent self-overlap (%.0f ms)" % shortest_cooldown,
 		shortest_cooldown >= 500.0)
+
+
+## THE BAND MAP (plan §3.2). A pure function on tier, so it can be checked exhaustively rather than
+## sampled — and every tier in the game must land somewhere, including tiers that do not exist yet.
+func _check_band_mapping() -> void:
+	print("
+-- the era band map --")
+	var script := _audio.get_script() as GDScript
+	var seen: Dictionary = {}
+	var previous := -1
+	var monotonic := true
+	for tier in range(1, 28):
+		var band: int = script.call("band_for_tier", tier)
+		seen[band] = true
+		if band < previous:
+			monotonic = false
+		previous = band
+	_check("every one of the 27 tiers maps to a band", seen.size() > 0)
+	_check("all five bands are used (%d of 5)" % seen.size(), seen.size() == 5)
+	# It must never go BACKWARDS: the music deepens as the run does, and a tier that fell back to an
+	# earlier band would crossfade the player into their own past.
+	_check("bands only ever move forward with the tiers", monotonic)
+
+	# The two Earth epochs get their own bands — the promotion is meant to be audible (§3.2).
+	_check("Blue Collar and White Collar are different bands",
+		int(script.call("band_for_tier", 1)) != int(script.call("band_for_tier", 2)))
+	# And a tier beyond the content still answers, rather than indexing off the end.
+	var beyond: int = script.call("band_for_tier", 99)
+	_check("a tier past the content still maps somewhere (%d)" % beyond, beyond >= 0 and beyond < 5)
+
+
+## THE MIX: crossfade, idle fade and duck all move the same volume, which is why they are computed
+## in one place. These check they cooperate rather than fight.
+func _check_music_mix() -> void:
+	print("
+-- the music mix --")
+	var players: Array = _audio.get("_music_players")
+	_check("there are two players, so a band can cross to another", players.size() == 2)
+
+	_audio.set_music_band(0)
+	_check("setting a band starts a track", int(_audio.get("_music_band")) == 0)
+	var first_player: int = int(_audio.get("_music_active"))
+
+	# Re-asserting the same band must be free — callers assert it on every epoch change.
+	_audio.set_music_band(0)
+	_check("re-asserting the same band does not restart it",
+		int(_audio.get("_music_active")) == first_player)
+
+	# A different band crosses to the OTHER player, or there is no crossfade to speak of.
+	_audio.set_music_band(3)
+	_check("a new band crosses to the other player",
+		int(_audio.get("_music_active")) != first_player)
+
+	# IDLE. Wind the interaction clock back and let the mix run: the music should fade away.
+	_audio.set("_music_idle_gain", 1.0)
+	_audio.set("_last_interaction_ms", Time.get_ticks_msec() - 600_000)
+	_audio.set("_heat_active", false)
+	for i in range(240):
+		_audio.call("_process", 0.05)
+	_check("with the player long gone, the music fades out (%.2f)"
+			% float(_audio.get("_music_idle_gain")),
+		float(_audio.get("_music_idle_gain")) < 0.01)
+
+	# ...and comes back when they touch anything.
+	_audio.set("_last_interaction_ms", Time.get_ticks_msec())
+	for i in range(120):
+		_audio.call("_process", 0.05)
+	_check("acting brings it back (%.2f)" % float(_audio.get("_music_idle_gain")),
+		float(_audio.get("_music_idle_gain")) > 0.99)
+
+	# A RIDE COUNTS AS PRESENCE. Fading out mid-rush because the player is HOLDING rather than
+	# tapping would be a bug that feels like a bug.
+	_audio.set("_last_interaction_ms", Time.get_ticks_msec() - 600_000)
+	_audio.set("_heat_active", true)
+	for i in range(120):
+		_audio.call("_process", 0.05)
+	_check("an active ride keeps the music alive even with no taps (%.2f)"
+			% float(_audio.get("_music_idle_gain")),
+		float(_audio.get("_music_idle_gain")) > 0.99)
+
+	# DUCK: with the bed running, the music sits lower than it would otherwise.
+	var ducked: float = (players[int(_audio.get("_music_active"))] as AudioStreamPlayer).volume_db
+	_audio.set("_heat_active", false)
+	_audio.set("_last_interaction_ms", Time.get_ticks_msec())
+	for i in range(10):
+		_audio.call("_process", 0.05)
+	var plain: float = (players[int(_audio.get("_music_active"))] as AudioStreamPlayer).volume_db
+	_check("the music ducks under a ride (%.1f dB vs %.1f dB)" % [ducked, plain], ducked < plain)
+
+	_audio.stop_music()
+	for i in range(120):
+		_audio.call("_process", 0.05)
+	var all_stopped := true
+	for player in players:
+		if (player as AudioStreamPlayer).playing:
+			all_stopped = false
+	_check("stopping the music really stops the streams", all_stopped)
 
 
 ## THE LIFT COUNT MUST FIT INSIDE THE WINDOW IT IS COUNTING FOR.

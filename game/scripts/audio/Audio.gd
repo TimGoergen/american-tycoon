@@ -64,6 +64,51 @@ const TAP_WINDOW_SIZE := 8
 ## step of the rise instead of a repeat.
 const TAP_WINDOW_DRIFT := 2
 
+# --- Music (plan §3) ---------------------------------------------------------------------------
+
+## Where the era tracks live, and what each band is called. ONE FILE PER BAND, named for the band —
+## dropping a new track in is a file copy, not a code change, which is the point (§7.2: the
+## architecture must not care whether the tracks are commissioned or library).
+##
+## `.ogg` is preferred and tried first; a `.wav` of the same name is the fallback, which is how the
+## generated placeholders work until real tracks arrive.
+const MUSIC_DIR := "res://audio/music/"
+const MUSIC_BAND_FILES := [
+	"band_0_blue_collar",
+	"band_1_white_collar",
+	"band_2_early_contact",
+	"band_3_mid",
+	"band_4_deep",
+]
+
+## Which band an epoch tier belongs to (§3.2). Aligned to the ECONOMY's own bands, so the music
+## changes character exactly where the maths does — free coherence, and one place to change it.
+##
+## A pure function on purpose: tier thresholds must not be scattered.
+static func band_for_tier(tier: int) -> int:
+	if tier <= 1:
+		return 0        # Blue Collar
+	if tier == 2:
+		return 1        # White Collar
+	if tier <= 11:
+		return 2        # early contact
+	if tier <= 19:
+		return 3        # mid
+	return 4            # deep
+
+
+## Seconds to cross from one band to the next. Long enough to read as a dissolve rather than a cut.
+const MUSIC_CROSSFADE_SECONDS := 2.0
+## How long the idle fade takes out and back in (§3.3). Out is slow — the music should seem to drift
+## away rather than be switched off; back in is quicker, because the player has just acted.
+const MUSIC_IDLE_FADE_OUT_SECONDS := 4.0
+const MUSIC_IDLE_FADE_IN_SECONDS := 1.5
+## How far the music drops while a rush is on (§5.3), so the overdrive bed sits on top of it.
+const MUSIC_DUCK_DB := -4.0
+## Ceiling for the music players themselves. The Music BUS carries the player's slider; this is the
+## mix trim underneath it.
+const MUSIC_VOLUME_DB := -6.0
+
 # --- The overdrive layer (plan §5.1, decision 9) ---------------------------------------------
 
 ## The two continuous streams a ride is made of, held as their own players rather than borrowed from
@@ -116,6 +161,22 @@ var _bus_levels: Dictionary = {}
 ## cheap return, so the gates need no audio stubs (plan §0.4 rule 4).
 var _enabled := true
 
+## Two music players so a band change can cross between them; `_music_active` says which one is
+## playing the current band.
+var _music_players: Array[AudioStreamPlayer] = []
+var _music_active := 0
+## Per-player gain, 0..1, walked toward its target every frame. Plain numbers rather than tweens:
+## the idle fade, the crossfade and the duck all move the same volume, and three tweens fighting over
+## one property is how audio mixers develop a mind of their own.
+var _music_gain: Array[float] = [0.0, 0.0]
+## The band currently playing, or -1 for none.
+var _music_band := -1
+## The idle envelope (§3.3): 1 while the player is around, 0 once they have gone quiet.
+var _music_idle_gain := 1.0
+## Set false to silence music entirely (the player's slider is separate — this is the system's own
+## on/off, used when no track exists for a band).
+var _music_wanted := false
+
 ## The overdrive bed: two dedicated players, and the fade tween that owns their volume.
 var _heat_player: AudioStreamPlayer
 var _urgency_player: AudioStreamPlayer
@@ -157,6 +218,7 @@ func _ready() -> void:
 	_load_catalog()
 	_build_voice_pools()
 	_build_heat_layer()
+	_build_music_players()
 	for bus in [BUS_MUSIC, BUS_SFX, BUS_UI, BUS_CEREMONY]:
 		_bus_levels[bus] = 1.0
 
@@ -222,6 +284,33 @@ func _make_loop_player(path: String) -> AudioStreamPlayer:
 	player.volume_db = -60.0
 	add_child(player)
 	return player
+
+
+## Two identical players, allocated at boot like everything else.
+func _build_music_players() -> void:
+	for i in range(2):
+		var player := AudioStreamPlayer.new()
+		player.bus = BUS_MUSIC
+		player.process_mode = Node.PROCESS_MODE_ALWAYS
+		player.volume_db = -60.0
+		add_child(player)
+		_music_players.append(player)
+
+
+## Load a band's track, or null if there is none. Tries .ogg then .wav, so a real track dropped in
+## beside a placeholder simply wins.
+##
+## A MISSING TRACK IS NOT AN ERROR. The game must run silent-but-correct with no music at all — that
+## is how it shipped for its whole life until now, and a half-populated audio/music/ directory is the
+## normal state while tracks are being auditioned one at a time.
+func _load_band_track(band: int) -> AudioStream:
+	if band < 0 or band >= MUSIC_BAND_FILES.size():
+		return null
+	for extension in [".ogg", ".wav"]:
+		var path: String = MUSIC_DIR + MUSIC_BAND_FILES[band] + extension
+		if ResourceLoader.exists(path):
+			return load(path)
+	return null
 
 
 # --- Public surface ----------------------------------------------------------------------------
@@ -391,6 +480,57 @@ func _urgency_db_for(normalized: float) -> float:
 	return lerpf(-60.0, URGENCY_VOLUME_DB, clampf(amount, 0.0, 1.0))
 
 
+## Play the track for `band`, crossfading from whatever is playing. A no-op if that band is already
+## on, so callers can assert the current band every time the epoch changes without tracking edges.
+##
+## Callers must not invoke this DURING a ceremony (§3.1): a band change that lands under the First
+## Contact overlay puts a new track's first bar beneath that beat's own sting and ruins both. Main
+## calls it when the overlay dismisses instead.
+func set_music_band(band: int) -> void:
+	if not _enabled or band == _music_band:
+		return
+
+	var track := _load_band_track(band)
+	if track == null:
+		# No track for this band yet. Leave whatever is playing rather than cutting to silence: a
+		# partially-populated music directory should degrade to "the old track keeps going", not to
+		# a hole in the soundtrack.
+		push_warning("Audio: no track for music band %d; leaving the current one playing." % band)
+		return
+
+	_music_band = band
+	_music_wanted = true
+	# The idle envelope must not carry over from a fade-out in progress, or a band change during a
+	# quiet spell would start the new track already vanishing.
+	_music_idle_gain = 1.0
+
+	var next := 1 - _music_active
+	var player := _music_players[next]
+	player.stream = _apply_loop(track)
+	player.play()
+	_music_active = next
+
+
+## Stop the music entirely (used by a caller that wants silence — not by the idle fade, which keeps
+## the system armed).
+func stop_music() -> void:
+	_music_wanted = false
+	_music_band = -1
+
+
+## Make a music stream loop. Same reasoning as the overdrive bed: a track that stops after one pass
+## fails silently, and the import setting for it lives in a gitignored file.
+func _apply_loop(stream: AudioStream) -> AudioStream:
+	if stream is AudioStreamOggVorbis:
+		(stream as AudioStreamOggVorbis).loop = true
+	elif stream is AudioStreamWAV:
+		var wav := stream as AudioStreamWAV
+		wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		wav.loop_begin = 0
+		wav.loop_end = wav.data.size() / 2
+	return stream
+
+
 ## Set one player-facing level, 0..1 linear. The SFX slider drives three buses (§1.2).
 func set_bus_volume(bus: StringName, linear: float) -> void:
 	if not _enabled:
@@ -432,6 +572,42 @@ func player_is_present() -> bool:
 
 
 # --- Internals ---------------------------------------------------------------------------------
+
+## Drive the music mix every frame: crossfade, idle fade and duck, all resolved into one volume per
+## player. THREE THINGS MOVE THE SAME NUMBER, which is exactly why they are computed together here
+## rather than as three tweens racing each other for the property.
+func _process(_delta_unused: float) -> void:
+	if not _enabled or _music_players.is_empty():
+		return
+	var delta := get_process_delta_time()
+
+	# IDLE (§3.3). The music carries the quiet, but not forever: after a long silence it drifts out,
+	# and the next thing the player does brings it back. An active ride never counts as idle —
+	# going quiet mid-rush because the player is HOLDING rather than tapping would be a bug that
+	# feels like a bug.
+	var present := player_is_present() or _heat_active
+	var idle_rate := 1.0 / (MUSIC_IDLE_FADE_IN_SECONDS if present else MUSIC_IDLE_FADE_OUT_SECONDS)
+	_music_idle_gain = move_toward(_music_idle_gain, 1.0 if present else 0.0, delta * idle_rate)
+
+	# DUCK (§5.3): the overdrive bed rides the same bus, so the music steps back under it.
+	var duck_db := MUSIC_DUCK_DB if _heat_active else 0.0
+
+	var crossfade_rate := 1.0 / MUSIC_CROSSFADE_SECONDS
+	for i in range(_music_players.size()):
+		var player := _music_players[i]
+		var target := 1.0 if (i == _music_active and _music_wanted) else 0.0
+		_music_gain[i] = move_toward(_music_gain[i], target, delta * crossfade_rate)
+
+		var level := _music_gain[i] * _music_idle_gain
+		if level <= 0.001:
+			# STOP rather than idle at silence. A stopped stream decodes nothing, and between the
+			# idle fade and the crossfade one of these two is silent almost all the time.
+			if player.playing:
+				player.stop()
+			continue
+		if not player.playing and _music_wanted:
+			player.play()
+		player.volume_db = MUSIC_VOLUME_DB + linear_to_db(level) + duck_db
 
 
 func _play_event(event_id: StringName, intensity: float, scaled: bool, pitch := 1.0) -> void:

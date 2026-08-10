@@ -33,7 +33,9 @@ SAMPLE_RATE = 44100
 # volumes in audio_events.tres trim further. Headroom now is cheaper than clipping later.
 PEAK = 0.5
 
-OUT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "game", "audio", "sfx")
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+OUT_DIR = os.path.join(ROOT, "game", "audio", "sfx")
+MUSIC_DIR = os.path.join(ROOT, "game", "audio", "music")
 
 # Equal-temperament note frequencies used below, so the tones sit in a real scale rather than on
 # arbitrary numbers. A4 = 440.
@@ -163,13 +165,13 @@ def glide(start_hz, end_hz, seconds, harmonics=(1.0,), curve=2.0, attack=0.05):
     return samples
 
 
-def write_wav(name, samples):
+def write_wav(name, samples, directory=None):
     """Normalize to PEAK and write 16-bit mono PCM."""
     loudest = max(abs(value) for value in samples) or 1.0
     scale = PEAK / loudest
     frames = b"".join(struct.pack("<h", int(max(-1.0, min(1.0, value * scale)) * 32767)) for value in samples)
 
-    path = os.path.join(OUT_DIR, name)
+    path = os.path.join(directory or OUT_DIR, name)
     with wave.open(path, "wb") as handle:
         handle.setnchannels(1)
         handle.setsampwidth(2)
@@ -213,6 +215,7 @@ def main():
     write_rush_layer()
     write_vent_cues()
     write_ceremony()
+    write_music()
 
 
 def write_rush_layer():
@@ -327,6 +330,43 @@ def write_ceremony():
         (0.150, tone(NOTES["E5"], 0.28, harmonics=(1.0, 0.4, 0.18), curve=3.2, attack=0.02)),
         (0.300, tone(NOTES["G5"], 0.75, harmonics=(1.0, 0.5, 0.25, 0.1), curve=2.2, attack=0.02)),
     ]))
+
+
+# The five era bands (Plans/Audio_System.md §3.2). These are PLACEHOLDERS in the most literal sense:
+# they hold the slot so the band mapping, the crossfade, the idle fade and the duck can all be heard
+# and judged before a note of real music exists. Nobody should mistake them for the soundtrack.
+#
+# Each is a slow chord loop, and they differ the way the real tracks are meant to: the Earth bands
+# are plain triads (department-store muzak, per decision 17), and the alien bands bend the same shape
+# further out of true as the tiers deepen (decision 18 -- the same melody on impossible instruments).
+MUSIC_BANDS = [
+    # name, root, chord (semitones over the root), harmonics, tremolo Hz, tremolo depth
+    ("band_0_blue_collar",  "C4", (0, 4, 7),      (1.0, 0.35, 0.12),            0.0,  0.0),
+    ("band_1_white_collar", "C4", (0, 4, 7, 11),  (1.0, 0.5, 0.25, 0.12),       0.0,  0.0),
+    ("band_2_early_contact","C4", (0, 4, 7, 10),  (1.0, 0.4, 0.2, 0.1, 0.05),   3.0,  0.25),
+    ("band_3_mid",          "C4", (0, 3, 6, 10),  (1.0, 0.55, 0.3, 0.18, 0.1),  5.0,  0.35),
+    ("band_4_deep",         "C4", (0, 1, 6, 11),  (1.0, 0.6, 0.4, 0.25, 0.15),  7.0,  0.45),
+]
+
+## Seconds per music loop. Short for a soundtrack, which is fine for a placeholder and keeps the
+## repository from carrying megabytes of tone.
+MUSIC_SECONDS = 8.0
+
+
+def write_music():
+    os.makedirs(MUSIC_DIR, exist_ok=True)
+    for name, root, chord, harmonics, tremolo_hz, tremolo_depth in MUSIC_BANDS:
+        base = NOTES[root]
+        voices = []
+        for semitones in chord:
+            frequency = base * (2.0 ** (semitones / 12.0))
+            voices.append(seamless_loop(frequency, MUSIC_SECONDS, harmonics=harmonics,
+                                        tremolo_hz=tremolo_hz, tremolo_depth=tremolo_depth))
+        # Every voice was rounded to its OWN whole-cycle length, so they differ by a few samples.
+        # Mix over the shortest, which is still a whole number of cycles for that voice.
+        length = min(len(v) for v in voices)
+        mixed = [sum(v[i] for v in voices) / len(voices) for i in range(length)]
+        write_wav(name + ".wav", mixed, MUSIC_DIR)
 
 
 def verify_loops():

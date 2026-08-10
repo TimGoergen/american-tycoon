@@ -820,7 +820,11 @@ func _build_ui() -> void:
 	# concept is NOT a card — it is taught as a permanent line ON the welcome-back screen itself,
 	# see WelcomeBackOverlay: a fresh launch has no "out", and that screen is the natural home for
 	# the explanation. Tim, 2026-07-23.)
-	game.rush_momentum.vent_window_opened.connect(_on_vent_window_opened)
+	# unbind(2): the signal carries (required_lifts, duration) and this handler wants neither. Without
+	# it the call fails at every vent window — "expected 0 arguments, but called with 2" — and the tip
+	# it exists to show has never once fired. Present since the tutorial wiring went in (6f0cbf7), and
+	# invisible because a failed signal call is an error in the log, not a crash.
+	game.rush_momentum.vent_window_opened.connect(_on_vent_window_opened.unbind(2))
 	game.epoch.contact_made.connect(_on_contact_made)
 	# When the player answers the contact, the trade-deal minigame negotiates their head start
 	# on the new alien property (GDD §5.5 site 2), so the negotiation follows the narration.

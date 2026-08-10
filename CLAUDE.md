@@ -11,7 +11,14 @@ Consult the sections of `/docs` relevant to the task (don't read the docs whole 
 - **M1 Brief** — canon for the current milestone scope.
 
 Large generated data lives alongside the canon — don't read it wholesale into context:
-- **Verification:** `pwsh toolsun_gates.ps1` runs the 12 gates + a boot check (`-All` includes the
+- **`*.import` IS GITIGNORED.** Fine while a file's import settings are all DEFAULTS — CI
+  regenerates them identically. Not fine the moment you change one, because the setting then
+  exists only on your machine: it works locally and ships without it. **Change an import setting
+  -> `git add -f` that `.import`.** Everything under `game/audio/` is force-added for exactly
+  this reason: the WAV importer defaults to QOA compression and the SFX are PCM, so a lost
+  setting would mean every sample decoding on the way out. The art `.import` files that ARE
+  tracked are the ones that once needed it; the rest sit at defaults and can stay ignored.
+- **Verification:** `pwsh tools\run_gates.ps1` runs the 12 gates + a boot check (`-All` includes the
   one that needs a window). `game/sim/CLAUDE.md` says which of the 27 sim scripts are gates and which
   are studies — they are not interchangeable.
 - **`docs/Tuning_Record.md`** — where each tuning number came from: fitted vs feel-tune, and the two

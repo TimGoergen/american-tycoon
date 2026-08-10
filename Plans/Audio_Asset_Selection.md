@@ -1,6 +1,32 @@
 # Audio Asset Selection — sourcing `Plans/Audio_System.md` from the owned packs
 
 **Status:** Recommendation, nothing implemented. Written 2026-08-07.
+
+> ## ⚠️ THE EVENT NAMES BELOW ARE OUT OF DATE — read this first (2026-08-10)
+>
+> This document was written against the audio plan's *proposed* event map, before the system was
+> built. The built system has **78 cues**, not the ~24 named here, and the names are now
+> **filenames** — a cue plays whatever sits at `game/audio/cues/<cue id>.ogg`, so the id has to match
+> exactly or the file is simply never heard.
+>
+> **`game/audio/README.md` is the authoritative list** (generated from the cue table, so it cannot
+> drift). Use this document for the LIBRARY RESEARCH — which packs hold what, the measured durations,
+> and the audition candidates. Use the README for what to NAME the file you pick.
+>
+> Specific mismatches to watch, all renamed or removed:
+>
+> | Named here | Now |
+> |---|---|
+> | `collect` | **Gone.** Cycle-payout audio was built, heard, and removed — "only when the user taps to purchase" |
+> | `heat_drone`, `heat_urgency` | `heat_loop`, `urgency_loop`, and they live in `audio/loops/` |
+> | `overlay_open`, `overlay_close` | `screen_open`, `screen_close` |
+> | `button_major` | Split into `make_contact`, `mode_toggle`, `tab_switch` |
+> | `first_contact` | `ceremony_contact` plus a separate `ceremony_contact_reveal` |
+> | `hire_levelup` | `hire_levelled`, and there is now a distinct `hire_first` |
+>
+> Everything this document does not mention at all — the six minigames' own vocabularies, the shared
+> minigame beats, the ceremony beats, the denial slots — is roughly **50 further cues** with no
+> audition candidate picked yet.
 **Feeds:** `Plans/Audio_System.md` §4 (SFX event map), §5 (overdrive), §7 (asset sourcing).
 **Library audited:** 14 packs extracted to `D:\Downloads\Game_Audio` — 3,763 audio files,
 ~2,200 unique sounds, 9.8 GB. Every path below was verified to exist on disk.

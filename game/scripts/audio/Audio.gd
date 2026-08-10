@@ -19,14 +19,118 @@ extends Node
 #   3. Audio never gates gameplay. Every call is fire-and-forget; nothing here is awaited.
 #   4. Muted is a first-class state, and so is headless.
 
-## Where the sound table lives. Editing that resource is how samples get swapped.
-const CATALOG_PATH := "res://config/audio_events.tres"
+# --- WHERE SOUNDS COME FROM -------------------------------------------------------------------
+#
+# BY CONVENTION, NOT BY CONFIGURATION. A cue named `tab_switch` plays whatever is at
+# `res://audio/cues/tab_switch.ogg` (or `.wav`), and that is the whole rule — there is no manifest to
+# edit and no id that can drift from its file. Dropping a sourced sample in with the right name is
+# the entire integration step.
+#
+# This replaced a `config/audio_events.tres` catalog on 2026-08-09. The plan asked for the data to
+# live outside GDScript so samples could be swapped without code changes (§1.4); a filename lookup
+# achieves that better, because it also removes the second place a sound could be described.
+#
+# Three folders, by ROLE rather than by bus — what a sound IS predicts where it lives better than
+# which fader it happens to sit on:
+const CUES_DIR := "res://audio/cues/"        # one-shots: everything that fires and finishes
+const LOOPS_DIR := "res://audio/loops/"      # continuous layers held for as long as a state lasts
+# (music tracks live in MUSIC_DIR, named per era band — see MUSIC_BAND_FILES)
+
+## How many numbered variants a cue may have. `tap_note.wav` alone is fine; add `tap_note_1.wav` …
+## `tap_note_4.wav` and the game picks one at random per play, which is the cheapest way to stop a
+## frequently-heard sample from wearing a groove. Probed by NAME rather than by scanning the folder:
+## directory listings inside an exported PCK are a class of bug this project has already paid for
+## once (raw .svg reads, 2026-08-05), and a fixed set of candidate names cannot have that problem.
+const MAX_VARIANTS := 4
 
 const BUS_MASTER := &"Master"
 const BUS_MUSIC := &"Music"
 const BUS_SFX := &"SFX"
 const BUS_UI := &"UI"
 const BUS_CEREMONY := &"Ceremony"
+
+
+# --- THE CUE TABLE ------------------------------------------------------------------------------
+#
+# Every sound the game can make, and what it means. This is the ONE place a cue is defined: its id
+# is its filename, and the row below is everything else about it.
+#
+# Columns:
+#   bus       — which fader it answers to. SFX and UI also mark the player as PRESENT (see
+#               player_is_present); Ceremony and Music deliberately do not, because those beats
+#               happen TO the player rather than being something they did.
+#   db        — trim relative to the bus. Set in isolation for now; the mix pass balances them.
+#   cooldown  — ignore a repeat inside this many ms. Guards against one frame firing a cue twice.
+#   variance  — random pitch spread, ±fraction. MUST be 0 for anything the game pitches on purpose.
+#   layered   — the cue has a `_layer` companion sample mixed in above it at high intensity.
+#
+# A cue with NO FILE is silent and harmless: _resolve_stream returns null and play() returns. That is
+# what lets this table describe the whole design while the samples arrive one at a time.
+const CUES := {
+	# --- The core loop ---------------------------------------------------------------------------
+	&"tap_note":         {"bus": BUS_SFX, "db": -6.0, "cooldown": 45.0, "variance": 0.0},
+	&"buy_success":      {"bus": BUS_SFX, "db": -3.0, "cooldown": 60.0, "variance": 0.0, "layered": true},
+	&"hire_first":       {"bus": BUS_SFX, "db": -3.0, "cooldown": 60.0, "variance": 0.0},
+	&"hire_levelled":    {"bus": BUS_SFX, "db": -7.0, "cooldown": 60.0, "variance": 0.04},
+	&"retain_staff":     {"bus": BUS_SFX, "db": -6.0, "cooldown": 60.0, "variance": 0.03},
+	&"milestone":        {"bus": BUS_SFX, "db": -2.0, "cooldown": 200.0, "variance": 0.0},
+	&"cycle_started":    {"bus": BUS_SFX, "db": -12.0, "cooldown": 60.0, "variance": 0.05},
+	&"frenzy_pop":       {"bus": BUS_SFX, "db": -2.0, "cooldown": 300.0, "variance": 0.0},
+	&"frenzy_end":       {"bus": BUS_SFX, "db": -10.0, "cooldown": 300.0, "variance": 0.0},
+
+	# --- Rush and overdrive ----------------------------------------------------------------------
+	&"overdrive_engage": {"bus": BUS_SFX, "db": -3.0, "cooldown": 200.0, "variance": 0.0},
+	&"vent_tick":        {"bus": BUS_SFX, "db": -12.0, "cooldown": 10.0, "variance": 0.0},
+	&"vent_open":        {"bus": BUS_SFX, "db": -1.0, "cooldown": 100.0, "variance": 0.0},
+	&"vent_lift":        {"bus": BUS_SFX, "db": -6.0, "cooldown": 10.0, "variance": 0.0},
+	&"vent_success":     {"bus": BUS_SFX, "db": -2.0, "cooldown": 100.0, "variance": 0.0, "layered": true},
+	&"vent_miss":        {"bus": BUS_SFX, "db": -4.0, "cooldown": 100.0, "variance": 0.0},
+	&"overheat":         {"bus": BUS_SFX, "db": -2.0, "cooldown": 200.0, "variance": 0.0},
+	&"rush_ready":       {"bus": BUS_SFX, "db": -8.0, "cooldown": 100.0, "variance": 0.0},
+
+	# --- UI (decision 15: tabs and major actions only) --------------------------------------------
+	&"tab_switch":       {"bus": BUS_UI, "db": -10.0, "cooldown": 60.0, "variance": 0.03},
+	&"screen_open":      {"bus": BUS_UI, "db": -9.0, "cooldown": 100.0, "variance": 0.0},
+	&"screen_close":     {"bus": BUS_UI, "db": -11.0, "cooldown": 100.0, "variance": 0.0},
+	&"mode_toggle":      {"bus": BUS_UI, "db": -12.0, "cooldown": 50.0, "variance": 0.04},
+	&"epoch_page":       {"bus": BUS_UI, "db": -12.0, "cooldown": 50.0, "variance": 0.03},
+	&"make_contact":     {"bus": BUS_UI, "db": -1.0, "cooldown": 400.0, "variance": 0.0},
+	&"tip_appear":       {"bus": BUS_UI, "db": -12.0, "cooldown": 200.0, "variance": 0.0},
+
+	# --- Denials (plan §4.5, deferred by decision 15 — hooks exist, samples deliberately absent) ---
+	# Registered so the moments are named and reachable. Ship a file only if the game turns out to
+	# need it: most denials never reach code at all, because the button is already disabled and a
+	# disabled Godot button emits nothing.
+	&"denied_cash":      {"bus": BUS_UI, "db": -10.0, "cooldown": 250.0, "variance": 0.0},
+	&"denied_locked":    {"bus": BUS_UI, "db": -10.0, "cooldown": 250.0, "variance": 0.0},
+
+	# --- Challenge Mode ---------------------------------------------------------------------------
+	&"challenge_start":  {"bus": BUS_UI, "db": -6.0, "cooldown": 200.0, "variance": 0.0},
+	&"challenge_credit": {"bus": BUS_CEREMONY, "db": -4.0, "cooldown": 400.0, "variance": 0.0},
+	&"challenge_tier":   {"bus": BUS_CEREMONY, "db": -3.0, "cooldown": 400.0, "variance": 0.0},
+
+	# --- Ceremony: the story beats -----------------------------------------------------------------
+	&"ceremony_obituary":       {"bus": BUS_CEREMONY, "db": -3.0, "cooldown": 800.0, "variance": 0.0},
+	&"ceremony_will":           {"bus": BUS_CEREMONY, "db": -6.0, "cooldown": 800.0, "variance": 0.0},
+	&"ceremony_heir":           {"bus": BUS_CEREMONY, "db": -2.0, "cooldown": 800.0, "variance": 0.0},
+	&"ceremony_contact":        {"bus": BUS_CEREMONY, "db": -4.0, "cooldown": 800.0, "variance": 0.0},
+	&"ceremony_contact_reveal": {"bus": BUS_CEREMONY, "db": -2.0, "cooldown": 800.0, "variance": 0.0},
+	&"legacy_purchase":         {"bus": BUS_CEREMONY, "db": -6.0, "cooldown": 300.0, "variance": 0.0},
+	&"welcome_back":            {"bus": BUS_CEREMONY, "db": -4.0, "cooldown": 800.0, "variance": 0.0},
+	&"prestige_confirm":        {"bus": BUS_CEREMONY, "db": -2.0, "cooldown": 800.0, "variance": 0.0},
+
+	# --- Settings previews (played when a slider is released) --------------------------------------
+	&"music_preview":    {"bus": BUS_MUSIC, "db": -4.0, "cooldown": 200.0, "variance": 0.0},
+}
+
+## Cues that are deliberately NEVER played, listed so the decision is visible where the table is.
+##
+##   auto_purchase — the Acquisitions Desk buys without the player, and rule 1 says unattended events
+##                   stay silent. It cannot even reach a hook: the desk buys inside AutoPurchaseState,
+##                   in core, which never touches this layer. Silent by construction.
+##   cycle_payout  — a cycle completing was built, heard, and removed (Tim, 2026-08-09: "only when
+##                   the user taps to purchase").
+const DELIBERATELY_SILENT := [&"auto_purchase", &"cycle_payout"]
 
 ## Voices per bus, allocated once at boot and never freed (plan §1.3). Sized for the worst honest
 ## case rather than generously: SFX gets the most because the tap scale is the highest-frequency
@@ -113,8 +217,8 @@ const MUSIC_VOLUME_DB := -6.0
 
 ## The two continuous streams a ride is made of, held as their own players rather than borrowed from
 ## a pool: they start once, run for the whole ride, and are never stolen mid-ride by a tap sound.
-const HEAT_LOOP_PATH := "res://audio/sfx/heat_loop.wav"
-const URGENCY_LOOP_PATH := "res://audio/sfx/urgency_loop.wav"
+const HEAT_LOOP_NAME := "heat_loop"
+const URGENCY_LOOP_NAME := "urgency_loop"
 
 ## How far the drone rises from cold to the top of the band, in semitones. About a fifth: enough that
 ## the ear tracks the climb without the tone becoming a whistle at the ceiling.
@@ -147,8 +251,10 @@ var _voices: Dictionary = {}
 ## least recently started voice on a bus is always the one furthest around the ring.
 var _next_voice: Dictionary = {}
 
-## event id → AudioEvent, built once from the catalog.
+## cue id → its samples (one, or several if variants exist). Resolved once at boot.
 var _events: Dictionary = {}
+## cue id → the optional `_layer` sample mixed in above it at high intensity.
+var _layers: Dictionary = {}
 
 ## event id → the msec clock reading when it last played, for per-event cooldowns.
 var _last_played_ms: Dictionary = {}
@@ -234,12 +340,55 @@ func _audio_is_available() -> bool:
 	return AudioServer.get_bus_index(BUS_SFX) >= 0
 
 
+## Find every cue's sample by NAME and remember what it resolved to. Done once at boot: the probing
+## is cheap but it is not free, and a cue that fires forty times a second must not pay for it.
+##
+## A cue with no file is recorded as null and simply never sounds. That is the normal state while
+## samples are being sourced one at a time, and it is why the table can describe the whole design
+## before any of it has been recorded.
 func _load_catalog() -> void:
-	var catalog: AudioEventCatalog = load(CATALOG_PATH)
-	if catalog == null:
-		push_warning("Audio: no catalog at %s; sounds will be skipped." % CATALOG_PATH)
-		return
-	_events = catalog.index()
+	var missing: Array[String] = []
+	for id in CUES:
+		var variants := _resolve_variants(id)
+		_events[id] = variants
+		if variants.is_empty():
+			missing.append(String(id))
+		var layer_id := String(id) + "_layer"
+		var layer := _resolve_stream(CUES_DIR + layer_id)
+		if layer != null:
+			_layers[id] = layer
+	if not missing.is_empty():
+		# Not a warning per cue — a half-populated cue folder is expected, and one line is the
+		# difference between a useful note and a wall the reader learns to scroll past.
+		print("Audio: %d of %d cues have no sample yet (%s)"
+			% [missing.size(), CUES.size(), ", ".join(missing)])
+
+
+## Every sample registered for a cue: the plain name first, then any numbered variants. Returns an
+## empty array when the cue has no file at all.
+func _resolve_variants(id: StringName) -> Array[AudioStream]:
+	var found: Array[AudioStream] = []
+	var plain := _resolve_stream(CUES_DIR + String(id))
+	if plain != null:
+		found.append(plain)
+	for index in range(1, MAX_VARIANTS + 1):
+		var variant := _resolve_stream(CUES_DIR + "%s_%d" % [id, index])
+		if variant != null:
+			found.append(variant)
+	return found
+
+
+## Load `path_without_extension` as .ogg if it exists, else .wav, else null.
+##
+## .ogg FIRST so a sourced track always wins over a generated placeholder of the same name — that is
+## what makes replacing a sound a pure file drop, with no cleanup step and no chance of the old one
+## lingering because someone forgot to delete it.
+func _resolve_stream(path_without_extension: String) -> AudioStream:
+	for extension in [".ogg", ".wav"]:
+		var path: String = path_without_extension + extension
+		if ResourceLoader.exists(path):
+			return load(path)
+	return null
 
 
 func _build_voice_pools() -> void:
@@ -259,13 +408,18 @@ func _build_voice_pools() -> void:
 ## Build the two continuous overdrive streams. Allocated once at boot like everything else, and
 ## started only when a ride begins.
 func _build_heat_layer() -> void:
-	_heat_player = _make_loop_player(HEAT_LOOP_PATH)
-	_urgency_player = _make_loop_player(URGENCY_LOOP_PATH)
+	_heat_player = _make_loop_player(LOOPS_DIR + HEAT_LOOP_NAME)
+	_urgency_player = _make_loop_player(LOOPS_DIR + URGENCY_LOOP_NAME)
 
 
-func _make_loop_player(path: String) -> AudioStreamPlayer:
+func _make_loop_player(path_without_extension: String) -> AudioStreamPlayer:
 	var player := AudioStreamPlayer.new()
-	var stream: AudioStreamWAV = load(path)
+	var stream := _resolve_stream(path_without_extension)
+	if stream == null:
+		push_warning("Audio: no loop at %s.(ogg|wav); that layer will stay silent." % path_without_extension)
+		player.bus = BUS_MUSIC
+		add_child(player)
+		return player
 	# LOOPING IS SET HERE, not in the .import file. Two reasons, and the second is the important one:
 	# the WAV importer's loop setting did not survive a re-import, and `*.import` is gitignored in
 	# this repo (the audio ones are force-added), so a setting held only there is one clean checkout
@@ -274,10 +428,7 @@ func _make_loop_player(path: String) -> AudioStreamPlayer:
 	#
 	# The samples are generated with a whole number of wave cycles precisely so this seam is
 	# inaudible (see seamless_loop in tools/generate_placeholder_audio.py).
-	stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
-	stream.loop_begin = 0
-	stream.loop_end = stream.data.size() / 2   # 16-bit mono: two bytes per frame
-	player.stream = stream
+	player.stream = _apply_loop(stream)
 	# The MUSIC bus, not SFX (plan §5.3). A player who turned music off is saying they want the game
 	# quiet, and a continuous drone is the least quiet thing here — it must obey that slider.
 	player.bus = BUS_MUSIC
@@ -625,39 +776,49 @@ func _process(_delta_unused: float) -> void:
 func _play_event(event_id: StringName, intensity: float, scaled: bool, pitch := 1.0) -> void:
 	if not _enabled:
 		return
-	var event: AudioEvent = _events.get(event_id)
-	if event == null or event.stream == null:
+	var definition: Dictionary = CUES.get(event_id, {})
+	if definition.is_empty():
+		# An id with no row in the table is a typo, not a missing sample, and it would otherwise fail
+		# by being silent — the hardest kind of bug to notice in an audio system.
+		push_warning("Audio: no cue named '%s'" % event_id)
 		return
 
+	var samples: Array = _events.get(event_id, [])
+	if samples.is_empty():
+		return      # described but not yet recorded; silence is the correct behaviour
+
+	var bus: StringName = definition["bus"]
 	# MUTED COSTS NOTHING (rule 4). Bail before touching a voice, a clock, or a cooldown table.
-	if float(_bus_levels.get(event.bus, 1.0)) <= 0.0:
+	if float(_bus_levels.get(bus, 1.0)) <= 0.0:
 		return
 
 	var now := Time.get_ticks_msec()
-	if now - int(_last_played_ms.get(event_id, -100000)) < int(event.cooldown_ms):
+	if now - int(_last_played_ms.get(event_id, -100000)) < int(definition["cooldown"]):
 		return
 	_last_played_ms[event_id] = now
 
 	# PRESENCE. SFX and UI are things the player did; ceremony and music happen TO them and must not
 	# count. See player_is_present for why this inference is only safe while every sound is a direct
 	# response to a press.
-	if event.bus == BUS_SFX or event.bus == BUS_UI:
+	if bus == BUS_SFX or bus == BUS_UI:
 		_last_interaction_ms = now
 
-	var volume_db := event.volume_db
+	var volume_db: float = definition["db"]
 	if scaled:
 		volume_db += lerpf(_scaled_min_db, 0.0, intensity)
 
-	var variance := event.pitch_variance
+	var variance: float = definition.get("variance", 0.0)
 	if variance > 0.0:
 		pitch *= randf_range(1.0 - variance, 1.0 + variance)
 
-	_start(event.bus, event.stream, volume_db, pitch)
+	# One of the cue's variants, at random. With a single sample this is simply that sample.
+	_start(bus, samples[randi() % samples.size()], volume_db, pitch)
 
 	# The brighter layer rides ON TOP of the base sample, never instead of it.
-	if scaled and event.layer_stream != null and intensity >= _layer_threshold:
+	var layer: AudioStream = _layers.get(event_id)
+	if scaled and layer != null and intensity >= _layer_threshold:
 		var layer_amount := inverse_lerp(_layer_threshold, 1.0, intensity)
-		_start(event.bus, event.layer_stream, volume_db + lerpf(_scaled_min_db, 0.0, layer_amount), pitch)
+		_start(bus, layer, volume_db + lerpf(_scaled_min_db, 0.0, layer_amount), pitch)
 
 
 ## Hand a stream to a voice on `bus`, stealing the oldest if the pool is busy.

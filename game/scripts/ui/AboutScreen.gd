@@ -98,4 +98,5 @@ func open() -> void:
 
 func _on_back_pressed() -> void:
 	visible = false
+	Audio.play(&"screen_close")
 	closed.emit()

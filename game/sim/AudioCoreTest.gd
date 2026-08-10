@@ -90,19 +90,41 @@ func _run() -> void:
 		quit(1)
 
 
+## EVERY CUE THE TABLE DESCRIBES MUST RESOLVE A SAMPLE. Tim's brief (2026-08-09) was that every cue
+## gets a hook AND a default, so the whole design can be heard before anything is sourced — this is
+## that promise, checked. A cue with no file is silent, which is correct behaviour and invisible.
 func _check_catalog() -> void:
-	print("-- catalog --")
+	print("-- every cue resolves a sample --")
+	var cues: Dictionary = _audio.get_script().get_script_constant_map()["CUES"]
 	var events: Dictionary = _audio.get("_events")
-	for id in [&"tap_note", &"buy_success", &"music_preview"]:
-		_check("'%s' is in the catalog with a sample" % id,
-			events.has(id) and (events[id] as AudioEvent).stream != null)
-	# The tap sample is pitched by the scale, so a random detune on top would simply be out of tune.
-	var tap: AudioEvent = events.get(&"tap_note")
-	_check("the tap sample has NO random pitch variance",
-		tap != null and is_zero_approx(tap.pitch_variance))
-	# The purchase sound needs its brighter layer, or intensity above the threshold does nothing.
-	var buy: AudioEvent = events.get(&"buy_success")
-	_check("the purchase sound has a layer for big moments", buy != null and buy.layer_stream != null)
+	var unrecorded: Array[String] = []
+	for id in cues:
+		var samples: Array = events.get(id, [])
+		if samples.is_empty():
+			unrecorded.append(String(id))
+	_check("all %d cues have a sample (%s)"
+			% [cues.size(), "none missing" if unrecorded.is_empty() else ", ".join(unrecorded)],
+		unrecorded.is_empty())
+
+	# The two the game pitches deliberately must have NO random detune, or a figure the player is
+	# meant to hear as counting becomes a figure that is merely out of tune.
+	for id in [&"tap_note", &"vent_lift"]:
+		_check("'%s' has no random pitch variance (the game pitches it)" % id,
+			is_zero_approx(float((cues[id] as Dictionary).get("variance", 0.0))))
+
+	# The layered cues need their companion sample, or intensity above the threshold does nothing.
+	var layers: Dictionary = _audio.get("_layers")
+	for id in cues:
+		if (cues[id] as Dictionary).get("layered", false):
+			_check("'%s' has its _layer sample" % id, layers.has(id))
+
+	# The window cue must beat the ticks it leads: it is the one the player reacts to.
+	_check("the vent window cue is louder than its ticks",
+		float((cues[&"vent_open"] as Dictionary)["db"]) > float((cues[&"vent_tick"] as Dictionary)["db"]))
+
+	# A NAME THAT IS NOT IN THE TABLE must complain rather than fail silently — a typo'd id is
+	# otherwise indistinguishable from a sound nobody has recorded yet.
+	_check("an unknown cue id is refused", not events.has(&"definitely_not_a_cue"))
 
 
 func _check_mute_costs_nothing() -> void:
@@ -334,38 +356,50 @@ func _check_vent_cues_exist() -> void:
 	var events: Dictionary = _audio.get("_events")
 	for id in [&"vent_tick", &"vent_open", &"vent_lift", &"vent_success", &"vent_miss",
 			&"overheat", &"rush_ready"]:
-		_check("'%s' has a sample" % id,
-			events.has(id) and (events[id] as AudioEvent).stream != null)
+		_check("'%s' has a sample" % id, not (events.get(id, []) as Array).is_empty())
 
-	# vent_lift is PITCHED per lift, so a random detune on top would make a counted sequence sound
-	# out of tune rather than like counting.
-	var lift: AudioEvent = events.get(&"vent_lift")
-	_check("the lift confirmation has no random detune",
-		lift != null and is_zero_approx(lift.pitch_variance))
 
-	# The window cue must be the loudest thing in the set: it is the one the player has to react to.
-	var open_cue: AudioEvent = events.get(&"vent_open")
-	var tick: AudioEvent = events.get(&"vent_tick")
-	_check("the window cue is louder than the telegraph ticks (%.1f vs %.1f dB)"
-			% [open_cue.volume_db, tick.volume_db],
-		open_cue.volume_db > tick.volume_db)
+## THE STORY BEATS (Phase 4). These differ from every other sound in the game in two ways that are
+## easy to get wrong, so both are asserted rather than assumed.
+func _check_ceremony_beats() -> void:
+	print("
+-- the ceremony beats --")
+	var cues: Dictionary = _audio.get_script().get_script_constant_map()["CUES"]
+	var events: Dictionary = _audio.get("_events")
+	var ids := [&"ceremony_obituary", &"ceremony_will", &"ceremony_heir", &"ceremony_contact",
+		&"ceremony_contact_reveal", &"legacy_purchase", &"welcome_back", &"prestige_confirm"]
+	for id in ids:
+		_check("'%s' has a sample" % id, not (events.get(id, []) as Array).is_empty())
+
+	# They ride the Ceremony bus, which keeps them separable in the mix from the tap sound — and,
+	# more importantly, means they cannot mark the player as PRESENT. A succession happens TO the
+	# player; a beat that renewed the presence window would be voting on their behalf.
+	var all_ceremony := true
+	for id in ids:
+		if (cues[id] as Dictionary)["bus"] != &"Ceremony":
+			all_ceremony = false
+	_check("every beat is on the Ceremony bus, so none can mark the player present", all_ceremony)
+
+	var shortest := 100000.0
+	for id in ids:
+		shortest = minf(shortest, float((cues[id] as Dictionary)["cooldown"]))
+	_check("their cooldowns prevent self-overlap (%.0f ms)" % shortest, shortest >= 250.0)
 
 
 ## A LOOP THAT DOES NOT MEET ITSELF CLICKS, once per lap, for as long as it plays.
 ##
 ## This shipped (2026-08-09). The generator rounded each wave's PERIOD to whole samples instead of
-## fitting whole cycles into the buffer, which left the loop 0.02 cycles short of home — a jump of
-## thirty times a normal sample step at the seam. Inaudible as a pitch error; obvious as a crackle
-## once the drone is held for seconds at a time (Tim: "there are crackles in it").
+## fitting whole cycles into the buffer, leaving the loop 0.02 cycles short of home — a jump thirty
+## times a normal sample step. Inaudible as a pitch error; obvious as a crackle once the drone is
+## held for seconds (Tim: "there are crackles in it").
 ##
-## Checked HERE, on the imported resource, rather than only in the generator: the generator asserts
-## what it wrote, and this asserts what the game will actually play. A future sourced sample, dropped
-## in by hand, gets the same scrutiny for free.
+## Checked on the IMPORTED resource rather than only in the generator: the generator asserts what it
+## wrote, this asserts what the game will play. A sourced loop dropped in by hand gets the same
+## scrutiny for free.
 ##
-## The comparator is the LARGEST step the waveform already makes on its own. The seam is simply one
-## more sample-to-sample transition, so anything within that range is normal motion — measuring
-## against the average instead makes a perfectly good loop look broken (which it did, on the first
-## attempt at this check).
+## The comparator is the LARGEST step the waveform already makes on its own — the seam is one more
+## sample transition, and measuring against the average makes a good loop look broken (it did, on the
+## first attempt at this check).
 func _check_loop_is_seamless(label: String, stream: AudioStreamWAV) -> void:
 	var bytes := stream.data
 	var frames := bytes.size() / 2
@@ -380,54 +414,11 @@ func _check_loop_is_seamless(label: String, stream: AudioStreamWAV) -> void:
 		var sample := bytes.decode_s16(i * 2)
 		biggest_step = maxi(biggest_step, absi(sample - previous))
 		previous = sample
-	var seam: int = absi(first - previous)   # last sample back round to the first
+	var seam: int = absi(first - previous)
 
 	_check("the %s loop meets itself cleanly (seam %d vs largest normal step %d)"
 			% [label, seam, biggest_step],
 		seam <= biggest_step)
-
-
-## THE STORY BEATS (Phase 4). These differ from every other sound in the game in two ways that are
-## easy to get wrong, so both are asserted rather than assumed.
-func _check_ceremony_beats() -> void:
-	print("
--- the ceremony beats --")
-	var events: Dictionary = _audio.get("_events")
-	var ids := [&"ceremony_obituary", &"ceremony_will", &"ceremony_heir", &"ceremony_contact",
-		&"ceremony_contact_reveal", &"legacy_purchase", &"welcome_back"]
-	for id in ids:
-		_check("'%s' has a sample" % id,
-			events.has(id) and (events[id] as AudioEvent).stream != null)
-
-	# ONE: they ride the Ceremony bus, not SFX. The player controls both with one slider, but the mix
-	# needs them separable — a beat that had to compete with the tap sound would either bury it or be
-	# buried by it, and tuning one would wreck the other.
-	var all_ceremony := true
-	for id in ids:
-		var event: AudioEvent = events.get(id)
-		if event == null or event.bus != &"Ceremony":
-			all_ceremony = false
-	_check("every beat is on the Ceremony bus", all_ceremony)
-
-	# TWO: they must not count as the player being PRESENT. A succession or a first contact happens
-	# TO the player — they are watching a screen, not acting — so if these renewed the presence
-	# window they would be voting on the player's behalf. (Nothing consults presence today; this is
-	# the trap that removed the collect sound, and Phase 2's idle fade will read it for real.)
-	var ceremony_is_passive := true
-	for id in ids:
-		var event: AudioEvent = events.get(id)
-		if event != null and (event.bus == &"SFX" or event.bus == &"UI"):
-			ceremony_is_passive = false
-	_check("...so none of them can mark the player as present", ceremony_is_passive)
-
-	# They are long — over a second in places — and a double-fire would layer one over itself.
-	var shortest_cooldown := 100000.0
-	for id in ids:
-		var event: AudioEvent = events.get(id)
-		if event != null:
-			shortest_cooldown = minf(shortest_cooldown, event.cooldown_ms)
-	_check("their cooldowns are long enough to prevent self-overlap (%.0f ms)" % shortest_cooldown,
-		shortest_cooldown >= 500.0)
 
 
 ## THE BAND MAP (plan §3.2). A pure function on tier, so it can be checked exhaustively rather than

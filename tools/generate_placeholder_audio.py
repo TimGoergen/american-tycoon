@@ -34,7 +34,8 @@ SAMPLE_RATE = 44100
 PEAK = 0.5
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT_DIR = os.path.join(ROOT, "game", "audio", "sfx")
+OUT_DIR = os.path.join(ROOT, "game", "audio", "cues")
+LOOPS_DIR = os.path.join(ROOT, "game", "audio", "loops")
 MUSIC_DIR = os.path.join(ROOT, "game", "audio", "music")
 
 # Equal-temperament note frequencies used below, so the tones sit in a real scale rather than on
@@ -199,7 +200,7 @@ def main():
     # replacing it. Same two notes an octave up plus a third, so it reads as "more of that", not as a
     # different sound. (Intensity drives volume and layering, never pitch -- pitch belongs to the tap
     # scale and the two must not collide.)
-    write_wav("buy_success_bright.wav", sequence([
+    write_wav("buy_success_layer.wav", sequence([
         (0.000, tone(NOTES["E6"], 0.14, harmonics=(1.0, 0.4, 0.2, 0.1), curve=4.0)),
         (0.085, tone(NOTES["C6"] * 2.0, 0.30, harmonics=(1.0, 0.35, 0.15), curve=3.0)),
     ]))
@@ -215,6 +216,7 @@ def main():
     write_rush_layer()
     write_vent_cues()
     write_ceremony()
+    write_remaining_cues()
     write_music()
 
 
@@ -227,11 +229,11 @@ def write_rush_layer():
     becomes something to endure.
     """
     write_wav("heat_loop.wav", seamless_loop(
-        NOTES["A2"], 1.0, harmonics=(1.0, 0.45, 0.18, 0.07)))
+        NOTES["A2"], 1.0, harmonics=(1.0, 0.45, 0.18, 0.07)), LOOPS_DIR)
     # Faster, brighter, and pulsing: the approach to overheat should be audible before it is visible.
     write_wav("urgency_loop.wav", seamless_loop(
         NOTES["E3"], 1.0, harmonics=(1.0, 0.6, 0.35, 0.2, 0.1),
-        tremolo_hz=9.0, tremolo_depth=0.55))
+        tremolo_hz=9.0, tremolo_depth=0.55), LOOPS_DIR)
 
 
 def write_vent_cues():
@@ -257,6 +259,14 @@ def write_vent_cues():
         (0.070, tone(NOTES["E5"], 0.12, harmonics=(1.0, 0.4, 0.2), curve=5.0)),
         (0.140, tone(NOTES["A5"], 0.40,
                      harmonics=(1.0, 0.5, 0.25, 0.12), curve=2.8)),
+    ]))
+
+    # The success LAYER, mixed in above the base at a deep vent tier: the same resolution an octave
+    # up, so a hard-won vent reads as more of the same sound rather than a different one.
+    write_wav("vent_success_layer.wav", sequence([
+        (0.000, tone(NOTES["C5"] * 2.0, 0.10, harmonics=(1.0, 0.5, 0.25), curve=5.0)),
+        (0.070, tone(NOTES["E5"] * 2.0, 0.10, harmonics=(1.0, 0.45, 0.2), curve=5.0)),
+        (0.140, tone(NOTES["A5"] * 2.0, 0.34, harmonics=(1.0, 0.5, 0.25, 0.12), curve=3.0)),
     ]))
 
     # MISSED — falling, and unresolved. It fires just before the overheat, so it is the "you blew
@@ -369,11 +379,98 @@ def write_music():
         write_wav(name + ".wav", mixed, MUSIC_DIR)
 
 
+def write_remaining_cues():
+    """Defaults for the cues that had no sound yet (Tim, 2026-08-09: every cue gets a hook AND a
+    default, so the whole design can be heard before a single sample is sourced).
+
+    Each is built from the same handful of shapes as the rest -- a rise means progress, a fall means
+    loss, a bare thud means a wall -- so a placeholder still tells the player what happened even
+    though none of them is the sound the game will ship with."""
+    # STAFF. First hire is an arrival and lands; a level-up is the same gesture, smaller and higher.
+    write_wav("hire_first.wav", sequence([
+        (0.000, tone(NOTES["G4"], 0.14, harmonics=(1.0, 0.4, 0.15), curve=4.0)),
+        (0.090, tone(NOTES["C5"], 0.30, harmonics=(1.0, 0.35, 0.15), curve=3.0)),
+    ]))
+    write_wav("hire_levelled.wav", tone(NOTES["E5"], 0.16, harmonics=(1.0, 0.3), curve=5.0))
+    write_wav("retain_staff.wav", tone(NOTES["A4"], 0.20, harmonics=(1.0, 0.35, 0.12), curve=4.0))
+
+    # A MILESTONE is an automatic reward, so it announces itself: a bell-like third.
+    write_wav("milestone.wav", sequence([
+        (0.000, tone(NOTES["C5"], 0.18, harmonics=(1.0, 0.5, 0.3, 0.15), curve=3.5)),
+        (0.000, tone(NOTES["E5"], 0.45, harmonics=(1.0, 0.45, 0.25, 0.12), curve=2.6)),
+    ]))
+    # Starting an idle cycle by hand: quiet, mechanical, and NOT a payout -- it is the machine
+    # turning over, and it must not be mistaken for money arriving.
+    write_wav("cycle_started.wav", tone(NOTES["A3"], 0.07, harmonics=(1.0, 0.6, 0.3), curve=7.0))
+
+    # FRENZY: a bright rush up on the pop, a soft settle when it lapses.
+    write_wav("frenzy_pop.wav", sequence([
+        (0.000, glide(NOTES["C5"], NOTES["C6"], 0.30, harmonics=(1.0, 0.4, 0.2), curve=2.5)),
+        (0.120, tone(NOTES["E6"], 0.34, harmonics=(1.0, 0.35), curve=3.0)),
+    ]))
+    write_wav("frenzy_end.wav", glide(NOTES["C5"], NOTES["G4"], 0.40,
+                                      harmonics=(1.0, 0.25), curve=2.2))
+    # ENGAGING OVERDRIVE: a rising swell, the counterpart to the overheat thud.
+    write_wav("overdrive_engage.wav", sequence([
+        (0.000, glide(NOTES["A3"], NOTES["A4"], 0.45, harmonics=(1.0, 0.4, 0.2, 0.1), curve=2.0)),
+        (0.150, tone(NOTES["E5"], 0.30, harmonics=(1.0, 0.3), curve=3.0)),
+    ]))
+
+    # UI. All small, all dry: these fire constantly and must never draw attention to themselves.
+    write_wav("tab_switch.wav", tone(NOTES["A4"], 0.045, harmonics=(1.0, 0.7, 0.4), curve=9.0))
+    write_wav("screen_open.wav", sequence([
+        (0.000, tone(NOTES["E4"], 0.06, harmonics=(1.0, 0.4), curve=7.0)),
+        (0.040, tone(NOTES["A4"], 0.14, harmonics=(1.0, 0.3), curve=5.0)),
+    ]))
+    write_wav("screen_close.wav", sequence([
+        (0.000, tone(NOTES["A4"], 0.06, harmonics=(1.0, 0.4), curve=7.0)),
+        (0.040, tone(NOTES["E4"], 0.14, harmonics=(1.0, 0.3), curve=5.0)),
+    ]))
+    write_wav("mode_toggle.wav", tone(NOTES["C5"], 0.04, harmonics=(1.0, 0.8, 0.5), curve=10.0))
+    write_wav("epoch_page.wav", tone(NOTES["G4"], 0.05, harmonics=(1.0, 0.5), curve=8.0))
+    write_wav("tip_appear.wav", tone(NOTES["F5"], 0.12, harmonics=(1.0, 0.3), curve=5.0))
+    # MAKE CONTACT is the biggest button in the game: a wide, opening chord.
+    write_wav("make_contact.wav", sequence([
+        (0.000, tone(NOTES["C4"], 0.55, harmonics=(1.0, 0.45, 0.2), curve=2.4, attack=0.02)),
+        (0.060, tone(NOTES["G4"], 0.50, harmonics=(1.0, 0.4, 0.18), curve=2.4, attack=0.02)),
+        (0.120, tone(NOTES["E5"], 0.60, harmonics=(1.0, 0.5, 0.25, 0.1), curve=2.2, attack=0.02)),
+    ]))
+
+    # DENIALS. A wall, not a punishment: low, short, unresolved, and quiet enough to ignore.
+    write_wav("denied_cash.wav", tone(NOTES["F3"], 0.10, harmonics=(1.0, 0.3), curve=6.0))
+    write_wav("denied_locked.wav", sequence([
+        (0.000, tone(NOTES["F3"], 0.07, harmonics=(1.0, 0.3), curve=7.0)),
+        (0.070, tone(NOTES["F3"], 0.12, harmonics=(1.0, 0.3), curve=6.0)),
+    ]))
+
+    # CHALLENGE MODE.
+    write_wav("challenge_start.wav", sequence([
+        (0.000, tone(NOTES["C5"], 0.10, harmonics=(1.0, 0.4), curve=5.0)),
+        (0.070, tone(NOTES["G5"], 0.26, harmonics=(1.0, 0.35), curve=3.5)),
+    ]))
+    write_wav("challenge_credit.wav", sequence([
+        (0.000, tone(NOTES["E5"], 0.12, harmonics=(1.0, 0.4, 0.2), curve=4.0)),
+        (0.080, tone(NOTES["A5"], 0.36, harmonics=(1.0, 0.45, 0.2), curve=2.8)),
+    ]))
+    # Climbing a tier of the ladder: the same figure, one rung higher and wider.
+    write_wav("challenge_tier.wav", sequence([
+        (0.000, tone(NOTES["A4"], 0.12, harmonics=(1.0, 0.4), curve=4.0)),
+        (0.080, tone(NOTES["E5"], 0.12, harmonics=(1.0, 0.4), curve=4.0)),
+        (0.160, tone(NOTES["A5"], 0.45, harmonics=(1.0, 0.5, 0.25), curve=2.4)),
+    ]))
+
+    # PRESTIGE CONFIRMED: the deep, deliberate beat before the succession screens take over.
+    write_wav("prestige_confirm.wav", sequence([
+        (0.000, tone(NOTES["F2"], 0.90, harmonics=(1.0, 0.3, 0.12), curve=1.8, attack=0.04)),
+        (0.180, tone(NOTES["C4"], 0.70, harmonics=(1.0, 0.35), curve=2.2, attack=0.04)),
+    ]))
+
+
 def verify_loops():
     """Assert every loop actually loops. A seam click is inaudible as a defect in isolation and
     obvious as a crackle once the sound is held for seconds, so it gets checked rather than trusted."""
     for name in ["heat_loop", "urgency_loop"]:
-        path = os.path.join(OUT_DIR, name + ".wav")
+        path = os.path.join(LOOPS_DIR, name + ".wav")
         with wave.open(path, "rb") as handle:
             count = handle.getnframes()
             data = struct.unpack("<%dh" % count, handle.readframes(count))

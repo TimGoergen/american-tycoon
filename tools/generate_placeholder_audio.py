@@ -220,6 +220,7 @@ def main():
     write_minigame_cues()
     write_basketball_cues()
     write_match_three_cues()
+    write_catch_money_cues()
     write_music()
 
 
@@ -599,6 +600,39 @@ def write_match_three_cues():
         (0.080, tone(NOTES["A5"], 0.12, harmonics=(1.0, 0.45, 0.2), curve=4.2)),
         (0.160, tone(NOTES["C5"] * 2.0, 0.44, harmonics=(1.0, 0.5, 0.28, 0.14), curve=2.5)),
     ]))
+
+
+def write_catch_money_cues():
+    """Catch Money. The busiest game of the six — coins arrive every 0.6s and a good player catches
+    nearly all of them, so `catch_coin` is the most-repeated sound in the whole build. It gets four
+    variants and is deliberately the smallest thing here: a coin landing in a hand, not a fanfare."""
+    for index in range(1, 5):
+        # Four coins, each a slightly different bright tick. Pitch spread across the set as well as
+        # the random variance the table adds, so consecutive catches rarely land the same twice.
+        write_wav("catch_coin_%d.wav" % index, sequence([
+            (0.000, noise_burst(0.025, curve=10.0)),
+            (0.000, tone(NOTES["C5"] * (1.0 + 0.06 * index), 0.06,
+                         harmonics=(1.0, 0.5, 0.25), curve=8.0)),
+        ]))
+    # PREMIUM: worth several catches, so it sounds like several — a quick double, scaled by value.
+    write_wav("catch_premium.wav", sequence([
+        (0.000, tone(NOTES["E5"], 0.07, harmonics=(1.0, 0.45, 0.2), curve=6.0)),
+        (0.050, tone(NOTES["A5"], 0.22, harmonics=(1.0, 0.45, 0.22), curve=4.0)),
+    ]))
+    # LEGACY: the jackpot coin, and the only one that pays the dynasty.
+    write_wav("catch_legacy.wav", sequence([
+        (0.000, tone(NOTES["A4"], 0.10, harmonics=(1.0, 0.45, 0.2), curve=4.5)),
+        (0.070, tone(NOTES["E5"], 0.10, harmonics=(1.0, 0.45, 0.2), curve=4.5)),
+        (0.140, tone(NOTES["A5"], 0.42, harmonics=(1.0, 0.5, 0.28, 0.14), curve=2.5)),
+    ]))
+    # MISS: a coin hitting the floor. Dull and low — the absence of a catch, not a buzzer. In
+    # challenge mode it already costs time, and the game should not scold on top of that.
+    write_wav("catch_miss.wav", sequence([
+        (0.000, noise_burst(0.06, curve=7.0)),
+        (0.000, tone(NOTES["F2"], 0.11, harmonics=(1.0, 0.25), curve=6.0)),
+    ]))
+    # SPAWN: almost nothing. Its job is to make the late-round RATE audible, not to announce a coin.
+    write_wav("catch_spawn.wav", noise_burst(0.022, curve=12.0))
 
 
 def verify_loops():

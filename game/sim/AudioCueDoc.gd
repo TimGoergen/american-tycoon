@@ -80,6 +80,11 @@ const TRIGGERS := {
 	&"m3_fall": "The refill drops into the gaps. Once per step, not once per gem.",
 	&"m3_avoid": "A match that hit the AVOID gem — this game's one real mistake, and a large score penalty.",
 	&"m3_legacy": "A Legacy gem is collected — the only thing in this game that pays the dynasty.",
+	&"catch_coin": "An ordinary coin caught. The most-repeated sound in the game — four variants, and the smallest thing in the build.",
+	&"catch_premium": "A premium coin caught, worth several ordinary ones. Scaled by its value.",
+	&"catch_legacy": "The JACKPOT coin — the only one that pays the dynasty.",
+	&"catch_miss": "A coin reaches the floor uncaught.",
+	&"catch_spawn": "A coin appears. Almost inaudible on purpose: its job is to make the late-round spawn RATE audible, not to announce a coin.",
 	&"music_preview": "Releasing the MUSIC slider in Settings.",
 }
 
@@ -174,6 +179,8 @@ func _cue_tables(cues: Dictionary, constants: Dictionary) -> String:
 		"Challenge Mode": [&"challenge_start", &"challenge_credit", &"challenge_tier"],
 		"Minigames — the shared beats": [&"minigame_begin", &"minigame_score", &"minigame_miss",
 			&"minigame_countdown", &"minigame_best", &"minigame_over"],
+		"Catch Money": [&"catch_coin", &"catch_premium", &"catch_legacy", &"catch_miss",
+			&"catch_spawn"],
 		"Match Three": [&"m3_select", &"m3_swap", &"m3_invalid", &"m3_match", &"m3_fall",
 			&"m3_avoid", &"m3_legacy"],
 		"Basketball": [&"bball_grab", &"bball_launch", &"bball_fizzle", &"bball_wall",
@@ -185,7 +192,7 @@ func _cue_tables(cues: Dictionary, constants: Dictionary) -> String:
 		"Settings": [&"music_preview"],
 	}
 	var order := ["The core loop", "Rush and overdrive", "Interface", "Denials (reserved)",
-		"Challenge Mode", "Minigames — the shared beats", "Basketball", "Match Three", "Ceremony — the story beats", "Settings"]
+		"Challenge Mode", "Minigames — the shared beats", "Basketball", "Match Three", "Catch Money", "Ceremony — the story beats", "Settings"]
 
 	var text := "## The cues\n\nBus decides which slider governs a sound, and whether it counts as"
 	text += " the player being *present* (SFX and UI do; Ceremony and Music do not).\n"
@@ -258,7 +265,7 @@ tuning, and a wobble on top is simply out of tune.
 
 ## The minigames
 
-**Basketball and Match Three are done; the other four are not.** The six games share the beats above — begin, score, miss, countdown, new best, over — and each
+**Basketball, Match Three and Catch Money are done; the other three are not.** The six games share the beats above — begin, score, miss, countdown, new best, over — and each
 game's own vocabulary (a swish, a match, a caught coin, a flipped pad) is a LATER PASS, deliberately.
 Getting the shared layer right first means every game already sounds like it belongs to this game
 before any of them sounds like itself.

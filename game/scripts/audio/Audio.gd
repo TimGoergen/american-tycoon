@@ -162,6 +162,16 @@ const CUES := {
 	&"m3_avoid":    {"bus": BUS_SFX, "db": -5.0, "cooldown": 150.0, "variance": 0.0},
 	&"m3_legacy":   {"bus": BUS_CEREMONY, "db": -4.0, "cooldown": 300.0, "variance": 0.0},
 
+	# --- Catch Money ------------------------------------------------------------------------------
+	# The busiest game of the six: coins spawn every 0.6s and a good player catches nearly all of
+	# them, so the ordinary catch is the single most-repeated sound in the build. It is the quietest
+	# and shortest thing here, and it carries the most variants.
+	&"catch_coin":    {"bus": BUS_SFX, "db": -10.0, "cooldown": 25.0, "variance": 0.07},
+	&"catch_premium": {"bus": BUS_SFX, "db": -5.0, "cooldown": 60.0, "variance": 0.03},
+	&"catch_legacy":  {"bus": BUS_CEREMONY, "db": -4.0, "cooldown": 300.0, "variance": 0.0},
+	&"catch_miss":    {"bus": BUS_SFX, "db": -12.0, "cooldown": 60.0, "variance": 0.06},
+	&"catch_spawn":   {"bus": BUS_SFX, "db": -22.0, "cooldown": 25.0, "variance": 0.10},
+
 	# --- Settings previews (played when a slider is released) --------------------------------------
 	&"music_preview":    {"bus": BUS_MUSIC, "db": -4.0, "cooldown": 200.0, "variance": 0.0},
 }

@@ -127,6 +127,16 @@ Bus decides which slider governs a sound, and whether it counts as the player be
 | `m3_avoid` | SFX | -5 | 150 ms | A match that hit the AVOID gem — this game's one real mistake, and a large score penalty. |
 | `m3_legacy` | Ceremony | -4 | 300 ms | A Legacy gem is collected — the only thing in this game that pays the dynasty. |
 
+### Catch Money
+
+| Cue / filename | Bus | dB | Cooldown | Fires when |
+|---|---|---|---|---|
+| `catch_coin` | SFX | -10 | 25 ms | An ordinary coin caught. The most-repeated sound in the game — four variants, and the smallest thing in the build. |
+| `catch_premium` | SFX | -5 | 60 ms | A premium coin caught, worth several ordinary ones. Scaled by its value. |
+| `catch_legacy` | Ceremony | -4 | 300 ms | The JACKPOT coin — the only one that pays the dynasty. |
+| `catch_miss` | SFX | -12 | 60 ms | A coin reaches the floor uncaught. |
+| `catch_spawn` | SFX | -22 | 25 ms | A coin appears. Almost inaudible on purpose: its job is to make the late-round spawn RATE audible, not to announce a coin. |
+
 ### Ceremony — the story beats
 
 | Cue / filename | Bus | dB | Cooldown | Fires when |
@@ -190,7 +200,7 @@ tuning, and a wobble on top is simply out of tune.
 
 ## The minigames
 
-**Basketball and Match Three are done; the other four are not.** The six games share the beats above — begin, score, miss, countdown, new best, over — and each
+**Basketball, Match Three and Catch Money are done; the other three are not.** The six games share the beats above — begin, score, miss, countdown, new best, over — and each
 game's own vocabulary (a swish, a match, a caught coin, a flipped pad) is a LATER PASS, deliberately.
 Getting the shared layer right first means every game already sounds like it belongs to this game
 before any of them sounds like itself.

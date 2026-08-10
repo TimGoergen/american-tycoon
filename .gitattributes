@@ -1,0 +1,45 @@
+# Line-ending policy.
+#
+# WHY THIS EXISTS. core.autocrlf=true is set globally on the dev machine, and Godot writes its
+# text formats with LF. Without this file git wants CRLF in the working tree for files the engine
+# keeps rewriting as LF, so `git status` showed 95 modified .import files whose `git diff` was
+# completely empty. The next `git add -A` would have committed 95 meaningless line-ending changes
+# and buried the real diff underneath them.
+#
+# The rule: anything Godot writes stays LF, anything Windows tooling runs stays CRLF, and binaries
+# are never touched.
+
+* text=auto
+
+# ── Godot text formats — the engine writes these as LF ──────────────────────────
+*.gd        text eol=lf
+*.tres      text eol=lf
+*.tscn      text eol=lf
+*.import    text eol=lf
+*.godot     text eol=lf
+*.cfg       text eol=lf
+*.uid       text eol=lf
+
+# SVG is text and is imported by Godot, not authored by Windows tools.
+*.svg       text eol=lf
+
+# ── Documentation ───────────────────────────────────────────────────────────────
+*.md        text eol=lf
+*.json      text eol=lf
+*.py        text eol=lf
+*.yml       text eol=lf
+
+# ── Windows-native tooling — these are run by PowerShell / cmd / Inno Setup ─────
+*.ps1       text eol=crlf
+*.bat       text eol=crlf
+*.iss       text eol=crlf
+
+# ── Binary — never normalize, never diff ────────────────────────────────────────
+*.png       binary
+*.jpg       binary
+*.psd       binary
+*.wav       binary
+*.ogg       binary
+*.keystore  binary
+*.apk       binary
+*.exe       binary

@@ -1,6 +1,8 @@
 # Audio System — Implementation Plan
 
-**Status:** Planned, not started. Written 2026-08-06 from an interview with Tim.
+**Status:** Phases 0, 1 and 3 BUILT (2026-08-08/09). Tim on the Phase 1 slice: "the sound on buy and
+tap are good". Phase 3 (overdrive) was brought forward ahead of Phase 2 because rush is central to
+how he plays. Phases 2, 4, 5 not started. Written 2026-08-06 from an interview with Tim.
 **Graduates:** GDD §12 (Art & Audio Direction), §13 M3 milestone entry "audio implementation
 (exotica/muzak per §12)", and GDD §11 open item "Sound & haptics design — remaining open:
 haptics and per-event sound mapping."
@@ -36,9 +38,11 @@ unmerged work that this plan's event map depends on:
 | `feature/auto-purchase-and-bulk-hire` | **Acquisitions Desk** (auto-buy) and **Head Hunters** (bulk hire). The interview decision "auto-buys are silent" (§4.4) is unimplementable until this merges — the code has no auto-buy at all today. |
 | `feature/civs-12-26` | The 27-tier epoch ladder. §3.2's era-band → track mapping assumes 27 tiers. |
 
-**Recommendation:** land audio *after* both merge, or accept that the auto-buy silencing
-and the deep-band music mapping are follow-ups. Building the audio branch off `main`
-today would produce an event map that goes stale on the next merge.
+**RESOLVED 2026-08-08 — both branches are merged to `main`,** so this dependency is discharged and
+the event map below is current. One correction to §4.4 fell out of it: the Acquisitions Desk buys
+inside `AutoPurchaseState`, in core, and never reaches `buy_requested` at all. **Auto-buys are silent
+by construction rather than by a check**, which is a stronger guarantee than the plan asked for — so
+the source enum shipped with two values (`PLAYER_TAP`, `HOLD_REPEAT`) and no `AUTO_PURCHASE`.
 
 ### 0.3 Decisions taken (Tim, 2026-08-06 interview)
 
@@ -59,7 +63,7 @@ Every row below is a decision, not a suggestion. Do not relitigate.
 | 11 | Bespoke ceremony audio | **Succession/obituary**, **First Contact / epoch arrival**, **Legacy upgrade purchase**. *Final Dollar deliberately excluded* (M4, not built) |
 | 12 | Sequencing | **Vertical slice first**, then phased |
 | 13 | Auto-purchase sound | **Silent — visual only** (the green count-chip wash already covers it) |
-| 14 | First slice | **Tap → buy → collect** |
+| 14 | First slice | **Tap → buy → collect** (collect later dropped — see §4.3) |
 | 15 | UI sounds | **Tabs and major actions only** |
 | 16 | Hard constraint | **Battery/CPU** — streaming vs in-memory, voice-count limits |
 | 17 | Earth musical style | **Department-store muzak** |
@@ -322,10 +326,32 @@ no signal today and needs one added.
 | **Cycle payout** | `PropertyState.gd:557 _collect()` — single chokepoint for *every* payout, passive and rushed | **new hook** |
 | **Count milestone** | `Main.gd:1848` (`if prop.get_milestone_band() > band_before:`) — already computed for the tutorial tip | call site exists |
 
-**The tap scale (decision 2, 6).** A fixed pentatonic set (C-D-E-G-A across ~1.5 octaves),
-climbing one step per tap, decaying back to the root after
-`audio_tap_scale_reset_seconds` (proposed 1.0 s) of no tapping, capped at the top of the
-range. Fixed scale, not keyed to the current track (decision 6) — so it is one sample set
+**The tap scale (decision 2, 6).** A fixed pentatonic set (C-D-E-G-A), advancing one step per tap
+and dropping back to the root after `audio_tap_scale_reset_seconds` (1.0 s) of no tapping.
+
+**REVISED 2026-08-08.** This originally said "capped at the top of the range", and that cap was the
+problem: a sustained run climbed ten notes and then hammered the top note for as long as tapping
+continued (Tim: *"it becomes a single highly repetitive sound... it would be nice for the sound to
+have some kind of movement in the cycle over time"*). The figure now **rises to the top and falls
+back**, over two octaves, so a lap is twenty taps and the pitch is always moving. Fast tapping reads
+as a rolling figure rather than as a note stuck on repeat.
+
+**AND THE DRIFT, same day** (Tim: *"I like the idea of rotating the starting degree each lap"*). The
+rise-and-fall now happens inside a **window of 8 degrees that slides across a 16-note set**, moving
+two degrees per lap and itself rising and falling. So there are two movements at once: the fast one
+inside a lap (14 taps, ~2 seconds of hard tapping) and the slow one across laps (8 laps, 112 taps,
+~20 seconds). Nothing repeats exactly until the whole cycle comes home.
+
+Two details that took a wrong turn each, recorded so they are not re-tried:
+
+- **The window slides; it does not rotate.** Rotating a fixed pitch set wraps the top note round to
+  the bottom mid-figure, putting an octave-plus drop inside what should be a smooth rise.
+- **The drift is two degrees, not one.** A lap ends one degree above its window's root, so a drift of
+  one opens the next lap on the pitch that just played — a stutter every 14 taps, which is the exact
+  artifact the turns are shaped to avoid. Two lands the new lap one step above it instead.
+
+Seams are a single scale step while the window climbs and up to a sixth while it falls back. The
+sixth is left alone: it is an ordinary melodic interval, not an artifact. Fixed scale, not keyed to the current track (decision 6) — so it is one sample set
 pitch-shifted, or a small bank of pre-pitched samples.
 
 Implementation note: pitch-shift a single sample via `AudioStreamPlayer.pitch_scale` using
@@ -357,23 +383,27 @@ Staff hire splits on `PropertyState.gd:247 add_staff_level()` — `staff_level =
 **first hire** (a distinct, more satisfying sound; it also starts the cycle at `:250`),
 anything above is a level-up.
 
-### 4.3 Collect — the fatigue trap
+### 4.3 Cycle payouts — NO AUDIO (Tim, 2026-08-08)
 
-`_collect()` fires for **every property, every cycle**, and cycle lengths go down to
-0.54 s at the fast end of the ladder. With a wide portfolio this is dozens of payouts per
-second. A "cha-ching" per payout is unshippable.
+**Reversed.** This section originally specified aggregated collect audio: sum payouts over a ~250 ms
+window, play one sound scaled to the aggregate, and stay silent unless the player had acted within
+~2 s. It was built that way in Phase 1 and removed the same day.
 
-Rules:
-- Collect audio is **aggregated, not per-event**. Accumulate payouts over a window
-  (proposed 250 ms) and play **one** sound whose intensity reflects the aggregate relative
-  to current income/sec.
-- **Hard cooldown** of `audio_collect_min_interval_ms` (proposed 250 ms) regardless.
-- **Passive collections while the player is not interacting are silent** — rule 0.4.1
-  again. A property finishing its cycle unattended is the game running, not the player
-  acting. Only collections within ~2 s of a player interaction sound.
+Tim, on hearing it: *"I don't like the idea of sound at the end of a cycle, only when the user taps
+to purchase."* So **a cycle completing is never audible**, at all, under any circumstances — the
+aggregation, the window, and the `collect` sample are gone rather than merely quiet.
 
-That last rule is the one that makes decision 1 (full soundtrack) survivable: the music
-carries the idle state, and SFX are reserved for presence.
+Which makes the section's original worry moot, and it is worth keeping the reasoning because it
+generalizes: `_collect()` fires for every property every cycle, and cycle lengths reach 0.54 s, so a
+wide portfolio pays out dozens of times a second. There was never a volume at which that is pleasant.
+The 2-second presence window was an attempt to have it both ways, and the simpler answer turned out
+to be the right one — **the player's actions make sound; the machine running does not.**
+
+That decision also removed a bug this design made possible. Presence was inferred from the BUS (SFX
+and UI count as the player acting), and the collect sound played on the SFX bus — so each collect
+renewed the very window that permitted it, and the window never closed. One purchase and every
+staffed property blipped forever. Any future sound that fires WITHOUT the player has the same trap
+waiting for it; see the note on `Audio.player_is_present`.
 
 ### 4.4 Auto-purchase — silent (decision 13)
 
@@ -467,7 +497,7 @@ All signals already exist on `RushMomentumState`:
 
 | Signal | Decl | Audio |
 |---|---|---|
-| `vent_incoming(approach_seconds, required_lifts)` | `:159` | Pulse train, **in lockstep with `MomentumBar.gd:893 _pulse_vent_telegraph`** — one audible tick per required lift, same timing as the haptic |
+| `vent_incoming(approach_seconds, required_lifts)` | `:159` | **SILENT AND STILL** — no sound, no buzz. See the note below |
 | `vent_window_opened(required_lifts, duration)` | `:163` | The "now" cue. This is the single most important sound in the game |
 | `vent_lift_registered(lifts_done, required_lifts)` | `:166` | Ascending confirmation per lift — the player hears progress toward the requirement |
 | `vent_succeeded(new_tier, new_peak_bonus)` | `:170` | Reward sting, intensity scaled by new tier |
@@ -475,9 +505,37 @@ All signals already exist on `RushMomentumState`:
 | `overheated(ended_vent_tier)` | `:185` | Failure thud; heat layer fades out |
 | `rush_ready` | `:190` | Re-arm chime; system is live again |
 
-The pulse-train lockstep is a hard requirement, not a nicety: `_pulse_vent_telegraph` fires
-at **spawn**, not window-open (rationale documented at `MomentumBar.gd:768-776`), and
-audio that fires at a different moment than the haptic would actively mislead.
+**REVISED 2026-08-09 — the count is heard at the WINDOW, not at the spawn.** This section
+originally had the audible tick train riding the haptic telegraph in lockstep at vent spawn. Built
+that way and played, Tim found the interval itself was the difficulty: *"the warning mark happens
+before the cycle starts, so you have to know how long to wait after that before you are actually
+paying the vent mechanic."*
+
+He is right, and the numbers say so — the approach is 0.7 s and the window decays to a 0.45 s floor,
+so a marker three-quarters of a second early asks the player to hold an interval in their head and
+punishes them for missing it. **Sound now marks the ACT.** The count ticks fire at
+`vent_window_opened`, straight after the "now" cue.
+
+**The haptic moved too, the same day.** The first pass left the buzz at spawn on the grounds that it
+was device-tuned and meant something different. Tim, playing it: *"the haptic bump is still occurring
+at the beginning of the sweep rather than when the vent mechanic begins."* The split was the problem,
+not the timing of either half — so both channels now fire together at the window, in genuine lockstep,
+and vent spawn has no feedback at all beyond the approach bar sweeping.
+
+This REVERSES the rationale recorded on 2026-07-20, which argued a window-open buzz would land "too
+late to help". That reasoning predates the audio: with a sound already marking the window, a buzz
+0.7 s earlier stopped being a warning and became an interval to memorise. The old comment is replaced
+rather than left standing, so the next reader does not reinstate it.
+
+The count's haptic is shortened to 40 ms, from the tuned 80 ms: at 70 ms spacing a full-length pulse
+would run into the next and the count would stop counting. It takes the SMALLER of the two values, so
+a zeroed vent-haptic knob still means no haptics.
+
+The count is paced fast (0.09 s lead, 0.07 s apart) so even the maximum three lifts finish in 0.23 s,
+about half the shortest window. A count that outlasted its window would read as something to wait
+through at exactly the moment the player must already be moving; `sim/AudioCoreTest.gd` asserts the
+relationship from the real constants, so raising `MAX_VENT_LIFTS` or lowering the duration floor
+fails a test rather than quietly breaking the mechanic.
 
 ### 5.3 Music interaction
 
@@ -627,11 +685,11 @@ Each phase is independently mergeable, device-testable, and leaves the game in a
 state. Branch names follow the project's `feature/**` convention (every push builds and
 ships a Firebase APK).
 
-### Phase 0 — `feature/settings-scrollcontainer`
+### Phase 0 — `feature/settings-scrollcontainer` — BUILT 2026-08-08
 Wrap the settings page in a `ScrollContainer` (§6.1). No audio. Small, isolated, unblocks
 everything downstream. Ship and device-check that nothing reflowed.
 
-### Phase 1 — `feature/audio-core-slice` ← **the vertical slice (decision 14)**
+### Phase 1 — `feature/audio-core-slice` — BUILT 2026-08-08 ← **the vertical slice (decision 14)**
 The whole path, end to end, for exactly three events.
 
 - `Audio` autoload + bus layout + voice pool + `audio_events.tres`
@@ -639,14 +697,25 @@ The whole path, end to end, for exactly three events.
 - The settings card, all three sliders, persistence **including
   `_carry_player_settings_to_heir`** (§6.4)
 - `TuningConfig` `audio_*` knobs + `DevTuningPanel` SECTIONS entry
-- **Three sounds only:** the tap scale, purchase-succeeded (relative-scaled), and
-  aggregated collect
+- **Two sounds** (was three): the tap scale and purchase-succeeded (relative-scaled). Aggregated
+  collect was built, heard, and removed — see §4.3
 - The `BuySource` enum refactor (§4.4) — needed now, because the collect and hold-repeat
   rules depend on it
 
 **Exit criterion:** Tim plays 20 minutes on device and judges whether the core loop feels
 better with sound than without. This is the decision point for everything after it. If the
-tap scale is annoying at minute 15, that is a finding worth the whole phase.
+tap scale is annoying at minute 15, that is a finding worth the whole phase. **PENDING.**
+
+Two gates landed with it, both with teeth (each was checked by breaking the code and watching it
+fail): `sim/AudioSettingsTest.gd` asserts generically that EVERY `ui_` preference surviving a save
+also survives a succession — the §6.4 bug class, protecting the three older settings too — and
+`sim/AudioCoreTest.gd` force-enables the autoload headless (the bus layout loads fine without an
+audio device) to pin muted-costs-nothing, the fixed voice pool, the tap scale, and rule 2: the same
+payout RATIO eighteen orders of magnitude apart must produce the same intensity.
+
+Phase 0 turned out to be load-bearing exactly as predicted: with the SOUND card added, the settings
+content measures taller than the viewport. Without the ScrollContainer the bottom buttons would have
+been unreachable, not merely clipped.
 
 ### Phase 2 — `feature/audio-music`
 Five band tracks, band mapping, crossfades, idle fade (§3.3), ceremony-safe transition
@@ -654,12 +723,17 @@ rule. Music slider becomes meaningful.
 
 **Exit criterion:** a multi-epoch device session without music fatigue.
 
-### Phase 3 — `feature/audio-overdrive`
+### Phase 3 — BUILT 2026-08-09, ahead of Phase 2 — `feature/audio-overdrive`
+
+**Brought forward on Tim's report:** with tap and buy working, "it just seems very sparse still
+because rush is a big part of how I play and it doesn't have its own sound yet." Rush is the skill
+mechanic, so the slice was thin without it — and none of it depends on the music Phase 2 adds. The
+one part deferred is music ducking (§5.3), which has nothing to duck yet.
 Continuous heat tone, urgency layer, all vent cues in lockstep with the haptic pulse train,
 cruise-vs-overdrive timbre split, music ducking.
 
 **Exit criterion:** Tim can hit vent windows with the screen dimmed / not looking directly
-at the bar. That is the test that proves the feature.
+at the bar. That is the test that proves the feature. **PENDING.**
 
 ### Phase 4 — `feature/audio-ceremony`
 Succession/obituary (`WillScreen.gd:285` `show_obituary`, `:317` `show_will`, `:341`
@@ -700,6 +774,20 @@ content exists together is the first time the mix can actually be judged.
 ---
 
 ## 10. Open questions for Tim
+
+### Answered 2026-08-08
+
+- **§10.2 — does a HELD wage tap climb the scale? NO: a hold holds one note** (Tim). Climbing would
+  make holding sound better than tapping, which inverts what the scale is for, and a held auto-tap
+  running up the scale to pin at the top is exactly the sound that stops being fun at minute 15.
+- **§10.3 — does the tap scale reset on tab change? YES** (Tim, taking the plan's lean). A climb that
+  resumed after the player went and did something else reads as the game losing its place.
+- **Asset sourcing for Phase 1 — synthesized placeholders** (Tim). `tools/generate_placeholder_audio.py`
+  writes the five samples as PCM: nothing downloaded, no licensing, and the feel test is real because
+  the timing and the pitch relationships are real. Sourced samples replace them by editing
+  `game/config/audio_events.tres` — no code change, which is the property §1.4 was built for.
+
+### Still open
 
 1. **Music sourcing route (§7.2)** — commission one melody with five arrangements, or ship
    the fallback (five related tracks + a shared re-instrumented motif sting)? This is the

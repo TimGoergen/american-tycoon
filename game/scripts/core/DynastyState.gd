@@ -470,6 +470,9 @@ func _carry_player_settings_to_heir(heir: GameState) -> void:
 	heir.ui_minigame_enabled = current.ui_minigame_enabled
 	heir.ui_epoch_tab = current.ui_epoch_tab
 	heir.ui_currency_format = current.ui_currency_format
+	heir.ui_music_volume = current.ui_music_volume
+	heir.ui_sfx_volume = current.ui_sfx_volume
+	heir.ui_haptics_scale = current.ui_haptics_scale
 	# AUTO-PURCHASE IS DELIBERATELY NOT CARRIED — the heir wakes with the desk switched OFF
 	# (Tim, 2026-08-01). It is the one setting here that SPENDS money rather than describing a
 	# preference, and an heir owns almost nothing: the opening capital plus any Trust Fund. Left

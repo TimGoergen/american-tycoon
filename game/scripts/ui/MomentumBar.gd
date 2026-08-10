@@ -459,6 +459,23 @@ const AUTO_PURCHASE_IDLE_DOT_SECONDS := 0.45
 const AUTO_PURCHASE_IDLE_MAX_DOTS := 3
 
 ## The READY flash's peak alpha and fade time.
+## How long after the window-open cue the lift count starts, and how far apart its ticks sit.
+## Five lifts take LEAD + 4 x SPACING = 0.37 s, comfortably inside the 0.45 s shortest window.
+const VENT_COUNT_TICK_LEAD_SEC := 0.09
+const VENT_COUNT_TICK_SPACING_SEC := 0.07
+
+## The count's haptic bump, in milliseconds. Short enough to sit between beats 70 ms apart and still
+## read as a distinct tap — the same length as the rush-ready tick, which is a known-good short bump.
+const VENT_COUNT_HAPTIC_MS := 40.0
+
+## How far each vent lift steps up the confirmation pitch, in semitones. A whole tone: audibly a
+## step, small enough that a five-lift window does not end up shrill.
+const VENT_LIFT_SEMITONES := 2.0
+
+## The vent tier at which the success sting reaches full intensity. Beyond it the sound stops
+## growing — the ladder keeps going, but a sound that never stops getting bigger has nowhere to go.
+const VENT_SUCCESS_FULL_TIER := 5.0
+
 const READY_FLASH_ALPHA := 0.75
 const READY_FLASH_FADE_SEC := 0.5
 
@@ -1383,6 +1400,20 @@ func _process(delta: float) -> void:
 	_displayed_fill = BarSmoothing.approach(_displayed_fill, target_fill, delta)
 	_meter.value = _displayed_fill
 
+	# THE OVERDRIVE BED (Plans/Audio_System.md §5.1, decision 9). Driven from the value the bar is
+	# ABOUT to show — reusing _displayed_fill rather than recomputing a normal form in the audio
+	# layer, because there is no stored one: the fill means heat/cruise while building and
+	# heat/ceiling in overdrive, and two derivations would eventually disagree. The project's
+	# invariant is that what the bar shows IS what the player gets, and the tone is part of that
+	# promise rather than a second opinion on it.
+	#
+	# CRUISE COUNTS AS A RIDE. It has no signal of its own — the UI polls is_cruising() every frame —
+	# so the bed follows the same poll. Hearing the difference between a calm cruise and a hot
+	# overdrive is what makes the choice between them audible, which supports the measured design
+	# intent that cruise is a genuine alternative rather than a consolation prize.
+	Audio.set_heat_active((overdrive or cruising) and not locked_out)
+	Audio.set_heat(_displayed_fill)
+
 	# Feed the overdrive instrument. Everything it shows is DERIVED FRESH each frame from the
 	# core's live getters — that per-frame derivation IS the orphan watchdog: an approach or
 	# window the core silently tore down (release-disengage, overheat, First Contact reset)
@@ -1678,6 +1709,7 @@ func _apply_label_state(state: int) -> void:
 ## this handler only adds the long haptic thump so the failure lands physically as well as
 ## visually.
 func _on_overheated(ended_vent_tier: int) -> void:
+	Audio.play(&"overheat")
 	_vibrate(_tuning.rush_momentum_haptic_overheat_ms)
 	# The death chip: how high this run got, and the bloodline best it is measured against (Tim
 	# 2026-07-20). Reuses the vent-success chip's shape (see _on_vent_succeeded) in a hot ketchup
@@ -1697,6 +1729,7 @@ func _on_overheated(ended_vent_tier: int) -> void:
 ## short haptic tick) so re-availability is unmissable — the label reverts to "+0%" on its own
 ## via _process now that is_locked_out() is false.
 func _on_rush_ready() -> void:
+	Audio.play(&"rush_ready")
 	_vibrate(_tuning.rush_momentum_haptic_ready_ms)
 	_ready_flash.color = Color(1, 1, 1, READY_FLASH_ALPHA)
 	var tween := create_tween()
@@ -1708,30 +1741,39 @@ func _on_rush_ready() -> void:
 # (Plans/Overdrive_Vent_Windows.md, approach-bar rework Tim 2026-07-19)
 # ---------------------------------------------------------------------------
 
-## A vent event just SPAWNED at the bar's right edge (~approach_seconds from triggering). Record
-## the divisor for the event bar's travel math, and fire the vent haptic HERE, at the spawn —
-## not at window-open — because a warning pulse with the whole approach still ahead is what a
-## telegraph haptic is FOR (it preserves the shipped meaning: "a check is coming, get ready",
-## with time to act on it). At window-open a buzz would land at the exact instant the player
-## should already be lifting — too late to help, and it would smear the physical beat players
-## calibrate their gesture timing against. The visual "NOW" is the red bar reaching the target.
-## The pulse also COUNTS the demand: one buzz per required lift (Tim 2026-07-20) — see
-## _pulse_vent_telegraph.
-func _on_vent_incoming(approach_seconds: float, required_lifts: int) -> void:
+## A vent event just SPAWNED at the bar's right edge (~approach_seconds from triggering). Record the
+## divisor for the event bar's travel math. The spawn is now SILENT and still — the approach bar
+## sweeping toward the target is the whole of its presentation.
+##
+## IT USED TO BUZZ HERE, one pulse per required lift (Tim, 2026-07-20), and the comment that stood in
+## this spot argued the case: a warning with the approach still ahead is what a telegraph is for, and
+## a buzz at window-open "would land at the exact instant the player should already be lifting — too
+## late to help".
+##
+## Playing it with audio in the mix reversed that judgement (Tim, 2026-08-09): "the haptic bump is
+## still occurring at the beginning of the sweep rather than when the vent mechanic begins." The
+## approach is 0.7 s and the window floors at 0.45 s, so a beat that early is not a get-ready — it is
+## an interval to hold in your head and be punished for misjudging. Both channels now fire at the
+## window, together, and the count rides them (see _play_vent_count).
+func _on_vent_incoming(approach_seconds: float, _required_lifts: int) -> void:
 	_vent_approach_seconds = maxf(approach_seconds, 0.001)
 	# Start the display clock exactly at the spawn value: the event is at the right edge NOW.
 	# (_predict_clock's snap-on-increase rule would catch this anyway; setting it here makes the
 	# first drawn frame exact rather than inferred.)
 	_approach_display = _vent_approach_seconds
 	_approach_core_seen = _vent_approach_seconds
-	_pulse_vent_telegraph(required_lifts)
 
 
 ## The event reached the target: the window is open, the gesture clock is running. All the
 ## presentation is in-bar now (pips + countdown via the instrument overlay, driven per frame by
 ## _process) — no chip: the old held-open gold "VENT!" plate is retired, replaced by the
 ## approaching red bar the player has been watching for the whole approach.
-func _on_vent_window_opened(_required_lifts: int, duration: float) -> void:
+func _on_vent_window_opened(required_lifts: int, duration: float) -> void:
+	# THE "NOW" CUE — the single most important sound in the game (Plans/Audio_System.md §5.2). The
+	# window is short and the eye may be anywhere; this is what makes the gesture playable without
+	# staring at the bar.
+	Audio.play(&"vent_open")
+	_play_vent_count(required_lifts)
 	_vent_window_duration = maxf(duration, 0.001)
 	# The countdown starts full this instant — same reasoning as the approach clock above.
 	_window_display = _vent_window_duration
@@ -1742,6 +1784,9 @@ func _on_vent_window_opened(_required_lifts: int, duration: float) -> void:
 ## A gesture lift landed: the in-bar pip display fills one more (the ×2/×3 vents need the
 ## player to KNOW each lift registered). _process feeds the tally to the instrument.
 func _on_vent_lift_registered(lifts_done: int, _required_lifts: int) -> void:
+	# ASCENDING CONFIRMATION: one step up the scale per lift, so progress toward the requirement is
+	# audible without reading the pips. Same pitch trick as the tap scale.
+	Audio.play_pitched(&"vent_lift", pow(2.0, (lifts_done - 1) * VENT_LIFT_SEMITONES / 12.0))
 	_window_lifts_done = lifts_done
 
 
@@ -1750,6 +1795,10 @@ func _on_vent_lift_registered(lifts_done: int, _required_lifts: int) -> void:
 ## core's ladder), in celebratory money-green, plus the same full-meter white flash the READY
 ## moment uses — success should feel like a payoff, not mere survival.
 func _on_vent_succeeded(new_tier: int, new_peak_bonus: float) -> void:
+	# Scaled by the TIER reached — a count of successful vents this ride, not a money figure, so the
+	# no-absolute-magnitudes rule is respected by construction.
+	Audio.play_scaled(&"vent_success",
+		clampf(inverse_lerp(1.0, VENT_SUCCESS_FULL_TIER, float(new_tier)), 0.0, 1.0))
 	# "UP TO", not "PEAK" (Tim, 2026-07-20). This number is current_peak_bonus() — the CEILING of
 	# the ladder you have just unlocked, i.e. what you would earn riding at the hard backstop — not
 	# what you are earning right now. The bar's own "+X%" and the spin-down chip both report the LIVE
@@ -1776,8 +1825,46 @@ func _on_vent_succeeded(new_tier: int, new_peak_bonus: float) -> void:
 ## count with the landed ones solid and the unfinished ones strobing red, held for the chip's
 ## timed life while the OVERHEATED presentation plays underneath.
 func _on_vent_missed(lifts_done: int, required_lifts: int) -> void:
+	Audio.play(&"vent_miss")
 	_vent_pips.show_miss(required_lifts, lifts_done)
 	_show_tier_chip("VENT MISSED!", UiPalette.KETCHUP_RED, UiPalette.PALE_GOLD)
+
+
+## Count out the required lifts, at the instant the window OPENS.
+##
+## THIS USED TO SOUND AT VENT SPAWN, alongside the haptic telegraph, and Tim found the gap it left
+## was the hard part of the mechanic (2026-08-09): "the warning mark happens before the cycle starts,
+## so you have to know how long to wait after that before you are actually paying the vent mechanic."
+## He is right — a marker 0.7 s before the thing it marks asks the player to hold an interval in their
+## head, and the window can be as short as 0.45 s, so mistiming it costs the ride.
+##
+## So the audio marks the ACT, not the approach. The haptic telegraph still fires at spawn, unchanged
+## and device-tuned: touch says "coming, this many", sound says "now, this many". They report the same
+## demand at the two different moments each is good for, which is why splitting them here does not
+## breach the lockstep rule — that rule forbids two channels claiming the same EVENT at different
+## times, not two channels covering different events.
+##
+## Paced fast on purpose. At VENT_COUNT_TICK_SPACING even five lifts finish inside the shortest
+## window the ladder ever produces, so the count can never read as something to wait through — the
+## player should be moving on the first tick.
+func _play_vent_count(required_lifts: int) -> void:
+	# A beat after the "now" cue, so the count reads as following it rather than smearing its attack.
+	await get_tree().create_timer(VENT_COUNT_TICK_LEAD_SEC).timeout
+	if not is_inside_tree():
+		return
+	# The haptic bump is SHORTENED to fit between beats: the tuned vent pulse is 80 ms and the beats
+	# are 70 ms apart, so at full length they would run together into one buzz and the count would
+	# stop counting. Taking the smaller of the two keeps a zeroed knob at zero, so turning vent
+	# haptics off still turns them off.
+	var bump_ms: float = minf(_tuning.rush_momentum_haptic_vent_ms, VENT_COUNT_HAPTIC_MS)
+	for i in range(maxi(required_lifts, 1)):
+		Audio.play(&"vent_tick")
+		_vibrate(bump_ms)
+		if i == required_lifts - 1:
+			return
+		await get_tree().create_timer(VENT_COUNT_TICK_SPACING_SEC).timeout
+		if not is_inside_tree():
+			return
 
 
 ## Show the tier chip: set its text/colors, ease it in, hold, fade out. A new chip request while
@@ -1813,39 +1900,11 @@ func _style_tier_chip(text: String, plate_color: Color, text_color: Color) -> vo
 	_tier_chip.add_theme_stylebox_override("panel", plate)
 
 
-## Haptic tap, mobile only — desktop must stay silent (Input.vibrate_handheld is a no-op on most
-## desktops anyway, but the explicit guard documents the intent and costs nothing). Takes the
-## tuning knob's float directly; a knob dialed to 0 (or below) disables that pulse.
+## Haptic tap. Takes the tuning knob's float directly; a knob dialed to 0 (or below) disables that
+## pulse, and so does the player's haptics slider — see Haptics.pulse, which also carries the
+## mobile-only guard this function used to hold.
 func _vibrate(duration_ms: float) -> void:
-	if duration_ms >= 1.0 and OS.has_feature("mobile"):
-		Input.vibrate_handheld(int(duration_ms))
-
-
-## The vent telegraph's haptic: ONE PULSE PER REQUIRED LIFT (Tim 2026-07-20). A x2 window buzzes
-## twice, a x3 three times, so the thumb already knows the demand before the eyes get to the pips
-## — deliberate redundant encoding for the moment the mechanic is fastest.
-##
-## The pulses are played as a train rather than one long buzz: each pulse waits out its OWN length
-## plus the gap knob before the next fires, so the player feels distinct counted beats. This is a
-## coroutine (it awaits scene-tree timers), which is why it is fire-and-forget from the signal
-## handler — the caller does not await it.
-##
-## Sized to fit inside the approach: at the shipped 80 ms pulse + 70 ms gap, three pulses take
-## ~370 ms against a 1.2 s runway. The is_inside_tree() re-check after each wait covers the bar
-## being torn down mid-train (screen change, First Contact reset).
-func _pulse_vent_telegraph(required_lifts: int) -> void:
-	var pulse_ms: float = _tuning.rush_momentum_haptic_vent_ms
-	if pulse_ms < 1.0 or not OS.has_feature("mobile"):
-		return  # knob disabled, or desktop — no train to play
-	var pulses: int = maxi(required_lifts, 1)
-	var gap_ms: float = maxf(_tuning.rush_momentum_haptic_vent_gap_ms, 0.0)
-	for i in range(pulses):
-		_vibrate(pulse_ms)
-		if i == pulses - 1:
-			return
-		await get_tree().create_timer((pulse_ms + gap_ms) / 1000.0).timeout
-		if not is_inside_tree():
-			return
+	Haptics.pulse(duration_ms)
 
 
 # ---------------------------------------------------------------------------

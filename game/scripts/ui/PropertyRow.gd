@@ -33,7 +33,20 @@ enum BuyMode { ONE, TEN, NEXT_TIER, MAX }
 ## mirrors this one's top ordinal by hand.
 enum HireMode { ONE, TEN, MAX }
 
-signal buy_requested(prop_index: int, mode: BuyMode)
+## WHO asked for this action. Audio is the reason it exists (Plans/Audio_System.md §4.4): a HOLD is
+## ONE gesture and must sound like one thing, not like sixty purchases — but until now the codebase
+## simply discarded "who initiated this", and the distinguishing state lived only in this file's
+## private _buy_hold_repeating.
+##
+## There is deliberately no AUTO_PURCHASE value: the Acquisitions Desk buys inside AutoPurchaseState,
+## in core, and never reaches these signals at all. Auto-buys are silent by construction rather than
+## by a check, which is the stronger guarantee.
+enum ActionSource {
+	PLAYER_TAP,   ## A discrete press.
+	HOLD_REPEAT,  ## A repeat pumped out while the button stays held.
+}
+
+signal buy_requested(prop_index: int, mode: BuyMode, source: ActionSource)
 signal tap_requested(prop_index: int)
 signal hold_rush_requested(prop_index: int)
 ## Fired the moment a rush HOLD that actually auto-rushed ends, so Rush Momentum can stop
@@ -57,7 +70,7 @@ signal rush_released(prop_index: int)
 ## BuyMode: the row emits the MODE and Main resolves it to a level count (via this row's
 ## resolve_hire_count) before spending. The mode sent is the EFFECTIVE one — already clamped
 ## to what the player's Head Hunters level allows (see _effective_hire_mode).
-signal hire_requested(prop_index: int, mode: HireMode)
+signal hire_requested(prop_index: int, mode: HireMode, source: ActionSource)
 
 var prop_index: int = -1
 
@@ -96,12 +109,17 @@ var _hold_accumulator := 0.0
 ## TuningConfig (buy_hold_* / hire_hold_*) so they can be felt out on device via the balance screen.
 var _buy_hold_accumulator := 0.0
 var _buy_hold_repeating := false
+## Whether THIS press-and-hold gesture has already produced a purchase. It decides which purchase
+## reports itself as the gesture's first — see _next_buy_source.
+var _buy_gesture_acted := false
 
 ## Hold-to-repeat state for the STAFF button (Tim, 2026-07-01): holding it keeps hiring/upgrading —
 ## and then leveling up the staffer — until the player releases, on its own hire_hold_* pacing
 ## (separate from the buy button's, Tim 2026-07-03).
 var _hire_hold_accumulator := 0.0
 var _hire_hold_repeating := false
+## The hire equivalent of _buy_gesture_acted.
+var _hire_gesture_acted := false
 
 # --- Concurrent multi-touch (Tim, 2026-07-02) ------------------------------------------------------
 # Godot converts only the FIRST finger of a touch gesture into a mouse event (project setting
@@ -186,6 +204,22 @@ const SOLID_BAR_THRESHOLD_SEC := 0.25
 ## rush; solid is reserved for genuinely strobe-fast laps.
 const RUSHED_SOLID_THRESHOLD_SEC := 0.4
 
+## THE COMPLETION PULSE, for cycles too short to animate honestly (Tim, 2026-08-09: "if a property
+## has a cycle that is too short, then it never looks like it fills up... you see an instantaneous
+## flash of the income bar about a third full, and then nothing").
+##
+## Photon Exchange with Efficiency Experts at level 10 runs a 0.139 s cycle. Pinned, the bar sprints
+## at PIN_FILL_PER_SEC = 3.0 bars/sec, so in 0.139 s it reaches 0.42 — a third of the way — and then
+## the cycle ENDS, the pin releases, and the bar snapped back to empty. Every payout looked like a
+## failed fill.
+##
+## So a completed cycle now owns a fixed-length flourish on ITS OWN clock rather than the economy's:
+## fill the rest of the way, hold a beat at full, then drop. It runs only where a real payout
+## happened, so the bar still never shows a cycle the player did not earn — it just takes long enough
+## to be seen. Roughly a quarter of a second all told.
+const COMPLETION_FILL_PER_SEC := 5.0
+const COMPLETION_HOLD_SEC := 0.12
+
 ## How fast the bar fills the rest of the way when it BECOMES pinned (fractions of the
 ## full bar per second): a quick sprint to the right edge, then hold — snapping straight
 ## to solid read as sudden (Tim, 2026-07-07). 3.0 = the remaining lap in ⅓s at most.
@@ -252,6 +286,12 @@ var _rush_button_was_down := false
 ## True once the current rush hold has fired at least one auto-rush pulse; drives the
 ## rush_hold_released signal on release (see _pump_held_rush).
 var _rush_hold_pulsed := false
+
+## Whether the property's cycle was running LAST frame. The running → stopped edge is what starts
+## the completion pulse: it fires exactly when an unstaffed cycle has paid out and halted.
+var _was_cycle_running := false
+## Seconds left of the pulse's hold-at-full, once the fill has arrived there.
+var _completion_hold_remaining := 0.0
 
 ## The displayed bar's eased sweep rate (bars/sec) — see SWEEP_EASE_TAU.
 var _sweep_rate := 0.0
@@ -739,7 +779,8 @@ func _ready() -> void:
 	_buy_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_buy_button.custom_minimum_size = Vector2(0, BUTTON_ROW_HEIGHT)
 	UiPalette.style_button(_buy_button, true)  # red: buying is a spend action (§8)
-	_buy_button.pressed.connect(func() -> void: buy_requested.emit(prop_index, _buy_mode))
+	_buy_button.pressed.connect(func() -> void:
+		buy_requested.emit(prop_index, _buy_mode, _next_buy_source()))
 	var buy_labels := _add_split_button_labels(_buy_button)
 	_buy_caption_label = buy_labels[0]
 	_buy_cost_label = buy_labels[1]
@@ -947,8 +988,10 @@ func _release_all_holds() -> void:
 	_rush_hold_seconds = 0.0
 	_buy_hold_accumulator = 0.0
 	_buy_hold_repeating = false
+	_buy_gesture_acted = false
 	_hire_hold_accumulator = 0.0
 	_hire_hold_repeating = false
+	_hire_gesture_acted = false
 
 
 ## Mark this row as one Auto-Purchase Mode just bought into. Main calls it immediately after the
@@ -1053,6 +1096,80 @@ func _on_touch_released(index: int) -> void:
 		_primary_finger = -1
 
 
+## Advance the completion pulse by one frame: fill to the right edge, hold there a beat, then let go.
+##
+## Deliberately its own clock. The bar's normal motion is derived from the economy — cycle_progress
+## over the effective length — and that is right for any cycle long enough to watch. Below roughly a
+## fifth of a second the arithmetic is still correct and the RESULT is useless: too few frames pass
+## for the fill to arrive, so the player sees a stub of a bar and then nothing. A payout the player
+## cannot see is, to them, a payout that did not happen.
+##
+## Releasing the flag is what ends it: the next frame mirrors the true (zero) progress, so the bar
+## drops to empty and the row is ready for the next tap.
+func _advance_completion_pulse(delta: float) -> void:
+	if _displayed_cycle_fraction < 1.0:
+		_displayed_cycle_fraction = minf(
+			_displayed_cycle_fraction + delta * COMPLETION_FILL_PER_SEC, 1.0)
+		return
+	_completion_hold_remaining -= delta
+	if _completion_hold_remaining <= 0.0:
+		_finish_lap_pending = false
+
+
+## The income readout over the cycle bar, as text. Pure: same inputs, same string, no node access —
+## which is what lets the rule below be tested directly instead of by squinting at a screenshot.
+##
+## THREE CASES, and the distinction that matters is WHO RESTARTS THE CYCLE.
+##
+##   • Being RUSHED — the held finger restarts it, so the boosted rate is genuinely delivered for as
+##     long as the hold lasts, and the readout quotes it (sub-second) or the rush-shortened lump.
+##   • Owned but UNSTAFFED, with a sub-second cycle — nothing restarts it. One tap buys exactly one
+##     cycle and then it stops, so the figure is shown BARE: no unit, because there is no rate. This
+##     replaces the per-SECOND form only; a longer unstaffed cycle already reads as its lump plus its
+##     wait, which is honest about the tap AND tells the player how long the payout takes.
+##   • STAFFED — the staffer restarts it forever, so a per-second rate is a real throughput. Sub-
+##     second cycles read as a rate; longer ones read as their lump plus the wait, because money
+##     arriving every 4 minutes is not a per-second trickle.
+##
+## The unstaffed case was added 2026-08-09. It used to fall through to the sub-second rate, which
+## advertised a throughput the row could not reach without a staffer — and the gap grew with every
+## Efficiency upgrade, since those shorten the cycle without changing what one tap pays. Tim, with an
+## 0.18 s cycle: "the income display on that property says 11.4T/s, but tapping the staff portrait
+## only gains around 2T... the disconnect between an income label specific to seconds but the actual
+## income for a single cycle is much less." The two figures were both correct; the label was simply
+## answering a question the player was not asking.
+##
+## Note the hero-panel headline already drew this distinction — an idle unstaffed row contributes
+## ZERO to it (Tim, 2026-07-13) — so this brings the row's own label in line with what the header
+## had been saying about it all along.
+func _format_income_readout(
+		per_cycle: float, effective_length: float, rushed_fractions_per_second: float,
+		is_owned: bool, is_staffed: bool
+) -> String:
+	# The leading "$" is shown as the dollar-bill icon just left of the label (see _income_icon),
+	# so strip it off every amount before it goes into the text (Tim, 2026-07-09).
+	if rushed_fractions_per_second > 0.0:
+		var rushed_cycle_time := 1.0 / rushed_fractions_per_second
+		if rushed_cycle_time <= PER_SECOND_READOUT_THRESHOLD_SEC:
+			return Money.of(per_cycle * rushed_fractions_per_second).display().trim_prefix("$") + " / s"
+		return "%s / %s" % [
+			Money.of(per_cycle).display().trim_prefix("$"), _format_cycle_duration(rushed_cycle_time)]
+
+	if effective_length > 0.0 and effective_length <= PER_SECOND_READOUT_THRESHOLD_SEC:
+		# The per-tap form replaces the per-SECOND form ONLY. A long cycle already reads as its lump
+		# plus its wait ("2T / 4.3m"), which is both honest about what a tap pays and useful about
+		# how long the payout takes — replacing that with "/ tap" would throw the wait away to fix a
+		# problem it never had.
+		if is_owned and not is_staffed:
+			# BARE, with no unit at all (Tim, 2026-08-09). "/ tap" was accurate but still framed the
+			# figure as a rate-of-something, and the row already says how the money arrives — the
+			# portrait is the only way to run this property. A naked amount is the payout, full stop.
+			return Money.of(per_cycle).display().trim_prefix("$")
+		return Money.of(per_cycle / effective_length).display().trim_prefix("$") + " / s"
+	return "%s / %s" % [
+		Money.of(per_cycle).display().trim_prefix("$"), _format_cycle_duration(effective_length)]
+
+
 ## Which of this row's three interactive controls, if any, sits under a global point — "" if none.
 ## Respects each control's current eligibility (a disabled Buy/Hire, or a non-interactive portrait, is
 ## not a target), so a secondary finger can only ever trigger what a primary finger could.
@@ -1076,7 +1193,7 @@ func _fire_secondary_action(control_id: String) -> void:
 		"rush":
 			tap_requested.emit(prop_index)  # start an idle cycle, or land one rush
 		"buy":
-			buy_requested.emit(prop_index, _buy_mode)
+			buy_requested.emit(prop_index, _buy_mode, _next_buy_source())
 		"hire":
 			_on_hire_pressed()
 
@@ -1152,6 +1269,10 @@ func _pump_held_buy(delta: float) -> void:
 	if not _buy_button.button_pressed and not _secondary_held("buy"):
 		_buy_hold_accumulator = 0.0
 		_buy_hold_repeating = false
+		# The gesture is over, so the next press starts a fresh one and gets its feedback. Safe to
+		# do here rather than on button_down: this runs in _process, and the release-fired `pressed`
+		# has already been emitted by the time the next frame sees the button unheld.
+		_buy_gesture_acted = false
 		return
 	_buy_hold_accumulator += delta
 	var threshold := _prop.tuning.buy_hold_repeat_interval if _buy_hold_repeating \
@@ -1160,7 +1281,7 @@ func _pump_held_buy(delta: float) -> void:
 		_buy_hold_accumulator = 0.0
 		_buy_hold_repeating = true
 		if not _buy_button.disabled:
-			buy_requested.emit(prop_index, _buy_mode)
+			buy_requested.emit(prop_index, _buy_mode, _next_buy_source())
 
 
 ## Holding the STAFF button keeps performing its current action on a calm cadence (Tim, 2026-07-01):
@@ -1174,6 +1295,7 @@ func _pump_held_hire(delta: float) -> void:
 	if not _hire_button.button_pressed and not _secondary_held("hire"):
 		_hire_hold_accumulator = 0.0
 		_hire_hold_repeating = false
+		_hire_gesture_acted = false   # gesture over — see the note in _pump_held_buy
 		return
 	_hire_hold_accumulator += delta
 	var threshold := _prop.tuning.hire_hold_repeat_interval if _hire_hold_repeating \
@@ -1404,23 +1526,8 @@ func _refresh(delta: float) -> void:
 	if rush_engaged and effective_length > 0.0:
 		rushed_fractions_per_second = 1.0 / effective_length \
 				+ _prop.tuning.hold_rush_per_second * _prop.tuning.rush_pct * _prop.rush_power_multiplier
-	# The leading "$" is now shown as the dollar-bill icon just left of the label (see
-	# _income_icon), so strip it off every amount before it goes into the text (Tim, 2026-07-09).
-	if rushed_fractions_per_second > 0.0:
-		# While rushing, the cycle completes every 1/rushed_fractions_per_second seconds. Apply the
-		# SAME rule as an un-rushed cycle: a sub-second effective cycle reads as a per-second RATE,
-		# but a cycle longer than a second reads as the per-cycle payout WITH its (rush-shortened)
-		# duration — the money lands in lumps that far apart, so "16 T / 2s" is honest where "8.1 T/s"
-		# implies a smooth per-second trickle it never delivers (Tim, 2026-07-13).
-		var rushed_cycle_time := 1.0 / rushed_fractions_per_second
-		if rushed_cycle_time <= PER_SECOND_READOUT_THRESHOLD_SEC:
-			_income_label.text = Money.of(per_cycle * rushed_fractions_per_second).display().trim_prefix("$") + " / s"
-		else:
-			_income_label.text = "%s / %s" % [Money.of(per_cycle).display().trim_prefix("$"), _format_cycle_duration(rushed_cycle_time)]
-	elif effective_length > 0.0 and effective_length <= PER_SECOND_READOUT_THRESHOLD_SEC:
-		_income_label.text = Money.of(per_cycle / effective_length).display().trim_prefix("$") + " / s"
-	else:
-		_income_label.text = "%s / %s" % [Money.of(per_cycle).display().trim_prefix("$"), _format_cycle_duration(effective_length)]
+	_income_label.text = _format_income_readout(
+		per_cycle, effective_length, rushed_fractions_per_second, owned, staffed)
 	# Cache the per-second equivalent of whatever the label just showed (rush-boosted
 	# while held) — Main sums these across rows for the hero panel's income headline
 	# (Tim, 2026-07-07), so the headline always equals the sum of the visible rows.
@@ -1471,10 +1578,21 @@ func _refresh(delta: float) -> void:
 	# A frozen row is never pinned "humming at full" — the machine is down, so the frozen
 	# branch below holds the bar exactly where the core stopped it instead.
 	var pinned := (bar_is_solid or rushed_solid) and not frozen
-	if _was_pinned and not pinned:
+
+	# A cycle just PAID OUT AND STOPPED — the unstaffed case, since a staffed property restarts
+	# itself and never takes this edge. Owe the bar a visible finish (see COMPLETION_FILL_PER_SEC).
+	if _was_cycle_running and not _prop.is_cycle_running and owned and not frozen:
+		_finish_lap_pending = true
+		_completion_hold_remaining = COMPLETION_HOLD_SEC
+	_was_cycle_running = _prop.is_cycle_running
+
+	if _was_pinned and not pinned and not _finish_lap_pending:
 		# Unpinning (rush released, usually): restart the visible lap from empty and let
 		# the easing below chase the real progress — holding at full would freeze the
 		# bar until the next natural completion.
+		#
+		# Skipped when a finish is owed: that is the completion pulse, and zeroing the bar here is
+		# precisely the snap-back that made a short cycle look like it never filled.
 		_displayed_cycle_fraction = 0.0
 		_finish_lap_pending = false
 	_was_pinned = pinned
@@ -1505,8 +1623,13 @@ func _refresh(delta: float) -> void:
 		# hard-reset the eased sweep to natural — so the "constant" rushed sweep was
 		# actually a sawtooth re-accelerating from scratch every lap (caught red-handed
 		# by Tim's debug-overlay data, 2026-07-08: swp cycled 17→283 within each lap).
-		_displayed_cycle_fraction = true_fraction
-		_finish_lap_pending = false
+		if _finish_lap_pending and _prop.units_owned > 0:
+			# THE COMPLETION PULSE. The cycle is over and the core has already paid; this is the
+			# flourish that lets the player SEE it happened, on a clock slow enough to register.
+			_advance_completion_pulse(delta)
+		else:
+			_displayed_cycle_fraction = true_fraction
+			_finish_lap_pending = false
 		# Park the eased sweep at the natural rate so a later start doesn't inherit
 		# a stale rushed rate (or a zero) from long ago.
 		if effective_length > 0.0:
@@ -1764,11 +1887,35 @@ func _apply_ownership_styling(owned: bool, frozen: bool) -> void:
 		add_theme_stylebox_override("panel", owned_plate)
 
 
+## Which source the NEXT buy of this gesture should report.
+##
+## THE FIRST purchase of a gesture is the one that gets the feedback, whether it came from a quick
+## tap or from the first pump of a hold — everything after it is a repeat.
+##
+## This was originally written the other way round (repeats silent, the release-fired purchase
+## audible), and that put the ONLY sound at the END of the gesture: press, hold half a second, and
+## the confirmation arrived when the finger lifted. Feedback belongs at the start of an action, not
+## its finish (Tim, 2026-08-08: "a noticeable delay between clicking the buy button and the sound").
+func _next_buy_source() -> ActionSource:
+	if _buy_gesture_acted:
+		return ActionSource.HOLD_REPEAT
+	_buy_gesture_acted = true
+	return ActionSource.PLAYER_TAP
+
+
+## The hire equivalent of _next_buy_source.
+func _next_hire_source() -> ActionSource:
+	if _hire_gesture_acted:
+		return ActionSource.HOLD_REPEAT
+	_hire_gesture_acted = true
+	return ActionSource.PLAYER_TAP
+
+
 ## The staff button's `pressed` handler. One action only — buy up the ladder — so no state
 ## dispatch (the pre-redesign HIRE/UPGRADE/LEVEL-UP state machine is gone). HOW MANY rungs is
 ## the current hire mode's business, and Main resolves that from the mode we send.
 func _on_hire_pressed() -> void:
-	hire_requested.emit(prop_index, _effective_hire_mode())
+	hire_requested.emit(prop_index, _effective_hire_mode(), _next_hire_source())
 
 
 ## Update the staff button for the property's sequential ladder (GDD §6.1, epoch-depth

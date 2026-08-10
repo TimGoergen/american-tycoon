@@ -672,3 +672,55 @@ Two structural failures worth naming, because they are not the same problem:
    inside the plan doc that caused it** (§7.1). A flag that lives where the change was made
    is invisible to the person doing the playtesting. Fix: a seed-deviation gets a checklist
    line, not just a paragraph — it is a device question by definition.
+
+---
+
+## §8 — Audio, Phases 0 and 1 (built 2026-08-08, `Plans/Audio_System.md`)
+
+Added at merge, per the process note above. Phase 1's whole purpose is this device pass: the plan's
+exit criterion is Tim judging whether the core loop feels better with sound than without, and that
+verdict decides everything after it.
+
+**The samples are synthesized placeholders**, not sourced assets (Tim's call). Judge the TIMING,
+the pitch relationships, and the mix — not the tone quality. A finding of "the tap scale is annoying"
+is about the scale; "the blip sounds cheap" is expected and is answered later by §7.1's asset
+sourcing.
+
+- [ ] **The 20-minute question.** Play a normal session with sound on. Is the tap scale still
+      pleasant at minute 15, or has it become something you want to turn off? This is the phase's
+      exit criterion, and a "turn it off" answer is a real finding, not a failure.
+- [ ] **Purchase feedback tracks the MOMENT, not the price.** An early cheap buy and a late enormous
+      one that move income by a similar fraction should sound the same. A big jump should bring in
+      the brighter layer audibly.
+- [ ] **A completing cycle makes NO sound**, ever — under any portfolio, at any tier, whether or not
+      you have just tapped something. Cycle-end audio was removed on Tim's call (2026-08-08); if you
+      hear anything at the end of a cycle, that is a regression.
+- [ ] **Idle really is silent.** Put the phone down mid-session. Nothing whatsoever should sound:
+      no cycle payouts, no auto-purchases.
+- [ ] **A held buy sounds like one gesture,** not sixty purchases.
+- [ ] **A held wage tap holds ONE note** rather than climbing (Tim's call, §10.2).
+- [ ] **The tap scale restarts at the root** after a pause and after a tab change.
+- [ ] **Background and foreground the app mid-session.** Audio fades out and comes back; it never
+      comes back stuck silent.
+- [ ] **All three sliders at zero: is the game genuinely silent,** and does it still play correctly?
+      Haptics at zero must actually stop the vibration.
+- [ ] **Sliders survive a succession.** Set them to something distinctive, prestige, and check.
+      (Gated headless too, but this is the trap that has bitten three times.)
+- [ ] **Settings page scrolls** (Phase 0). The SOUND card pushes the content past the viewport, so
+      the bottom buttons are now reached by scrolling — swipe from over a button, not just from the
+      gaps, and confirm a swipe does not also press whatever it ends on.
+- [ ] **Battery draw over 30 minutes, audio on vs off.** The stated hard constraint.
+
+### Before reporting audio latency: check the audio route
+
+**Settled 2026-08-08.** Tim reported "a quarter to half second delay" before a sound was heard. It
+was **Bluetooth earbuds**, which add 150-300 ms of their own — switching to the phone's speaker cut
+it to "very small though not gone", which is normal Android output latency plus, for the purchase
+sound, the press-to-release time of the tap itself (Godot Buttons fire `pressed` on RELEASE, and the
+purchase legitimately belongs there — moving it to press would mean a swipe down the ladder buys
+things).
+
+So the first question about any audio-timing complaint is **what is it playing through**, not what
+the code is doing. The diagnostic that isolated it in one step: does the TAP sound lag too? The tap
+fires directly off the touch with no purchase logic in between, so a lag on both is the shared output
+path and everything above `play()` is exonerated.

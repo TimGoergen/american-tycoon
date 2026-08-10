@@ -18,6 +18,31 @@ run/main_scene="res://Main.tscn"
 config/features=PackedStringArray("4.5", "Mobile")
 config/icon="res://art/branding/american_tycoon_logo.png"
 
+[autoload]
+
+; The project's first and only autoload. Audio needs AudioStreamPlayer NODES that survive Main being
+; rebuilt on every succession and tuning-apply, which a static class cannot own.
+Audio="*res://scripts/audio/Audio.gd"
+
+[audio]
+
+buses/default_bus_layout="res://audio/default_bus_layout.tres"
+
+; ANDROID LATENCY (Tim, 2026-08-08: a quarter to half second before a sound is heard, on device, for
+; taps as well as purchases — so it is the shared output path, not any one event's trigger).
+;
+; Two per-platform overrides, both aimed at the buffer rather than at the game:
+;
+; output_latency asks the driver for a smaller buffer. 15 -> 8 is worth a few milliseconds at some
+; risk of crackling on a slow device; if anything ever crackles, this is the line to raise first.
+;
+; mix_rate matters more. Android hardware runs at 48 kHz almost universally, and asking for 44.1
+; makes the OS insert its own resampler — which brings its own buffer, and that buffer is latency the
+; engine cannot see or report. Matching the hardware rate removes that stage entirely. Our samples
+; are 44.1 kHz and get resampled per voice either way, which costs nothing extra.
+driver/output_latency.android=8
+driver/mix_rate.android=48000
+
 [display]
 
 window/size/viewport_width=1080

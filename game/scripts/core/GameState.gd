@@ -114,6 +114,24 @@ var ui_currency_format: int = Money.Format.ALPHABET
 ## the player opts out — GDD §5.5). Persisted in the save like ui_buy_mode.
 var ui_minigame_enabled: bool = true
 
+## UI preferences: the three audio sliders, each a LINEAR 0..1 level the scene layer pushes into
+## the Audio autoload (Plans/Audio_System.md §6). Parked here for the same reason as every other
+## `ui_` field — so they survive the save — and read by nothing in the headless model.
+##
+## Linear, not decibels: the slider is linear, and a stored dB value would need a special case for
+## "off" (silence is −∞ dB, not a number a slider can hold). The conversion happens once, at the
+## AudioServer boundary.
+##
+## Default 0.8 rather than 1.0 leaves headroom: several sounds can land in the same frame, and a
+## first launch at full scale is how a game gets muted in the first minute.
+var ui_music_volume: float = 0.8
+var ui_sfx_volume: float = 0.8
+
+## UI preference: a 0..1 MULTIPLIER on every haptic duration, not a volume. At 0.0 the durations
+## fall under the `>= 1.0` guard in the one vibrate call site, so zero disables haptics with no
+## extra branch anywhere (Plans/Audio_System.md §6.3).
+var ui_haptics_scale: float = 1.0
+
 ## The headline income/sec shown on the hero panel. A STABLE, THEORETICAL rate computed from
 ## the player's current assets (see EconomyState.get_passive_income_per_sec): the sum over
 ## staffed properties of (per-cycle payout × multipliers) ÷ cycle duration. It is NOT a
@@ -594,6 +612,9 @@ func to_save_dict() -> Dictionary:
 		"hire_mode": ui_hire_mode,
 		"currency_format": ui_currency_format,
 		"minigame_enabled": ui_minigame_enabled,
+		"music_volume": ui_music_volume,
+		"sfx_volume": ui_sfx_volume,
+		"haptics_scale": ui_haptics_scale,
 		# The civ tab the pager last showed — also the tab Auto-Purchase Mode buys from.
 		"epoch_tab": ui_epoch_tab,
 		# Read straight off the policy object rather than mirrored into a second field, so
@@ -652,6 +673,11 @@ func load_save_dict(data: Dictionary) -> void:
 	)
 	# Pre-minigame saves have no flag; default to enabled (mandatory until opted out).
 	ui_minigame_enabled = bool(data.get("minigame_enabled", true))
+	# Clamped on load, not merely defaulted: a level outside 0..1 would come straight through to
+	# AudioServer as a nonsense dB value. No SAVE_VERSION bump — absent keys take the defaults.
+	ui_music_volume = clampf(float(data.get("music_volume", 0.8)), 0.0, 1.0)
+	ui_sfx_volume = clampf(float(data.get("sfx_volume", 0.8)), 0.0, 1.0)
+	ui_haptics_scale = clampf(float(data.get("haptics_scale", 1.0)), 0.0, 1.0)
 	# Saves written before Auto-Purchase Mode have neither key. Both defaults are the pre-feature
 	# behaviour exactly — tab 0 (which Main then re-clamps/overrides through its own pager rules)
 	# and the mode off — so an old save loads clean with no migration and no version bump.

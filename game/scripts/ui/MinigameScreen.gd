@@ -310,6 +310,11 @@ const CHALLENGE_TIMER_LOW_SECONDS := 2.0
 var _challenge_tier_label: Label
 ## The best tier reached, nestled under the current-tier primary ("Best: 7"), dark gray a size down.
 var _best_tier_label: Label
+## Whether this run has already passed the stored high score, so the beat fires once rather than on
+## every frame after the crossing.
+var _beaten_high_score := false
+## The last whole second the countdown displayed, so its cue fires once per tick rather than per frame.
+var _last_ticked_second := -1
 var _challenge_tier_pulse: float = 0.0
 var _challenge_shown_tier: int = 0
 
@@ -1191,6 +1196,10 @@ static func _save_last_dealt(type_script: Script) -> void:
 func start_game(
 		reward: Dictionary, bonus_max: float, forced_type: Script = null, review_mode: bool = false
 ) -> void:
+	# THE SOUNDTRACK STEPS OUT (Tim, 2026-08-09: "remove soundtrack entirely during minigame modal").
+	# A minigame owns the whole screen, sets its own pace, and its own sounds are fast and small; an
+	# era track underneath would fight all three. Restored in _close_modal_audio when the run ends.
+	Audio.set_music_suppressed(true)
 	# A normal reward round: make sure the reward chrome (timer/spectrum/skip/opt-out) is shown and
 	# the Challenge chrome hidden, in case the previous round was a Challenge run.
 	_challenge_mode = false
@@ -1338,6 +1347,11 @@ func start_game(
 ## Launched from the Minigame Tuning screen, so review_mode is on (a Back button appears). Tapping
 ## DONE (or Back) saves the high score and returns to the list.
 func start_challenge(type_script: Script) -> void:
+	_beaten_high_score = false
+	# THE SOUNDTRACK STEPS OUT (Tim, 2026-08-09: "remove soundtrack entirely during minigame modal").
+	# A minigame owns the whole screen, sets its own pace, and its own sounds are fast and small; an
+	# era track underneath would fight all three. Restored in _close_modal_audio when the run ends.
+	Audio.set_music_suppressed(true)
 	_challenge_mode = true
 	_review_mode = true
 	_set_challenge_chrome(true)
@@ -1438,6 +1452,7 @@ func _set_challenge_chrome(on: bool) -> void:
 ## Begin pressed on the Get Ready gate: hide it, start the chosen type, and unpause the clock — the
 ## one and only point where a round actually goes live.
 func _on_begin_pressed() -> void:
+	Audio.play(&"minigame_begin")
 	if _active_minigame == null:
 		return
 	# Fade the cream gate off to unmask the game (plan §1), THEN start the round — so the clock
@@ -1525,6 +1540,13 @@ func _update_challenge_tier() -> void:
 	# Pop the display the moment the current tier rises past the last one we showed (once per crossing).
 	if current > _challenge_shown_tier:
 		_challenge_tier_pulse = 1.0
+		# A TIER CLIMBED mid-run — the ladder moving is the reason to keep playing, so it gets its own
+		# beat rather than being lumped in with an ordinary score.
+		Audio.play(&"challenge_tier")
+	# BEATING THE STORED HIGH SCORE, once per run: the moment the run stops being practice.
+	if not _beaten_high_score and _challenge_high > 0 and score > _challenge_high:
+		_beaten_high_score = true
+		Audio.play(&"minigame_best")
 	_challenge_shown_tier = current
 	# Decay the pulse toward 0 over ~0.4s (rate 2.5/sec). Uses the Control's own frame delta so no delta
 	# needs threading in here, mirroring the timer bar's decay pattern.
@@ -1575,6 +1597,9 @@ func _tick_challenge_timer(delta: float) -> void:
 		# shows up here; its time cost arrives through the explicit challenge_time_penalty channel
 		# (see _on_challenge_time_penalty), which drains the timer directly.
 		if gained > 0:
+			# The shared "you scored" beat. Every game's get_score() is monotonic, so a positive gain
+			# is unambiguously a success in that game's own terms, whatever the gesture was.
+			Audio.play(&"minigame_score")
 			_challenge_time_left += float(gained) * ChallengeGoals.seconds_per_point(_active_type_key)
 		_challenge_last_score = score
 		_challenge_time_left = clampf(_challenge_time_left, 0.0, ChallengeGoals.timer_cap_seconds())
@@ -1595,6 +1620,9 @@ func _tick_challenge_timer(delta: float) -> void:
 ## up (seconds_per_point), scaled by the tunable miss-penalty ratio — so a miss costs miss_penalty_ratio x
 ## what the hit was worth. Floored at 0. Gated to an ACTIVE run so a stray emit never drains a dead clock.
 func _on_challenge_time_penalty(points: float) -> void:
+	# The one MISS every game already reports through a shared channel. Per-game misses that do not
+	# cost time (a whiffed basketball in reward mode) belong to the per-game pass.
+	Audio.play(&"minigame_miss")
 	if not _challenge_mode or _challenge_ended:
 		return
 	var drain := ChallengeGoals.miss_penalty_ratio() * points * ChallengeGoals.seconds_per_point(_active_type_key)
@@ -1686,6 +1714,7 @@ func _group_thousands(value: int) -> String:
 ## screen itself — _exit_challenge does that once the player has seen the result.
 func _end_challenge() -> void:
 	_playing = false
+	Audio.play(&"minigame_over")
 	var score := _active_minigame.get_score() if _active_minigame != null else 0
 	# Keep driving the arcade "Best" store (unchanged) — that still powers the tuning list's Best
 	# label. The dynasty tier credit is a SEPARATE path, reported via challenge_finished below.
@@ -1695,6 +1724,7 @@ func _end_challenge() -> void:
 	# Report the finished run so Main can credit any newly-cleared tiers into the dynasty bonus and
 	# hand the outcome back to show_challenge_credit. Signals are synchronous, so by the time this
 	# returns the credit line is already filled (when routed through Main).
+	Audio.set_music_suppressed(false)
 	challenge_finished.emit(_active_type_key, score)
 
 
@@ -1759,6 +1789,7 @@ func _exit_challenge() -> void:
 	if _challenge_end_view != null:
 		_challenge_end_view.visible = false
 	visible = false
+	Audio.set_music_suppressed(false)
 	back_pressed.emit()
 
 
@@ -1826,6 +1857,11 @@ func _refresh_timer(delta: float, busy: bool) -> void:
 	_timer_label.text = "0:%02d" % secs
 	var color := UiPalette.KETCHUP_RED
 	var pulse := 1.0
+	if secs != _last_ticked_second and _seconds_left <= TIMER_PULSE_SECONDS and _seconds_left > 0.0:
+		# One cue per displayed second, on the same tick the label pops. The visual urgency has been
+		# there since 2026-07-09; this is the audible half of it.
+		Audio.play(&"minigame_countdown")
+	_last_ticked_second = secs
 	if _seconds_left <= TIMER_PULSE_SECONDS and _seconds_left > 0.0:
 		# One pop per second: the fractional part of the remaining time runs 1→0 within each second
 		# and jumps back to ~1 the instant the displayed number ticks down, so the pop lands ON each
@@ -1938,6 +1974,7 @@ func _draw_segment(rect: Rect2, track: StyleBoxFlat, fill: StyleBoxFlat, frac: f
 
 func _end_round() -> void:
 	_playing = false
+	Audio.play(&"minigame_over")
 	var performance := _current_performance()
 	# The spectrum bar's fill is SMOOTHED (lerped toward the live value each frame while playing). Now
 	# that the round is over the lerp stops, so snap the bar to the true final multiplier — otherwise a
@@ -2210,6 +2247,7 @@ func _on_back_pressed() -> void:
 		return
 	_playing = false
 	visible = false
+	Audio.set_music_suppressed(false)
 	back_pressed.emit()
 
 
@@ -2222,6 +2260,7 @@ func _on_skip_pressed() -> void:
 		return
 	_playing = false
 	visible = false
+	Audio.set_music_suppressed(false)
 	finished.emit(1.0, _opt_out)
 
 
@@ -2234,4 +2273,5 @@ func _on_continue_pressed() -> void:
 		var bonus := _legacy_bonus_amount(mult)
 		if bonus > 0:
 			legacy_bonus_earned.emit(bonus)
+	Audio.set_music_suppressed(false)
 	finished.emit(mult, _opt_out)

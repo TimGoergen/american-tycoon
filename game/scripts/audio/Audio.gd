@@ -119,6 +119,17 @@ const CUES := {
 	&"welcome_back":            {"bus": BUS_CEREMONY, "db": -4.0, "cooldown": 800.0, "variance": 0.0},
 	&"prestige_confirm":        {"bus": BUS_CEREMONY, "db": -2.0, "cooldown": 800.0, "variance": 0.0},
 
+	# --- Minigames, shared beats ------------------------------------------------------------------
+	# The SHARED layer only: every game has a start, a clock, a score, a miss and an ending, and those
+	# are worth getting right before any game's own vocabulary (a swish, a match, a caught coin) is
+	# written. The per-game cues are a separate pass.
+	&"minigame_begin":     {"bus": BUS_UI, "db": -4.0, "cooldown": 200.0, "variance": 0.0},
+	&"minigame_score":     {"bus": BUS_SFX, "db": -8.0, "cooldown": 40.0, "variance": 0.05},
+	&"minigame_miss":      {"bus": BUS_SFX, "db": -7.0, "cooldown": 80.0, "variance": 0.03},
+	&"minigame_countdown": {"bus": BUS_UI, "db": -9.0, "cooldown": 250.0, "variance": 0.0},
+	&"minigame_best":      {"bus": BUS_CEREMONY, "db": -3.0, "cooldown": 500.0, "variance": 0.0},
+	&"minigame_over":      {"bus": BUS_UI, "db": -4.0, "cooldown": 500.0, "variance": 0.0},
+
 	# --- Settings previews (played when a slider is released) --------------------------------------
 	&"music_preview":    {"bus": BUS_MUSIC, "db": -4.0, "cooldown": 200.0, "variance": 0.0},
 }
@@ -282,6 +293,9 @@ var _music_idle_gain := 1.0
 ## Set false to silence music entirely (the player's slider is separate — this is the system's own
 ## on/off, used when no track exists for a band).
 var _music_wanted := false
+## True while a modal takeover owns the screen — a minigame. Separate from `_music_wanted` because it
+## is a different question: the soundtrack is still WANTED, it is just not welcome right now.
+var _music_suppressed := false
 
 ## The overdrive bed: two dedicated players and the gain envelope that owns their volume. No tween —
 ## see set_heat_active for why.
@@ -671,6 +685,19 @@ func set_music_band(band: int) -> void:
 	_music_active = next
 
 
+## Take the soundtrack out entirely for a modal takeover, and put it back afterwards.
+##
+## A MINIGAME IS NOT A PLACE FOR THE SOUNDTRACK (Tim, 2026-08-09: "remove soundtrack entirely during
+## minigame modal"). It owns the whole screen, has its own pace, and its own sounds are fast and
+## small — an era track playing underneath would fight all three. Ducking would only make the fight
+## quieter; this removes it.
+##
+## Deliberately NOT stop_music(): the band is remembered, so returning restores the same track rather
+## than deciding a new one, and no band-change logic runs on the way back.
+func set_music_suppressed(suppressed: bool) -> void:
+	_music_suppressed = suppressed
+
+
 ## Stop the music entirely (used by a caller that wants silence — not by the idle fade, which keeps
 ## the system armed).
 func stop_music() -> void:
@@ -758,7 +785,10 @@ func _process(_delta_unused: float) -> void:
 	var crossfade_rate := 1.0 / MUSIC_CROSSFADE_SECONDS
 	for i in range(_music_players.size()):
 		var player := _music_players[i]
-		var target := 1.0 if (i == _music_active and _music_wanted) else 0.0
+		# A suppressed soundtrack targets silence on EVERY player, so a modal that opens mid-crossfade
+		# takes both of them out rather than leaving the outgoing track audible underneath.
+		var wanted := _music_wanted and not _music_suppressed
+		var target := 1.0 if (i == _music_active and wanted) else 0.0
 		_music_gain[i] = move_toward(_music_gain[i], target, delta * crossfade_rate)
 
 		var level := _music_gain[i] * _music_idle_gain
@@ -768,7 +798,7 @@ func _process(_delta_unused: float) -> void:
 			if player.playing:
 				player.stop()
 			continue
-		if not player.playing and _music_wanted:
+		if not player.playing and wanted:
 			player.play()
 		player.volume_db = MUSIC_VOLUME_DB + linear_to_db(level) + duck_db
 

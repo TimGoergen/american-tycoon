@@ -217,6 +217,7 @@ def main():
     write_vent_cues()
     write_ceremony()
     write_remaining_cues()
+    write_minigame_cues()
     write_music()
 
 
@@ -463,6 +464,40 @@ def write_remaining_cues():
     write_wav("prestige_confirm.wav", sequence([
         (0.000, tone(NOTES["F2"], 0.90, harmonics=(1.0, 0.3, 0.12), curve=1.8, attack=0.04)),
         (0.180, tone(NOTES["C4"], 0.70, harmonics=(1.0, 0.35), curve=2.2, attack=0.04)),
+    ]))
+
+
+def write_minigame_cues():
+    """The SHARED minigame beats — the layer every game has in common (Tim, 2026-08-09: shared beats
+    first). Each game's own vocabulary — a swish, a match, a caught coin — is a later pass.
+
+    These are the fastest, most repeated sounds in the game, so they are the smallest: a minigame can
+    fire `minigame_score` several times a second for a minute straight."""
+    # BEGIN: the round starts. A short rising pair, so the run opens on an upbeat.
+    write_wav("minigame_begin.wav", sequence([
+        (0.000, tone(NOTES["G4"], 0.09, harmonics=(1.0, 0.4), curve=5.5)),
+        (0.070, tone(NOTES["C5"], 0.22, harmonics=(1.0, 0.35), curve=4.0)),
+    ]))
+    # SCORE: tiny and bright. Carries a little pitch variance in the table so a fast run does not
+    # turn into a machine gun on one note.
+    write_wav("minigame_score.wav", tone(NOTES["E5"], 0.07, harmonics=(1.0, 0.35), curve=7.0))
+    # MISS: low and short. It must read as "no" without punishing — in challenge mode a miss only
+    # costs time, and play continues.
+    write_wav("minigame_miss.wav", tone(NOTES["C4"], 0.10, harmonics=(1.0, 0.3), curve=6.0))
+    # COUNTDOWN: one per second over the last few. Dry, so five in a row do not blur together.
+    write_wav("minigame_countdown.wav", tone(NOTES["A4"], 0.055, harmonics=(1.0, 0.5), curve=8.0))
+    # NEW BEST: the moment the run stops being practice. The only one of these allowed to be big.
+    write_wav("minigame_best.wav", sequence([
+        (0.000, tone(NOTES["C5"], 0.10, harmonics=(1.0, 0.45, 0.2), curve=4.5)),
+        (0.070, tone(NOTES["E5"], 0.10, harmonics=(1.0, 0.45, 0.2), curve=4.5)),
+        (0.140, tone(NOTES["G5"], 0.12, harmonics=(1.0, 0.45, 0.2), curve=4.5)),
+        (0.210, tone(NOTES["C5"] * 2.0, 0.40, harmonics=(1.0, 0.5, 0.25, 0.12), curve=2.6)),
+    ]))
+    # OVER: the run ends. Falling and settled — an ending, not a failure.
+    write_wav("minigame_over.wav", sequence([
+        (0.000, tone(NOTES["G4"], 0.14, harmonics=(1.0, 0.35), curve=4.5)),
+        (0.100, tone(NOTES["E4"], 0.16, harmonics=(1.0, 0.3), curve=4.0)),
+        (0.200, tone(NOTES["C4"], 0.45, harmonics=(1.0, 0.3, 0.12), curve=2.8)),
     ]))
 
 

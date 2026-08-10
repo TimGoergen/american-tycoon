@@ -47,7 +47,7 @@ const TRIGGERS := {
 	&"denied_locked": "Reserved: an action refused because something is locked. NO HOOK YET — deferred by decision 15.",
 	&"challenge_start": "Launching a game from the CHALLENGES screen.",
 	&"challenge_credit": "A challenge run ends and its score is credited.",
-	&"challenge_tier": "A challenge run climbs a tier of its ladder. NO HOOK YET — needs the credit result inspected.",
+	&"challenge_tier": "A challenge run climbs a tier of its ladder, mid-run.",
 	&"ceremony_obituary": "The succession's obituary card.",
 	&"ceremony_will": "The reading of the will.",
 	&"ceremony_heir": "The heir reveal — the bloodline continues.",
@@ -56,12 +56,18 @@ const TRIGGERS := {
 	&"legacy_purchase": "Buying a Legacy upgrade in the Estate shop.",
 	&"welcome_back": "The welcome-back pile after time away.",
 	&"prestige_confirm": "PASS THE TORCH is confirmed, just before the succession screens take over.",
+	&"minigame_begin": "BEGIN on a minigame's Get Ready gate — the round starts.",
+	&"minigame_score": "The player scores in any minigame. Fired from the shared score tracker, so it covers all six games without any of them knowing about it.",
+	&"minigame_miss": "A miss that costs challenge time — the one miss every game already reports through a shared channel.",
+	&"minigame_countdown": "One per second over the last few seconds of the clock, on the same tick the timer pops.",
+	&"minigame_best": "The run passes the stored high score. Once per run.",
+	&"minigame_over": "A round or challenge run ends.",
 	&"music_preview": "Releasing the MUSIC slider in Settings.",
 }
 
 ## Cues whose hook does not exist yet, so the document can say so plainly rather than implying the
 ## sound is wired and merely silent.
-const NOT_YET_HOOKED := [&"frenzy_end", &"denied_cash", &"denied_locked", &"challenge_tier"]
+const NOT_YET_HOOKED := [&"frenzy_end", &"denied_cash", &"denied_locked"]
 
 
 func _initialize() -> void:
@@ -148,13 +154,15 @@ func _cue_tables(cues: Dictionary, constants: Dictionary) -> String:
 			&"epoch_page", &"make_contact", &"tip_appear"],
 		"Denials (reserved)": [&"denied_cash", &"denied_locked"],
 		"Challenge Mode": [&"challenge_start", &"challenge_credit", &"challenge_tier"],
+		"Minigames — the shared beats": [&"minigame_begin", &"minigame_score", &"minigame_miss",
+			&"minigame_countdown", &"minigame_best", &"minigame_over"],
 		"Ceremony — the story beats": [&"ceremony_obituary", &"ceremony_will", &"ceremony_heir",
 			&"ceremony_contact", &"ceremony_contact_reveal", &"legacy_purchase", &"welcome_back",
 			&"prestige_confirm"],
 		"Settings": [&"music_preview"],
 	}
 	var order := ["The core loop", "Rush and overdrive", "Interface", "Denials (reserved)",
-		"Challenge Mode", "Ceremony — the story beats", "Settings"]
+		"Challenge Mode", "Minigames — the shared beats", "Ceremony — the story beats", "Settings"]
 
 	var text := "## The cues\n\nBus decides which slider governs a sound, and whether it counts as"
 	text += " the player being *present* (SFX and UI do; Ceremony and Music do not).\n"
@@ -221,6 +229,17 @@ tuning, and a wobble on top is simply out of tune.
   window drifting up the scale as a run continues. Record it as ONE note; C5 is what the placeholder
   uses. It is pitched from there in both directions.
 - **`vent_lift`** steps up a whole tone per lift within a window, so the count is audible.
+
+## The minigames
+
+The six games share the beats above — begin, score, miss, countdown, new best, over — and each
+game's own vocabulary (a swish, a match, a caught coin, a flipped pad) is a LATER PASS, deliberately.
+Getting the shared layer right first means every game already sounds like it belongs to this game
+before any of them sounds like itself.
+
+**The soundtrack stops entirely while a minigame is up**, rather than ducking. A minigame owns the
+whole screen, sets its own pace, and its own sounds are fast and small; an era track underneath would
+fight all three. The band is remembered, so returning restores the same track.
 
 ## Credits
 

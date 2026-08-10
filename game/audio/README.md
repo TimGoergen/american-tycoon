@@ -86,7 +86,18 @@ Bus decides which slider governs a sound, and whether it counts as the player be
 |---|---|---|---|---|
 | `challenge_start` | UI | -6 | 200 ms | Launching a game from the CHALLENGES screen. |
 | `challenge_credit` | Ceremony | -4 | 400 ms | A challenge run ends and its score is credited. |
-| `challenge_tier` ⚠ | Ceremony | -3 | 400 ms | A challenge run climbs a tier of its ladder. NO HOOK YET — needs the credit result inspected. |
+| `challenge_tier` | Ceremony | -3 | 400 ms | A challenge run climbs a tier of its ladder, mid-run. |
+
+### Minigames — the shared beats
+
+| Cue / filename | Bus | dB | Cooldown | Fires when |
+|---|---|---|---|---|
+| `minigame_begin` | UI | -4 | 200 ms | BEGIN on a minigame's Get Ready gate — the round starts. |
+| `minigame_score` | SFX | -8 | 40 ms | The player scores in any minigame. Fired from the shared score tracker, so it covers all six games without any of them knowing about it. |
+| `minigame_miss` | SFX | -7 | 80 ms | A miss that costs challenge time — the one miss every game already reports through a shared channel. |
+| `minigame_countdown` | UI | -9 | 250 ms | One per second over the last few seconds of the clock, on the same tick the timer pops. |
+| `minigame_best` | Ceremony | -3 | 500 ms | The run passes the stored high score. Once per run. |
+| `minigame_over` | UI | -4 | 500 ms | A round or challenge run ends. |
 
 ### Ceremony — the story beats
 
@@ -145,6 +156,17 @@ tuning, and a wobble on top is simply out of tune.
   window drifting up the scale as a run continues. Record it as ONE note; C5 is what the placeholder
   uses. It is pitched from there in both directions.
 - **`vent_lift`** steps up a whole tone per lift within a window, so the count is audible.
+
+## The minigames
+
+The six games share the beats above — begin, score, miss, countdown, new best, over — and each
+game's own vocabulary (a swish, a match, a caught coin, a flipped pad) is a LATER PASS, deliberately.
+Getting the shared layer right first means every game already sounds like it belongs to this game
+before any of them sounds like itself.
+
+**The soundtrack stops entirely while a minigame is up**, rather than ducking. A minigame owns the
+whole screen, sets its own pace, and its own sounds are fast and small; an era track underneath would
+fight all three. The band is remembered, so returning restores the same track.
 
 ## Credits
 

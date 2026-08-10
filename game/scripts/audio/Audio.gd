@@ -177,11 +177,12 @@ var _music_idle_gain := 1.0
 ## on/off, used when no track exists for a band).
 var _music_wanted := false
 
-## The overdrive bed: two dedicated players, and the fade tween that owns their volume.
+## The overdrive bed: two dedicated players and the gain envelope that owns their volume. No tween —
+## see set_heat_active for why.
 var _heat_player: AudioStreamPlayer
 var _urgency_player: AudioStreamPlayer
 var _heat_active := false
-var _heat_fade: Tween
+var _heat_gain := 0.0
 ## Last normalized heat pushed in, so the pitch/urgency mix can be recomputed when the layer starts.
 var _heat_normalized := 0.0
 
@@ -433,43 +434,51 @@ func set_heat(normalized: float) -> void:
 	if not _enabled or _heat_player == null:
 		return
 	_heat_normalized = clampf(normalized, 0.0, 1.0)
-	if not _heat_active:
-		return
-	# Equal temperament again, so the climb is musical rather than a siren.
+	# Pitch is safe to set every frame — it is a parameter read by the mixer, not a state change.
+	# The VOLUMES belong to the per-frame mix, so the fade envelope owns them in one place.
 	_heat_player.pitch_scale = pow(2.0, (_heat_normalized * HEAT_PITCH_SEMITONES) / 12.0)
-	_urgency_player.volume_db = _urgency_db_for(_heat_normalized)
 
 
-## Start or stop the ride's bed. Idempotent: calling it every frame with the same value is free,
-## which is what lets the caller drive it from a per-frame update without tracking edges itself.
+## Start or stop the ride's bed. Just a flag — the mix in _process does the rest.
+##
+## IT USED TO DO THE WORK HERE, killing and rebuilding a fade tween on every change and calling
+## stop()/play() on two streaming players at the edges. That was fine in principle and dangerous in
+## practice: the caller polls `is_cruising()` every frame, and heat hovering at the cruise clamp makes
+## that answer flicker — so a busy moment could churn a tween and a stream restart sixty times a
+## second on the audio thread. Tim's game closed outright while rushing and buying at the same time
+## (2026-08-09), which is the heaviest such moment the game has.
+##
+## Now the flag is free to flicker: the gain walks toward it a frame at a time, so a state that
+## changes its mind costs a few milliseconds of fade and nothing else.
 func set_heat_active(active: bool) -> void:
-	if not _enabled or _heat_player == null or active == _heat_active:
+	if not _enabled:
 		return
 	_heat_active = active
 
-	if _heat_fade != null and _heat_fade.is_valid():
-		_heat_fade.kill()
-	_heat_fade = create_tween().set_parallel(true)
 
-	if active:
-		if not _heat_player.playing:
-			_heat_player.play()
-		if not _urgency_player.playing:
-			_urgency_player.play()
-		set_heat(_heat_normalized)
-		_heat_fade.tween_property(_heat_player, "volume_db", HEAT_VOLUME_DB, HEAT_FADE_IN_SECONDS)
-		_heat_fade.tween_property(
-			_urgency_player, "volume_db", _urgency_db_for(_heat_normalized), HEAT_FADE_IN_SECONDS)
+## Walk the bed's gain toward its target and resolve both layers' volumes. Everything about the bed
+## that can change lives here, once per frame, so nothing can race anything else.
+func _mix_heat_bed(delta: float) -> void:
+	if _heat_player == null:
+		return
+	var rate := 1.0 / (HEAT_FADE_IN_SECONDS if _heat_active else HEAT_FADE_OUT_SECONDS)
+	_heat_gain = move_toward(_heat_gain, 1.0 if _heat_active else 0.0, delta * rate)
+
+	if _heat_gain <= 0.001:
+		# Fully out: stop, so a stopped stream decodes nothing. A ride is off far more than it is on.
+		if _heat_player.playing:
+			_heat_player.stop()
+		if _urgency_player.playing:
+			_urgency_player.stop()
 		return
 
-	_heat_fade.tween_property(_heat_player, "volume_db", -60.0, HEAT_FADE_OUT_SECONDS)
-	_heat_fade.tween_property(_urgency_player, "volume_db", -60.0, HEAT_FADE_OUT_SECONDS)
-	# STOP the streams once they are inaudible rather than leaving them running at -60 dB. A stopped
-	# stream decodes nothing, and a ride is over far more often than it is on.
-	_heat_fade.chain().tween_callback(func() -> void:
-		if not _heat_active:
-			_heat_player.stop()
-			_urgency_player.stop())
+	if not _heat_player.playing:
+		_heat_player.play()
+	if not _urgency_player.playing:
+		_urgency_player.play()
+
+	_heat_player.volume_db = HEAT_VOLUME_DB + linear_to_db(_heat_gain)
+	_urgency_player.volume_db = _urgency_db_for(_heat_normalized) + linear_to_db(_heat_gain)
 
 
 ## The urgency layer's level at a given heat: silent until the top of the band, then up to full.
@@ -589,8 +598,11 @@ func _process(_delta_unused: float) -> void:
 	var idle_rate := 1.0 / (MUSIC_IDLE_FADE_IN_SECONDS if present else MUSIC_IDLE_FADE_OUT_SECONDS)
 	_music_idle_gain = move_toward(_music_idle_gain, 1.0 if present else 0.0, delta * idle_rate)
 
-	# DUCK (§5.3): the overdrive bed rides the same bus, so the music steps back under it.
-	var duck_db := MUSIC_DUCK_DB if _heat_active else 0.0
+	_mix_heat_bed(delta)
+
+	# DUCK (§5.3): the overdrive bed rides the same bus, so the music steps back under it. Keyed on
+	# the GAIN rather than the flag, so the duck follows the bed in and out instead of snapping.
+	var duck_db := MUSIC_DUCK_DB * _heat_gain
 
 	var crossfade_rate := 1.0 / MUSIC_CROSSFADE_SECONDS
 	for i in range(_music_players.size()):
@@ -668,6 +680,11 @@ func _start(bus: StringName, stream: AudioStream, volume_db: float, pitch: float
 		chosen = pool[index]
 		_next_voice[bus] = (index + 1) % pool.size()
 
+	# STOP BEFORE REUSING. Assigning `stream` to a playing player is documented as stopping it, but
+	# doing it explicitly makes the order unambiguous on the audio thread — this is the path taken
+	# dozens of times a second when rushing and buying at once, which is when the game was closing.
+	if chosen.playing:
+		chosen.stop()
 	chosen.stream = stream
 	chosen.volume_db = volume_db
 	chosen.pitch_scale = pitch

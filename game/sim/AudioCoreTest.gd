@@ -590,12 +590,18 @@ func _check_overdrive_bed() -> void:
 		(heat.stream as AudioStreamWAV).loop_mode != AudioStreamWAV.LOOP_DISABLED)
 	_check_loop_is_seamless("heat", heat.stream as AudioStreamWAV)
 	_check_loop_is_seamless("urgency", urgency.stream as AudioStreamWAV)
-	_check("they start SILENT rather than audible", heat.volume_db < -40.0)
-	_check("nothing plays before a ride begins", not heat.playing)
+	# Settle the bed first. It shares the per-frame mix with the music, and the music section above
+	# leaves a ride running to test the duck — so asserting a pristine startup state here would be
+	# measuring test order rather than behaviour.
+	_audio.set_heat_active(false)
+	for i in range(120):
+		_audio.call("_mix_heat_bed", 1.0 / 60.0)
+	_check("with no ride on, the bed is silent and stopped", not heat.playing and not urgency.playing)
 
 	# A ride starts.
 	_audio.set_heat_active(true)
 	_audio.set_heat(0.0)
+	_audio.call("_mix_heat_bed", 0.5)
 	_check("engaging starts the bed", heat.playing)
 	var cold_pitch := heat.pitch_scale
 	_check("the urgency layer is silent while heat is low (%.0f dB)" % urgency.volume_db,
@@ -603,6 +609,7 @@ func _check_overdrive_bed() -> void:
 
 	# Heat climbs.
 	_audio.set_heat(1.0)
+	_audio.call("_mix_heat_bed", 0.5)
 	_check("the drone RISES with heat (%.3f -> %.3f)" % [cold_pitch, heat.pitch_scale],
 		heat.pitch_scale > cold_pitch)
 	_check("...by a musical interval, not a siren (%.2f = %.1f semitones)"
@@ -614,6 +621,7 @@ func _check_overdrive_bed() -> void:
 	# Half way up, the urgency layer must still be out of the way — it announces the ceiling, and an
 	# alarm that sounds in the middle of the band is an alarm the player learns to ignore.
 	_audio.set_heat(0.5)
+	_audio.call("_mix_heat_bed", 0.5)
 	_check("...and stays silent through the middle of the band (%.0f dB)" % urgency.volume_db,
 		urgency.volume_db < -40.0)
 
@@ -621,14 +629,30 @@ func _check_overdrive_bed() -> void:
 	_audio.set_heat_active(true)
 	_check("re-engaging an already-running bed does not restart it", heat.playing)
 
+	# THE FLAG MUST BE FREE TO FLICKER. It is polled every frame from a value that genuinely wavers
+	# near the cruise clamp, and the first version rebuilt a fade tween and restarted two streams on
+	# every change — sixty times a second in a busy moment, on the audio thread. Tim's game closed
+	# outright while rushing and buying at once. Flipping it repeatedly must now cost nothing.
+	for i in range(200):
+		_audio.set_heat_active(i % 2 == 0)
+		_audio.call("_mix_heat_bed", 1.0 / 60.0)
+	_check("flipping the ride flag every frame leaves the bed intact", heat.stream != null)
+
 	# And it must actually STOP, not linger at -60 dB decoding forever.
 	_audio.set_heat_active(false)
-	for i in range(90):
-		await process_frame
-		if not heat.playing:
-			break
+	for i in range(120):
+		_audio.call("_mix_heat_bed", 1.0 / 60.0)
 	_check("ending the ride stops the streams rather than muting them", not heat.playing)
 	_check("...and the urgency layer stops with it", not urgency.playing)
+
+	# Coming back on must restart cleanly after that stop.
+	_audio.set_heat_active(true)
+	for i in range(30):
+		_audio.call("_mix_heat_bed", 1.0 / 60.0)
+	_check("a later ride starts the bed again", heat.playing)
+	_audio.set_heat_active(false)
+	for i in range(120):
+		_audio.call("_mix_heat_bed", 1.0 / 60.0)
 
 
 # --- Observing plays ----------------------------------------------------------------------------

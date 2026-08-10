@@ -224,10 +224,12 @@ func open() -> void:
 
 func _on_back_pressed() -> void:
 	visible = false
+	Audio.play(&"screen_close")
 	closed.emit()
 
 
 func _on_replay_pressed() -> void:
 	visible = false
+	Audio.play(&"screen_close")
 	closed.emit()
 	replay_requested.emit()

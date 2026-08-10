@@ -1,6 +1,14 @@
 # Audio System — Implementation Plan
 
-**Status:** Phases 0, 1 and 3 BUILT (2026-08-08/09). Tim on the Phase 1 slice: "the sound on buy and
+**Status:** ALL PHASES BUILT (2026-08-08/09); 0/1/3 merged to `main` at `24c5e70`. Every cue in the
+game now has a hook and a default sound, and `game/audio/README.md` — generated from the cue table,
+so it cannot drift — is the drop sheet for replacing them. What remains is sourcing the audio itself,
+and the mix pass that only becomes meaningful once real samples are in.
+
+**§1.4 REVERSED 2026-08-09:** the `audio_events.tres` catalog is gone. Sounds are found BY FILENAME
+(`res://audio/cues/<cue id>.ogg`, falling back to `.wav`), which serves the section's own goal —
+swapping a sample without touching code — better than a manifest did, because it also removes the
+second place a sound could be described. Tim on the Phase 1 slice: "the sound on buy and
 tap are good". Phase 3 (overdrive) was brought forward ahead of Phase 2 because rush is central to
 how he plays. Phases 2, 4, 5 not started. Written 2026-08-06 from an interview with Tim.
 **Graduates:** GDD §12 (Art & Audio Direction), §13 M3 milestone entry "audio implementation
@@ -717,11 +725,14 @@ Phase 0 turned out to be load-bearing exactly as predicted: with the SOUND card 
 content measures taller than the viewport. Without the ScrollContainer the bottom buttons would have
 been unreachable, not merely clipped.
 
-### Phase 2 — `feature/audio-music`
+### Phase 2 — BUILT 2026-08-09 — `feature/audio-music`
 Five band tracks, band mapping, crossfades, idle fade (§3.3), ceremony-safe transition
 rule. Music slider becomes meaningful.
 
-**Exit criterion:** a multi-epoch device session without music fatigue.
+**Exit criterion:** a multi-epoch device session without music fatigue. **PENDING**, and it needs
+real tracks to mean anything — the five files in `game/audio/music/` are 8-second generated chord
+loops that exist so the machinery could be built and heard. `game/audio/music/README.md` is the drop
+sheet: exact filenames, format, and what the game does with them.
 
 ### Phase 3 — BUILT 2026-08-09, ahead of Phase 2 — `feature/audio-overdrive`
 
@@ -735,14 +746,19 @@ cruise-vs-overdrive timbre split, music ducking.
 **Exit criterion:** Tim can hit vent windows with the screen dimmed / not looking directly
 at the bar. That is the test that proves the feature. **PENDING.**
 
-### Phase 4 — `feature/audio-ceremony`
+### Phase 4 — BUILT 2026-08-09 — `feature/audio-ceremony`
 Succession/obituary (`WillScreen.gd:285` `show_obituary`, `:317` `show_will`, `:341`
 `show_heir_reveal`), First Contact / epoch arrival (`FirstContactOverlay.gd:248
 show_contact`, reveal `:321`, typewriter `:418`), Legacy upgrade purchase
 (`LegacyScreen.purchased` → `Main.gd:2382`). Music ducking per beat. Welcome-back overlay
 (`WelcomeBackOverlay.gd:237 show_pile`) gets a return-spike cue.
 
-**Exit criterion:** a full succession on device feels like an event.
+**Exit criterion:** a full succession on device feels like an event. **PENDING.**
+
+Music ducking per beat is deferred with Phase 2 — there is nothing to duck yet. The First Contact
+typewriter was left silent: it is a single `visible_ratio` tween rather than a per-character step, so
+a per-letter tick would need a poller bolted onto it, and a repeated tick under a story beat is the
+most likely thing in this phase to wear out its welcome.
 
 ### Phase 5 — `feature/audio-ui-polish`
 Tabs and major actions (§4.6). Mix pass across all buses at once — the first time all

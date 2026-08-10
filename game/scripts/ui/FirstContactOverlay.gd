@@ -246,6 +246,9 @@ func _process(delta: float) -> void:
 ## EpochCatalog. Tier 1 (Earth) never triggers this — you begin there. Safe to call again
 ## while already showing: any running reveal is killed and the card resets cleanly first.
 func show_contact(tier: int) -> void:
+	# The arrival: a theremin slide, which says "alien" faster than any line of copy. The civ's own
+	# reveal sting lands later in the timeline, on the beat that names them.
+	Audio.play(&"ceremony_contact")
 	var epoch := EpochCatalog.get_epoch(tier)
 	if epoch.is_empty():
 		return
@@ -342,6 +345,9 @@ func _play_reveal() -> void:
 	#    resized it, so the tween could park the name too low, overlapping the line below
 	#    (the render bug Tim hit at the end of Earth, 2026-07-03). Scale doesn't touch
 	#    layout, so the pop can never fight the container.
+	# The civ's name landing is the reveal — the beat the whole card builds to — so the sting is
+	# fired FROM the timeline rather than at show_contact, and cannot drift out of step with it.
+	_reveal_tween.tween_callback(func() -> void: Audio.play(&"ceremony_contact_reveal"))
 	_pop_in_step(_civ_label, 0.40, 0.85)
 
 	# 4) Home world and 5) currency flavor arrive as quick quiet fades.

@@ -139,4 +139,5 @@ func _add_stat_row(stat_name: String, value_text: String) -> void:
 
 func _on_back_pressed() -> void:
 	visible = false
+	Audio.play(&"screen_close")
 	closed.emit()

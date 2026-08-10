@@ -198,7 +198,19 @@ func _style_pad(pad: Panel, pad_id: int, lit: bool) -> void:
 
 ## Light a pad AND bounce it (color + scale together), so a flash pops out at a glance. `lit`
 ## false restores the resting look and eases the scale back to normal.
+## Each pad has its OWN PITCH, so a sequence is a little tune the player can rehearse by ear rather
+## than only by position. That is the point of sound in a memory game: it carries the information the
+## game is asking you to remember, and it means the same cue serves both the playback and the input.
+##
+## Only the LIT edge sounds — _flash_pad is called again to unlight, and a note on the way out would
+## double every pad in the sequence.
+const MEM_PAD_SEMITONES := [0, 4, 7, 12]
+
+
 func _flash_pad(pad_id: int, lit: bool) -> void:
+	if lit:
+		Audio.play_pitched(&"mem_pad",
+			pow(2.0, float(MEM_PAD_SEMITONES[pad_id % MEM_PAD_SEMITONES.size()]) / 12.0))
 	var pad: Panel = _pads[pad_id]
 	_style_pad(pad, pad_id, lit)
 	pad.pivot_offset = pad.size / 2.0  # scale about the pad's center, not its corner
@@ -334,6 +346,7 @@ func _on_pad_input(event: InputEvent, pad_id: int) -> void:
 			else:
 				_play_round_clear_celebration()
 		else:
+			Audio.play(&"mem_round")
 			_set_status("Nice!", UiPalette.MONEY_GREEN)
 			# Floating success chip over the board, matching Match-3's per-success feedback
 			# (Tim, 2026-07-11 — every minigame shows success feedback like Match-3). A round
@@ -346,6 +359,7 @@ func _on_pad_input(event: InputEvent, pad_id: int) -> void:
 ## beat holds the host countdown (is_busy) so it is actually seen before the result appears.
 func _play_game_over_beat(wrong_pad_id: int) -> void:
 	_beat_playing = true
+	Audio.play(&"mem_wrong")
 	_set_status("Missed!", UiPalette.KETCHUP_RED)
 
 	var pad: Panel = _pads[wrong_pad_id]
@@ -508,6 +522,7 @@ func _on_gem_pad_input(pad_id: int) -> void:
 		_gem_accepting_input = false
 		_gem_round_active = false
 		collect_legacy_gem()
+		Audio.play(&"mem_gem")
 		_play_gem_success_celebration()
 
 

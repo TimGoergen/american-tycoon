@@ -83,9 +83,11 @@ func show_for(tab_name: String, subtitle: String) -> void:
 
 func _on_show_pressed() -> void:
 	visible = false
+	Audio.play(&"screen_open")
 	show_requested.emit()
 
 
 func _on_later_pressed() -> void:
 	visible = false
+	Audio.play(&"screen_close")
 	dismissed.emit()

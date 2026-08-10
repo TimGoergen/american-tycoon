@@ -87,6 +87,14 @@ const LABEL_LAYOUT_HEIGHT := 247
 # art-direction knobs for Tim to eyeball — change them, not the layout code.
 const PLANET_FILL_FRACTION := 2.0
 const PLANET_WATERMARK_ALPHA := 0.6
+# Extra zoom applied ABOUT THE PLATE'S BOTTOM EDGE (Tim, 2026-08-09). Growing the globe from the
+# bottom rather than the top is what lets it get bigger while showing the SAME share of itself:
+# both the globe and the strip of it that fits on the plate scale by the same factor, so the
+# framing is unchanged and only the scale grows. The visible consequence is that the dome's top
+# edge climbs toward the plate top — 1.09 roughly halves the cream gap above it. The rows that
+# push off the plate top (the world art's faint outer glow) are simply not blitted.
+# Another art-direction knob: raise it to zoom in further, 1.0 to go back to the old framing.
+const PLANET_ZOOM := 1.09
 # Corner rounding baked into the watermark, in pixels. Matches the cream plate's own corners as
 # seen at the content rect: the plate rounds its TOP corners by SCREEN_CORNER_RADIUS and its
 # bottom corners only slightly, and the content sits ~12px (the border) inside that.
@@ -484,7 +492,7 @@ func _bake_planet_watermark(full_image: Image, plate_size: Vector2i, top_offset:
 	var fit_scale := minf(
 		float(plate_size.x) / globe.get_width(),
 		float(available_height) / globe.get_height()
-	) * PLANET_FILL_FRACTION
+	) * PLANET_FILL_FRACTION * PLANET_ZOOM
 	var globe_size := Vector2i(
 		maxi(1, int(globe.get_width() * fit_scale)),
 		maxi(1, int(globe.get_height() * fit_scale))
@@ -493,16 +501,26 @@ func _bake_planet_watermark(full_image: Image, plate_size: Vector2i, top_offset:
 	globe.convert(Image.FORMAT_RGBA8)  # ensure an alpha channel for the transparent surround
 
 	# 3. Compose the globe onto a transparent plate-sized canvas: centred horizontally, TOP
-	# PINNED just below the camera cutout (the plate top itself when there is none) — so
-	# enlarging the globe grows it downward only, and whatever extends past the plate bottom
-	# is simply not blitted (the "bottom third runs off the panel" look, Tim 2026-07-04; the
-	# clipped bottom edge is what "pins" the visible globe to the panel bottom). The
-	# transparent surround lets the cream plate (and the frenzy glow) show around the planet.
+	# PINNED just below the camera cutout (the plate top itself when there is none) — so the
+	# globe grows downward and whatever extends past the plate bottom is simply not blitted
+	# (the "bottom third runs off the panel" look, Tim 2026-07-04; the clipped bottom edge is
+	# what "pins" the visible globe to the panel bottom). The transparent surround lets the
+	# cream plate (and the frenzy glow) show around the planet.
+	#
+	# PLANET_ZOOM shifts that top pin UPWARD by `overscan` pixels, which is what makes the zoom
+	# happen about the plate's bottom edge instead of its top. Rather than blit at a negative y
+	# (blit_rect would reject it), we start reading the globe `overscan` rows down: the same
+	# thing, expressed as a source offset.
 	var watermark := Image.create(plate_size.x, plate_size.y, false, Image.FORMAT_RGBA8)
 	watermark.fill(Color(0, 0, 0, 0))
+	var overscan := clampi(int(round(available_height * (PLANET_ZOOM - 1.0))), 0, globe_size.y - 1)
 	var top_pinned_offset := Vector2i((plate_size.x - globe_size.x) / 2, top_offset)
-	var visible_globe := Vector2i(globe_size.x, mini(globe_size.y, plate_size.y - top_offset))
-	watermark.blit_rect(globe, Rect2i(Vector2i.ZERO, visible_globe), top_pinned_offset)
+	var visible_globe := Vector2i(
+		globe_size.x,
+		mini(globe_size.y - overscan, plate_size.y - top_offset)
+	)
+	if visible_globe.y > 0:
+		watermark.blit_rect(globe, Rect2i(Vector2i(0, overscan), visible_globe), top_pinned_offset)
 
 	# 4. Round the corners by clearing the alpha outside the rounded rectangle, so the watermark
 	# matches the white plate's curved corners (clip_children can't do this here — see the header).

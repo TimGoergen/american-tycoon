@@ -92,6 +92,11 @@ const BANNER_EDGE_MARGIN := 80
 ## How far a press must move before it counts as a drag-swap (rather than a stray tap).
 const DRAG_THRESHOLD := CELL_SIZE * 0.4
 
+## How many steps of a cascade the match cue keeps rising for. Beyond this it holds: eight whole
+## tones is already an octave and a third, and a chain long enough to exceed it should sound
+## triumphant rather than shrill.
+const M3_CASCADE_PITCH_STEPS := 6.0
+
 # Animation durations (seconds).
 const SWAP_TIME := 0.16
 const FLASH_TIME := 0.14
@@ -594,6 +599,7 @@ func _begin_drag(local: Vector2) -> void:
 	_drag_row = row
 	_drag_col = col
 	_drag_press_pos = local
+	Audio.play(&"m3_select")
 	_style_gem(_gem_nodes[row][col], true)
 	_show_select_ring(row, col)
 
@@ -646,12 +652,16 @@ func _play_resolution(result: Dictionary) -> void:
 	var node_a: Control = _gem_nodes[a[0]][a[1]]
 	var node_b: Control = _gem_nodes[b[0]][b[1]]
 
+	Audio.play(&"m3_swap")
 	var swap_tween := create_tween().set_parallel(true)
 	swap_tween.tween_property(node_a, "position", _cell_pos(b[0], b[1]), SWAP_TIME)
 	swap_tween.tween_property(node_b, "position", _cell_pos(a[0], a[1]), SWAP_TIME)
 	await swap_tween.finished
 
 	if not result["valid"]:
+		# The swap that made nothing. Sounded as the gems START back rather than when they land, so
+		# the refusal is heard at the moment the player learns it — the animation is the consequence.
+		Audio.play(&"m3_invalid")
 		var undo := create_tween().set_parallel(true)
 		undo.tween_property(node_a, "position", _cell_pos(a[0], a[1]), SWAP_TIME)
 		undo.tween_property(node_b, "position", _cell_pos(b[0], b[1]), SWAP_TIME)
@@ -795,6 +805,8 @@ func _score_steps(steps: Array) -> Dictionary:
 ## Bank collected Legacy gems and, once the bonus is secured, stop the board spawning more (design
 ## rule 3 — no pointless noise once earned). The shared host draws the "gem earned" badge.
 func _collect_legacy(count: int) -> void:
+	if count > 0:
+		Audio.play(&"m3_legacy")
 	if count <= 0:
 		return
 	collect_legacy_gem(count)
@@ -810,6 +822,18 @@ func _animate_step(step: Dictionary, points: float, step_index: int, group_detai
 		var detail: Dictionary = group_details[gi]
 		_spawn_match_badge(
 				matches[gi], bool(detail["is_avoid"]), bool(detail.get("is_legacy", false)))
+	# THE CASCADE IS THE FEELING. Each step of a chain plays the match a whole tone higher than the
+	# last, so a swap that keeps paying is audibly a run rather than the same sound four times. Capped
+	# so a long cascade climbs into brightness and not into a whistle.
+	Audio.play_pitched(&"m3_match",
+		pow(2.0, minf(float(step_index), M3_CASCADE_PITCH_STEPS) * 2.0 / 12.0))
+	# An AVOID match is the one mistake this game has, and it costs a large factor of the score, so
+	# it gets its own sound rather than a quieter version of a good one.
+	for detail in group_details:
+		if bool(detail["is_avoid"]):
+			Audio.play(&"m3_avoid")
+			break
+
 	# Every match flashes the same (no combo now): a plain, consistent pop as it clears.
 	var flash_scale := 1.25
 	var flash := create_tween().set_parallel(true)
@@ -843,6 +867,10 @@ func _animate_step(step: Dictionary, points: float, step_index: int, group_detai
 
 
 func _apply_falls(falls: Array, drop: Tween) -> void:
+	# One sound for the whole refill, not one per gem: a cascade step can drop a dozen, and a dozen
+	# overlapping thuds is noise rather than weight.
+	if not falls.is_empty():
+		Audio.play(&"m3_fall")
 	var captured: Array = []  # [target_row, col, node]
 	for fall in falls:
 		var col: int = fall["col"]

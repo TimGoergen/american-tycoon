@@ -489,6 +489,7 @@ func _advance_balls_step(delta: float, bounds: Vector2) -> void:
 		if _legacy_gem_active and not _passed_through_gem_this_shot:
 			if _segment_hits_gem(ball["prev"], ball["pos"]):
 				_passed_through_gem_this_shot = true
+				Audio.play(&"bball_gem_through")
 
 	# Pass 2: hoop scoring/bounces, then the board walls.
 	for ball in _balls:
@@ -513,19 +514,23 @@ func _resolve_walls(ball: Dictionary, bounds: Vector2) -> void:
 	# Side walls: clamp the center back inside and flip + dampen the horizontal velocity.
 	if ball["pos"].x < min_x:
 		ball["pos"].x = min_x
+		_play_impact(&"bball_wall", absf(ball["vel"].x))
 		ball["vel"].x = absf(ball["vel"].x) * RESTITUTION
 	elif ball["pos"].x > max_x:
 		ball["pos"].x = max_x
+		_play_impact(&"bball_wall", absf(ball["vel"].x))
 		ball["vel"].x = -absf(ball["vel"].x) * RESTITUTION
 
 	# Ceiling.
 	if ball["pos"].y < min_y:
 		ball["pos"].y = min_y
+		_play_impact(&"bball_wall", absf(ball["vel"].y))
 		ball["vel"].y = absf(ball["vel"].y) * RESTITUTION
 
 	# Floor, with extra horizontal friction on each landing.
 	elif ball["pos"].y > floor_y:
 		ball["pos"].y = floor_y
+		_play_impact(&"bball_floor", absf(ball["vel"].y))
 		ball["vel"].y = -absf(ball["vel"].y) * RESTITUTION
 		ball["vel"].x *= FLOOR_FRICTION
 		# Once the ball is barely moving along the floor, let it settle into a throwable rest
@@ -533,12 +538,27 @@ func _resolve_walls(ball: Dictionary, bounds: Vector2) -> void:
 		if absf(ball["vel"].y) < REST_SPEED and absf(ball["vel"].x) < REST_SPEED:
 			ball["vel"] = Vector2.ZERO
 			ball["state"] = "idle"
+			Audio.play(&"bball_settle")
 			# The shot has ended without scoring (a made basket returns earlier, in _resolve_hoop).
 			# If it passed through the gem but missed, that gem is spent: clear it so a lucky
 			# pass-through can't be retried until it finally scores (design: one honest attempt).
 			if _legacy_gem_active and _passed_through_gem_this_shot:
 				_legacy_gem_active = false
 			_passed_through_gem_this_shot = false
+
+
+## Play an impact cue at a volume matching how hard the ball hit.
+##
+## Normalized against the throw speed cap, so it is a fraction of "as hard as this game can throw"
+## rather than a raw pixel rate — the same discipline the economy sounds follow, for the same reason:
+## a number with units in it eventually gets compared against a different number with different units.
+##
+## RESTITUTION is 0.46, so each bounce in a chain is roughly half the last. That decay is the point —
+## a ball dribbling to rest should fade out on its own without any code counting bounces.
+func _play_impact(cue: StringName, speed: float) -> void:
+	if _max_throw_speed <= 0.0:
+		return
+	Audio.play_scaled(cue, clampf(speed / _max_throw_speed, 0.0, 1.0))
 
 
 ## Resolve a flight ball against the hoop. Returns true if it scored (the caller then skips the
@@ -565,11 +585,16 @@ func _resolve_hoop(ball: Dictionary, prev: Vector2, bounds: Vector2) -> bool:
 		var is_swish := drop_offset <= RIM_HALF_WIDTH * 0.5
 		var chip_text := "SWISH!" if is_swish else "SCORE!"
 		var chip_color := UiPalette.MUSTARD_GOLD if is_swish else UiPalette.MONEY_GREEN
+		# LAYERED over the host's shared "you scored" cue, not instead of it: that one means the
+		# point counted, these mean what the ball did. A swish is the payoff sound of this game.
+		Audio.play(&"bball_swish" if is_swish else &"bball_score")
 		FloatingChip.spawn(_play, _hoop_pos - Vector2(0.0, HOOP_RY + 40.0), chip_text, chip_color)
 		# Legacy gem: earned only if THIS shot also passed through the gem (both in one shot). The
 		# host gates the actual payout by the round result; here we just record the collection.
 		if _legacy_gem_active and _passed_through_gem_this_shot:
 			collect_legacy_gem()
+			# Both halves in one shot — the game's rarest outcome, and the only one that pays Legacy.
+			Audio.play(&"bball_gem_earned")
 			_legacy_gem_win_cue = 1.0     # a brief pop at the gem's spot
 			_legacy_gem_active = false    # consumed — one gem per appearance
 		_rest_ball(ball, bounds)
@@ -593,6 +618,7 @@ func _resolve_hoop(ball: Dictionary, prev: Vector2, bounds: Vector2) -> bool:
 			ball["pos"] = post + normal * min_distance
 			var into_post: float = ball["vel"].dot(normal)
 			if into_post < 0.0:  # only reflect if moving toward the post
+				_play_impact(&"bball_rim", absf(into_post))
 				ball["vel"] -= normal * into_post * (1.0 + RESTITUTION)
 				# No particles on a rim touch (Tim, 2026-07-01): the ball still bounces off the post,
 				# but sparks are reserved for a MADE basket only, so a spray always means "score".
@@ -666,6 +692,7 @@ func _begin_aim(point: Vector2) -> void:
 	if best_index == -1:
 		return
 	_aim_index = best_index
+	Audio.play(&"bball_grab")
 	_balls[best_index]["vel"] = Vector2.ZERO   # freeze a ball caught mid-flight in place
 	_aim_anchor = _balls[best_index]["pos"]    # re-shoot from where it was caught
 	_balls[best_index]["state"] = "aiming"
@@ -701,11 +728,16 @@ func _release_sling() -> void:
 		# settles straight back. Either way it is released, not left hanging, frozen, in the air.
 		ball["vel"] = Vector2.ZERO
 		ball["state"] = "flight"
+		Audio.play(&"bball_fizzle")
 	else:
 		# Aim OPPOSITE the pull; speed comes from the non-linear launch curve (see _throw_fraction).
-		var speed := _throw_fraction(pull_distance) * _max_throw_speed
+		var force := _throw_fraction(pull_distance)
+		var speed := force * _max_throw_speed
 		ball["vel"] = (-pull / pull_distance) * speed
 		ball["state"] = "flight"
+		# Scaled by the SAME force fraction the aim wedge shows, so a lob and a cannon shot sound as
+		# different as they look — and the sound cannot disagree with the guide.
+		Audio.play_scaled(&"bball_launch", force)
 	_aim_index = -1
 
 

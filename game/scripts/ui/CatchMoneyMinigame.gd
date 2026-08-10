@@ -23,6 +23,11 @@ const SPAWN_INTERVAL_END := 0.38
 ## Challenge Mode uses a slower, fixed spawn interval than the reward-round rush, so the board isn't
 ## crowded — challenge difficulty comes from coin speed + the keep-alive timer, not clutter (Tim,
 ## 2026-07-22: "too many coins on screen").
+## The premium coin value at which the catch cue reaches full intensity. Premium coins are worth
+## several ordinary catches; beyond this the sound stops growing, because a number that never stops
+## getting louder has nowhere left to go.
+const CATCH_PREMIUM_FULL_VALUE := 5.0
+
 const CHALLENGE_SPAWN_INTERVAL := 0.60  # Tim 2026-07-22: +10% spawn rate (was 0.66 -> 0.66/1.1)
 ## How fast a coin falls (px/sec in the 1080-wide space).
 const FALL_SPEED := 340.0
@@ -247,6 +252,7 @@ func _process(delta: float) -> void:
 			var drop_center := Vector2(coin.position.x + coin.size.x / 2.0, area_size.y)
 			_coins.remove_at(i)
 			coin.queue_free()
+			Audio.play(&"catch_miss")
 			_spawn_miss_effect(drop_center)
 
 	# All spawned and none left on screen -> the round is over. Challenge Mode never self-completes
@@ -304,6 +310,10 @@ func _challenge_coin_params() -> Dictionary:
 ## REWARD mode none of that applies: the coin uses the shrinking _spawn_size, FALL_SPEED, no sway,
 ## and is worth 1 — exactly as before.
 func _spawn_coin(area_width: float) -> void:
+	# Barely audible on purpose (-22 dB). One coin appearing is not an event, but the RATE is: the
+	# spawn interval ramps toward a late-round rush, and hearing that press in is the point. Any
+	# louder and the busiest game in the set would be a rattle.
+	Audio.play(&"catch_spawn")
 	_spawned += 1
 
 	var size := _spawn_size
@@ -450,13 +460,20 @@ func _on_coin_caught(coin: Button) -> void:
 	# exceptional/bonus catch, so it gets a gold "JACKPOT!" chip; a premium coin gets a green
 	# "+N PREMIUM!"; an ordinary catch gets a green "CAUGHT!". This stacks on top of the "+N" pop
 	# (and, for legacy, the gem cue) by design.
+	# Three outcomes the game already tells apart by chip; the audio follows the same split rather
+	# than inventing a second definition of "a good catch".
 	if was_legacy:
+		Audio.play(&"catch_legacy")
 		FloatingChip.spawn(_area, center, "JACKPOT!", UiPalette.MUSTARD_GOLD)
 		collect_legacy_gem()
 		_spawn_legacy_catch_effect(center, coin.size.x)
 	elif was_premium:
+		# Scaled by how many catches this one coin is worth, so a fat coin sounds like one.
+		Audio.play_scaled(&"catch_premium",
+			clampf(inverse_lerp(1.0, CATCH_PREMIUM_FULL_VALUE, float(value)), 0.0, 1.0))
 		FloatingChip.spawn(_area, center, "+%d PREMIUM!" % value, UiPalette.MONEY_GREEN)
 	else:
+		Audio.play(&"catch_coin")
 		FloatingChip.spawn(_area, center, "CAUGHT!", UiPalette.MONEY_GREEN)
 
 

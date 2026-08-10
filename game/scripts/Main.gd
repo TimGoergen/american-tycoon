@@ -622,6 +622,9 @@ func _create_game() -> void:
 	# Audio no-ops entirely when there is no audio device, so this is safe headless.
 	Audio.apply_tuning(tuning)
 	Audio.set_bus_volume(Audio.BUS_MUSIC, game.ui_music_volume)
+	# Start on the band this save is already in, with no transition — a load should land in its era,
+	# not crossfade into it from nothing.
+	Audio.set_music_band(Audio.band_for_tier(game.epoch.current_tier))
 	_apply_sfx_volume(game.ui_sfx_volume)
 	Haptics.scale = game.ui_haptics_scale
 
@@ -817,7 +820,11 @@ func _build_ui() -> void:
 	# concept is NOT a card — it is taught as a permanent line ON the welcome-back screen itself,
 	# see WelcomeBackOverlay: a fresh launch has no "out", and that screen is the natural home for
 	# the explanation. Tim, 2026-07-23.)
-	game.rush_momentum.vent_window_opened.connect(_on_vent_window_opened)
+	# unbind(2): the signal carries (required_lifts, duration) and this handler wants neither. Without
+	# it the call fails at every vent window — "expected 0 arguments, but called with 2" — and the tip
+	# it exists to show has never once fired. Present since the tutorial wiring went in (6f0cbf7), and
+	# invisible because a failed signal call is an error in the log, not a crash.
+	game.rush_momentum.vent_window_opened.connect(_on_vent_window_opened.unbind(2))
 	game.epoch.contact_made.connect(_on_contact_made)
 	# When the player answers the contact, the trade-deal minigame negotiates their head start
 	# on the new alien property (GDD §5.5 site 2), so the negotiation follows the narration.
@@ -1320,6 +1327,7 @@ func _build_epoch_pager() -> Control:
 ## currently met (so a stale tap can never skip an epoch) and emits contact_made on success, so
 ## the First Contact beat and the trade-deal minigame play exactly as they always have.
 func _on_make_contact_pressed() -> void:
+	Audio.play(&"make_contact")
 	game.epoch.advance()
 
 
@@ -1394,6 +1402,8 @@ func _step_epoch_tab(delta: int) -> void:
 ## Switch to a tab: gate every row's liveness to it (only this tab refreshes + draws), then
 ## repaint the pager. Safe to call before the rows exist (used from _on_contact_made too).
 func _set_epoch_tab(tab: int) -> void:
+	if tab != _epoch_tab:
+		Audio.play(&"epoch_page")
 	# Remember where the player left the tab we're leaving, so returning to it restores that spot.
 	if _ladder_scroll != null and _epoch_tab >= 0 and _epoch_tab < _tab_scroll.size():
 		_tab_scroll[_epoch_tab] = _ladder_scroll.scroll_vertical
@@ -2121,6 +2131,9 @@ func _update_estate_badge() -> void:
 ## Switch to tab `index`: show its panel, hide the rest, restyle the bar, and refresh
 ## the Family Ledger / Settings content that depends on live state when entered.
 func _show_tab(index: int) -> void:
+	# Only when the tab actually CHANGES: _show_tab is also called to re-assert the current tab.
+	if index != _active_tab:
+		Audio.play(&"tab_switch")
 	_active_tab = index
 	# The musical tap run belongs to one burst of tapping. Resuming mid-climb after the player went
 	# and did something else would sound like the game lost its place (Plans/Audio_System.md §10.3).
@@ -2223,6 +2236,8 @@ func _on_buy_requested(
 		# Milestone reward: fire on the crossing (not before) — a milestone is an automatic reward,
 		# not an action to direct, so a just-happened notification is the right shape.
 		if prop.get_milestone_band() > band_before:
+			# An automatic reward, so it announces itself rather than confirming an action.
+			Audio.play(&"milestone")
 			_maybe_show_tip("first_milestone", _row_for_index(prop_index))
 
 
@@ -2372,6 +2387,7 @@ func _maybe_show_tip(tip_id: String, target: Control, body_override: String = ""
 	if body_override != "":
 		body = body_override
 	_tutorial_tip.show_tip(tip["title"], body, target)
+	Audio.play(&"tip_appear")
 	return true
 
 
@@ -2401,6 +2417,7 @@ func _on_vent_window_opened() -> void:
 
 ## Settings → Help: open the glossary modal.
 func _on_help_pressed() -> void:
+	Audio.play(&"screen_open")
 	_help_screen.open()
 
 
@@ -2666,6 +2683,10 @@ func _on_tap_requested(prop_index: int) -> void:
 	game.tap_property(prop_index)
 	if was_running:
 		Audio.play_tap_note()
+	else:
+		# Starting a stopped cycle is the machine turning over, not a payout — a different sound, and
+		# deliberately not part of the musical tap run.
+		Audio.play(&"cycle_started")
 
 
 func _on_hold_rush_requested(prop_index: int) -> void:
@@ -2709,7 +2730,11 @@ func _on_hire_requested(
 			mode, game.economy, prop_index, game.epoch.current_tier)
 	if count <= 0:
 		return
+	# FIRST hire versus a level-up: the first one starts the property running by itself, which is a
+	# bigger moment than adding a rung, and gets its own sound.
+	var was_staffed := (game.economy.properties[prop_index] as PropertyState).is_staffed
 	game.economy.try_buy_staff_levels(prop_index, count, game.epoch.current_tier)
+	Audio.play(&"hire_levelled" if was_staffed else &"hire_first")
 
 
 func _on_wage_tapped() -> void:
@@ -2726,6 +2751,7 @@ func _on_wage_hold_tapped() -> void:
 
 
 func _on_pop_requested() -> void:
+	Audio.play(&"frenzy_pop")
 	game.pop_frenzy()
 
 
@@ -2733,13 +2759,24 @@ func _on_pop_requested() -> void:
 ## (Plans/Rush_Cruise_Control.md). GameState gates the verb on can_rush(), so a stray tap
 ## racing a lockout is refused there rather than here.
 func _on_overdrive_requested() -> void:
+	# Fired on the REQUEST rather than inside the core: the core refuses in several cases (auto-buy
+	# on, already locked out), and a cue that only sounds when the ride really starts is checked
+	# below instead of guessed here.
+	var was_engaged := game.rush_momentum.is_overdrive_engaged()
 	game.engage_rush_overdrive()
+	# Only if the ride ACTUALLY started. The core refuses in several cases — auto-buy on, already
+	# locked out — and a cue that sounded on a refused press would be the row lying about the state,
+	# which is the one thing this system is not allowed to do.
+	if not was_engaged and game.rush_momentum.is_overdrive_engaged():
+		Audio.play(&"overdrive_engage")
 
 
 ## Player opened Balance Tuning: swap it into the Settings tab's slot, seeded with the
 ## live config (baked defaults + any active overrides) for the editor values, plus a
 ## pristine baked copy so it can tell which constants are overridden and diff on Apply.
+
 func _on_dev_pressed() -> void:
+	Audio.play(&"screen_open")
 	_settings_page.visible = false
 	_dev_panel.open(tuning, ConfigLoader.load_tuning(false))
 
@@ -2747,18 +2784,21 @@ func _on_dev_pressed() -> void:
 ## Open the Minigame Tuning review screen (Settings). The economy freezes while it is up
 ## (see _process), just like the other full-screen overlays.
 func _on_minigame_tuning_pressed() -> void:
+	Audio.play(&"screen_open")
 	_minigame_review_screen.open()
 
 
 ## About pressed: show the modal with the logo, name, version, and credits. Its own Back button
 ## hides it again (no state to restore — the game keeps running behind it).
 func _on_about_pressed() -> void:
+	Audio.play(&"screen_open")
 	_about_screen.open()
 
 
 ## Stats pressed: show the Statistics modal. It reads the bloodline's current numbers on open;
 ## its own Back button hides it again (the game keeps running behind it).
 func _on_stats_pressed() -> void:
+	Audio.play(&"screen_open")
 	_stats_screen.open()
 
 
@@ -2774,6 +2814,7 @@ func _on_stats_closed() -> void:
 ## this is the belt-and-braces half: the core refuses and the UI grays, rather than the gate living
 ## in only one of the two.
 func _on_challenges_pressed() -> void:
+	Audio.play(&"screen_open")
 	if not _ledger_unlocked():
 		return
 	_challenges_screen.open()
@@ -2924,6 +2965,11 @@ func _on_contact_made(new_tier: int) -> void:
 func _on_contact_dismissed() -> void:
 	var tier := _pending_contact_tier
 	_pending_contact_tier = 0
+	# THE BAND CHANGE WAITS FOR THE OVERLAY (Plans/Audio_System.md §3.1). Crossfading while the card
+	# is up would put the new track's first bar underneath that beat's own sting and ruin both, so
+	# the music turns over here rather than on contact_made. Note this runs BEFORE the Earth-promotion
+	# early return below: tier 2 is its own band, and a quiet card is still a band change.
+	Audio.set_music_band(Audio.band_for_tier(tier))
 	# The Earth→Earth promotion beat (White Collar, tier 2) is a quiet card only for now —
 	# no trade-deal minigame (Tim, 2026-07-27). SEAM: when the promotion minigame gets its
 	# own moving-up copy (planned follow-up, Plans/Earth_Split_Epochs.md), remove this guard.
@@ -3071,6 +3117,7 @@ func _retention_levels_for_hire_mode(property_index: int) -> int:
 ## The staff rows are updated IN PLACE (not rebuilt) so a held RETAIN button survives the
 ## refresh — rebuilding would free the very button under the player's finger and break the hold.
 func _on_retain_requested(property_index: int, levels: int) -> void:
+	Audio.play(&"retain_staff")
 	if levels <= 0:
 		return
 	if dynasty.buy_staff_retention_levels(property_index, levels) > 0:
@@ -3084,6 +3131,9 @@ func _on_retain_requested(property_index: int, levels: int) -> void:
 ## generation immediately (faster cycles / cheaper staff / fatter wage take hold
 ## mid-life) and persist, so a purchase is never lost to a crash before autosave.
 func _on_upgrade_purchased(_upgrade_id: String) -> void:
+	# A Legacy purchase is a ceremony beat rather than a shop click: it is permanent, it costs the
+	# currency of a whole lifetime, and it is the one thing carried across a succession.
+	Audio.play(&"legacy_purchase")
 	dynasty.refresh_current_generation_effects()
 	# The purchase just drained the shared Legacy wallet, and the Household Staff rows carry
 	# can_afford SNAPSHOTS — without a rebuild they keep advertising affordability the wallet
@@ -3191,6 +3241,7 @@ func _on_minigame_met(game_key: String) -> void:
 ## refresh its row list). `screen` is bound onto the connection (see _build_ui) — either the dev
 ## MinigameReviewScreen or the player-facing ChallengesScreen; both expose show_challenge_credit.
 func _on_challenge_finished(game_key: String, final_score: int, screen: Object) -> void:
+	Audio.play(&"challenge_credit")
 	var result := dynasty.credit_challenge_score(game_key, float(final_score))
 	if result["improved"]:
 		SaveManager.save_dict_to_file(dynasty.to_save_dict())
@@ -3270,6 +3321,8 @@ func _finish_welcome_back_minigame(multiplier: float) -> void:
 ## Execute the death with the given Legacy multiplier — bank (boosted) Legacy, advance
 ## the generation, raise the heir — then reveal who inherits.
 func _finalize_succession(multiplier: float) -> void:
+	# The deliberate beat before the succession screens take over — the last sound of a life.
+	Audio.play(&"prestige_confirm")
 	dynasty.perform_succession("Retired to Palm Beach", multiplier)
 	_will_screen.show_heir_reveal(HeirNames.dynasty_name(dynasty.generation), dynasty.generation)
 
@@ -3284,6 +3337,7 @@ func _on_heir_begin_pressed() -> void:
 
 
 func _on_buy_mode_toggled() -> void:
+	Audio.play(&"mode_toggle")
 	_buy_mode = ((_buy_mode + 1) % PropertyRow.BuyMode.size()) as PropertyRow.BuyMode
 	game.ui_buy_mode = _buy_mode  # persisted on the next autosave / on background
 	_refresh_buy_mode_button()
@@ -3632,6 +3686,7 @@ func _refresh_mode_buttons() -> void:
 ## The HireMode ordinals and the track's levels line up exactly (0 = ×1 … 3 = MAX), which is what
 ## makes the modulo below the whole rule.
 func _on_hire_mode_toggled() -> void:
+	Audio.play(&"mode_toggle")
 	var max_hire := clampi(dynasty.upgrades.max_hire_mode(),
 			PropertyRow.HireMode.ONE, PropertyRow.HireMode.MAX)
 	_hire_mode = ((_hire_mode + 1) % (max_hire + 1)) as PropertyRow.HireMode

@@ -235,6 +235,8 @@ func _relayout() -> void:
 ## Show the overlay for a banked pile. `allow_risk` reveals the RISK IT button — true on the
 ## initial welcome (when transition minigames are on), false on the post-minigame result.
 func show_pile(pile: float, hours_away: float, allow_risk: bool = false) -> void:
+	# The return spike (Plans/Audio_System.md Phase 4): the first thing a player hears on coming back.
+	Audio.play(&"welcome_back")
 	_pile_label.text = Money.of(pile).display()
 	# Money.trim drops a whole number's ".0" — "away 2 hours", not "away 2.0 hours".
 	_away_label.text = "You were away %s hours." % Money.trim(hours_away, 1)

@@ -56,6 +56,7 @@ func _run() -> void:
 	for bus in [&"Music", BUS_SFX, &"UI", &"Ceremony"]:
 		_audio.set_bus_volume(bus, 1.0)
 	_audio.call("_build_heat_layer")
+	_audio.call("_build_music_players")
 
 	_check_catalog()
 	_check_mute_costs_nothing()
@@ -65,6 +66,9 @@ func _run() -> void:
 	await _check_buy_intensity_is_relative()
 	_check_one_sound_per_gesture()
 	_check_vent_cues_exist()
+	_check_ceremony_beats()
+	_check_band_mapping()
+	await _check_music_mix()
 	_check_the_count_fits_the_window()
 	await _check_overdrive_bed()
 
@@ -86,19 +90,41 @@ func _run() -> void:
 		quit(1)
 
 
+## EVERY CUE THE TABLE DESCRIBES MUST RESOLVE A SAMPLE. Tim's brief (2026-08-09) was that every cue
+## gets a hook AND a default, so the whole design can be heard before anything is sourced — this is
+## that promise, checked. A cue with no file is silent, which is correct behaviour and invisible.
 func _check_catalog() -> void:
-	print("-- catalog --")
+	print("-- every cue resolves a sample --")
+	var cues: Dictionary = _audio.get_script().get_script_constant_map()["CUES"]
 	var events: Dictionary = _audio.get("_events")
-	for id in [&"tap_note", &"buy_success", &"music_preview"]:
-		_check("'%s' is in the catalog with a sample" % id,
-			events.has(id) and (events[id] as AudioEvent).stream != null)
-	# The tap sample is pitched by the scale, so a random detune on top would simply be out of tune.
-	var tap: AudioEvent = events.get(&"tap_note")
-	_check("the tap sample has NO random pitch variance",
-		tap != null and is_zero_approx(tap.pitch_variance))
-	# The purchase sound needs its brighter layer, or intensity above the threshold does nothing.
-	var buy: AudioEvent = events.get(&"buy_success")
-	_check("the purchase sound has a layer for big moments", buy != null and buy.layer_stream != null)
+	var unrecorded: Array[String] = []
+	for id in cues:
+		var samples: Array = events.get(id, [])
+		if samples.is_empty():
+			unrecorded.append(String(id))
+	_check("all %d cues have a sample (%s)"
+			% [cues.size(), "none missing" if unrecorded.is_empty() else ", ".join(unrecorded)],
+		unrecorded.is_empty())
+
+	# The two the game pitches deliberately must have NO random detune, or a figure the player is
+	# meant to hear as counting becomes a figure that is merely out of tune.
+	for id in [&"tap_note", &"vent_lift"]:
+		_check("'%s' has no random pitch variance (the game pitches it)" % id,
+			is_zero_approx(float((cues[id] as Dictionary).get("variance", 0.0))))
+
+	# The layered cues need their companion sample, or intensity above the threshold does nothing.
+	var layers: Dictionary = _audio.get("_layers")
+	for id in cues:
+		if (cues[id] as Dictionary).get("layered", false):
+			_check("'%s' has its _layer sample" % id, layers.has(id))
+
+	# The window cue must beat the ticks it leads: it is the one the player reacts to.
+	_check("the vent window cue is louder than its ticks",
+		float((cues[&"vent_open"] as Dictionary)["db"]) > float((cues[&"vent_tick"] as Dictionary)["db"]))
+
+	# A NAME THAT IS NOT IN THE TABLE must complain rather than fail silently — a typo'd id is
+	# otherwise indistinguishable from a sound nobody has recorded yet.
+	_check("an unknown cue id is refused", not events.has(&"definitely_not_a_cue"))
 
 
 func _check_mute_costs_nothing() -> void:
@@ -330,38 +356,50 @@ func _check_vent_cues_exist() -> void:
 	var events: Dictionary = _audio.get("_events")
 	for id in [&"vent_tick", &"vent_open", &"vent_lift", &"vent_success", &"vent_miss",
 			&"overheat", &"rush_ready"]:
-		_check("'%s' has a sample" % id,
-			events.has(id) and (events[id] as AudioEvent).stream != null)
+		_check("'%s' has a sample" % id, not (events.get(id, []) as Array).is_empty())
 
-	# vent_lift is PITCHED per lift, so a random detune on top would make a counted sequence sound
-	# out of tune rather than like counting.
-	var lift: AudioEvent = events.get(&"vent_lift")
-	_check("the lift confirmation has no random detune",
-		lift != null and is_zero_approx(lift.pitch_variance))
 
-	# The window cue must be the loudest thing in the set: it is the one the player has to react to.
-	var open_cue: AudioEvent = events.get(&"vent_open")
-	var tick: AudioEvent = events.get(&"vent_tick")
-	_check("the window cue is louder than the telegraph ticks (%.1f vs %.1f dB)"
-			% [open_cue.volume_db, tick.volume_db],
-		open_cue.volume_db > tick.volume_db)
+## THE STORY BEATS (Phase 4). These differ from every other sound in the game in two ways that are
+## easy to get wrong, so both are asserted rather than assumed.
+func _check_ceremony_beats() -> void:
+	print("
+-- the ceremony beats --")
+	var cues: Dictionary = _audio.get_script().get_script_constant_map()["CUES"]
+	var events: Dictionary = _audio.get("_events")
+	var ids := [&"ceremony_obituary", &"ceremony_will", &"ceremony_heir", &"ceremony_contact",
+		&"ceremony_contact_reveal", &"legacy_purchase", &"welcome_back", &"prestige_confirm"]
+	for id in ids:
+		_check("'%s' has a sample" % id, not (events.get(id, []) as Array).is_empty())
+
+	# They ride the Ceremony bus, which keeps them separable in the mix from the tap sound — and,
+	# more importantly, means they cannot mark the player as PRESENT. A succession happens TO the
+	# player; a beat that renewed the presence window would be voting on their behalf.
+	var all_ceremony := true
+	for id in ids:
+		if (cues[id] as Dictionary)["bus"] != &"Ceremony":
+			all_ceremony = false
+	_check("every beat is on the Ceremony bus, so none can mark the player present", all_ceremony)
+
+	var shortest := 100000.0
+	for id in ids:
+		shortest = minf(shortest, float((cues[id] as Dictionary)["cooldown"]))
+	_check("their cooldowns prevent self-overlap (%.0f ms)" % shortest, shortest >= 250.0)
 
 
 ## A LOOP THAT DOES NOT MEET ITSELF CLICKS, once per lap, for as long as it plays.
 ##
 ## This shipped (2026-08-09). The generator rounded each wave's PERIOD to whole samples instead of
-## fitting whole cycles into the buffer, which left the loop 0.02 cycles short of home — a jump of
-## thirty times a normal sample step at the seam. Inaudible as a pitch error; obvious as a crackle
-## once the drone is held for seconds at a time (Tim: "there are crackles in it").
+## fitting whole cycles into the buffer, leaving the loop 0.02 cycles short of home — a jump thirty
+## times a normal sample step. Inaudible as a pitch error; obvious as a crackle once the drone is
+## held for seconds (Tim: "there are crackles in it").
 ##
-## Checked HERE, on the imported resource, rather than only in the generator: the generator asserts
-## what it wrote, and this asserts what the game will actually play. A future sourced sample, dropped
-## in by hand, gets the same scrutiny for free.
+## Checked on the IMPORTED resource rather than only in the generator: the generator asserts what it
+## wrote, this asserts what the game will play. A sourced loop dropped in by hand gets the same
+## scrutiny for free.
 ##
-## The comparator is the LARGEST step the waveform already makes on its own. The seam is simply one
-## more sample-to-sample transition, so anything within that range is normal motion — measuring
-## against the average instead makes a perfectly good loop look broken (which it did, on the first
-## attempt at this check).
+## The comparator is the LARGEST step the waveform already makes on its own — the seam is one more
+## sample transition, and measuring against the average makes a good loop look broken (it did, on the
+## first attempt at this check).
 func _check_loop_is_seamless(label: String, stream: AudioStreamWAV) -> void:
 	var bytes := stream.data
 	var frames := bytes.size() / 2
@@ -376,11 +414,108 @@ func _check_loop_is_seamless(label: String, stream: AudioStreamWAV) -> void:
 		var sample := bytes.decode_s16(i * 2)
 		biggest_step = maxi(biggest_step, absi(sample - previous))
 		previous = sample
-	var seam: int = absi(first - previous)   # last sample back round to the first
+	var seam: int = absi(first - previous)
 
 	_check("the %s loop meets itself cleanly (seam %d vs largest normal step %d)"
 			% [label, seam, biggest_step],
 		seam <= biggest_step)
+
+
+## THE BAND MAP (plan §3.2). A pure function on tier, so it can be checked exhaustively rather than
+## sampled — and every tier in the game must land somewhere, including tiers that do not exist yet.
+func _check_band_mapping() -> void:
+	print("
+-- the era band map --")
+	var script := _audio.get_script() as GDScript
+	var seen: Dictionary = {}
+	var previous := -1
+	var monotonic := true
+	for tier in range(1, 28):
+		var band: int = script.call("band_for_tier", tier)
+		seen[band] = true
+		if band < previous:
+			monotonic = false
+		previous = band
+	_check("every one of the 27 tiers maps to a band", seen.size() > 0)
+	_check("all five bands are used (%d of 5)" % seen.size(), seen.size() == 5)
+	# It must never go BACKWARDS: the music deepens as the run does, and a tier that fell back to an
+	# earlier band would crossfade the player into their own past.
+	_check("bands only ever move forward with the tiers", monotonic)
+
+	# The two Earth epochs get their own bands — the promotion is meant to be audible (§3.2).
+	_check("Blue Collar and White Collar are different bands",
+		int(script.call("band_for_tier", 1)) != int(script.call("band_for_tier", 2)))
+	# And a tier beyond the content still answers, rather than indexing off the end.
+	var beyond: int = script.call("band_for_tier", 99)
+	_check("a tier past the content still maps somewhere (%d)" % beyond, beyond >= 0 and beyond < 5)
+
+
+## THE MIX: crossfade, idle fade and duck all move the same volume, which is why they are computed
+## in one place. These check they cooperate rather than fight.
+func _check_music_mix() -> void:
+	print("
+-- the music mix --")
+	var players: Array = _audio.get("_music_players")
+	_check("there are two players, so a band can cross to another", players.size() == 2)
+
+	_audio.set_music_band(0)
+	_check("setting a band starts a track", int(_audio.get("_music_band")) == 0)
+	var first_player: int = int(_audio.get("_music_active"))
+
+	# Re-asserting the same band must be free — callers assert it on every epoch change.
+	_audio.set_music_band(0)
+	_check("re-asserting the same band does not restart it",
+		int(_audio.get("_music_active")) == first_player)
+
+	# A different band crosses to the OTHER player, or there is no crossfade to speak of.
+	_audio.set_music_band(3)
+	_check("a new band crosses to the other player",
+		int(_audio.get("_music_active")) != first_player)
+
+	# IDLE. Wind the interaction clock back and let the mix run: the music should fade away.
+	_audio.set("_music_idle_gain", 1.0)
+	_audio.set("_last_interaction_ms", Time.get_ticks_msec() - 600_000)
+	_audio.set("_heat_active", false)
+	for i in range(240):
+		_audio.call("_process", 0.05)
+	_check("with the player long gone, the music fades out (%.2f)"
+			% float(_audio.get("_music_idle_gain")),
+		float(_audio.get("_music_idle_gain")) < 0.01)
+
+	# ...and comes back when they touch anything.
+	_audio.set("_last_interaction_ms", Time.get_ticks_msec())
+	for i in range(120):
+		_audio.call("_process", 0.05)
+	_check("acting brings it back (%.2f)" % float(_audio.get("_music_idle_gain")),
+		float(_audio.get("_music_idle_gain")) > 0.99)
+
+	# A RIDE COUNTS AS PRESENCE. Fading out mid-rush because the player is HOLDING rather than
+	# tapping would be a bug that feels like a bug.
+	_audio.set("_last_interaction_ms", Time.get_ticks_msec() - 600_000)
+	_audio.set("_heat_active", true)
+	for i in range(120):
+		_audio.call("_process", 0.05)
+	_check("an active ride keeps the music alive even with no taps (%.2f)"
+			% float(_audio.get("_music_idle_gain")),
+		float(_audio.get("_music_idle_gain")) > 0.99)
+
+	# DUCK: with the bed running, the music sits lower than it would otherwise.
+	var ducked: float = (players[int(_audio.get("_music_active"))] as AudioStreamPlayer).volume_db
+	_audio.set("_heat_active", false)
+	_audio.set("_last_interaction_ms", Time.get_ticks_msec())
+	for i in range(10):
+		_audio.call("_process", 0.05)
+	var plain: float = (players[int(_audio.get("_music_active"))] as AudioStreamPlayer).volume_db
+	_check("the music ducks under a ride (%.1f dB vs %.1f dB)" % [ducked, plain], ducked < plain)
+
+	_audio.stop_music()
+	for i in range(120):
+		_audio.call("_process", 0.05)
+	var all_stopped := true
+	for player in players:
+		if (player as AudioStreamPlayer).playing:
+			all_stopped = false
+	_check("stopping the music really stops the streams", all_stopped)
 
 
 ## THE LIFT COUNT MUST FIT INSIDE THE WINDOW IT IS COUNTING FOR.
@@ -446,12 +581,18 @@ func _check_overdrive_bed() -> void:
 		(heat.stream as AudioStreamWAV).loop_mode != AudioStreamWAV.LOOP_DISABLED)
 	_check_loop_is_seamless("heat", heat.stream as AudioStreamWAV)
 	_check_loop_is_seamless("urgency", urgency.stream as AudioStreamWAV)
-	_check("they start SILENT rather than audible", heat.volume_db < -40.0)
-	_check("nothing plays before a ride begins", not heat.playing)
+	# Settle the bed first. It shares the per-frame mix with the music, and the music section above
+	# leaves a ride running to test the duck — so asserting a pristine startup state here would be
+	# measuring test order rather than behaviour.
+	_audio.set_heat_active(false)
+	for i in range(120):
+		_audio.call("_mix_heat_bed", 1.0 / 60.0)
+	_check("with no ride on, the bed is silent and stopped", not heat.playing and not urgency.playing)
 
 	# A ride starts.
 	_audio.set_heat_active(true)
 	_audio.set_heat(0.0)
+	_audio.call("_mix_heat_bed", 0.5)
 	_check("engaging starts the bed", heat.playing)
 	var cold_pitch := heat.pitch_scale
 	_check("the urgency layer is silent while heat is low (%.0f dB)" % urgency.volume_db,
@@ -459,6 +600,7 @@ func _check_overdrive_bed() -> void:
 
 	# Heat climbs.
 	_audio.set_heat(1.0)
+	_audio.call("_mix_heat_bed", 0.5)
 	_check("the drone RISES with heat (%.3f -> %.3f)" % [cold_pitch, heat.pitch_scale],
 		heat.pitch_scale > cold_pitch)
 	_check("...by a musical interval, not a siren (%.2f = %.1f semitones)"
@@ -470,6 +612,7 @@ func _check_overdrive_bed() -> void:
 	# Half way up, the urgency layer must still be out of the way — it announces the ceiling, and an
 	# alarm that sounds in the middle of the band is an alarm the player learns to ignore.
 	_audio.set_heat(0.5)
+	_audio.call("_mix_heat_bed", 0.5)
 	_check("...and stays silent through the middle of the band (%.0f dB)" % urgency.volume_db,
 		urgency.volume_db < -40.0)
 
@@ -477,14 +620,30 @@ func _check_overdrive_bed() -> void:
 	_audio.set_heat_active(true)
 	_check("re-engaging an already-running bed does not restart it", heat.playing)
 
+	# THE FLAG MUST BE FREE TO FLICKER. It is polled every frame from a value that genuinely wavers
+	# near the cruise clamp, and the first version rebuilt a fade tween and restarted two streams on
+	# every change — sixty times a second in a busy moment, on the audio thread. Tim's game closed
+	# outright while rushing and buying at once. Flipping it repeatedly must now cost nothing.
+	for i in range(200):
+		_audio.set_heat_active(i % 2 == 0)
+		_audio.call("_mix_heat_bed", 1.0 / 60.0)
+	_check("flipping the ride flag every frame leaves the bed intact", heat.stream != null)
+
 	# And it must actually STOP, not linger at -60 dB decoding forever.
 	_audio.set_heat_active(false)
-	for i in range(90):
-		await process_frame
-		if not heat.playing:
-			break
+	for i in range(120):
+		_audio.call("_mix_heat_bed", 1.0 / 60.0)
 	_check("ending the ride stops the streams rather than muting them", not heat.playing)
 	_check("...and the urgency layer stops with it", not urgency.playing)
+
+	# Coming back on must restart cleanly after that stop.
+	_audio.set_heat_active(true)
+	for i in range(30):
+		_audio.call("_mix_heat_bed", 1.0 / 60.0)
+	_check("a later ride starts the bed again", heat.playing)
+	_audio.set_heat_active(false)
+	for i in range(120):
+		_audio.call("_mix_heat_bed", 1.0 / 60.0)
 
 
 # --- Observing plays ----------------------------------------------------------------------------

@@ -665,6 +665,7 @@ func _on_play_pressed(type_script: Script) -> void:
 	# image (Tim, 2026-07-22). With both hidden, the player host is the only visible layer.
 	_show_list_chrome(false)
 	_player.visible = true
+	Audio.play(&"challenge_start")
 	_player.start_challenge(type_script)
 
 
@@ -686,6 +687,7 @@ func _return_to_list() -> void:
 
 func _on_back_pressed() -> void:
 	visible = false
+	Audio.play(&"screen_close")
 	closed.emit()
 
 

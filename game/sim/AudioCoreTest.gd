@@ -65,6 +65,7 @@ func _run() -> void:
 	await _check_buy_intensity_is_relative()
 	_check_one_sound_per_gesture()
 	_check_vent_cues_exist()
+	_check_ceremony_beats()
 	_check_the_count_fits_the_window()
 	await _check_overdrive_bed()
 
@@ -381,6 +382,49 @@ func _check_loop_is_seamless(label: String, stream: AudioStreamWAV) -> void:
 	_check("the %s loop meets itself cleanly (seam %d vs largest normal step %d)"
 			% [label, seam, biggest_step],
 		seam <= biggest_step)
+
+
+## THE STORY BEATS (Phase 4). These differ from every other sound in the game in two ways that are
+## easy to get wrong, so both are asserted rather than assumed.
+func _check_ceremony_beats() -> void:
+	print("
+-- the ceremony beats --")
+	var events: Dictionary = _audio.get("_events")
+	var ids := [&"ceremony_obituary", &"ceremony_will", &"ceremony_heir", &"ceremony_contact",
+		&"ceremony_contact_reveal", &"legacy_purchase", &"welcome_back"]
+	for id in ids:
+		_check("'%s' has a sample" % id,
+			events.has(id) and (events[id] as AudioEvent).stream != null)
+
+	# ONE: they ride the Ceremony bus, not SFX. The player controls both with one slider, but the mix
+	# needs them separable — a beat that had to compete with the tap sound would either bury it or be
+	# buried by it, and tuning one would wreck the other.
+	var all_ceremony := true
+	for id in ids:
+		var event: AudioEvent = events.get(id)
+		if event == null or event.bus != &"Ceremony":
+			all_ceremony = false
+	_check("every beat is on the Ceremony bus", all_ceremony)
+
+	# TWO: they must not count as the player being PRESENT. A succession or a first contact happens
+	# TO the player — they are watching a screen, not acting — so if these renewed the presence
+	# window they would be voting on the player's behalf. (Nothing consults presence today; this is
+	# the trap that removed the collect sound, and Phase 2's idle fade will read it for real.)
+	var ceremony_is_passive := true
+	for id in ids:
+		var event: AudioEvent = events.get(id)
+		if event != null and (event.bus == &"SFX" or event.bus == &"UI"):
+			ceremony_is_passive = false
+	_check("...so none of them can mark the player as present", ceremony_is_passive)
+
+	# They are long — over a second in places — and a double-fire would layer one over itself.
+	var shortest_cooldown := 100000.0
+	for id in ids:
+		var event: AudioEvent = events.get(id)
+		if event != null:
+			shortest_cooldown = minf(shortest_cooldown, event.cooldown_ms)
+	_check("their cooldowns are long enough to prevent self-overlap (%.0f ms)" % shortest_cooldown,
+		shortest_cooldown >= 500.0)
 
 
 ## THE LIFT COUNT MUST FIT INSIDE THE WINDOW IT IS COUNTING FOR.

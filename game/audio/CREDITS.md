@@ -25,6 +25,13 @@ commit it.
 | `sfx/vent_miss.wav` | Generated — `tools/generate_placeholder_audio.py` | Original work, no third-party content | No |
 | `sfx/overheat.wav` | Generated — `tools/generate_placeholder_audio.py` | Original work, no third-party content | No |
 | `sfx/rush_ready.wav` | Generated — `tools/generate_placeholder_audio.py` | Original work, no third-party content | No |
+| `sfx/ceremony_obituary.wav` | Generated — `tools/generate_placeholder_audio.py` | Original work, no third-party content | No |
+| `sfx/ceremony_will.wav` | Generated — `tools/generate_placeholder_audio.py` | Original work, no third-party content | No |
+| `sfx/ceremony_heir.wav` | Generated — `tools/generate_placeholder_audio.py` | Original work, no third-party content | No |
+| `sfx/ceremony_contact.wav` | Generated — `tools/generate_placeholder_audio.py` | Original work, no third-party content | No |
+| `sfx/ceremony_contact_reveal.wav` | Generated — `tools/generate_placeholder_audio.py` | Original work, no third-party content | No |
+| `sfx/legacy_purchase.wav` | Generated — `tools/generate_placeholder_audio.py` | Original work, no third-party content | No |
+| `sfx/welcome_back.wav` | Generated — `tools/generate_placeholder_audio.py` | Original work, no third-party content | No |
 
 **These are placeholders.** They are synthesized sine tones with amplitude envelopes, written
 directly as PCM by the script above — no sampled or third-party material of any kind, so there is

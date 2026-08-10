@@ -283,6 +283,9 @@ func _build_phase2(parent: VBoxContainer) -> void:
 ##   seed      — float, the cash the generation was born with (the "grew from $X" anchor)
 ##   employees — int, how many properties the generation kept staffed (its payroll)
 func show_obituary(stats: Dictionary) -> void:
+	# The succession's three beats each get their own sound, and the arc is audible in their shape:
+	# down for the death, level for the paperwork, up for the heir (Plans/Audio_System.md Phase 4).
+	Audio.play(&"ceremony_obituary")
 	_obituary_name_label.text = String(stats.get("name", ""))
 	_obituary_fortune_label.text = Money.of(float(stats.get("fortune", 0.0))).display()
 
@@ -315,6 +318,7 @@ func show_obituary(stats: Dictionary) -> void:
 ##   legacy_gain    — integer legacy points awarded (treat as int)
 ## `dying_dynasty_name` — e.g. "Wellington Pemberton VIII"
 func show_will(will: Dictionary, dying_dynasty_name: String) -> void:
+	Audio.play(&"ceremony_will")
 	_deceased_label.text = "The estate of %s" % dying_dynasty_name
 
 	# Format money amounts; deductions are prefixed with a minus sign so the
@@ -339,6 +343,7 @@ func show_will(will: Dictionary, dying_dynasty_name: String) -> void:
 ## `heir_dynasty_name` — e.g. "Wellington Pemberton IX"
 ## `generation`        — the new 1-based generation number
 func show_heir_reveal(heir_dynasty_name: String, generation: int) -> void:
+	Audio.play(&"ceremony_heir")
 	_heir_name_label.text   = heir_dynasty_name
 	# Deadpan subline: acknowledges the ceremony is perfunctory, which is the joke.
 	_generation_label.text  = "Generation %d — the family office handles the paperwork now." % generation

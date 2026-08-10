@@ -1,6 +1,6 @@
 # Audio System — Implementation Plan
 
-**Status:** Phases 0, 1 and 3 BUILT (2026-08-08/09). Tim on the Phase 1 slice: "the sound on buy and
+**Status:** Phases 0, 1, 3 and 4 BUILT (2026-08-08/09); 0/1/3 merged to `main` at `24c5e70`. Tim on the Phase 1 slice: "the sound on buy and
 tap are good". Phase 3 (overdrive) was brought forward ahead of Phase 2 because rush is central to
 how he plays. Phases 2, 4, 5 not started. Written 2026-08-06 from an interview with Tim.
 **Graduates:** GDD §12 (Art & Audio Direction), §13 M3 milestone entry "audio implementation
@@ -735,14 +735,19 @@ cruise-vs-overdrive timbre split, music ducking.
 **Exit criterion:** Tim can hit vent windows with the screen dimmed / not looking directly
 at the bar. That is the test that proves the feature. **PENDING.**
 
-### Phase 4 — `feature/audio-ceremony`
+### Phase 4 — BUILT 2026-08-09 — `feature/audio-ceremony`
 Succession/obituary (`WillScreen.gd:285` `show_obituary`, `:317` `show_will`, `:341`
 `show_heir_reveal`), First Contact / epoch arrival (`FirstContactOverlay.gd:248
 show_contact`, reveal `:321`, typewriter `:418`), Legacy upgrade purchase
 (`LegacyScreen.purchased` → `Main.gd:2382`). Music ducking per beat. Welcome-back overlay
 (`WelcomeBackOverlay.gd:237 show_pile`) gets a return-spike cue.
 
-**Exit criterion:** a full succession on device feels like an event.
+**Exit criterion:** a full succession on device feels like an event. **PENDING.**
+
+Music ducking per beat is deferred with Phase 2 — there is nothing to duck yet. The First Contact
+typewriter was left silent: it is a single `visible_ratio` tween rather than a per-character step, so
+a per-letter tick would need a poller bolted onto it, and a repeated tick under a story beat is the
+most likely thing in this phase to wear out its welcome.
 
 ### Phase 5 — `feature/audio-ui-polish`
 Tabs and major actions (§4.6). Mix pass across all buses at once — the first time all

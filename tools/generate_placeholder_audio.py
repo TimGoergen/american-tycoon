@@ -38,14 +38,20 @@ OUT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 # Equal-temperament note frequencies used below, so the tones sit in a real scale rather than on
 # arbitrary numbers. A4 = 440.
 NOTES = {
+    "F2": 87.31,
     "A2": 110.00,
     "E3": 164.81,
     "A3": 220.00,
+    "F3": 174.61,
     "C4": 261.63,
+    "F4": 349.23,
+    "G4": 392.00,
     "E4": 329.63,
     "A4": 440.00,
     "A5": 880.00,
     "C5": 523.25,
+    "D5": 587.33,
+    "F5": 698.46,
     "E5": 659.25,
     "G5": 783.99,
     "C6": 1046.50,
@@ -136,6 +142,27 @@ def noise_burst(seconds, curve=6.0):
     return samples
 
 
+def glide(start_hz, end_hz, seconds, harmonics=(1.0,), curve=2.0, attack=0.05):
+    """A tone that SLIDES from one pitch to another — the theremin gesture the alien beats want.
+
+    Integrating the frequency over time rather than plugging it into sin(2*pi*f*t) is the whole
+    point: the naive version restarts the phase every sample as the frequency moves, which warbles.
+    Accumulating phase keeps the waveform continuous through the slide.
+    """
+    total = int(seconds * SAMPLE_RATE)
+    samples = []
+    phase = 0.0
+    for i in range(total):
+        progress = i / max(1, total - 1)
+        frequency = start_hz + (end_hz - start_hz) * progress
+        phase += 2.0 * math.pi * frequency / SAMPLE_RATE
+        value = 0.0
+        for index, level in enumerate(harmonics):
+            value += level * math.sin(phase * (index + 1))
+        samples.append(value * envelope(i, total, attack, curve))
+    return samples
+
+
 def write_wav(name, samples):
     """Normalize to PEAK and write 16-bit mono PCM."""
     loudest = max(abs(value) for value in samples) or 1.0
@@ -185,6 +212,7 @@ def main():
 
     write_rush_layer()
     write_vent_cues()
+    write_ceremony()
 
 
 def write_rush_layer():
@@ -246,6 +274,58 @@ def write_vent_cues():
     write_wav("rush_ready.wav", sequence([
         (0.000, tone(NOTES["A4"], 0.08, harmonics=(1.0, 0.3), curve=6.0)),
         (0.055, tone(NOTES["E5"], 0.20, harmonics=(1.0, 0.35), curve=4.0)),
+    ]))
+
+
+def write_ceremony():
+    """The story beats (Plans/Audio_System.md §4, Phase 4). These are the only sounds in the game
+    that are ALLOWED to be slow: every other cue answers a press and must be out of the way, while
+    these accompany a screen the player is reading. They ride their own Ceremony bus so they can sit
+    above the feedback floor without the tap sound having to move."""
+    # SUCCESSION, in three beats. A death, a reading, and an heir -- the arc has to be audible in the
+    # shape: down, level, up.
+    write_wav("ceremony_obituary.wav", sequence([
+        (0.000, tone(NOTES["F3"], 1.10, harmonics=(1.0, 0.3, 0.12), curve=1.6, attack=0.05)),
+        (0.220, tone(NOTES["C4"], 0.95, harmonics=(1.0, 0.25), curve=1.6, attack=0.05)),
+        (0.440, tone(NOTES["F2"], 1.40, harmonics=(1.0, 0.2), curve=1.4, attack=0.06)),
+    ]))
+    # The will: level and procedural, a chord that neither mourns nor celebrates. It is paperwork.
+    write_wav("ceremony_will.wav", sequence([
+        (0.000, tone(NOTES["C4"], 0.85, harmonics=(1.0, 0.35, 0.15), curve=2.2, attack=0.03)),
+        (0.000, tone(NOTES["G4"], 0.80, harmonics=(1.0, 0.3), curve=2.2, attack=0.03)),
+    ]))
+    # The heir: the one beat in the set that resolves upward and lands. The bloodline continues.
+    write_wav("ceremony_heir.wav", sequence([
+        (0.000, tone(NOTES["F4"], 0.30, harmonics=(1.0, 0.4, 0.2), curve=3.0)),
+        (0.180, tone(NOTES["C5"], 0.30, harmonics=(1.0, 0.4, 0.2), curve=3.0)),
+        (0.360, tone(NOTES["F5"], 1.20, harmonics=(1.0, 0.5, 0.25, 0.12), curve=1.8)),
+    ]))
+
+    # FIRST CONTACT. A theremin slide is the one instrument that says "alien" without a word of
+    # explanation, and the GDD's audio direction asks for exactly that vocabulary.
+    write_wav("ceremony_contact.wav", sequence([
+        (0.000, glide(NOTES["A3"], NOTES["E5"], 1.30, harmonics=(1.0, 0.22, 0.08), curve=1.5)),
+        (0.500, glide(NOTES["E4"], NOTES["A4"], 0.95, harmonics=(1.0, 0.18), curve=1.8, attack=0.12)),
+    ]))
+    # The civilization is named: a bright, wide chord landing under the reveal.
+    write_wav("ceremony_contact_reveal.wav", sequence([
+        (0.000, tone(NOTES["A4"], 1.00, harmonics=(1.0, 0.45, 0.2, 0.1), curve=2.0, attack=0.02)),
+        (0.050, tone(NOTES["D5"], 0.95, harmonics=(1.0, 0.4, 0.18), curve=2.0, attack=0.02)),
+        (0.100, tone(NOTES["F5"], 0.90, harmonics=(1.0, 0.35, 0.15), curve=2.0, attack=0.02)),
+    ]))
+
+    # A LEGACY PURCHASE. Short and bright -- this one fires far more often than the others, so it is
+    # the ceremony sound most able to wear out its welcome, and it is deliberately the smallest.
+    write_wav("legacy_purchase.wav", sequence([
+        (0.000, tone(NOTES["A5"], 0.14, harmonics=(1.0, 0.5, 0.25), curve=4.5)),
+        (0.080, tone(NOTES["E5"] * 2.0, 0.34, harmonics=(1.0, 0.4, 0.2), curve=3.0)),
+    ]))
+
+    # COMING BACK to a pile of offline earnings: warm, and pleased to see you.
+    write_wav("welcome_back.wav", sequence([
+        (0.000, tone(NOTES["C5"], 0.28, harmonics=(1.0, 0.45, 0.2), curve=3.2, attack=0.02)),
+        (0.150, tone(NOTES["E5"], 0.28, harmonics=(1.0, 0.4, 0.18), curve=3.2, attack=0.02)),
+        (0.300, tone(NOTES["G5"], 0.75, harmonics=(1.0, 0.5, 0.25, 0.1), curve=2.2, attack=0.02)),
     ]))
 
 

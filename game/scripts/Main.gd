@@ -3084,6 +3084,9 @@ func _on_retain_requested(property_index: int, levels: int) -> void:
 ## generation immediately (faster cycles / cheaper staff / fatter wage take hold
 ## mid-life) and persist, so a purchase is never lost to a crash before autosave.
 func _on_upgrade_purchased(_upgrade_id: String) -> void:
+	# A Legacy purchase is a ceremony beat rather than a shop click: it is permanent, it costs the
+	# currency of a whole lifetime, and it is the one thing carried across a succession.
+	Audio.play(&"legacy_purchase")
 	dynasty.refresh_current_generation_effects()
 	# The purchase just drained the shared Legacy wallet, and the Household Staff rows carry
 	# can_afford SNAPSHOTS — without a rebuild they keep advertising affordability the wallet

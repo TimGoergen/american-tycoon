@@ -60,7 +60,7 @@ func _initialize() -> void:
 
 	if _failures == 0:
 		print("ALL CHECKS PASSED")
-		quit()
+		quit(0)   # explicit: the runner judges by exit code
 	else:
 		print("%d CHECK(S) FAILED" % _failures)
 		quit(1)

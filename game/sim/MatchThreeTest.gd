@@ -30,7 +30,7 @@ func _init() -> void:
 
 	print("")
 	if _failures == 0:
-		print("ALL TESTS PASS (%d checks)" % _checks)
+		print("ALL CHECKS PASSED (%d checks)" % _checks)
 		quit(0)
 	else:
 		print("FAILURES: %d of %d checks failed" % [_failures, _checks])

@@ -69,6 +69,9 @@ var _pos: float = 0.25           # marker position, 0 = bottom (it starts restin
 var _vel: float = 0.0
 var _held: bool = false
 var _time_in_zone: float = 0.0
+## Whether the beam was inside the scoring zone last frame, so the crossing cues fire on the EDGE
+## rather than every frame it happens to be inside.
+var _was_in_zone := false
 var _total_round_seconds: float = 1.0  # fixed performance denominator (set in begin)
 var _zone_center: float = 0.6          # current center of the gold zone (wanders)
 var _zone_target: float = 0.6          # center the zone is currently easing toward
@@ -205,6 +208,7 @@ func begin(tuning: TuningConfig) -> void:
 
 
 func _on_lift_button_down() -> void:
+	Audio.play(&"bal_lift")
 	_held = true
 
 
@@ -269,6 +273,13 @@ func _process(delta: float) -> void:
 		_vel = -absf(_vel) * EDGE_BOUNCE
 
 	var in_zone := absf(_pos - _zone_center) <= ZONE_HALF
+	# THE ONLY MOMENTS THAT MATTER HERE ARE THE CROSSINGS. This game has no discrete input — the
+	# player holds, the beam drifts — so entering and leaving the scoring zone are the only times
+	# anything changes, and they are what the audio marks. A continuous tone tracking the beam was
+	# the obvious alternative and would be the second drone in the game; one is enough.
+	if in_zone != _was_in_zone:
+		Audio.play(&"bal_enter" if in_zone else &"bal_leave")
+		_was_in_zone = in_zone
 	if in_zone:
 		_time_in_zone += delta
 
@@ -328,6 +339,7 @@ func _update_legacy_gem(delta: float, in_zone: bool) -> void:
 	if _gem_progress >= 1.0:
 		# Bar full — bank the gem (host gates/grants it), clear it, and flash a win cue.
 		collect_legacy_gem()
+		Audio.play(&"bal_gem")
 		_gem_active = false
 		_gem_progress = 0.0
 		_gem_won_flash = 0.9

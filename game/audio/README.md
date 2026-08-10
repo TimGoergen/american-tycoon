@@ -137,6 +137,32 @@ Bus decides which slider governs a sound, and whether it counts as the player be
 | `catch_miss` | SFX | -12 | 60 ms | A coin reaches the floor uncaught. |
 | `catch_spawn` | SFX | -22 | 25 ms | A coin appears. Almost inaudible on purpose: its job is to make the late-round spawn RATE audible, not to announce a coin. |
 
+### Memory
+
+| Cue / filename | Bus | dB | Cooldown | Fires when |
+|---|---|---|---|---|
+| `mem_pad` | SFX | -7 | 20 ms | A pad lights — during playback AND when the player taps it. PITCHED PER PAD, so a sequence is a little tune you can rehearse by ear. |
+| `mem_round` | SFX | -4 | 200 ms | The whole sequence recalled correctly. |
+| `mem_wrong` | SFX | -3 | 200 ms | The wrong pad. This game ENDS on it, so it is the most final sound of the six. |
+| `mem_gem` | Ceremony | -4 | 300 ms | A Legacy gem earned in the bonus round. |
+
+### Balance
+
+| Cue / filename | Bus | dB | Cooldown | Fires when |
+|---|---|---|---|---|
+| `bal_enter` | SFX | -9 | 150 ms | The beam crosses INTO the scoring zone. |
+| `bal_leave` | SFX | -11 | 150 ms | The beam drifts back out of it. |
+| `bal_lift` | SFX | -16 | 80 ms | The lift button is pressed. |
+| `bal_gem` | Ceremony | -4 | 300 ms | A Legacy gem earned by holding the zone long enough. |
+
+### Timing Bar
+
+| Cue / filename | Bus | dB | Cooldown | Fires when |
+|---|---|---|---|---|
+| `time_lock_hit` | SFX | -5 | 80 ms | A lock inside the zone. |
+| `time_lock_miss` | SFX | -8 | 80 ms | A lock outside it. |
+| `time_gem` | Ceremony | -4 | 300 ms | A lock that also collected the pending Legacy gem. |
+
 ### Ceremony — the story beats
 
 | Cue / filename | Bus | dB | Cooldown | Fires when |
@@ -185,7 +211,7 @@ playing rather than cutting to silence, so tracks can arrive one at a time.
 | `auto_purchase` | The Acquisitions Desk buys without the player, and unattended events stay silent. It cannot even reach a hook — the desk buys inside the core, which never touches the audio layer. |
 | `cycle_payout` | A cycle completing was built, heard, and removed: *"only when the user taps to purchase"*. |
 
-## Three sounds the game pitches itself
+## Four sounds the game pitches itself
 
 Do not add pitch variance to either, and do not record them with vibrato — the game is doing the
 tuning, and a wobble on top is simply out of tune.
@@ -197,10 +223,12 @@ tuning, and a wobble on top is simply out of tune.
 - **`m3_match`** climbs a whole tone per cascade step, so a chain reads as a run. Record it as one
   clean tone with no vibrato and no movement of its own — anything already going somewhere fights
   the climb the game puts on top.
+- **`mem_pad`** is pitched per pad across a major triad plus the octave, which is what turns a
+  memory sequence into a tune. Record it steady and clean, with no movement of its own.
 
 ## The minigames
 
-**Basketball, Match Three and Catch Money are done; the other three are not.** The six games share the beats above — begin, score, miss, countdown, new best, over — and each
+**All six games are done.** The six games share the beats above — begin, score, miss, countdown, new best, over — and each
 game's own vocabulary (a swish, a match, a caught coin, a flipped pad) is a LATER PASS, deliberately.
 Getting the shared layer right first means every game already sounds like it belongs to this game
 before any of them sounds like itself.

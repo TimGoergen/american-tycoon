@@ -335,6 +335,7 @@ func _on_lock() -> void:
 	# Drop a fading line wherever the marker was at the moment of the click — hit or miss — colored
 	# green (scored) or red (wasted) so the player gets clear feedback on exactly where, and how
 	# well, their tap was perceived.
+	Audio.play(&"time_lock_hit" if hit else &"time_lock_miss")
 	_click_marks.append({"pos": _marker_pos, "age": 0.0, "hit": hit})
 	# A pending legacy gem is consumed by THIS lock, whichever way it goes: a hit (lock landed in
 	# the zone the gem sits in) collects it with a win cue; a miss simply loses it (no penalty).
@@ -343,6 +344,7 @@ func _on_lock() -> void:
 		_legacy_gem_active = false
 		if hit:
 			collect_legacy_gem()
+			Audio.play(&"time_gem")
 			_legacy_win_flash = 1.0
 			grabbed_gem = true  # this lock's success chip becomes the gold "LEGACY GEM!" cue
 		else:

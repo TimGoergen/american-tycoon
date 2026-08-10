@@ -221,6 +221,7 @@ def main():
     write_basketball_cues()
     write_match_three_cues()
     write_catch_money_cues()
+    write_remaining_game_cues()
     write_music()
 
 
@@ -633,6 +634,60 @@ def write_catch_money_cues():
     ]))
     # SPAWN: almost nothing. Its job is to make the late-round RATE audible, not to announce a coin.
     write_wav("catch_spawn.wav", noise_burst(0.022, curve=12.0))
+
+
+def write_remaining_game_cues():
+    """Memory, Balance and Timing Bar — the last three games' own vocabularies."""
+    # MEMORY. One pad tone, pitched per pad by the game across a major triad + octave, so a sequence
+    # is a little tune. Authored clean and steady for the same reason as the tap note: the game is
+    # doing the tuning, and a sample with its own movement would fight it.
+    write_wav("mem_pad.wav", tone(NOTES["C5"], 0.20, harmonics=(1.0, 0.4, 0.18), curve=4.0))
+    # A round recalled: the sequence closing, resolved upward.
+    write_wav("mem_round.wav", sequence([
+        (0.000, tone(NOTES["C5"], 0.10, harmonics=(1.0, 0.4, 0.18), curve=4.5)),
+        (0.070, tone(NOTES["G5"], 0.30, harmonics=(1.0, 0.45, 0.2), curve=3.2)),
+    ]))
+    # The wrong pad — this game ENDS on it, so it is the most final sound of the six.
+    write_wav("mem_wrong.wav", sequence([
+        (0.000, tone(NOTES["F3"], 0.40, harmonics=(1.0, 0.35, 0.15), curve=3.0)),
+        (0.000, tone(NOTES["F3"] * 1.059463, 0.40, harmonics=(1.0, 0.3), curve=3.0)),
+    ]))
+    write_wav("mem_gem.wav", sequence([
+        (0.000, tone(NOTES["E5"], 0.12, harmonics=(1.0, 0.45, 0.2), curve=4.2)),
+        (0.080, tone(NOTES["A5"], 0.40, harmonics=(1.0, 0.5, 0.26, 0.13), curve=2.5)),
+    ]))
+
+    # BALANCE. Two crossings, deliberately a matched pair: the same interval up on the way in and
+    # down on the way out, so the ear learns them as one thing with two directions.
+    write_wav("bal_enter.wav", sequence([
+        (0.000, tone(NOTES["C5"], 0.08, harmonics=(1.0, 0.35), curve=5.5)),
+        (0.055, tone(NOTES["G5"], 0.22, harmonics=(1.0, 0.4, 0.18), curve=3.6)),
+    ]))
+    write_wav("bal_leave.wav", sequence([
+        (0.000, tone(NOTES["G5"], 0.08, harmonics=(1.0, 0.35), curve=5.5)),
+        (0.055, tone(NOTES["C5"], 0.22, harmonics=(1.0, 0.3), curve=3.6)),
+    ]))
+    # The lift press itself: mechanical and tiny, under everything else.
+    write_wav("bal_lift.wav", noise_burst(0.035, curve=10.0))
+    write_wav("bal_gem.wav", sequence([
+        (0.000, tone(NOTES["A4"], 0.12, harmonics=(1.0, 0.45, 0.2), curve=4.2)),
+        (0.080, tone(NOTES["E5"], 0.40, harmonics=(1.0, 0.5, 0.26, 0.13), curve=2.5)),
+    ]))
+
+    # TIMING BAR. A lock is a single decisive press, so both outcomes are SHORT and definite — this
+    # game is about the instant, and a long sound would still be playing when the bar moved on.
+    write_wav("time_lock_hit.wav", sequence([
+        (0.000, tone(NOTES["E5"], 0.07, harmonics=(1.0, 0.5, 0.25), curve=6.5)),
+        (0.040, tone(NOTES["C5"] * 2.0, 0.20, harmonics=(1.0, 0.45, 0.2), curve=3.8)),
+    ]))
+    write_wav("time_lock_miss.wav", sequence([
+        (0.000, noise_burst(0.045, curve=8.0)),
+        (0.000, tone(NOTES["A3"], 0.11, harmonics=(1.0, 0.3), curve=6.0)),
+    ]))
+    write_wav("time_gem.wav", sequence([
+        (0.000, tone(NOTES["C5"], 0.12, harmonics=(1.0, 0.45, 0.2), curve=4.2)),
+        (0.080, tone(NOTES["G5"], 0.40, harmonics=(1.0, 0.5, 0.26, 0.13), curve=2.5)),
+    ]))
 
 
 def verify_loops():

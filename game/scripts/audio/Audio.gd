@@ -172,6 +172,29 @@ const CUES := {
 	&"catch_miss":    {"bus": BUS_SFX, "db": -12.0, "cooldown": 60.0, "variance": 0.06},
 	&"catch_spawn":   {"bus": BUS_SFX, "db": -22.0, "cooldown": 25.0, "variance": 0.10},
 
+	# --- Memory -----------------------------------------------------------------------------------
+	# A memory game's sounds CARRY INFORMATION rather than decorate: each pad has its own pitch, so
+	# the sequence is a little tune and the player can rehearse it by ear. That is the whole design —
+	# one cue, pitched per pad, exactly like the tap scale.
+	&"mem_pad":     {"bus": BUS_SFX, "db": -7.0, "cooldown": 20.0, "variance": 0.0},
+	&"mem_round":   {"bus": BUS_SFX, "db": -4.0, "cooldown": 200.0, "variance": 0.0},
+	&"mem_wrong":   {"bus": BUS_SFX, "db": -3.0, "cooldown": 200.0, "variance": 0.0},
+	&"mem_gem":     {"bus": BUS_CEREMONY, "db": -4.0, "cooldown": 300.0, "variance": 0.0},
+
+	# --- Balance ----------------------------------------------------------------------------------
+	# The only game with no discrete input: the player holds, and the beam drifts. So its sounds are
+	# about CROSSING — entering and leaving the zone — because that is the only moment anything
+	# actually changes.
+	&"bal_enter":   {"bus": BUS_SFX, "db": -9.0, "cooldown": 150.0, "variance": 0.0},
+	&"bal_leave":   {"bus": BUS_SFX, "db": -11.0, "cooldown": 150.0, "variance": 0.0},
+	&"bal_lift":    {"bus": BUS_SFX, "db": -16.0, "cooldown": 80.0, "variance": 0.05},
+	&"bal_gem":     {"bus": BUS_CEREMONY, "db": -4.0, "cooldown": 300.0, "variance": 0.0},
+
+	# --- Timing Bar -------------------------------------------------------------------------------
+	&"time_lock_hit":  {"bus": BUS_SFX, "db": -5.0, "cooldown": 80.0, "variance": 0.0},
+	&"time_lock_miss": {"bus": BUS_SFX, "db": -8.0, "cooldown": 80.0, "variance": 0.04},
+	&"time_gem":       {"bus": BUS_CEREMONY, "db": -4.0, "cooldown": 300.0, "variance": 0.0},
+
 	# --- Settings previews (played when a slider is released) --------------------------------------
 	&"music_preview":    {"bus": BUS_MUSIC, "db": -4.0, "cooldown": 200.0, "variance": 0.0},
 }

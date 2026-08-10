@@ -1,19 +1,82 @@
 # Audio System — Implementation Plan
 
-**Status:** ALL PHASES BUILT (2026-08-08/09); 0/1/3 merged to `main` at `24c5e70`. Every cue in the
-game now has a hook and a default sound, and `game/audio/README.md` — generated from the cue table,
-so it cannot drift — is the drop sheet for replacing them. What remains is sourcing the audio itself,
-and the mix pass that only becomes meaningful once real samples are in.
+**Status: COMPLETE AND MERGED — `main` @ `1bd2511`, 2026-08-10.** Every phase of §8 is built. What
+remains is not code: the audio ASSETS themselves (everything shipped is a synthesized placeholder),
+the mix pass that only becomes meaningful once real samples land, and the per-phase device criteria.
 
-**§1.4 REVERSED 2026-08-09:** the `audio_events.tres` catalog is gone. Sounds are found BY FILENAME
-(`res://audio/cues/<cue id>.ogg`, falling back to `.wav`), which serves the section's own goal —
-swapping a sample without touching code — better than a manifest did, because it also removes the
-second place a sound could be described. Tim on the Phase 1 slice: "the sound on buy and
-tap are good". Phase 3 (overdrive) was brought forward ahead of Phase 2 because rush is central to
-how he plays. Phases 2, 4, 5 not started. Written 2026-08-06 from an interview with Tim.
-**Graduates:** GDD §12 (Art & Audio Direction), §13 M3 milestone entry "audio implementation
-(exotica/muzak per §12)", and GDD §11 open item "Sound & haptics design — remaining open:
-haptics and per-event sound mapping."
+**Written 2026-08-06** from an interview with Tim; built 2026-08-08 to 08-10.
+**Graduates** GDD §12 (Art & Audio Direction), the §13 M3 milestone entry "audio implementation
+(exotica/muzak per §12)", and GDD §11 open item "Sound & haptics design".
+
+---
+
+## SHIPPED STATE — read this before the sections below
+
+The sections after this point are the ORIGINAL PLAN plus its revisions, and several were reversed by
+playtesting. This section is what is actually true. Where they disagree, this wins.
+
+### What exists
+
+**78 cues**, each with a hook and a default sound: the economy loop, the interface, rush and the vent
+gesture, Challenge Mode, the ceremony beats, five era music bands, the shared minigame beats, and all
+six games' own vocabularies. `game/audio/README.md` — **generated** by `sim/AudioCueDoc.gd` from the
+cue table in `Audio.gd`, so it cannot drift — lists every one with its trigger, bus, trim and
+filename. Re-run it after touching `CUES`.
+
+### How a sound is found — §1.4 REVERSED
+
+There is no manifest. A cue plays whatever is at `res://audio/cues/<cue id>.ogg`, falling back to
+`.wav`; `audio/loops/` holds the two continuous rush layers, `audio/music/` the era tracks.
+`config/audio_events.tres` and its two resource classes were **deleted**.
+
+The plan asked for sound data to live outside GDScript so samples could be swapped without code
+changes. A filename lookup serves that better than a manifest did, because it also removes the second
+place a sound could be described. Numbered variants (`<id>_1`…`_4`, picked at random per play) and
+`<id>_layer` companions come free, probed BY NAME rather than by scanning a folder — directory
+listings inside an exported PCK are a bug class this project has already paid for once.
+
+**A missing file is silent, not broken**, and startup prints what is still unrecorded.
+
+### Reversals worth knowing, all from playing it
+
+- **§4.3 — cycle-payout audio was built, heard, and REMOVED.** "Only when the user taps to purchase."
+- **§4.1 — the tap scale** climbed and then stuck at the top, which made a sustained run one repeated
+  note. It now rises and falls inside a window that drifts across a two-octave set.
+- **§5.2 — the vent count moved from the SPAWN to the WINDOW**, and the haptic followed it, reversing
+  a July decision. A marker 0.7 s before the thing it marks asks the player to hold an interval in
+  their head and punishes a misjudgement.
+- **§5.3 — music STOPS entirely during a minigame** rather than ducking. It still ducks 4 dB under a
+  rush.
+- **The minigames were not in the original event map at all.** They now have a shared layer (begin,
+  score, miss, countdown, best, over) plus per-game cues.
+
+### Four sounds the game pitches itself
+
+`tap_note`, `vent_lift`, `m3_match` (per cascade step) and `mem_pad` (per pad). Record these as ONE
+clean note with no vibrato and no movement of their own — the game is doing the tuning, and a sample
+already going somewhere fights it.
+
+### A crash this caused, and the rule that came out of it
+
+Tim's device closed outright while rushing and buying at once. `set_heat_active` was killing and
+rebuilding a fade tween and restarting two streaming players on every call — and it is driven from
+`is_cruising()`, which the UI polls EVERY FRAME and which wavers at the cruise clamp.
+
+**Never let per-frame-polled state drive `stop()`/`play()` or tween rebuilds.** The fix was to move
+the bed onto the same per-frame gain model the music mix already used.
+
+### Still open
+
+- **§7.2, the only decision with money attached:** commission one melody arranged five ways, or ship
+  five related library tracks plus a shared re-instrumented motif sting. The architecture does not
+  care; it is a file swap either way.
+- **The mix pass** (§8 Phase 5's second half) — all 78 trims were set in isolation.
+- **Device criteria:** the 20-minute tap-scale question, a multi-epoch session without music fatigue,
+  hitting vent windows with eyes off the bar, and whether a succession feels like an event.
+- **Three cues have a slot and a default but no caller:** `frenzy_end` (the core has no signal for a
+  burn expiring), and the two denial cues (deferred by decision 15).
+
+---
 
 **Code map basis:** all `file:line` references were verified against the working tree on
 branch `feature/challenge-mode-gating` on 2026-08-06. Two branches carry work this plan
@@ -189,6 +252,10 @@ most likely to stack. Concrete limits:
   nothing.
 
 ### 1.4 What plays where — the config resource
+
+> **SUPERSEDED — see SHIPPED STATE at the top.** This catalog was built and then deleted: sounds are
+> found by FILENAME (`audio/cues/<cue id>.ogg`), which serves this section's own goal better than a
+> manifest does. The rest of §1.4 is kept for the reasoning that led here.
 
 **New file:** `game/config/audio_events.tres` (a `Resource`, matching how `tuning.tres` and
 the property `.tres` files work).

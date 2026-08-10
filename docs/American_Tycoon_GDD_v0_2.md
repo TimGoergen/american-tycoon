@@ -595,7 +595,7 @@ The native visual language of the American Dream: 1950s advertising — the era 
 - **Not a period setting.** NFTs and Day Trading rendered in 50s ad vocabulary — the anachronism is the gag. The aesthetic is the Dream's eternal branding.
 - **Evolving backdrops (added v0.2):** 6–8 painted mid-century backdrops per planet, crossfading at net-worth thresholds — Main Street diner-and-alley → suburban boomtown → downtown skyline → penthouse → marble lobby → the Capitol dome at golden hour. An ambient progress bar needing no numbers. Prestige interaction: each heir inherits post-tax, so the backdrop briefly regresses a tier and re-climbs visibly faster — "speeds up every time," rendered in scenery.
 - **Asset bill (Earth):** ~12 property hero illustrations, 6–8 backdrops, ad-styled UI chrome, ceremony screens (obituary/will, Final Dollar set). **Staffer portraits are generated, not drawn one-by-one:** rather than ~312 hand-authored staffer cards (52 rungs × 6 epochs, per the 2026-07-15 escalating ladder), a layered generator composites faces from a small per-epoch part library (§6.5, `Plans/Layered_Staffer_Portrait_Generator.md`) — the Earth human part set is the priority slice.
-- **Audio:** chipper exotica/muzak — the hold music of prosperity. (Winds down at the Final Dollar.)
+- **Audio:** chipper exotica/muzak — the hold music of prosperity. (Winds down at the Final Dollar.) **Implemented 2026-08-10** as five era bands — Earth's muzak becoming progressively less of this world as the epochs deepen, the same tune on stranger instruments (`Plans/Audio_System.md` §3.1). Placeholder tracks are in place; the real ones are being sourced.
 
 ---
 
@@ -607,7 +607,7 @@ Sequenced as four playable plateaus — each a legitimate stopping point that is
 |---|---|---|
 | **M1 — The Slice** | Tap wage, buy ladder, cycles/collect, count-milestone speed-ups, bulk-buy UI, income/sec hero stat. Placeholder art. | Dopaminergic on real phone hardware; the return-spike loop verified against a real 3-hour gap |
 | **M2 — The Dynasty** | Death, obituary/will screen, estate tax, Legacy (front-loaded), heir name generator, Family Ledger, origins & debt, offers system | "Speeds up every time" verified across ≥5 generations |
-| **M3 — The Theme** | Art pass (backdrops, heroes, staffers incl. per-epoch reskins §6.1), audio implementation (exotica/muzak per §12), UI polish, narrator copy pass, epoch-keyed staffing UI & first-contact beat (§6), offline/welcome-back ritual, rare events, the Ledger | The game is *itself* |
+| **M3 — The Theme** | Art pass (backdrops, heroes, staffers incl. per-epoch reskins §6.1), ~~audio implementation (exotica/muzak per §12)~~ **DONE 2026-08-10, assets pending**, UI polish, narrator copy pass, epoch-keyed staffing UI & first-contact beat (§6), offline/welcome-back ritual, rare events, the Ledger | The game is *itself* |
 | **M4 — The Epoch** | Earth target & percentage display, Final Dollar / first-contact sequence, epoch progression beyond Earth (alien contact, §6.2), balance simulator validation of the full week | Earth captured; first contact made |
 
 Headless balance simulator is built during M1–M2, not after.
@@ -652,7 +652,7 @@ Resolved since v0.1: ~~automation/managers~~ (§6), ~~dynasty identity~~ (§8.2)
 8. ~~**Market Two design.**~~ **Superseded (2026-06-16)** by the epoch model (§6.2): there are no distinct markets — Earth advances through alien-contact epochs on one dollar economy. Remaining epoch open questions live in the Future Features "per-epoch modifier draft" note.
 9. **Narrator copy pass.** Voice defined (§1.2); the writing itself is a dedicated effort (obituaries, will lines, staffer cards, event copy, the Letter).
 10. **Name generator part-lists.** A fun evening of writing (§8.2).
-11. **Sound & haptics design.** The return-spike delta (§3.1) needs weight; audio direction set, implementation now scheduled into M3 (§13). Remaining open: haptics and per-event sound mapping.
+11. ~~**Sound & haptics design.**~~ **RESOLVED & shipped 2026-08-10** (`Plans/Audio_System.md`, all phases; `main` @ `1bd2511`). Per-event sound mapping is complete: 78 cues across the economy, interface, rush/vent, ceremony, five era music bands, and all six minigames, each with a hook and a default. Haptics are a player-facing slider that scales the tuned pulse durations, with one call site (`Haptics.pulse`). The return-spike delta has its cue (`welcome_back`). **Remaining: the audio ASSETS themselves** — everything shipped is a synthesized placeholder — and the mix pass, which is only meaningful once real samples land. Sounds are found by filename; `game/audio/README.md` is the generated drop sheet.
 12. **Frenzy meter tuning.** Layer 3 charge rate, multiplier size, duration.
 13. ~~**Cycle-time curve (post-vacation rework, §4).**~~ **RESOLVED & shipped 2026-06-22:** back
     half (tiers 7–12) stretched to a 180s top, income-neutral; milestone cadence switched to AdCap

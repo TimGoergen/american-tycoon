@@ -675,7 +675,7 @@ Two structural failures worth naming, because they are not the same problem:
 
 ---
 
-## §8 — Audio, Phases 0 and 1 (built 2026-08-08, `Plans/Audio_System.md`)
+## §8 — Audio, complete (built 2026-08-08/10, merged `1bd2511`, `Plans/Audio_System.md`)
 
 Added at merge, per the process note above. Phase 1's whole purpose is this device pass: the plan's
 exit criterion is Tim judging whether the core loop feels better with sound than without, and that
@@ -710,6 +710,32 @@ sourcing.
       the bottom buttons are now reached by scrolling — swipe from over a button, not just from the
       gaps, and confirm a swipe does not also press whatever it ends on.
 - [ ] **Battery draw over 30 minutes, audio on vs off.** The stated hard constraint.
+
+### Added 2026-08-10 — music, ceremony, and the minigames
+
+- [ ] **A FIRST CONTACT into tier 3.** The band crossfade only happens between eras, and it is
+      deliberately deferred until the contact card is DISMISSED — so listen for the new track arriving
+      after the card closes, never underneath it.
+- [ ] **A SUCCESSION, start to finish.** Obituary, will, heir: three beats whose shape is meant to be
+      the arc (down, level, up). Phase 4's exit criterion is whether it feels like an event.
+- [ ] **Idle fade.** Put the phone down for a few minutes with music on. It should drift out, and
+      come back when you next touch anything — but NOT fade during an active rush, which counts as
+      being present.
+- [ ] **Music ducks under a rush**, and **stops entirely inside a minigame**, returning to the same
+      track afterwards rather than restarting the era.
+- [ ] **Play all six minigames.** Each has its own vocabulary now. The two to listen hardest to:
+      **Match Three**, where the match cue climbs a whole tone per cascade step (a long chain should
+      read as a RUN), and **Memory**, where each pad has its own pitch so a sequence is a little tune
+      you can rehearse by ear.
+- [ ] **Catch Money is the fatigue test.** A coin every 0.6s and a catch sound for nearly all of
+      them: if any sound in the game is going to wear out, it is that one.
+- [ ] **Rushing AND buying at once, for a while.** This is the combination that closed the game on
+      2026-08-09. It survived both Earth epochs after the fix, but the fix was a hardening pass
+      against a mechanism rather than a reproduced diagnosis, so it is worth deliberate abuse.
+
+**Everything you are hearing is a placeholder.** Judge TIMING, pitch relationships and the mix —
+whether a sound lands at the right moment and at the right size. Tone quality is answered later, by
+sourcing.
 
 ### Before reporting audio latency: check the audio route
 

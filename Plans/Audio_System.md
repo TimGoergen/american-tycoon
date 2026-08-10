@@ -1,7 +1,14 @@
 # Audio System — Implementation Plan
 
-**Status:** Phases 0-4 BUILT (2026-08-08/09); 0/1/3 merged to `main` at `24c5e70`. Only Phase 5
-(UI + mix pass) remains, plus replacing every placeholder sample with sourced audio. Tim on the Phase 1 slice: "the sound on buy and
+**Status:** ALL PHASES BUILT (2026-08-08/09); 0/1/3 merged to `main` at `24c5e70`. Every cue in the
+game now has a hook and a default sound, and `game/audio/README.md` — generated from the cue table,
+so it cannot drift — is the drop sheet for replacing them. What remains is sourcing the audio itself,
+and the mix pass that only becomes meaningful once real samples are in.
+
+**§1.4 REVERSED 2026-08-09:** the `audio_events.tres` catalog is gone. Sounds are found BY FILENAME
+(`res://audio/cues/<cue id>.ogg`, falling back to `.wav`), which serves the section's own goal —
+swapping a sample without touching code — better than a manifest did, because it also removes the
+second place a sound could be described. Tim on the Phase 1 slice: "the sound on buy and
 tap are good". Phase 3 (overdrive) was brought forward ahead of Phase 2 because rush is central to
 how he plays. Phases 2, 4, 5 not started. Written 2026-08-06 from an interview with Tim.
 **Graduates:** GDD §12 (Art & Audio Direction), §13 M3 milestone entry "audio implementation

@@ -73,6 +73,13 @@ const TRIGGERS := {
 	&"bball_swish": "A clean centred drop — the gold SWISH! Also layers over `minigame_score`.",
 	&"bball_gem_through": "The ball passes through the Legacy gem. A promise, not yet a payout.",
 	&"bball_gem_earned": "The shot that passed through the gem also scored — the game's rarest outcome, and the only one that pays Legacy.",
+	&"m3_select": "A gem is picked up — the drag begins.",
+	&"m3_swap": "Two gems trade places.",
+	&"m3_invalid": "A swap that matched nothing; the gems slide back. Sounded as they START back, so the refusal lands when the player learns it.",
+	&"m3_match": "A match clears. PITCHED UP a whole tone per cascade step (capped), so a chain is audibly a run rather than the same sound four times.",
+	&"m3_fall": "The refill drops into the gaps. Once per step, not once per gem.",
+	&"m3_avoid": "A match that hit the AVOID gem — this game's one real mistake, and a large score penalty.",
+	&"m3_legacy": "A Legacy gem is collected — the only thing in this game that pays the dynasty.",
 	&"music_preview": "Releasing the MUSIC slider in Settings.",
 }
 
@@ -167,6 +174,8 @@ func _cue_tables(cues: Dictionary, constants: Dictionary) -> String:
 		"Challenge Mode": [&"challenge_start", &"challenge_credit", &"challenge_tier"],
 		"Minigames — the shared beats": [&"minigame_begin", &"minigame_score", &"minigame_miss",
 			&"minigame_countdown", &"minigame_best", &"minigame_over"],
+		"Match Three": [&"m3_select", &"m3_swap", &"m3_invalid", &"m3_match", &"m3_fall",
+			&"m3_avoid", &"m3_legacy"],
 		"Basketball": [&"bball_grab", &"bball_launch", &"bball_fizzle", &"bball_wall",
 			&"bball_floor", &"bball_settle", &"bball_rim", &"bball_score", &"bball_swish",
 			&"bball_gem_through", &"bball_gem_earned"],
@@ -176,7 +185,7 @@ func _cue_tables(cues: Dictionary, constants: Dictionary) -> String:
 		"Settings": [&"music_preview"],
 	}
 	var order := ["The core loop", "Rush and overdrive", "Interface", "Denials (reserved)",
-		"Challenge Mode", "Minigames — the shared beats", "Basketball", "Ceremony — the story beats", "Settings"]
+		"Challenge Mode", "Minigames — the shared beats", "Basketball", "Match Three", "Ceremony — the story beats", "Settings"]
 
 	var text := "## The cues\n\nBus decides which slider governs a sound, and whether it counts as"
 	text += " the player being *present* (SFX and UI do; Ceremony and Music do not).\n"
@@ -234,7 +243,7 @@ func _footer(constants: Dictionary) -> String:
 | `%s` | The Acquisitions Desk buys without the player, and unattended events stay silent. It cannot even reach a hook — the desk buys inside the core, which never touches the audio layer. |
 | `%s` | A cycle completing was built, heard, and removed: *"only when the user taps to purchase"*. |
 
-## Two sounds the game pitches itself
+## Three sounds the game pitches itself
 
 Do not add pitch variance to either, and do not record them with vibrato — the game is doing the
 tuning, and a wobble on top is simply out of tune.
@@ -243,10 +252,13 @@ tuning, and a wobble on top is simply out of tune.
   window drifting up the scale as a run continues. Record it as ONE note; C5 is what the placeholder
   uses. It is pitched from there in both directions.
 - **`vent_lift`** steps up a whole tone per lift within a window, so the count is audible.
+- **`m3_match`** climbs a whole tone per cascade step, so a chain reads as a run. Record it as one
+  clean tone with no vibrato and no movement of its own — anything already going somewhere fights
+  the climb the game puts on top.
 
 ## The minigames
 
-**Basketball is done; the other five are not.** The six games share the beats above — begin, score, miss, countdown, new best, over — and each
+**Basketball and Match Three are done; the other four are not.** The six games share the beats above — begin, score, miss, countdown, new best, over — and each
 game's own vocabulary (a swish, a match, a caught coin, a flipped pad) is a LATER PASS, deliberately.
 Getting the shared layer right first means every game already sounds like it belongs to this game
 before any of them sounds like itself.

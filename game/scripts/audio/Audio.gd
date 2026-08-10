@@ -150,6 +150,18 @@ const CUES := {
 	&"bball_gem_through": {"bus": BUS_SFX, "db": -8.0, "cooldown": 120.0, "variance": 0.0},
 	&"bball_gem_earned":  {"bus": BUS_CEREMONY, "db": -4.0, "cooldown": 400.0, "variance": 0.0},
 
+	# --- Match Three ------------------------------------------------------------------------------
+	# The richest vocabulary of the six, and the one where the CASCADE is the whole feeling: a swap
+	# that keeps paying is what the game is for, so the match cue rises in pitch with each step of a
+	# chain (see MatchThreeMinigame._animate_step) rather than repeating flat.
+	&"m3_select":   {"bus": BUS_SFX, "db": -16.0, "cooldown": 50.0, "variance": 0.05},
+	&"m3_swap":     {"bus": BUS_SFX, "db": -11.0, "cooldown": 60.0, "variance": 0.04},
+	&"m3_invalid":  {"bus": BUS_SFX, "db": -10.0, "cooldown": 80.0, "variance": 0.03},
+	&"m3_match":    {"bus": BUS_SFX, "db": -6.0, "cooldown": 30.0, "variance": 0.0},
+	&"m3_fall":     {"bus": BUS_SFX, "db": -15.0, "cooldown": 40.0, "variance": 0.08},
+	&"m3_avoid":    {"bus": BUS_SFX, "db": -5.0, "cooldown": 150.0, "variance": 0.0},
+	&"m3_legacy":   {"bus": BUS_CEREMONY, "db": -4.0, "cooldown": 300.0, "variance": 0.0},
+
 	# --- Settings previews (played when a slider is released) --------------------------------------
 	&"music_preview":    {"bus": BUS_MUSIC, "db": -4.0, "cooldown": 200.0, "variance": 0.0},
 }

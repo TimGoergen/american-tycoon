@@ -219,6 +219,7 @@ def main():
     write_remaining_cues()
     write_minigame_cues()
     write_basketball_cues()
+    write_match_three_cues()
     write_music()
 
 
@@ -557,6 +558,46 @@ def write_basketball_cues():
         (0.000, tone(NOTES["A4"], 0.12, harmonics=(1.0, 0.45, 0.2), curve=4.0)),
         (0.080, tone(NOTES["E5"], 0.12, harmonics=(1.0, 0.45, 0.2), curve=4.0)),
         (0.160, tone(NOTES["A5"], 0.50, harmonics=(1.0, 0.5, 0.3, 0.15), curve=2.4)),
+    ]))
+
+
+def write_match_three_cues():
+    """Match Three's vocabulary. The match cue is the one that matters: the game pitches it up a whole
+    tone per cascade step, so it is authored as a single clean tone with no vibrato and no built-in
+    movement — anything already going somewhere would fight the climb the game puts on top of it."""
+    # SELECT and SWAP: the smallest sounds in the game. A player makes hundreds of these.
+    write_wav("m3_select.wav", tone(NOTES["A4"], 0.04, harmonics=(1.0, 0.5), curve=9.0))
+    write_wav("m3_swap.wav", sequence([
+        (0.000, noise_burst(0.045, curve=8.0)),
+        (0.000, tone(NOTES["E4"], 0.07, harmonics=(1.0, 0.4), curve=7.0)),
+    ]))
+    # INVALID: a flat refusal. Falling, unresolved, and over quickly — it must not feel like a
+    # punishment for experimenting, which is how the player learns the board.
+    write_wav("m3_invalid.wav", glide(NOTES["E4"], NOTES["C4"], 0.13,
+                                      harmonics=(1.0, 0.25), curve=5.0))
+
+    # THE MATCH. Authored at the root; the game pitches it per cascade step.
+    write_wav("m3_match.wav", sequence([
+        (0.000, tone(NOTES["C5"], 0.09, harmonics=(1.0, 0.45, 0.2), curve=5.0)),
+        (0.030, tone(NOTES["G5"], 0.20, harmonics=(1.0, 0.4, 0.18), curve=3.6)),
+    ]))
+    # The refill: gems landing. One soft settle for the whole drop, under the match that caused it.
+    write_wav("m3_fall.wav", sequence([
+        (0.000, noise_burst(0.07, curve=6.0)),
+        (0.010, tone(NOTES["A3"], 0.09, harmonics=(1.0, 0.3), curve=6.5)),
+    ]))
+
+    # THE AVOID GEM: this game's only real mistake, and it costs a large factor of the score. Low and
+    # dissonant — a minor second, which is the most obviously wrong interval there is.
+    write_wav("m3_avoid.wav", sequence([
+        (0.000, tone(NOTES["F3"], 0.30, harmonics=(1.0, 0.4, 0.2), curve=3.5)),
+        (0.000, tone(NOTES["F3"] * 1.059463, 0.30, harmonics=(1.0, 0.4, 0.2), curve=3.5)),
+    ]))
+    # A LEGACY gem collected: the only thing in this game that pays the dynasty.
+    write_wav("m3_legacy.wav", sequence([
+        (0.000, tone(NOTES["E5"], 0.12, harmonics=(1.0, 0.45, 0.2), curve=4.2)),
+        (0.080, tone(NOTES["A5"], 0.12, harmonics=(1.0, 0.45, 0.2), curve=4.2)),
+        (0.160, tone(NOTES["C5"] * 2.0, 0.44, harmonics=(1.0, 0.5, 0.28, 0.14), curve=2.5)),
     ]))
 
 

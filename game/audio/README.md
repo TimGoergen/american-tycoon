@@ -115,6 +115,18 @@ Bus decides which slider governs a sound, and whether it counts as the player be
 | `bball_gem_through` | SFX | -8 | 120 ms | The ball passes through the Legacy gem. A promise, not yet a payout. |
 | `bball_gem_earned` | Ceremony | -4 | 400 ms | The shot that passed through the gem also scored — the game's rarest outcome, and the only one that pays Legacy. |
 
+### Match Three
+
+| Cue / filename | Bus | dB | Cooldown | Fires when |
+|---|---|---|---|---|
+| `m3_select` | SFX | -16 | 50 ms | A gem is picked up — the drag begins. |
+| `m3_swap` | SFX | -11 | 60 ms | Two gems trade places. |
+| `m3_invalid` | SFX | -10 | 80 ms | A swap that matched nothing; the gems slide back. Sounded as they START back, so the refusal lands when the player learns it. |
+| `m3_match` | SFX | -6 | 30 ms | A match clears. PITCHED UP a whole tone per cascade step (capped), so a chain is audibly a run rather than the same sound four times. |
+| `m3_fall` | SFX | -15 | 40 ms | The refill drops into the gaps. Once per step, not once per gem. |
+| `m3_avoid` | SFX | -5 | 150 ms | A match that hit the AVOID gem — this game's one real mistake, and a large score penalty. |
+| `m3_legacy` | Ceremony | -4 | 300 ms | A Legacy gem is collected — the only thing in this game that pays the dynasty. |
+
 ### Ceremony — the story beats
 
 | Cue / filename | Bus | dB | Cooldown | Fires when |
@@ -163,7 +175,7 @@ playing rather than cutting to silence, so tracks can arrive one at a time.
 | `auto_purchase` | The Acquisitions Desk buys without the player, and unattended events stay silent. It cannot even reach a hook — the desk buys inside the core, which never touches the audio layer. |
 | `cycle_payout` | A cycle completing was built, heard, and removed: *"only when the user taps to purchase"*. |
 
-## Two sounds the game pitches itself
+## Three sounds the game pitches itself
 
 Do not add pitch variance to either, and do not record them with vibrato — the game is doing the
 tuning, and a wobble on top is simply out of tune.
@@ -172,10 +184,13 @@ tuning, and a wobble on top is simply out of tune.
   window drifting up the scale as a run continues. Record it as ONE note; C5 is what the placeholder
   uses. It is pitched from there in both directions.
 - **`vent_lift`** steps up a whole tone per lift within a window, so the count is audible.
+- **`m3_match`** climbs a whole tone per cascade step, so a chain reads as a run. Record it as one
+  clean tone with no vibrato and no movement of its own — anything already going somewhere fights
+  the climb the game puts on top.
 
 ## The minigames
 
-**Basketball is done; the other five are not.** The six games share the beats above — begin, score, miss, countdown, new best, over — and each
+**Basketball and Match Three are done; the other four are not.** The six games share the beats above — begin, score, miss, countdown, new best, over — and each
 game's own vocabulary (a swish, a match, a caught coin, a flipped pad) is a LATER PASS, deliberately.
 Getting the shared layer right first means every game already sounds like it belongs to this game
 before any of them sounds like itself.

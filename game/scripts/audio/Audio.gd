@@ -706,12 +706,17 @@ func _mix_heat_bed(delta: float) -> void:
 
 	if not _heat_player.playing and _heat_player.stream != null:
 		_heat_player.play()
-	if not _urgency_player.playing and _urgency_player.stream != null:
-		_urgency_player.play()
 
 	var safe_gain := maxf(_heat_gain, 0.0001)
 	_heat_player.volume_db = HEAT_VOLUME_DB + linear_to_db(safe_gain)
-	_urgency_player.volume_db = _urgency_db_for(_heat_normalized) + linear_to_db(safe_gain)
+
+	var urgency_db := _urgency_db_for(_heat_normalized)
+	_urgency_player.volume_db = urgency_db + linear_to_db(safe_gain)
+	if urgency_db > -59.0:
+		if not _urgency_player.playing and _urgency_player.stream != null:
+			_urgency_player.play()
+	elif _urgency_player.playing:
+		_urgency_player.stop()
 
 
 ## The urgency layer's level at a given heat: silent until the top of the band, then up to full.

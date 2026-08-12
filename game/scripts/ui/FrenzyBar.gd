@@ -162,6 +162,8 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_displayed_fill = BarSmoothing.approach(_displayed_fill, _frenzy.meter, delta)
+	if is_nan(_displayed_fill) or is_inf(_displayed_fill):
+		_displayed_fill = 0.0
 	_meter.value = _displayed_fill
 
 	if _frenzy.mode == FrenzyState.Mode.BURNING:

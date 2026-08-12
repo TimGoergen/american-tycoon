@@ -1653,6 +1653,8 @@ func _refresh(delta: float) -> void:
 		if rushed_fractions_per_second > 0.0:
 			target_rate = rushed_fractions_per_second
 		_sweep_rate = lerpf(_sweep_rate, target_rate, 1.0 - exp(-delta / SWEEP_EASE_TAU))
+		if is_nan(_sweep_rate) or is_inf(_sweep_rate) or _sweep_rate < 0.0:
+			_sweep_rate = target_rate
 		var advanced := _displayed_cycle_fraction + delta * _sweep_rate
 		if target > advanced:
 			# Catch-up (single rush taps, the engage moment, the owed lap after a
@@ -1677,6 +1679,8 @@ func _refresh(delta: float) -> void:
 			# blip in the frenzy (autopilot data, 2026-07-08). Rate is what matters
 			# during a hold; phase re-syncs on release via the normal machinery.
 			_displayed_cycle_fraction -= 1.0
+		if is_nan(_displayed_cycle_fraction) or is_inf(_displayed_cycle_fraction):
+			_displayed_cycle_fraction = 0.0
 		_displayed_cycle_fraction = clampf(_displayed_cycle_fraction, 0.0, 1.0)
 	_last_true_cycle_fraction = true_fraction
 	_cycle_bar.value = _displayed_cycle_fraction

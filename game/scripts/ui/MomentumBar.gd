@@ -1381,7 +1381,8 @@ func _process(delta: float) -> void:
 		# guard covers a hand-poked zero cruise bonus.
 		var cruise: float = maxf(_rush_momentum.cruise_heat(), 0.0001)
 		target_fill = clampf(_rush_momentum.heat / cruise, 0.0, 1.0)
-		# A RELEASE TAIL needs nothing extra here (Tim 2026-07-20). The bonus follows heat down
+		if is_nan(target_fill) or is_inf(target_fill):
+			target_fill = 0.0
 		# the whole way, so this same heat fill is already the tail's remaining length: it starts
 		# pinned full (heat sits at or above the clamp right after any ride) and reaches zero on
 		# the exact tick the bonus does. An earlier build banked a separate number on its own
@@ -1398,6 +1399,8 @@ func _process(delta: float) -> void:
 	# keeps the bail transition seamless — a predicted fill handed off to an eased one would put a
 	# visible seam at exactly the moment this fix exists to smooth.
 	_displayed_fill = BarSmoothing.approach(_displayed_fill, target_fill, delta)
+	if is_nan(_displayed_fill) or is_inf(_displayed_fill):
+		_displayed_fill = 0.0
 	_meter.value = _displayed_fill
 
 	# THE OVERDRIVE BED (Plans/Audio_System.md §5.1, decision 9). Driven from the value the bar is

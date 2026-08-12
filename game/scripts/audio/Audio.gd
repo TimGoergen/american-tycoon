@@ -658,15 +658,19 @@ func reset_tap_scale() -> void:
 ## Takes the normalized value rather than computing it, because there is no stored normal form — the
 ## view derives it, and it means different things in different modes (heat/cruise while building,
 ## heat/ceiling in overdrive). Recomputing it here would let the tone and the bar disagree, and the
-## project's invariant is that what the bar shows IS what the player gets. The sound has to be part
+## project's invariant that what the bar shows IS what the player gets. The sound has to be part
 ## of that promise, not a second opinion on it.
 func set_heat(normalized: float) -> void:
 	if not _enabled or _heat_player == null:
 		return
-	_heat_normalized = clampf(normalized, 0.0, 1.0)
-	# Pitch is safe to set every frame — it is a parameter read by the mixer, not a state change.
-	# The VOLUMES belong to the per-frame mix, so the fade envelope owns them in one place.
-	_heat_player.pitch_scale = pow(2.0, (_heat_normalized * HEAT_PITCH_SEMITONES) / 12.0)
+	var safe_norm := clampf(normalized, 0.0, 1.0)
+	if is_nan(safe_norm) or is_inf(safe_norm):
+		safe_norm = 0.0
+	_heat_normalized = safe_norm
+	var pitch := pow(2.0, (_heat_normalized * HEAT_PITCH_SEMITONES) / 12.0)
+	if is_nan(pitch) or is_inf(pitch) or pitch <= 0.0:
+		pitch = 1.0
+	_heat_player.pitch_scale = pitch
 
 
 ## Start or stop the ride's bed. Just a flag — the mix in _process does the rest.
@@ -681,15 +685,13 @@ func set_heat(normalized: float) -> void:
 ## Now the flag is free to flicker: the gain walks toward it a frame at a time, so a state that
 ## changes its mind costs a few milliseconds of fade and nothing else.
 func set_heat_active(active: bool) -> void:
-	if not _enabled:
-		return
 	_heat_active = active
 
 
 ## Walk the bed's gain toward its target and resolve both layers' volumes. Everything about the bed
 ## that can change lives here, once per frame, so nothing can race anything else.
 func _mix_heat_bed(delta: float) -> void:
-	if _heat_player == null:
+	if _heat_player == null or _urgency_player == null:
 		return
 	var rate := 1.0 / (HEAT_FADE_IN_SECONDS if _heat_active else HEAT_FADE_OUT_SECONDS)
 	_heat_gain = move_toward(_heat_gain, 1.0 if _heat_active else 0.0, delta * rate)
@@ -702,13 +704,14 @@ func _mix_heat_bed(delta: float) -> void:
 			_urgency_player.stop()
 		return
 
-	if not _heat_player.playing:
+	if not _heat_player.playing and _heat_player.stream != null:
 		_heat_player.play()
-	if not _urgency_player.playing:
+	if not _urgency_player.playing and _urgency_player.stream != null:
 		_urgency_player.play()
 
-	_heat_player.volume_db = HEAT_VOLUME_DB + linear_to_db(_heat_gain)
-	_urgency_player.volume_db = _urgency_db_for(_heat_normalized) + linear_to_db(_heat_gain)
+	var safe_gain := maxf(_heat_gain, 0.0001)
+	_heat_player.volume_db = HEAT_VOLUME_DB + linear_to_db(safe_gain)
+	_urgency_player.volume_db = _urgency_db_for(_heat_normalized) + linear_to_db(safe_gain)
 
 
 ## The urgency layer's level at a given heat: silent until the top of the band, then up to full.
@@ -922,6 +925,8 @@ func _play_event(event_id: StringName, intensity: float, scaled: bool, pitch := 
 ## frame-time problem, and a sound that arrives late is worse than one that never arrives — it lands
 ## after the thing it was describing.
 func _start(bus: StringName, stream: AudioStream, volume_db: float, pitch: float) -> void:
+	if stream == null:
+		return
 	var pool: Array = _voices.get(bus, [])
 	if pool.is_empty():
 		return
@@ -942,8 +947,11 @@ func _start(bus: StringName, stream: AudioStream, volume_db: float, pitch: float
 	if chosen.playing:
 		chosen.stop()
 	chosen.stream = stream
-	chosen.volume_db = volume_db
-	chosen.pitch_scale = pitch
+	chosen.volume_db = clampf(volume_db, -120.0, 24.0)
+	var safe_pitch := pitch
+	if is_nan(safe_pitch) or is_inf(safe_pitch) or safe_pitch <= 0.0:
+		safe_pitch = 1.0
+	chosen.pitch_scale = safe_pitch
 	chosen.play()
 
 

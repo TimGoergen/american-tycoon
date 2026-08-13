@@ -1,5 +1,7 @@
 extends Control
 
+const ActionTracer := preload("res://scripts/core/ActionTracer.gd")
+
 # Main screen driver (M1 brief §4: the one screen). Owns the GameState,
 # advances it on a fixed timestep, autosaves, applies offline earnings on
 # launch, and wires every UI verb into GameState.

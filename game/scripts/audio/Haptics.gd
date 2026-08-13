@@ -1,6 +1,8 @@
 class_name Haptics
 extends RefCounted
 
+const ActionTracer := preload("res://scripts/core/ActionTracer.gd")
+
 # The project's ONE vibrate call site (Plans/Audio_System.md §6.3).
 #
 # It used to be MomentumBar._vibrate, and keeping it to a single site is exactly why the haptic

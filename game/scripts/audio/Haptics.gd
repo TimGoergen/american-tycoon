@@ -14,17 +14,20 @@ extends RefCounted
 
 
 ## The player's haptics setting: a 0..1 MULTIPLIER on every pulse duration, not a separate on/off.
-##
-## At 0.0 every duration falls under the `>= 1.0` guard below, so haptics turn off with no extra
-## branch anywhere — the same property that lets a tuning knob at zero disable its own pulse. One
-## rule, two ways of reaching it.
+## At 0.0 haptics are completely disabled.
 static var scale: float = 1.0
+
+## Minimum safe vibration pulse duration in milliseconds. Calling OS vibration drivers with
+## micro-durations (< 15ms) can cause native driver crashes / segfaults on mobile hardware.
+const MIN_SAFE_VIBRATION_MS := 15.0
+const MAX_SAFE_VIBRATION_MS := 500.0
 
 
 ## Vibrate for `duration_ms`, scaled by the player's setting. Mobile only: desktop must stay silent.
-## (Input.vibrate_handheld is a no-op on most desktops anyway, but the explicit guard documents the
-## intent, keeps the platform check out of every caller, and costs nothing.)
 static func pulse(duration_ms: float) -> void:
+	if scale <= 0.01 or duration_ms <= 0.0:
+		return
 	var scaled := duration_ms * scale
-	if scaled >= 1.0 and OS.has_feature("mobile"):
-		Input.vibrate_handheld(int(scaled))
+	if scaled >= MIN_SAFE_VIBRATION_MS and OS.has_feature("mobile"):
+		var ms := clampi(int(scaled), int(MIN_SAFE_VIBRATION_MS), int(MAX_SAFE_VIBRATION_MS))
+		Input.vibrate_handheld(ms)

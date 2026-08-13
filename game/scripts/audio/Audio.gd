@@ -961,10 +961,12 @@ func _start(bus: StringName, stream: AudioStream, volume_db: float, pitch: float
 
 
 func _safe_play(player: AudioStreamPlayer) -> void:
-	if player == null:
+	if player == null or not _enabled:
 		return
 	if OS.has_feature("mobile"):
-		player.call_deferred(&"play")
+		# Avoid stacking deferred play calls on a player that is already scheduled or actively playing
+		if not player.playing:
+			player.call_deferred(&"play")
 	else:
 		player.play()
 

@@ -21,7 +21,7 @@ config/icon="res://art/branding/american_tycoon_logo.png"
 [audio]
 
 buses/default_bus_layout="res://audio/default_bus_layout.tres"
-driver/output_latency.android=15
+driver/output_latency.android=30
 driver/mix_rate.android=48000
 
 [autoload]

@@ -25,9 +25,11 @@ const MAX_SAFE_VIBRATION_MS := 500.0
 
 ## Vibrate for `duration_ms`, scaled by the player's setting. Mobile only: desktop must stay silent.
 static func pulse(duration_ms: float) -> void:
+	ActionTracer.trace("HAPTICS", "pulse(%.1f ms), scale=%.2f" % [duration_ms, scale])
 	if scale <= 0.01 or duration_ms <= 0.0:
 		return
 	var scaled := duration_ms * scale
 	if scaled >= MIN_SAFE_VIBRATION_MS and OS.has_feature("mobile"):
 		var ms := clampi(int(scaled), int(MIN_SAFE_VIBRATION_MS), int(MAX_SAFE_VIBRATION_MS))
+		ActionTracer.trace("HAPTICS", "Calling Input.vibrate_handheld(%d ms)" % ms)
 		Input.vibrate_handheld(ms)

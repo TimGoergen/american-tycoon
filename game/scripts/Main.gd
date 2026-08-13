@@ -323,6 +323,7 @@ const WELCOME_BACK_BONUS_MAX := 1.0
 
 
 func _ready() -> void:
+	ActionTracer.init_tracer()
 	_create_game()
 	_build_ui()
 	_apply_offline_if_due()
@@ -553,6 +554,7 @@ func _refresh_contact_progress() -> void:
 
 
 func _notification(what: int) -> void:
+	ActionTracer.trace("SYSTEM", "Notification %d received" % what)
 	# Save on backgrounding (phone) and on close (desktop) — Spec §12.
 	if what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_WM_CLOSE_REQUEST:
 		if dynasty != null:
@@ -2287,12 +2289,16 @@ func _build_volume_row(
 	slider.add_theme_icon_override("grabber_highlight", _make_slider_grabber())
 	slider.value_changed.connect(func(level: float) -> void:
 		value_label.text = "%d%%" % roundi(level * 100.0)
+		ActionTracer.trace("SETTINGS", "%s slider value_changed: %.2f" % [label_text, level])
 		on_changed.call(level))
 	# drag_ended fires for a drag; a TAP on the track moves the value without one, so the preview
 	# also has to hang off the release of a press. Both funnel through the same guarded call.
-	slider.drag_ended.connect(func(_changed: bool) -> void: _preview_volume(on_released))
+	slider.drag_ended.connect(func(_changed: bool) -> void:
+		ActionTracer.trace("SETTINGS", "%s slider drag_ended" % label_text)
+		_preview_volume(on_released))
 	slider.gui_input.connect(func(event: InputEvent) -> void:
 		if event is InputEventScreenTouch and not (event as InputEventScreenTouch).pressed:
+			ActionTracer.trace("SETTINGS", "%s slider touch_released" % label_text)
 			_preview_volume(on_released))
 	row.add_child(slider)
 	row.add_child(value_label)

@@ -667,16 +667,18 @@ func set_heat(normalized: float) -> void:
 	if is_nan(safe_norm) or is_inf(safe_norm):
 		safe_norm = 0.0
 	_heat_normalized = safe_norm
-	var pitch := pow(2.0, (_heat_normalized * HEAT_PITCH_SEMITONES) / 12.0)
-	if is_nan(pitch) or is_inf(pitch) or pitch <= 0.0:
-		pitch = 1.0
-	# On mobile, avoid per-frame C++ resampler buffer reallocations which trigger native Scudo allocator crashes.
-	# Quantize pitch scale changes so updates only happen at major semitone steps rather than 60 FPS.
-	if OS.has_feature("mobile"):
-		if absf(_heat_player.pitch_scale - pitch) >= 0.15:
+	# On mobile, pitch_scale stays locked at 1.0. ANY mutation of pitch_scale on a playing looping
+	# stream triggers a resampler buffer reallocation in Godot's C++ AudioStreamPlaybackResampled,
+	# which races the native AudioTrack callback thread and causes SIGSEGV (SEGV_ACCERR, "buffer
+	# overflow accessing after secondary allocation"). The quantization threshold of 0.15 that was
+	# here before only reduced the crash FREQUENCY, not its possibility. Intensity is still conveyed
+	# through the volume envelope and the urgency layer crossfade.
+	if not OS.has_feature("mobile"):
+		var pitch := pow(2.0, (_heat_normalized * HEAT_PITCH_SEMITONES) / 12.0)
+		if is_nan(pitch) or is_inf(pitch) or pitch <= 0.0:
+			pitch = 1.0
+		if _heat_player.pitch_scale != pitch:
 			_heat_player.pitch_scale = pitch
-	elif _heat_player.pitch_scale != pitch:
-		_heat_player.pitch_scale = pitch
 
 
 ## Start or stop the ride's bed. Just a flag — the mix in _process does the rest.
@@ -711,6 +713,11 @@ func _mix_heat_bed(delta: float) -> void:
 		return
 
 	if not _heat_player.playing and _heat_player.stream != null:
+		# On mobile, lock pitch to 1.0 BEFORE starting the stream. Once a looping
+		# AudioStreamPlaybackResampled is active, ANY pitch_scale mutation can trigger
+		# a buffer reallocation that races the AudioTrack callback thread.
+		if OS.has_feature("mobile"):
+			_heat_player.pitch_scale = 1.0
 		_safe_play(_heat_player)
 
 	var safe_gain := maxf(_heat_gain, 0.0001)
@@ -793,7 +800,20 @@ func _apply_loop(stream: AudioStream) -> AudioStream:
 		var wav := stream as AudioStreamWAV
 		wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
 		wav.loop_begin = 0
-		wav.loop_end = wav.data.size() / 2
+		# loop_end is in SAMPLES (per channel). Compute from raw byte count using the
+		# stream's actual format and channel count, not a hard-coded /2 that only works
+		# for mono 16-bit. A wrong loop_end makes Godot's resampler read past the buffer.
+		var bytes_per_sample := 1
+		match wav.format:
+			AudioStreamWAV.FORMAT_16_BITS:
+				bytes_per_sample = 2
+			AudioStreamWAV.FORMAT_IMA_ADPCM:
+				# IMA ADPCM packing is non-trivial; leave loop_end at the
+				# default (-1 = full stream) and let the engine handle it.
+				wav.loop_end = -1
+				return stream
+		var channels := 2 if wav.stereo else 1
+		wav.loop_end = wav.data.size() / (bytes_per_sample * channels)
 	return stream
 
 

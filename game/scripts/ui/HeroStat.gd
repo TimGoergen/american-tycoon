@@ -133,6 +133,13 @@ const INCOME_REFRESH_INTERVAL := 0.33
 var _pending_income_per_sec := 0.0
 var _income_refresh_accumulator := INCOME_REFRESH_INTERVAL  # repaint on the very first frame
 
+# Cash readout throttle (Pattern A): hold each shown cash balance for a short interval
+# (~12.5 Hz refresh rate) to prevent jittery/twitchy numbers when cash ticks up rapidly,
+# while updating immediately if cash drops (e.g. player buys a property or upgrade).
+const CASH_REFRESH_INTERVAL := 0.08
+var _pending_cash := 0.0
+var _cash_refresh_accumulator := CASH_REFRESH_INTERVAL  # repaint on the very first frame
+
 var _content: Control
 var _income_label: Label
 var _cash_label: Label
@@ -375,7 +382,12 @@ func set_income_per_sec(income_per_sec: float) -> void:
 func set_cash(cash: float) -> void:
 	# The cash balance uses its own fuller formatting (commas to 999,999, cents below 1,000,
 	# "1.00 M" above). No leading "$" — the dollar-bill icon beneath it carries that (Tim, 2026-07-09).
-	_cash_label.text = Money.of(cash).display_cash().trim_prefix("$")
+	# Record the target cash amount; repainting is throttled in _process (see CASH_REFRESH_INTERVAL).
+	# If spending money (cash dropped), force immediate repaint for instant feedback.
+	if cash < _pending_cash:
+		_cash_refresh_accumulator = CASH_REFRESH_INTERVAL
+		_cash_label.text = Money.of(cash).display_cash().trim_prefix("$")
+	_pending_cash = cash
 
 
 ## Progress toward the next First Contact: how much of the CURRENT epoch's economy this
@@ -573,6 +585,13 @@ func _process(delta: float) -> void:
 		# Same fuller formatting as the cash amount, and no leading "$" — the bill + "/ s" symbol
 		# beneath it carries the currency and the "per second" (Tim, 2026-07-09).
 		_income_label.text = Money.of(_pending_income_per_sec).display_cash().trim_prefix("$")
+
+	# Throttled cash repaint (Pattern A): cap continuous upward label updates to ~12.5 Hz
+	# so rapidly earning cash reads as a calm, steady figure rather than a flickering blur.
+	_cash_refresh_accumulator += delta
+	if _cash_refresh_accumulator >= CASH_REFRESH_INTERVAL:
+		_cash_refresh_accumulator = 0.0
+		_cash_label.text = Money.of(_pending_cash).display_cash().trim_prefix("$")
 
 	# Frenzy glow: pulse the ticket background between white and a soft red while a burn is
 	# active; snap back to plain white the moment it ends. The glow shows through the planet

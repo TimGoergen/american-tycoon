@@ -20,6 +20,8 @@ config/icon="res://art/branding/american_tycoon_logo.png"
 
 [audio]
 
+driver/name="AAudio"
+driver/name.Android="AAudio"
 driver/name.android="AAudio"
 buses/default_bus_layout="res://audio/default_bus_layout.tres"
 driver/output_latency.android=50

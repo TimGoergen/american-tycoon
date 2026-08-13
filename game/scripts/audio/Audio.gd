@@ -760,7 +760,7 @@ func set_music_band(band: int) -> void:
 	var next := 1 - _music_active
 	var player := _music_players[next]
 	player.stream = _apply_loop(track)
-	player.play()
+	_safe_play(player)
 	_music_active = next
 
 

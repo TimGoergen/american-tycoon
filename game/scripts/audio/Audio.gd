@@ -414,11 +414,8 @@ func _ready() -> void:
 func _audio_is_available() -> bool:
 	if DisplayServer.get_name() == "headless":
 		return false
-	# OpenSL ES native C++ audio driver crash protection on Android hardware:
-	# Godot 4.5's OpenSL ES backend experiences native buffer overflow segfaults
-	# inside Android's libwilhelm.so / AudioTrackCallback on arm64 devices.
-	if OS.has_feature("mobile") or OS.get_name() == "Android":
-		return false
+	# A missing bus means the layout resource did not load, in which case every play would land on
+	# Master at full volume with no slider controlling it. Silence is the better failure.
 	return AudioServer.get_bus_index(BUS_SFX) >= 0
 
 
@@ -708,7 +705,7 @@ func _mix_heat_bed(delta: float) -> void:
 		return
 
 	if not _heat_player.playing and _heat_player.stream != null:
-		_heat_player.play()
+		_safe_play(_heat_player)
 
 	var safe_gain := maxf(_heat_gain, 0.0001)
 	_heat_player.volume_db = HEAT_VOLUME_DB + linear_to_db(safe_gain)
@@ -717,7 +714,7 @@ func _mix_heat_bed(delta: float) -> void:
 	_urgency_player.volume_db = urgency_db + linear_to_db(safe_gain)
 	if urgency_db > -59.0:
 		if not _urgency_player.playing and _urgency_player.stream != null:
-			_urgency_player.play()
+			_safe_play(_urgency_player)
 	elif _urgency_player.playing:
 		_urgency_player.stop()
 
@@ -875,7 +872,7 @@ func _process(_delta_unused: float) -> void:
 				player.stop()
 			continue
 		if not player.playing and wanted:
-			player.play()
+			_safe_play(player)
 		player.volume_db = MUSIC_VOLUME_DB + linear_to_db(level) + duck_db
 
 
@@ -960,7 +957,16 @@ func _start(bus: StringName, stream: AudioStream, volume_db: float, pitch: float
 	if is_nan(safe_pitch) or is_inf(safe_pitch) or safe_pitch <= 0.0:
 		safe_pitch = 1.0
 	chosen.pitch_scale = safe_pitch
-	chosen.play()
+	_safe_play(chosen)
+
+
+func _safe_play(player: AudioStreamPlayer) -> void:
+	if player == null:
+		return
+	if OS.has_feature("mobile"):
+		player.call_deferred(&"play")
+	else:
+		player.play()
 
 
 ## Silence on focus loss, restore on return (decision 8).

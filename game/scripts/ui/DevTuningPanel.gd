@@ -600,15 +600,66 @@ func _add_playtest_section() -> void:
 	var trace_row := HBoxContainer.new()
 	trace_row.add_theme_constant_override("separation", 8)
 	var tb := _playtest_button("PRINT LAST RUN LOG")
-	tb.pressed.connect(func() -> void:
-		print("=== LAST RUN ACTION TRACE LOG ===")
-		print(ActionTracer.get_last_run_trace())
-		print("=================================")
-	)
+	tb.pressed.connect(_show_trace_modal)
 	trace_row.add_child(tb)
 	body.add_child(trace_row)
 
 	_toggle_section(title)  # open it by default
+
+
+## Display an on-screen scrollable modal overlay with the last session's action trace log.
+func _show_trace_modal() -> void:
+	var trace_text := ActionTracer.get_last_run_trace()
+	print("=== LAST RUN ACTION TRACE LOG ===")
+	print(trace_text)
+	print("=================================")
+
+	var existing := get_node_or_null("TraceLogModal")
+	if existing != null:
+		existing.queue_free()
+
+	var modal := PanelContainer.new()
+	modal.name = "TraceLogModal"
+	modal.set_anchors_preset(Control.PRESET_FULL_RECT)
+	modal.process_mode = Node.PROCESS_MODE_ALWAYS
+	modal.z_index = 100
+
+	var style := StyleBoxFlat.new()
+	style.bg_color = UiPalette.CREAM
+	style.set_content_margin_all(24)
+	modal.add_theme_stylebox_override("panel", style)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 16)
+	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	modal.add_child(vbox)
+
+	var title_lbl := Label.new()
+	title_lbl.text = "Last Session Action Trace Log"
+	title_lbl.add_theme_color_override("font_color", UiPalette.NAVY)
+	title_lbl.add_theme_font_size_override("font_size", TITLE_SIZE)
+	vbox.add_child(title_lbl)
+
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	vbox.add_child(scroll)
+
+	var content := Label.new()
+	content.text = trace_text
+	content.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.add_theme_color_override("font_color", UiPalette.INK_NAVY)
+	content.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)
+	scroll.add_child(content)
+
+	var close_btn := _make_button("CLOSE LOG", true)
+	close_btn.pressed.connect(func() -> void: modal.queue_free())
+	vbox.add_child(close_btn)
+
+	add_child(modal)
 
 
 ## A wide button for the Playtest section, sharing its row evenly with its siblings.

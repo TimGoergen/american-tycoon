@@ -414,8 +414,11 @@ func _ready() -> void:
 func _audio_is_available() -> bool:
 	if DisplayServer.get_name() == "headless":
 		return false
-	# A missing bus means the layout resource did not load, in which case every play would land on
-	# Master at full volume with no slider controlling it. Silence is the better failure.
+	# OpenSL ES native C++ audio driver crash protection on Android hardware:
+	# Godot 4.5's OpenSL ES backend experiences native buffer overflow segfaults
+	# inside Android's libwilhelm.so / AudioTrackCallback on arm64 devices.
+	if OS.has_feature("mobile") or OS.get_name() == "Android":
+		return false
 	return AudioServer.get_bus_index(BUS_SFX) >= 0
 
 

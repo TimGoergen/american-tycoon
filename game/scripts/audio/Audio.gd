@@ -670,7 +670,13 @@ func set_heat(normalized: float) -> void:
 	var pitch := pow(2.0, (_heat_normalized * HEAT_PITCH_SEMITONES) / 12.0)
 	if is_nan(pitch) or is_inf(pitch) or pitch <= 0.0:
 		pitch = 1.0
-	_heat_player.pitch_scale = pitch
+	# On mobile, avoid per-frame C++ resampler buffer reallocations which trigger native Scudo allocator crashes.
+	# Quantize pitch scale changes so updates only happen at major semitone steps rather than 60 FPS.
+	if OS.has_feature("mobile"):
+		if absf(_heat_player.pitch_scale - pitch) >= 0.15:
+			_heat_player.pitch_scale = pitch
+	elif _heat_player.pitch_scale != pitch:
+		_heat_player.pitch_scale = pitch
 
 
 ## Start or stop the ride's bed. Just a flag — the mix in _process does the rest.
@@ -951,12 +957,17 @@ func _start(bus: StringName, stream: AudioStream, volume_db: float, pitch: float
 	# dozens of times a second when rushing and buying at once, which is when the game was closing.
 	if chosen.playing:
 		chosen.stop()
-	chosen.stream = stream
+	if chosen.stream != stream:
+		chosen.stream = stream
 	chosen.volume_db = clampf(volume_db, -120.0, 24.0)
 	var safe_pitch := pitch
 	if is_nan(safe_pitch) or is_inf(safe_pitch) or safe_pitch <= 0.0:
 		safe_pitch = 1.0
-	chosen.pitch_scale = safe_pitch
+	# On mobile, lock SFX pitch_scale to 1.0 to prevent Godot C++ AudioStreamPlaybackResampled buffer reallocations
+	if OS.has_feature("mobile"):
+		safe_pitch = 1.0
+	if chosen.pitch_scale != safe_pitch:
+		chosen.pitch_scale = safe_pitch
 	_safe_play(chosen)
 
 

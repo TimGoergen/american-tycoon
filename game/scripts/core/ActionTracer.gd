@@ -31,7 +31,9 @@ static func trace(category: String, message: String) -> void:
 	print(line)
 	if _file != null:
 		_file.store_line(line)
-		_file.flush()
+		# Flush on major events or periodic intervals to prevent disk I/O thrashing
+		if category == "SYSTEM" or category == "SAVE" or category == "SETTINGS" or (timestamp % 1000 < 50):
+			_file.flush()
 
 
 static func get_last_run_trace() -> String:

@@ -25,13 +25,21 @@ const MIN_SAFE_VIBRATION_MS := 15.0
 const MAX_SAFE_VIBRATION_MS := 500.0
 
 
+static var _last_vibrate_ms: int = 0
+
+
 ## Vibrate for `duration_ms`, scaled by the player's setting. Mobile only: desktop must stay silent.
 static func pulse(duration_ms: float) -> void:
 	ActionTracer.trace("HAPTICS", "pulse(%.1f ms), scale=%.2f" % [duration_ms, scale])
 	if scale <= 0.01 or duration_ms <= 0.0:
 		return
+	var now := Time.get_ticks_msec()
+	# Rate-limit native Android vibration calls to a 40ms floor to prevent flooding JNI VibratorService
+	if now - _last_vibrate_ms < 40:
+		return
 	var scaled := duration_ms * scale
 	if scaled >= MIN_SAFE_VIBRATION_MS and OS.has_feature("mobile"):
 		var ms := clampi(int(scaled), int(MIN_SAFE_VIBRATION_MS), int(MAX_SAFE_VIBRATION_MS))
+		_last_vibrate_ms = now
 		ActionTracer.trace("HAPTICS", "Calling Input.vibrate_handheld(%d ms)" % ms)
 		Input.vibrate_handheld(ms)

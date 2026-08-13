@@ -596,8 +596,17 @@ func _add_playtest_section() -> void:
 		var m: float = mult
 		var cb := _playtest_button("x%d" % int(m))
 		cb.pressed.connect(func() -> void: grant_cash_requested.emit(m))
-		cash_row.add_child(cb)
-	body.add_child(cash_row)
+	body.add_child(_playtest_label("Diagnostics & Crash Trace Log:"))
+	var trace_row := HBoxContainer.new()
+	trace_row.add_theme_constant_override("separation", 8)
+	var tb := _playtest_button("PRINT LAST RUN LOG")
+	tb.pressed.connect(func() -> void:
+		print("=== LAST RUN ACTION TRACE LOG ===")
+		print(ActionTracer.get_last_run_trace())
+		print("=================================")
+	)
+	trace_row.add_child(tb)
+	body.add_child(trace_row)
 
 	_toggle_section(title)  # open it by default
 

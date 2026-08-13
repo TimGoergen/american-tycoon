@@ -392,7 +392,9 @@ func _process(delta: float) -> void:
 	_autosave_timer += delta
 	if _autosave_timer >= tuning.autosave_cadence:
 		_autosave_timer = 0.0
+		ActionTracer.trace("SAVE", "Autosave starting at %.1fs cadence" % tuning.autosave_cadence)
 		SaveManager.save_dict_to_file(dynasty.to_save_dict())
+		ActionTracer.trace("SAVE", "Autosave completed successfully")
 
 	# Headline income/sec: the simple SUM of the rate each property row currently
 	# displays — rush-boosted while rush is held (Tim, 2026-07-07) — so the panel always

@@ -798,22 +798,23 @@ func _apply_loop(stream: AudioStream) -> AudioStream:
 		(stream as AudioStreamOggVorbis).loop = true
 	elif stream is AudioStreamWAV:
 		var wav := stream as AudioStreamWAV
-		wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
-		wav.loop_begin = 0
-		# loop_end is in SAMPLES (per channel). Compute from raw byte count using the
-		# stream's actual format and channel count, not a hard-coded /2 that only works
-		# for mono 16-bit. A wrong loop_end makes Godot's resampler read past the buffer.
-		var bytes_per_sample := 1
-		match wav.format:
-			AudioStreamWAV.FORMAT_16_BITS:
-				bytes_per_sample = 2
-			AudioStreamWAV.FORMAT_IMA_ADPCM:
-				# IMA ADPCM packing is non-trivial; leave loop_end at the
-				# default (-1 = full stream) and let the engine handle it.
-				wav.loop_end = -1
-				return stream
-		var channels := 2 if wav.stereo else 1
-		wav.loop_end = wav.data.size() / (bytes_per_sample * channels)
+		if wav.loop_mode != AudioStreamWAV.LOOP_FORWARD:
+			wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
+			wav.loop_begin = 0
+			# loop_end is in SAMPLES (per channel). Compute from raw byte count using the
+			# stream's actual format and channel count, not a hard-coded /2 that only works
+			# for mono 16-bit. A wrong loop_end makes Godot's resampler read past the buffer.
+			var bytes_per_sample := 1
+			match wav.format:
+				AudioStreamWAV.FORMAT_16_BITS:
+					bytes_per_sample = 2
+				AudioStreamWAV.FORMAT_IMA_ADPCM:
+					# IMA ADPCM packing is non-trivial; leave loop_end at the
+					# default (-1 = full stream) and let the engine handle it.
+					wav.loop_end = -1
+					return stream
+			var channels := 2 if wav.stereo else 1
+			wav.loop_end = wav.data.size() / (bytes_per_sample * channels)
 	return stream
 
 
@@ -994,11 +995,7 @@ func _start(bus: StringName, stream: AudioStream, volume_db: float, pitch: float
 func _safe_play(player: AudioStreamPlayer) -> void:
 	if player == null or not _enabled:
 		return
-	if OS.has_feature("mobile"):
-		# Avoid stacking deferred play calls on a player that is already scheduled or actively playing
-		if not player.playing:
-			player.call_deferred(&"play")
-	else:
+	if not player.playing:
 		player.play()
 
 

@@ -24,7 +24,7 @@ driver/name="AAudio"
 driver/name.Android="AAudio"
 driver/name.android="AAudio"
 buses/default_bus_layout="res://audio/default_bus_layout.tres"
-driver/output_latency.android=50
+driver/output_latency.android=100
 driver/mix_rate.android=44100
 
 [autoload]

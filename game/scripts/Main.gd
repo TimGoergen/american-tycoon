@@ -558,7 +558,15 @@ func _refresh_contact_progress() -> void:
 
 
 func _notification(what: int) -> void:
-	ActionTracer.trace("SYSTEM", "Notification %d received" % what)
+	# Only trace meaningful lifecycle events; ignore high-frequency per-frame notifications
+	# (such as NOTIFICATION_PROCESS / 17) to prevent disk I/O and logcat saturation.
+	match what:
+		NOTIFICATION_APPLICATION_PAUSED, NOTIFICATION_APPLICATION_RESUMED, \
+		NOTIFICATION_APPLICATION_FOCUS_IN, NOTIFICATION_APPLICATION_FOCUS_OUT, \
+		NOTIFICATION_WM_CLOSE_REQUEST, NOTIFICATION_READY, \
+		NOTIFICATION_ENTER_TREE, NOTIFICATION_EXIT_TREE:
+			ActionTracer.trace("SYSTEM", "Notification %d received" % what)
+
 	# Save on backgrounding (phone) and on close (desktop) — Spec §12.
 	if what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_WM_CLOSE_REQUEST:
 		if dynasty != null:

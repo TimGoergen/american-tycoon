@@ -31,8 +31,8 @@ static func trace(category: String, message: String) -> void:
 	print(line)
 	if _file != null:
 		_file.store_line(line)
-		# Flush on major events or periodic intervals to prevent disk I/O thrashing
-		if category == "SYSTEM" or category == "SAVE" or category == "SETTINGS" or (timestamp % 1000 < 50):
+		# Flush on save/settings or periodic 2-second intervals to prevent flash storage thrashing
+		if category == "SAVE" or category == "SETTINGS" or (timestamp % 2000 < 50):
 			_file.flush()
 
 

@@ -166,19 +166,33 @@ def glide(start_hz, end_hz, seconds, harmonics=(1.0,), curve=2.0, attack=0.05):
     return samples
 
 
+import numpy as np
+import soundfile as sf
+
+
 def write_wav(name, samples, directory=None):
-    """Normalize to PEAK and write 16-bit mono PCM."""
+    """Normalize to PEAK and write both .ogg (Vorbis) and .wav (PCM)."""
     loudest = max(abs(value) for value in samples) or 1.0
     scale = PEAK / loudest
-    frames = b"".join(struct.pack("<h", int(max(-1.0, min(1.0, value * scale)) * 32767)) for value in samples)
+    normalized = np.array([max(-1.0, min(1.0, value * scale)) for value in samples], dtype=np.float32)
 
-    path = os.path.join(directory or OUT_DIR, name)
-    with wave.open(path, "wb") as handle:
+    base_name = os.path.splitext(name)[0]
+    out_dir = directory or OUT_DIR
+    os.makedirs(out_dir, exist_ok=True)
+
+    # 1. Write Ogg Vorbis (.ogg) - primary format for Godot streaming / playback stability
+    ogg_path = os.path.join(out_dir, base_name + ".ogg")
+    sf.write(ogg_path, normalized, SAMPLE_RATE, format="OGG", subtype="VORBIS")
+
+    # 2. Write WAV (.wav) - fallback
+    wav_path = os.path.join(out_dir, base_name + ".wav")
+    frames = b"".join(struct.pack("<h", int(val * 32767)) for val in normalized)
+    with wave.open(wav_path, "wb") as handle:
         handle.setnchannels(1)
         handle.setsampwidth(2)
         handle.setframerate(SAMPLE_RATE)
         handle.writeframes(frames)
-    print("wrote %s (%.0f ms)" % (name, 1000.0 * len(samples) / SAMPLE_RATE))
+    print("wrote %s (.ogg + .wav, %.0f ms)" % (base_name, 1000.0 * len(samples) / SAMPLE_RATE))
 
 
 def main():

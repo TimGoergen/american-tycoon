@@ -101,8 +101,8 @@ func _run_abbreviated_checks(pass_label: String) -> void:
 	_check(Money.of(14_700_000.0).display(0), "$15M", "display(0) rounds to whole units")
 	_check(Money.of(2.5e21).display(0), "$3Sx", "display(0) rounds past T too")
 
-	# display_cash(): the balance format — spaced suffix, up to two decimals with
-	# trailing zeros dropped (no ".0"/".00" noise anywhere on screen; Tim, 2026-07-03).
+	# display_cash(): the balance format — spaced suffix, exactly two decimals ($1.50 M, $1.00 M)
+	# to prevent horizontal layout jitter as digits change (Tim, 2026-08-13).
 	# Cents under $1,000 keep their conventional two digits ($5.50, not $5.5).
 	_check(Money.of(5.5).display_cash(), "$5.50", "cash shows cents under $1,000")
 	_check(Money.of(950.0).display_cash(), "$950", "cash under $1,000 stays exact")
@@ -110,11 +110,11 @@ func _run_abbreviated_checks(pass_label: String) -> void:
 	# comma-grouped thousands range ("$1,250", "$18,610") is retired.
 	_check(Money.of(1_250.0).display_cash(), "$1.25 K", "cash abbreviates from $1,000")
 	_check(Money.of(18_610.0).display_cash(), "$18.61 K", "Tim's balance now reads in K")
-	_check(Money.of(2_300.0).display_cash(), "$2.3 K", "Tim's example: 2,300 is 2.3 K")
-	_check(Money.of(1_000_000.0).display_cash(), "$1 M", "whole cash drops the decimals")
-	_check(Money.of(1_500_000.0).display_cash(), "$1.5 M", "cash drops only trailing zeros")
+	_check(Money.of(2_300.0).display_cash(), "$2.30 K", "Tim's example: 2,300 is 2.30 K")
+	_check(Money.of(1_000_000.0).display_cash(), "$1.00 M", "whole cash keeps 2 fixed decimals")
+	_check(Money.of(1_500_000.0).display_cash(), "$1.50 M", "cash keeps 2 fixed decimals")
 	_check(Money.of(1.23e15).display_cash(), "$1.23 Qa", "cash uses the extended ladder")
-	_check(Money.of(2.5e21).display_cash(), "$2.5 Sx", "cash agrees with display on suffixes")
+	_check(Money.of(2.5e21).display_cash(), "$2.50 Sx", "cash agrees with display on suffixes")
 
 	# trim(): the shared "decimal only when it's non-zero" formatter every other
 	# on-screen number routes through (cycle durations, TURBO multipliers, ×N effects).
@@ -179,8 +179,8 @@ func _check_alphabet_spot_values() -> void:
 	_check(Money.of(1.5e120).display(), "$1.5bj", "rung 0 (NoTg, 1e120) is 'bj'")
 	_check(Money.of(1.5e90).display(), "$1.5" + _expected_alphabet_label(25), "the 26th lettered rung is 'az'")
 	_check(Money.of(1.5e93).display(), "$1.5ba", "the 27th lettered rung rolls over to 'ba'")
-	_check(Money.of(1.5e15).display_cash(), "$1.5 aa", "cash keeps the suffix slot's space")
-	_check(Money.of(1_500_000.0).display_cash(), "$1.5 M", "cash keeps 'M' in alphabet mode")
+	_check(Money.of(1.5e15).display_cash(), "$1.50 aa", "cash keeps the suffix slot's space")
+	_check(Money.of(1_500_000.0).display_cash(), "$1.50 M", "cash keeps 'M' in alphabet mode")
 
 	_leave_mode()
 
@@ -229,12 +229,12 @@ func _check_scientific_values() -> void:
 
 	# The rounding boundary, spelled out: 9.999e17 must carry to the next magnitude.
 	_check(Money.of(9.999e17).display(), "$1e18", "9.999e17 rounds up to $1e18, never $10e17")
-	_check(Money.of(9.999e17).display_cash(), "$1e18", "cash rounds the same way")
+	_check(Money.of(9.999e17).display_cash(), "$1.00e18", "cash rounds the same way with 2 fixed decimals")
 	# Lowercase 'e', no '+', trailing zeros trimmed by the shared trim().
 	_check(Money.of(4.2e18).display(), "$4.2e18", "mantissa keeps one real decimal")
 	_check(Money.of(1.0e18).display(), "$1e18", "a whole mantissa drops its decimals")
 	_check(Money.of(1.23e15).display_cash(), "$1.23e15", "cash keeps two real decimals")
-	_check(Money.of(1_500_000.0).display_cash(), "$1.5e6", "no space before the 'e'")
+	_check(Money.of(1_500_000.0).display_cash(), "$1.50e6", "no space before the 'e'")
 	# The intended consequence of the threshold rule: both formatters abbreviate from
 	# $1,000, so SCIENTIFIC takes over from $1,000 in both.
 	_check(Money.of(14_300.0).display(), "$1.43e4", "display() goes scientific from $1,000")
@@ -386,17 +386,17 @@ func _check_negatives_in_every_mode() -> void:
 
 	_enter_mode(Money.Format.ABBREVIATED)
 	_check(Money.of(-14_300.0).display(), "-$14.3K", "abbreviated display() negative")
-	_check(Money.of(-4.2e18).display_cash(), "-$4.2 Qi", "abbreviated display_cash() negative")
+	_check(Money.of(-4.2e18).display_cash(), "-$4.20 Qi", "abbreviated display_cash() negative")
 	_leave_mode()
 
 	_enter_mode(Money.Format.ALPHABET)
 	_check(Money.of(-14_300.0).display(), "-$14.3K", "alphabet display() negative keeps 'K'")
-	_check(Money.of(-4.2e18).display_cash(), "-$4.2 ab", "alphabet display_cash() negative")
+	_check(Money.of(-4.2e18).display_cash(), "-$4.20 ab", "alphabet display_cash() negative")
 	_leave_mode()
 
 	_enter_mode(Money.Format.SCIENTIFIC)
 	_check(Money.of(-14_300.0).display(), "-$1.43e4", "scientific display() negative")
-	_check(Money.of(-4.2e18).display_cash(), "-$4.2e18", "scientific display_cash() negative")
+	_check(Money.of(-4.2e18).display_cash(), "-$4.20e18", "scientific display_cash() negative")
 	_leave_mode()
 
 

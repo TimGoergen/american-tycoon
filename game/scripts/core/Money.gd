@@ -163,23 +163,21 @@ func display_cash() -> String:
 	var prefix := "-$" if value < 0.0 else "$"
 
 	if v >= 1_000.0:
-		# Abbreviated range: up to two decimals (trailing zeros dropped — "$1.5 M",
-		# never "$1.50 M" or "$1.00 M"; Tim, 2026-07-03) and a spaced suffix, from the
-		# same ladder display() uses so the two formats can never disagree on a suffix.
+		# Abbreviated range: always two fixed decimal places ("$1.50 M", "$1.00 M") and
+		# a spaced suffix, preventing horizontal layout jitter when values fluctuate.
 		#
 		# Per the threshold rule, the alternate formats take over here and only here — the
 		# cents and whole dollars below $1,000 are byte-identical in all three modes.
 		if format_mode == Format.SCIENTIFIC:
-			# NO space before the "e". "$4.2 e18" would read as a number followed by a
-			# suffix; the exponent is part of the number itself, not a label beside it.
-			return _scientific(v, prefix)
+			# NO space before the "e". "$4.20e18"
+			return _scientific_cash(v, prefix)
 		for i in SUFFIXES.size():
 			var rung: Dictionary = SUFFIXES[i]
 			if v >= rung["scale"]:
-				# ALPHABET KEEPS the space ("$4.2 ab"): it occupies the suffix slot, so it
+				# ALPHABET KEEPS the space ("$4.20 ab"): it occupies the suffix slot, so it
 				# gets the suffix slot's spacing, and the balance readout stays visually
 				# aligned when the player switches modes.
-				return prefix + trim(v / rung["scale"], 2) + " " + _suffix_for_rung(i)
+				return prefix + ("%.2f" % (v / rung["scale"])) + " " + _suffix_for_rung(i)
 	if v == floor(v):
 		# Below $1,000 and a whole number of dollars: no decimal point at all.
 		return prefix + str(int(v))
@@ -284,6 +282,27 @@ static func _scientific(v: float, prefix: String) -> String:
 	# trim() (not a bare "%.2f") so the rounding and the trailing-zero rule match the other
 	# two modes exactly: 4.20 → "4.2", 1.00 → "1".
 	return prefix + trim(mantissa, 2) + "e" + str(exponent)
+
+
+## Render scientific notation specifically for cash balance, preserving 2 fixed decimal places.
+static func _scientific_cash(v: float, prefix: String) -> String:
+	if v <= 0.0:
+		return prefix + "0.00e0"
+	var exponent := int(floor(log(v) / log(10.0)))
+	var mantissa := v / pow(10.0, exponent)
+
+	while mantissa >= 10.0:
+		mantissa /= 10.0
+		exponent += 1
+	while mantissa < 1.0:
+		mantissa *= 10.0
+		exponent -= 1
+
+	if round(mantissa * 100.0) >= 1000.0:
+		mantissa = 1.0
+		exponent += 1
+
+	return prefix + ("%.2f" % mantissa) + "e" + str(exponent)
 
 
 ## Format a number to at most `decimals` decimal places, then drop any trailing zeros

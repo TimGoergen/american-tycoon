@@ -134,9 +134,9 @@ var _pending_income_per_sec := 0.0
 var _income_refresh_accumulator := INCOME_REFRESH_INTERVAL  # repaint on the very first frame
 
 # Cash readout throttle (Pattern A): hold each shown cash balance for a short interval
-# (~12.5 Hz refresh rate) to prevent jittery/twitchy numbers when cash ticks up rapidly,
+# (~4 Hz refresh rate) to prevent jittery/twitchy numbers when cash ticks up rapidly,
 # while updating immediately if cash drops (e.g. player buys a property or upgrade).
-const CASH_REFRESH_INTERVAL := 0.08
+const CASH_REFRESH_INTERVAL := 0.25
 var _pending_cash := 0.0
 var _cash_refresh_accumulator := CASH_REFRESH_INTERVAL  # repaint on the very first frame
 

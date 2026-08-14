@@ -72,6 +72,12 @@ var met_minigames: Dictionary = {}
 ## Updated by note_vent_streak, hooked to the living generation's `overheated` signal below.
 var best_vent_streak: int = 0
 
+## True if the dynasty has captured Earth ($103.6T / completed White Collar into Luminari Contact).
+## GDD §10 / Final Dollar win condition. Preserved across prestige successions.
+var earth_captured: bool = false
+var earth_capture_generation: int = 0
+var earth_capture_lifetime_cash: float = 0.0
+
 ## One record per deceased generation, oldest first — the Family Ledger (GDD §8.2).
 ## Each entry is a Dictionary: { "name": String (e.g. "Wellington Pemberton VIII"),
 ## "generation": int, "fortune": float (the life's cash_earned_this_gen — the
@@ -128,6 +134,18 @@ func note_minigame_met(game_key: String) -> void:
 ## playable or shown locked. `game_key` is the minigame's display_name().
 func has_met_minigame(game_key: String) -> bool:
 	return met_minigames.has(game_key)
+
+
+## True if the dynasty has captured Earth ($103.6T / Final Dollar).
+func is_earth_captured() -> bool:
+	return earth_captured
+
+
+## Mark that the dynasty has captured Earth.
+func mark_earth_captured(gen: int, cash_at_capture: float) -> void:
+	earth_captured = true
+	earth_capture_generation = gen
+	earth_capture_lifetime_cash = cash_at_capture
 
 
 ## The whole-mode Challenge INCOME bonus in force right now (a fraction; 0.0 when nothing is cleared).
@@ -559,6 +577,9 @@ func to_save_dict() -> Dictionary:
 		"dynastic_taps": dynastic_taps,
 		"lifetime_cash_earned": lifetime_cash_earned,
 		"best_vent_streak": best_vent_streak,
+		"earth_captured": earth_captured,
+		"earth_capture_generation": earth_capture_generation,
+		"earth_capture_lifetime_cash": earth_capture_lifetime_cash,
 		"challenge_highest_tiers": challenge_highest_tiers,
 		"met_minigames": met_minigames,
 		"ancestors": ancestors,
@@ -581,6 +602,9 @@ func load_save_dict(data: Dictionary) -> void:
 	lifetime_cash_earned = float(data.get("lifetime_cash_earned", 0.0))
 	# Pre-stats-screen saves have no best-streak record; default to 0 (never reached a vent).
 	best_vent_streak = int(data.get("best_vent_streak", 0))
+	earth_captured = bool(data.get("earth_captured", false))
+	earth_capture_generation = int(data.get("earth_capture_generation", 0))
+	earth_capture_lifetime_cash = float(data.get("earth_capture_lifetime_cash", 0.0))
 	# Pre-Challenge-Mode saves have no cleared-tier record; default to empty (→ 0 income bonus).
 	# Duplicate so the loaded dynasty owns its own dictionary, not the save's (like `ancestors`).
 	challenge_highest_tiers = (data.get("challenge_highest_tiers", {}) as Dictionary).duplicate()

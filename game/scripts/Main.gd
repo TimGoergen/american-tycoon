@@ -35,6 +35,7 @@ var _background: TextureRect
 ## Small banner under the hero stat naming the civilization Earth is currently trading
 ## with (the reached epoch). Updates the moment a first contact advances the epoch.
 var _first_contact_overlay: FirstContactOverlay
+var _final_dollar_screen: FinalDollarScreen
 var _frenzy_bar: FrenzyBar
 var _momentum_bar: MomentumBar
 var _wage_panel: WagePanel
@@ -356,6 +357,7 @@ func _process(delta: float) -> void:
 	StafferFace.generation = dynasty.generation
 
 	var modal_up := _will_screen.visible or _first_contact_overlay.visible \
+			or _final_dollar_screen.visible \
 			or _minigame_screen.visible or _minigame_review_screen.visible \
 			or _challenges_screen.visible or _venture_overlay.visible
 	var overlay_up := modal_up or _welcome_overlay.visible
@@ -821,6 +823,12 @@ func _build_ui() -> void:
 	_first_contact_overlay = FirstContactOverlay.new()
 	_first_contact_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_first_contact_overlay)
+
+	# The Final Dollar screen (GDD §10): Earth capture climax sequence
+	_final_dollar_screen = FinalDollarScreen.new()
+	_final_dollar_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_final_dollar_screen.finished.connect(_on_final_dollar_finished)
+	add_child(_final_dollar_screen)
 
 	# The tutorial coach card sits on top of everything (added last), hidden until a first-time
 	# tip fires. It is non-blocking — taps outside the card pass through to the game.
@@ -2189,7 +2197,7 @@ func _show_tab(index: int) -> void:
 		_legacy_screen.set_retention_entries(_build_retention_entries())
 		_legacy_screen.refresh()
 	elif index == TAB_LEDGER:
-		_ledger_screen.refresh(dynasty.ancestors, dynasty.lifetime_cash_earned)
+		_ledger_screen.refresh(dynasty.ancestors, dynasty.lifetime_cash_earned, dynasty.is_earth_captured(), dynasty.earth_capture_generation)
 	elif index == TAB_SETTINGS and _minigame_check != null:
 		_minigame_check.button_pressed = game.ui_minigame_enabled
 		if _tutorial_check != null:
@@ -2452,6 +2460,7 @@ func _maybe_show_tip(tip_id: String, target: Control, body_override: String = ""
 ## showing, so a card never lands on a beat instead of the main game screen.
 func _any_fullscreen_overlay_visible() -> bool:
 	return _welcome_overlay.visible or _will_screen.visible or _first_contact_overlay.visible \
+			or _final_dollar_screen.visible \
 			or _minigame_screen.visible or _minigame_review_screen.visible \
 			or _challenges_screen.visible or _about_screen.visible or _stats_screen.visible \
 			or _help_screen.visible or _venture_overlay.visible
@@ -3010,7 +3019,20 @@ func _on_contact_made(new_tier: int) -> void:
 	_update_tab_unlocks()
 	_set_epoch_tab(new_tier - 1)  # tab = tier − 1 since the Earth split
 	_pending_contact_tier = new_tier
-	_first_contact_overlay.show_contact(new_tier)
+
+	# If transitioning out of Earth (Tier 2 -> 3) for the FIRST time in this dynasty,
+	# stage the 4-beat Final Dollar Climax sequence (GDD §10) before Luminari contact.
+	if new_tier == 3 and not dynasty.is_earth_captured():
+		dynasty.mark_earth_captured(dynasty.generation, game.economy.cash_earned_this_gen)
+		SaveManager.save_dict_to_file(dynasty.to_save_dict())
+		_final_dollar_screen.show_climax(dynasty.generation, game.economy.cash_earned_this_gen)
+	else:
+		_first_contact_overlay.show_contact(new_tier)
+
+
+func _on_final_dollar_finished() -> void:
+	# Handover from Final Dollar Climax directly into Luminari First Contact card
+	_first_contact_overlay.show_contact(3)
 
 
 ## The player answered the contact call (the overlay's "ANSWER THE CALL"). If this epoch opened a

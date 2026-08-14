@@ -115,6 +115,8 @@ const CUES := {
 	&"ceremony_heir":           {"bus": BUS_CEREMONY, "db": -2.0, "cooldown": 800.0, "variance": 0.0},
 	&"ceremony_contact":        {"bus": BUS_CEREMONY, "db": -4.0, "cooldown": 800.0, "variance": 0.0},
 	&"ceremony_contact_reveal": {"bus": BUS_CEREMONY, "db": -2.0, "cooldown": 800.0, "variance": 0.0},
+	&"ceremony_fanfare":        {"bus": BUS_CEREMONY, "db": -2.0, "cooldown": 800.0, "variance": 0.0},
+	&"ceremony_power_down":     {"bus": BUS_CEREMONY, "db": -4.0, "cooldown": 800.0, "variance": 0.0},
 	&"legacy_purchase":         {"bus": BUS_CEREMONY, "db": -6.0, "cooldown": 300.0, "variance": 0.0},
 	&"welcome_back":            {"bus": BUS_CEREMONY, "db": -4.0, "cooldown": 800.0, "variance": 0.0},
 	&"prestige_confirm":        {"bus": BUS_CEREMONY, "db": -2.0, "cooldown": 800.0, "variance": 0.0},
@@ -789,6 +791,25 @@ func set_music_suppressed(suppressed: bool) -> void:
 func stop_music() -> void:
 	_music_wanted = false
 	_music_band = -1
+
+
+## Smoothly wind down and silence music for the Engine Stops / Final Dollar ceremony beat.
+func wind_down_music(duration: float = 2.0) -> void:
+	if not _enabled:
+		return
+	var active_player: AudioStreamPlayer = _music_players[_music_active]
+	if active_player != null and active_player.playing:
+		var tween := create_tween()
+		if not OS.has_feature("mobile"):
+			tween.parallel().tween_property(active_player, "pitch_scale", 0.35, duration).set_ease(Tween.EASE_IN)
+		tween.parallel().tween_property(active_player, "volume_db", -60.0, duration).set_ease(Tween.EASE_IN)
+		tween.tween_callback(func() -> void:
+			stop_music()
+			active_player.volume_db = 0.0
+			active_player.pitch_scale = 1.0
+		)
+	else:
+		stop_music()
 
 
 ## Make a music stream loop. Same reasoning as the overdrive bed: a track that stops after one pass

@@ -283,6 +283,47 @@ func max_hire_mode() -> int:
 	return ALL_HIRE_MODES_UNLOCKED
 
 
+## Effective offline accrual cap in seconds (Night Shift), scaled from the base cap (14400 = 4h).
+func offline_cap_seconds(base_cap: float = 14400.0) -> float:
+	return base_cap + _per_level(LegacyUpgradeCatalog.EXTENDED_OFFLINE) \
+		* float(get_level(LegacyUpgradeCatalog.EXTENDED_OFFLINE))
+
+
+## How many unstaffed properties auto-restart their cycles (Shift Supervisors).
+func auto_restart_count() -> int:
+	return int(_per_level(LegacyUpgradeCatalog.AUTO_RESTART_CYCLES) \
+		* float(get_level(LegacyUpgradeCatalog.AUTO_RESTART_CYCLES)))
+
+
+## True if Hair Trigger is owned (enabling the auto-pop TURBO setting).
+func auto_pop_turbo_unlocked() -> bool:
+	return get_level(LegacyUpgradeCatalog.AUTO_POP_TURBO) >= 1
+
+
+## Frenzy meter charge added per completed property cycle (Market Buzz).
+func frenzy_cycle_charge_per_completion() -> float:
+	return _per_level(LegacyUpgradeCatalog.FRENZY_CYCLE_CHARGE) \
+		* float(get_level(LegacyUpgradeCatalog.FRENZY_CYCLE_CHARGE))
+
+
+## Extra seconds of idle grace before frenzy decay begins (Market Momentum).
+func frenzy_idle_grace_bonus() -> float:
+	return _per_level(LegacyUpgradeCatalog.FRENZY_DECAY_RESIST) \
+		* float(get_level(LegacyUpgradeCatalog.FRENZY_DECAY_RESIST))
+
+
+## Multiplier on frenzy meter decay rate per second (Market Momentum): -8% per level down to min 0.20.
+func frenzy_decay_rate_multiplier() -> float:
+	var level := get_level(LegacyUpgradeCatalog.FRENZY_DECAY_RESIST)
+	return maxf(1.0 - 0.08 * float(level), 0.20)
+
+
+## Duration in seconds of the decaying afterburn tail after a frenzy burn ends (Residual Momentum).
+func frenzy_afterburn_duration() -> float:
+	return _per_level(LegacyUpgradeCatalog.FRENZY_AFTERBURN) \
+		* float(get_level(LegacyUpgradeCatalog.FRENZY_AFTERBURN))
+
+
 ## The catalog's per-level magnitude for an upgrade (0.0 if unknown).
 func _per_level(id: String) -> float:
 	var definition := LegacyUpgradeCatalog.get_definition(id)

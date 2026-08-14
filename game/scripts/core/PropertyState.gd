@@ -125,10 +125,17 @@ var is_overheat_frozen: bool = false
 ## NOT saved, for the same reason the freeze is not: no heat/lockout state persists.
 var is_rush_tail_rider: bool = false
 
+## True if Shift Supervisors (Legacy upgrade) auto-restarts this unstaffed property's cycle.
+var auto_restarts: bool = false
+
+## Cycles completed by this property during the last tick() or rush_cycle() call.
+var cycles_completed_this_tick: int = 0
+
 ## Dynasty-wide property-income multiplier (the Legacy "Family Fortune" upgrade), mirrored
 ## here for DISPLAY only so the row's per-cycle figure reflects it (the live tick applies
 ## the same factor at point of payment via the global multiplier). Set by DynastyState.
 var legacy_income_multiplier: float = 1.0
+
 
 ## How many milestone bands have been crossed. Used to know which reward fires next.
 var _milestones_crossed: int = 0
@@ -201,8 +208,8 @@ func buy(count: int) -> void:
 		units_owned += 1
 		_check_milestone()
 
-	# Staffed properties auto-start; make sure a cycle is running.
-	if is_staffed and not is_cycle_running:
+	# Staffed or auto-restarting properties auto-start; make sure a cycle is running.
+	if (is_staffed or auto_restarts) and not is_cycle_running:
 		_start_cycle_internal()
 
 
@@ -234,9 +241,10 @@ func staff_block_epoch(block: int) -> int:
 	return config.unlock_tier + block - 1
 
 
-## How many blocks the run has made available to this property: one per epoch from its
-## unlock epoch up to the reached epoch, capped at the defined epochs. 0 while the
-## property itself is still locked. The level cap is 20 × this.
+## How many 20-level blocks are unlocked for THIS property once the dynasty has
+## reached `reached_tier`. An Earth property (unlock_tier 1) has 1 block at tier 1,
+## 2 at tier 2, up to 27. An alien property unlocking at tier 10 has 0 blocks at
+## tier 9, 1 at tier 10, 2 at tier 11, up to (27 - 10 + 1) = 18.
 func staff_blocks_available(reached_tier: int) -> int:
 	var last_defined_block := EpochCatalog.tier_count() - config.unlock_tier + 1
 	return clampi(reached_tier - config.unlock_tier + 1, 0, last_defined_block)
@@ -398,7 +406,7 @@ func restore(
 	# effective length the clamp measures against.
 	set_first_contact_bonus(p_first_contact_income_mult, p_first_contact_cycle_mult)
 	cycle_progress = clampf(p_cycle_progress, 0.0, _effective_cycle_length())
-	is_cycle_running = (p_is_running or is_staffed) and units_owned > 0
+	is_cycle_running = (p_is_running or is_staffed or auto_restarts) and units_owned > 0
 
 
 # ---------------------------------------------------------------------------
@@ -409,6 +417,7 @@ func restore(
 ## Staffed properties loop automatically; unstaffed stop after one cycle.
 ## `income_multiplier` (frenzy, events) applies at point of payment (Spec §3.4).
 func tick(delta: float, income_multiplier: float = 1.0) -> float:
+	cycles_completed_this_tick = 0
 	# Overheat freeze: the whole property is DOWN for the lockout — the cycle holds exactly
 	# where it was (staffed auto-cycling included) and pays nothing. Returning before the
 	# loop below is what guarantees no collection path can leak: _collect only ever runs
@@ -430,8 +439,9 @@ func tick(delta: float, income_multiplier: float = 1.0) -> float:
 			remaining -= time_to_complete
 			cycle_progress = 0.0
 			income_earned += _collect(income_multiplier)
+			cycles_completed_this_tick += 1
 
-			if is_staffed:
+			if is_staffed or auto_restarts:
 				_start_cycle_internal()  # auto-restart
 			else:
 				is_cycle_running = false  # manual: stop after one pay
@@ -458,6 +468,7 @@ func start_cycle() -> void:
 ## 10 Hz logic tick collects it. That tick delay was making rushed income visibly lag the rushed
 ## cycles (Tim 2026-07-11). Returns the income earned by this rush (0 unless a cycle completed).
 func rush_cycle(income_multiplier: float = 1.0) -> float:
+	cycles_completed_this_tick = 0
 	# Belt to GameState's brace: rush verbs are already globally dead during an overheat
 	# lockout (can_rush() is false whenever a property is frozen), but a frozen property must
 	# never pay even if some future caller forgets that gate.
@@ -481,13 +492,19 @@ func rush_cycle(income_multiplier: float = 1.0) -> float:
 		# Staffed: pay every full cycle covered, keep the leftover progress, and stay running.
 		var completed := int(cycle_progress / effective_length)
 		cycle_progress -= float(completed) * effective_length
+		cycles_completed_this_tick += completed
 		for _i in range(completed):
 			earned += _collect(income_multiplier)
 	else:
-		# Manual (unstaffed): pays exactly one cycle then stops (Spec §4; a held pulse re-taps it).
+		# Manual (unstaffed): pays exactly one cycle then stops (Spec §4; a held pulse re-taps it),
+		# unless Shift Supervisors auto-restarts it.
 		cycle_progress = 0.0
 		earned = _collect(income_multiplier)
-		is_cycle_running = false
+		cycles_completed_this_tick += 1
+		if auto_restarts:
+			_start_cycle_internal()
+		else:
+			is_cycle_running = false
 	return earned
 
 

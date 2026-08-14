@@ -224,6 +224,7 @@ var _tab_icon_tween: Array = []     # the in-flight fade Tween per tab (killed o
 var _active_tab: int = TAB_PROPERTY
 var _minigame_check: CheckBox  # the Settings-tab "play the minigame" toggle
 var _tutorial_check: CheckBox  # the Settings-tab "show tutorial tips" toggle
+var _auto_pop_turbo_check: CheckBox  # the Settings-tab "auto-trigger full TURBO" toggle
 ## The Settings tab's three number-format rows, INDEXED BY Money.Format (so
 ## _currency_format_rows[Money.Format.ALPHABET] is the ALPHABET row). One always-visible row
 ## per mode; the active one is restyled, never hidden or moved.
@@ -437,6 +438,11 @@ func _process(delta: float) -> void:
 			_fire_polled_tip("first_hire", _hire_control_of(hireable))
 	if _tip_armed.get("turbo_ready", false) and game.frenzy.can_pop():
 		_fire_polled_tip("turbo_ready", _frenzy_bar)
+	# Auto-Pop TURBO (Hair Trigger): when the frenzy meter is at 100% full charge and the setting is on.
+	if game.ui_auto_pop_turbo and dynasty.upgrades.auto_pop_turbo_unlocked() \
+			and game.frenzy.mode == FrenzyState.Mode.FILLING and game.frenzy.meter >= 1.0:
+		_on_pop_requested()
+
 	# Reaching cruise enables the OVERDRIVE button — teach it the first frame it lights up.
 	# Deliberately NOT keyed on the button's disabled flag alone: Auto-Purchase Mode holds rush
 	# (and so OVR) shut for as long as it is switched on, which would suppress this one-time card
@@ -653,11 +659,10 @@ func _seconds_since_save(save_dict: Dictionary) -> float:
 
 
 func _apply_offline_if_due() -> void:
-	# Offline earnings accrue to the living generation at the staffed rate. They do
-	# NOT yet receive the dynasty's Legacy multiplier (OfflineCalculator predates
-	# the dynasty layer); folding Legacy into offline accrual is a later refinement.
+	# Offline earnings accrue to the living generation at the staffed rate.
 	if _elapsed_since_save > 0.0:
-		var offline := game.apply_offline(_elapsed_since_save)
+		var effective_cap := dynasty.upgrades.offline_cap_seconds(tuning.offline_cap_seconds)
+		var offline := game.apply_offline(_elapsed_since_save, effective_cap)
 		# The welcome-back ritual plays whenever a pile actually accrued (staffed income).
 		if offline.pile > 0.0:
 			var hours_away := offline.elapsed_seconds / 3600.0
@@ -1744,6 +1749,28 @@ func _build_settings_tab() -> Control:
 		TutorialProgress.set_enabled(on))
 	v.add_child(_tutorial_check)
 
+	# Auto-Pop TURBO toggle (Hair Trigger). Unlocked via Legacy upgrade; if unowned, grayed in-place
+	# with unlock subtitle so UI never shifts (no-moving-UI rule).
+	_auto_pop_turbo_check = CheckBox.new()
+	var auto_pop_unlocked := dynasty.upgrades.auto_pop_turbo_unlocked()
+	_auto_pop_turbo_check.text = "Auto-trigger full TURBO" if auto_pop_unlocked else "Auto-trigger full TURBO (Unlock in Estate Office)"
+	_auto_pop_turbo_check.disabled = not auto_pop_unlocked
+	_auto_pop_turbo_check.add_theme_font_size_override("font_size", 45)
+	for state in ["font_color", "font_pressed_color", "font_hover_color",
+			"font_focus_color", "font_hover_pressed_color"]:
+		_auto_pop_turbo_check.add_theme_color_override(state, UiPalette.NAVY)
+	_auto_pop_turbo_check.add_theme_color_override("font_disabled_color", UiPalette.MID_GRAY)
+	_auto_pop_turbo_check.add_theme_icon_override("checked", load("res://art/icons/checkbox_checked.svg"))
+	_auto_pop_turbo_check.add_theme_icon_override("unchecked", load("res://art/icons/checkbox_unchecked.svg"))
+	_auto_pop_turbo_check.button_pressed = game.ui_auto_pop_turbo and auto_pop_unlocked
+	_auto_pop_turbo_check.toggled.connect(func(on: bool) -> void:
+		if _settings_tap_was_a_swipe():
+			_auto_pop_turbo_check.set_pressed_no_signal(game.ui_auto_pop_turbo)
+			return
+		game.ui_auto_pop_turbo = on)
+	v.add_child(_auto_pop_turbo_check)
+
+
 	# Number format (Plans/Currency_Format_Setting.md): THREE always-visible rows, one per mode,
 	# rather than one cycling button. Tim, 2026-08-05: "I don't like having a single button that is
 	# not clear what will happen when you click it." A cycler hides its own behaviour — you cannot
@@ -2167,10 +2194,21 @@ func _show_tab(index: int) -> void:
 		_minigame_check.button_pressed = game.ui_minigame_enabled
 		if _tutorial_check != null:
 			_tutorial_check.button_pressed = TutorialProgress.is_enabled()
+		_refresh_auto_pop_turbo_setting()
 		# Resync which number-format row is marked active on entry, the same way the toggles above
 		# resync — so it can never mark a mode the formatter isn't actually in.
 		if not _currency_format_rows.is_empty():
 			_style_currency_format_rows()
+
+
+func _refresh_auto_pop_turbo_setting() -> void:
+	if _auto_pop_turbo_check == null or not is_instance_valid(_auto_pop_turbo_check):
+		return
+	var auto_pop_unlocked := dynasty.upgrades.auto_pop_turbo_unlocked()
+	_auto_pop_turbo_check.text = "Auto-trigger full TURBO" if auto_pop_unlocked else "Auto-trigger full TURBO (Unlock in Estate Office)"
+	_auto_pop_turbo_check.disabled = not auto_pop_unlocked
+	_auto_pop_turbo_check.set_pressed_no_signal(game.ui_auto_pop_turbo and auto_pop_unlocked)
+
 
 
 ## The active tab button reads as a mustard plate; the rest as plain cream plates. The
@@ -3166,7 +3204,9 @@ func _on_upgrade_purchased(_upgrade_id: String) -> void:
 	for row in _rows:
 		(row as PropertyRow).set_max_hire_mode(dynasty.upgrades.max_hire_mode())
 	_refresh_mode_buttons()
+	_refresh_auto_pop_turbo_setting()
 	SaveManager.save_dict_to_file(dynasty.to_save_dict())
+
 
 
 ## Player opened the estate planner: open the ceremony on the obituary (beat 1),

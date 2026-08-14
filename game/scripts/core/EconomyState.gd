@@ -13,8 +13,12 @@ var cash: float = 0.0
 ## Accumulated income paid out this tick (reset each tick — used by callers to read delta).
 var income_this_tick: float = 0.0
 
+## Total property cycles completed across all properties during this tick.
+var cycles_completed_this_tick: int = 0
+
 ## Total income paid out since economy creation (for simulator graphs).
 var total_income: float = 0.0
+
 
 ## Dollars this generation has EARNED over its life — property income plus wage
 ## taps plus the offline pile. Monotonic: it only ever rises, and spending never
@@ -119,14 +123,18 @@ func get_staff_price_rank(prop_index: int) -> int:
 ## `income_multiplier` (frenzy, events) applies at point of payment (Spec §3.4).
 func tick(delta: float, income_multiplier: float = 1.0) -> void:
 	income_this_tick = 0.0
+	cycles_completed_this_tick = 0
 	for prop in properties:
-		income_this_tick += (prop as PropertyState).tick(delta, income_multiplier)
+		var p := prop as PropertyState
+		income_this_tick += p.tick(delta, income_multiplier)
+		cycles_completed_this_tick += p.cycles_completed_this_tick
 	cash += income_this_tick
 	total_income += income_this_tick
 	# Property income is earned money, so it feeds the lifetime-earned accumulator
 	# that the estate waterfall now grosses on (Spec §9.1).
 	cash_earned_this_gen += income_this_tick
 	time_elapsed += delta
+
 
 
 # ---------------------------------------------------------------------------
@@ -406,29 +414,57 @@ func get_total_income_per_sec() -> float:
 	return total
 
 
-## Sum of income/sec from STAFFED properties only — the income the player keeps
-## earning hands-off. Unstaffed cycles stop after one payout, so they are not
+## Update auto-restart flags for unstaffed properties (Shift Supervisors).
+## Flags the top `allowed_count` owned unstaffed properties by get_income_per_sec() descending.
+func update_auto_restarts(allowed_count: int) -> void:
+	var unstaffed_owned: Array[PropertyState] = []
+	for prop in properties:
+		var p := prop as PropertyState
+		if p.units_owned > 0 and not p.is_staffed:
+			unstaffed_owned.append(p)
+		else:
+			p.auto_restarts = false
+
+	# Sort descending by income rate (tiebreak on base_cost descending)
+	unstaffed_owned.sort_custom(func(a: PropertyState, b: PropertyState) -> bool:
+		var rate_a := a.get_income_per_sec()
+		var rate_b := b.get_income_per_sec()
+		if not is_equal_approx(rate_a, rate_b):
+			return rate_a > rate_b
+		return a.config.base_cost > b.config.base_cost
+	)
+
+	for i in range(unstaffed_owned.size()):
+		var p := unstaffed_owned[i]
+		var should_restart := (i < allowed_count)
+		p.auto_restarts = should_restart
+		if should_restart and not p.is_cycle_running and not p.is_overheat_frozen and p.units_owned > 0:
+			p.start_cycle()
+
+
+## Sum of income/sec from STAFFED or AUTO-RESTARTING properties — the income the player keeps
+## earning hands-off. Unstaffed non-restarting cycles stop after one payout, so they are not
 ## guaranteed and do not count. Excludes frenzy/event multipliers, which are
 ## temporary; this is the dependable floor the headline stat never reads below.
 func get_staffed_income_per_sec() -> float:
 	var total := 0.0
 	for prop in properties:
 		var p := prop as PropertyState
-		if p.is_staffed:
+		if p.is_staffed or p.auto_restarts:
 			total += p.get_income_per_sec()
 	return total
 
 
 ## The THEORETICAL passive income/sec from current assets — the figure shown on the hero
-## panel (Tim, 2026-06-24). For each STAFFED (auto-cycling) property it is the per-cycle
-## payout — units × per-unit income × the staffer-tier multiplier × the permanent Legacy
-## "Family Fortune" multiplier — divided by the effective cycle duration, summed across
+## panel (Tim, 2026-06-24). For each STAFFED or AUTO-RESTARTING (auto-cycling) property it is
+## the per-cycle payout — units × per-unit income × the staffer-tier multiplier × the permanent
+## Legacy "Family Fortune" multiplier — divided by the effective cycle duration, summed across
 ## properties. That is exactly the image's `Σ (Base Payout × Multipliers) / Cycle Duration`.
 ##
 ## It is a pure function of the holdings, NOT a measurement of recent cash inflow, so it is
 ## rock-steady: it changes only when the player buys units, hires/upgrades staff, crosses a
 ## milestone, or a permanent multiplier changes — never from the lumpy timing of payouts.
-## Unstaffed properties are excluded (they only pay when tapped, so they earn nothing
+## Unstaffed non-restarting properties are excluded (they only pay when tapped, so they earn nothing
 ## passively), and the temporary frenzy/event multiplier is excluded so the headline reads
 ## the dependable rate rather than spiking during a burn.
 func get_passive_income_per_sec() -> float:
@@ -438,9 +474,10 @@ func get_passive_income_per_sec() -> float:
 		# get_income_per_cycle already folds in the staff-tier and Family Fortune multipliers
 		# the live tick pays on; dividing by the effective (sped-up) cycle length turns that
 		# per-cycle payout into a per-second rate.
-		if p.is_staffed:
+		if p.is_staffed or p.auto_restarts:
 			total += p.get_income_per_cycle() / p.get_effective_cycle_length()
 	return total
+
 
 
 ## Index of the CHEAPEST property the player owns none of and cannot yet afford one

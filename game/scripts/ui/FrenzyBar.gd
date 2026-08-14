@@ -178,6 +178,10 @@ func _process(delta: float) -> void:
 		# already conveys "TURBO", so the readout is just the reward.
 		_label.text = "%s× — %ds left" % [Money.trim(_frenzy.locked_multiplier, 1), int(seconds_left)]
 		_pop_button.disabled = true
+	elif _frenzy.mode == FrenzyState.Mode.AFTERBURN:
+		_apply_fill_style(FillStyle.BURNING)
+		_label.text = "%s× tail" % Money.trim(_frenzy.locked_multiplier, 1)
+		_pop_button.disabled = true
 	else:
 		# Gold the moment a pop is actually possible, so the meter's colour and the pop
 		# button's enabled state always agree — they read the same can_pop().

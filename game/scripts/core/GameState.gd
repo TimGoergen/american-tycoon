@@ -132,7 +132,12 @@ var ui_sfx_volume: float = 0.8
 ## extra branch anywhere (Plans/Audio_System.md §6.3).
 var ui_haptics_scale: float = 1.0
 
+## UI preference: whether TURBO automatically pops at 100% full frenzy meter (Hair Trigger).
+## Gated by the AUTO_POP_TURBO Legacy upgrade in the UI; stored here to persist across sessions and successions.
+var ui_auto_pop_turbo: bool = false
+
 ## The headline income/sec shown on the hero panel. A STABLE, THEORETICAL rate computed from
+
 ## the player's current assets (see EconomyState.get_passive_income_per_sec): the sum over
 ## staffed properties of (per-cycle payout × multipliers) ÷ cycle duration. It is NOT a
 ## measurement of recent cash inflow — that swung wildly frame to frame between the lumpy
@@ -233,6 +238,8 @@ func tick(delta: float, extra_property_multiplier: float = 1.0) -> void:
 			p.rush_active_grace = maxf(p.rush_active_grace - delta, 0.0)
 	var tier_before := epoch.current_tier
 	economy.tick(delta, frenzy.get_multiplier() * extra_property_multiplier)
+	if economy.cycles_completed_this_tick > 0:
+		frenzy.on_cycle_completed(economy.cycles_completed_this_tick)
 	peak_net_worth = maxf(peak_net_worth, economy.get_net_worth())
 	# Advance the alien epoch if this generation has now earned enough to consume the current
 	# economy AND owns at least one of every property in it. Reads the same lifetime-earned tally
@@ -574,8 +581,8 @@ func try_buy_staff_level(prop_index: int) -> bool:
 ## system, and a mode that spent the pile before the player ever saw it would undermine the
 ## welcome-back beat. So this deliberately never touches `auto_purchase` — the mode only
 ## advances on live ticks driven by the caller.
-func apply_offline(elapsed_seconds: float) -> OfflineCalculator.OfflineResult:
-	var result := OfflineCalculator.calculate(economy, tuning, elapsed_seconds)
+func apply_offline(elapsed_seconds: float, effective_cap_seconds: float = -1.0) -> OfflineCalculator.OfflineResult:
+	var result := OfflineCalculator.calculate(economy, tuning, elapsed_seconds, effective_cap_seconds)
 	OfflineCalculator.apply(economy, result)
 	return result
 
@@ -612,6 +619,7 @@ func to_save_dict() -> Dictionary:
 		"hire_mode": ui_hire_mode,
 		"currency_format": ui_currency_format,
 		"minigame_enabled": ui_minigame_enabled,
+		"auto_pop_turbo": ui_auto_pop_turbo,
 		"music_volume": ui_music_volume,
 		"sfx_volume": ui_sfx_volume,
 		"haptics_scale": ui_haptics_scale,
@@ -673,6 +681,7 @@ func load_save_dict(data: Dictionary) -> void:
 	)
 	# Pre-minigame saves have no flag; default to enabled (mandatory until opted out).
 	ui_minigame_enabled = bool(data.get("minigame_enabled", true))
+	ui_auto_pop_turbo = bool(data.get("auto_pop_turbo", false))
 	# Clamped on load, not merely defaulted: a level outside 0..1 would come straight through to
 	# AudioServer as a nonsense dB value. No SAVE_VERSION bump — absent keys take the defaults.
 	ui_music_volume = clampf(float(data.get("music_volume", 0.8)), 0.0, 1.0)
@@ -685,6 +694,7 @@ func load_save_dict(data: Dictionary) -> void:
 	# the pager shows, so the upper clamp belongs to the UI (Main._epoch_tab_max).
 	ui_epoch_tab = maxi(int(data.get("epoch_tab", 0)), 0)
 	auto_purchase.enabled = bool(data.get("auto_purchase_enabled", false))
+
 	economy.spent_on_units_this_gen = float(data.get("spent_on_units_this_gen", 0.0))
 	economy.spent_on_staff_this_gen = float(data.get("spent_on_staff_this_gen", 0.0))
 	economy.starting_cash = float(data.get("starting_cash", 0.0))

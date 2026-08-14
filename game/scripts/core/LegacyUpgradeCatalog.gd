@@ -53,6 +53,13 @@ const RAPID_RESTART    := "rapid_restart"
 const AUTO_PURCHASE_UNLOCK   := "auto_purchase_unlock"
 const AUTO_PURCHASE_QUANTITY := "auto_purchase_quantity"
 const AUTO_PURCHASE_CADENCE  := "auto_purchase_cadence"
+const EXTENDED_OFFLINE       := "extended_offline"
+const AUTO_RESTART_CYCLES    := "auto_restart_cycles"
+const AUTO_POP_TURBO         := "auto_pop_turbo"
+const FRENZY_CYCLE_CHARGE    := "frenzy_cycle_charge"
+const FRENZY_DECAY_RESIST    := "frenzy_decay_resist"
+const FRENZY_AFTERBURN       := "frenzy_afterburn"
+
 
 
 # ── The catalog ───────────────────────────────────────────────────────────────
@@ -293,6 +300,66 @@ const UPGRADES := [
 		"cost_growth": 3.5,           # FITTED — see AutoPurchaseCostStudy
 		"effect_per_level": 0.25,     # seconds shaved off the cadence per level
 	},
+	{
+		"id": EXTENDED_OFFLINE,
+		"name": "Night Shift",
+		"category": "Operations",
+		"description": "Operations run longer while you are away. Extends the offline earnings window.",
+		"max_level": 5,
+		"base_cost": 2666.6666666667, # With 3.0 cost_multiplier = 8,000 gems Level 1
+		"cost_growth": 2.5,
+		"effect_per_level": 14400.0,  # +4 hours in seconds per level
+	},
+	{
+		"id": AUTO_RESTART_CYCLES,
+		"name": "Shift Supervisors",
+		"category": "Operations",
+		"description": "Supervisors keep machines running. Automatically restarts cycles on your top unstaffed properties.",
+		"max_level": 12,
+		"base_cost": 10,
+		"cost_growth": 2.2,
+		"effect_per_level": 1.0,      # restarts top N unstaffed properties
+	},
+	{
+		"id": AUTO_POP_TURBO,
+		"name": "Hair Trigger",
+		"category": "Frenzy",
+		"description": "The instant the market peaks, you strike. Automatically triggers TURBO when the frenzy meter is full.",
+		"max_level": 1,
+		"base_cost": 15,
+		"cost_growth": 1.0,
+		"effect_per_level": 1.0,
+	},
+	{
+		"id": FRENZY_CYCLE_CHARGE,
+		"name": "Market Buzz",
+		"category": "Frenzy",
+		"description": "Market volume feeds excitement. Completed property cycles generate frenzy meter charge.",
+		"max_level": 10,
+		"base_cost": 8,
+		"cost_growth": 2.2,
+		"effect_per_level": 0.0005,   # +0.05% meter per completed cycle per level
+	},
+	{
+		"id": FRENZY_DECAY_RESIST,
+		"name": "Market Momentum",
+		"category": "Frenzy",
+		"description": "Hype holds its value. Extends grace before frenzy decays and reduces decay speed.",
+		"max_level": 10,
+		"base_cost": 6,
+		"cost_growth": 2.0,
+		"effect_per_level": 6.0,      # +6s grace and -8% decay speed per level
+	},
+	{
+		"id": FRENZY_AFTERBURN,
+		"name": "Residual Momentum",
+		"category": "Frenzy",
+		"description": "The buzz lingers after the peak. Frenzy multiplier fades gradually over a tail instead of ending abruptly.",
+		"max_level": 8,
+		"base_cost": 10,
+		"cost_growth": 2.4,
+		"effect_per_level": 1.5,      # +1.5s afterburn duration per level
+	},
 ]
 
 
@@ -403,4 +470,18 @@ static func describe_effect(id: String, level: int) -> String:
 			# The base cadence being shaved from is a live tuning knob, so the card quotes the
 			# shave alone rather than a total that could quietly go stale.
 			return "%ss faster between rounds" % Money.trim(per_level * float(shown_level), 2)
+		EXTENDED_OFFLINE:
+			var total_hours := int(round((14400.0 + per_level * float(shown_level)) / 3600.0))
+			return "%dh offline earnings cap" % total_hours
+		AUTO_RESTART_CYCLES:
+			return "auto-restarts top %d unstaffed %s" % [shown_level, "property" if shown_level == 1 else "properties"]
+		AUTO_POP_TURBO:
+			return "auto-triggers TURBO at 100% charge"
+		FRENZY_CYCLE_CHARGE:
+			return "+%s%% frenzy meter per cycle" % Money.trim(per_level * 100.0 * float(shown_level), 3)
+		FRENZY_DECAY_RESIST:
+			return "+%ds grace · −%d%% decay speed" % [int(per_level * float(shown_level)), mini(80, int(8.0 * float(shown_level)))]
+		FRENZY_AFTERBURN:
+			return "+%ss post-frenzy decay tail" % Money.trim(per_level * float(shown_level), 1)
 	return ""
+

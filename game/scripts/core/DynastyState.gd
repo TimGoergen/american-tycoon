@@ -470,6 +470,7 @@ func _carry_player_settings_to_heir(heir: GameState) -> void:
 	heir.ui_minigame_enabled = current.ui_minigame_enabled
 	heir.ui_epoch_tab = current.ui_epoch_tab
 	heir.ui_currency_format = current.ui_currency_format
+	heir.ui_auto_pop_turbo = current.ui_auto_pop_turbo
 	heir.ui_music_volume = current.ui_music_volume
 	heir.ui_sfx_volume = current.ui_sfx_volume
 	heir.ui_haptics_scale = current.ui_haptics_scale
@@ -518,17 +519,22 @@ func _apply_upgrade_effects(game: GameState) -> void:
 		# Display mirror of Family Fortune, so the row's per-cycle figure reflects it
 		# (the live tick already applies the same factor at payment via tick()).
 		p.legacy_income_multiplier = income_mult
+	game.economy.update_auto_restarts(upgrades.auto_restart_count())
 	game.wage.wage_multiplier = upgrades.wage_multiplier()
 	game.wage.auto_tap_speed_multiplier = auto_speed
-	# Frenzy (TURBO) upgrades: a bigger popped multiplier (Killer Instinct) and a longer burn
-	# (Second Wind). Read live by FrenzyState.pop()/tick().
+	# Frenzy (TURBO) upgrades: intensity, duration, cycle charge, decay resistance, afterburn.
 	game.frenzy.intensity_multiplier = upgrades.frenzy_intensity_multiplier()
 	game.frenzy.duration_multiplier = upgrades.frenzy_duration_multiplier()
+	game.frenzy.cycle_charge_per_completion = upgrades.frenzy_cycle_charge_per_completion()
+	game.frenzy.grace_bonus = upgrades.frenzy_idle_grace_bonus()
+	game.frenzy.decay_multiplier = upgrades.frenzy_decay_rate_multiplier()
+	game.frenzy.afterburn_duration = upgrades.frenzy_afterburn_duration()
 	# Rush cruise upgrades: a hotter safe cruise point (Cooling Systems) and a shorter overheat
 	# lockout (Rapid Restart). Read live by RushMomentumState's tick — and because this also runs
 	# via refresh_current_generation_effects, a purchase takes hold mid-life, like every upgrade.
 	game.rush_momentum.legacy_cruise_bonus = upgrades.cruise_bonus_points()
 	game.rush_momentum.lockout_time_scale = upgrades.overheat_lockout_scale()
+
 
 
 ## Re-apply upgrade effects to the LIVING generation. Called after a purchase so a

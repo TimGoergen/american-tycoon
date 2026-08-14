@@ -42,7 +42,8 @@ $headless = @(
     "ScrollEdgeFadeTest",    # list fade against an unlaid-out viewport
     "IncomeReadoutTest",     # what a property row displays
     "AudioSettingsTest",     # every ui_ preference survives a succession
-    "AudioCoreTest"          # the audio system's rules
+    "AudioCoreTest",         # the audio system's rules
+    "QolLegacyTest"          # offline cap, auto-restarts, auto-pop, frenzy upgrades
 )
 
 # Gates that need a REAL RENDERER — headless has no framebuffer to capture, so these cannot run in

@@ -22,16 +22,18 @@ class OfflineResult:
 static func calculate(
 		economy: EconomyState,
 		tuning: TuningConfig,
-		elapsed_seconds: float
+		elapsed_seconds: float,
+		effective_cap_seconds: float = -1.0
 ) -> OfflineResult:
 	var result := OfflineResult.new()
 	result.elapsed_seconds = maxf(elapsed_seconds, 0.0)
-	result.paid_seconds = minf(result.elapsed_seconds, tuning.offline_cap_seconds)
+	var cap := effective_cap_seconds if effective_cap_seconds > 0.0 else tuning.offline_cap_seconds
+	result.paid_seconds = minf(result.elapsed_seconds, cap)
 
 	var offline_rate := 0.0
 	for prop in economy.properties:
 		var p := prop as PropertyState
-		if p.is_staffed:
+		if p.is_staffed or p.auto_restarts:
 			offline_rate += p.get_income_per_sec()
 
 	result.pile = floorf(offline_rate * tuning.offline_efficiency * result.paid_seconds)
@@ -41,13 +43,14 @@ static func calculate(
 ## Bank a computed pile into the economy and reset staffed cycles.
 ## Staffed in-flight cycle progress resets to 0 on resume — it was already
 ## paid for by the rate calculation (Spec §2). Unstaffed progress is frozen
-## while away, so it is left untouched.
+## while away, so it is left untouched (unless auto-restarted).
 static func apply(economy: EconomyState, result: OfflineResult) -> void:
 	# The offline pile is property income earned while away, so it counts toward
 	# the lifetime-earned estate basis (award_earned, not award_cash).
 	economy.award_earned(result.pile)
 	for prop in economy.properties:
 		var p := prop as PropertyState
-		if p.is_staffed:
+		if p.is_staffed or p.auto_restarts:
 			p.cycle_progress = 0.0
 			p.is_cycle_running = p.units_owned > 0
+

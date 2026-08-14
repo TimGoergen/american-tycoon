@@ -394,6 +394,12 @@ func _ready() -> void:
 	# sounds, and a paused audio singleton would swallow them.
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
+	# Isolate the mobile AudioTrack crash: bypass audio hardware initialization on mobile
+	if OS.has_feature("mobile"):
+		print("Audio: Mobile detected; bypassing audio hardware to isolate native crash.")
+		_enabled = false
+		return
+
 	_enabled = _audio_is_available()
 	if not _enabled:
 		# A headless gate run lands here. Say so once — a silent disable is indistinguishable from a

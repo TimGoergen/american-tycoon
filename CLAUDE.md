@@ -33,6 +33,7 @@ Every implementation is judged against **Principle 4 (playable and fun first)** 
 - **No tuning constants in code.** Costs, rates, multipliers, timings, etc. load from `game/config/`
   (`tuning.tres` + `config/properties/*.tres`). The Balance Tuning dev panel edits them on device.
 - **GDScript only.** Prioritize human readability — clear names, brief comments on non-obvious choices.
+- **Atomic Git Execution.** Always execute `git` commands as single, unchained commands (e.g. `git status`, `git add -A`, `git commit -m "..."`, `git push origin main`). Never chain multiple commands with semicolons (`;`), `&&`, or shell wrapper scripts, ensuring IDE blanket permission rules execute seamlessly without approval prompts.
 
 ## Code map (`game/`)
 - `scripts/core/` — headless game state + rules (NO scene tree). See its `CLAUDE.md`.

@@ -102,16 +102,36 @@ const PLANET_CORNER_RADIUS_TOP := UiPalette.SCREEN_CORNER_RADIUS - 12
 const PLANET_CORNER_RADIUS_BOTTOM := 4
 # Tier (1-based, EpochCatalog) -> world image. Index 0 is unused so the array is tier-aligned.
 # Tiers 1-2 are BOTH Earth (the Blue/White Collar split, Plans/Earth_Split_Epochs.md); the
-# alien worlds start at tier 3. Tiers past the table simply show no watermark (existing rule).
+# alien worlds start at tier 3. Tiers 1-27 map to every civilization's unique home world.
 const PLANET_IMAGE_PATHS := [
 	"",
-	"res://art/worlds/earth.svg",
-	"res://art/worlds/earth.svg",
-	"res://art/worlds/luminari.svg",
-	"res://art/worlds/geth-sentinel.svg",
-	"res://art/worlds/mycelium.svg",
-	"res://art/worlds/quartzite.svg",
-	"res://art/worlds/chronophage.svg",
+	"res://art/worlds/earth.svg",          # Tier 1: Earth (Blue Collar)
+	"res://art/worlds/earth.svg",          # Tier 2: Earth (White Collar)
+	"res://art/worlds/luminari.svg",       # Tier 3: Luminari Collective (Solaria Prime)
+	"res://art/worlds/geth-sentinel.svg",  # Tier 4: Geth-Sentinel Grid (Rannoch-01)
+	"res://art/worlds/mycelium.svg",       # Tier 5: Mycelium Network (Spore-Deep)
+	"res://art/worlds/quartzite.svg",      # Tier 6: Quartzite Assemblers (Geode-7)
+	"res://art/worlds/chronophage.svg",    # Tier 7: Chronophage Syndicate (Tempus)
+	"res://art/worlds/bathyros.svg",       # Tier 8: Vashti Deep-Court (Bathyros)
+	"res://art/worlds/ssethra.svg",        # Tier 9: Ssethraki Coil-Banks (Ssethra)
+	"res://art/worlds/melissar.svg",       # Tier 10: Melissar Hive-Court (Melissar VI)
+	"res://art/worlds/norrvane.svg",       # Tier 11: Norrvane Frostholm (Norrvane)
+	"res://art/worlds/cadenza.svg",        # Tier 12: The Resonant Octave (Cadenza)
+	"res://art/worlds/nocturne.svg",       # Tier 13: Umbrafex Syndicate (Nocturne-9)
+	"res://art/worlds/karrvok.svg",        # Tier 14: Karr'ghan Warhoard (Karr'Vok)
+	"res://art/worlds/decorum.svg",        # Tier 15: The Politesse Ascendancy (Decorum)
+	"res://art/worlds/somnia.svg",         # Tier 16: Oneiroi Drift (Somnia)
+	"res://art/worlds/lexica.svg",         # Tier 17: The Glossolalia Lyceum (Lexica)
+	"res://art/worlds/oxidane.svg",        # Tier 18: The Rust Syndicate (Oxidane)
+	"res://art/worlds/monochrome.svg",     # Tier 19: The Monochrome Syndicate (Monochrome)
+	"res://art/worlds/fortuna.svg",        # Tier 20: The House of Luck (Fortuna Prime)
+	"res://art/worlds/speculum.svg",       # Tier 21: The Specular Court (Speculum)
+	"res://art/worlds/ossuar.svg",         # Tier 22: The Necro-Capital Trust (Ossuar)
+	"res://art/worlds/limelight.svg",      # Tier 23: The Attention Syndicate (Limelight)
+	"res://art/worlds/kartoteka.svg",      # Tier 24: The Ministry of Delays (Kartoteka)
+	"res://art/worlds/meridian.svg",       # Tier 25: The Meridian Cartel (Meridian Zero)
+	"res://art/worlds/asymptote.svg",      # Tier 26: The Redshift Receivership (Asymptote)
+	"res://art/worlds/provisio.svg",       # Tier 27: Finality Proprietors (Provisio)
 ]
 var _planet_image: TextureRect
 var _shown_planet_tier := 0  # which tier's image is currently loaded (0 = none yet)

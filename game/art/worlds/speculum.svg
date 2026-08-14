@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- The Specular Court — home: Speculum. Mirror Monarchs & Infinite Regress.
+     Polished chrome mirror world: kaleidoscopic reflection facets, mercury shimmer, infinite prismatic split.
+     Same canvas/centre as earth.svg (circle at 104.7,145.6). -->
+<svg width="210mm" height="297mm" viewBox="0 0 210 297" version="1.1"
+     xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="speculumChrome" cx="104.7" cy="145.6" r="92" gradientUnits="userSpaceOnUse">
+      <stop offset="0"    stop-color="#ffffff"/>
+      <stop offset="0.3"  stop-color="#dbe4ee"/>
+      <stop offset="0.7"  stop-color="#778da9"/>
+      <stop offset="1"    stop-color="#1b263b"/>
+    </radialGradient>
+    <radialGradient id="prismaticGlow" cx="104.7" cy="145.6" r="98" gradientUnits="userSpaceOnUse">
+      <stop offset="0.8"  stop-color="#bde0fe" stop-opacity="0"/>
+      <stop offset="1"    stop-color="#bde0fe" stop-opacity="0.6"/>
+    </radialGradient>
+    <clipPath id="mirrorGlobe"><circle cx="104.7" cy="145.6" r="92"/></clipPath>
+  </defs>
+
+  <g opacity="0.94">
+    <!-- Prismatic shimmer halo -->
+    <circle cx="104.7" cy="145.6" r="98" fill="url(#prismaticGlow)"/>
+
+    <!-- Chrome mirror sphere body -->
+    <circle cx="104.7" cy="145.6" r="92" fill="url(#speculumChrome)"
+            stroke="#ffffff" stroke-width="2.2" stroke-opacity="0.95"/>
+
+    <g clip-path="url(#mirrorGlobe)">
+      <!-- Kaleidoscopic Geometric Mirror Facets -->
+      <g fill="none" stroke="#ffffff" stroke-width="1.6" opacity="0.8">
+        <!-- Central Octagonal Facet -->
+        <polygon points="104.7,105 133.4,116.9 145.3,145.6 133.4,174.3 104.7,186.2 76,174.3 64.1,145.6 76,116.9"
+                 fill="#ffffff" fill-opacity="0.2"/>
+
+        <!-- Connecting Facet Rays -->
+        <line x1="104.7" y1="105" x2="104.7" y2="53.6"/>
+        <line x1="133.4" y1="116.9" x2="169.7" y2="80.6"/>
+        <line x1="145.3" y1="145.6" x2="196.7" y2="145.6"/>
+        <line x1="133.4" y1="174.3" x2="169.7" y2="210.6"/>
+        <line x1="104.7" y1="186.2" x2="104.7" y2="237.6"/>
+        <line x1="76" y1="174.3" x2="39.6" y2="210.6"/>
+        <line x1="64.1" y1="145.6" x2="12.7" y2="145.6"/>
+        <line x1="76" y1="116.9" x2="39.6" y2="80.6"/>
+
+        <!-- Inner Miniature Nested Octagon (Infinite Regress) -->
+        <polygon points="104.7,125 119.3,131 125.3,145.6 119.3,160.2 104.7,166.2 90.1,160.2 84.1,145.6 90.1,131"
+                 fill="#ffffff" fill-opacity="0.5"/>
+      </g>
+
+      <!-- Shimmer Prism Glints -->
+      <polygon points="104.7,140 106,144 110,145.6 106,147 104.7,151 103.4,147 99.4,145.6 103.4,144" fill="#ffffff"/>
+      <polygon points="140,100 141,103 144,104 141,105 140,108 139,105 136,104 139,103" fill="#ffffff"/>
+      <polygon points="70,190 71,193 74,194 71,195 70,198 69,195 66,194 69,193" fill="#ffffff"/>
+    </g>
+
+    <!-- Outer Beveled Mirror Rim -->
+    <circle cx="104.7" cy="145.6" r="95" fill="none" stroke="#e0e1dd" stroke-width="1.6" opacity="0.85"/>
+  </g>
+</svg>

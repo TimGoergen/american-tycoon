@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- The Ministry of Delays — home: Kartoteka. Bureaucratic Labyrinths & Eternal Filings.
+     Bureaucracy world: red-tape wax seals, stacked docket folders, official triplicate stamp grids.
+     Same canvas/centre as earth.svg (circle at 104.7,145.6). -->
+<svg width="210mm" height="297mm" viewBox="0 0 210 297" version="1.1"
+     xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="kartotekaCore" cx="104.7" cy="145.6" r="92" gradientUnits="userSpaceOnUse">
+      <stop offset="0"    stop-color="#e9d8a6"/>
+      <stop offset="0.45" stop-color="#bb3e03"/>
+      <stop offset="0.8"  stop-color="#9b2226"/>
+      <stop offset="1"    stop-color="#3d0c02"/>
+    </radialGradient>
+    <radialGradient id="redTapeGlow" cx="104.7" cy="145.6" r="98" gradientUnits="userSpaceOnUse">
+      <stop offset="0.8"  stop-color="#ae2012" stop-opacity="0"/>
+      <stop offset="1"    stop-color="#ae2012" stop-opacity="0.5"/>
+    </radialGradient>
+    <clipPath id="filingGlobe"><circle cx="104.7" cy="145.6" r="92"/></clipPath>
+  </defs>
+
+  <g opacity="0.94">
+    <!-- Red tape halo -->
+    <circle cx="104.7" cy="145.6" r="98" fill="url(#redTapeGlow)"/>
+
+    <!-- Manila file globe body -->
+    <circle cx="104.7" cy="145.6" r="92" fill="url(#kartotekaCore)"
+            stroke="#e9d8a6" stroke-width="1.8" stroke-opacity="0.9"/>
+
+    <g clip-path="url(#filingGlobe)">
+      <!-- Official Red-Tape Ribbons crossed over the globe -->
+      <g fill="#9b2226" stroke="#e9d8a6" stroke-width="1.2">
+        <path d="M12.7,110 L196.7,170 L196.7,185 L12.7,125 Z"/>
+        <path d="M12.7,170 L196.7,110 L196.7,125 L12.7,185 Z"/>
+      </g>
+
+      <!-- Stacked Manila Dossier Folders -->
+      <g fill="#e9d8a6" stroke="#3d0c02" stroke-width="1.4">
+        <!-- Background Folder -->
+        <polygon points="65,115 80,105 130,105 145,115 145,175 65,175"/>
+        <!-- Foreground Folder -->
+        <polygon points="75,125 90,115 140,115 155,125 155,185 75,185"/>
+      </g>
+
+      <!-- Official Central Wax Seal [PENDING / APPROVED] -->
+      <circle cx="104.7" cy="145.6" r="22" fill="#ae2012" stroke="#e9d8a6" stroke-width="2.0"/>
+      <circle cx="104.7" cy="145.6" r="16" fill="none" stroke="#e9d8a6" stroke-width="1.2" stroke-dasharray="3,3"/>
+      <!-- Seal Emblem Monogram (Official Stamp) -->
+      <path d="M96,145.6 L104.7,135 L113.4,145.6 L104.7,156.2 Z" fill="#e9d8a6"/>
+      <circle cx="104.7" cy="145.6" r="3" fill="#ae2012"/>
+    </g>
+
+    <!-- Outer Triplicate Perforated Margin Ring -->
+    <circle cx="104.7" cy="145.6" r="95" fill="none" stroke="#e9d8a6" stroke-width="1.6" stroke-dasharray="4,6" opacity="0.85"/>
+  </g>
+</svg>

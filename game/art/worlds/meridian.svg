@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- The Meridian Cartel — home: Meridian Zero. Cosmic Cartographers & Toll Meridians.
+     Astrolabe & navigational world: brass armillary rings, nautical compass rose, latitude graticule mesh.
+     Same canvas/centre as earth.svg (circle at 104.7,145.6). -->
+<svg width="210mm" height="297mm" viewBox="0 0 210 297" version="1.1"
+     xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="meridianOcean" cx="104.7" cy="145.6" r="92" gradientUnits="userSpaceOnUse">
+      <stop offset="0"    stop-color="#0077b6"/>
+      <stop offset="0.5"  stop-color="#023e8a"/>
+      <stop offset="0.85" stop-color="#03045e"/>
+      <stop offset="1"    stop-color="#000814"/>
+    </radialGradient>
+    <radialGradient id="brassGlow" cx="104.7" cy="145.6" r="98" gradientUnits="userSpaceOnUse">
+      <stop offset="0.8"  stop-color="#ffd166" stop-opacity="0"/>
+      <stop offset="1"    stop-color="#ffd166" stop-opacity="0.55"/>
+    </radialGradient>
+    <clipPath id="armillaryGlobe"><circle cx="104.7" cy="145.6" r="92"/></clipPath>
+  </defs>
+
+  <g opacity="0.94">
+    <!-- Nautical Brass Halo -->
+    <circle cx="104.7" cy="145.6" r="98" fill="url(#brassGlow)"/>
+
+    <!-- Navigational sphere body -->
+    <circle cx="104.7" cy="145.6" r="92" fill="url(#meridianOcean)"
+            stroke="#ffd166" stroke-width="2.2" stroke-opacity="0.9"/>
+
+    <g clip-path="url(#armillaryGlobe)">
+      <!-- Graticule Latitude Parallels -->
+      <ellipse cx="104.7" cy="145.6" rx="92" ry="25" fill="none" stroke="#90e0ef" stroke-width="1.4" opacity="0.65"/>
+      <ellipse cx="104.7" cy="145.6" rx="92" ry="55" fill="none" stroke="#90e0ef" stroke-width="1.4" opacity="0.65"/>
+      <ellipse cx="104.7" cy="145.6" rx="92" ry="80" fill="none" stroke="#90e0ef" stroke-width="1.2" opacity="0.5"/>
+
+      <!-- Graticule Longitude Meridians -->
+      <ellipse cx="104.7" cy="145.6" rx="30" ry="92" fill="none" stroke="#90e0ef" stroke-width="1.4" opacity="0.65"/>
+      <ellipse cx="104.7" cy="145.6" rx="60" ry="92" fill="none" stroke="#90e0ef" stroke-width="1.4" opacity="0.65"/>
+      <line x1="104.7" y1="53.6" x2="104.7" y2="237.6" stroke="#ffd166" stroke-width="2.0"/>
+
+      <!-- Central 8-Pointed Nautical Compass Rose -->
+      <g stroke="#03045e" stroke-width="1.0">
+        <!-- North / South / East / West Principal Points -->
+        <polygon points="104.7,100 110,140 104.7,145.6" fill="#ffd166"/>
+        <polygon points="104.7,100 99.4,140 104.7,145.6" fill="#ca6702"/>
+
+        <polygon points="104.7,191 110,151 104.7,145.6" fill="#ca6702"/>
+        <polygon points="104.7,191 99.4,151 104.7,145.6" fill="#ffd166"/>
+
+        <polygon points="150,145.6 110,140 104.7,145.6" fill="#ffd166"/>
+        <polygon points="150,145.6 110,151 104.7,145.6" fill="#ca6702"/>
+
+        <polygon points="59.4,145.6 99.4,140 104.7,145.6" fill="#ca6702"/>
+        <polygon points="59.4,145.6 99.4,151 104.7,145.6" fill="#ffd166"/>
+      </g>
+
+      <!-- Center Brass Pivot Ring -->
+      <circle cx="104.7" cy="145.6" r="6" fill="#ffd166" stroke="#03045e" stroke-width="1.4"/>
+      <circle cx="104.7" cy="145.6" r="2.5" fill="#ffffff"/>
+    </g>
+
+    <!-- Outer Degree Hash Marks Ring -->
+    <circle cx="104.7" cy="145.6" r="95" fill="none" stroke="#ffd166" stroke-width="1.6" stroke-dasharray="2,6" opacity="0.85"/>
+  </g>
+</svg>

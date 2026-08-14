@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- The Monochrome Syndicate — home: Monochrome. High Society, Art Gallerists & Noir Salons.
+     Noir Art Deco world: stark black/white split, silver pinstripes, gallery spotlight cone.
+     Same canvas/centre as earth.svg (circle at 104.7,145.6). -->
+<svg width="210mm" height="297mm" viewBox="0 0 210 297" version="1.1"
+     xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="noirHalo" cx="104.7" cy="145.6" r="98" gradientUnits="userSpaceOnUse">
+      <stop offset="0.8"  stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="1"    stop-color="#ffffff" stop-opacity="0.5"/>
+    </radialGradient>
+    <clipPath id="noirGlobe"><circle cx="104.7" cy="145.6" r="92"/></clipPath>
+  </defs>
+
+  <g opacity="0.94">
+    <!-- Silver Halo -->
+    <circle cx="104.7" cy="145.6" r="98" fill="url(#noirHalo)"/>
+
+    <!-- Base Globe Body -->
+    <circle cx="104.7" cy="145.6" r="92" fill="#111111"
+            stroke="#ffffff" stroke-width="2.0"/>
+
+    <g clip-path="url(#noirGlobe)">
+      <!-- Yin-Yang / Diagonal Split Art Deco Motif -->
+      <path d="M104.7,53.6 C155.5,53.6 155.5,145.6 104.7,145.6 C53.9,145.6 53.9,237.6 104.7,237.6 A92,92 0 0,0 104.7,53.6 Z"
+            fill="#ffffff"/>
+
+      <!-- Gallery Spotlight Beam -->
+      <polygon points="104.7,53.6 50,237.6 160,237.6" fill="#ffffff" opacity="0.15"/>
+
+      <!-- High-Society Top Hat & Diamond Mask Silhouette in Center -->
+      <!-- Center Opposite Dot (Black on White) -->
+      <circle cx="104.7" cy="100" r="10" fill="#111111" stroke="#ffffff" stroke-width="1.6"/>
+      <!-- Center Opposite Dot (White on Black) -->
+      <circle cx="104.7" cy="190" r="10" fill="#ffffff" stroke="#111111" stroke-width="1.6"/>
+
+      <!-- Art Deco Fan Rays -->
+      <g stroke="#888888" stroke-width="1.2" opacity="0.6">
+        <line x1="104.7" y1="145.6" x2="30" y2="80"/>
+        <line x1="104.7" y1="145.6" x2="45" y2="60"/>
+        <line x1="104.7" y1="145.6" x2="180" y2="210"/>
+        <line x1="104.7" y1="145.6" x2="165" y2="230"/>
+      </g>
+    </g>
+
+    <!-- Outer Geometric Art Deco Octagon Ring -->
+    <polygon points="104.7,47.6 174,76.3 202.7,145.6 174,214.9 104.7,243.6 35.4,214.9 6.7,145.6 35.4,76.3"
+             fill="none" stroke="#ffffff" stroke-width="1.4" opacity="0.75"/>
+  </g>
+</svg>

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Melissar Hive-Court — home: Melissar VI. Hive Aristocracy & Royal Jelly Banks.
+     Gilded hexagonal honeycomb world: amber nectar cells, royal crown filigree, golden orbital bees.
+     Same canvas/centre as earth.svg (circle at 104.7,145.6). -->
+<svg width="210mm" height="297mm" viewBox="0 0 210 297" version="1.1"
+     xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="amberHoney" cx="104.7" cy="145.6" r="92" gradientUnits="userSpaceOnUse">
+      <stop offset="0"    stop-color="#ffb703"/>
+      <stop offset="0.6"  stop-color="#fb8500"/>
+      <stop offset="1"    stop-color="#8f4a00"/>
+    </radialGradient>
+    <radialGradient id="royalGlow" cx="104.7" cy="145.6" r="98" gradientUnits="userSpaceOnUse">
+      <stop offset="0.8"  stop-color="#ffd166" stop-opacity="0"/>
+      <stop offset="1"    stop-color="#ffd166" stop-opacity="0.5"/>
+    </radialGradient>
+    <clipPath id="hiveGlobe"><circle cx="104.7" cy="145.6" r="92"/></clipPath>
+  </defs>
+
+  <g opacity="0.92">
+    <!-- Golden halo -->
+    <circle cx="104.7" cy="145.6" r="98" fill="url(#royalGlow)"/>
+
+    <!-- Honey globe body -->
+    <circle cx="104.7" cy="145.6" r="92" fill="url(#amberHoney)"
+            stroke="#ffe6a7" stroke-width="1.8" stroke-opacity="0.85"/>
+
+    <g clip-path="url(#hiveGlobe)">
+      <!-- Hexagonal Honeycomb lattice -->
+      <g fill="#ffb703" fill-opacity="0.3" stroke="#432818" stroke-width="1.6">
+        <!-- Row 1 -->
+        <polygon points="104.7,85 119.7,93.6 119.7,111 104.7,119.6 89.7,111 89.7,93.6"/>
+        <polygon points="74.7,85 89.7,93.6 89.7,111 74.7,119.6 59.7,111 59.7,93.6"/>
+        <polygon points="134.7,85 149.7,93.6 149.7,111 134.7,119.6 119.7,111 119.7,93.6"/>
+        <!-- Row 2 -->
+        <polygon points="89.7,111 104.7,119.6 104.7,137 89.7,145.6 74.7,137 74.7,119.6" fill="#ffe6a7" fill-opacity="0.5"/>
+        <polygon points="119.7,111 134.7,119.6 134.7,137 119.7,145.6 104.7,137 104.7,119.6" fill="#ffe6a7" fill-opacity="0.5"/>
+        <polygon points="59.7,111 74.7,119.6 74.7,137 59.7,145.6 44.7,137 44.7,119.6"/>
+        <polygon points="149.7,111 164.7,119.6 164.7,137 149.7,145.6 134.7,137 134.7,119.6"/>
+        <!-- Row 3 (Center Queen Chamber) -->
+        <polygon points="104.7,137 119.7,145.6 119.7,163 104.7,171.6 89.7,163 89.7,145.6" fill="#fff" fill-opacity="0.75" stroke="#d4af37" stroke-width="2.2"/>
+        <polygon points="74.7,137 89.7,145.6 89.7,163 74.7,171.6 59.7,163 59.7,145.6"/>
+        <polygon points="134.7,137 149.7,145.6 149.7,163 134.7,171.6 119.7,163 119.7,145.6"/>
+        <polygon points="44.7,137 59.7,145.6 59.7,163 44.7,171.6 29.7,163 29.7,145.6"/>
+        <polygon points="164.7,137 179.7,145.6 179.7,163 164.7,171.6 149.7,163 149.7,145.6"/>
+        <!-- Row 4 -->
+        <polygon points="89.7,163 104.7,171.6 104.7,189 89.7,197.6 74.7,189 74.7,171.6" fill="#ffe6a7" fill-opacity="0.5"/>
+        <polygon points="119.7,163 134.7,171.6 134.7,189 119.7,197.6 104.7,189 104.7,171.6" fill="#ffe6a7" fill-opacity="0.5"/>
+        <!-- Row 5 -->
+        <polygon points="104.7,189 119.7,197.6 119.7,215 104.7,223.6 89.7,215 89.7,197.6"/>
+      </g>
+
+      <!-- Queen Crown Symbol in Center -->
+      <path d="M96,158 L104.7,148 L113.4,158 L118,150 L115,164 L94,164 L91,150 Z"
+            fill="#d4af37" stroke="#fff" stroke-width="0.8"/>
+      <circle cx="96" cy="157" r="1.2" fill="#fff"/>
+      <circle cx="104.7" cy="147" r="1.5" fill="#fff"/>
+      <circle cx="113.4" cy="157" r="1.2" fill="#fff"/>
+    </g>
+
+    <!-- Orbiting Royal Drone Spores -->
+    <g fill="#ffd166">
+      <circle cx="104.7" cy="42" r="3.5"/>
+      <circle cx="178" cy="85" r="2.8"/>
+      <circle cx="192" cy="175" r="3.2"/>
+      <circle cx="35" cy="120" r="3.0"/>
+      <circle cx="48" cy="205" r="2.5"/>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Finality Proprietors — home: Provisio. Universal Deed Holders & The Last Monopoly.
+     Supreme imperial cosmic seal world: gold omega crown, eternal deed parchment rays, omniversal title rings.
+     Same canvas/centre as earth.svg (circle at 104.7,145.6). -->
+<svg width="210mm" height="297mm" viewBox="0 0 210 297" version="1.1"
+     xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="provisioGold" cx="104.7" cy="145.6" r="92" gradientUnits="userSpaceOnUse">
+      <stop offset="0"    stop-color="#fff275"/>
+      <stop offset="0.4"  stop-color="#ffd000"/>
+      <stop offset="0.75" stop-color="#cc8b00"/>
+      <stop offset="1"    stop-color="#3d2600"/>
+    </radialGradient>
+    <radialGradient id="supremeHalo" cx="104.7" cy="145.6" r="98" gradientUnits="userSpaceOnUse">
+      <stop offset="0.8"  stop-color="#ffe600" stop-opacity="0"/>
+      <stop offset="1"    stop-color="#ffe600" stop-opacity="0.65"/>
+    </radialGradient>
+    <clipPath id="finalityGlobe"><circle cx="104.7" cy="145.6" r="92"/></clipPath>
+  </defs>
+
+  <g opacity="0.95">
+    <!-- Supreme Imperial Halo -->
+    <circle cx="104.7" cy="145.6" r="98" fill="url(#supremeHalo)"/>
+
+    <!-- Universal Deed globe body -->
+    <circle cx="104.7" cy="145.6" r="92" fill="url(#provisioGold)"
+            stroke="#ffffff" stroke-width="2.2" stroke-opacity="0.95"/>
+
+    <g clip-path="url(#finalityGlobe)">
+      <!-- 16-Pointed Imperial Starburst Rays -->
+      <g fill="#ffffff" opacity="0.25">
+        <polygon points="104.7,53.6 109,145.6 100.4,145.6"/>
+        <polygon points="104.7,237.6 109,145.6 100.4,145.6"/>
+        <polygon points="12.7,145.6 104.7,141.3 104.7,149.9"/>
+        <polygon points="196.7,145.6 104.7,141.3 104.7,149.9"/>
+        <polygon points="39.6,80.6 107,142 101,148"/>
+        <polygon points="169.7,210.6 107,142 101,148"/>
+        <polygon points="39.6,210.6 107,148 101,142"/>
+        <polygon points="169.7,80.6 107,148 101,142"/>
+      </g>
+
+      <!-- Central Sacred Omega Ω Emblem (The Finality / End of the Economy) -->
+      <path d="M78,168 L92,168 A24,24 0 1,1 117.4,168 L131.4,168"
+            fill="none" stroke="#3d2600" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M78,168 L92,168 A24,24 0 1,1 117.4,168 L131.4,168"
+            fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+      <!-- Supreme Crown Above Omega -->
+      <g fill="#ffffff" stroke="#3d2600" stroke-width="1.2">
+        <polygon points="90,122 96,132 104.7,118 113.4,132 119.4,122 116.4,138 93,138"/>
+        <circle cx="90" cy="120" r="1.8" fill="#ffd000"/>
+        <circle cx="104.7" cy="116" r="2.2" fill="#ffd000"/>
+        <circle cx="119.4" cy="120" r="1.8" fill="#ffd000"/>
+      </g>
+    </g>
+
+    <!-- Outer Supreme Universal Title Ring -->
+    <circle cx="104.7" cy="145.6" r="95" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-dasharray="12,4" opacity="0.9"/>
+  </g>
+</svg>

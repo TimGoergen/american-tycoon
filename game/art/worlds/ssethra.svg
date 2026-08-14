@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Ssethraki Coil-Banks — home: Ssethra. Serpent Banks & Insurance Dens.
+     Encoiled serpent-world: emerald scaled rings, venomous glow, ouroboros orbital loop.
+     Same canvas/centre as earth.svg (circle at 104.7,145.6). -->
+<svg width="210mm" height="297mm" viewBox="0 0 210 297" version="1.1"
+     xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="serpentCore" cx="104.7" cy="145.6" r="92" gradientUnits="userSpaceOnUse">
+      <stop offset="0"    stop-color="#2d5a27"/>
+      <stop offset="0.6"  stop-color="#1b3817"/>
+      <stop offset="1"    stop-color="#0b1a0a"/>
+    </radialGradient>
+    <radialGradient id="venomGlow" cx="104.7" cy="145.6" r="95" gradientUnits="userSpaceOnUse">
+      <stop offset="0.75" stop-color="#70e000" stop-opacity="0"/>
+      <stop offset="1"    stop-color="#70e000" stop-opacity="0.45"/>
+    </radialGradient>
+    <clipPath id="serpentGlobe"><circle cx="104.7" cy="145.6" r="92"/></clipPath>
+  </defs>
+
+  <g opacity="0.90">
+    <!-- Soft venom halo -->
+    <circle cx="104.7" cy="145.6" r="98" fill="url(#venomGlow)"/>
+
+    <!-- Main sphere -->
+    <circle cx="104.7" cy="145.6" r="92" fill="url(#serpentCore)"
+            stroke="#70e000" stroke-width="1.6" stroke-opacity="0.8"/>
+
+    <g clip-path="url(#serpentGlobe)">
+      <!-- Massive coiled bands across the planet -->
+      <path d="M12.7,110 Q60,70 110,120 T196.7,100 L196.7,130 Q150,150 100,100 T12.7,140 Z"
+            fill="#38b000" opacity="0.5"/>
+      <path d="M12.7,160 Q60,120 110,170 T196.7,150 L196.7,180 Q150,200 100,150 T12.7,190 Z"
+            fill="#38b000" opacity="0.6"/>
+
+      <!-- Serpent eye slit in center -->
+      <path d="M74.7,145.6 Q104.7,115.6 134.7,145.6 Q104.7,175.6 74.7,145.6 Z"
+            fill="#ccff33" opacity="0.85"/>
+      <ellipse cx="104.7" cy="145.6" rx="4.5" ry="24" fill="#0b1a0a"/>
+      <circle cx="103" cy="138" r="2.5" fill="#ffffff" opacity="0.8"/>
+
+      <!-- Geometric scale mesh overlay -->
+      <g fill="none" stroke="#9ef01a" stroke-width="1.0" opacity="0.4">
+        <path d="M30,90 L45,105 L30,120 L15,105 Z"/>
+        <path d="M60,85 L75,100 L60,115 L45,100 Z"/>
+        <path d="M150,90 L165,105 L150,120 L135,105 Z"/>
+        <path d="M175,105 L190,120 L175,135 L160,120 Z"/>
+        <path d="M40,170 L55,185 L40,200 L25,185 Z"/>
+        <path d="M70,180 L85,195 L70,210 L55,195 Z"/>
+        <path d="M140,175 L155,190 L140,205 L125,190 Z"/>
+        <path d="M165,160 L180,175 L165,190 L150,175 Z"/>
+      </g>
+    </g>
+
+    <!-- Ouroboros Orbital Ring -->
+    <ellipse cx="104.7" cy="145.6" rx="100" ry="32" fill="none"
+             stroke="#ccff33" stroke-width="2.2" stroke-dasharray="8,4"
+             transform="rotate(-25,104.7,145.6)" opacity="0.75"/>
+  </g>
+</svg>

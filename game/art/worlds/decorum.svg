@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- The Politesse Ascendancy — home: Decorum. High Courtesy & Monogrammed Foreclosures.
+     Victorian cameo world: rose-gold filigree, lace orbital rings, ornamental seal border.
+     Same canvas/centre as earth.svg (circle at 104.7,145.6). -->
+<svg width="210mm" height="297mm" viewBox="0 0 210 297" version="1.1"
+     xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="decorumCore" cx="104.7" cy="145.6" r="92" gradientUnits="userSpaceOnUse">
+      <stop offset="0"    stop-color="#f2e9e4"/>
+      <stop offset="0.45" stop-color="#c9ada7"/>
+      <stop offset="0.8"  stop-color="#9a8c98"/>
+      <stop offset="1"    stop-color="#4a4e69"/>
+    </radialGradient>
+    <radialGradient id="roseHalo" cx="104.7" cy="145.6" r="98" gradientUnits="userSpaceOnUse">
+      <stop offset="0.8"  stop-color="#ffb5a7" stop-opacity="0"/>
+      <stop offset="1"    stop-color="#ffb5a7" stop-opacity="0.45"/>
+    </radialGradient>
+    <clipPath id="decorumGlobe"><circle cx="104.7" cy="145.6" r="92"/></clipPath>
+  </defs>
+
+  <g opacity="0.92">
+    <!-- Rose gold halo -->
+    <circle cx="104.7" cy="145.6" r="98" fill="url(#roseHalo)"/>
+
+    <!-- Cameo globe body -->
+    <circle cx="104.7" cy="145.6" r="92" fill="url(#decorumCore)"
+            stroke="#fcd5ce" stroke-width="1.8" stroke-opacity="0.9"/>
+
+    <g clip-path="url(#decorumGlobe)">
+      <!-- Ornate Victorian Filigree & Medallion -->
+      <ellipse cx="104.7" cy="145.6" rx="60" ry="75" fill="#f8edeb" opacity="0.6"
+               stroke="#b5838d" stroke-width="1.8"/>
+
+      <ellipse cx="104.7" cy="145.6" rx="42" ry="54" fill="#6d6875" opacity="0.4"
+               stroke="#e5989b" stroke-width="1.4" stroke-dasharray="6,4"/>
+
+      <!-- Center Monogrammed Bow & Teacup / Quill crest -->
+      <g fill="none" stroke="#6d6875" stroke-width="2.0" stroke-linecap="round">
+        <path d="M85,135 Q104.7,110 124,135 Q104.7,160 85,135 Z"/>
+        <circle cx="104.7" cy="135" r="4" fill="#e5989b"/>
+        <path d="M92,150 Q104.7,175 117,150"/>
+        <path d="M104.7,158 L104.7,180"/>
+        <path d="M94,180 L115,180"/>
+      </g>
+
+      <!-- Lace scallops around the perimeter -->
+      <g fill="#fcd5ce" opacity="0.7">
+        <circle cx="104.7" cy="62" r="4"/>
+        <circle cx="104.7" cy="229" r="4"/>
+        <circle cx="21" cy="145.6" r="4"/>
+        <circle cx="188" cy="145.6" r="4"/>
+        <circle cx="45" cy="86" r="3.5"/>
+        <circle cx="164" cy="86" r="3.5"/>
+        <circle cx="45" cy="205" r="3.5"/>
+        <circle cx="164" cy="205" r="3.5"/>
+      </g>
+    </g>
+
+    <!-- Outer Victorian Pearl Beaded Ring -->
+    <circle cx="104.7" cy="145.6" r="95" fill="none" stroke="#fcd5ce" stroke-width="1.4" stroke-dasharray="3,7" opacity="0.8"/>
+  </g>
+</svg>

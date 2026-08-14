@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- The Necro-Capital Trust — home: Ossuar. Catacomb Bankers & Perpetual Probate.
+     Gothic ossuary world: gilded bone filigree, eternal reliquary urns, tarnished gold crypt arches.
+     Same canvas/centre as earth.svg (circle at 104.7,145.6). -->
+<svg width="210mm" height="297mm" viewBox="0 0 210 297" version="1.1"
+     xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="ossuaryCore" cx="104.7" cy="145.6" r="92" gradientUnits="userSpaceOnUse">
+      <stop offset="0"    stop-color="#e9ecef"/>
+      <stop offset="0.4"  stop-color="#adb5bd"/>
+      <stop offset="0.75" stop-color="#495057"/>
+      <stop offset="1"    stop-color="#121416"/>
+    </radialGradient>
+    <radialGradient id="cryptGlow" cx="104.7" cy="145.6" r="98" gradientUnits="userSpaceOnUse">
+      <stop offset="0.8"  stop-color="#d4af37" stop-opacity="0"/>
+      <stop offset="1"    stop-color="#d4af37" stop-opacity="0.5"/>
+    </radialGradient>
+    <clipPath id="ossuaryGlobe"><circle cx="104.7" cy="145.6" r="92"/></clipPath>
+  </defs>
+
+  <g opacity="0.94">
+    <!-- Tarnished Gold Crypt Glow -->
+    <circle cx="104.7" cy="145.6" r="98" fill="url(#cryptGlow)"/>
+
+    <!-- Crypt globe body -->
+    <circle cx="104.7" cy="145.6" r="92" fill="url(#ossuaryCore)"
+            stroke="#d4af37" stroke-width="1.8" stroke-opacity="0.9"/>
+
+    <g clip-path="url(#ossuaryGlobe)">
+      <!-- Gothic Cathedral Arch Vaults -->
+      <path d="M50,237.6 L50,140 Q104.7,75 159.4,140 L159.4,237.6 Z"
+            fill="#212529" stroke="#d4af37" stroke-width="2.0"/>
+
+      <path d="M68,237.6 L68,155 Q104.7,105 141.4,155 L141.4,237.6 Z"
+            fill="#0b0c10" stroke="#adb5bd" stroke-width="1.4"/>
+
+      <!-- Ornate Gilded Reliquary Urn / Skull in Center Vault -->
+      <g fill="#d4af37" stroke="#121416" stroke-width="1.0">
+        <!-- Reliquary Cup -->
+        <path d="M92,145 Q104.7,135 117.4,145 L114,165 Q104.7,172 95.4,165 Z"/>
+        <!-- Pedestal Base -->
+        <rect x="98.7" y="165" width="12" height="12"/>
+        <rect x="92.7" y="177" width="24" height="6" rx="2"/>
+        <!-- Reliquary Finial Cross -->
+        <line x1="104.7" y1="125" x2="104.7" y2="138" stroke="#d4af37" stroke-width="2.2"/>
+        <line x1="99" y1="130" x2="110.4" y2="130" stroke="#d4af37" stroke-width="2.2"/>
+      </g>
+
+      <!-- Bone Filigree Crossbones across the flanks -->
+      <g stroke="#e9ecef" stroke-width="2.2" stroke-linecap="round" opacity="0.75">
+        <line x1="30" y1="90" x2="60" y2="120"/>
+        <line x1="60" y1="90" x2="30" y2="120"/>
+        <line x1="150" y1="90" x2="180" y2="120"/>
+        <line x1="180" y1="90" x2="150" y2="120"/>
+      </g>
+    </g>
+
+    <!-- Outer Tomb Inscription Ring -->
+    <circle cx="104.7" cy="145.6" r="95" fill="none" stroke="#d4af37" stroke-width="1.4" stroke-dasharray="10,4" opacity="0.8"/>
+  </g>
+</svg>

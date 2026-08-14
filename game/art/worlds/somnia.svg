@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Oneiroi Drift — home: Somnia. Dream Architects & Invoiced Slumbers.
+     Twilight dream world: lavender mist, glowing crescent moons, phosphene dream spirals.
+     Same canvas/centre as earth.svg (circle at 104.7,145.6). -->
+<svg width="210mm" height="297mm" viewBox="0 0 210 297" version="1.1"
+     xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="somniaCore" cx="104.7" cy="145.6" r="92" gradientUnits="userSpaceOnUse">
+      <stop offset="0"    stop-color="#e2afff"/>
+      <stop offset="0.4"  stop-color="#9d4edd"/>
+      <stop offset="0.75" stop-color="#3c096c"/>
+      <stop offset="1"    stop-color="#10002b"/>
+    </radialGradient>
+    <radialGradient id="dreamAura" cx="104.7" cy="145.6" r="98" gradientUnits="userSpaceOnUse">
+      <stop offset="0.8"  stop-color="#c77dff" stop-opacity="0"/>
+      <stop offset="1"    stop-color="#e0aaff" stop-opacity="0.5"/>
+    </radialGradient>
+    <clipPath id="dreamGlobe"><circle cx="104.7" cy="145.6" r="92"/></clipPath>
+  </defs>
+
+  <g opacity="0.92">
+    <!-- Lavender dream aura -->
+    <circle cx="104.7" cy="145.6" r="98" fill="url(#dreamAura)"/>
+
+    <!-- Twilight globe body -->
+    <circle cx="104.7" cy="145.6" r="92" fill="url(#somniaCore)"
+            stroke="#e0aaff" stroke-width="1.8" stroke-opacity="0.85"/>
+
+    <g clip-path="url(#dreamGlobe)">
+      <!-- Dream Mist Swirls -->
+      <path d="M12.7,110 Q50,150 104.7,110 T196.7,140" fill="none" stroke="#e0aaff" stroke-width="3.2" opacity="0.5" stroke-linecap="round"/>
+      <path d="M12.7,170 Q70,120 120,170 T196.7,180" fill="none" stroke="#e0aaff" stroke-width="2.6" opacity="0.4" stroke-linecap="round"/>
+
+      <!-- Glowing Crescent Moon in Center -->
+      <path d="M115,115 A35,35 0 1 1 85,165 A30,30 0 1 0 115,115 Z"
+            fill="#ffea00" opacity="0.9"/>
+
+      <!-- Phosphene Dream Stars & Floating Particles -->
+      <g fill="#ffffff">
+        <polygon points="70,110 72,115 77,117 72,119 70,124 68,119 63,117 68,115" opacity="0.9"/>
+        <polygon points="140,115 141.5,118.5 145,120 141.5,121.5 140,125 138.5,121.5 135,120 138.5,118.5" opacity="0.85"/>
+        <polygon points="130,170 131.5,173.5 135,175 131.5,176.5 130,180 128.5,176.5 125,175 128.5,173.5" opacity="0.75"/>
+        <circle cx="55" cy="145" r="2.2" opacity="0.8"/>
+        <circle cx="155" cy="155" r="2.0" opacity="0.7"/>
+        <circle cx="95" cy="195" r="1.8" opacity="0.6"/>
+        <circle cx="110" cy="85" r="2.2" opacity="0.85"/>
+      </g>
+
+      <!-- Golden Closed-Eye Eyelash Motifs (REM state) -->
+      <g fill="none" stroke="#ffea00" stroke-width="1.8" stroke-linecap="round" opacity="0.8">
+        <path d="M60,165 Q75,175 90,165"/>
+        <line x1="68" y1="172" x2="65" y2="178"/>
+        <line x1="75" y1="174" x2="75" y2="181"/>
+        <line x1="82" y1="172" x2="85" y2="178"/>
+      </g>
+    </g>
+
+    <!-- Outer Dreamcatcher Ring -->
+    <ellipse cx="104.7" cy="145.6" rx="98" ry="34" fill="none"
+             stroke="#e0aaff" stroke-width="1.4" stroke-dasharray="10,6"
+             transform="rotate(-20,104.7,145.6)" opacity="0.7"/>
+  </g>
+</svg>

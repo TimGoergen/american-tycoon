@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- The Rust Syndicate — home: Oxidane. Heavy Smelters & Oxidized Ore Tithes.
+     Industrial rusted-iron world: copper patina verde, corrosion plates, heavy chemical pipelines.
+     Same canvas/centre as earth.svg (circle at 104.7,145.6). -->
+<svg width="210mm" height="297mm" viewBox="0 0 210 297" version="1.1"
+     xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="oxidaneCore" cx="104.7" cy="145.6" r="92" gradientUnits="userSpaceOnUse">
+      <stop offset="0"    stop-color="#52b788"/>
+      <stop offset="0.45" stop-color="#b08968"/>
+      <stop offset="0.8"  stop-color="#7f4f24"/>
+      <stop offset="1"    stop-color="#2d1500"/>
+    </radialGradient>
+    <radialGradient id="patinaHalo" cx="104.7" cy="145.6" r="98" gradientUnits="userSpaceOnUse">
+      <stop offset="0.8"  stop-color="#74c69d" stop-opacity="0"/>
+      <stop offset="1"    stop-color="#74c69d" stop-opacity="0.45"/>
+    </radialGradient>
+    <clipPath id="rustGlobe"><circle cx="104.7" cy="145.6" r="92"/></clipPath>
+  </defs>
+
+  <g opacity="0.94">
+    <!-- Copper patina halo -->
+    <circle cx="104.7" cy="145.6" r="98" fill="url(#patinaHalo)"/>
+
+    <!-- Smelter globe body -->
+    <circle cx="104.7" cy="145.6" r="92" fill="url(#oxidaneCore)"
+            stroke="#ddb892" stroke-width="1.8" stroke-opacity="0.9"/>
+
+    <g clip-path="url(#rustGlobe)">
+      <!-- Heavy Industrial Pipeline Grid -->
+      <g fill="none" stroke="#2d1500" stroke-width="8" stroke-linecap="square">
+        <path d="M12.7,110 L90,110 L90,145.6 L196.7,145.6"/>
+        <path d="M104.7,53.6 L104.7,180 L40,180"/>
+        <path d="M120,145.6 L120,237.6"/>
+      </g>
+      <g fill="none" stroke="#52b788" stroke-width="3.6" stroke-linecap="square">
+        <path d="M12.7,110 L90,110 L90,145.6 L196.7,145.6"/>
+        <path d="M104.7,53.6 L104.7,180 L40,180"/>
+        <path d="M120,145.6 L120,237.6"/>
+      </g>
+
+      <!-- Bolted Rivet Flanges at Joints -->
+      <g fill="#ddb892" stroke="#2d1500" stroke-width="1.2">
+        <circle cx="90" cy="110" r="7"/>
+        <circle cx="90" cy="145.6" r="7"/>
+        <circle cx="104.7" cy="180" r="7"/>
+        <circle cx="120" cy="145.6" r="7"/>
+      </g>
+      <g fill="#2d1500">
+        <circle cx="90" cy="110" r="2.5"/>
+        <circle cx="90" cy="145.6" r="2.5"/>
+        <circle cx="104.7" cy="180" r="2.5"/>
+        <circle cx="120" cy="145.6" r="2.5"/>
+      </g>
+
+      <!-- Heavy Industrial Gear in Center-Right -->
+      <circle cx="145" cy="105" r="22" fill="#7f4f24" stroke="#ddb892" stroke-width="2"/>
+      <circle cx="145" cy="105" r="12" fill="#2d1500"/>
+      <circle cx="145" cy="105" r="5"  fill="#52b788"/>
+      <!-- Gear Teeth -->
+      <g fill="#ddb892">
+        <rect x="142" y="80" width="6" height="6"/>
+        <rect x="142" y="124" width="6" height="6"/>
+        <rect x="120" y="102" width="6" height="6"/>
+        <rect x="164" y="102" width="6" height="6"/>
+      </g>
+    </g>
+
+    <!-- Outer Riveted Ring -->
+    <circle cx="104.7" cy="145.6" r="95" fill="none" stroke="#ddb892" stroke-width="1.6" stroke-dasharray="4,8" opacity="0.8"/>
+  </g>
+</svg>

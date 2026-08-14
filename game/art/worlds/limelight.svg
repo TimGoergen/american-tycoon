@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- The Attention Syndicate — home: Limelight. Virality Monopolists & 24/7 Live Broadcasts.
+     Electric broadcast world: neon green aperture lens, broadcast wave towers, virality signal bars.
+     Same canvas/centre as earth.svg (circle at 104.7,145.6). -->
+<svg width="210mm" height="297mm" viewBox="0 0 210 297" version="1.1"
+     xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="limelightCore" cx="104.7" cy="145.6" r="92" gradientUnits="userSpaceOnUse">
+      <stop offset="0"    stop-color="#38b000"/>
+      <stop offset="0.4"  stop-color="#007200"/>
+      <stop offset="0.75" stop-color="#004b23"/>
+      <stop offset="1"    stop-color="#001a0a"/>
+    </radialGradient>
+    <radialGradient id="neonGlow" cx="104.7" cy="145.6" r="98" gradientUnits="userSpaceOnUse">
+      <stop offset="0.8"  stop-color="#70e000" stop-opacity="0"/>
+      <stop offset="1"    stop-color="#70e000" stop-opacity="0.6"/>
+    </radialGradient>
+    <clipPath id="broadcastGlobe"><circle cx="104.7" cy="145.6" r="92"/></clipPath>
+  </defs>
+
+  <g opacity="0.94">
+    <!-- Neon broadcast halo -->
+    <circle cx="104.7" cy="145.6" r="98" fill="url(#neonGlow)"/>
+
+    <!-- Broadcast sphere body -->
+    <circle cx="104.7" cy="145.6" r="92" fill="url(#limelightCore)"
+            stroke="#ccff33" stroke-width="2.0" stroke-opacity="0.95"/>
+
+    <g clip-path="url(#broadcastGlobe)">
+      <!-- Camera Aperture Iris Blades in Center -->
+      <g fill="#004b23" stroke="#ccff33" stroke-width="1.8">
+        <polygon points="104.7,110 135,125 125,155 104.7,145.6"/>
+        <polygon points="135,125 140,155 115,170 104.7,145.6"/>
+        <polygon points="140,155 120,180 90,170 104.7,145.6"/>
+        <polygon points="120,180 90,180 80,150 104.7,145.6"/>
+        <polygon points="90,180 70,150 85,125 104.7,145.6"/>
+        <polygon points="70,150 90,120 104.7,110 104.7,145.6"/>
+      </g>
+
+      <!-- Center Live-Feed Recording Dot (Red & Neon White) -->
+      <circle cx="104.7" cy="145.6" r="12" fill="#ff0054" stroke="#ffffff" stroke-width="2.0"/>
+      <circle cx="104.7" cy="145.6" r="5"  fill="#ffffff"/>
+
+      <!-- Broadcast Signal Wave Arcs -->
+      <g fill="none" stroke="#70e000" stroke-width="2.2" stroke-linecap="round" opacity="0.85">
+        <path d="M55,145.6 A50,50 0 0,1 154.4,145.6"/>
+        <path d="M40,145.6 A65,65 0 0,1 169.4,145.6"/>
+        <path d="M25,145.6 A80,80 0 0,1 184.4,145.6"/>
+      </g>
+
+      <!-- Virality Volume Graphic Equalizer Bars at bottom -->
+      <g fill="#ccff33">
+        <rect x="75" y="195" width="6" height="15" rx="1"/>
+        <rect x="85" y="185" width="6" height="25" rx="1"/>
+        <rect x="95" y="175" width="6" height="35" rx="1"/>
+        <rect x="105" y="180" width="6" height="30" rx="1"/>
+        <rect x="115" y="190" width="6" height="20" rx="1"/>
+        <rect x="125" y="200" width="6" height="10" rx="1"/>
+      </g>
+    </g>
+
+    <!-- Outer 'ON AIR' Shutter Frame Ring -->
+    <circle cx="104.7" cy="145.6" r="95" fill="none" stroke="#ccff33" stroke-width="1.6" stroke-dasharray="16,8" opacity="0.8"/>
+  </g>
+</svg>

@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Karr'ghan Warhoard — home: Karr'Vok. Mercenary Horde & Spreadsheets of Conquest.
+     Volcanic war-world: molten magma fissures, spiked fortress bastions, jagged armor plates.
+     Same canvas/centre as earth.svg (circle at 104.7,145.6). -->
+<svg width="210mm" height="297mm" viewBox="0 0 210 297" version="1.1"
+     xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="magmaCore" cx="104.7" cy="145.6" r="92" gradientUnits="userSpaceOnUse">
+      <stop offset="0"    stop-color="#e63946"/>
+      <stop offset="0.4"  stop-color="#9d0208"/>
+      <stop offset="0.8"  stop-color="#370617"/>
+      <stop offset="1"    stop-color="#140107"/>
+    </radialGradient>
+    <radialGradient id="warGlow" cx="104.7" cy="145.6" r="98" gradientUnits="userSpaceOnUse">
+      <stop offset="0.8"  stop-color="#ffba08" stop-opacity="0"/>
+      <stop offset="1"    stop-color="#ffba08" stop-opacity="0.55"/>
+    </radialGradient>
+    <clipPath id="warGlobe"><circle cx="104.7" cy="145.6" r="92"/></clipPath>
+  </defs>
+
+  <g opacity="0.94">
+    <!-- Molten war glow -->
+    <circle cx="104.7" cy="145.6" r="98" fill="url(#warGlow)"/>
+
+    <!-- Fortress sphere -->
+    <circle cx="104.7" cy="145.6" r="92" fill="url(#magmaCore)"
+            stroke="#ffba08" stroke-width="2.0" stroke-opacity="0.85"/>
+
+    <g clip-path="url(#warGlobe)">
+      <!-- Molten Fissures across the planet surface -->
+      <g fill="none" stroke="#ffba08" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.9">
+        <path d="M25,120 L60,135 L90,120 L104.7,145.6 L130,130 L165,150 L190,130"/>
+        <path d="M45,175 L80,160 L104.7,185 L140,165 L175,180"/>
+        <path d="M104.7,65 L104.7,105 L80,125"/>
+        <path d="M104.7,185 L104.7,225"/>
+      </g>
+
+      <!-- Spiked Fortress Bastion Plates -->
+      <g fill="#210309" stroke="#d00000" stroke-width="1.8" stroke-linejoin="bevel">
+        <polygon points="50,90 70,80 85,100 65,110"/>
+        <polygon points="125,95 145,80 160,105 140,115"/>
+        <polygon points="40,150 60,140 75,165 55,175"/>
+        <polygon points="135,155 155,140 170,165 150,175"/>
+        <!-- Central War Citadel -->
+        <polygon points="104.7,120 122,135 115,160 94,160 87,135" fill="#370617" stroke="#ffba08" stroke-width="2.2"/>
+      </g>
+
+      <circle cx="104.7" cy="145.6" r="6" fill="#ffba08"/>
+      <circle cx="104.7" cy="145.6" r="3" fill="#ffffff"/>
+    </g>
+
+    <!-- Outer Spiked Bastion Ring -->
+    <g fill="#d00000" stroke="#ffba08" stroke-width="1.0">
+      <polygon points="104.7,43 100,53 109.4,53"/>
+      <polygon points="104.7,248 100,238 109.4,238"/>
+      <polygon points="2,145.6 12,141 12,150.2"/>
+      <polygon points="207,145.6 197,141 197,150.2"/>
+    </g>
+  </g>
+</svg>

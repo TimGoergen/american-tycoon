@@ -88,12 +88,15 @@ func _build_chrome() -> void:
 ## Rebuild the ancestor rows from `ancestors` (oldest first, founder at top — a lineage
 ## reads chronologically). `lifetime_total` is the dynasty-wide cash-earned sum shown in
 ## the header. Call when the tab is opened, so it reflects the latest succession.
-func refresh(ancestors: Array, lifetime_total: float) -> void:
+func refresh(ancestors: Array, lifetime_total: float, earth_captured: bool = false, earth_gen: int = 1) -> void:
 	_total_label.text = "Dynasty Total: %s" % Money.of(lifetime_total).display()
 
 	# The list grows each generation, so rebuild it fresh rather than appending.
 	for child in _list.get_children():
 		child.queue_free()
+
+	if earth_captured:
+		_add_earth_certificate_card(earth_gen)
 
 	if ancestors.is_empty():
 		var empty := Label.new()
@@ -104,6 +107,38 @@ func refresh(ancestors: Array, lifetime_total: float) -> void:
 	else:
 		for record in ancestors:
 			_add_ancestor_row(record as Dictionary)
+
+
+## Commemorative Earth Saturation Certificate Card displayed at the top of the ledger.
+func _add_earth_certificate_card(generation_captured: int) -> void:
+	var cert_card := PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = UiPalette.CREAM
+	style.border_color = UiPalette.MUSTARD_GOLD
+	style.set_border_width_all(4)
+	style.set_corner_radius_all(14)
+	style.set_content_margin_all(16)
+	cert_card.add_theme_stylebox_override("panel", style)
+	_list.add_child(cert_card)
+
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 6)
+	cert_card.add_child(column)
+
+	var title := Label.new()
+	title.text = "★ COMMENDATION OF TOTAL EARTH SATURATION ★"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_color_override("font_color", UiPalette.DARK_GOLD)
+	title.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
+	column.add_child(title)
+
+	var detail := Label.new()
+	detail.text = "Earth's Entire Economy Captured in Generation %d ($103.6T)\nCertified 100%% Monopoly by the Dept. of Commerce" % generation_captured
+	detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	detail.add_theme_color_override("font_color", UiPalette.NAVY)
+	detail.add_theme_font_size_override("font_size", BODY_SIZE)
+	column.add_child(detail)
 
 
 ## One ancestor card: name + numeral on top, then "Earned $X · {cause}" beneath.

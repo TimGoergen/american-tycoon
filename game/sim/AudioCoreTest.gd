@@ -400,25 +400,30 @@ func _check_ceremony_beats() -> void:
 ## The comparator is the LARGEST step the waveform already makes on its own — the seam is one more
 ## sample transition, and measuring against the average makes a good loop look broken (it did, on the
 ## first attempt at this check).
-func _check_loop_is_seamless(label: String, stream: AudioStreamWAV) -> void:
-	var bytes := stream.data
-	var frames := bytes.size() / 2
-	if frames < 3:
-		_check("%s loop has audio to check" % label, false)
+func _check_loop_is_seamless(label: String, stream: AudioStream) -> void:
+	if stream is AudioStreamOggVorbis:
+		_check("the %s stream loops" % label, (stream as AudioStreamOggVorbis).loop)
 		return
+	if stream is AudioStreamWAV:
+		var wav := stream as AudioStreamWAV
+		var bytes := wav.data
+		var frames := bytes.size() / 2
+		if frames < 3:
+			_check("%s loop has audio to check" % label, false)
+			return
 
-	var biggest_step := 0
-	var previous := bytes.decode_s16(0)
-	var first := previous
-	for i in range(1, frames):
-		var sample := bytes.decode_s16(i * 2)
-		biggest_step = maxi(biggest_step, absi(sample - previous))
-		previous = sample
-	var seam: int = absi(first - previous)
+		var biggest_step := 0
+		var previous := bytes.decode_s16(0)
+		var first := previous
+		for i in range(1, frames):
+			var sample := bytes.decode_s16(i * 2)
+			biggest_step = maxi(biggest_step, absi(sample - previous))
+			previous = sample
+		var seam: int = absi(first - previous)
 
-	_check("the %s loop meets itself cleanly (seam %d vs largest normal step %d)"
-			% [label, seam, biggest_step],
-		seam <= biggest_step)
+		_check("the %s loop meets itself cleanly (seam %d vs largest normal step %d)"
+				% [label, seam, biggest_step],
+			seam <= biggest_step)
 
 
 ## THE BAND MAP (plan §3.2). A pure function on tier, so it can be checked exhaustively rather than
@@ -577,10 +582,14 @@ func _check_overdrive_bed() -> void:
 	if heat == null or urgency == null:
 		return
 	_check("they ride the MUSIC bus, so the music slider governs the drone", heat.bus == &"Music")
-	_check("both loop, or the bed would fall silent mid-ride",
-		(heat.stream as AudioStreamWAV).loop_mode != AudioStreamWAV.LOOP_DISABLED)
-	_check_loop_is_seamless("heat", heat.stream as AudioStreamWAV)
-	_check_loop_is_seamless("urgency", urgency.stream as AudioStreamWAV)
+	var heat_loops := false
+	if heat.stream is AudioStreamOggVorbis:
+		heat_loops = (heat.stream as AudioStreamOggVorbis).loop
+	elif heat.stream is AudioStreamWAV:
+		heat_loops = (heat.stream as AudioStreamWAV).loop_mode != AudioStreamWAV.LOOP_DISABLED
+	_check("both loop, or the bed would fall silent mid-ride", heat_loops)
+	_check_loop_is_seamless("heat", heat.stream)
+	_check_loop_is_seamless("urgency", urgency.stream)
 	# Settle the bed first. It shares the per-frame mix with the music, and the music section above
 	# leaves a ride running to test the duck — so asserting a pristine startup state here would be
 	# measuring test order rather than behaviour.

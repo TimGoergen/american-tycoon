@@ -772,6 +772,9 @@ extends Resource
 ## How long a gap in tapping resets the musical tap scale back to its root note, in seconds.
 @export var audio_tap_scale_reset_seconds: float = 1.0
 
+## Seconds between harmonic chord changes during sustained rush mode (2-4s).
+@export var audio_rush_harmony_interval_seconds: float = 3.0
+
 ## How long after a player action the game still counts them as PRESENT. Phase 2's idle music fade
 ## is what will consume this; nothing reads it today (see Audio.player_is_present).
 @export var audio_presence_window_ms: float = 2000.0

@@ -73,3 +73,4 @@ balance_zone_ease = 1.6
 match3_keepalive_seconds_per_point = 0.012
 timing_keepalive_seconds_per_point = 0.9
 catch_keepalive_seconds_per_point = 1.5
+audio_rush_harmony_interval_seconds = 3.0

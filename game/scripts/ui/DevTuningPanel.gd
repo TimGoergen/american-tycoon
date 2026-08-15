@@ -195,6 +195,7 @@ const DESCRIPTIONS := {
 	"audit_threshold": "Legislative Assets needed to void an audit.",
 	"earth_economy_target": "Total money on Earth; capture it to win ($).",
 	"autosave_cadence": "Seconds between autosaves.",
+	"audio_rush_harmony_interval_seconds": "Rush Audio: seconds between harmonic chord changes (2-4s).",
 }
 
 
@@ -203,6 +204,7 @@ const DESCRIPTIONS := {
 ## abbreviations get intuitive names here. Everything else falls back to capitalize().
 ## Keyed by the exact variable name, like DESCRIPTIONS.
 const DISPLAY_NAMES := {
+	"audio_rush_harmony_interval_seconds": "Rush Harmony Interval /s",
 	"m1_starting_cash": "Starting Cash",
 	"rush_pct": "Rush Percent",
 	"rush_momentum_heat_build_per_second": "Heat Build /s",

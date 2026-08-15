@@ -63,6 +63,7 @@ func _run() -> void:
 	_check_cooldown()
 	_check_voice_pool_is_bounded()
 	_check_tap_scale()
+	_check_rush_harmonic_progression()
 	await _check_buy_intensity_is_relative()
 	_check_one_sound_per_gesture()
 	_check_vent_cues_exist()
@@ -261,6 +262,50 @@ func _check_tap_scale() -> void:
 	# Print one lap and the lap after it, so the melody is inspectable rather than merely asserted.
 	print("      lap 0: %s" % str(notes.slice(0, lap_length)))
 	print("      lap 1: %s" % str(notes.slice(lap_length, lap_length * 2)))
+
+
+func _check_rush_harmonic_progression() -> void:
+	print("\n-- rush mode harmonic progression (I -> IV -> vi -> V) --")
+	var scales: Array = _audio.get_script().get_script_constant_map()["HARMONY_PROGRESSION_SCALES"]
+	var drone_offsets: Array = _audio.get_script().get_script_constant_map()["HARMONY_DRONE_OFFSETS"]
+
+	_check("progression has 4 chords", scales.size() == 4)
+	_check("drone offsets has 4 values", drone_offsets.size() == 4)
+
+	# Each scale must have exactly 16 notes to fit the sliding window travel calculation
+	for idx in range(scales.size()):
+		var chord_scale: Array = scales[idx]
+		_check("chord %d scale has 16 notes" % idx, chord_scale.size() == 16)
+		# Assert strictly increasing pitch order
+		var strictly_increasing := true
+		for j in range(1, chord_scale.size()):
+			if int(chord_scale[j]) <= int(chord_scale[j - 1]):
+				strictly_increasing = false
+				break
+		_check("chord %d scale is strictly ascending" % idx, strictly_increasing)
+
+	# Test progression advancing over time
+	_audio.reset_tap_scale()
+	_audio.set("_rush_harmony_interval_seconds", 3.0)
+	_audio.set("_rush_active_timer", 0.0)
+	_check("starts on chord 0 (I / C Major)", int(_audio.call("get_current_rush_chord_index")) == 0)
+
+	_audio.set("_rush_active_timer", 3.1)
+	_check("advances to chord 1 (IV / F Major) after 3.1s", int(_audio.call("get_current_rush_chord_index")) == 1)
+
+	_audio.set("_rush_active_timer", 6.1)
+	_check("advances to chord 2 (vi / A Minor) after 6.1s", int(_audio.call("get_current_rush_chord_index")) == 2)
+
+	_audio.set("_rush_active_timer", 9.1)
+	_check("advances to chord 3 (V / G Major) after 9.1s", int(_audio.call("get_current_rush_chord_index")) == 3)
+
+	_audio.set("_rush_active_timer", 12.1)
+	_check("loops back to chord 0 (I / C Major) after 12.1s", int(_audio.call("get_current_rush_chord_index")) == 0)
+
+	# Reset on idle
+	_audio.reset_tap_scale()
+	_check("reset_tap_scale resets chord progression to 0", int(_audio.call("get_current_rush_chord_index")) == 0)
+
 
 
 ## RULE 2: nothing may branch on a dollar MAGNITUDE.

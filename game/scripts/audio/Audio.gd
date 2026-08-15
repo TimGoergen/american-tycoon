@@ -231,7 +231,28 @@ const VOICES_PER_BUS := {
 ## The set runs an octave BELOW the sample's authored pitch as well as above it. Extending downward
 ## rather than piling more octaves on top keeps the top of the range at ~1.7 kHz: a sine blip up at
 ## three octaves is shrill, and shrill is what a repeated sound cannot afford to be.
-const TAP_SCALE_SEMITONES := [-12, -10, -8, -5, -3, 0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24]
+##
+## HARMONIC PROGRESSION FOR RUSH MODE:
+## The underlying harmony cycles through a classic 4-chord bright pop progression (I -> IV -> vi -> V)
+## every audio_rush_harmony_interval_seconds (default 3.0s, range 2-4s) during sustained rush/heat.
+const HARMONY_I_SEMITONES := [-12, -10, -8, -5, -3, 0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24]
+const HARMONY_IV_SEMITONES := [-12, -10, -7, -5, -3, 0, 2, 5, 7, 9, 12, 14, 17, 19, 21, 24]
+const HARMONY_VI_SEMITONES := [-15, -12, -10, -8, -5, -3, 0, 2, 4, 7, 9, 12, 14, 16, 19, 21]
+const HARMONY_V_SEMITONES := [-14, -13, -10, -8, -5, -3, -1, 2, 4, 7, 9, 11, 14, 16, 19, 21]
+
+const HARMONY_PROGRESSION_SCALES := [
+	HARMONY_I_SEMITONES,
+	HARMONY_IV_SEMITONES,
+	HARMONY_VI_SEMITONES,
+	HARMONY_V_SEMITONES,
+]
+
+## Default/initial tap scale (Chord I: C Major pentatonic).
+const TAP_SCALE_SEMITONES := HARMONY_I_SEMITONES
+
+## Bass drone root pitch offsets in semitones for the heat loop across the 4-chord progression.
+## Kept in a tight [-5, +5] range to maintain acoustic warmth without muddy low-end or shrill highs.
+const HARMONY_DRONE_OFFSETS := [0.0, 5.0, -3.0, -5.0]
 
 ## How many of those degrees one lap of the figure moves through. The lap is the FAST movement; the
 ## window it occupies drifts slowly across the full set, which is the slow one (see _degree_at).
@@ -386,9 +407,13 @@ var _last_interaction_ms := 0
 ## Tunable knobs, pushed in by Main from TuningConfig so audio timing is adjustable in the dev panel
 ## like everything else. Defaults here match TuningConfig's and keep Audio usable before any push.
 var _tap_scale_reset_seconds := 1.0
+var _rush_harmony_interval_seconds := 3.0
 var _presence_window_ms := 2000.0
 var _scaled_min_db := -10.0
 var _layer_threshold := 0.5
+
+## Sustained rush/active-tapping timer in seconds, advancing the harmonic progression.
+var _rush_active_timer := 0.0
 
 
 func _ready() -> void:
@@ -571,6 +596,13 @@ func play_pitched(event_id: StringName, pitch: float) -> void:
 	_play_event(event_id, 1.0, false, pitch)
 
 
+## The active chord index (0..3) in the 4-chord progression (I -> IV -> vi -> V).
+## Advances every _rush_harmony_interval_seconds during sustained rushing/tapping.
+func get_current_rush_chord_index() -> int:
+	var interval := maxf(0.1, _rush_harmony_interval_seconds)
+	return int(floor(_rush_active_timer / interval)) % HARMONY_PROGRESSION_SCALES.size()
+
+
 ## Play the next note of the tap scale (plan §4.1). Every manual tap climbs one step; the climb
 ## decays back to the root after `audio_tap_scale_reset_seconds` of not tapping, and pins at the top
 ## of the range rather than running away.
@@ -587,6 +619,7 @@ func play_tap_note() -> void:
 		# it was — so two bursts a minute apart do not sound like the same three seconds replayed.
 		# Only an explicit reset_tap_scale (a tab change) puts everything back to the start.
 		_tap_position = 0
+		_rush_active_timer = 0.0
 	else:
 		_tap_position += 1
 		if _tap_position >= _tap_run_length():
@@ -594,7 +627,9 @@ func play_tap_note() -> void:
 			_tap_lap = (_tap_lap + 1) % maxi(1, _tap_window_travel() * 2)
 	_tap_last_ms = now
 
-	var semitones: int = TAP_SCALE_SEMITONES[_degree_at(_tap_position, _tap_lap)]
+	var chord_idx := get_current_rush_chord_index()
+	var scale: Array = HARMONY_PROGRESSION_SCALES[chord_idx]
+	var semitones: int = scale[_degree_at(_tap_position, _tap_lap)]
 	# Equal temperament: each semitone is a factor of 2^(1/12).
 	_play_event(&"tap_note", 1.0, false, pow(2.0, semitones / 12.0))
 
@@ -648,6 +683,7 @@ func _ping_pong(index: int, top: int) -> int:
 func reset_tap_scale() -> void:
 	_tap_position = 0
 	_tap_lap = 0
+	_rush_active_timer = 0.0
 	# A sentinel far in the past, NOT 0. The clock is milliseconds since the engine started, so 0
 	# means "at launch" — which in the first second of runtime still reads as RECENT, and the next
 	# tap would climb instead of restarting at the root. Only visible in a test or in the first
@@ -669,6 +705,12 @@ func set_heat(normalized: float) -> void:
 	if is_nan(safe_norm) or is_inf(safe_norm):
 		safe_norm = 0.0
 	_heat_normalized = safe_norm
+	_update_heat_pitch()
+
+
+func _update_heat_pitch() -> void:
+	if _heat_player == null:
+		return
 	# On mobile, pitch_scale stays locked at 1.0. ANY mutation of pitch_scale on a playing looping
 	# stream triggers a resampler buffer reallocation in Godot's C++ AudioStreamPlaybackResampled,
 	# which races the native AudioTrack callback thread and causes SIGSEGV (SEGV_ACCERR, "buffer
@@ -676,7 +718,9 @@ func set_heat(normalized: float) -> void:
 	# here before only reduced the crash FREQUENCY, not its possibility. Intensity is still conveyed
 	# through the volume envelope and the urgency layer crossfade.
 	if not OS.has_feature("mobile"):
-		var pitch := pow(2.0, (_heat_normalized * HEAT_PITCH_SEMITONES) / 12.0)
+		var chord_idx := get_current_rush_chord_index()
+		var drone_offset: float = HARMONY_DRONE_OFFSETS[chord_idx]
+		var pitch := pow(2.0, (_heat_normalized * HEAT_PITCH_SEMITONES + drone_offset) / 12.0)
 		if is_nan(pitch) or is_inf(pitch) or pitch <= 0.0:
 			pitch = 1.0
 		if _heat_player.pitch_scale != pitch:
@@ -721,6 +765,9 @@ func _mix_heat_bed(delta: float) -> void:
 		if OS.has_feature("mobile"):
 			_heat_player.pitch_scale = 1.0
 		_safe_play(_heat_player)
+
+	if _heat_player.playing:
+		_update_heat_pitch()
 
 	var safe_gain := maxf(_heat_gain, 0.0001)
 	_heat_player.volume_db = HEAT_VOLUME_DB + linear_to_db(safe_gain)
@@ -859,6 +906,7 @@ func apply_tuning(tuning: TuningConfig) -> void:
 	if tuning == null:
 		return
 	_tap_scale_reset_seconds = tuning.audio_tap_scale_reset_seconds
+	_rush_harmony_interval_seconds = tuning.audio_rush_harmony_interval_seconds
 	_presence_window_ms = tuning.audio_presence_window_ms
 	_scaled_min_db = tuning.audio_scaled_min_db
 	_layer_threshold = tuning.audio_layer_threshold
@@ -888,6 +936,16 @@ func _process(_delta_unused: float) -> void:
 	if not _enabled or _music_players.is_empty():
 		return
 	var delta := get_process_delta_time()
+
+	# RUSH HARMONY PROGRESSION:
+	# Accumulate active rush / tapping time to advance through the 4-chord progression.
+	# If no player action or rush bed for longer than _tap_scale_reset_seconds, reset back to Chord 0.
+	var now := Time.get_ticks_msec()
+	var rush_active := _heat_active or (now - _tap_last_ms <= int(_tap_scale_reset_seconds * 1000.0))
+	if rush_active:
+		_rush_active_timer += delta
+	elif (now - _tap_last_ms > int(_tap_scale_reset_seconds * 1000.0)) and not _heat_active:
+		_rush_active_timer = 0.0
 
 	# IDLE (§3.3). The music carries the quiet, but not forever: after a long silence it drifts out,
 	# and the next thing the player does brings it back. An active ride never counts as idle —

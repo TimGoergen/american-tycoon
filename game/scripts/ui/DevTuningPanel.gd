@@ -47,6 +47,10 @@ signal reset_dynasty_requested
 signal jump_epoch_requested(tier: int)
 signal grant_legacy_requested(amount: int)
 signal grant_cash_requested(epoch_target_multiplier: float)
+signal trigger_crash_requested
+signal trigger_audit_requested
+signal trigger_windfall_requested
+signal clear_events_requested
 
 
 # Large, legible type for phone reading (UI notes §1) — sized up 25% from the first
@@ -193,6 +197,10 @@ const DESCRIPTIONS := {
 	"crash_duration_minutes": "Market Crash length (active minutes).",
 	"audit_settle_rate": "Audit settlement cost as a fraction of net worth.",
 	"audit_threshold": "Legislative Assets needed to void an audit.",
+	"windfall_net_worth_fraction": "The Windfall: fraction of net worth granted as cash.",
+	"event_roll_interval_seconds": "Rare Events: seconds between random roll checks.",
+	"event_base_chance": "Rare Events: base probability on each roll interval (0..1).",
+	"event_grace_period_seconds": "Rare Events: grace period at generation start before events fire.",
 	"earth_economy_target": "Total money on Earth; capture it to win ($).",
 	"autosave_cadence": "Seconds between autosaves.",
 	"audio_rush_harmony_interval_seconds": "Rush Audio: seconds between harmonic chord changes (2-4s).",
@@ -300,7 +308,7 @@ const SECTIONS := [
 	{"title": "Legacy Bonus", "prefixes": ["legacy_bonus_", "legacy_gem_chance_"]},
 	{"title": "Estate & Legacy", "prefixes": ["estate_", "loophole_", "k_legacy", "alpha_legacy",
 		"legacy_knee_net", "legacy_cost_steepening", "legacy_upgrade_cost_multiplier"]},
-	{"title": "Events", "prefixes": ["crash_", "audit_"]},
+	{"title": "Events", "prefixes": ["crash_", "audit_", "windfall_", "event_"]},
 ]
 
 ## The catch-all section title for knobs no SECTIONS prefix matched (so a newly added knob always
@@ -598,6 +606,31 @@ func _add_playtest_section() -> void:
 		var m: float = mult
 		var cb := _playtest_button("x%d" % int(m))
 		cb.pressed.connect(func() -> void: grant_cash_requested.emit(m))
+		cash_row.add_child(cb)
+	body.add_child(cash_row)
+
+	body.add_child(_playtest_label("Rare Events (trigger on demand):"))
+	var event_row := HFlowContainer.new()
+	event_row.add_theme_constant_override("h_separation", 8)
+	event_row.add_theme_constant_override("v_separation", 8)
+
+	var btn_crash := _playtest_button("CRASH")
+	btn_crash.pressed.connect(func() -> void: trigger_crash_requested.emit())
+	event_row.add_child(btn_crash)
+
+	var btn_audit := _playtest_button("AUDIT")
+	btn_audit.pressed.connect(func() -> void: trigger_audit_requested.emit())
+	event_row.add_child(btn_audit)
+
+	var btn_windfall := _playtest_button("WINDFALL")
+	btn_windfall.pressed.connect(func() -> void: trigger_windfall_requested.emit())
+	event_row.add_child(btn_windfall)
+
+	var btn_clear := _playtest_button("CLEAR ALL")
+	btn_clear.pressed.connect(func() -> void: clear_events_requested.emit())
+	event_row.add_child(btn_clear)
+	body.add_child(event_row)
+
 	body.add_child(_playtest_label("Diagnostics & Crash Trace Log:"))
 	var trace_row := HBoxContainer.new()
 	trace_row.add_theme_constant_override("separation", 8)

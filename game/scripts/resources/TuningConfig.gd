@@ -751,6 +751,19 @@ extends Resource
 ## Legislative Assets units required to make an audit case evaporate.
 @export var audit_threshold: int = 1  # TBD-SIM (placeholder)
 
+## Cash grant fraction of net worth during The Windfall.
+@export var windfall_net_worth_fraction: float = 0.10  # feel-tune
+
+## Cadence in active seconds between event rolls.
+@export var event_roll_interval_seconds: float = 180.0  # 3 minutes
+
+## Base probability of triggering an event on each roll interval.
+@export var event_base_chance: float = 0.35  # feel-tune
+
+## Grace period in active seconds at the start of a generation before random events can fire.
+@export var event_grace_period_seconds: float = 60.0  # feel-tune
+
+
 # --- Win condition (GDD §10) ---
 
 ## Total money in Earth's economy; capturing this wins the planet.

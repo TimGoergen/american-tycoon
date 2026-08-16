@@ -35,6 +35,8 @@ var _background: TextureRect
 ## Small banner under the hero stat naming the civilization Earth is currently trading
 ## with (the reached epoch). Updates the moment a first contact advances the epoch.
 var _first_contact_overlay: FirstContactOverlay
+var _event_overlay: EventOverlay
+var _event_hud_banner: EventHudBanner
 var _final_dollar_screen: FinalDollarScreen
 var _frenzy_bar: FrenzyBar
 var _momentum_bar: MomentumBar
@@ -359,7 +361,8 @@ func _process(delta: float) -> void:
 	var modal_up := _will_screen.visible or _first_contact_overlay.visible \
 			or _final_dollar_screen.visible \
 			or _minigame_screen.visible or _minigame_review_screen.visible \
-			or _challenges_screen.visible or _venture_overlay.visible
+			or _challenges_screen.visible or _venture_overlay.visible \
+			or _event_overlay.visible
 	var overlay_up := modal_up or _welcome_overlay.visible
 	SecondaryTapButton.enabled = _active_tab == TAB_PROPERTY and not overlay_up
 
@@ -412,6 +415,11 @@ func _process(delta: float) -> void:
 	# Cash keeps updating every frame so the balance still counts up smoothly.
 	_hero_stat.set_cash(game.economy.cash)
 	_hero_stat.set_frenzy_glow(game.frenzy.get_multiplier() > 1.0)
+
+	if game.events.is_crash_active():
+		_event_hud_banner.update_status(game.events.active_event_remaining, tuning.crash_multiplier)
+	else:
+		_event_hud_banner.visible = false
 
 	# Poll-driven tutorial tips: fire the first time each condition is met. This runs only AFTER
 	# the modal-freeze return above, so a card never lands on top of a full-screen beat.
@@ -757,6 +765,10 @@ func _build_ui() -> void:
 	_hero_stat = HeroStat.new()
 	column.add_child(_hero_stat)
 
+	_event_hud_banner = EventHudBanner.new()
+	_event_hud_banner.banner_tapped.connect(_on_event_banner_tapped)
+	column.add_child(_event_hud_banner)
+
 	# Tab content: the four surfaces stacked in one slot, one visible at a time. It
 	# expands so the bottom tab bar pins beneath it. Switching tabs never pauses the
 	# economy (idle game) — only the modal overlays freeze it (see _process).
@@ -823,6 +835,19 @@ func _build_ui() -> void:
 	_first_contact_overlay = FirstContactOverlay.new()
 	_first_contact_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_first_contact_overlay)
+
+	# The rare events modal overlay (Market Crash, The Audit, The Windfall).
+	_event_overlay = EventOverlay.new()
+	_event_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_event_overlay.choice_selected.connect(_on_event_choice_selected)
+	_event_overlay.dismissed.connect(_on_event_overlay_dismissed)
+	add_child(_event_overlay)
+
+	# Wire Rare Events signals from the generation state
+	game.events.weather_started.connect(_on_event_weather_started)
+	game.events.weather_ended.connect(_on_event_weather_ended)
+	game.events.dilemma_opened.connect(_on_event_dilemma_opened)
+	game.events.grant_received.connect(_on_event_grant_received)
 
 	# The Final Dollar screen (GDD §10): Earth capture climax sequence
 	_final_dollar_screen = FinalDollarScreen.new()
@@ -1997,6 +2022,10 @@ func _build_settings_tab() -> Control:
 	_dev_panel.jump_epoch_requested.connect(_on_dev_jump_epoch)
 	_dev_panel.grant_legacy_requested.connect(_on_dev_grant_legacy)
 	_dev_panel.grant_cash_requested.connect(_on_dev_grant_cash)
+	_dev_panel.trigger_crash_requested.connect(_on_dev_trigger_crash)
+	_dev_panel.trigger_audit_requested.connect(_on_dev_trigger_audit)
+	_dev_panel.trigger_windfall_requested.connect(_on_dev_trigger_windfall)
+	_dev_panel.clear_events_requested.connect(_on_dev_clear_events)
 	_dev_panel.closed.connect(_on_dev_closed)
 	stack.add_child(_dev_panel)
 
@@ -2467,7 +2496,7 @@ func _any_fullscreen_overlay_visible() -> bool:
 			or _final_dollar_screen.visible \
 			or _minigame_screen.visible or _minigame_review_screen.visible \
 			or _challenges_screen.visible or _about_screen.visible or _stats_screen.visible \
-			or _help_screen.visible or _venture_overlay.visible
+			or _help_screen.visible or _venture_overlay.visible or _event_overlay.visible
 
 
 ## Fire a poll-driven availability tip. Disarms ONLY once the card actually shows, so a tip whose
@@ -3930,6 +3959,59 @@ func _overdrive_is_teachable() -> bool:
 		return false
 	return momentum.heat >= momentum.cruise_heat() \
 			or is_equal_approx(momentum.heat, momentum.cruise_heat())
+
+
+# ---------------------------------------------------------------------------
+# Rare Events Handlers
+# ---------------------------------------------------------------------------
+
+func _on_event_weather_started(_event_id: String, duration_sec: float, mult: float) -> void:
+	Audio.play(&"screen_open")
+	_event_overlay.show_crash(duration_sec / 60.0, mult)
+
+
+func _on_event_weather_ended(_event_id: String) -> void:
+	_event_hud_banner.visible = false
+
+
+func _on_event_dilemma_opened(_event_id: String, data: Dictionary) -> void:
+	Audio.play(&"screen_open")
+	_event_overlay.show_audit(data)
+
+
+func _on_event_grant_received(_event_id: String, amount: float) -> void:
+	Audio.play(&"buy_success")
+	_event_overlay.show_windfall(amount)
+
+
+func _on_event_choice_selected(choice_index: int) -> void:
+	game.events.resolve_audit(choice_index, game)
+	Audio.play(&"screen_close")
+
+
+func _on_event_overlay_dismissed() -> void:
+	Audio.play(&"screen_close")
+
+
+func _on_event_banner_tapped() -> void:
+	if game.events.is_crash_active():
+		_event_overlay.show_crash(game.events.active_event_remaining / 60.0, tuning.crash_multiplier)
+
+
+func _on_dev_trigger_crash() -> void:
+	game.events.trigger_crash(tuning.crash_duration_minutes, game)
+
+
+func _on_dev_trigger_audit() -> void:
+	game.events.trigger_audit(game)
+
+
+func _on_dev_trigger_windfall() -> void:
+	game.events.trigger_windfall(game)
+
+
+func _on_dev_clear_events() -> void:
+	game.events.clear_all_events()
 
 
 # ---------------------------------------------------------------------------

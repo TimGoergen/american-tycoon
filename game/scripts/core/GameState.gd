@@ -39,6 +39,7 @@ var tuning: TuningConfig
 var economy: EconomyState
 var wage: WageState
 var frenzy: FrenzyState
+var events: EventState
 
 ## Rush Momentum / Overheat — the climbing heat meter whose property-income bonus rewards
 ## ATTENTIVE rushing (ride the danger bands, vent before the shutdown — Tim 2026-07-15,
@@ -153,6 +154,7 @@ func _init(property_configs: Array, p_tuning: TuningConfig) -> void:
 	frenzy = FrenzyState.new(p_tuning)
 	rush_momentum = RushMomentumState.new(p_tuning)
 	epoch = EpochState.new(p_tuning)
+	events = EventState.new(p_tuning)
 	# OVERHEAT PROPERTY FREEZE (Plans/Overdrive_Vent_Windows.md, Tim 2026-07-19): the signal
 	# pair below is the one seam every overheat and every recovery flows through. `overheated`
 	# is emitted synchronously from RushMomentumState._begin_overheat — the single funnel for
@@ -236,8 +238,9 @@ func tick(delta: float, extra_property_multiplier: float = 1.0) -> void:
 			p.rush_momentum_factor = 1.0
 		if not vent_gesture_holding:
 			p.rush_active_grace = maxf(p.rush_active_grace - delta, 0.0)
+	events.tick(delta, self)
 	var tier_before := epoch.current_tier
-	economy.tick(delta, frenzy.get_multiplier() * extra_property_multiplier)
+	economy.tick(delta, frenzy.get_multiplier() * extra_property_multiplier * events.get_property_income_multiplier())
 	if economy.cycles_completed_this_tick > 0:
 		frenzy.on_cycle_completed(economy.cycles_completed_this_tick)
 	peak_net_worth = maxf(peak_net_worth, economy.get_net_worth())
@@ -378,7 +381,7 @@ func tap_property(prop_index: int) -> void:
 		# Rush pays at the SAME multiplier the tick uses — frenzy and the dynasty's Family Fortune;
 		# Rush Momentum is now folded in per-property via _collect's rush_momentum_factor (set just
 		# above), so the rushed cycle collects exactly the full rate the row shows (Tim 2026-07-12/13).
-		economy.credit_property_income(prop.rush_cycle(frenzy.get_multiplier() * prop.legacy_income_multiplier))
+		economy.credit_property_income(prop.rush_cycle(frenzy.get_multiplier() * prop.legacy_income_multiplier * events.get_property_income_multiplier()))
 	else:
 		# Starting an idle cycle is still a real tap (it feeds frenzy) and is allowed even
 		# during an overheat lockout — only a FROZEN property refuses, up at the top of this func.
@@ -648,6 +651,7 @@ func to_save_dict() -> Dictionary:
 		},
 		# A frenzy burn does not survive an app close; only the charge does.
 		"frenzy": {"meter": frenzy.meter},
+		"events": events.to_save_dict(),
 	}
 
 
@@ -759,3 +763,6 @@ func load_save_dict(data: Dictionary) -> void:
 
 	var f: Dictionary = data.get("frenzy", {})
 	frenzy.meter = float(f.get("meter", 0.0))
+
+	if data.has("events"):
+		events.load_save_dict(data["events"])

@@ -44,7 +44,8 @@ $headless = @(
     "AudioSettingsTest",     # every ui_ preference survives a succession
     "AudioCoreTest",         # the audio system's rules
     "QolLegacyTest",         # offline cap, auto-restarts, auto-pop, frenzy upgrades
-    "FinalDollarTest"        # Earth capture climax and commemorative certificate
+    "FinalDollarTest",       # Earth capture climax and commemorative certificate
+    "RareEventsTest"         # market crash, the audit, the windfall, save persistence
 )
 
 # Gates that need a REAL RENDERER — headless has no framebuffer to capture, so these cannot run in

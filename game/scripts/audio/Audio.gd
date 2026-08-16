@@ -337,6 +337,14 @@ const URGENCY_VOLUME_DB := -16.0
 const HEAT_FADE_IN_SECONDS := 0.25
 const HEAT_FADE_OUT_SECONDS := 0.45
 
+## How deep the volume dips on a chord change, as a linear multiplier floor.
+## 0.35 = a ~9 dB dip, enough to hear but not enough to feel like the drone cut out.
+const CHORD_SWELL_FLOOR := 0.35
+
+## How fast the swell recovers (seconds from floor to 1.0). Matched to roughly
+## 1/8 of the chord interval so the breath is a short accent, not a long fade.
+const CHORD_SWELL_RECOVERY_SECONDS := 0.4
+
 ## Fade applied to the master bus when the app loses focus (plan §3.4). Short enough to be gone
 ## before the app is backgrounded, long enough not to click.
 const FOCUS_FADE_SECONDS := 0.2
@@ -393,6 +401,14 @@ var _heat_active := false
 var _heat_gain := 0.0
 ## Last normalized heat pushed in, so the pitch/urgency mix can be recomputed when the layer starts.
 var _heat_normalized := 0.0
+
+## Chord-change volume swell envelope, 0..1. Drops to CHORD_SWELL_FLOOR on a
+## chord transition and recovers toward 1.0, giving the drone an audible breath
+## at each chord boundary — the one modulation that works on both desktop and mobile.
+var _chord_swell: float = 1.0
+
+## The chord index on the previous frame, so we can detect transitions.
+var _heat_chord_prev: int = 0
 
 ## How far into the current lap we are, which lap the slow window drift is on, and when the run last
 ## advanced. Neither counter is a scale degree — see _degree_at.
@@ -756,6 +772,10 @@ func _mix_heat_bed(delta: float) -> void:
 			_heat_player.stop()
 		if _urgency_player.playing:
 			_urgency_player.stop()
+		# Reset chord tracking so the next ride starts clean — a stale index from the last ride
+		# would trigger a false swell on the first frame of the new one.
+		_chord_swell = 1.0
+		_heat_chord_prev = 0
 		return
 
 	if not _heat_player.playing and _heat_player.stream != null:
@@ -769,7 +789,18 @@ func _mix_heat_bed(delta: float) -> void:
 	if _heat_player.playing:
 		_update_heat_pitch()
 
-	var safe_gain := maxf(_heat_gain, 0.0001)
+	# CHORD-CHANGE SWELL: detect chord transitions and dip the envelope. Each chord change
+	# briefly softens the drone and lets it recover, so the 4-chord progression (I→IV→vi→V)
+	# is audible even on mobile where pitch_scale is locked to 1.0. On desktop the pitch
+	# shift from HARMONY_DRONE_OFFSETS already changes the character; the swell makes it more
+	# noticeable by giving the ear a moment of quiet before the new pitch arrives.
+	var chord_now := get_current_rush_chord_index()
+	if chord_now != _heat_chord_prev and _heat_active:
+		_chord_swell = CHORD_SWELL_FLOOR
+	_heat_chord_prev = chord_now
+	_chord_swell = move_toward(_chord_swell, 1.0, delta / CHORD_SWELL_RECOVERY_SECONDS)
+
+	var safe_gain := maxf(_heat_gain * _chord_swell, 0.0001)
 	_heat_player.volume_db = HEAT_VOLUME_DB + linear_to_db(safe_gain)
 
 	var urgency_db := _urgency_db_for(_heat_normalized)

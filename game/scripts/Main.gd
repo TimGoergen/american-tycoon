@@ -1714,6 +1714,7 @@ func _build_settings_tab() -> Control:
 	_minigame_check = CheckBox.new()
 	_minigame_check.text = "Play transition minigames"
 	# 40% larger than FONT_BODY (32 -> 45) at Tim's request.
+	_minigame_check.clip_text = true
 	_minigame_check.add_theme_font_size_override("font_size", 45)
 	# Navy text in every state — the default theme's checked/hover/pressed colors are a
 	# pale near-white that was unreadable on the cream tab (Tim, 2026-06-22).
@@ -1743,6 +1744,7 @@ func _build_settings_tab() -> Control:
 	# to match the minigame checkbox above (large navy label + big custom check glyphs).
 	_tutorial_check = CheckBox.new()
 	_tutorial_check.text = "Show tutorial tips"
+	_tutorial_check.clip_text = true
 	_tutorial_check.add_theme_font_size_override("font_size", 45)
 	for state in ["font_color", "font_pressed_color", "font_hover_color",
 			"font_focus_color", "font_hover_pressed_color", "font_disabled_color"]:
@@ -1763,6 +1765,7 @@ func _build_settings_tab() -> Control:
 	var auto_pop_unlocked := dynasty.upgrades.auto_pop_turbo_unlocked()
 	_auto_pop_turbo_check.text = "Auto-trigger full TURBO" if auto_pop_unlocked else "Auto-trigger full TURBO (Unlock in Estate Office)"
 	_auto_pop_turbo_check.disabled = not auto_pop_unlocked
+	_auto_pop_turbo_check.clip_text = true
 	_auto_pop_turbo_check.add_theme_font_size_override("font_size", 45)
 	for state in ["font_color", "font_pressed_color", "font_hover_color",
 			"font_focus_color", "font_hover_pressed_color"]:
@@ -2320,6 +2323,7 @@ func _build_volume_row(
 
 	var name_label := Label.new()
 	name_label.text = label_text
+	name_label.clip_text = true
 	name_label.custom_minimum_size = Vector2(VOLUME_LABEL_WIDTH, 0)
 	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	name_label.add_theme_font_size_override("font_size", UiPalette.FONT_BODY)

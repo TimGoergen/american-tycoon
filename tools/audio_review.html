@@ -50,6 +50,10 @@
       -webkit-font-smoothing: antialiased;
     }
 
+    html {
+      scroll-behavior: smooth;
+    }
+
     body {
       background-color: var(--bg-base);
       color: var(--text-main);
@@ -60,16 +64,22 @@
       overflow-x: hidden;
     }
 
-    /* Top Navigation / App Header */
-    header.app-header {
+    /* Top Persistent Sticky Control Center */
+    .sticky-top-container {
       position: sticky;
       top: 0;
       z-index: 100;
-      background: rgba(10, 12, 16, 0.88);
+      background: rgba(10, 12, 16, 0.94);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
       border-bottom: 1px solid var(--border-subtle);
-      padding: 14px 28px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+    }
+
+    /* Top Navigation / App Header */
+    header.app-header {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding: 10px 28px;
     }
 
     .header-content {
@@ -212,13 +222,9 @@
 
     /* Master Transport / Player Bar */
     .master-transport {
-      position: sticky;
-      top: 65px;
-      z-index: 95;
-      background: rgba(18, 22, 31, 0.95);
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--border-subtle);
-      padding: 10px 28px;
+      background: rgba(18, 22, 31, 0.75);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding: 6px 28px;
     }
 
     .transport-content {
@@ -350,30 +356,29 @@
       cursor: pointer;
     }
 
-    /* Main Container & Filter Toolbar */
-    .app-main {
+    /* Sticky Controls Bar (Search, Filters & Section Pills) */
+    .sticky-controls-bar {
       max-width: 1600px;
-      margin: 24px auto;
-      padding: 0 28px;
+      margin: 0 auto;
+      padding: 8px 28px 8px;
     }
 
     .filter-toolbar {
-      background: var(--bg-surface);
+      background: rgba(18, 22, 31, 0.6);
       border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-lg);
-      padding: 16px 20px;
+      border-radius: var(--radius-md);
+      padding: 6px 14px;
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
-      gap: 16px;
-      margin-bottom: 24px;
-      box-shadow: var(--shadow-soft);
+      gap: 12px;
+      margin-bottom: 6px;
     }
 
     .search-box {
       flex: 1;
-      min-width: 280px;
+      min-width: 260px;
       position: relative;
     }
 
@@ -382,9 +387,9 @@
       background: var(--bg-card);
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-md);
-      padding: 10px 16px 10px 38px;
+      padding: 7px 14px 7px 34px;
       font-family: inherit;
-      font-size: 13px;
+      font-size: 12px;
       color: var(--text-main);
       outline: none;
       transition: all 0.2s ease;
@@ -398,7 +403,7 @@
 
     .search-icon {
       position: absolute;
-      left: 12px;
+      left: 10px;
       top: 50%;
       transform: translateY(-50%);
       color: var(--text-dim);
@@ -409,7 +414,7 @@
       display: flex;
       align-items: center;
       flex-wrap: wrap;
-      gap: 10px;
+      gap: 8px;
     }
 
     .select-dropdown {
@@ -417,8 +422,8 @@
       border: 1px solid var(--border-subtle);
       color: var(--text-main);
       font-family: inherit;
-      font-size: 12px;
-      padding: 8px 12px;
+      font-size: 11px;
+      padding: 6px 10px;
       border-radius: var(--radius-md);
       outline: none;
       cursor: pointer;
@@ -432,24 +437,28 @@
     .section-nav {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       overflow-x: auto;
-      padding-bottom: 12px;
-      margin-bottom: 24px;
-      scrollbar-width: thin;
+      padding: 2px 0 2px;
+      margin-bottom: 0;
+      scrollbar-width: none;
+    }
+
+    .section-nav::-webkit-scrollbar {
+      display: none;
     }
 
     .section-pill {
-      background: var(--bg-surface);
+      background: rgba(24, 31, 44, 0.7);
       border: 1px solid var(--border-subtle);
       color: var(--text-muted);
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 600;
-      padding: 6px 14px;
+      padding: 4px 12px;
       border-radius: 999px;
       white-space: nowrap;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: all 0.15s ease;
       text-decoration: none;
     }
 
@@ -457,10 +466,19 @@
       background: var(--bg-card-hover);
       color: #fff;
       border-color: var(--accent-primary);
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.2);
+    }
+
+    /* Main Container */
+    .app-main {
+      max-width: 1600px;
+      margin: 16px auto 0;
+      padding: 0 28px;
     }
 
     /* Group Section Panel */
     .section-panel {
+      scroll-margin-top: 230px;
       background: var(--bg-surface);
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-xl);
@@ -578,8 +596,46 @@
     }
 
     .cue-card.has-selection {
-      border-color: rgba(16, 185, 129, 0.35);
-      background: linear-gradient(180deg, #182230 0%, #151d2a 100%);
+      border-color: #10b981 !important;
+      background: linear-gradient(180deg, #0c271e 0%, #081a14 100%) !important;
+      box-shadow: 0 4px 24px rgba(16, 185, 129, 0.22), inset 0 0 16px rgba(16, 185, 129, 0.06) !important;
+    }
+
+    .cue-card.has-selection .cue-header {
+      border-bottom-color: rgba(16, 185, 129, 0.3) !important;
+    }
+
+    .cue-card.has-selection .cue-id {
+      color: #34d399 !important;
+      background: rgba(16, 185, 129, 0.22) !important;
+      border-color: rgba(16, 185, 129, 0.6) !important;
+      box-shadow: 0 0 12px rgba(16, 185, 129, 0.25);
+    }
+
+    .cue-card.has-selection .cue-selected-tag {
+      display: inline-flex !important;
+      align-items: center;
+      gap: 4px;
+      background: rgba(16, 185, 129, 0.25);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.6);
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.2);
+    }
+
+    .existing-choice-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: rgba(16, 185, 129, 0.22);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.55);
+      letter-spacing: 0.5px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.15);
     }
 
     .cue-header {
@@ -747,10 +803,21 @@
       border-color: rgba(16, 185, 129, 0.35);
     }
 
+    .candidate-row.is-interesting {
+      border-left: 4px solid #f59e0b !important;
+      background: rgba(245, 158, 11, 0.07);
+    }
+
+    .candidate-row.is-selected.is-interesting {
+      border-left: 4px solid #f59e0b !important;
+      background: linear-gradient(90deg, rgba(245, 158, 11, 0.12) 0%, rgba(16, 185, 129, 0.08) 100%);
+      border-color: rgba(16, 185, 129, 0.45);
+    }
+
     .candidate-left {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
       flex: 1;
       min-width: 0;
     }
@@ -760,6 +827,51 @@
       height: 18px;
       cursor: pointer;
       accent-color: var(--accent-emerald);
+    }
+
+    .star-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--text-dim);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+    }
+
+    .star-btn:hover {
+      background: rgba(245, 158, 11, 0.15);
+      border-color: rgba(245, 158, 11, 0.5);
+      color: #f59e0b;
+      transform: scale(1.1);
+    }
+
+    .star-btn.is-active {
+      background: rgba(245, 158, 11, 0.25);
+      border-color: #f59e0b;
+      color: #fbbf24;
+      box-shadow: 0 0 10px rgba(245, 158, 11, 0.35);
+    }
+
+    .interesting-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: rgba(245, 158, 11, 0.22);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.6);
+      letter-spacing: 0.5px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      box-shadow: 0 0 8px rgba(245, 158, 11, 0.25);
     }
 
     .play-btn {
@@ -1110,128 +1222,135 @@
   <!-- Hidden HTML5 Audio Element -->
   <audio id="global-audio-player" preload="auto"></audio>
 
-  <!-- App Header -->
-  <header class="app-header">
-    <div class="header-content">
-      <div class="brand-group">
-        <span class="brand-badge">DAW Refine</span>
-        <h1 class="brand-title">American Tycoon <span>Audio Studio</span></h1>
-      </div>
+  <!-- Persistent Sticky Top Control Center -->
+  <div class="sticky-top-container">
+    <!-- App Header -->
+    <header class="app-header">
+      <div class="header-content">
+        <div class="brand-group">
+          <span class="brand-badge">DAW Refine</span>
+          <h1 class="brand-title">American Tycoon <span>Audio Studio</span></h1>
+        </div>
 
-      <div class="header-stats">
-        <div class="stat-pill">
-          Assigned Cues: <strong id="stat-assigned-cues">0</strong> / <span id="stat-total-cues">87</span>
-          <div class="stat-progress-bar">
-            <div class="stat-progress-fill" id="stat-progress-fill"></div>
+        <div class="header-stats">
+          <div class="stat-pill">
+            Assigned Cues: <strong id="stat-assigned-cues">0</strong> / <span id="stat-total-cues">87</span>
+            <div class="stat-progress-bar">
+              <div class="stat-progress-fill" id="stat-progress-fill"></div>
+            </div>
+          </div>
+          <div class="stat-pill" style="border-color: rgba(245, 158, 11, 0.35); color: #fbbf24;">
+            ★ Shortlisted: <strong id="stat-interesting-count" style="color: #fbbf24;">0</strong>
+          </div>
+          <div class="stat-pill">
+            Pack Files: <strong id="stat-total-files">3,763</strong>
           </div>
         </div>
-        <div class="stat-pill">
-          Pack Files: <strong id="stat-total-files">3,763</strong>
+
+        <div class="header-actions">
+          <button class="btn btn-secondary" onclick="autoSelectTopPicks()" title="Automatically select the highest-scoring recommended audio asset for every game cue">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            Auto-Select Top Picks
+          </button>
+          <button class="btn btn-secondary" onclick="toggleAllSections()" title="Expand or collapse all high-level audio sections">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16m-7 6h7"/></svg>
+            Sections (±)
+          </button>
+          <button class="btn btn-secondary" onclick="toggleAllCues()" title="Expand or collapse all audio cue cards">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 9l4-4 4 4m0 6l-4 4-4-4"/></svg>
+            Cues (±)
+          </button>
+          <button class="btn btn-emerald" onclick="openExportModal()" title="Open modal to review and export session audio changes and deployment scripts">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+            Export Selection
+          </button>
         </div>
       </div>
+    </header>
 
-      <div class="header-actions">
-        <button class="btn btn-secondary" onclick="autoSelectTopPicks()">
-          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-          Auto-Select Top Picks
-        </button>
-        <button class="btn btn-secondary" onclick="toggleAllSections()">
-          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16m-7 6h7"/></svg>
-          Sections (±)
-        </button>
-        <button class="btn btn-secondary" onclick="toggleAllCues()">
-          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 9l4-4 4 4m0 6l-4 4-4-4"/></svg>
-          Cues (±)
-        </button>
-        <button class="btn btn-emerald" onclick="openExportModal()">
-          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-          Export Selection
-        </button>
+    <!-- Sticky Master Transport / Audio Player -->
+    <div class="master-transport">
+      <div class="transport-content">
+        <div class="now-playing-info">
+          <div class="audio-visualizer-wave" id="visualizer-wave">
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+          </div>
+          <div class="track-meta">
+            <div class="track-title" id="player-track-title">Ready to audition audio</div>
+            <div class="track-source" id="player-track-source">Click any play button to start</div>
+          </div>
+        </div>
+
+        <div class="transport-controls">
+          <button class="play-btn" id="master-play-pause-btn" onclick="toggleMasterPlay()" title="Play or pause currently loaded audio track (Spacebar)">
+            <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24" id="master-play-icon"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </button>
+
+          <button class="btn btn-sm btn-secondary" onclick="stopAllAudio()" title="Stop playback and rewind to the beginning">
+            <svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+            Stop
+          </button>
+
+          <div class="transport-time" id="player-time-display">0:00 / 0:00</div>
+
+          <div class="transport-slider-container">
+            <input type="range" class="scrubber" id="player-scrubber" min="0" max="100" value="0" step="0.1" oninput="seekAudio(this.value)" title="Seek playback position">
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <svg width="14" height="14" fill="currentColor" color="var(--text-dim)" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+            <input type="range" class="volume-slider" id="player-volume" min="0" max="1" step="0.05" value="0.8" oninput="setVolume(this.value)" title="Adjust master preview volume">
+          </div>
+        </div>
       </div>
     </div>
-  </header>
 
-  <!-- Sticky Master Transport / Audio Player -->
-  <div class="master-transport">
-    <div class="transport-content">
-      <div class="now-playing-info">
-        <div class="audio-visualizer-wave" id="visualizer-wave">
-          <div class="wave-bar"></div>
-          <div class="wave-bar"></div>
-          <div class="wave-bar"></div>
-          <div class="wave-bar"></div>
-        </div>
-        <div class="track-meta">
-          <div class="track-title" id="player-track-title">Ready to audition audio</div>
-          <div class="track-source" id="player-track-source">Click any play button to start</div>
-        </div>
-      </div>
-
-      <div class="transport-controls">
-        <button class="play-btn" id="master-play-pause-btn" onclick="toggleMasterPlay()">
-          <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24" id="master-play-icon"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-        </button>
-
-        <button class="btn btn-sm btn-secondary" onclick="stopAllAudio()">
-          <svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
-          Stop
-        </button>
-
-        <div class="transport-time" id="player-time-display">0:00 / 0:00</div>
-
-        <div class="transport-slider-container">
-          <input type="range" class="scrubber" id="player-scrubber" min="0" max="100" value="0" step="0.1" oninput="seekAudio(this.value)">
+    <!-- Sticky Studio Controls (Search, Filters & Section Jump Toggles) -->
+    <div class="sticky-controls-bar">
+      <div class="filter-toolbar">
+        <div class="search-box">
+          <svg class="search-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          <input type="text" id="global-search" class="search-input" placeholder="Search cues, audio files, packs, or keywords..." oninput="filterAudioStudio()">
         </div>
 
-        <div style="display: flex; align-items: center; gap: 6px;">
-          <svg width="14" height="14" fill="currentColor" color="var(--text-dim)" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-          <input type="range" class="volume-slider" id="player-volume" min="0" max="1" step="0.05" value="0.8" oninput="setVolume(this.value)">
+        <div class="filter-controls">
+          <select id="filter-bus" class="select-dropdown" onchange="filterAudioStudio()" title="Filter audio cues by bus routing">
+            <option value="ALL">All Audio Buses</option>
+            <option value="SFX">SFX Bus</option>
+            <option value="UI">UI Bus</option>
+            <option value="Ceremony">Ceremony Bus</option>
+            <option value="Music">Music Bus</option>
+          </select>
+
+          <select id="filter-status" class="select-dropdown" onchange="filterAudioStudio()" title="Filter cues by selection status">
+            <option value="ALL">All Audio Cues (87)</option>
+            <option value="SELECTED">Only Selected (Has Sound File)</option>
+            <option value="UNSELECTED">Only Unselected (No Sound File)</option>
+            <option value="INTERESTING">★ Has Shortlisted / Interesting Sounds</option>
+          </select>
+
+          <select id="filter-pack" class="select-dropdown" onchange="filterAudioStudio()" title="Filter cues by candidate pack presence">
+            <option value="ALL">All 15 Audio Packs</option>
+          </select>
         </div>
       </div>
+
+      <!-- Section Navigator Pills -->
+      <nav class="section-nav" id="section-nav-pills"></nav>
     </div>
   </div>
 
   <!-- App Main Content -->
   <main class="app-main">
-    
-    <!-- Filter Toolbar -->
-    <div class="filter-toolbar">
-      <div class="search-box">
-        <svg class="search-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-        <input type="text" id="global-search" class="search-input" placeholder="Search cues, audio files, packs, or keywords..." oninput="filterAudioStudio()">
-      </div>
-
-      <div class="filter-controls">
-        <select id="filter-bus" class="select-dropdown" onchange="filterAudioStudio()">
-          <option value="ALL">All Audio Buses</option>
-          <option value="SFX">SFX Bus</option>
-          <option value="UI">UI Bus</option>
-          <option value="Ceremony">Ceremony Bus</option>
-          <option value="Music">Music Bus</option>
-        </select>
-
-        <select id="filter-status" class="select-dropdown" onchange="filterAudioStudio()">
-          <option value="ALL">All Selection Statuses</option>
-          <option value="SELECTED">Has Selection</option>
-          <option value="UNSELECTED">Needs Selection</option>
-        </select>
-
-        <select id="filter-pack" class="select-dropdown" onchange="filterAudioStudio()">
-          <option value="ALL">All 15 Audio Packs</option>
-        </select>
-      </div>
-    </div>
-
-    <!-- Section Navigator Pills -->
-    <nav class="section-nav" id="section-nav-pills"></nav>
-
     <!-- Sections Container -->
     <div id="sections-container">
       <div style="text-align: center; padding: 60px 0; color: var(--text-muted);">
         Loading audio dataset...
       </div>
     </div>
-
   </main>
 
   <!-- Sticky Bottom Export Bar -->
@@ -1243,8 +1362,8 @@
       </div>
 
       <div style="display: flex; gap: 12px;">
-        <button class="btn btn-secondary" onclick="clearAllSelections()">Clear All</button>
-        <button class="btn btn-emerald" onclick="openExportModal()">
+        <button class="btn btn-secondary" onclick="clearAllSelections()" title="Deselect all chosen sound assets across all audio cues">Clear All</button>
+        <button class="btn btn-emerald" onclick="openExportModal()" title="Open export modal for modified audio selections, shortlisted files, and deployment scripts">
           <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
           Export Selection to Antigravity
         </button>
@@ -1256,14 +1375,19 @@
   <div class="modal-backdrop" id="export-modal">
     <div class="modal-container">
       <div class="modal-header">
-        <h2 class="modal-title">Export Audio Selections</h2>
-        <button class="btn btn-secondary btn-sm" onclick="closeExportModal()">✕</button>
+        <div>
+          <h2 class="modal-title">Export Audio Modifications</h2>
+          <div style="font-size: 12px; color: var(--text-dim); margin-top: 2px;" id="export-modal-subtitle">
+            Exporting modifications made since page load
+          </div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="closeExportModal()" title="Close export dialog">✕</button>
       </div>
 
       <div class="modal-tabs">
-        <button class="modal-tab-btn active" id="tab-btn-json" onclick="switchExportTab('json')">Antigravity JSON</button>
-        <button class="modal-tab-btn" id="tab-btn-md" onclick="switchExportTab('md')">Markdown Checklist</button>
-        <button class="modal-tab-btn" id="tab-btn-ps" onclick="switchExportTab('ps')">PowerShell Copy Script</button>
+        <button class="modal-tab-btn active" id="tab-btn-json" onclick="switchExportTab('json')" title="View structured JSON payload of session modifications for automated Antigravity ingestion">Antigravity JSON</button>
+        <button class="modal-tab-btn" id="tab-btn-md" onclick="switchExportTab('md')" title="View Markdown checklist table of modified audio cues for documentation">Markdown Checklist</button>
+        <button class="modal-tab-btn" id="tab-btn-ps" onclick="switchExportTab('ps')" title="View PowerShell script to automatically copy modified audio files into game audio folder">PowerShell Copy Script</button>
       </div>
 
       <div class="modal-body">
@@ -1275,8 +1399,8 @@
           Ready to copy into Antigravity
         </div>
         <div style="display: flex; gap: 10px;">
-          <button class="btn btn-secondary" onclick="saveExportToServer()">Save to Workspace</button>
-          <button class="btn btn-primary" onclick="copyExportText()">
+          <button class="btn btn-secondary" onclick="saveExportToServer()" title="Save modified audio selections directly to Plans/Audio_Selection_Export.json on the server">Save to Workspace</button>
+          <button class="btn btn-primary" onclick="copyExportText()" title="Copy the exported text directly to your clipboard">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
             Copy to Clipboard
           </button>
@@ -1287,31 +1411,46 @@
 
   <!-- Assign Sound from 'Other' Modal -->
   <div class="modal-backdrop" id="assign-modal">
-    <div class="modal-container" style="max-width: 550px;">
+    <div class="modal-container" style="max-width: 600px;">
       <div class="modal-header">
         <h2 class="modal-title">Assign Sound to Game Cue</h2>
-        <button class="btn btn-secondary btn-sm" onclick="closeAssignModal()">✕</button>
+        <button class="btn btn-secondary btn-sm" onclick="closeAssignModal()" title="Close sound assignment dialog">✕</button>
       </div>
       <div class="modal-body">
-        <div style="font-size: 13px; color: var(--text-muted);">
-          Assign sound <strong id="assign-filename" style="color: #fff;"></strong> to:
+        <!-- Selected Sound Asset Info Card -->
+        <div style="background: rgba(0,0,0,0.35); border: 1px solid var(--border-subtle); padding: 12px 16px; border-radius: var(--radius-md); margin-bottom: 16px;">
+          <div style="font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Selected Sound Asset</div>
+          <div style="font-size: 14px; font-weight: 600; color: #fff;" id="assign-filename"></div>
+          <div style="font-size: 11px; color: var(--text-muted); font-family: monospace; margin-top: 2px;" id="assign-sound-details"></div>
         </div>
-        <select class="assign-modal-select" id="assign-target-cue"></select>
-        <div style="margin-top: 14px;">
-          <label style="font-size: 12px; color: var(--text-muted);">Role:</label>
+
+        <label style="font-size: 12px; font-weight: 600; color: var(--text-main);">Target Game Audio Cue:</label>
+        <select class="assign-modal-select" id="assign-target-cue" onchange="onAssignTargetCueChange(this.value)"></select>
+
+        <!-- Live Cue Context & Description Preview -->
+        <div id="assign-cue-preview" style="margin-top: 12px; background: rgba(56, 189, 248, 0.05); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: var(--radius-md); padding: 12px 14px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; flex-wrap: wrap; gap: 8px;">
+            <strong style="color: var(--accent-primary); font-size: 13px;" id="assign-cue-name"></strong>
+            <span class="cue-meta-pill" id="assign-cue-bus" style="color: #38bdf8; border-color: rgba(56,189,248,0.3);"></span>
+          </div>
+          <div style="font-size: 12px; color: var(--text-muted); line-height: 1.5;" id="assign-cue-trigger"></div>
+        </div>
+
+        <div style="margin-top: 16px;">
+          <label style="font-size: 12px; font-weight: 600; color: var(--text-main);">Sound Role in Cue:</label>
           <select class="assign-modal-select" id="assign-target-role" style="margin-top: 4px;">
-            <option value="primary">Primary (Main sample)</option>
-            <option value="variant_1">Variant 1</option>
-            <option value="variant_2">Variant 2</option>
-            <option value="variant_3">Variant 3</option>
-            <option value="variant_4">Variant 4</option>
-            <option value="layer">Layer (Companion sample)</option>
+            <option value="primary">Primary (Main default sample)</option>
+            <option value="variant_1">Variant 1 (Alternate take)</option>
+            <option value="variant_2">Variant 2 (Alternate take)</option>
+            <option value="variant_3">Variant 3 (Alternate take)</option>
+            <option value="variant_4">Variant 4 (Alternate take)</option>
+            <option value="layer">Layer (Simultaneous companion layer)</option>
           </select>
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="closeAssignModal()">Cancel</button>
-        <button class="btn btn-primary" onclick="confirmSoundAssignment()">Assign Sound</button>
+        <button class="btn btn-secondary" onclick="closeAssignModal()" title="Cancel and discard sound assignment">Cancel</button>
+        <button class="btn btn-primary" onclick="confirmSoundAssignment()" title="Confirm assignment of this sound to the chosen game cue">Assign Sound</button>
       </div>
     </div>
   </div>
@@ -1326,10 +1465,65 @@
     // Global Application State
     let audioData = null;
     let selectedCuesMap = {}; // { cue_id: [ { file_id, rel_path, filename, pack, role, duration } ] }
+    let interestingFilesMap = {}; // { cue_id: [ file_id, ... ] }
+    let initialSelectedCuesMap = {}; // Baseline captured at page load
+    let initialInterestingFilesMap = {}; // Baseline captured at page load
     let currentlyPlayingAudio = null;
     let currentPlayingBtn = null;
     let currentExportTab = 'json';
     let soundToAssign = null;
+
+    function loadInterestingStorage() {
+      try {
+        const saved = localStorage.getItem('american_tycoon_interesting_audio');
+        if (saved) interestingFilesMap = JSON.parse(saved);
+      } catch (e) {
+        interestingFilesMap = {};
+      }
+    }
+
+    function saveInterestingStorage() {
+      try {
+        localStorage.setItem('american_tycoon_interesting_audio', JSON.stringify(interestingFilesMap));
+      } catch (e) {}
+    }
+
+    function toggleInteresting(cueId, fileId, event) {
+      if (event) event.stopPropagation();
+      if (!interestingFilesMap[cueId]) interestingFilesMap[cueId] = [];
+      
+      const idx = interestingFilesMap[cueId].indexOf(fileId);
+      const starBtn = document.getElementById(`star-${cueId}-${fileId}`);
+      const row = document.getElementById(`cand-row-${cueId}-${fileId}`);
+      const badge = document.getElementById(`int-badge-${cueId}-${fileId}`);
+
+      if (idx === -1) {
+        interestingFilesMap[cueId].push(fileId);
+        if (starBtn) {
+          starBtn.classList.add('is-active');
+          starBtn.title = "Remove from interesting / shortlisted";
+          starBtn.innerHTML = `<svg width="14" height="14" fill="currentColor" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
+        }
+        if (row) row.classList.add('is-interesting');
+        if (badge) badge.style.display = 'inline-flex';
+        showToast('Marked candidate as interesting');
+      } else {
+        interestingFilesMap[cueId].splice(idx, 1);
+        if (interestingFilesMap[cueId].length === 0) delete interestingFilesMap[cueId];
+        if (starBtn) {
+          starBtn.classList.remove('is-active');
+          starBtn.title = "Mark as interesting / shortlisted candidate (not yet final)";
+          starBtn.innerHTML = `<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
+        }
+        if (row) row.classList.remove('is-interesting');
+        if (badge) badge.style.display = 'none';
+        showToast('Removed from interesting');
+      }
+
+      saveInterestingStorage();
+      updateSelectionStats();
+      filterAudioStudio();
+    }
 
     const audioPlayer = document.getElementById('global-audio-player');
     const playPauseBtn = document.getElementById('master-play-pause-btn');
@@ -1342,6 +1536,7 @@
 
     // Initialize App
     document.addEventListener('DOMContentLoaded', async () => {
+      loadInterestingStorage();
       await loadAudioData();
       setupAudioPlayerEvents();
     });
@@ -1351,10 +1546,55 @@
         const res = await fetch('/api/data');
         if (!res.ok) throw new Error('Network response not ok');
         audioData = await res.json();
+
+        // Auto-populate existing sound choices by default
+        selectedCuesMap = {};
+        if (audioData && audioData.sections) {
+          audioData.sections.forEach(sec => {
+            sec.cues.forEach(cue => {
+              if (cue.candidates && cue.candidates.length > 0) {
+                cue.candidates.forEach(cand => {
+                  const isCurated = cand.reason && cand.reason.startsWith('Curated');
+                  if (cand.selected || cand.role === 'primary' || isCurated) {
+                    if (!selectedCuesMap[cue.cue_id]) selectedCuesMap[cue.cue_id] = [];
+                    // Only add one primary unless multi-variant
+                    if (cand.role === 'primary') {
+                      const hasPrim = selectedCuesMap[cue.cue_id].some(s => s.role === 'primary');
+                      if (!hasPrim) {
+                        selectedCuesMap[cue.cue_id].push({
+                          file_id: cand.file_id,
+                          rel_path: cand.rel_path,
+                          filename: cand.filename,
+                          pack: cand.pack,
+                          role: 'primary',
+                          duration: cand.duration
+                        });
+                      }
+                    } else if (cand.role === 'layer' || cand.role.startsWith('variant')) {
+                      selectedCuesMap[cue.cue_id].push({
+                        file_id: cand.file_id,
+                        rel_path: cand.rel_path,
+                        filename: cand.filename,
+                        pack: cand.pack,
+                        role: cand.role,
+                        duration: cand.duration
+                      });
+                    }
+                  }
+                });
+              }
+            });
+          });
+        }
+
         populatePacksDropdown();
         populateSectionNav();
         renderSections();
         updateSelectionStats();
+
+        // Capture initial baseline state after load for changes-only export
+        initialSelectedCuesMap = JSON.parse(JSON.stringify(selectedCuesMap));
+        initialInterestingFilesMap = JSON.parse(JSON.stringify(interestingFilesMap));
       } catch (err) {
         console.error('Failed to load data:', err);
         document.getElementById('sections-container').innerHTML = `
@@ -1386,7 +1626,16 @@
         const a = document.createElement('a');
         a.className = 'section-pill';
         a.href = `#sec-${sec.section_id}`;
-        a.textContent = sec.name;
+        a.textContent = `${idx + 1}. ${sec.name}`;
+        a.title = `Jump to Section ${idx + 1}: ${sec.name}`;
+        a.onclick = () => {
+          document.querySelectorAll('.section-pill').forEach(p => p.classList.remove('active'));
+          a.classList.add('active');
+          const panel = document.getElementById(`sec-${sec.section_id}`);
+          if (panel && panel.classList.contains('collapsed')) {
+            panel.classList.remove('collapsed');
+          }
+        };
         nav.appendChild(a);
       });
 
@@ -1395,6 +1644,15 @@
       otherA.className = 'section-pill';
       otherA.href = '#sec-other';
       otherA.textContent = 'Other (Library Browser)';
+      otherA.title = 'Jump to full library browser of 3,763 assets';
+      otherA.onclick = () => {
+        document.querySelectorAll('.section-pill').forEach(p => p.classList.remove('active'));
+        otherA.classList.add('active');
+        const otherPanel = document.getElementById('sec-other');
+        if (otherPanel && otherPanel.classList.contains('collapsed')) {
+          otherPanel.classList.remove('collapsed');
+        }
+      };
       nav.appendChild(otherA);
     }
 
@@ -1439,7 +1697,7 @@
     function renderCueCard(cue) {
       const candCount = cue.candidates.length;
       const existingBadge = cue.existing_in_game ? `
-        <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); playGameAudio('${escapeHtml(cue.existing_in_game.path)}', '${escapeHtml(cue.cue_id)} (In-Game Placeholder)', this)">
+        <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); playGameAudio('${escapeHtml(cue.existing_in_game.path)}', '${escapeHtml(cue.cue_id)} (In-Game Placeholder)', this)" title="Play the currently installed in-game placeholder audio file for this cue">
           <svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           Audition Placeholder
         </button>
@@ -1488,32 +1746,49 @@
     }
 
     function renderCandidateRow(cueId, cand) {
+      const isCurated = cand.reason && (cand.reason.startsWith('Curated') || cand.reason.startsWith('Curated Top Pick'));
+      const isExistingChoice = isCurated || cand.role === 'primary' || cand.selected;
+      const isChecked = selectedCuesMap[cueId] && selectedCuesMap[cueId].some(s => s.file_id === cand.file_id);
+      const isInteresting = interestingFilesMap[cueId] && interestingFilesMap[cueId].includes(cand.file_id);
       const scoreClass = cand.score >= 90 ? 'score-top' : (cand.score >= 70 ? 'score-high' : (cand.score >= 45 ? 'score-mid' : 'score-low'));
-      const isCurated = cand.reason && cand.reason.startsWith('Curated');
       const fullPath = getFullAudioPath(cand.rel_path);
       
       return `
-        <div class="candidate-row" id="cand-row-${escapeHtml(cueId)}-${escapeHtml(cand.file_id)}" data-file-id="${escapeHtml(cand.file_id)}" title="${escapeHtml(fullPath)}">
+        <div class="candidate-row ${isChecked ? 'is-selected' : ''} ${isInteresting ? 'is-interesting' : ''}" id="cand-row-${escapeHtml(cueId)}-${escapeHtml(cand.file_id)}" data-file-id="${escapeHtml(cand.file_id)}" title="${escapeHtml(fullPath)}">
           <div class="candidate-left">
             <input type="checkbox" class="checkbox-custom" 
               id="chk-${escapeHtml(cueId)}-${escapeHtml(cand.file_id)}"
+              ${isChecked ? 'checked' : ''}
+              title="Select this sound asset as an active choice for this cue to include in export"
               onchange="onCandidateToggle('${escapeHtml(cueId)}', '${escapeHtml(cand.file_id)}', this.checked)">
             
-            <button class="play-btn" onclick="playLibraryAudio('${escapeHtml(cand.rel_path)}', '${escapeHtml(cand.filename)}', this)" title="Audition sound">
+            <button type="button" class="star-btn ${isInteresting ? 'is-active' : ''}" 
+              id="star-${escapeHtml(cueId)}-${escapeHtml(cand.file_id)}"
+              onclick="toggleInteresting('${escapeHtml(cueId)}', '${escapeHtml(cand.file_id)}', event)"
+              title="${isInteresting ? 'Remove from interesting / shortlisted candidates' : 'Mark this sound as an interesting candidate for this cue (shortlist without committing)'}">
+              <svg width="14" height="14" fill="${isInteresting ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+              </svg>
+            </button>
+
+            <button class="play-btn" onclick="playLibraryAudio('${escapeHtml(cand.rel_path)}', '${escapeHtml(cand.filename)}', this)" title="Audition this sound asset in the audio player">
               <svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
             </button>
 
             <div class="candidate-info" title="${escapeHtml(fullPath)}">
               <div class="candidate-filename" title="${escapeHtml(fullPath)}">
                 ${escapeHtml(cand.filename)}
-                ${isCurated ? '<span style="font-size: 10px; background: rgba(16,185,129,0.15); color: #34d399; padding: 1px 6px; border-radius: 4px; font-weight: 700;">TOP PICK</span>' : ''}
+                ${isExistingChoice ? '<span class="existing-choice-badge"><svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg> EXISTING CHOICE</span>' : ''}
+                <span class="interesting-badge" id="int-badge-${escapeHtml(cueId)}-${escapeHtml(cand.file_id)}" style="display: ${isInteresting ? 'inline-flex' : 'none'};">
+                  ★ INTERESTING
+                </span>
               </div>
               <div class="candidate-pack" title="${escapeHtml(fullPath)}">${escapeHtml(cand.pack)} • ${escapeHtml(cand.reason || '')}</div>
             </div>
           </div>
 
           <div class="candidate-right">
-            <select class="role-select" id="role-${escapeHtml(cueId)}-${escapeHtml(cand.file_id)}" onchange="onRoleChange('${escapeHtml(cueId)}', '${escapeHtml(cand.file_id)}', this.value)">
+            <select class="role-select" id="role-${escapeHtml(cueId)}-${escapeHtml(cand.file_id)}" onchange="onRoleChange('${escapeHtml(cueId)}', '${escapeHtml(cand.file_id)}', this.value)" title="Assign playback role for this sound within the cue (Primary, Variant, or Layer)">
               <option value="primary" ${cand.role === 'primary' ? 'selected' : ''}>Primary</option>
               <option value="variant_1" ${cand.role === 'variant_1' ? 'selected' : ''}>Variant 1</option>
               <option value="variant_2" ${cand.role === 'variant_2' ? 'selected' : ''}>Variant 2</option>
@@ -1535,7 +1810,7 @@
       otherSec.id = 'sec-other';
 
       otherSec.innerHTML = `
-        <div class="section-header" onclick="toggleSection(this)">
+        <div class="section-header" onclick="toggleSection(this)" title="Click to expand or collapse the full library browser">
           <div class="section-title-group">
             <div class="section-index-badge">∞</div>
             <div>
@@ -1552,7 +1827,7 @@
           <div class="other-browser">
             <div class="other-filter-row">
               <input type="text" id="other-search-input" class="search-input" style="flex: 1; max-width: 400px;" placeholder="Search library sounds..." oninput="filterOtherLibrary()">
-              <select id="other-pack-select" class="select-dropdown" onchange="filterOtherLibrary()">
+              <select id="other-pack-select" class="select-dropdown" onchange="filterOtherLibrary()" title="Filter full sound library by pack">
                 <option value="ALL">All Packs</option>
                 ${(audioData.packs || []).map(p => `<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)} (${p.count})</option>`).join('')}
               </select>
@@ -1584,7 +1859,7 @@
         const fullPath = getFullAudioPath(item.rel_path);
         return `
           <div class="other-card" title="${escapeHtml(fullPath)}">
-            <button class="play-btn" onclick="playLibraryAudio('${escapeHtml(item.rel_path)}', '${escapeHtml(item.filename)}', this)" title="Audition sound">
+            <button class="play-btn" onclick="playLibraryAudio('${escapeHtml(item.rel_path)}', '${escapeHtml(item.filename)}', this)" title="Audition this sound asset in the audio player">
               <svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
             </button>
             <div style="flex: 1; min-width: 0;" title="${escapeHtml(fullPath)}">
@@ -1595,7 +1870,7 @@
                 ${escapeHtml(item.pack)} • ${item.duration.toFixed(2)}s
               </div>
             </div>
-            <button class="btn btn-sm btn-secondary" onclick="openAssignModal('${escapeHtml(item.id)}', '${escapeHtml(item.filename)}')">
+            <button class="btn btn-sm btn-secondary" onclick="openAssignModal('${escapeHtml(item.id)}', '${escapeHtml(item.filename)}')" title="Assign this audio file from the library to a game cue and choose its role">
               Assign...
             </button>
           </div>
@@ -1636,7 +1911,8 @@
     }
 
     function playGameAudio(gamePath, title, btnElement) {
-      const streamUrl = `/${gamePath}`;
+      const cleanPath = gamePath.startsWith('game/audio/') ? gamePath.substring('game/audio/'.length) : (gamePath.startsWith('game/') ? gamePath.substring('game/'.length) : gamePath);
+      const streamUrl = `/audio/game/${encodeURI(cleanPath)}`;
       playStream(streamUrl, title, gamePath, btnElement);
     }
 
@@ -1760,6 +2036,7 @@
       }
 
       updateSelectionStats();
+      filterAudioStudio();
     }
 
     function onRoleChange(cueId, fileId, newRole) {
@@ -1802,6 +2079,7 @@
         });
       });
 
+      filterAudioStudio();
       showToast(`Auto-selected top recommendations for ${count} cues`);
     }
 
@@ -1810,12 +2088,20 @@
       document.querySelectorAll('.checkbox-custom').forEach(chk => chk.checked = false);
       document.querySelectorAll('.candidate-row').forEach(row => row.classList.remove('is-selected'));
       updateSelectionStats();
+      filterAudioStudio();
       showToast('All selections cleared');
     }
 
     function updateSelectionStats() {
       const assignedCuesCount = Object.keys(selectedCuesMap).filter(k => selectedCuesMap[k] && selectedCuesMap[k].length > 0).length;
       const totalCues = audioData ? audioData.total_cues : 87;
+
+      let totalInteresting = 0;
+      for (const k in interestingFilesMap) {
+        if (interestingFilesMap[k]) totalInteresting += interestingFilesMap[k].length;
+      }
+      const statInt = document.getElementById('stat-interesting-count');
+      if (statInt) statInt.textContent = totalInteresting;
 
       document.getElementById('stat-assigned-cues').textContent = assignedCuesCount;
       document.getElementById('stat-total-cues').textContent = totalCues;
@@ -1861,12 +2147,14 @@
         const cueId = card.id.replace('cue-card-', '');
         const cardBus = card.dataset.bus;
         const hasSelection = selectedCuesMap[cueId] && selectedCuesMap[cueId].length > 0;
+        const hasInteresting = interestingFilesMap[cueId] && interestingFilesMap[cueId].length > 0;
 
         let visible = true;
 
         if (bus !== 'ALL' && cardBus !== bus) visible = false;
         if (status === 'SELECTED' && !hasSelection) visible = false;
         if (status === 'UNSELECTED' && hasSelection) visible = false;
+        if (status === 'INTERESTING' && !hasInteresting) visible = false;
 
         if (query) {
           const cardText = card.textContent.toLowerCase();
@@ -1929,49 +2217,148 @@
       generateExportData();
     }
 
+    function getModifiedSessionData() {
+      const modifiedSelections = {};
+      const modifiedInteresting = {};
+      let modifiedCueCount = 0;
+
+      const allCueIds = new Set([
+        ...Object.keys(selectedCuesMap),
+        ...Object.keys(initialSelectedCuesMap),
+        ...Object.keys(interestingFilesMap),
+        ...Object.keys(initialInterestingFilesMap)
+      ]);
+
+      allCueIds.forEach(cueId => {
+        const curSel = (selectedCuesMap[cueId] || []).map(s => ({ f: s.file_id, r: s.role, p: s.rel_path, n: s.filename, pk: s.pack, d: s.duration })).sort((a,b) => a.f.localeCompare(b.f));
+        const initSel = (initialSelectedCuesMap[cueId] || []).map(s => ({ f: s.file_id, r: s.role, p: s.rel_path, n: s.filename, pk: s.pack, d: s.duration })).sort((a,b) => a.f.localeCompare(b.f));
+        
+        const selChanged = JSON.stringify(curSel) !== JSON.stringify(initSel);
+        if (selChanged) {
+          modifiedSelections[cueId] = selectedCuesMap[cueId] || [];
+        }
+
+        const curInt = (interestingFilesMap[cueId] || []).slice().sort();
+        const initInt = (initialInterestingFilesMap[cueId] || []).slice().sort();
+        const intChanged = JSON.stringify(curInt) !== JSON.stringify(initInt);
+        if (intChanged) {
+          modifiedInteresting[cueId] = interestingFilesMap[cueId] || [];
+        }
+
+        if (selChanged || intChanged) {
+          modifiedCueCount++;
+        }
+      });
+
+      return {
+        modifiedSelections,
+        modifiedInteresting,
+        modifiedCueCount
+      };
+    }
+
     function generateExportData() {
       const textarea = document.getElementById('export-textarea');
       const statusEl = document.getElementById('export-footer-status');
+      const subtitleEl = document.getElementById('export-modal-subtitle');
+      
+      const { modifiedSelections, modifiedInteresting, modifiedCueCount } = getModifiedSessionData();
+
+      if (subtitleEl) {
+        subtitleEl.textContent = modifiedCueCount > 0 
+          ? `Exporting ${modifiedCueCount} modified cue${modifiedCueCount === 1 ? '' : 's'} changed since page load`
+          : `No cues modified since page load`;
+      }
+
+      if (modifiedCueCount === 0) {
+        if (currentExportTab === 'json') {
+          textarea.value = JSON.stringify({
+            export_type: "session_changes_only",
+            export_date: new Date().toISOString(),
+            status: "no_changes",
+            message: "No audio cue selections or shortlisted sounds were modified after this page loaded. Check/uncheck sounds or toggle stars to export changes.",
+            modified_cues_count: 0,
+            changed_selections: {},
+            changed_shortlisted_candidates: {}
+          }, null, 2);
+        } else if (currentExportTab === 'md') {
+          textarea.value = "# American Tycoon — No Changes Detected\n\nNo audio cue selections or shortlisted sounds were modified after this page loaded.\n\n*Toggle a candidate checkbox, switch a role, or star an interesting file to record changes for export.*";
+        } else if (currentExportTab === 'ps') {
+          textarea.value = "# PowerShell Asset Deployment Script\n# No audio cue changes were made during this session.\nWrite-Host 'No changed audio assets to deploy.' -ForegroundColor Yellow\n";
+        }
+        statusEl.textContent = '0 modified cues — change any sound to export diffs';
+        return;
+      }
 
       if (currentExportTab === 'json') {
         const exportObj = {
+          export_type: "session_changes_only",
           export_date: new Date().toISOString(),
           app: "American Tycoon",
-          total_assigned_cues: Object.keys(selectedCuesMap).length,
-          selections: selectedCuesMap
+          modified_cues_count: modifiedCueCount,
+          changed_selections: modifiedSelections,
+          changed_shortlisted_candidates: modifiedInteresting
         };
         textarea.value = JSON.stringify(exportObj, null, 2);
-        statusEl.textContent = 'Structured JSON format for Antigravity automated ingestion';
+        statusEl.textContent = `Structured JSON of ${modifiedCueCount} modified cue(s) for Antigravity ingestion`;
       } else if (currentExportTab === 'md') {
-        let md = '# American Tycoon — Audio Asset Integration Checklist\n\n';
-        md += '| Cue ID | Role | Source Pack | Source File | Duration |\n';
-        md += '|---|---|---|---|---|\n';
-        for (const [cueId, selections] of Object.entries(selectedCuesMap)) {
-          selections.forEach(sel => {
-            md += `| \`${cueId}\` | **${sel.role}** | ${sel.pack} | \`${sel.filename}\` | ${sel.duration.toFixed(2)}s |\n`;
-          });
+        let md = `# American Tycoon — Session Audio Changes (${modifiedCueCount} Cues Modified)\n\n`;
+        md += `*Export generated at ${new Date().toLocaleTimeString()} containing only changes made since page load.*\n\n`;
+        
+        const selKeys = Object.keys(modifiedSelections);
+        if (selKeys.length > 0) {
+          md += '## Modified Active Selections\n\n';
+          md += '| Cue ID | Status / Role | Source Pack | Source File | Duration |\n';
+          md += '|---|---|---|---|---|\n';
+          for (const cueId of selKeys) {
+            const selections = modifiedSelections[cueId];
+            if (selections.length === 0) {
+              md += `| \`${cueId}\` | *(Cleared / None)* | — | — | — |\n`;
+            } else {
+              selections.forEach(sel => {
+                md += `| \`${cueId}\` | **${sel.role}** | ${sel.pack} | \`${sel.filename}\` | ${sel.duration.toFixed(2)}s |\n`;
+              });
+            }
+          }
         }
+
+        const intKeys = Object.keys(modifiedInteresting);
+        if (intKeys.length > 0) {
+          md += '\n## Modified Shortlisted / Interesting Candidates\n\n';
+          md += '| Cue ID | Shortlisted Candidate Files |\n';
+          md += '|---|---|\n';
+          for (const cueId of intKeys) {
+            const files = modifiedInteresting[cueId];
+            const fileList = files.length > 0 ? files.map(f => `\`${f}\``).join(', ') : '*(None / Cleared)*';
+            md += `| \`${cueId}\` | ${fileList} |\n`;
+          }
+        }
+
         textarea.value = md;
-        statusEl.textContent = 'Markdown checklist formatted for plans and documentation';
+        statusEl.textContent = `Markdown diff of ${modifiedCueCount} modified cue(s)`;
       } else if (currentExportTab === 'ps') {
-        let ps = '# PowerShell Automated Asset Deployment Script\n';
+        let ps = `# PowerShell Automated Asset Deployment Script (Changed Assets Only: ${modifiedCueCount} cues)\n`;
         ps += '$AudioSrc = "D:\\Downloads\\Game_Audio"\n';
         ps += '$GameDest = "game\\audio\\cues"\n';
         ps += 'New-Item -ItemType Directory -Force -Path $GameDest | Out-Null\n\n';
 
-        for (const [cueId, selections] of Object.entries(selectedCuesMap)) {
-          selections.forEach(sel => {
-            let targetName = `${cueId}.ogg`;
-            if (sel.role.startsWith('variant_')) {
-              targetName = `${cueId}_${sel.role.replace('variant_', '')}.ogg`;
-            } else if (sel.role === 'layer') {
-              targetName = `${cueId}_layer.ogg`;
-            }
-            ps += `Copy-Item -Force "$AudioSrc\\${sel.rel_path.replace(/\//g, '\\')}" "$GameDest\\${targetName}"\n`;
-          });
+        for (const [cueId, selections] of Object.entries(modifiedSelections)) {
+          if (selections.length === 0) {
+            ps += `# [CLEARED] Cue ${cueId} had its selection removed\n`;
+          } else {
+            selections.forEach(sel => {
+              let targetName = `${cueId}.ogg`;
+              if (sel.role.startsWith('variant_')) {
+                targetName = `${cueId}_${sel.role.replace('variant_', '')}.ogg`;
+              } else if (sel.role === 'layer') {
+                targetName = `${cueId}_layer.ogg`;
+              }
+              ps += `Copy-Item -Force "$AudioSrc\\${sel.rel_path.replace(/\//g, '\\')}" "$GameDest\\${targetName}"\n`;
+            });
+          }
         }
         textarea.value = ps;
-        statusEl.textContent = 'PowerShell script ready to copy selected assets into game/audio';
+        statusEl.textContent = `PowerShell script deploying only the ${modifiedCueCount} modified cue(s)`;
       }
     }
 
@@ -1988,11 +2375,16 @@
     }
 
     async function saveExportToServer() {
+      const { modifiedSelections, modifiedInteresting, modifiedCueCount } = getModifiedSessionData();
+
       const exportObj = {
+        export_type: "session_changes_only",
         export_date: new Date().toISOString(),
         app: "American Tycoon",
-        total_assigned_cues: Object.keys(selectedCuesMap).length,
-        selections: selectedCuesMap
+        modified_cues_count: modifiedCueCount,
+        changed_selections: modifiedSelections,
+        changed_shortlisted_candidates: modifiedInteresting,
+        full_active_selections: selectedCuesMap
       };
 
       try {
@@ -2003,7 +2395,7 @@
         });
         const data = await res.json();
         if (data.status === 'success') {
-          showToast(`Saved to ${data.saved_to}`);
+          showToast(`Saved changes (${modifiedCueCount} cues) to ${data.saved_to}`);
         } else {
           showToast('Failed to save export');
         }
@@ -2013,10 +2405,106 @@
       }
     }
 
+    const CUE_FRIENDLY_NAMES = {
+      "tap_note": "Tap Note (Clock In / Rush)",
+      "buy_success": "Property Purchase",
+      "hire_first": "Hire First Staffer (Auto-Run)",
+      "hire_levelled": "Upgrade Staff Level",
+      "retain_staff": "Retain Staff Contract",
+      "milestone": "Property Milestone",
+      "cycle_started": "Manual Machine Cycle Start",
+      "frenzy_pop": "Frenzy Meter Pop",
+      "frenzy_end": "Frenzy Cooldown End",
+      "overdrive_engage": "Overdrive Ignition",
+      "vent_tick": "Vent Interval Tick",
+      "vent_open": "Vent Window Open Warning",
+      "vent_lift": "Vent Lift Impulse",
+      "vent_success": "Vent Success Confirm",
+      "vent_miss": "Vent Miss / Overheat Warning",
+      "overheat": "Overheat Burnout",
+      "rush_ready": "Rush Lockout Cleared",
+      "heat_loop": "Momentum Heat Engine Loop",
+      "urgency_loop": "Urgency Critical Tension Loop",
+      "tab_switch": "Tab Switch",
+      "screen_open": "Modal Screen Open",
+      "screen_close": "Modal Screen Close",
+      "mode_toggle": "Buy / Hire Mode Toggle",
+      "epoch_page": "Epoch Civilization Page Turn",
+      "make_contact": "Make Contact Button",
+      "tip_appear": "Tutorial Coach Card Tip",
+      "denied_cash": "Denied: Insufficient Cash",
+      "denied_locked": "Denied: Item Locked",
+      "challenge_start": "Challenge Session Start",
+      "challenge_credit": "Challenge Score Credited",
+      "challenge_tier": "Challenge Tier Advance",
+      "minigame_begin": "Minigame Round Begin",
+      "minigame_score": "Minigame Score Point",
+      "minigame_miss": "Minigame Time Penalty Miss",
+      "minigame_countdown": "Minigame Clock Countdown",
+      "minigame_best": "Minigame High Score",
+      "minigame_over": "Minigame Round Over",
+      "bball_grab": "Basketball Grab / Floor Squeak",
+      "bball_launch": "Basketball Throw Launch",
+      "bball_fizzle": "Basketball Weak Fizzle Drop",
+      "bball_wall": "Basketball Backboard / Wall Bounce",
+      "bball_floor": "Basketball Gym Floor Bounce",
+      "bball_settle": "Basketball Roll to Halt",
+      "bball_rim": "Basketball Rim-Out Clang",
+      "bball_score": "Basketball Made Basket",
+      "bball_swish": "Basketball Clean Swish",
+      "bball_gem_through": "Basketball Pass Through Gem",
+      "bball_gem_earned": "Basketball Legacy Gem Scored",
+      "m3_select": "Match-3 Gem Pickup",
+      "m3_swap": "Match-3 Gem Swap Slide",
+      "m3_invalid": "Match-3 Invalid Swap",
+      "m3_match": "Match-3 Gem Clear",
+      "m3_fall": "Match-3 Refill Gem Drop",
+      "m3_avoid": "Match-3 Avoid Gem Hazard",
+      "m3_legacy": "Match-3 Legacy Gem Clear",
+      "catch_coin": "Catch Money: Standard Coin",
+      "catch_premium": "Catch Money: Gold Bag Coin",
+      "catch_legacy": "Catch Money: Jackpot Coin",
+      "catch_miss": "Catch Money: Missed Drop",
+      "catch_spawn": "Catch Money: Coin Spawn Rhythm",
+      "mem_pad": "Simon Memory: Tone Pad Tap",
+      "mem_round": "Simon Memory: Round Complete",
+      "mem_wrong": "Simon Memory: Sequence Error",
+      "mem_gem": "Simon Memory: Legacy Gem Round",
+      "bal_enter": "Balance: Zone Enter Resonance",
+      "bal_leave": "Balance: Zone Exit",
+      "bal_lift": "Balance: Lift Thruster Pulse",
+      "bal_gem": "Balance: Legacy Gem Earned",
+      "time_lock_hit": "Timing Bar: Target Lock Hit",
+      "time_lock_miss": "Timing Bar: Off-Target Miss",
+      "time_gem": "Timing Bar: Legacy Gem Lock",
+      "ceremony_obituary": "Obituary Solemn Bell",
+      "ceremony_will": "Reading of the Will / Parchment",
+      "ceremony_heir": "Heir Reveal / Rebirth Fanfare",
+      "ceremony_contact": "First Contact Cosmic Portal",
+      "ceremony_contact_reveal": "Alien Civilization Reveal",
+      "ceremony_fanfare": "Dynasty Prestige Fanfare",
+      "ceremony_power_down": "Reset / Power Down",
+      "legacy_purchase": "Legacy Upgrade Purchase",
+      "welcome_back": "Welcome Back Idle Wealth Pile",
+      "prestige_confirm": "Pass the Torch Confirm Bell",
+      "band_0_blue_collar": "Era 1: Blue Collar Muzak (Tier 1)",
+      "band_1_white_collar": "Era 2: White Collar Executive (Tier 2)",
+      "band_2_early_contact": "Era 3: Early Alien Contact (Tiers 3–11)",
+      "band_3_mid": "Era 4: Mid Alien Contact (Tiers 12–19)",
+      "band_4_deep": "Era 5: Deep Cosmos (Tiers 20–27)",
+      "music_preview": "Music Volume Preview Stinger"
+    };
+
     // Assign Modal (From Other)
     function openAssignModal(fileId, filename) {
-      soundToAssign = { fileId, filename };
+      const item = (audioData && audioData.library_sample) ? audioData.library_sample.find(f => f.id === fileId) : null;
+      soundToAssign = { fileId, filename, item };
+
       document.getElementById('assign-filename').textContent = filename;
+      const detailsEl = document.getElementById('assign-sound-details');
+      if (detailsEl && item) {
+        detailsEl.textContent = `${item.pack} • ${item.duration.toFixed(2)}s • ${item.subfolder || 'Root'}`;
+      }
 
       const select = document.getElementById('assign-target-cue');
       select.innerHTML = '';
@@ -2025,16 +2513,44 @@
           const optGroup = document.createElement('optgroup');
           optGroup.label = sec.name;
           sec.cues.forEach(c => {
+            const friendly = CUE_FRIENDLY_NAMES[c.cue_id] || c.cue_id;
             const opt = document.createElement('option');
             opt.value = c.cue_id;
-            opt.textContent = `${c.cue_id} (${c.bus})`;
+            opt.textContent = `${friendly} — [${c.cue_id}] (${c.bus})`;
             optGroup.appendChild(opt);
           });
           select.appendChild(optGroup);
         });
       }
 
+      if (select.options.length > 0) {
+        onAssignTargetCueChange(select.value);
+      }
+
       document.getElementById('assign-modal').classList.add('open');
+    }
+
+    function onAssignTargetCueChange(cueId) {
+      let foundCue = null;
+      for (const sec of (audioData.sections || [])) {
+        for (const c of sec.cues) {
+          if (c.cue_id === cueId) {
+            foundCue = c;
+            break;
+          }
+        }
+      }
+
+      const nameEl = document.getElementById('assign-cue-name');
+      const busEl = document.getElementById('assign-cue-bus');
+      const triggerEl = document.getElementById('assign-cue-trigger');
+
+      if (foundCue) {
+        const friendly = CUE_FRIENDLY_NAMES[cueId] || cueId;
+        if (nameEl) nameEl.textContent = `${friendly} (${cueId})`;
+        if (busEl) busEl.textContent = `${foundCue.bus} Bus • ${foundCue.db > 0 ? '+' : ''}${foundCue.db} dB • ${foundCue.cooldown}ms cooldown`;
+        if (triggerEl) triggerEl.innerHTML = `<strong>Trigger context:</strong> ${escapeHtml(foundCue.trigger || 'In-game audio event')}`;
+      }
     }
 
     function closeAssignModal() {

@@ -88,9 +88,20 @@ class AudioReviewHandler(BaseHTTPRequestHandler):
             return
 
         # 4. Stream In-Game Audio (game/audio/...)
-        elif path.startswith("/audio/game/"):
-            rel_game_path = urllib.parse.unquote(path[len("/audio/game/"):])
+        elif path.startswith("/audio/game/") or path.startswith("/game/audio/") or path.startswith("/game/"):
+            if path.startswith("/audio/game/"):
+                rel_game_path = urllib.parse.unquote(path[len("/audio/game/"):])
+            elif path.startswith("/game/audio/"):
+                rel_game_path = urllib.parse.unquote(path[len("/game/audio/"):])
+            else:
+                rel_game_path = urllib.parse.unquote(path[len("/game/"):])
+            
             file_path = os.path.join(PROJECT_AUDIO_DIR, rel_game_path)
+            if not os.path.exists(file_path):
+                fallback_path = os.path.join(WORKSPACE_DIR, urllib.parse.unquote(path.lstrip("/")))
+                if os.path.exists(fallback_path):
+                    file_path = fallback_path
+
             self.serve_audio_file(file_path)
             return
 

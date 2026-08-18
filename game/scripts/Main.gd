@@ -416,8 +416,16 @@ func _process(delta: float) -> void:
 	_hero_stat.set_cash(game.economy.cash)
 	_hero_stat.set_frenzy_glow(game.frenzy.get_multiplier() > 1.0)
 
-	if game.events.is_crash_active():
-		_event_hud_banner.update_status(game.events.active_event_remaining, tuning.crash_multiplier)
+	var crash_on: bool = game.events.is_crash_active()
+	_hero_stat.set_crash_active(crash_on)
+	_wage_panel.set_crash_active(crash_on)
+
+	if crash_on:
+		_event_hud_banner.update_status(
+			game.events.active_event_remaining,
+			game.events.get_property_income_multiplier(),
+			game.events.active_crash_dollars_lost
+		)
 	else:
 		_event_hud_banner.visible = false
 
@@ -1082,7 +1090,7 @@ func _build_property_tab() -> Control:
 		# game.rush_momentum is passed so the row can present the rush control as disabled while
 		# rushing is locked out after an overheat (Rush Overheat, Tim 2026-07-15) — read-only.
 		row.setup(i, game.economy.properties[i] as PropertyState, game.economy, game.frenzy,
-				game.epoch, game.rush_momentum, game.auto_purchase)
+				game.epoch, game.rush_momentum, game.auto_purchase, game.events)
 		row.buy_requested.connect(_on_buy_requested)
 		row.tap_requested.connect(_on_tap_requested)
 		row.hold_rush_requested.connect(_on_hold_rush_requested)
@@ -3967,7 +3975,11 @@ func _overdrive_is_teachable() -> bool:
 
 func _on_event_weather_started(_event_id: String, duration_sec: float, mult: float) -> void:
 	Audio.play(&"screen_open")
-	_event_overlay.show_crash(duration_sec / 60.0, mult)
+	var legacy_bonuses := {
+		"hedging_bonus": dynasty.upgrades.crash_income_retention_bonus(),
+		"duration_reduction_pct": dynasty.upgrades.crash_duration_reduction_pct(),
+	}
+	_event_overlay.show_crash(duration_sec / 60.0, mult, game.events.active_crash_dollars_lost, legacy_bonuses)
 
 
 func _on_event_weather_ended(_event_id: String) -> void:
@@ -3995,11 +4007,20 @@ func _on_event_overlay_dismissed() -> void:
 
 func _on_event_banner_tapped() -> void:
 	if game.events.is_crash_active():
-		_event_overlay.show_crash(game.events.active_event_remaining / 60.0, tuning.crash_multiplier)
+		var legacy_bonuses := {
+			"hedging_bonus": dynasty.upgrades.crash_income_retention_bonus(),
+			"duration_reduction_pct": dynasty.upgrades.crash_duration_reduction_pct(),
+		}
+		_event_overlay.show_crash(
+			game.events.active_event_remaining / 60.0,
+			game.events.get_property_income_multiplier(),
+			game.events.active_crash_dollars_lost,
+			legacy_bonuses
+		)
 
 
 func _on_dev_trigger_crash() -> void:
-	game.events.trigger_crash(tuning.crash_duration_minutes, game)
+	game.events.trigger_crash(-1.0, game)
 
 
 func _on_dev_trigger_audit() -> void:

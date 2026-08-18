@@ -240,7 +240,11 @@ func tick(delta: float, extra_property_multiplier: float = 1.0) -> void:
 			p.rush_active_grace = maxf(p.rush_active_grace - delta, 0.0)
 	events.tick(delta, self)
 	var tier_before := epoch.current_tier
-	economy.tick(delta, frenzy.get_multiplier() * extra_property_multiplier * events.get_property_income_multiplier())
+	var crash_mult := events.get_property_income_multiplier()
+	economy.tick(delta, frenzy.get_multiplier() * extra_property_multiplier * crash_mult)
+	if events.is_crash_active() and crash_mult > 0.0 and economy.income_this_tick > 0.0:
+		var unpenalized := economy.income_this_tick / crash_mult
+		events.record_loss(unpenalized - economy.income_this_tick)
 	if economy.cycles_completed_this_tick > 0:
 		frenzy.on_cycle_completed(economy.cycles_completed_this_tick)
 	peak_net_worth = maxf(peak_net_worth, economy.get_net_worth())
@@ -381,7 +385,13 @@ func tap_property(prop_index: int) -> void:
 		# Rush pays at the SAME multiplier the tick uses — frenzy and the dynasty's Family Fortune;
 		# Rush Momentum is now folded in per-property via _collect's rush_momentum_factor (set just
 		# above), so the rushed cycle collects exactly the full rate the row shows (Tim 2026-07-12/13).
-		economy.credit_property_income(prop.rush_cycle(frenzy.get_multiplier() * prop.legacy_income_multiplier * events.get_property_income_multiplier()))
+		var event_mult := events.get_property_income_multiplier()
+		var base_mult := frenzy.get_multiplier() * prop.legacy_income_multiplier
+		var credited := prop.rush_cycle(base_mult * event_mult)
+		economy.credit_property_income(credited)
+		if events.is_crash_active() and event_mult > 0.0 and credited > 0.0:
+			var unpenalized := credited / event_mult
+			events.record_loss(unpenalized - credited)
 	else:
 		# Starting an idle cycle is still a real tap (it feeds frenzy) and is allowed even
 		# during an overheat lockout — only a FROZEN property refuses, up at the top of this func.

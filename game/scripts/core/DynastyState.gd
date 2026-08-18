@@ -552,6 +552,11 @@ func _apply_upgrade_effects(game: GameState) -> void:
 	# via refresh_current_generation_effects, a purchase takes hold mid-life, like every upgrade.
 	game.rush_momentum.legacy_cruise_bonus = upgrades.cruise_bonus_points()
 	game.rush_momentum.lockout_time_scale = upgrades.overheat_lockout_scale()
+	# Rare event mitigations: Hedging Strategies and Emergency Liquidity.
+	if game.events != null:
+		game.events.generation_index = generation
+		game.events.legacy_retention_bonus = upgrades.crash_income_retention_bonus()
+		game.events.legacy_duration_reduction_pct = upgrades.crash_duration_reduction_pct()
 
 
 

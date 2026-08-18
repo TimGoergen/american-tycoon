@@ -451,6 +451,26 @@ func set_frenzy_glow(active: bool) -> void:
 	_frenzy_glow = active
 
 
+## Toggle Market Crash visual state on the income readout.
+func set_crash_active(active: bool) -> void:
+	if _income_label == null:
+		return
+	if active:
+		_income_label.add_theme_color_override("font_color", UiPalette.KETCHUP_RED)
+		_income_label.add_theme_color_override("font_outline_color", UiPalette.KETCHUP_RED)
+		_income_slash_label.add_theme_color_override("font_color", UiPalette.KETCHUP_RED)
+		_income_slash_label.add_theme_color_override("font_outline_color", UiPalette.KETCHUP_RED)
+		_income_s_label.add_theme_color_override("font_color", UiPalette.KETCHUP_RED)
+		_income_s_label.add_theme_color_override("font_outline_color", UiPalette.KETCHUP_RED)
+	else:
+		_income_label.add_theme_color_override("font_color", UiPalette.NAVY)
+		_income_label.add_theme_color_override("font_outline_color", UiPalette.NAVY)
+		_income_slash_label.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD)
+		_income_slash_label.add_theme_color_override("font_outline_color", UiPalette.MUSTARD_GOLD)
+		_income_s_label.add_theme_color_override("font_color", UiPalette.MUSTARD_GOLD)
+		_income_s_label.add_theme_color_override("font_outline_color", UiPalette.MUSTARD_GOLD)
+
+
 ## Show the current planet's world image (1-based EpochCatalog tier). Main calls this every
 ## frame; the watermark is only re-baked when the tier (or the plate size) actually changes,
 ## so the cost falls only on a first contact, not every frame.

@@ -21,6 +21,24 @@ var active_event_remaining: float = 0.0
 ## Initial duration of the currently active weather event.
 var active_event_duration: float = 0.0
 
+## Multiplier currently applied during active weather (e.g. crash).
+var active_crash_multiplier: float = 0.5
+
+## Dollars lost due to the current active crash event.
+var active_crash_dollars_lost: float = 0.0
+
+## Total cumulative dollars lost across all crashes this generation.
+var total_crash_dollars_lost: float = 0.0
+
+## 1-based generation index of the living generation (drives crash duration scaling).
+var generation_index: int = 1
+
+## Legacy Hedging Strategies bonus (0.0 to 0.40 added to crash multiplier).
+var legacy_retention_bonus: float = 0.0
+
+## Legacy Emergency Liquidity discount (0.0 to 0.48 shaved from crash duration).
+var legacy_duration_reduction_pct: float = 0.0
+
 ## Currently pending dilemma ID (e.g. EventDef.ID_AUDIT), or empty string if none.
 var pending_dilemma_id: String = ""
 
@@ -59,17 +77,46 @@ func tick(delta: float, game: GameState) -> void:
 			_maybe_trigger_random_event(game)
 
 
+## Base duration in minutes for Market Crash before legacy reductions.
+func get_base_crash_duration_minutes(game: GameState = null) -> float:
+	var gen := generation_index
+	if game != null and game.epoch != null:
+		gen = maxi(gen, game.epoch.current_tier)
+	var base_dur := tuning.crash_duration_base_minutes + float(gen - 1) * tuning.crash_duration_growth_per_gen
+	return clampf(base_dur, tuning.crash_duration_base_minutes, tuning.crash_duration_max_minutes)
+
+
+## Effective duration in active minutes after applying Legacy reductions.
+func get_effective_crash_duration_minutes(game: GameState = null) -> float:
+	var base_dur := get_base_crash_duration_minutes(game)
+	var reduction := clampf(legacy_duration_reduction_pct, 0.0, 0.80)
+	return maxf(0.5, base_dur * (1.0 - reduction))
+
+
+## Effective property income multiplier during a crash after applying Legacy hedging.
+func get_effective_crash_multiplier() -> float:
+	var bonus := legacy_retention_bonus
+	return clampf(tuning.crash_multiplier + bonus, 0.1, 0.95)
+
+
 ## Property income multiplier in effect from active weather events.
 ## Applies ONLY to property income, NEVER to wages (Spec §10 / GDD §9).
 func get_property_income_multiplier() -> float:
-	if active_event_id == EventDef.ID_CRASH and active_event_remaining > 0.0:
-		return tuning.crash_multiplier
+	if is_crash_active():
+		return active_crash_multiplier
 	return 1.0
 
 
 ## True if Market Crash weather is currently in progress.
 func is_crash_active() -> bool:
 	return active_event_id == EventDef.ID_CRASH and active_event_remaining > 0.0
+
+
+## Record additional discrete income lost (e.g. from rushed payouts).
+func record_loss(amount: float) -> void:
+	if amount > 0.0:
+		active_crash_dollars_lost += amount
+		total_crash_dollars_lost += amount
 
 
 ## Trigger an event by ID explicitly (used by random roll or dev tuning panel).
@@ -79,7 +126,7 @@ func trigger_event(event_id: String, game: GameState) -> bool:
 
 	match event_id:
 		EventDef.ID_CRASH:
-			trigger_crash(tuning.crash_duration_minutes, game)
+			trigger_crash(-1.0, game)
 			return true
 		EventDef.ID_AUDIT:
 			trigger_audit(game)
@@ -92,12 +139,16 @@ func trigger_event(event_id: String, game: GameState) -> bool:
 
 
 ## Start a Market Crash weather event.
-func trigger_crash(duration_minutes: float, _game: GameState) -> void:
+func trigger_crash(duration_minutes: float = -1.0, game: GameState = null) -> void:
 	active_event_id = EventDef.ID_CRASH
+	if duration_minutes <= 0.0:
+		duration_minutes = get_effective_crash_duration_minutes(game)
 	active_event_duration = maxf(1.0, duration_minutes * 60.0)
 	active_event_remaining = active_event_duration
+	active_crash_multiplier = get_effective_crash_multiplier()
+	active_crash_dollars_lost = 0.0
 	generation_events_triggered.append(EventDef.ID_CRASH)
-	weather_started.emit(EventDef.ID_CRASH, active_event_remaining, tuning.crash_multiplier)
+	weather_started.emit(EventDef.ID_CRASH, active_event_remaining, active_crash_multiplier)
 
 
 ## Present The Audit dilemma.
@@ -250,6 +301,12 @@ func to_save_dict() -> Dictionary:
 		"active_event_id": active_event_id,
 		"active_event_remaining": active_event_remaining,
 		"active_event_duration": active_event_duration,
+		"active_crash_multiplier": active_crash_multiplier,
+		"active_crash_dollars_lost": active_crash_dollars_lost,
+		"total_crash_dollars_lost": total_crash_dollars_lost,
+		"generation_index": generation_index,
+		"legacy_retention_bonus": legacy_retention_bonus,
+		"legacy_duration_reduction_pct": legacy_duration_reduction_pct,
 		"pending_dilemma_id": pending_dilemma_id,
 		"pending_dilemma_data": pending_dilemma_data,
 		"time_since_last_roll": time_since_last_roll,
@@ -262,6 +319,12 @@ func load_save_dict(data: Dictionary) -> void:
 	active_event_id = String(data.get("active_event_id", ""))
 	active_event_remaining = float(data.get("active_event_remaining", 0.0))
 	active_event_duration = float(data.get("active_event_duration", 0.0))
+	active_crash_multiplier = float(data.get("active_crash_multiplier", 0.5))
+	active_crash_dollars_lost = float(data.get("active_crash_dollars_lost", 0.0))
+	total_crash_dollars_lost = float(data.get("total_crash_dollars_lost", 0.0))
+	generation_index = int(data.get("generation_index", 1))
+	legacy_retention_bonus = float(data.get("legacy_retention_bonus", 0.0))
+	legacy_duration_reduction_pct = float(data.get("legacy_duration_reduction_pct", 0.0))
 	pending_dilemma_id = String(data.get("pending_dilemma_id", ""))
 	pending_dilemma_data = (data.get("pending_dilemma_data", {}) as Dictionary).duplicate()
 	time_since_last_roll = float(data.get("time_since_last_roll", 0.0))

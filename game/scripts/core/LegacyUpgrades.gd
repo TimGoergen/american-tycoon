@@ -324,6 +324,18 @@ func frenzy_afterburn_duration() -> float:
 		* float(get_level(LegacyUpgradeCatalog.FRENZY_AFTERBURN))
 
 
+## Additional retained property income during a Market Crash (Hedging Strategies, 0.0 to 0.40).
+func crash_income_retention_bonus() -> float:
+	return _per_level(LegacyUpgradeCatalog.CRISIS_HEDGING) \
+		* float(get_level(LegacyUpgradeCatalog.CRISIS_HEDGING))
+
+
+## Percentage reduction in Market Crash duration (Emergency Liquidity, 0.0 to 0.48).
+func crash_duration_reduction_pct() -> float:
+	return _per_level(LegacyUpgradeCatalog.CRISIS_LIQUIDITY) \
+		* float(get_level(LegacyUpgradeCatalog.CRISIS_LIQUIDITY))
+
+
 ## The catalog's per-level magnitude for an upgrade (0.0 if unknown).
 func _per_level(id: String) -> float:
 	var definition := LegacyUpgradeCatalog.get_definition(id)

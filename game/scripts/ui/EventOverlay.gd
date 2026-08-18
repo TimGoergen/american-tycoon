@@ -139,7 +139,7 @@ func _ready() -> void:
 
 
 ## Display Market Crash weather notification.
-func show_crash(duration_minutes: float, multiplier: float) -> void:
+func show_crash(duration_minutes: float, multiplier: float, dollars_lost: float = 0.0, legacy_bonuses: Dictionary = {}) -> void:
 	_current_event_id = EventDef.ID_CRASH
 	_is_dilemma = false
 
@@ -149,9 +149,29 @@ func show_crash(duration_minutes: float, multiplier: float) -> void:
 	_headline_label.add_theme_color_override("font_color", UiPalette.KETCHUP_RED)
 	_description_label.text = EventDef.get_description(_current_event_id)
 
-	_impact_label.text = "PROPERTY INCOME: %d%%" % int(multiplier * 100.0)
+	var penalty_pct: int = 100 - int(multiplier * 100.0)
+	_impact_label.text = "PROPERTY CAPITAL: %d%% (−%d%% Penalty)" % [int(multiplier * 100.0), penalty_pct]
 	_impact_label.add_theme_color_override("font_color", UiPalette.KETCHUP_RED)
-	_detail_label.text = "Duration: %d Active Minutes · Hourly Wages Unaffected (100%%)" % int(duration_minutes)
+
+	var detail_lines: Array[String] = []
+	var dur_str: String = "%.1f" % duration_minutes if duration_minutes < 1.0 or fmod(duration_minutes, 1.0) != 0.0 else "%d" % int(duration_minutes)
+	detail_lines.append("⏱️ Duration: %s Active Minutes" % dur_str)
+	detail_lines.append("🛡️ Hourly Wages: 100% UNAFFECTED (Crash-Proof)")
+
+	var hedging_bonus: float = float(legacy_bonuses.get("hedging_bonus", 0.0))
+	var dur_shave: float = float(legacy_bonuses.get("duration_reduction_pct", 0.0))
+	if hedging_bonus > 0.0 or dur_shave > 0.0:
+		var bonus_parts: Array[String] = []
+		if hedging_bonus > 0.0:
+			bonus_parts.append("+%d%% Hedged Income" % int(hedging_bonus * 100.0))
+		if dur_shave > 0.0:
+			bonus_parts.append("−%d%% Duration Shaved" % int(dur_shave * 100.0))
+		detail_lines.append("💼 Legacy Mitigations: %s" % " · ".join(bonus_parts))
+
+	if dollars_lost > 0.0:
+		detail_lines.append("📉 Capital Lost So Far: −%s" % Money.of(dollars_lost).display_cash())
+
+	_detail_label.text = "\n".join(detail_lines)
 	_detail_label.add_theme_color_override("font_color", UiPalette.NAVY)
 
 	_narrator_label.text = EventDef.get_narrator_quote(_current_event_id)

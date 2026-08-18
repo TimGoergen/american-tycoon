@@ -742,7 +742,16 @@ extends Resource
 ## Income multiplier during a Market Crash event.
 @export var crash_multiplier: float = 0.5  # TBD-SIM
 
-## Duration of a Market Crash event in active minutes.
+## Base duration of a Market Crash event in active minutes for generation 1.
+@export var crash_duration_base_minutes: float = 2.0  # feel-tune
+
+## Growth in crash duration per generation reached.
+@export var crash_duration_growth_per_gen: float = 0.5  # feel-tune
+
+## Maximum duration cap for a Market Crash event in active minutes.
+@export var crash_duration_max_minutes: float = 8.0  # feel-tune
+
+## Legacy fallback duration of a Market Crash event in active minutes.
 @export var crash_duration_minutes: float = 10.0  # TBD-SIM
 
 ## Settlement cost as a fraction of net worth during The Audit.

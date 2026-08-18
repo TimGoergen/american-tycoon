@@ -47,17 +47,22 @@ func _process(delta: float) -> void:
 	modulate.a = alpha
 
 
-## Update the displayed countdown and effect magnitude.
-func update_status(remaining_seconds: float, multiplier: float) -> void:
+## Update the displayed countdown, effect magnitude, and cumulative dollars lost.
+func update_status(remaining_seconds: float, multiplier: float, dollars_lost: float = 0.0) -> void:
 	if remaining_seconds <= 0.0:
 		visible = false
 		return
 
 	var mins := int(remaining_seconds) / 60
 	var secs := int(remaining_seconds) % 60
-	_text_label.text = "📉 MARKET CRASH (%d%% Income) · %02d:%02d" % [
-		int(multiplier * 100.0), mins, secs
-	]
+	if dollars_lost > 0.0:
+		_text_label.text = "📉 MARKET CRASH (%d%% Income) · %02d:%02d · Lost: −%s" % [
+			int(multiplier * 100.0), mins, secs, Money.of(dollars_lost).display_cash()
+		]
+	else:
+		_text_label.text = "📉 MARKET CRASH (%d%% Income) · %02d:%02d" % [
+			int(multiplier * 100.0), mins, secs
+		]
 	visible = true
 
 

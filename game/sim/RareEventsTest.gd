@@ -15,6 +15,9 @@ func _init() -> void:
 
 	_test_crash_weather_and_multipliers()
 	_test_crash_duration_and_expiry()
+	_test_crash_duration_progression_scaling()
+	_test_crash_legacy_mitigations()
+	_test_crash_loss_tracking()
 	_test_audit_settle_vs_fight()
 	_test_audit_legislative_evaporation()
 	_test_windfall_grant()
@@ -103,6 +106,73 @@ func _test_crash_duration_and_expiry() -> void:
 	_assert(game.events.active_event_remaining == 0.0, "Remaining time hit zero")
 	_assert(!game.events.is_crash_active(), "Crash ended on expiry")
 	_assert(game.events.get_property_income_multiplier() == 1.0, "Multiplier restored to 1.0")
+
+
+func _test_crash_duration_progression_scaling() -> void:
+	print("-- Market Crash: duration scales with generation progression --")
+	var game := _build_test_game()
+
+	# Gen 1 base duration = 2.0 min
+	game.events.generation_index = 1
+	var dur_gen1 := game.events.get_base_crash_duration_minutes(game)
+	_assert_approx(dur_gen1, 2.0, 0.01, "Gen 1 crash base duration is 2.0 minutes")
+
+	# Gen 5 base duration = 2.0 + 4 * 0.5 = 4.0 min
+	game.events.generation_index = 5
+	var dur_gen5 := game.events.get_base_crash_duration_minutes(game)
+	_assert_approx(dur_gen5, 4.0, 0.01, "Gen 5 crash base duration is 4.0 minutes")
+
+	# Gen 20 capped at 8.0 min
+	game.events.generation_index = 20
+	var dur_gen20 := game.events.get_base_crash_duration_minutes(game)
+	_assert_approx(dur_gen20, 8.0, 0.01, "Gen 20 crash base duration is capped at 8.0 minutes")
+
+
+func _test_crash_legacy_mitigations() -> void:
+	print("-- Market Crash: Legacy upgrades reduce impact and duration --")
+	var tuning := ConfigLoader.load_tuning(false)
+	var configs := ConfigLoader.load_property_configs()
+	var dynasty := DynastyState.new(configs, tuning)
+
+	# Baseline: 0.50 multiplier, 2.0 min duration
+	_assert_approx(dynasty.current.events.get_effective_crash_multiplier(), 0.50, 0.01, "Base crash multiplier is 0.50")
+	_assert_approx(dynasty.current.events.get_effective_crash_duration_minutes(dynasty.current), 2.0, 0.01, "Base crash duration is 2.0m")
+
+	# Purchase 4 levels of Hedging Strategies (+20% retained -> 0.70 multiplier)
+	dynasty.upgrades.levels[LegacyUpgradeCatalog.CRISIS_HEDGING] = 4
+	dynasty.refresh_current_generation_effects()
+
+	_assert_approx(dynasty.current.events.legacy_retention_bonus, 0.20, 0.01, "Legacy retention bonus is +0.20")
+	_assert_approx(dynasty.current.events.get_effective_crash_multiplier(), 0.70, 0.01, "Effective multiplier is 0.70 (only -30% penalty)")
+
+	# Purchase 3 levels of Emergency Liquidity (-24% duration -> 2.0 * 0.76 = 1.52m)
+	dynasty.upgrades.levels[LegacyUpgradeCatalog.CRISIS_LIQUIDITY] = 3
+	dynasty.refresh_current_generation_effects()
+
+	_assert_approx(dynasty.current.events.legacy_duration_reduction_pct, 0.24, 0.01, "Legacy duration reduction is -24%")
+	var eff_dur := dynasty.current.events.get_effective_crash_duration_minutes(dynasty.current)
+	_assert_approx(eff_dur, 1.52, 0.01, "Effective duration is 1.52 minutes")
+
+
+func _test_crash_loss_tracking() -> void:
+	print("-- Market Crash: live capital loss tracking --")
+	var game := _build_test_game()
+
+	# Give ATM property 10 units, staff it, and start cycle (pays $50 every 1s = $50/s)
+	var atm := game.economy.properties[0] as PropertyState
+	atm.units_owned = 10
+	atm.staff_level = 1
+	atm.start_cycle()
+
+	# Trigger crash (-50% multiplier -> $25/s lost)
+	game.events.trigger_crash(2.0, game)
+	_assert(game.events.active_crash_dollars_lost == 0.0, "Initial lost dollars is 0")
+
+	# Tick 10 seconds -> 10s * ($50 * 1.8 staffer) * 0.5 = $450 lost
+	game.tick(10.0)
+	_assert_approx(game.events.active_crash_dollars_lost, 450.0, 1.0, "10 seconds of crash tracks $450 lost capital")
+	_assert_approx(game.events.total_crash_dollars_lost, 450.0, 1.0, "Cumulative generation loss matches $450")
+
 
 
 func _test_audit_settle_vs_fight() -> void:

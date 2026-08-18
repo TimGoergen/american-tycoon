@@ -791,8 +791,14 @@ DEPLOYED_LIBRARY_PATHS = {
     "bball_launch": "Foley Sports Sound FX Pack/Foley Sports/Basketball/Ball Throw Fast.wav",
     "bball_fizzle": "Foley Sports Sound FX Pack/Foley Sports/Buzzers and Boards/Scoreboard Timer A.wav",
     "bball_wall": "Foley Sports Sound FX Pack/Foley Sports/Basketball/Generic Bounce Normal.wav",
-    "bball_swish": "Foley Sports Sound FX Pack/Foley Sports/Basketball/Net Swoosh Normal.wav"
+    "bball_swish": "Foley Sports Sound FX Pack/Foley Sports/Basketball/Net Swoosh Normal.wav",
+    "band_0_blue_collar": "Jazz Music Pack/Jazz Music Pack/Harlem Nights (RT 3.003)/Jazz Harlem Nights Intensity 2.wav",
+    "band_1_white_collar": "Corporate Music Pack Vol. 1/The Simulation (RT 2.182)/Corporate The Simulation Intensity 2.wav",
+    "band_2_early_contact": "spaceaudiobundle/Space Audio Bundle/MP3/Music/A Tale From Outer Space.mp3",
+    "band_3_mid": "Ethereal Music Pack Vol. 3/Ethereal Music Pack Vol. 3/Mystics (RT 13.197)/Ethereal Vol3 Mystics Intensity 2.wav",
+    "band_4_deep": "Corporate Music Pack Vol. 1/Space Intruder (RT 4)/Corporate Space Intruder Cut 30.wav"
 }
+
 
 # Curated recommendations for unassigned cues or alternative options
 CURATED_PICKS = {

@@ -13,6 +13,7 @@ SRC_BASE = r"D:\Downloads\Game_Audio"
 PLANS_DIR = os.path.join(WORKSPACE, "Plans")
 CUES_DIR = os.path.join(WORKSPACE, "game", "audio", "cues")
 LOOPS_DIR = os.path.join(WORKSPACE, "game", "audio", "loops")
+MUSIC_DIR = os.path.join(WORKSPACE, "game", "audio", "music")
 
 EXPORT_DATA = {
   "export_date": "2026-08-17T04:14:27.407Z",
@@ -319,6 +320,85 @@ EXPORT_DATA = {
         "role": "primary",
         "duration": 1.125
       }
+    ],
+    "band_0_blue_collar": [
+      {
+        "file_id": "Jazz Music Pack/Jazz Music Pack/Harlem Nights (RT 3.003)/Jazz Harlem Nights Intensity 2.wav",
+        "rel_path": "Jazz Music Pack/Jazz Music Pack/Harlem Nights (RT 3.003)/Jazz Harlem Nights Intensity 2.wav",
+        "filename": "Jazz Harlem Nights Intensity 2.wav",
+        "pack": "Jazz Music Pack",
+        "role": "variant_1",
+        "duration": 161.881
+      }
+    ],
+    "band_1_white_collar": [
+      {
+        "file_id": "Corporate Music Pack Vol. 1/The Simulation (RT 2.182)/Corporate The Simulation Intensity 2.wav",
+        "rel_path": "Corporate Music Pack Vol. 1/The Simulation (RT 2.182)/Corporate The Simulation Intensity 2.wav",
+        "filename": "Corporate The Simulation Intensity 2.wav",
+        "pack": "Corporate Music Pack Vol. 1",
+        "role": "primary",
+        "duration": 146.049
+      },
+      {
+        "file_id": "Corporate Music Pack Vol. 1/The Simulation (RT 2.182)/Corporate The Simulation Main.wav",
+        "rel_path": "Corporate Music Pack Vol. 1/The Simulation (RT 2.182)/Corporate The Simulation Main.wav",
+        "filename": "Corporate The Simulation Main.wav",
+        "pack": "Corporate Music Pack Vol. 1",
+        "role": "layer",
+        "duration": 146.049
+      }
+    ],
+    "band_2_early_contact": [
+      {
+        "file_id": "spaceaudiobundle/Space Audio Bundle/MP3/Music/A Tale From Outer Space.mp3",
+        "rel_path": "spaceaudiobundle/Space Audio Bundle/MP3/Music/A Tale From Outer Space.mp3",
+        "filename": "A Tale From Outer Space.mp3",
+        "pack": "spaceaudiobundle",
+        "role": "primary",
+        "duration": 59.294
+      }
+    ],
+    "band_3_mid": [
+      {
+        "file_id": "Ethereal Music Pack Vol. 3/Ethereal Music Pack Vol. 3/Mystics (RT 13.197)/Ethereal Vol3 Mystics Intensity 2.wav",
+        "rel_path": "Ethereal Music Pack Vol. 3/Ethereal Music Pack Vol. 3/Mystics (RT 13.197)/Ethereal Vol3 Mystics Intensity 2.wav",
+        "filename": "Ethereal Vol3 Mystics Intensity 2.wav",
+        "pack": "Ethereal Music Pack Vol. 3",
+        "role": "variant_1",
+        "duration": 166.919
+      },
+      {
+        "file_id": "Ethereal Music Pack Vol. 3/Ethereal Music Pack Vol. 3/Mystics (RT 13.197)/Ethereal Vol3 Mystics Main.wav",
+        "rel_path": "Ethereal Music Pack Vol. 3/Ethereal Music Pack Vol. 3/Mystics (RT 13.197)/Ethereal Vol3 Mystics Main.wav",
+        "filename": "Ethereal Vol3 Mystics Main.wav",
+        "pack": "Ethereal Music Pack Vol. 3",
+        "role": "layer",
+        "duration": 166.919
+      }
+    ],
+    "band_4_deep": [
+      {
+        "file_id": "Corporate Music Pack Vol. 1/Space Intruder (RT 4)/Corporate Space Intruder Cut 30.wav",
+        "rel_path": "Corporate Music Pack Vol. 1/Space Intruder (RT 4)/Corporate Space Intruder Cut 30.wav",
+        "filename": "Corporate Space Intruder Cut 30.wav",
+        "pack": "Corporate Music Pack Vol. 1",
+        "role": "primary",
+        "duration": 58.776
+      }
+    ]
+  },
+  "shortlisted_candidates": {
+    "ceremony_contact": [
+      "magicspellssfxbundle_audio/magicspellssfxbundle/Stereo/Misc/Spell Fail 5.mp3"
+    ],
+    "ceremony_fanfare": [
+      "westernaudiobundle/Western Audio Bundle/WAV/SFX/Buttons and Stingers/Stinger 8.wav",
+      "westernaudiobundle/Western Audio Bundle/MP3/FX/Buttons and Stingers/Stinger 15.mp3"
+    ],
+    "minigame_begin": [
+      "buttonssfxlibrary/Buttons SFX Library/WAV/Start/Start Button 7.wav",
+      "buttonssfxlibrary/Buttons SFX Library/WAV/Start/Start Button 5.wav"
     ]
   }
 }
@@ -346,19 +426,37 @@ def main():
             print(f"ERROR: Source file missing: {src_path}")
             continue
 
-        target_dir = LOOPS_DIR if cue_id == "heat_loop" else CUES_DIR
+        if cue_id.startswith("band_"):
+            target_dir = MUSIC_DIR
+        elif cue_id in ("heat_loop", "urgency_loop"):
+            target_dir = LOOPS_DIR
+        else:
+            target_dir = CUES_DIR
         os.makedirs(target_dir, exist_ok=True)
 
-        samples, sr = sf.read(src_path)
+        try:
+            samples, sr = sf.read(src_path)
 
-        ogg_path = os.path.join(target_dir, f"{cue_id}.ogg")
-        wav_path = os.path.join(target_dir, f"{cue_id}.wav")
+            wav_path = os.path.join(target_dir, f"{cue_id}.wav")
+            sf.write(wav_path, samples, sr, format="WAV", subtype="PCM_16")
 
-        sf.write(ogg_path, samples, sr, format="OGG", subtype="VORBIS")
-        sf.write(wav_path, samples, sr, format="WAV", subtype="PCM_16")
+            if cue_id.startswith("band_"):
+                # Clean up old synthesized placeholder ogg so Godot loads the real wav track
+                for ext in [".ogg", ".ogg.import"]:
+                    old_f = os.path.join(target_dir, f"{cue_id}{ext}")
+                    if os.path.exists(old_f):
+                        os.remove(old_f)
+            else:
+                ogg_path = os.path.join(target_dir, f"{cue_id}.ogg")
+                sf.write(ogg_path, samples, sr, format="OGG", subtype="VORBIS")
 
-        deployed_count += 1
-        print(f"[{deployed_count:02d}] Deployed '{cue_id}' from '{sel['pack']}/{sel['filename']}' ({len(samples)/sr:.2f}s)")
+            deployed_count += 1
+            print(f"[{deployed_count:02d}] Deployed '{cue_id}' from '{sel['pack']}/{sel['filename']}' ({len(samples)/sr:.2f}s)")
+        except Exception as e:
+            print(f"ERROR deploying '{cue_id}' from '{src_path}': {e}")
+
+
+
 
     print(f"\nCompleted deployment of {deployed_count} cues.")
 

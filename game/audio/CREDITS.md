@@ -55,5 +55,13 @@ Remaining unreplaced cues and test music stems use synthesized tones:
 
 ## Music
 
-Tracks live in `music/`, one per era band — see `music/README.md` for names, format and what the
-game does with them.
+Tracks live in `music/`, one per era band — see `music/README.md` for names, format and what the game does with them.
+
+| Track / Band | Source File | Pack | Licensor | License / Attribution |
+|---|---|---|---|---|
+| `band_0_blue_collar` | `Jazz Harlem Nights Intensity 2.wav` | Jazz Music Pack | Ovani Sound | Commercial royalty-free |
+| `band_1_white_collar` | `Corporate The Simulation Intensity 2.wav` | Corporate Music Pack Vol. 1 | Ovani Sound | Commercial royalty-free |
+| `band_2_early_contact` | `A Tale From Outer Space.mp3` | Space Audio Bundle | Tao & Sound | Commercial royalty-free (Attribution: Tao & Sound) |
+| `band_3_mid` | `Ethereal Vol3 Mystics Intensity 2.wav` | Ethereal Music Pack Vol. 3 | Ovani Sound | Commercial royalty-free |
+| `band_4_deep` | `Corporate Space Intruder Cut 30.wav` | Corporate Music Pack Vol. 1 | Ovani Sound | Commercial royalty-free |
+

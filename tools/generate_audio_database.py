@@ -5,6 +5,10 @@ Indexes 3,763 licensed audio assets across 15 packs in D:\\Downloads\\Game_Audio
 Applies semantic subfolder matching, category affinity, duration constraints,
 negative noise filtering, and research-backed curated picks to deliver top-tier
 recommendations for all 87 game audio cues.
+
+Updated to accurately reflect current audio files used in Godot code (Audio.gd),
+including deployed licensed assets from CREDITS.md, active format resolution (.ogg > .wav),
+variants, layers, and synthesized placeholders.
 """
 
 import os
@@ -17,6 +21,9 @@ from pathlib import Path
 GAME_AUDIO_DIR = r"D:\Downloads\Game_Audio"
 WORKSPACE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROJECT_AUDIO_DIR = os.path.join(WORKSPACE_DIR, "game", "audio")
+CREDITS_PATH = os.path.join(PROJECT_AUDIO_DIR, "CREDITS.md")
+AUDIO_GD_PATH = os.path.join(WORKSPACE_DIR, "game", "scripts", "audio", "Audio.gd")
+EXPORT_PATH = os.path.join(WORKSPACE_DIR, "Plans", "Audio_Selection_Export.json")
 OUTPUT_JSON_PATH = os.path.join(WORKSPACE_DIR, "tools", "audio_review_data.json")
 
 # Structure of Sections and Cues from game/sim/AudioCueDoc.gd & Audio.gd
@@ -148,319 +155,319 @@ CUE_METADATA = {
         "bus": "SFX", "db": -6.0, "cooldown": 60, "layered": False, "has_variants": False,
         "trigger": "Buying staff retention in the Estate screen.",
         "ideal_duration": [0.3, 1.2],
-        "keywords": ["card deliver", "contract", "stamp", "signature", "paper", "lock", "select button", "clothesequip"],
-        "folder_affinities": ["SFX/Misc", "Books & Scrolls", "Select", "Bags"]
+        "keywords": ["card deliver 1", "paper", "contract", "seal", "stamp", "signature", "retain", "hire"],
+        "folder_affinities": ["SFX/Misc", "Select", "Coins"]
     },
     "milestone": {
         "bus": "SFX", "db": -2.0, "cooldown": 200, "layered": False, "has_variants": False,
-        "trigger": "A property crosses a count milestone (25, 50, 100...). Fires on crossing.",
-        "ideal_duration": [0.3, 1.8],
-        "keywords": ["scoreboard ding", "ding", "bell", "levelup", "chime", "achievement", "triumph", "reward"],
-        "folder_affinities": ["Buzzers and Boards", "Misc", "Events", "Buttons and Stingers"]
+        "trigger": "A property crosses a count milestone (25, 50, 100 …). Fires on the crossing.",
+        "ideal_duration": [0.3, 1.5],
+        "keywords": ["scoreboard ding", "ding", "bell", "chime", "levelup", "milestone", "triumph"],
+        "folder_affinities": ["Buzzers and Boards", "Buttons and Stingers", "Events", "Misc"]
     },
     "cycle_started": {
         "bus": "SFX", "db": -12.0, "cooldown": 60, "layered": False, "has_variants": False,
-        "trigger": "Tapping a STOPPED property to start one cycle by hand (machine turnover, not payout).",
-        "ideal_duration": [0.1, 0.5],
-        "keywords": ["hammer", "lever", "crank", "gear", "switch", "turn", "start", "ratchet", "open lock"],
-        "folder_affinities": ["FX", "Misc", "Click"]
+        "trigger": "Tapping a STOPPED property to start one cycle by hand (crank/turnover).",
+        "ideal_duration": [0.15, 0.6],
+        "keywords": ["hammer 1", "open lock 2", "ratchet", "crank", "click", "turnover", "start", "gear"],
+        "folder_affinities": ["FX", "Misc", "Steps"]
     },
     "frenzy_pop": {
         "bus": "SFX", "db": -2.0, "cooldown": 300, "layered": False, "has_variants": False,
         "trigger": "Popping the FRENZY meter.",
         "ideal_duration": [0.4, 2.0],
-        "keywords": ["fire", "ignite", "flame", "blast", "power", "siren sound", "frenzy", "burst"],
-        "folder_affinities": ["Fire", "Buzzers and Boards", "FX", "Generic"]
+        "keywords": ["fire 1", "siren sound", "pop", "burst", "ignition", "spark", "explosion", "frenzy", "power on"],
+        "folder_affinities": ["Fire", "Buzzers and Boards", "FX/Misc", "Misc"]
     },
     "frenzy_end": {
         "bus": "SFX", "db": -10.0, "cooldown": 300, "layered": False, "has_variants": False,
-        "trigger": "A frenzy burn runs out.",
+        "trigger": "A frenzy burn runs out. Smooth steam/gas dissipation.",
         "ideal_duration": [0.3, 1.5],
-        "keywords": ["steam", "cooldown", "hiss", "extinguish", "drain", "power down", "wind down", "fizzle", "exhaust"],
-        "folder_affinities": ["FX", "Tech and Mech", "Update"]
+        "keywords": ["decompression 2", "vent exhale", "steam", "hiss", "cooldown", "drain", "exhaust"],
+        "folder_affinities": ["FX", "Tech and Mech", "Misc"]
     },
 
     # Rush and Overdrive
     "overdrive_engage": {
         "bus": "SFX", "db": -3.0, "cooldown": 200, "layered": False, "has_variants": False,
-        "trigger": "The OVERDRIVE button engaged, ride begins.",
+        "trigger": "The OVERDRIVE button starts the high-speed ride.",
         "ideal_duration": [0.4, 1.8],
-        "keywords": ["computer on", "engine rev", "thruster", "boost", "engage", "ignition", "power on"],
-        "folder_affinities": ["FX", "Tech and Mech", "Start"]
+        "keywords": ["computer on", "saw loop", "engine start", "turbine", "whine", "power up", "alarm"],
+        "folder_affinities": ["FX", "Tech and Mech", "Misc"]
     },
     "vent_tick": {
         "bus": "SFX", "db": -12.0, "cooldown": 10, "layered": False, "has_variants": False,
         "trigger": "One per required lift, counted out the instant the vent window opens.",
-        "ideal_duration": [0.03, 0.25],
-        "keywords": ["pacer beeps", "pacer", "beep", "tick", "telegraph", "pip", "blip", "button 2", "timer"],
+        "ideal_duration": [0.03, 0.12],
+        "keywords": ["pacer beeps", "button 2", "pip", "blip", "tick", "beep", "telegraph", "punctuation"],
         "folder_affinities": ["Buzzers and Boards", "Buttons SFX Library", "FX"]
     },
     "vent_open": {
         "bus": "SFX", "db": -1.0, "cooldown": 100, "layered": False, "has_variants": False,
-        "trigger": "A vent window opens. Crucial gameplay telegraph to lift immediately.",
-        "ideal_duration": [0.2, 0.8],
-        "keywords": ["buzzer", "scoreboard buzzer", "communication receiving", "alert", "horn", "klaxon", "warning", "valve"],
+        "trigger": "A vent window opens — the most critical audio cue in the game.",
+        "ideal_duration": [0.15, 0.6],
+        "keywords": ["buzzer", "communication recieving", "horn", "klaxon", "alarm", "open", "vent"],
         "folder_affinities": ["Buzzers and Boards", "FX", "Tech and Mech"]
     },
     "vent_lift": {
         "bus": "SFX", "db": -6.0, "cooldown": 10, "layered": False, "has_variants": False,
         "trigger": "Each lift registered inside the window. Pitched up one whole tone per lift.",
-        "ideal_duration": [0.08, 0.5],
-        "keywords": ["elevator", "whoosh", "lift", "valve", "pump", "generic spell end", "piston", "air release"],
-        "folder_affinities": ["FX", "Generic", "Slide"]
+        "ideal_duration": [0.08, 0.45],
+        "keywords": ["elevator", "generic spell end", "lift", "whoosh", "pneumatic", "rise", "place diamond"],
+        "folder_affinities": ["FX", "Generic", "Building and Crafting Audio Bundle"]
     },
     "vent_success": {
         "bus": "SFX", "db": -2.0, "cooldown": 100, "layered": True, "has_variants": False,
         "trigger": "A vent completes in time. Intensity scales with vent tier reached.",
-        "ideal_duration": [0.4, 2.8],
-        "keywords": ["strong accept", "accept", "reward 2", "reward 1", "success", "chime", "complete"],
-        "folder_affinities": ["Tech and Mech", "Misc", "Events"]
+        "ideal_duration": [0.3, 1.6],
+        "keywords": ["strong accept", "reward 2", "chime", "vent clear", "success", "lock"],
+        "folder_affinities": ["Tech and Mech", "Misc", "FX"]
     },
     "vent_miss": {
         "bus": "SFX", "db": -4.0, "cooldown": 100, "layered": False, "has_variants": False,
-        "trigger": "The vent window closes unmet — fires just before overheat.",
-        "ideal_duration": [0.3, 1.5],
-        "keywords": ["strong deny", "deny", "wrong 1", "wrong 3", "error", "buzz", "fault", "miss"],
-        "folder_affinities": ["Tech and Mech", "Misc", "Cancel"]
+        "trigger": "The window closes unmet — fires just before overheat.",
+        "ideal_duration": [0.2, 0.9],
+        "keywords": ["strong deny", "wrong 1", "buzzer", "refusal", "miss", "fail"],
+        "folder_affinities": ["Tech and Mech", "Buzzers and Boards", "Misc"]
     },
     "overheat": {
         "bus": "SFX", "db": -2.0, "cooldown": 200, "layered": False, "has_variants": False,
         "trigger": "The ride ends in flames. Heat drains, rushing is locked out.",
-        "ideal_duration": [0.8, 4.0],
-        "keywords": ["decompression", "vent exhale", "exhaust", "steam", "explosion", "overheat", "sizzle"],
+        "ideal_duration": [0.8, 3.5],
+        "keywords": ["decompression 1", "vent exhale", "overheat", "steam blast", "burnout", "alarm", "explosion"],
         "folder_affinities": ["FX", "Tech and Mech", "Fire"]
     },
     "rush_ready": {
         "bus": "SFX", "db": -8.0, "cooldown": 100, "layered": False, "has_variants": False,
         "trigger": "The lockout ends and rushing is live again.",
         "ideal_duration": [0.2, 1.2],
-        "keywords": ["computer on", "scoreboard ding", "ready", "boot", "chime", "power on", "recharge"],
-        "folder_affinities": ["FX", "Buzzers and Boards", "Start"]
+        "keywords": ["computer on", "scoreboard ding", "ready", "charge", "recharge", "boot"],
+        "folder_affinities": ["FX", "Buzzers and Boards", "Misc"]
     },
     "heat_loop": {
-        "bus": "SFX", "db": -16.0, "cooldown": 0, "layered": False, "has_variants": False,
-        "trigger": "Continuous mechanical drone held while momentum/heat is active.",
-        "ideal_duration": [1.5, 30.0],
-        "keywords": ["truck gear idle", "gear loop", "engine loop", "idle loop", "hum loop", "electric loop", "motor"],
-        "folder_affinities": ["Update", "Electric", "FX"]
+        "bus": "Music", "db": -14.0, "cooldown": 0, "layered": False, "has_variants": False,
+        "trigger": "Continuous bass drone held throughout rush mode, pitch-shifted with heat.",
+        "ideal_duration": [1.5, 10.0],
+        "keywords": ["truck gear idle", "gear 3", "electric loop", "motor", "hum", "drone", "idle"],
+        "folder_affinities": ["Update", "FX", "Electric", "Misc"]
     },
     "urgency_loop": {
-        "bus": "SFX", "db": -14.0, "cooldown": 0, "layered": False, "has_variants": False,
-        "trigger": "Continuous rising tension sound held as heat approaches critical redline.",
-        "ideal_duration": [1.5, 30.0],
-        "keywords": ["saw loop", "pathetic alarm", "alarm loop", "tension loop", "siren loop", "urgency"],
-        "folder_affinities": ["FX", "Tech and Mech", "Update"]
+        "bus": "Music", "db": -16.0, "cooldown": 0, "layered": False, "has_variants": False,
+        "trigger": "Continuous warning pulsation rising in top 25% of heat gauge.",
+        "ideal_duration": [1.5, 10.0],
+        "keywords": ["saw loop", "pathetic alarm", "urgency", "pulse", "pulsation", "friction", "hazard"],
+        "folder_affinities": ["FX", "Tech and Mech", "Madness"]
     },
 
-    # Interface
+    # UI / Interface
     "tab_switch": {
         "bus": "UI", "db": -10.0, "cooldown": 60, "layered": False, "has_variants": False,
-        "trigger": "Changing tab, and only when the tab actually changes.",
-        "ideal_duration": [0.1, 0.4],
-        "keywords": ["slide button 13", "slide button", "slide", "switch", "tab", "swipe", "button 5"],
-        "folder_affinities": ["Slide", "Buttons and Stingers", "Click"]
+        "trigger": "Changing navigation tab in the bottom bar.",
+        "ideal_duration": [0.08, 0.35],
+        "keywords": ["slide button 13", "bullet impact 6", "button 5", "click", "slide", "tab", "switch"],
+        "folder_affinities": ["Slide", "Buttons and Stingers", "Click", "Weapons"]
     },
     "screen_open": {
         "bus": "UI", "db": -9.0, "cooldown": 100, "layered": False, "has_variants": False,
-        "trigger": "Opening a modal screen: About, Stats, Challenges, Help, Tuning.",
-        "ideal_duration": [0.2, 0.9],
-        "keywords": ["open drawer 2", "open drawer", "select button 1", "open", "popup", "expand", "drawer"],
-        "folder_affinities": ["Misc", "Select", "Buttons SFX Library"]
+        "trigger": "Opening a modal screen (Stats, Challenges, Help, About, Tuning).",
+        "ideal_duration": [0.15, 0.8],
+        "keywords": ["open drawer 2", "select button 1", "screen open", "whoosh", "panel open", "sheet"],
+        "folder_affinities": ["Misc", "Select", "Slide"]
     },
     "screen_close": {
         "bus": "UI", "db": -11.0, "cooldown": 100, "layered": False, "has_variants": False,
         "trigger": "Closing a modal screen.",
-        "ideal_duration": [0.2, 0.9],
-        "keywords": ["close drawer 3", "close drawer", "click button 6", "close", "cancel", "dismiss", "popdown"],
-        "folder_affinities": ["Misc", "Cancel", "Click"]
+        "ideal_duration": [0.12, 0.6],
+        "keywords": ["close drawer 2", "cancel button 1", "screen close", "slide back", "dismiss"],
+        "folder_affinities": ["Misc", "Cancel", "Slide"]
     },
     "mode_toggle": {
         "bus": "UI", "db": -12.0, "cooldown": 50, "layered": False, "has_variants": False,
-        "trigger": "The buy-mode or hire-mode toggle.",
-        "ideal_duration": [0.08, 0.35],
-        "keywords": ["click button 6", "click button 1", "click button", "toggle", "switch", "tick", "flick"],
-        "folder_affinities": ["Click", "Select", "Buttons and Stingers"]
+        "trigger": "The buy-mode (x1, x10, Next, Max) or hire-mode toggle.",
+        "ideal_duration": [0.05, 0.25],
+        "keywords": ["toggle button 6", "button 6", "switch", "toggle", "notch", "tick"],
+        "folder_affinities": ["Buttons SFX Library", "Misc", "Click"]
     },
     "epoch_page": {
         "bus": "UI", "db": -12.0, "cooldown": 50, "layered": False, "has_variants": False,
-        "trigger": "The epoch pager moves to another civilization.",
-        "ideal_duration": [0.1, 0.45],
-        "keywords": ["card deliver 1", "slide button 1", "page flip", "slide", "carousel", "flick"],
-        "folder_affinities": ["Slide", "SFX/Misc", "Books & Scrolls"]
+        "trigger": "Paging through epochs/civilizations in the Era carousel.",
+        "ideal_duration": [0.15, 0.6],
+        "keywords": ["slide button 10", "slide button", "page flip", "card swipe", "glide"],
+        "folder_affinities": ["Slide", "Buttons SFX Library", "Select"]
     },
     "make_contact": {
         "bus": "UI", "db": -1.0, "cooldown": 400, "layered": False, "has_variants": False,
-        "trigger": "The MAKE CONTACT button — the biggest action button in the game.",
-        "ideal_duration": [0.8, 3.0],
-        "keywords": ["teleportation", "beam me up", "select button 1", "warp", "contact", "portal", "light speed"],
-        "folder_affinities": ["FX", "Tech and Mech", "Select"]
+        "trigger": "The MAKE CONTACT button — the largest milestone action in the game.",
+        "ideal_duration": [0.6, 3.0],
+        "keywords": ["teleportation", "light speed", "contact", "cosmic", "hyperspace", "warp", "transmission"],
+        "folder_affinities": ["FX", "Space Audio Bundle", "Revive"]
     },
     "tip_appear": {
         "bus": "UI", "db": -12.0, "cooldown": 200, "layered": False, "has_variants": False,
-        "trigger": "A tutorial coach card appears.",
-        "ideal_duration": [0.15, 0.6],
-        "keywords": ["bubble button", "bubble", "pop", "tip", "notification", "hint", "chime", "appear"],
-        "folder_affinities": ["Bubble", "Misc", "Buttons SFX Library"]
+        "trigger": "A tutorial coach card or system tip appears on screen.",
+        "ideal_duration": [0.1, 0.6],
+        "keywords": ["bubble button 5", "bubble button", "pop", "tip", "notification", "blip"],
+        "folder_affinities": ["Bubble", "Buttons SFX Library", "Misc"]
     },
     "denied_cash": {
         "bus": "UI", "db": -10.0, "cooldown": 250, "layered": False, "has_variants": False,
-        "trigger": "Reserved: an action refused for want of money.",
+        "trigger": "An action refused due to insufficient cash.",
         "ideal_duration": [0.1, 0.5],
-        "keywords": ["wrong 1", "cancel button", "deny", "dull", "empty", "no", "buzz", "refuse"],
+        "keywords": ["wrong 1", "cancel button 1", "deny", "buzz", "refusal", "no funds"],
         "folder_affinities": ["Cancel", "Misc", "Tech and Mech"]
     },
     "denied_locked": {
         "bus": "UI", "db": -10.0, "cooldown": 250, "layered": False, "has_variants": False,
-        "trigger": "Reserved: an action refused because something is locked.",
-        "ideal_duration": [0.15, 0.6],
-        "keywords": ["close lock", "padlock", "lock", "chain", "rattle", "metal rattle", "locked"],
-        "folder_affinities": ["Misc", "FX", "Cancel"]
+        "trigger": "An action refused because an item is locked.",
+        "ideal_duration": [0.1, 0.5],
+        "keywords": ["wrong 3", "locked", "refusal", "padlock", "deny", "rattle"],
+        "folder_affinities": ["Cancel", "Misc", "Tech and Mech"]
     },
 
     # Challenge Mode
     "challenge_start": {
         "bus": "UI", "db": -6.0, "cooldown": 200, "layered": False, "has_variants": False,
-        "trigger": "Launching a game from the CHALLENGES screen.",
-        "ideal_duration": [0.4, 1.8],
-        "keywords": ["start gun", "whistle blow", "start button", "buzzer", "launch", "ready", "charge"],
-        "folder_affinities": ["Buzzers and Boards", "Whistle", "Start", "Buttons and Stingers"]
+        "trigger": "Launching a time-attack session from the Challenges screen.",
+        "ideal_duration": [0.3, 1.5],
+        "keywords": ["boxing bell fight start", "stinger 15", "gong", "challenge", "start gong", "whistle"],
+        "folder_affinities": ["Buzzers and Boards", "Buttons and Stingers", "Whistle"]
     },
     "challenge_credit": {
         "bus": "Ceremony", "db": -4.0, "cooldown": 400, "layered": False, "has_variants": False,
-        "trigger": "A challenge run ends and its score is credited.",
+        "trigger": "A challenge run ends and points/currency are credited.",
         "ideal_duration": [0.6, 2.5],
-        "keywords": ["coinbag", "coins pouring", "tally", "score count", "reward", "coins bag", "credit"],
-        "folder_affinities": ["Coins", "Events", "Misc", "Buttons and Stingers"]
+        "keywords": ["reward 1", "coins pouring", "tally", "score", "credit", "victory"],
+        "folder_affinities": ["Coins", "Events", "Misc"]
     },
     "challenge_tier": {
         "bus": "Ceremony", "db": -3.0, "cooldown": 400, "layered": False, "has_variants": False,
-        "trigger": "A challenge run climbs a tier of its ladder mid-run.",
-        "ideal_duration": [0.6, 2.2],
-        "keywords": ["stinger 15", "stinger 8", "levelup", "tier", "rank up", "fanfare", "chime"],
-        "folder_affinities": ["Buttons and Stingers", "Misc", "Bravery", "Revive"]
+        "trigger": "Climbing a tier in the challenge ladder mid-run.",
+        "ideal_duration": [0.4, 2.0],
+        "keywords": ["scoreboard ding", "levelup", "tier", "stinger", "fanfare", "climb"],
+        "folder_affinities": ["Buzzers and Boards", "Buttons and Stingers", "Events"]
     },
 
-    # Shared Minigames
+    # Minigames Shared
     "minigame_begin": {
         "bus": "UI", "db": -4.0, "cooldown": 200, "layered": False, "has_variants": False,
-        "trigger": "BEGIN on a minigame Get Ready gate — the round starts.",
+        "trigger": "BEGIN on a minigame's Get Ready gate — round start.",
         "ideal_duration": [0.3, 1.5],
-        "keywords": ["whistle blow normal", "start gun", "buzzer", "ready", "start button", "stinger"],
-        "folder_affinities": ["Whistle", "Buzzers and Boards", "Start", "Buttons and Stingers"]
+        "keywords": ["whistle blow normal", "referee whistle", "game whistle", "start whistle", "go"],
+        "folder_affinities": ["Whistle", "Buzzers and Boards"]
     },
     "minigame_score": {
         "bus": "SFX", "db": -8.0, "cooldown": 40, "layered": False, "has_variants": False,
         "trigger": "The player scores in any minigame (shared layer across all 6 games).",
-        "ideal_duration": [0.1, 0.45],
-        "keywords": ["scoreboard ding", "coin pickup", "ding", "score", "point", "hit", "ping", "reward"],
-        "folder_affinities": ["Buzzers and Boards", "Coins", "Misc", "Events"]
+        "ideal_duration": [0.15, 0.7],
+        "keywords": ["scoreboard ding", "point chime", "ding", "bell", "score", "swish hit"],
+        "folder_affinities": ["Buzzers and Boards", "Events", "Misc"]
     },
     "minigame_miss": {
         "bus": "SFX", "db": -7.0, "cooldown": 80, "layered": False, "has_variants": False,
-        "trigger": "A miss that costs challenge time (shared miss channel).",
-        "ideal_duration": [0.15, 0.6],
-        "keywords": ["wrong 1", "wrong 3", "buzzer", "miss", "error", "fail", "thud"],
-        "folder_affinities": ["Misc", "Buzzers and Boards", "Cancel", "Tech and Mech"]
+        "trigger": "A miss that costs challenge time in any minigame.",
+        "ideal_duration": [0.15, 0.7],
+        "keywords": ["scoreboard timer a", "timer tick", "buzzer", "miss", "dull clank"],
+        "folder_affinities": ["Buzzers and Boards", "Tech and Mech", "Misc"]
     },
     "minigame_countdown": {
         "bus": "UI", "db": -9.0, "cooldown": 250, "layered": False, "has_variants": False,
-        "trigger": "One per second over the last few seconds of the minigame clock.",
+        "trigger": "One per second over the last 5 seconds of the minigame clock.",
         "ideal_duration": [0.05, 0.25],
-        "keywords": ["scoreboard timer", "timer", "pacer beeps", "tick", "beep", "countdown", "clock"],
-        "folder_affinities": ["Buzzers and Boards", "Buttons SFX Library", "FX"]
+        "keywords": ["punctuation sound", "pacer beeps normal", "tick", "beep", "countdown", "blip"],
+        "folder_affinities": ["Buzzers and Boards", "Space Audio Bundle", "Buttons SFX Library"]
     },
     "minigame_best": {
         "bus": "Ceremony", "db": -3.0, "cooldown": 500, "layered": False, "has_variants": False,
-        "trigger": "The run passes the stored high score. Once per run.",
+        "trigger": "The run passes the stored all-time high score.",
         "ideal_duration": [0.8, 3.0],
-        "keywords": ["stinger 15", "stinger 8", "high score", "fanfare", "victory", "triumph", "record"],
-        "folder_affinities": ["Buttons and Stingers", "Bravery", "Events", "Misc"]
+        "keywords": ["stinger 15", "revive 3", "high score fanfare", "best", "triumph", "fanfare"],
+        "folder_affinities": ["Buttons and Stingers", "Revive", "Events"]
     },
     "minigame_over": {
         "bus": "UI", "db": -4.0, "cooldown": 500, "layered": False, "has_variants": False,
-        "trigger": "A minigame round or challenge run ends.",
-        "ideal_duration": [0.5, 2.5],
-        "keywords": ["whistle blow intense stop", "scoreboard buzzer", "soccer match end", "buzzer", "game over", "finish"],
-        "folder_affinities": ["Whistle", "Buzzers and Boards", "Events"]
+        "trigger": "A round or challenge run timer hits 0:00.",
+        "ideal_duration": [0.4, 2.0],
+        "keywords": ["scoreboard buzzer", "game buzzer", "round over", "horn", "final buzzer"],
+        "folder_affinities": ["Buzzers and Boards", "Whistle"]
     },
 
     # Basketball
     "bball_grab": {
         "bus": "SFX", "db": -16.0, "cooldown": 60, "layered": False, "has_variants": False,
-        "trigger": "A finger takes the ball and slingshot drag begins.",
-        "ideal_duration": [0.08, 0.4],
-        "keywords": ["court squeak generic", "court squeak", "court squeak sudden stop", "ball glove catch", "glove catch", "drag", "grab"],
-        "folder_affinities": ["Tennis", "Basketball", "Pool", "Baseball - Cricket", "Misc"]
+        "trigger": "A finger touches the ball and the slingshot drag begins.",
+        "ideal_duration": [0.05, 0.25],
+        "keywords": ["basketball grab", "leather squeak", "grip", "shoe squeak", "leather catch", "court squeak"],
+        "folder_affinities": ["Basketball", "Tennis", "Misc"]
     },
     "bball_launch": {
         "bus": "SFX", "db": -6.0, "cooldown": 60, "layered": False, "has_variants": False,
-        "trigger": "The throw is released. Scaled by pull force.",
-        "ideal_duration": [0.1, 0.5],
-        "keywords": ["throw in normal", "throw in long", "generic swing normal", "generic swing powerful", "swoosh", "throw", "release"],
-        "folder_affinities": ["Soccer", "Tennis", "Basketball", "Generic", "Wind"]
+        "trigger": "Throw released, scaled by pull force.",
+        "ideal_duration": [0.2, 0.9],
+        "keywords": ["ball throw fast", "throw", "whoosh", "launch", "release", "whip"],
+        "folder_affinities": ["Basketball", "Foley Sports", "FX"]
     },
     "bball_fizzle": {
         "bus": "SFX", "db": -14.0, "cooldown": 80, "layered": False, "has_variants": False,
-        "trigger": "Released under minimum pull — ball drops without throw.",
-        "ideal_duration": [0.1, 0.4],
-        "keywords": ["generic bounce distant", "ball sink distant", "ball roll", "drop", "plop", "soft bounce", "dull"],
-        "folder_affinities": ["Basketball", "Pool", "Soccer", "Misc"]
+        "trigger": "Released under minimum pull — ball drops feebly.",
+        "ideal_duration": [0.15, 0.6],
+        "keywords": ["scoreboard timer a", "fizzle", "drop", "plop", "fail", "soft bounce"],
+        "folder_affinities": ["Buzzers and Boards", "Pool", "Basketball"]
     },
     "bball_wall": {
         "bus": "SFX", "db": -12.0, "cooldown": 40, "layered": False, "has_variants": True,
-        "trigger": "The ball bounces off a side wall or ceiling.",
-        "ideal_duration": [0.08, 0.4],
-        "keywords": ["wall hit normal", "wall hit intense", "wall hit powerful", "padding on glass", "ball contact pad", "backboard", "bounce"],
-        "folder_affinities": ["Tennis", "Hockey", "Basketball", "Pool"]
+        "trigger": "Ball rebounds from side walls or ceiling.",
+        "ideal_duration": [0.1, 0.45],
+        "keywords": ["generic bounce normal", "bounce", "backboard", "wall rebound", "ball hit", "rebound"],
+        "folder_affinities": ["Basketball", "Foley Sports", "Tennis"]
     },
     "bball_floor": {
         "bus": "SFX", "db": -11.0, "cooldown": 40, "layered": False, "has_variants": True,
-        "trigger": "The ball lands on the hardwood gym floor.",
-        "ideal_duration": [0.08, 0.4],
-        "keywords": ["generic bounce normal", "generic bounce intense", "generic bounce distant", "ball kick normal", "dribble", "floor bounce"],
-        "folder_affinities": ["Basketball", "Soccer", "Tennis", "Pool"]
+        "trigger": "Ball hits hardwood court floor.",
+        "ideal_duration": [0.1, 0.45],
+        "keywords": ["generic bounce normal", "dribble", "floor bounce", "hardwood", "ball floor"],
+        "folder_affinities": ["Basketball", "Foley Sports"]
     },
     "bball_settle": {
         "bus": "SFX", "db": -18.0, "cooldown": 120, "layered": False, "has_variants": False,
-        "trigger": "The ball stops rolling and becomes throwable again.",
-        "ideal_duration": [0.1, 0.45],
-        "keywords": ["pitch movement ball rolling", "ball roll down bar", "generic bounce distant", "roll stop", "settle", "rest"],
-        "folder_affinities": ["Soccer", "Pool", "Basketball", "Misc"]
+        "trigger": "Ball rolls to a stop and becomes throwable again.",
+        "ideal_duration": [0.1, 0.5],
+        "keywords": ["basketball settle", "ball roll", "settle", "soft stop", "roll"],
+        "folder_affinities": ["Basketball", "Pool", "Misc"]
     },
     "bball_rim": {
         "bus": "SFX", "db": -8.0, "cooldown": 50, "layered": False, "has_variants": False,
-        "trigger": "Clipping a rim post — the rim-out.",
-        "ideal_duration": [0.1, 0.5],
-        "keywords": ["generic net hit intense", "field goal kick goalpost", "generic net hit normal", "metal clang", "rim hit", "clank", "pole hit"],
-        "folder_affinities": ["Basketball", "Football - Rugby", "Hockey", "FX"]
+        "trigger": "Ball clips the metal hoop rim.",
+        "ideal_duration": [0.15, 0.6],
+        "keywords": ["generic net hit intense", "field goal kick goalpost", "rim", "iron", "clang", "hoop strike"],
+        "folder_affinities": ["Basketball", "Football - Rugby", "Foley Sports"]
     },
     "bball_score": {
         "bus": "SFX", "db": -5.0, "cooldown": 120, "layered": False, "has_variants": False,
-        "trigger": "A made basket. Layers over shared minigame_score.",
+        "trigger": "Basket made (hits rim and net). Layers over minigame_score.",
         "ideal_duration": [0.2, 0.8],
-        "keywords": ["in the net a", "in the net b", "generic net hit normal", "generic net swoosh", "basket", "net score"],
-        "folder_affinities": ["Basketball", "Soccer", "Buzzers and Boards"]
+        "keywords": ["in the net a", "in the net b", "generic net hit normal", "basket", "made shot", "net"],
+        "folder_affinities": ["Basketball", "Foley Sports"]
     },
     "bball_swish": {
         "bus": "SFX", "db": -3.0, "cooldown": 120, "layered": False, "has_variants": False,
-        "trigger": "A clean centered drop — the gold SWISH! Layers over minigame_score.",
+        "trigger": "Clean center drop with no rim contact — golden SWISH!",
         "ideal_duration": [0.3, 1.2],
-        "keywords": ["net swoosh intense", "net swoosh normal", "generic net swoosh", "in the net a", "clean net", "swish", "nylon"],
-        "folder_affinities": ["Basketball", "Generic", "Wind"]
+        "keywords": ["net swoosh intense", "net swoosh normal", "generic net swoosh", "swish", "nylon", "swoosh"],
+        "folder_affinities": ["Basketball", "Foley Sports"]
     },
     "bball_gem_through": {
         "bus": "SFX", "db": -8.0, "cooldown": 120, "layered": False, "has_variants": False,
         "trigger": "The ball passes through the Legacy gem. A promise, not yet a payout.",
         "ideal_duration": [0.2, 0.7],
-        "keywords": ["crystal", "jewel", "gem", "glass touch", "shimmer", "sparkle", "ping"],
+        "keywords": ["gem1", "crystal", "jewel", "gem", "glass touch", "shimmer", "sparkle", "ping"],
         "folder_affinities": ["Jewels & Runes", "Generic", "Misc"]
     },
     "bball_gem_earned": {
         "bus": "Ceremony", "db": -4.0, "cooldown": 400, "layered": False, "has_variants": False,
-        "trigger": "Shot passed through gem AND scored — rarest basketball outcome, pays Legacy.",
+        "trigger": "Shot passed through gem AND scored — pays Legacy.",
         "ideal_duration": [0.8, 3.0],
         "keywords": ["revive 3", "stinger 15", "gem", "magic reward", "crystal chime", "legacy fanfare"],
-        "folder_affinities": ["Revive", "Buttons and Stingers", "Jewels & Runes", "Bravery"]
+        "folder_affinities": ["Revive", "Buttons and Stingers", "Jewels & Runes"]
     },
 
     # Match Three
@@ -468,7 +475,7 @@ CUE_METADATA = {
         "bus": "SFX", "db": -16.0, "cooldown": 50, "layered": False, "has_variants": False,
         "trigger": "A gem is picked up — the drag begins.",
         "ideal_duration": [0.05, 0.25],
-        "keywords": ["click button 6", "select button 4", "crystal tap", "gem click", "glass touch", "select", "bead"],
+        "keywords": ["click button 6", "select button 4", "crystal tap", "gem click", "glass touch", "select"],
         "folder_affinities": ["Click", "Select", "Jewels & Runes", "Misc"]
     },
     "m3_swap": {
@@ -503,7 +510,7 @@ CUE_METADATA = {
         "bus": "SFX", "db": -5.0, "cooldown": 150, "layered": False, "has_variants": False,
         "trigger": "A match that hit the AVOID gem — the main hazard penalty.",
         "ideal_duration": [0.3, 1.2],
-        "keywords": ["pathetic alarm", "alarm 1", "wrong 3", "dark magic", "curse", "poison", "hazard", "shock"],
+        "keywords": ["pathetic alarm", "alarm 1", "wrong 3", "dark magic", "curse", "hazard", "shock"],
         "folder_affinities": ["Tech and Mech", "Misc", "Madness", "Venom"]
     },
     "m3_legacy": {
@@ -533,19 +540,19 @@ CUE_METADATA = {
         "bus": "Ceremony", "db": -4.0, "cooldown": 300, "layered": False, "has_variants": False,
         "trigger": "The JACKPOT Legacy coin caught — pays dynasty points.",
         "ideal_duration": [0.6, 2.5],
-        "keywords": ["coinpouring3", "coinbag3", "coins bag 2", "jackpot", "coin shower", "fortune", "legacy chime"],
+        "keywords": ["coinpouring3", "coinbag3", "coins bag 2", "jackpot", "coin shower", "fortune"],
         "folder_affinities": ["Coins", "SFX/Misc", "Generic"]
     },
     "catch_miss": {
         "bus": "SFX", "db": -12.0, "cooldown": 60, "layered": False, "has_variants": False,
         "trigger": "A coin reaches floor uncaught.",
         "ideal_duration": [0.1, 0.45],
-        "keywords": ["coin drop", "ball sink", "floor bounce", "clatter", "miss", "lost coin"],
+        "keywords": ["coinpickup3", "ball sink", "floor bounce", "clatter", "miss", "lost coin"],
         "folder_affinities": ["Coins", "Pool", "Misc"]
     },
     "catch_spawn": {
         "bus": "SFX", "db": -22.0, "cooldown": 25, "layered": False, "has_variants": False,
-        "trigger": "A coin appears at the top. Quiet, makes spawn rate audible.",
+        "trigger": "A coin appears at top. Quiet, makes spawn rate audible.",
         "ideal_duration": [0.04, 0.18],
         "keywords": ["bubble button 5", "bubble button", "button 6", "soft pop", "blip", "spawn", "light tick"],
         "folder_affinities": ["Bubble", "Buttons SFX Library", "Misc"]
@@ -563,7 +570,7 @@ CUE_METADATA = {
         "bus": "SFX", "db": -4.0, "cooldown": 200, "layered": False, "has_variants": False,
         "trigger": "The whole sequence recalled correctly.",
         "ideal_duration": [0.4, 1.8],
-        "keywords": ["reward 1", "reward 2", "reward 3", "success tune", "arpeggio", "sequence clear", "correct"],
+        "keywords": ["reward 1", "reward 2", "reward 3", "success tune", "arpeggio", "sequence clear"],
         "folder_affinities": ["Misc", "Events", "Buttons and Stingers"]
     },
     "mem_wrong": {
@@ -586,431 +593,395 @@ CUE_METADATA = {
         "bus": "SFX", "db": -9.0, "cooldown": 150, "layered": False, "has_variants": False,
         "trigger": "The beam crosses INTO the scoring zone.",
         "ideal_duration": [0.1, 0.5],
-        "keywords": ["slide button 13", "hum on", "zone enter", "lock", "chime in", "activate", "resonance in"],
+        "keywords": ["slide button 13", "hum on", "zone enter", "lock", "chime in", "activate"],
         "folder_affinities": ["Slide", "FX", "Electric", "Misc"]
     },
     "bal_leave": {
         "bus": "SFX", "db": -11.0, "cooldown": 150, "layered": False, "has_variants": False,
         "trigger": "The beam drifts back out of the scoring zone.",
         "ideal_duration": [0.1, 0.5],
-        "keywords": ["click button 6", "hum off", "zone exit", "dissipate", "fade tone", "resonance out"],
+        "keywords": ["click button 6", "hum off", "zone exit", "dissipate", "fade tone"],
         "folder_affinities": ["Click", "Cancel", "FX"]
     },
     "bal_lift": {
         "bus": "SFX", "db": -16.0, "cooldown": 80, "layered": False, "has_variants": False,
-        "trigger": "The lift button is pressed to pulse the beam.",
-        "ideal_duration": [0.05, 0.25],
-        "keywords": ["button 2", "thruster puff", "air pulse", "lift pulse", "short click", "blip"],
-        "folder_affinities": ["FX", "Buttons SFX Library", "Misc"]
+        "trigger": "The lift impulse button is pressed.",
+        "ideal_duration": [0.08, 0.4],
+        "keywords": ["elevator", "pneumatic pulse", "lift", "thrust", "puff"],
+        "folder_affinities": ["FX", "Tech and Mech"]
     },
     "bal_gem": {
         "bus": "Ceremony", "db": -4.0, "cooldown": 300, "layered": False, "has_variants": False,
-        "trigger": "A Legacy gem earned by holding the zone long enough.",
+        "trigger": "A Legacy gem earned by maintaining the zone balance.",
         "ideal_duration": [0.6, 2.5],
-        "keywords": ["revive 3", "reward 1", "shimmer", "gem earned", "harmony", "legacy reward"],
-        "folder_affinities": ["Revive", "Events", "Misc", "Jewels & Runes"]
+        "keywords": ["revive 3", "generic spell summon", "crystal chime", "sparkle", "gem reward"],
+        "folder_affinities": ["Revive", "Generic", "Jewels & Runes"]
     },
 
     # Timing Bar
     "time_lock_hit": {
         "bus": "SFX", "db": -5.0, "cooldown": 80, "layered": False, "has_variants": False,
-        "trigger": "A lock inside the target zone on the oscillating timing bar.",
+        "trigger": "Locking the moving needle inside the target zone.",
         "ideal_duration": [0.15, 0.6],
-        "keywords": ["strong accept", "target hit", "bullseye", "heavy lock", "snap", "latch", "lock 2"],
-        "folder_affinities": ["Tech and Mech", "Misc", "FX"]
+        "keywords": ["strong accept", "reward 2", "chime", "lock hit", "target hit", "bullseye"],
+        "folder_affinities": ["Tech and Mech", "Misc", "Events"]
     },
     "time_lock_miss": {
         "bus": "SFX", "db": -8.0, "cooldown": 80, "layered": False, "has_variants": False,
-        "trigger": "A lock outside the target zone.",
+        "trigger": "Locking outside the target zone.",
         "ideal_duration": [0.1, 0.45],
-        "keywords": ["strong deny", "wrong 1", "miss click", "metal glancing", "off target", "ricochet"],
-        "folder_affinities": ["Tech and Mech", "Misc", "Cancel"]
+        "keywords": ["wrong 1", "strong deny", "buzzer", "lock miss", "off target"],
+        "folder_affinities": ["Misc", "Tech and Mech", "Cancel"]
     },
     "time_gem": {
         "bus": "Ceremony", "db": -4.0, "cooldown": 300, "layered": False, "has_variants": False,
-        "trigger": "A lock that also collected the pending Legacy gem.",
+        "trigger": "A lock that collects the pending Legacy gem.",
         "ideal_duration": [0.6, 2.5],
-        "keywords": ["revive 3", "crystal target", "perfect lock", "gem reward", "magic bell"],
-        "folder_affinities": ["Revive", "Jewels & Runes", "Events"]
+        "keywords": ["revive 3", "generic spell summon", "crystal stinger", "gem fanfare"],
+        "folder_affinities": ["Revive", "Generic", "Jewels & Runes"]
     },
 
     # Ceremony
     "ceremony_obituary": {
         "bus": "Ceremony", "db": -3.0, "cooldown": 800, "layered": False, "has_variants": False,
-        "trigger": "The succession obituary card appears.",
-        "ideal_duration": [2.0, 8.0],
-        "keywords": ["bell 1", "bell 2", "funeral bell", "deep toll", "gong", "church bell", "solemn chime"],
-        "folder_affinities": ["SFX/Misc", "Misc", "Events"]
+        "trigger": "The succession's obituary card reveals the departed patriarch.",
+        "ideal_duration": [1.5, 8.0],
+        "keywords": ["bell 1", "bell 2", "bell toll", "solemn stinger", "church bell", "death stinger"],
+        "folder_affinities": ["Misc", "Buttons and Stingers", "Revive"]
     },
     "ceremony_will": {
         "bus": "Ceremony", "db": -6.0, "cooldown": 800, "layered": False, "has_variants": False,
-        "trigger": "The reading of the tycoon's will.",
-        "ideal_duration": [1.5, 6.0],
-        "keywords": ["card deliver 1", "card deliver 2", "paper unfold", "parchment", "wax seal", "legal tone", "bookopen"],
-        "folder_affinities": ["SFX/Misc", "Books & Scrolls", "Bags"]
+        "trigger": "The reading and opening of the last will and testament.",
+        "ideal_duration": [0.3, 1.5],
+        "keywords": ["card deliver 1", "bookopen1", "parchment", "document", "will open", "legal"],
+        "folder_affinities": ["SFX/Misc", "Books & Scrolls", "Select"]
     },
     "ceremony_heir": {
         "bus": "Ceremony", "db": -2.0, "cooldown": 800, "layered": False, "has_variants": False,
-        "trigger": "The heir reveal — the bloodline continues.",
-        "ideal_duration": [2.0, 7.0],
-        "keywords": ["revive 3", "stinger 15", "triumph", "majestic fanfare", "rebirth", "dynasty"],
-        "folder_affinities": ["Revive", "Buttons and Stingers", "Bravery"]
+        "trigger": "The heir reveal — the dynasty continues into the next generation.",
+        "ideal_duration": [1.2, 7.0],
+        "keywords": ["revive 3", "stinger 15", "heir fanfare", "triumph", "continuation", "dynasty stinger"],
+        "folder_affinities": ["Revive", "Buttons and Stingers", "Events"]
     },
     "ceremony_contact": {
         "bus": "Ceremony", "db": -4.0, "cooldown": 800, "layered": False, "has_variants": False,
-        "trigger": "A First Contact alien card opens.",
-        "ideal_duration": [2.0, 7.0],
-        "keywords": ["generic spell summon", "teleportation", "light speed", "beam me up", "alien portal", "cosmic"],
-        "folder_affinities": ["Generic", "FX", "Tech and Mech"]
+        "trigger": "First Contact ceremony card opens for an alien civilization.",
+        "ideal_duration": [1.5, 7.0],
+        "keywords": ["generic spell summon 1", "light speed", "alien contact", "cosmic arrival", "warp tone"],
+        "folder_affinities": ["Generic", "Space Audio Bundle", "Revive"]
     },
     "ceremony_contact_reveal": {
         "bus": "Ceremony", "db": -2.0, "cooldown": 800, "layered": False, "has_variants": False,
-        "trigger": "The alien civilization's name lands on the card.",
-        "ideal_duration": [1.5, 5.0],
-        "keywords": ["communication receiving 2", "incoming transmission c", "stinger 15", "stinger 8", "synth swell"],
-        "folder_affinities": ["FX", "Tech and Mech", "Buttons and Stingers"]
+        "trigger": "The civilization's name and portrait land on the card.",
+        "ideal_duration": [0.5, 2.5],
+        "keywords": ["communication recieving 2", "incoming transmission c", "stinger 8", "decode", "reveal"],
+        "folder_affinities": ["Space Audio Bundle", "Tech and Mech", "Buttons and Stingers"]
     },
     "ceremony_fanfare": {
         "bus": "Ceremony", "db": -2.0, "cooldown": 800, "layered": False, "has_variants": False,
-        "trigger": "Major celebratory milestones and prestige fanfare.",
-        "ideal_duration": [1.5, 6.0],
-        "keywords": ["stinger 15", "stinger 8", "stinger 14", "brass fanfare", "victory", "triumph"],
-        "folder_affinities": ["Buttons and Stingers", "Bravery", "Events"]
+        "trigger": "Major generational milestone achievement fanfare.",
+        "ideal_duration": [1.0, 4.0],
+        "keywords": ["stinger 15", "stinger 8", "triumph fanfare", "victory brass", "americana celebration"],
+        "folder_affinities": ["Buttons and Stingers", "Events"]
     },
     "ceremony_power_down": {
         "bus": "Ceremony", "db": -4.0, "cooldown": 800, "layered": False, "has_variants": False,
-        "trigger": "Transition into succession or reset sequence.",
-        "ideal_duration": [1.0, 4.5],
-        "keywords": ["decompression 1", "decompression 2", "power down", "shut down", "turbine fade", "system offline"],
-        "folder_affinities": ["FX", "Tech and Mech"]
+        "trigger": "Machine and city systems shutting down for succession handover.",
+        "ideal_duration": [0.8, 3.5],
+        "keywords": ["decompression 1", "decompression 2", "power down", "turbine off", "dissipate"],
+        "folder_affinities": ["Space Audio Bundle", "Tech and Mech"]
     },
     "legacy_purchase": {
         "bus": "Ceremony", "db": -6.0, "cooldown": 300, "layered": False, "has_variants": False,
-        "trigger": "Buying a permanent Legacy upgrade in the Estate shop.",
-        "ideal_duration": [1.0, 5.0],
-        "keywords": ["generic spell summon", "coins bag 2", "strong accept", "magic upgrade", "divine blessing"],
-        "folder_affinities": ["Generic", "SFX/Misc", "Tech and Mech", "Revive"]
+        "trigger": "Buying a permanent Legacy / Dynasty upgrade in the Estate shop.",
+        "ideal_duration": [0.8, 4.0],
+        "keywords": ["generic spell summon 1", "coins bag 2", "legacy unlock", "dynasty purchase", "power"],
+        "folder_affinities": ["Generic", "SFX/Misc", "Coins"]
     },
     "welcome_back": {
         "bus": "Ceremony", "db": -4.0, "cooldown": 800, "layered": False, "has_variants": False,
-        "trigger": "The welcome-back pile after time away.",
-        "ideal_duration": [2.0, 8.5],
-        "keywords": ["coinpouring3", "heal 9", "coinbag3", "cash flood", "wealth return", "tally"],
-        "folder_affinities": ["Coins", "Heal", "Bags"]
+        "trigger": "The welcome-back overlay celebrating offline earnings collected.",
+        "ideal_duration": [1.5, 8.0],
+        "keywords": ["coinpouring3", "heal 9", "offline cash cascade", "fortune", "wealth shower"],
+        "folder_affinities": ["Coins", "Heal", "Generic"]
     },
     "prestige_confirm": {
         "bus": "Ceremony", "db": -2.0, "cooldown": 800, "layered": False, "has_variants": False,
-        "trigger": "PASS THE TORCH confirmed, just before succession screens take over.",
-        "ideal_duration": [1.5, 6.0],
-        "keywords": ["boxing bell fight start", "stinger 15", "bell 1", "gong", "torch ignite", "grand transition"],
-        "folder_affinities": ["Buzzers and Boards", "Buttons and Stingers", "SFX/Misc"]
+        "trigger": "PASS THE TORCH is confirmed, handing over the empire.",
+        "ideal_duration": [0.8, 3.0],
+        "keywords": ["boxing bell fight start", "stinger 15", "pass the torch", "transition bell", "confirm"],
+        "folder_affinities": ["Buzzers and Boards", "Buttons and Stingers"]
     },
 
-    # Music Tracks
+    # Music Bands
     "band_0_blue_collar": {
         "bus": "Music", "db": -6.0, "cooldown": 0, "layered": False, "has_variants": False,
-        "trigger": "Earth, Blue Collar (Tier 1) — department-store muzak, thin arrangement.",
-        "ideal_duration": [60.0, 180.0],
-        "keywords": ["intensity 1", "coffee time", "corporate", "jazz velvet lounge", "acoustic", "muzak"],
+        "trigger": "Epochs 1-2 (Tiers 0-1): Blue collar acoustic department-store muzak.",
+        "ideal_duration": [40.0, 180.0],
+        "keywords": ["corporate coffee time intensity 1", "jazz velvet lounge intensity 1", "blue collar muzak"],
         "folder_affinities": ["Corporate Music Pack Vol. 1", "Jazz Music Pack"]
     },
     "band_1_white_collar": {
         "bus": "Music", "db": -6.0, "cooldown": 0, "layered": False, "has_variants": False,
-        "trigger": "Earth, White Collar (Tier 2) — the same tune, fuller mix. Promotion audible.",
-        "ideal_duration": [60.0, 180.0],
-        "keywords": ["main", "coffee time", "corporate", "cheerful whistle", "full mix", "strings", "promotion"],
-        "folder_affinities": ["Corporate Music Pack Vol. 1", "Jazz Music Pack"]
+        "trigger": "Epoch 3 (Tier 2): White collar promotion — full orchestra strings arrangement of the theme.",
+        "ideal_duration": [40.0, 180.0],
+        "keywords": ["corporate coffee time main", "corporate cheerful whistle main", "executive muzak"],
+        "folder_affinities": ["Corporate Music Pack Vol. 1"]
     },
     "band_2_early_contact": {
         "bus": "Music", "db": -6.0, "cooldown": 0, "layered": False, "has_variants": False,
-        "trigger": "Early contact (Tiers 3–11) — melody survives, synths and theremin creep in.",
-        "ideal_duration": [60.0, 180.0],
-        "keywords": ["ethereal", "air flows", "space", "synth", "cosmic", "ambient", "electronic loop"],
+        "trigger": "Tiers 3-11: First alien civilizations — melody carries over with ethereal synth pads.",
+        "ideal_duration": [40.0, 180.0],
+        "keywords": ["ethereal vol3 air flows", "space 1", "early contact ambience", "space synth"],
         "folder_affinities": ["Ethereal Music Pack Vol. 3", "Space Audio Bundle"]
     },
     "band_3_mid": {
         "bus": "Music", "db": -6.0, "cooldown": 0, "layered": False, "has_variants": False,
-        "trigger": "Mid alien contact (Tiers 12–19) — fewer Earth instruments left.",
-        "ideal_duration": [60.0, 180.0],
-        "keywords": ["ethereal", "mystics", "eastern", "exotic", "hypnotic", "alien drone"],
+        "trigger": "Tiers 12-19: Galactic federation — exotic scales and non-Western harmonic textures.",
+        "ideal_duration": [40.0, 180.0],
+        "keywords": ["ethereal vol3 mystics", "eastern mysterious land main", "galactic synth"],
         "folder_affinities": ["Ethereal Music Pack Vol. 3", "Eastern Music Pack"]
     },
     "band_4_deep": {
         "bus": "Music", "db": -6.0, "cooldown": 0, "layered": False, "has_variants": False,
-        "trigger": "Deep cosmos (Tiers 20–27) — recognizable, but barely of this world.",
-        "ideal_duration": [60.0, 180.0],
-        "keywords": ["ethereal", "direct sunlight", "winds of time", "deep space", "synthetic", "celestial"],
+        "trigger": "Tiers 20+: Deep cosmos void — ethereal, transcendent cosmic soundscapes.",
+        "ideal_duration": [40.0, 180.0],
+        "keywords": ["ethereal vol3 direct sunlight", "ethereal vol3 winds of time", "deep space void"],
         "folder_affinities": ["Ethereal Music Pack Vol. 3"]
     },
+
+    # Settings
     "music_preview": {
         "bus": "Music", "db": -4.0, "cooldown": 200, "layered": False, "has_variants": False,
-        "trigger": "Releasing the MUSIC slider in Settings.",
-        "ideal_duration": [0.5, 3.0],
-        "keywords": ["stinger 15", "stinger 8", "preview", "music chord", "short chord"],
-        "folder_affinities": ["Buttons and Stingers", "Corporate Music Pack Vol. 1"]
+        "trigger": "Releasing the MUSIC slider in Settings screen.",
+        "ideal_duration": [0.4, 2.0],
+        "keywords": ["stinger 15", "reward 1", "music stinger", "chime"],
+        "folder_affinities": ["Buttons and Stingers", "Misc"]
     }
 }
 
-# Curated High-Confidence Picks from Plans/Audio_Asset_Selection.md & Audio README
+# Deployed / Sourced Cues from CREDITS.md & deploy_audio_selections.py
+DEPLOYED_LIBRARY_PATHS = {
+    "tap_note": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Button 6.wav",
+    "buy_success": "inventorysfxbundle_audio/inventorysfxbundle/Assets/Coins/CoinFlip6.mp3",
+    "hire_first": "buildingandcraftingaudiobundle/Building and Crafting Audio Bundle/WAV/FX/Craft Button 2.wav",
+    "hire_levelled": "buildingandcraftingaudiobundle/Building and Crafting Audio Bundle/WAV/FX/Mining (diamond) 1.wav",
+    "retain_staff": "inventorysfxbundle_audio/inventorysfxbundle/Assets/Coins/CoinFlip5.mp3",
+    "cycle_started": "westernaudiobundle/Western Audio Bundle/WAV/SFX/Steps/Horse (sand) 1.wav",
+    "frenzy_pop": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Lever 3 (Power On).wav",
+    "overdrive_engage": "puzzleaudiokit/Puzzle Audio Bundle/MP3/FX/Misc/Clock Alarm 1 (loop).mp3",
+    "vent_tick": "spaceaudiobundle/Space Audio Bundle/WAV/FX/Puntuation Sound.wav",
+    "vent_open": "spaceaudiobundle/Space Audio Bundle/WAV/FX/Button 2.wav",
+    "vent_lift": "buildingandcraftingaudiobundle/Building and Crafting Audio Bundle/WAV/FX/Place Diamond.wav",
+    "vent_success": "spaceaudiobundle/Space Audio Bundle/WAV/FX/Communication Recieving 2.wav",
+    "vent_miss": "Foley Sports Sound FX Pack/Foley Sports/Buzzers and Boards/Buzzer.wav",
+    "overheat": "spaceaudiobundle/Space Audio Bundle/MP3/FX/Decompression 2.mp3",
+    "rush_ready": "Foley Sports Sound FX Pack/Foley Sports/Buzzers and Boards/Scoreboard Ding.wav",
+    "heat_loop": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Gear 3 (loop).wav",
+    "tab_switch": "westernaudiobundle/Western Audio Bundle/WAV/SFX/Weapons/Bullet impact 6.wav",
+    "mode_toggle": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Button 6.wav",
+    "epoch_page": "buttonssfxlibrary/Buttons SFX Library/WAV/Slide/Slide Button 10.wav",
+    "make_contact": "spaceaudiobundle/Space Audio Bundle/WAV/FX/Teleportation.wav",
+    "tip_appear": "buttonssfxlibrary/Buttons SFX Library/WAV/Bubble/Bubble Button 5.wav",
+    "minigame_begin": "Foley Sports Sound FX Pack/Foley Sports/Whistle/Whistle Blow Normal.wav",
+    "minigame_score": "Foley Sports Sound FX Pack/Foley Sports/Buzzers and Boards/Scoreboard Ding.wav",
+    "minigame_miss": "Foley Sports Sound FX Pack/Foley Sports/Buzzers and Boards/Scoreboard Timer A.wav",
+    "minigame_countdown": "spaceaudiobundle/Space Audio Bundle/WAV/FX/Puntuation Sound.wav",
+    "minigame_over": "Foley Sports Sound FX Pack/Foley Sports/Buzzers and Boards/Scoreboard Buzzer.wav",
+    "bball_launch": "Foley Sports Sound FX Pack/Foley Sports/Basketball/Ball Throw Fast.wav",
+    "bball_fizzle": "Foley Sports Sound FX Pack/Foley Sports/Buzzers and Boards/Scoreboard Timer A.wav",
+    "bball_wall": "Foley Sports Sound FX Pack/Foley Sports/Basketball/Generic Bounce Normal.wav",
+    "bball_swish": "Foley Sports Sound FX Pack/Foley Sports/Basketball/Net Swoosh Normal.wav"
+}
+
+# Curated recommendations for unassigned cues or alternative options
 CURATED_PICKS = {
-    # Core Loop
+    # Core Loop alternatives
     "tap_note": [
-        {"path": "Foley Sports Sound FX Pack/Foley Sports/Buzzers and Boards/Scoreboard Counter A.wav", "role": "primary", "note": "Adding-machine mechanical tally tick under 200ms (0.142s)"},
-        {"path": "Foley Sports Sound FX Pack/Foley Sports/Buzzers and Boards/Scoreboard Counter B.wav", "role": "variant_1", "note": "Alternating tick variant to mask pitch-shift (0.181s)"},
-        {"path": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Button 6.wav", "role": "candidate", "note": "Electronic blip alternate (0.099s)"},
-        {"path": "buttonssfxlibrary/Buttons SFX Library/WAV/Click/Click Button 6.wav", "role": "candidate", "note": "Crisp tactile button click"}
+        {"path": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Button 6.wav", "role": "primary", "note": "Active in Godot code (0.099s)"},
+        {"path": "Foley Sports Sound FX Pack/Foley Sports/Buzzers and Boards/Scoreboard Counter A.wav", "role": "candidate", "note": "Mechanical tally tick (0.142s)"},
+        {"path": "buttonssfxlibrary/Buttons SFX Library/WAV/Click/Click Button 6.wav", "role": "candidate", "note": "Tactile click alternate"}
     ],
     "buy_success": [
-        {"path": "westernaudiobundle/Western Audio Bundle/WAV/SFX/Misc/Coins Bag 1.wav", "role": "primary", "note": "Quiet metallic cash base texture (0.565s)"},
-        {"path": "westernaudiobundle/Western Audio Bundle/WAV/SFX/Misc/Coins Bag 2.wav", "role": "layer", "note": "Bright celebratory layer for big income moves (1.144s)"},
-        {"path": "buildingandcraftingaudiobundle/Building and Crafting Audio Bundle/WAV/FX/Coin 4.wav", "role": "candidate", "note": "Clean coin clink alternate (0.500s)"},
-        {"path": "buildingandcraftingaudiobundle/Building and Crafting Audio Bundle/WAV/FX/Coins 2.wav", "role": "candidate", "note": "Multiple coin rattle alternate (0.950s)"},
-        {"path": "inventorysfxbundle_audio/inventorysfxbundle/Assets/Coins/CoinBag2.mp3", "role": "candidate", "note": "Heavy purse buy alternate"}
-    ],
-    "hire_first": [
-        {"path": "buildingandcraftingaudiobundle/Building and Crafting Audio Bundle/WAV/FX/Create Engineer.wav", "role": "primary", "note": "First staffer acquisition — craftsman sound (0.774s)"},
-        {"path": "westernaudiobundle/Western Audio Bundle/WAV/Buttons and Stingers/Stinger 15.wav", "role": "candidate", "note": "Americana brass/guitar stinger alternate (1.659s)"}
-    ],
-    "hire_levelled": [
-        {"path": "buildingandcraftingaudiobundle/Building and Crafting Audio Bundle/WAV/FX/Create Human Female.wav", "role": "primary", "note": "Lighter weight upgrade in same sample family (0.304s)"},
-        {"path": "buildingandcraftingaudiobundle/Building and Crafting Audio Bundle/WAV/FX/Create Human Male.wav", "role": "variant_1", "note": "Companion staff level-up variant"},
-        {"path": "buildingandcraftingaudiobundle/Building and Crafting Audio Bundle/WAV/FX/Create Robot 1.wav", "role": "candidate", "note": "Tech/engineer staff upgrade alternate (0.485s)"}
-    ],
-    "retain_staff": [
-        {"path": "westernaudiobundle/Western Audio Bundle/WAV/SFX/Misc/Card Deliver 1.wav", "role": "primary", "note": "Contract signature / paper delivery (0.534s)"},
-        {"path": "buttonssfxlibrary/Buttons SFX Library/WAV/Select/Select Button 1.wav", "role": "candidate", "note": "Major executive agreement select"}
+        {"path": "inventorysfxbundle_audio/inventorysfxbundle/Assets/Coins/CoinFlip6.mp3", "role": "primary", "note": "Active in Godot code (0.867s)"},
+        {"path": "westernaudiobundle/Western Audio Bundle/WAV/SFX/Misc/Coins Bag 1.wav", "role": "candidate", "note": "Heavy coins bag texture (0.565s)"},
+        {"path": "westernaudiobundle/Western Audio Bundle/WAV/SFX/Misc/Coins Bag 2.wav", "role": "layer", "note": "Celebratory gold layer for big jumps"}
     ],
     "milestone": [
         {"path": "Foley Sports Sound FX Pack/Foley Sports/Buzzers and Boards/Scoreboard Ding.wav", "role": "primary", "note": "Triumph scoreboard milestone bell (0.408s)"},
-        {"path": "inventorysfxbundle_audio/inventorysfxbundle/Assets/Misc/LevelUp1.mp3", "role": "candidate", "note": "Bigger level-up stinger for late bands (1.776s)"}
-    ],
-    "cycle_started": [
-        {"path": "buildingandcraftingaudiobundle/Building and Crafting Audio Bundle/WAV/FX/Hammer 1.wav", "role": "primary", "note": "Mechanical physical crank/turnover starting machine cycle"},
-        {"path": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Open Lock 2.wav", "role": "candidate", "note": "Latch click alternate"}
-    ],
-    "frenzy_pop": [
-        {"path": "magicspellssfxbundle_audio/magicspellssfxbundle/Mono/Fire/Fire 1.mp3", "role": "primary", "note": "Massive fiery ignition burst"},
-        {"path": "Foley Sports Sound FX Pack/Foley Sports/Buzzers and Boards/Siren Sound.wav", "role": "candidate", "note": "Overdrive siren alarm pop"}
+        {"path": "inventorysfxbundle_audio/inventorysfxbundle/Assets/Misc/LevelUp1.mp3", "role": "candidate", "note": "Level up fanfare (1.776s)"}
     ],
     "frenzy_end": [
-        {"path": "spaceaudiobundle/Space Audio Bundle/WAV/FX/Decompression 2.wav", "role": "primary", "note": "Smooth cooldown steam exhaust"},
-        {"path": "Sci-Fi Horror Sound FX Pack Vol. 2/Sci-Fi Horror/Tech and Mech/Vent Exhale.wav", "role": "candidate", "note": "Long pneumatic gas exhaust"}
-    ],
-
-    # Rush & Overdrive
-    "overdrive_engage": [
-        {"path": "spaceaudiobundle/Space Audio Bundle/WAV/FX/Computer On.wav", "role": "primary", "note": "Overdrive console power engagement (1.110s)"},
-        {"path": "buildingandcraftingaudiobundle/Building and Crafting Audio Bundle/WAV/FX/Saw (loop).wav", "role": "candidate", "note": "Mechanical machine acceleration"}
-    ],
-    "vent_tick": [
-        {"path": "Foley Sports Sound FX Pack/Foley Sports/Buzzers and Boards/Pacer Beeps Normal.wav", "role": "primary", "note": "Interval timer pulse rhythm (to slice single tick) (4.424s)"},
-        {"path": "spaceaudiobundle/Space Audio Bundle/WAV/FX/Button 2.wav", "role": "candidate", "note": "Crisp electronic telegraph pip (0.250s)"}
-    ],
-    "vent_open": [
-        {"path": "Foley Sports Sound FX Pack/Foley Sports/Buzzers and Boards/Buzzer.wav", "role": "primary", "note": "Clear urgent game horn — signal to start lifting (0.337s)"},
-        {"path": "spaceaudiobundle/Space Audio Bundle/WAV/FX/Communication Recieving 2.wav", "role": "candidate", "note": "Sci-fi klaxon alternate (0.400s)"}
-    ],
-    "vent_lift": [
-        {"path": "spaceaudiobundle/Space Audio Bundle/WAV/FX/Elevator.wav", "role": "primary", "note": "Pneumatic elevator lift pulse (2.500s)"},
-        {"path": "magicspellssfxbundle_audio/magicspellssfxbundle/Mono/Generic/Generic Spell (end) 4.mp3", "role": "candidate", "note": "Ascending energy lift alternate (2.210s)"}
-    ],
-    "vent_success": [
-        {"path": "Sci-Fi Horror Sound FX Pack Vol. 2/Sci-Fi Horror/Tech and Mech/Strong Accept.wav", "role": "primary", "note": "Clean machine confirm / success stinger (2.701s)"},
-        {"path": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Reward 2.wav", "role": "candidate", "note": "Bright melodic chime alternate (0.540s)"}
-    ],
-    "vent_miss": [
-        {"path": "Sci-Fi Horror Sound FX Pack Vol. 2/Sci-Fi Horror/Tech and Mech/Strong Deny.wav", "role": "primary", "note": "Matched opposite to Strong Accept (2.701s)"},
-        {"path": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Wrong 1.wav", "role": "candidate", "note": "Snappy refusal buzzer (0.529s)"}
-    ],
-    "overheat": [
-        {"path": "spaceaudiobundle/Space Audio Bundle/WAV/FX/Decompression 1.wav", "role": "primary", "note": "Violent steam release / machine burnout (3.740s)"},
-        {"path": "Sci-Fi Horror Sound FX Pack Vol. 2/Sci-Fi Horror/Tech and Mech/Vent Exhale.wav", "role": "candidate", "note": "Long pneumatic gas exhaust (8.811s)"}
-    ],
-    "rush_ready": [
-        {"path": "spaceaudiobundle/Space Audio Bundle/WAV/FX/Computer On.wav", "role": "primary", "note": "System boot / ready confirmation (1.110s)"},
-        {"path": "Foley Sports Sound FX Pack/Foley Sports/Buzzers and Boards/Scoreboard Ding.wav", "role": "candidate", "note": "Pitched-up chime ready chime (0.408s)"}
-    ],
-    "heat_loop": [
-        {"path": "buildingandcraftingaudiobundle/Building and Crafting Audio Bundle/WAV/Update/Truck Gear Idle (loop).wav", "role": "primary", "note": "Loop-tagged industrial engine idle (2.055s)"},
-        {"path": "magicspellssfxbundle_audio/magicspellssfxbundle/Mono/Electric/Electric (loop).mp3", "role": "candidate", "note": "Continuous electric hum loop (6.440s)"}
+        {"path": "spaceaudiobundle/Space Audio Bundle/WAV/FX/Decompression 2.wav", "role": "primary", "note": "Steam cooldown exhaust (2.43s)"},
+        {"path": "Sci-Fi Horror Sound FX Pack Vol. 2/Sci-Fi Horror/Tech and Mech/Vent Exhale.wav", "role": "candidate", "note": "Pneumatic exhaust (8.81s)"}
     ],
     "urgency_loop": [
-        {"path": "buildingandcraftingaudiobundle/Building and Crafting Audio Bundle/WAV/FX/Saw (loop).wav", "role": "primary", "note": "Loop-tagged rising saw motor friction (2.440s)"},
-        {"path": "Sci-Fi Horror Sound FX Pack Vol. 2/Sci-Fi Horror/Tech and Mech/Pathetic Alarm.wav", "role": "candidate", "note": "Sci-fi warning pulsation loop (2.928s)"}
-    ],
-
-    # Interface
-    "tab_switch": [
-        {"path": "buttonssfxlibrary/Buttons SFX Library/WAV/Slide/Slide Button 13.wav", "role": "primary", "note": "Crisp tactile tab slide (0.263s)"},
-        {"path": "westernaudiobundle/Western Audio Bundle/WAV/Buttons and Stingers/Button 5.wav", "role": "candidate", "note": "Americana period tactile button (0.311s)"}
+        {"path": "buildingandcraftingaudiobundle/Building and Crafting Audio Bundle/WAV/FX/Saw (loop).wav", "role": "primary", "note": "Urgency engine friction loop (2.44s)"},
+        {"path": "Sci-Fi Horror Sound FX Pack Vol. 2/Sci-Fi Horror/Tech and Mech/Pathetic Alarm.wav", "role": "candidate", "note": "Warning pulsation loop (2.93s)"}
     ],
     "screen_open": [
-        {"path": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Open Drawer 2.wav", "role": "primary", "note": "Physical cabinet / drawer opening (0.691s)"},
-        {"path": "buttonssfxlibrary/Buttons SFX Library/WAV/Select/Select Button 1.wav", "role": "candidate", "note": "Major panel selection (0.489s)"}
+        {"path": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Open Drawer 2.wav", "role": "primary", "note": "Physical cabinet / drawer open (0.691s)"},
+        {"path": "buttonssfxlibrary/Buttons SFX Library/WAV/Select/Select Button 1.wav", "role": "candidate", "note": "Panel select (0.489s)"}
     ],
     "screen_close": [
-        {"path": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Close Drawer 3.wav", "role": "primary", "note": "Matched cabinet drawer closing pair (0.888s)"},
-        {"path": "buttonssfxlibrary/Buttons SFX Library/WAV/Click/Click Button 6.wav", "role": "candidate", "note": "Snappy dismiss click (0.221s)"}
+        {"path": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Close Drawer 2.wav", "role": "primary", "note": "Panel dismiss (0.505s)"},
+        {"path": "buttonssfxlibrary/Buttons SFX Library/WAV/Cancel/Cancel Button 1.wav", "role": "candidate", "note": "Cancel dismiss"}
     ],
-    "mode_toggle": [
-        {"path": "buttonssfxlibrary/Buttons SFX Library/WAV/Click/Click Button 6.wav", "role": "primary", "note": "Mechanical toggle switch click (0.221s)"},
-        {"path": "buttonssfxlibrary/Buttons SFX Library/WAV/Click/Click Button 1.wav", "role": "candidate", "note": "Firm push button click (0.190s)"}
+    "denied_cash": [
+        {"path": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Wrong 1.wav", "role": "primary", "note": "Refusal buzz for insufficient cash (0.529s)"}
     ],
-    "epoch_page": [
-        {"path": "westernaudiobundle/Western Audio Bundle/WAV/SFX/Misc/Card Deliver 1.wav", "role": "primary", "note": "Tactile card flick / page slide (0.534s)"},
-        {"path": "buttonssfxlibrary/Buttons SFX Library/WAV/Slide/Slide Button 1.wav", "role": "candidate", "note": "Smooth panel slide"}
+    "denied_locked": [
+        {"path": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Wrong 3.wav", "role": "primary", "note": "Locked state denial (0.540s)"}
     ],
-    "make_contact": [
-        {"path": "spaceaudiobundle/Space Audio Bundle/WAV/FX/Teleportation.wav", "role": "primary", "note": "Massive cosmic portal activation (2.650s)"},
-        {"path": "Sci-Fi Horror Sound FX Pack Vol. 2/Sci-Fi Horror/Tech and Mech/Beam Me Up A.wav", "role": "candidate", "note": "Sci-fi transporter ascension (9.202s)"}
+    "challenge_start": [
+        {"path": "Foley Sports Sound FX Pack/Foley Sports/Buzzers and Boards/Boxing Bell Fight Start.wav", "role": "primary", "note": "Match starting fight bell (0.760s)"}
     ],
-    "tip_appear": [
-        {"path": "buttonssfxlibrary/Buttons SFX Library/WAV/Bubble/Bubble Button 5.wav", "role": "primary", "note": "Light, friendly popup bubble"},
-        {"path": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Button 5.wav", "role": "candidate", "note": "Subtle UI chime"}
+    "challenge_credit": [
+        {"path": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Reward 1.wav", "role": "primary", "note": "Challenge victory score credit (1.20s)"}
     ],
-
-    # Basketball (Direct Semantic Matches from Foley Sports / Basketball)
+    "challenge_tier": [
+        {"path": "Foley Sports Sound FX Pack/Foley Sports/Buzzers and Boards/Scoreboard Ding.wav", "role": "primary", "note": "Ladder climb chime (0.408s)"}
+    ],
     "bball_grab": [
-        {"path": "Foley Sports Sound FX Pack/Foley Sports/Tennis/Court Squeak Generic A.wav", "role": "primary", "note": "Authentic gym floor shoe squeak / drag friction (0.220s)"},
-        {"path": "Foley Sports Sound FX Pack/Foley Sports/Tennis/Court Squeak Sudden Stop.wav", "role": "variant_1", "note": "Sharp shoe squeak variation"},
-        {"path": "Foley Sports Sound FX Pack/Foley Sports/Tennis/Court Squeak Normal.wav", "role": "candidate", "note": "Court grip friction"}
-    ],
-    "bball_launch": [
-        {"path": "Foley Sports Sound FX Pack/Foley Sports/Soccer/Throw in Normal.wav", "role": "primary", "note": "Clean, dynamic athletic release whoosh"},
-        {"path": "Foley Sports Sound FX Pack/Foley Sports/Soccer/Throw in Long.wav", "role": "variant_1", "note": "Powerful athletic launch throw"},
-        {"path": "Foley Sports Sound FX Pack/Foley Sports/Tennis/Generic Swing Normal.wav", "role": "candidate", "note": "Crisp air swing"}
-    ],
-    "bball_fizzle": [
-        {"path": "Foley Sports Sound FX Pack/Foley Sports/Basketball/Generic Bounce Distant.wav", "role": "primary", "note": "Soft weak ball drop without throw"},
-        {"path": "Foley Sports Sound FX Pack/Foley Sports/Pool/Ball Sink Distant.wav", "role": "candidate", "note": "Dull dropped ball flop"}
-    ],
-    "bball_wall": [
-        {"path": "Foley Sports Sound FX Pack/Foley Sports/Tennis/Wall Hit Normal.wav", "role": "primary", "note": "Authentic gym wall / backboard rebound (0.240s)"},
-        {"path": "Foley Sports Sound FX Pack/Foley Sports/Tennis/Wall Hit Intense.wav", "role": "variant_1", "note": "High-velocity backboard impact"},
-        {"path": "Foley Sports Sound FX Pack/Foley Sports/Hockey/Padding on Glass Normal Hit.wav", "role": "variant_2", "note": "Padded glass bounce variation"}
+        {"path": "Foley Sports Sound FX Pack/Foley Sports/Basketball/Basketball Squeak Single A.wav", "role": "primary", "note": "Tactile gym court shoe/ball squeak (0.134s)"},
+        {"path": "Foley Sports Sound FX Pack/Foley Sports/Tennis/Shoe Squeak A.wav", "role": "candidate", "note": "Shoe grip alternate"}
     ],
     "bball_floor": [
-        {"path": "Foley Sports Sound FX Pack/Foley Sports/Basketball/Generic Bounce Normal.wav", "role": "primary", "note": "Classic basketball hardwood dribble bounce (0.190s)"},
-        {"path": "Foley Sports Sound FX Pack/Foley Sports/Basketball/Generic Bounce Intense.wav", "role": "variant_1", "note": "Hard direct basketball floor bounce"},
-        {"path": "Foley Sports Sound FX Pack/Foley Sports/Basketball/Generic Bounce Distant.wav", "role": "variant_2", "note": "Light ball bounce variation"}
+        {"path": "Foley Sports Sound FX Pack/Foley Sports/Basketball/Generic Bounce Normal.wav", "role": "primary", "note": "Hardwood basketball bounce (0.334s)"},
+        {"path": "Foley Sports Sound FX Pack/Foley Sports/Basketball/Dribble A.wav", "role": "variant_1", "note": "Dribble bounce alternate"}
     ],
     "bball_settle": [
-        {"path": "Foley Sports Sound FX Pack/Foley Sports/Soccer/Pitch Movement Ball Rolling.wav", "role": "primary", "note": "Ball rolling to a gentle halt"},
-        {"path": "Foley Sports Sound FX Pack/Foley Sports/Pool/Ball Roll Down Bar.wav", "role": "candidate", "note": "Ball deceleration roll"}
+        {"path": "Foley Sports Sound FX Pack/Foley Sports/Basketball/Generic Bounce Soft.wav", "role": "primary", "note": "Ball settling roll (0.240s)"}
     ],
     "bball_rim": [
-        {"path": "Foley Sports Sound FX Pack/Foley Sports/Basketball/Generic Net Hit Intense.wav", "role": "primary", "note": "Sharp iron rim impact / hoop collision"},
-        {"path": "Foley Sports Sound FX Pack/Foley Sports/Football - Rugby/Field Goal Kick Goalpost.wav", "role": "candidate", "note": "Resonant metal post clang"}
+        {"path": "Foley Sports Sound FX Pack/Foley Sports/Basketball/Generic Net Hit Intense.wav", "role": "primary", "note": "Hoop rim hit (0.405s)"},
+        {"path": "Foley Sports Sound FX Pack/Foley Sports/Football - Rugby/Field Goal Kick Goalpost.wav", "role": "candidate", "note": "Metal post clang"}
     ],
     "bball_score": [
-        {"path": "Foley Sports Sound FX Pack/Foley Sports/Basketball/In The Net A.wav", "role": "primary", "note": "Direct made basket net hit"},
-        {"path": "Foley Sports Sound FX Pack/Foley Sports/Basketball/In The Net B.wav", "role": "variant_1", "note": "Basket made variation"},
-        {"path": "Foley Sports Sound FX Pack/Foley Sports/Basketball/Generic Net Hit Normal.wav", "role": "candidate", "note": "Hoop net strike"}
-    ],
-    "bball_swish": [
-        {"path": "Foley Sports Sound FX Pack/Foley Sports/Basketball/Net Swoosh Intense.wav", "role": "primary", "note": "Flawless crisp nylon SWISH basket"},
-        {"path": "Foley Sports Sound FX Pack/Foley Sports/Basketball/Net Swoosh Normal.wav", "role": "variant_1", "note": "Clean net swoosh variation"},
-        {"path": "Foley Sports Sound FX Pack/Foley Sports/Basketball/Generic Net Swoosh.wav", "role": "candidate", "note": "Nylon net flutter"}
+        {"path": "Foley Sports Sound FX Pack/Foley Sports/Basketball/In The Net A.wav", "role": "primary", "note": "Clean made basket (0.420s)"},
+        {"path": "Foley Sports Sound FX Pack/Foley Sports/Basketball/In The Net B.wav", "role": "variant_1", "note": "Basket made variation"}
     ],
     "bball_gem_through": [
-        {"path": "inventorysfxbundle_audio/inventorysfxbundle/Assets/Jewels & Runes/Gem1.mp3", "role": "primary", "note": "Crystal chime contact through legacy gem"},
-        {"path": "magicspellssfxbundle_audio/magicspellssfxbundle/Mono/Generic/Generic Spell (end) 1.mp3", "role": "candidate", "note": "Shimmer pass-through tone"}
+        {"path": "inventorysfxbundle_audio/inventorysfxbundle/Assets/Jewels & Runes/Gem1.mp3", "role": "primary", "note": "Crystal chime pass-through (0.450s)"}
     ],
     "bball_gem_earned": [
-        {"path": "magicspellssfxbundle_audio/magicspellssfxbundle/Mono/Revive/Revive 3.mp3", "role": "primary", "note": "Grand Legacy shot celebration fanfare (6.08s)"},
-        {"path": "westernaudiobundle/Western Audio Bundle/WAV/Buttons and Stingers/Stinger 15.wav", "role": "candidate", "note": "Victory celebration stinger (1.65s)"}
+        {"path": "magicspellssfxbundle_audio/magicspellssfxbundle/Mono/Revive/Revive 3.mp3", "role": "primary", "note": "Legacy basket celebration stinger (6.08s)"}
     ],
-
-    # Catch Money
+    "m3_select": [
+        {"path": "buttonssfxlibrary/Buttons SFX Library/WAV/Click/Click Button 6.wav", "role": "primary", "note": "Tactile gem pick up click (0.150s)"}
+    ],
+    "m3_swap": [
+        {"path": "buttonssfxlibrary/Buttons SFX Library/WAV/Slide/Slide Button 13.wav", "role": "primary", "note": "Smooth gem tile slide (0.263s)"}
+    ],
+    "m3_invalid": [
+        {"path": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Wrong 1.wav", "role": "primary", "note": "Invalid match refusal (0.529s)"}
+    ],
+    "m3_match": [
+        {"path": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Reward 2.wav", "role": "primary", "note": "Clear match chime (0.540s)"}
+    ],
+    "m3_fall": [
+        {"path": "westernaudiobundle/Western Audio Bundle/WAV/SFX/Misc/Card Deliver 1.wav", "role": "primary", "note": "Gem grid drop refill (0.534s)"}
+    ],
+    "m3_avoid": [
+        {"path": "Sci-Fi Horror Sound FX Pack Vol. 2/Sci-Fi Horror/Tech and Mech/Pathetic Alarm.wav", "role": "primary", "note": "Avoid gem hazard strike (2.93s)"}
+    ],
+    "m3_legacy": [
+        {"path": "magicspellssfxbundle_audio/magicspellssfxbundle/Mono/Revive/Revive 3.mp3", "role": "primary", "note": "Match-3 Legacy collect fanfare (6.08s)"}
+    ],
     "catch_coin": [
-        {"path": "inventorysfxbundle_audio/inventorysfxbundle/Assets/Coins/CoinPickUp2.mp3", "role": "primary", "note": "Light, crisp falling coin catch (0.336s)"},
+        {"path": "inventorysfxbundle_audio/inventorysfxbundle/Assets/Coins/CoinPickUp2.mp3", "role": "primary", "note": "Crisp falling coin catch (0.336s)"},
         {"path": "inventorysfxbundle_audio/inventorysfxbundle/Assets/Coins/CoinPickUp1.mp3", "role": "variant_1", "note": "Coin catch variant (0.384s)"},
-        {"path": "westernaudiobundle/Western Audio Bundle/WAV/SFX/Misc/Card Deliver 1.wav", "role": "variant_2", "note": "Paper dollar catch variation (0.534s)"},
-        {"path": "buildingandcraftingaudiobundle/Building and Crafting Audio Bundle/WAV/FX/Coin 4.wav", "role": "candidate", "note": "Metallic coin alternate (0.500s)"}
+        {"path": "westernaudiobundle/Western Audio Bundle/WAV/SFX/Misc/Card Deliver 1.wav", "role": "variant_2", "note": "Paper dollar catch variation (0.534s)"}
     ],
     "catch_premium": [
-        {"path": "westernaudiobundle/Western Audio Bundle/WAV/SFX/Misc/Coins Bag 1.wav", "role": "primary", "note": "Heavy purse premium coin catch (0.565s)"},
-        {"path": "inventorysfxbundle_audio/inventorysfxbundle/Assets/Coins/CoinBag2.mp3", "role": "candidate", "note": "Rich coin bag catch"},
-        {"path": "buildingandcraftingaudiobundle/Building and Crafting Audio Bundle/WAV/FX/Coins 2.wav", "role": "candidate", "note": "Multiple gold coins clink"}
+        {"path": "westernaudiobundle/Western Audio Bundle/WAV/SFX/Misc/Coins Bag 1.wav", "role": "primary", "note": "Heavy gold coin catch (0.565s)"}
     ],
     "catch_legacy": [
-        {"path": "inventorysfxbundle_audio/inventorysfxbundle/Assets/Coins/CoinPouring3.mp3", "role": "primary", "note": "Massive jackpot offline cascade (8.28s)"},
-        {"path": "inventorysfxbundle_audio/inventorysfxbundle/Assets/Coins/CoinBag3.mp3", "role": "candidate", "note": "Grand fortune coin bag"}
+        {"path": "inventorysfxbundle_audio/inventorysfxbundle/Assets/Coins/CoinPouring3.mp3", "role": "primary", "note": "Jackpot fortune cascade (8.28s)"}
     ],
     "catch_miss": [
-        {"path": "inventorysfxbundle_audio/inventorysfxbundle/Assets/Coins/CoinPickUp3.mp3", "role": "primary", "note": "Dropped coin impact on floor"},
-        {"path": "Foley Sports Sound FX Pack/Foley Sports/Pool/Ball Sink Distant.wav", "role": "candidate", "note": "Dull lost coin drop"}
+        {"path": "inventorysfxbundle_audio/inventorysfxbundle/Assets/Coins/CoinPickUp3.mp3", "role": "primary", "note": "Dropped coin floor impact (0.350s)"}
     ],
     "catch_spawn": [
-        {"path": "buttonssfxlibrary/Buttons SFX Library/WAV/Bubble/Bubble Button 5.wav", "role": "primary", "note": "Inaudible soft pop indicating spawn rate"},
-        {"path": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Button 6.wav", "role": "candidate", "note": "Micro blip"}
+        {"path": "buttonssfxlibrary/Buttons SFX Library/WAV/Bubble/Bubble Button 5.wav", "role": "primary", "note": "Soft bubble spawn pop (0.533s)"}
     ],
-
-    # Ceremony
+    "mem_pad": [
+        {"path": "spaceaudiobundle/Space Audio Bundle/WAV/FX/Button 2.wav", "role": "primary", "note": "Pad synthesizer note (0.251s)"}
+    ],
+    "mem_round": [
+        {"path": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Reward 1.wav", "role": "primary", "note": "Round clear arpeggio (1.20s)"}
+    ],
+    "mem_wrong": [
+        {"path": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Wrong 1.wav", "role": "primary", "note": "Memory error buzzer (0.529s)"}
+    ],
+    "mem_gem": [
+        {"path": "magicspellssfxbundle_audio/magicspellssfxbundle/Mono/Revive/Revive 3.mp3", "role": "primary", "note": "Memory bonus gem (6.08s)"}
+    ],
+    "bal_enter": [
+        {"path": "buttonssfxlibrary/Buttons SFX Library/WAV/Slide/Slide Button 13.wav", "role": "primary", "note": "Balance zone entry lock (0.263s)"}
+    ],
+    "bal_leave": [
+        {"path": "buttonssfxlibrary/Buttons SFX Library/WAV/Click/Click Button 6.wav", "role": "primary", "note": "Balance zone leave tone (0.150s)"}
+    ],
+    "bal_lift": [
+        {"path": "buildingandcraftingaudiobundle/Building and Crafting Audio Bundle/WAV/FX/Place Diamond.wav", "role": "primary", "note": "Lift impulse sound (0.320s)"}
+    ],
+    "bal_gem": [
+        {"path": "magicspellssfxbundle_audio/magicspellssfxbundle/Mono/Revive/Revive 3.mp3", "role": "primary", "note": "Balance reward gem (6.08s)"}
+    ],
+    "time_lock_hit": [
+        {"path": "Sci-Fi Horror Sound FX Pack Vol. 2/Sci-Fi Horror/Tech and Mech/Strong Accept.wav", "role": "primary", "note": "Target lock success (2.70s)"}
+    ],
+    "time_lock_miss": [
+        {"path": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Wrong 1.wav", "role": "primary", "note": "Target lock miss (0.529s)"}
+    ],
+    "time_gem": [
+        {"path": "magicspellssfxbundle_audio/magicspellssfxbundle/Mono/Revive/Revive 3.mp3", "role": "primary", "note": "Timing lock gem (6.08s)"}
+    ],
     "ceremony_obituary": [
-        {"path": "westernaudiobundle/Western Audio Bundle/WAV/SFX/Misc/Bell 1.wav", "role": "primary", "note": "Warm, dignified period bell toll (6.842s)"},
-        {"path": "westernaudiobundle/Western Audio Bundle/WAV/SFX/Misc/Bell 2.wav", "role": "variant_1", "note": "Solemn bell chime toll"},
-        {"path": "magicspellssfxbundle_audio/magicspellssfxbundle/Mono/Revive/Revive 3.mp3", "role": "candidate", "note": "Solemn transition stinger (6.080s)"}
+        {"path": "westernaudiobundle/Western Audio Bundle/WAV/SFX/Misc/Bell 1.wav", "role": "primary", "note": "Solemn succession bell toll (6.84s)"}
     ],
     "ceremony_will": [
-        {"path": "westernaudiobundle/Western Audio Bundle/WAV/SFX/Misc/Card Deliver 1.wav", "role": "primary", "note": "Opening legal parchment & will (0.534s)"},
-        {"path": "inventorysfxbundle_audio/inventorysfxbundle/Assets/Books & Scrolls/BookOpen1.mp3", "role": "candidate", "note": "Heavy leather book opened"},
-        {"path": "buttonssfxlibrary/Buttons SFX Library/WAV/Select/Select Button 1.wav", "role": "candidate", "note": "Official document selection"}
+        {"path": "westernaudiobundle/Western Audio Bundle/WAV/SFX/Misc/Card Deliver 1.wav", "role": "primary", "note": "Opening last will parchment (0.534s)"}
     ],
     "ceremony_heir": [
-        {"path": "magicspellssfxbundle_audio/magicspellssfxbundle/Mono/Revive/Revive 3.mp3", "role": "primary", "note": "Continuation of the dynasty reveal (6.080s)"},
-        {"path": "westernaudiobundle/Western Audio Bundle/WAV/Buttons and Stingers/Stinger 15.wav", "role": "candidate", "note": "Americana acoustic celebration (1.659s)"}
+        {"path": "magicspellssfxbundle_audio/magicspellssfxbundle/Mono/Revive/Revive 3.mp3", "role": "primary", "note": "Heir continuation fanfare (6.08s)"}
     ],
     "ceremony_contact": [
-        {"path": "magicspellssfxbundle_audio/magicspellssfxbundle/Mono/Generic/Generic Spell (summon) 1.mp3", "role": "primary", "note": "Cosmic alien encounter stinger (6.130s)"},
-        {"path": "spaceaudiobundle/Space Audio Bundle/WAV/FX/Light Speed.wav", "role": "candidate", "note": "Hyperspace arrival (1.670s)"}
+        {"path": "magicspellssfxbundle_audio/magicspellssfxbundle/Mono/Generic/Generic Spell (summon) 1.mp3", "role": "primary", "note": "Alien contact stinger (6.13s)"}
     ],
     "ceremony_contact_reveal": [
-        {"path": "spaceaudiobundle/Space Audio Bundle/WAV/FX/Communication Recieving 2.wav", "role": "primary", "note": "Incoming extraterrestrial transmission decode"},
-        {"path": "Sci-Fi Horror Sound FX Pack Vol. 2/Sci-Fi Horror/Tech and Mech/Incoming Transmission C.wav", "role": "candidate", "note": "Alien radio broadcast decode"},
-        {"path": "westernaudiobundle/Western Audio Bundle/WAV/Buttons and Stingers/Stinger 8.wav", "role": "candidate", "note": "Dramatic reveal chord"}
+        {"path": "spaceaudiobundle/Space Audio Bundle/WAV/FX/Communication Recieving 2.wav", "role": "primary", "note": "Civilization transmission decode (0.403s)"}
     ],
     "ceremony_fanfare": [
-        {"path": "westernaudiobundle/Western Audio Bundle/WAV/Buttons and Stingers/Stinger 15.wav", "role": "primary", "note": "Grand triumphant Americana fanfare (1.659s)"},
-        {"path": "westernaudiobundle/Western Audio Bundle/WAV/Buttons and Stingers/Stinger 8.wav", "role": "candidate", "note": "Major milestone triumph stinger"}
+        {"path": "westernaudiobundle/Western Audio Bundle/WAV/Buttons and Stingers/Stinger 15.wav", "role": "primary", "note": "Dynasty triumph fanfare (1.659s)"}
     ],
     "ceremony_power_down": [
-        {"path": "spaceaudiobundle/Space Audio Bundle/WAV/FX/Decompression 1.wav", "role": "primary", "note": "System offline power-down sound"},
-        {"path": "spaceaudiobundle/Space Audio Bundle/WAV/FX/Decompression 2.wav", "role": "candidate", "note": "Turbine deceleration"}
+        {"path": "spaceaudiobundle/Space Audio Bundle/WAV/FX/Decompression 1.wav", "role": "primary", "note": "System power down (3.74s)"}
     ],
     "legacy_purchase": [
-        {"path": "magicspellssfxbundle_audio/magicspellssfxbundle/Mono/Generic/Generic Spell (summon) 1.mp3", "role": "primary", "note": "Legacy permanent power unlocked (6.130s)"},
-        {"path": "westernaudiobundle/Western Audio Bundle/WAV/SFX/Misc/Coins Bag 2.wav", "role": "candidate", "note": "Layered gold treasure purchase (1.144s)"}
+        {"path": "magicspellssfxbundle_audio/magicspellssfxbundle/Mono/Generic/Generic Spell (summon) 1.mp3", "role": "primary", "note": "Permanent legacy purchase (6.13s)"}
     ],
     "welcome_back": [
-        {"path": "inventorysfxbundle_audio/inventorysfxbundle/Assets/Coins/CoinPouring3.mp3", "role": "primary", "note": "Massive pile of idle offline cash cascade (8.280s)"},
-        {"path": "magicspellssfxbundle_audio/magicspellssfxbundle/Mono/Heal/Heal 9.mp3", "role": "candidate", "note": "Warm restoration chime (4.570s)"}
+        {"path": "inventorysfxbundle_audio/inventorysfxbundle/Assets/Coins/CoinPouring3.mp3", "role": "primary", "note": "Offline cash shower (8.28s)"}
     ],
     "prestige_confirm": [
-        {"path": "Foley Sports Sound FX Pack/Foley Sports/Buzzers and Boards/Boxing Bell Fight Start.wav", "role": "primary", "note": "Resonant bell starting the next generation"},
-        {"path": "westernaudiobundle/Western Audio Bundle/WAV/Buttons and Stingers/Stinger 15.wav", "role": "candidate", "note": "Triumphant succession confirmation"}
+        {"path": "Foley Sports Sound FX Pack/Foley Sports/Buzzers and Boards/Boxing Bell Fight Start.wav", "role": "primary", "note": "Succession bell handover (0.760s)"}
     ],
-
-    # Music Bands
     "band_0_blue_collar": [
-        {"path": "Corporate Music Pack Vol. 1/Corporate Coffee Time (RT 4.000)/Intensity 1.wav", "role": "primary", "note": "Thin arrangement department-store acoustic muzak (100.0s)"},
-        {"path": "Jazz Music Pack/Jazz Velvet Lounge (RT 3.000)/Intensity 1.wav", "role": "candidate", "note": "Mellow retro lounge jazz bed"}
+        {"path": "Corporate Music Pack Vol. 1/Corporate Coffee Time (RT 4.000)/Intensity 1.wav", "role": "primary", "note": "Department-store acoustic muzak (100.0s)"}
     ],
     "band_1_white_collar": [
-        {"path": "Corporate Music Pack Vol. 1/Corporate Coffee Time (RT 4.000)/Main.wav", "role": "primary", "note": "Same tune, full arrangement with strings — promotion audible (100.0s)"},
-        {"path": "Corporate Music Pack Vol. 1/Corporate Cheerful Whistle (RT 4.000)/Main.wav", "role": "candidate", "note": "Upbeat executive success groove"}
+        {"path": "Corporate Music Pack Vol. 1/Corporate Coffee Time (RT 4.000)/Main.wav", "role": "primary", "note": "Executive strings arrangement (100.0s)"}
     ],
     "band_2_early_contact": [
-        {"path": "Ethereal Music Pack Vol. 3/Ethereal Vol3 Air Flows (RT 4.000)/Main.wav", "role": "primary", "note": "Melody survives with synths and ethereal ambient texture (92.0s)"},
-        {"path": "Space Audio Bundle/Space Audio Bundle/WAV/Music/Space 1.wav", "role": "candidate", "note": "Cosmic exploration synth soundtrack"}
+        {"path": "Ethereal Music Pack Vol. 3/Ethereal Vol3 Air Flows (RT 4.000)/Main.wav", "role": "primary", "note": "Ethereal synth texture (92.0s)"}
     ],
     "band_3_mid": [
-        {"path": "Ethereal Music Pack Vol. 3/Ethereal Vol3 Mystics (RT 4.000)/Main.wav", "role": "primary", "note": "Hypnotic alien intervals and exotic synth textures (88.0s)"},
-        {"path": "Eastern Music Pack/Eastern Mysterious Land (RT 4.000)/Main.wav", "role": "candidate", "note": "Exotic non-Western alien harmonics"}
+        {"path": "Ethereal Music Pack Vol. 3/Ethereal Vol3 Mystics (RT 4.000)/Main.wav", "role": "primary", "note": "Alien harmonics (88.0s)"}
     ],
     "band_4_deep": [
-        {"path": "Ethereal Music Pack Vol. 3/Ethereal Vol3 Direct Sunlight (RT 4.000)/Main.wav", "role": "primary", "note": "Recognizable, but deep cosmic space music (96.0s)"},
-        {"path": "Ethereal Music Pack Vol. 3/Ethereal Vol3 Winds of Time (RT 4.000)/Main.wav", "role": "candidate", "note": "Deep void synth ambience"}
+        {"path": "Ethereal Music Pack Vol. 3/Ethereal Vol3 Direct Sunlight (RT 4.000)/Main.wav", "role": "primary", "note": "Deep space void soundtrack (96.0s)"}
     ]
 }
 
@@ -1022,24 +993,44 @@ NEGATIVE_KEYWORDS = [
 ]
 
 
-def get_audio_duration(file_path):
+def parse_credits_md():
+    """Parse CREDITS.md to get exact licensor, pack, and file for sourced cues."""
+    credits_map = {}
+    if not os.path.exists(CREDITS_PATH):
+        return credits_map
+    with open(CREDITS_PATH, "r", encoding="utf-8") as f:
+        for line in f:
+            if line.startswith("| `"):
+                parts = [p.strip() for p in line.split("|")[1:-1]]
+                if len(parts) >= 5:
+                    cue_id = parts[0].strip("`")
+                    src_file = parts[1].strip("`")
+                    pack = parts[2]
+                    licensor = parts[3]
+                    license_info = parts[4]
+                    credits_map[cue_id] = {
+                        "source_file": src_file,
+                        "pack": pack,
+                        "licensor": licensor,
+                        "license": license_info,
+                        "library_rel_path": DEPLOYED_LIBRARY_PATHS.get(cue_id, "")
+                    }
+    return credits_map
+
+
+def get_audio_duration(file_path, ext, size):
     """Accurately extract duration from WAV RIFF header or estimate MP3/OGG."""
-    ext = os.path.splitext(file_path)[1].lower()
-    size = os.path.getsize(file_path)
     if ext == '.wav':
+        if size < 44:
+            return 0.1
         try:
             with open(file_path, 'rb') as f:
-                header = f.read(128)
+                header = f.read(64)
                 if header[:4] == b'RIFF' and header[8:12] == b'WAVE':
                     fmt_idx = header.find(b'fmt ')
-                    if fmt_idx != -1 and len(header) >= fmt_idx + 24:
-                        fmt, channels, rate, byte_rate = struct.unpack('<HHII', header[fmt_idx+8:fmt_idx+20])
+                    if fmt_idx != -1 and len(header) >= fmt_idx + 20:
+                        byte_rate = struct.unpack('<I', header[fmt_idx+16:fmt_idx+20])[0]
                         if byte_rate > 0:
-                            data_idx = header.find(b'data')
-                            if data_idx != -1 and len(header) >= data_idx + 8:
-                                data_sz = struct.unpack('<I', header[data_idx+4:data_idx+8])[0]
-                                if 0 < data_sz <= size:
-                                    return round(data_sz / byte_rate, 3)
                             return round((size - 44) / byte_rate, 3)
         except Exception:
             pass
@@ -1052,7 +1043,7 @@ def get_audio_duration(file_path):
 
 
 def scan_all_library_files():
-    """Scan all 15 audio packs and build indexed file catalog."""
+    """Scan all 15 audio packs and build indexed file catalog with fast parsing."""
     print("Scanning audio packs in:", GAME_AUDIO_DIR)
     catalog = []
     if not os.path.exists(GAME_AUDIO_DIR):
@@ -1073,7 +1064,7 @@ def scan_all_library_files():
                     rel_to_audio_root = os.path.relpath(full_path, GAME_AUDIO_DIR)
                     
                     size_bytes = os.path.getsize(full_path)
-                    duration = get_audio_duration(full_path)
+                    duration = get_audio_duration(full_path, ext, size_bytes)
                     
                     name_clean = os.path.splitext(f)[0]
                     subfolder_rel = os.path.relpath(root, pack_path).replace('\\', '/')
@@ -1098,31 +1089,103 @@ def scan_all_library_files():
     return catalog
 
 
-def check_existing_game_cues():
-    """Scan what audio files currently exist in the game/audio folder."""
-    existing = {}
-    if not os.path.exists(PROJECT_AUDIO_DIR):
-        return existing
-    
+def inspect_game_audio_for_cue(cue_id, category, credits_map):
+    """
+    Inspect what audio files exist in game/audio/ for a specific cue,
+    following Godot's Audio.gd runtime resolution order (.ogg then .wav).
+    """
     cues_dir = os.path.join(PROJECT_AUDIO_DIR, "cues")
     loops_dir = os.path.join(PROJECT_AUDIO_DIR, "loops")
     music_dir = os.path.join(PROJECT_AUDIO_DIR, "music")
     
-    for d, category in [(cues_dir, "cue"), (loops_dir, "loop"), (music_dir, "music")]:
-        if os.path.exists(d):
-            for f in os.listdir(d):
-                if f.endswith(('.ogg', '.wav', '.mp3')):
-                    base_id = os.path.splitext(f)[0]
-                    existing[base_id] = {
-                        "filename": f,
-                        "category": category,
-                        "path": f"game/audio/{os.path.basename(d)}/{f}",
-                        "size": os.path.getsize(os.path.join(d, f))
-                    }
-    return existing
+    target_dir = cues_dir if category == "cue" else (loops_dir if category == "loop" else music_dir)
+    is_sourced = cue_id in credits_map
+    
+    # 1. Resolve active base file (.ogg then .wav)
+    active_file = None
+    all_files = []
+    
+    if os.path.exists(target_dir):
+        # Look for direct matches
+        for ext in [".ogg", ".wav", ".mp3"]:
+            fn = cue_id + ext
+            fp = os.path.join(target_dir, fn)
+            if os.path.exists(fp):
+                sz = os.path.getsize(fp)
+                dur = get_audio_duration(fp, ext, sz)
+                file_obj = {
+                    "filename": fn,
+                    "path": f"game/audio/{os.path.basename(target_dir)}/{fn}",
+                    "format": ext.replace('.', '').upper(),
+                    "size": sz,
+                    "duration": dur,
+                    "is_active": active_file is None
+                }
+                all_files.append(file_obj)
+                if active_file is None:
+                    active_file = file_obj
+    
+    # 2. Resolve variants (_1 to _4)
+    variants = []
+    if category == "cue":
+        for i in range(1, 5):
+            var_id = f"{cue_id}_{i}"
+            for ext in [".ogg", ".wav", ".mp3"]:
+                fn = var_id + ext
+                fp = os.path.join(cues_dir, fn)
+                if os.path.exists(fp):
+                    sz = os.path.getsize(fp)
+                    dur = get_audio_duration(fp, ext, sz)
+                    variants.append({
+                        "variant_index": i,
+                        "filename": fn,
+                        "path": f"game/audio/cues/{fn}",
+                        "format": ext.replace('.', '').upper(),
+                        "size": sz,
+                        "duration": dur
+                    })
+                    break
+    
+    # 3. Resolve layer (_layer)
+    layer = None
+    if category == "cue":
+        layer_id = f"{cue_id}_layer"
+        for ext in [".ogg", ".wav", ".mp3"]:
+            fn = layer_id + ext
+            fp = os.path.join(cues_dir, fn)
+            if os.path.exists(fp):
+                sz = os.path.getsize(fp)
+                dur = get_audio_duration(fp, ext, sz)
+                layer = {
+                    "filename": fn,
+                    "path": f"game/audio/cues/{fn}",
+                    "format": ext.replace('.', '').upper(),
+                    "size": sz,
+                    "duration": dur
+                }
+                break
+    
+    # Status determination
+    if active_file:
+        status = "sourced" if is_sourced else "placeholder"
+    elif variants:
+        status = "sourced" if is_sourced else "placeholder"
+        active_file = variants[0] # e.g. bball_floor uses variants directly
+    else:
+        status = "missing"
+    
+    return {
+        "status": status,
+        "is_sourced": is_sourced,
+        "active_file": active_file,
+        "source_info": credits_map.get(cue_id),
+        "variants": variants,
+        "layer": layer,
+        "all_files": all_files
+    }
 
 
-def score_candidate_match(cue_id, cue_meta, audio_file):
+def score_candidate_match(cue_id, cue_meta, audio_file, credits_map):
     """
     Compute high-precision match strength score (0 - 100) between an audio file and a game cue.
     """
@@ -1130,32 +1193,36 @@ def score_candidate_match(cue_id, cue_meta, audio_file):
     file_name_lower = audio_file["filename"].lower()
     file_subfolder_lower = audio_file["subfolder"].lower()
     
-    # 1. Curated Priority Match
+    # 1. Exact Deployed In-Game Match
+    if cue_id in DEPLOYED_LIBRARY_PATHS:
+        dep_path = DEPLOYED_LIBRARY_PATHS[cue_id].lower()
+        if dep_path in file_rel_norm or file_rel_norm.endswith(dep_path) or (os.path.basename(dep_path) == file_name_lower and dep_path.split('/')[0] in file_rel_norm):
+            return 100, f"Active In-Game Sound (Sourced from {audio_file['pack']})"
+    
+    # 2. Curated Priority Match
     if cue_id in CURATED_PICKS:
         for pick in CURATED_PICKS[cue_id]:
             pick_path_norm = pick["path"].lower()
             pick_fn = os.path.basename(pick["path"]).lower()
             
-            # Exact path match
             if pick_path_norm in file_rel_norm or file_rel_norm.endswith(pick_path_norm):
                 base_score = 98 if pick["role"] == "primary" else (95 if pick["role"].startswith("variant") else (93 if pick["role"] == "layer" else 88))
-                return base_score, f"Curated Top Pick: {pick.get('note', 'Research match')}"
+                return base_score, f"Curated: {pick.get('note', 'Research match')}"
             
-            # Filename match within same pack
             if pick_fn == file_name_lower and pick["path"].split('/')[0].lower() in file_rel_norm:
                 base_score = 94 if pick["role"] == "primary" else 88
                 return base_score, f"Curated: {pick.get('note', 'Pack match')}"
 
-    # 2. Negative Noise Filtering
+    # 3. Negative Noise Filtering
     is_weapon_or_animal = any(neg in file_name_lower or neg in file_subfolder_lower for neg in NEGATIVE_KEYWORDS)
-    if is_weapon_or_animal and "frenzy" not in cue_id and "avoid" not in cue_id and "combat" not in cue_id:
+    if is_weapon_or_animal and "frenzy" not in cue_id and "avoid" not in cue_id and "tab_switch" not in cue_id:
         return 0, "Noise filtered (unrelated sound family)"
 
     score = 0.0
     reasons = []
     file_tokens = set(audio_file["tokens"])
     
-    # 3. Subfolder Affinity Bonus
+    # 4. Subfolder Affinity Bonus
     folder_affinities = cue_meta.get("folder_affinities", [])
     for aff in folder_affinities:
         aff_lower = aff.lower()
@@ -1164,7 +1231,7 @@ def score_candidate_match(cue_id, cue_meta, audio_file):
             reasons.append(f"Subfolder: {aff}")
             break
 
-    # 4. Cue Specific Heuristics & Keywords
+    # 5. Cue Specific Keywords
     keywords = cue_meta.get("keywords", [])
     matched_kws = []
     for kw in keywords:
@@ -1179,7 +1246,7 @@ def score_candidate_match(cue_id, cue_meta, audio_file):
     if matched_kws:
         reasons.append(f"Keywords: {', '.join(matched_kws[:3])}")
 
-    # Basketball specific boost for Foley Sports / Basketball
+    # Specific boosts
     if cue_id.startswith("bball_"):
         if "basketball" in file_subfolder_lower or "basketball" in file_rel_norm:
             score += 45
@@ -1188,25 +1255,22 @@ def score_candidate_match(cue_id, cue_meta, audio_file):
             score += 35
             reasons.append("Gym court acoustics")
 
-    # Match Three specific boost
     if cue_id.startswith("m3_"):
         if "jewels" in file_subfolder_lower or "puzzle" in file_rel_norm:
             score += 30
             reasons.append("Puzzle & Gem library")
 
-    # Catch Money specific boost
     if cue_id.startswith("catch_"):
         if "coins" in file_subfolder_lower or "coin" in file_name_lower:
             score += 40
             reasons.append("Coin sound category")
 
-    # Interface specific boost
     if cue_meta.get("bus") == "UI":
         if "buttons sfx library" in file_rel_norm:
             score += 25
             reasons.append("Tactile UI library")
 
-    # 5. Duration Adherence
+    # Duration Adherence
     ideal_dur = cue_meta.get("ideal_duration", [0.1, 2.0])
     dur = audio_file["duration"]
     if ideal_dur[0] <= dur <= ideal_dur[1]:
@@ -1217,7 +1281,7 @@ def score_candidate_match(cue_id, cue_meta, audio_file):
     elif dur > ideal_dur[1] * 2.0:
         score -= 35
 
-    # 6. Loop cues
+    # Loop cues
     if "loop" in cue_id or cue_meta.get("bus") == "Music":
         if audio_file["is_loop"] or "loop" in file_name_lower:
             score += 25
@@ -1234,12 +1298,16 @@ def score_candidate_match(cue_id, cue_meta, audio_file):
 
 
 def build_audio_database():
+    credits_map = parse_credits_md()
+    print(f"Loaded {len(credits_map)} sourced cue entries from CREDITS.md")
+    
     catalog = scan_all_library_files()
-    existing_cues = check_existing_game_cues()
     
     all_assigned_file_ids = set()
     sections_output = []
     total_cues_count = 0
+    total_sourced_count = 0
+    total_placeholder_count = 0
     
     for group in CUE_GROUPS:
         cues_list = []
@@ -1250,14 +1318,32 @@ def build_audio_database():
                 "trigger": "Audio event", "ideal_duration": [0.1, 2.0], "keywords": [], "folder_affinities": []
             })
             
+            category = "loop" if "loop" in cue_id else ("music" if group["id"] == "music_tracks" else "cue")
+            in_game_info = inspect_game_audio_for_cue(cue_id, category, credits_map)
+            
+            if in_game_info["is_sourced"]:
+                total_sourced_count += 1
+            else:
+                total_placeholder_count += 1
+            
             # Find and rank candidates
             candidates = []
             for item in catalog:
-                score, reason = score_candidate_match(cue_id, meta, item)
-                if score >= 25:
+                score, reason = score_candidate_match(cue_id, meta, item, credits_map)
+                if score >= 25 or (cue_id in DEPLOYED_LIBRARY_PATHS and os.path.basename(DEPLOYED_LIBRARY_PATHS[cue_id]).lower() == item["filename"].lower()):
                     role = "candidate"
-                    # Check curated role
-                    if cue_id in CURATED_PICKS:
+                    is_active_deployed = False
+                    
+                    # Check if this candidate is the deployed in-game sound
+                    if cue_id in DEPLOYED_LIBRARY_PATHS:
+                        dep_p = DEPLOYED_LIBRARY_PATHS[cue_id].lower()
+                        if dep_p in item["rel_path"].lower() or item["rel_path"].lower().endswith(dep_p) or (os.path.basename(dep_p) == item["filename"].lower() and dep_p.split('/')[0] in item["rel_path"].lower()):
+                            role = "primary"
+                            is_active_deployed = True
+                            score = 100
+                            reason = f"Active in Godot code (Sourced from {item['pack']})"
+                    
+                    if not is_active_deployed and cue_id in CURATED_PICKS:
                         for p in CURATED_PICKS[cue_id]:
                             if os.path.basename(p["path"]).lower() == item["filename"].lower() and (p["path"].split('/')[0].lower() in item["rel_path"].lower()):
                                 role = p.get("role", "primary")
@@ -1275,13 +1361,13 @@ def build_audio_database():
                         "score": score,
                         "role": role,
                         "reason": reason,
-                        "selected": role in ("primary", "layer", "variant_1") or score >= 95
+                        "is_current_deployed": is_active_deployed,
+                        "selected": is_active_deployed or role in ("primary", "layer", "variant_1") or score >= 95
                     })
             
-            # Sort candidates by score descending, then duration proximity
-            candidates.sort(key=lambda x: (x["score"], -abs(x["duration"] - meta.get("ideal_duration", [0.5, 1.0])[0])), reverse=True)
+            # Sort: active deployed always at top, then score, then duration match
+            candidates.sort(key=lambda x: (1 if x["is_current_deployed"] else 0, x["score"], -abs(x["duration"] - meta.get("ideal_duration", [0.5, 1.0])[0])), reverse=True)
             
-            # Record assigned file ids
             for c in candidates[:15]:
                 all_assigned_file_ids.add(c["file_id"])
             
@@ -1293,8 +1379,8 @@ def build_audio_database():
                 "layered": meta.get("layered", False),
                 "has_variants": meta.get("has_variants", False),
                 "trigger": meta.get("trigger", ""),
-                "existing_in_game": existing_cues.get(cue_id),
-                "candidates": candidates[:30]  # Cap top 30 candidates per cue
+                "existing_in_game": in_game_info,
+                "candidates": candidates[:30]
             })
         
         sections_output.append({
@@ -1304,7 +1390,7 @@ def build_audio_database():
             "cues": cues_list
         })
     
-    # Categorize 'Other' by pack
+    # Packs Summary
     packs_summary = {}
     for item in catalog:
         p = item["pack"]
@@ -1317,9 +1403,11 @@ def build_audio_database():
         packs_summary[p]["formats"] = list(packs_summary[p]["formats"])
     
     output_data = {
-        "generated_at": "2026-08-16",
+        "generated_at": "2026-08-17",
         "total_library_files": len(catalog),
         "total_cues": total_cues_count,
+        "total_sourced": total_sourced_count,
+        "total_placeholders": total_placeholder_count,
         "packs": list(packs_summary.values()),
         "sections": sections_output,
         "library_sample": catalog
@@ -1330,7 +1418,7 @@ def build_audio_database():
         json.dump(output_data, f, indent=2)
     
     print(f"Generated {OUTPUT_JSON_PATH} successfully.")
-    print(f"Sections: {len(sections_output)}, Total cues: {total_cues_count}, Library files: {len(catalog)}")
+    print(f"Sections: {len(sections_output)}, Total cues: {total_cues_count} (Sourced: {total_sourced_count}, Placeholders: {total_placeholder_count}), Library files: {len(catalog)}")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,2754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>American Tycoon — Estate Planning & Legacy Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Outfit:wght@500;600;700;800;900&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    /* ═════════════════════════════════════════════════════════════════════
+       AMERICAN TYCOON — CANONICAL ESTATE PLANNING PALETTE (UiPalette.gd)
+       ═════════════════════════════════════════════════════════════════════ */
+    :root {
+      /* Canon Godot Palette Constants */
+      --game-cream: #F4ECD8;
+      --game-cream-light: #FAF5E9;
+      --game-cream-dark: #E6DCB8;
+      --game-navy: #1D2D50;
+      --game-navy-light: #2B3F6C;
+      --game-ink-navy: #0D1830;
+      --game-mustard-gold: #E3B23C;
+      --game-dark-gold: #A87C16;
+      --game-pale-gold: #F0D49A;
+      --game-atomic-teal: #9FD8D4;
+      --game-dark-teal: #508E89;
+      --game-money-green: #7DA87B;
+      --game-dark-money-green: #4D724B;
+      --game-ketchup-red: #B5402A;
+      --game-brick: #8E2F1E;
+      --game-cycle-blue: #5E86B8;
+      --game-dark-cycle-blue: #3E608C;
+      --game-purple: #9B5DE5;
+      --game-dark-purple: #5E3499;
+      --game-bright-purple: #C77DFF;
+      --game-light-gray: #CBCBCB;
+      --game-mid-gray: #9A9A9A;
+      --game-dark-gray: #555555;
+      --game-charcoal: #333333;
+
+      /* Page Canvas */
+      --bg-base: #0D1830;
+      --bg-surface: #1D2D50;
+      --bg-card: #F4ECD8;
+      --bg-card-alt: #EFE6CD;
+      
+      --border-game: #1D2D50;
+      --border-gold: #E3B23C;
+      --border-dark-gold: #A87C16;
+      
+      --radius-xs: 4px;
+      --radius-sm: 6px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      
+      --shadow-game: 0 4px 10px rgba(0, 0, 0, 0.4);
+      --shadow-card: 0 3px 6px rgba(0, 0, 0, 0.25);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      color: var(--game-navy);
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      line-height: 1.45;
+      padding-bottom: 120px;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--game-ink-navy);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--game-mustard-gold);
+      border: 2px solid var(--game-ink-navy);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--game-pale-gold);
+    }
+
+    /* ── Sticky Top Header (Estate Control Center) ── */
+    .sticky-top-container {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--game-ink-navy);
+      border-bottom: 3px solid var(--game-mustard-gold);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+    }
+
+    header.app-header {
+      padding: 10px 24px;
+      background: linear-gradient(180deg, rgba(29, 45, 80, 0.95) 0%, rgba(13, 24, 48, 0.98) 100%);
+      border-bottom: 1px solid rgba(227, 178, 60, 0.25);
+    }
+
+    .header-content {
+      max-width: 1800px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon-wrap {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-md);
+      background: var(--game-navy);
+      border: 2px solid var(--game-mustard-gold);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+
+    .brand-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 21px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      color: var(--game-cream);
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    }
+    .brand-title span {
+      color: var(--game-mustard-gold);
+    }
+
+    .brand-badge {
+      background: var(--game-mustard-gold);
+      color: var(--game-navy);
+      border: 1px solid var(--game-dark-gold);
+      font-family: 'Outfit', sans-serif;
+      font-size: 12px;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: var(--radius-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .header-stats {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: var(--game-navy);
+      border: 2px solid var(--game-mustard-gold);
+      border-radius: var(--radius-md);
+      padding: 6px 16px;
+      font-size: 13px;
+      color: var(--game-cream);
+      flex-wrap: wrap;
+    }
+
+    .stat-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: help;
+    }
+    .stat-pill strong {
+      color: var(--game-mustard-gold);
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+    }
+    .stat-pill.dirty strong {
+      color: var(--game-ketchup-red);
+    }
+    .stat-pill.gems strong {
+      color: #ffd700;
+      font-size: 14px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    /* Buttons (Godot UiPalette Aesthetic) */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 13px;
+      font-weight: 800;
+      padding: 7px 14px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all 0.1s ease;
+      border: 2px solid var(--game-navy);
+      user-select: none;
+      text-decoration: none;
+      color: var(--game-navy);
+      background: var(--game-cream);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+    }
+    .btn:hover {
+      background: #ffffff;
+      transform: translateY(-1px);
+      box-shadow: 0 3px 6px rgba(0, 0, 0, 0.35);
+    }
+    .btn:active {
+      transform: translateY(1px);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    }
+    .btn-sm {
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+    .btn-xs {
+      padding: 3px 8px;
+      font-size: 11px;
+      border-radius: 4px;
+      border-width: 1.5px;
+    }
+    
+    /* Button Variations */
+    .btn-gold {
+      background: var(--game-mustard-gold);
+      color: var(--game-navy);
+      border-color: var(--game-navy);
+    }
+    .btn-gold:hover {
+      background: var(--game-pale-gold);
+    }
+    .btn-prestige {
+      background: var(--game-ketchup-red);
+      color: var(--game-cream);
+      border-color: var(--game-ink-navy);
+    }
+    .btn-prestige:hover {
+      background: #c94931;
+      color: #fff;
+    }
+    .btn-cycle {
+      background: var(--game-cycle-blue);
+      color: var(--game-cream);
+      border-color: var(--game-ink-navy);
+    }
+    .btn-cycle:hover {
+      background: #739ccf;
+    }
+    .btn-money {
+      background: var(--game-money-green);
+      color: var(--game-ink-navy);
+      border-color: var(--game-ink-navy);
+    }
+    .btn-money:hover {
+      background: #92bd90;
+    }
+    .btn-teal {
+      background: var(--game-atomic-teal);
+      color: var(--game-navy);
+      border-color: var(--game-navy);
+    }
+    .btn-teal:hover {
+      background: #b5e8e4;
+    }
+    .btn-danger {
+      background: rgba(181, 64, 42, 0.15);
+      border-color: var(--game-ketchup-red);
+      color: var(--game-ketchup-red);
+    }
+    .btn-danger:hover {
+      background: var(--game-ketchup-red);
+      color: var(--game-cream);
+    }
+
+    /* ── Subheader Controls & Filters ── */
+    .subheader-bar {
+      padding: 8px 24px;
+      background: var(--game-ink-navy);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+      max-width: 1800px;
+      margin: 0 auto;
+    }
+
+    .filter-group-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      flex: 1;
+    }
+
+    .search-box {
+      position: relative;
+      min-width: 250px;
+      flex: 1;
+      max-width: 360px;
+    }
+    .search-box input {
+      width: 100%;
+      background: var(--game-cream);
+      border: 2px solid var(--game-navy);
+      border-radius: var(--radius-sm);
+      padding: 7px 12px 7px 34px;
+      color: var(--game-navy);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      outline: none;
+    }
+    .search-box input:focus {
+      border-color: var(--game-mustard-gold);
+      background: #ffffff;
+    }
+    .search-box .search-icon {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--game-navy);
+      font-weight: bold;
+      pointer-events: none;
+    }
+
+    .category-pills {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-wrap: wrap;
+    }
+
+    .pill-btn {
+      background: var(--game-navy);
+      border: 2px solid var(--game-navy-light);
+      color: var(--game-cream);
+      font-family: 'Outfit', sans-serif;
+      font-size: 12px;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.1s;
+    }
+    .pill-btn:hover {
+      border-color: var(--game-mustard-gold);
+      color: var(--game-mustard-gold);
+    }
+    .pill-btn.active {
+      background: var(--game-mustard-gold);
+      border-color: var(--game-dark-gold);
+      color: var(--game-navy);
+    }
+    .pill-count {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      background: rgba(0, 0, 0, 0.25);
+      color: inherit;
+      padding: 1px 5px;
+      border-radius: 3px;
+    }
+
+    .filter-group-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .select-control {
+      background: var(--game-cream);
+      border: 2px solid var(--game-navy);
+      border-radius: var(--radius-sm);
+      padding: 6px 10px;
+      color: var(--game-navy);
+      font-family: 'Outfit', sans-serif;
+      font-size: 12px;
+      font-weight: 800;
+      outline: none;
+      cursor: pointer;
+    }
+    .select-control:focus {
+      border-color: var(--game-mustard-gold);
+    }
+
+    /* ── Main Catalog Layout ── */
+    main.main-layout {
+      max-width: 1800px;
+      margin: 16px auto 0;
+      padding: 0 24px;
+    }
+
+    /* ── Category Section: Godot Filled Accent Plates ── */
+    .category-section {
+      margin-bottom: 20px;
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      box-shadow: var(--shadow-game);
+      border: 3px solid var(--game-navy);
+      background: var(--game-navy);
+    }
+
+    .category-header {
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+      border-bottom: 2px solid var(--game-navy);
+      font-family: 'Outfit', sans-serif;
+    }
+
+    /* Authentic Category Accent Colors from LegacyScreen.gd */
+    .cat-plate-wealth {
+      background: var(--game-mustard-gold);
+      color: var(--game-navy);
+    }
+    .cat-plate-operations {
+      background: var(--game-cycle-blue);
+      color: var(--game-cream);
+    }
+    .cat-plate-career {
+      background: var(--game-atomic-teal);
+      color: var(--game-navy);
+    }
+    .cat-plate-legacy {
+      background: var(--game-ketchup-red);
+      color: var(--game-cream);
+    }
+    .cat-plate-labor {
+      background: var(--game-brick);
+      color: var(--game-cream);
+    }
+    .cat-plate-frenzy {
+      background: var(--game-dark-gold);
+      color: var(--game-cream);
+    }
+    .cat-plate-rush {
+      background: var(--game-purple);
+      color: var(--game-cream);
+    }
+    .cat-plate-default {
+      background: var(--game-navy-light);
+      color: var(--game-cream);
+    }
+
+    .cat-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .cat-name {
+      font-size: 17px;
+      font-weight: 900;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .cat-meta-desc {
+      font-size: 12px;
+      font-weight: 600;
+      opacity: 0.85;
+      margin-left: 8px;
+    }
+
+    .cat-stats-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .cat-stat-chip {
+      font-size: 12px;
+      font-weight: 700;
+      background: rgba(0, 0, 0, 0.25);
+      padding: 3px 8px;
+      border-radius: var(--radius-xs);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    .cat-stat-chip strong {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .collapse-chevron {
+      font-size: 13px;
+      font-weight: 900;
+      transition: transform 0.2s;
+    }
+    .category-section.collapsed .collapse-chevron {
+      transform: rotate(-90deg);
+    }
+    .category-section.collapsed .category-body {
+      display: none;
+    }
+
+    .category-body {
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      background: var(--game-ink-navy);
+    }
+
+    /* ── FULL-WIDTH SHORT ROW UPGRADE ENTRY (Godot Cream Card) ── */
+    .upgrade-row {
+      background: var(--game-cream);
+      border: 3px solid var(--game-mustard-gold);
+      border-radius: var(--radius-sm);
+      padding: 8px 14px;
+      display: grid;
+      grid-template-columns: 240px 1fr 180px 250px 110px;
+      align-items: center;
+      gap: 12px;
+      box-shadow: var(--shadow-card);
+      transition: all 0.12s ease;
+      color: var(--game-navy);
+    }
+    .upgrade-row:nth-child(even) {
+      background: var(--game-cream-light);
+    }
+    .upgrade-row:hover {
+      background: #ffffff;
+      border-color: var(--game-dark-gold);
+      transform: translateY(-1px);
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.35);
+    }
+
+    /* Col 1: Identity */
+    .row-col-identity {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+    .row-name {
+      font-family: 'Outfit', sans-serif;
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--game-navy);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .row-tags {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+    .card-id-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--game-navy);
+      background: var(--game-pale-gold);
+      border: 1px solid var(--game-dark-gold);
+      padding: 1px 5px;
+      border-radius: 3px;
+      cursor: help;
+    }
+    .req-tag {
+      font-size: 10px;
+      font-weight: 800;
+      color: var(--game-cream);
+      background: var(--game-ketchup-red);
+      padding: 1px 5px;
+      border-radius: 3px;
+      cursor: help;
+    }
+
+    /* Col 2: Desc & Effect */
+    .row-col-desc {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+    .row-desc-text {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--game-dark-gray);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .row-effect-pill {
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--game-dark-money-green);
+      background: rgba(125, 168, 123, 0.2);
+      padding: 2px 8px;
+      border-radius: 4px;
+      border-left: 3px solid var(--game-dark-money-green);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      width: fit-content;
+      cursor: help;
+    }
+
+    /* Col 3: Economics & Cap */
+    .row-col-econ {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      font-size: 11px;
+      color: var(--game-dark-gray);
+      font-weight: 700;
+    }
+    .econ-line {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+    .econ-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      color: var(--game-navy);
+    }
+
+    /* Col 4: Interactive Level Stepper & Cost */
+    .row-col-stepper {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      background: var(--game-navy);
+      padding: 6px 10px;
+      border-radius: var(--radius-xs);
+      border: 1px solid var(--game-dark-gold);
+      color: var(--game-cream);
+    }
+    .stepper-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+    }
+    .stepper-lvl-title {
+      font-weight: 800;
+      color: var(--game-cream);
+      font-family: 'Outfit', sans-serif;
+    }
+    .stepper-cost {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 11px;
+      color: var(--game-mustard-gold);
+    }
+    .stepper-slider {
+      width: 100%;
+      accent-color: var(--game-mustard-gold);
+      height: 4px;
+      cursor: pointer;
+    }
+
+    /* Col 5: Actions */
+    .row-col-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 4px;
+    }
+
+    /* ── Live Modal Visualizer Box ── */
+    .modal-visualizer-box {
+      background: var(--game-ink-navy);
+      border: 2px solid var(--game-mustard-gold);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      color: var(--game-cream);
+    }
+    .vis-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--game-mustard-gold);
+      font-family: 'Outfit', sans-serif;
+    }
+    .vis-stat-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+    .vis-stat-card {
+      background: var(--game-navy);
+      border: 1px solid var(--game-dark-gold);
+      border-radius: var(--radius-xs);
+      padding: 6px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .vis-stat-label {
+      font-size: 10px;
+      font-weight: 800;
+      color: var(--game-mid-gray);
+      text-transform: uppercase;
+    }
+    .vis-stat-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--game-cream);
+    }
+    .vis-stat-val.highlight {
+      color: var(--game-atomic-teal);
+    }
+    .vis-stat-val.gold {
+      color: var(--game-mustard-gold);
+    }
+    .vis-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .vis-table th {
+      text-align: left;
+      padding: 4px 6px;
+      color: var(--game-mustard-gold);
+      border-bottom: 1px solid var(--game-navy-light);
+      background: var(--game-navy);
+    }
+    .vis-table td {
+      padding: 4px 6px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      color: var(--game-cream);
+      cursor: pointer;
+    }
+    .vis-table tr:hover td {
+      background: rgba(227, 178, 60, 0.2);
+    }
+
+    /* ── Modals (Godot Theme) ── */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(13, 24, 48, 0.88);
+      backdrop-filter: blur(6px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s ease;
+    }
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-window {
+      background: var(--game-cream);
+      border: 4px solid var(--game-navy);
+      border-radius: var(--radius-lg);
+      width: 100%;
+      max-width: 820px;
+      max-height: 92vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
+      transform: scale(0.97);
+      transition: transform 0.15s ease;
+      overflow: hidden;
+      color: var(--game-navy);
+    }
+    .modal-overlay.active .modal-window {
+      transform: scale(1);
+    }
+
+    .modal-header {
+      padding: 14px 20px;
+      background: var(--game-navy);
+      border-bottom: 3px solid var(--game-mustard-gold);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--game-cream);
+    }
+    .modal-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 19px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+    }
+    .modal-close-btn {
+      background: transparent;
+      border: none;
+      color: var(--game-cream);
+      font-size: 20px;
+      font-weight: bold;
+      cursor: pointer;
+      padding: 4px;
+    }
+    .modal-close-btn:hover {
+      color: var(--game-mustard-gold);
+    }
+
+    .modal-body {
+      padding: 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      background: var(--game-cream);
+    }
+
+    .modal-footer {
+      padding: 14px 20px;
+      background: var(--game-cream-dark);
+      border-top: 2px solid var(--game-navy);
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    /* Form Fields */
+    .form-grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .form-grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+    }
+
+    .form-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .form-label {
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--game-navy);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: help;
+      font-family: 'Outfit', sans-serif;
+    }
+    .form-input, .form-textarea, .form-select {
+      background: #ffffff;
+      border: 2px solid var(--game-navy);
+      border-radius: var(--radius-xs);
+      padding: 8px 10px;
+      color: var(--game-navy);
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      outline: none;
+    }
+    .form-input:focus, .form-textarea:focus, .form-select:focus {
+      border-color: var(--game-dark-gold);
+      background: var(--game-cream-light);
+    }
+    .form-textarea {
+      min-height: 55px;
+      resize: vertical;
+    }
+    .tt-code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      background: var(--game-pale-gold);
+      padding: 1px 4px;
+      border-radius: 3px;
+      color: var(--game-navy);
+    }
+
+    /* ── Floating Tooltip ── */
+    #global-tooltip {
+      position: fixed;
+      z-index: 9999;
+      pointer-events: none;
+      background: var(--game-ink-navy);
+      border: 2px solid var(--game-mustard-gold);
+      border-radius: var(--radius-sm);
+      padding: 8px 12px;
+      max-width: 380px;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6);
+      font-size: 12px;
+      line-height: 1.4;
+      color: var(--game-cream);
+      opacity: 0;
+      transition: opacity 0.12s ease;
+    }
+    #global-tooltip.active {
+      opacity: 1;
+    }
+    .tt-header {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 800;
+      color: var(--game-mustard-gold);
+      font-size: 13px;
+      margin-bottom: 3px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* ── Estate Office Store Simulator ── */
+    .game-screen-wrapper {
+      background: var(--game-ink-navy);
+      border: 3px solid var(--game-navy);
+      border-radius: 10px;
+      padding: 14px;
+      color: var(--game-navy);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    .game-tab-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 22px;
+      font-weight: 900;
+      color: var(--game-cream);
+      text-align: center;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    }
+
+    .game-wallet-plate {
+      background: var(--game-navy);
+      border: 2px solid var(--game-mustard-gold);
+      border-radius: 6px;
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .game-wallet-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .game-wallet-amount {
+      font-family: 'Outfit', sans-serif;
+      font-size: 20px;
+      font-weight: 900;
+      color: var(--game-mustard-gold);
+    }
+
+    .game-cards-scroll {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 52vh;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .game-section-header {
+      background: var(--game-mustard-gold);
+      color: var(--game-navy);
+      border: 2px solid var(--game-navy);
+      border-radius: 4px;
+      padding: 6px 10px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 14px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .game-upgrade-card {
+      background: var(--game-cream);
+      border: 3px solid var(--game-mustard-gold);
+      border-radius: 6px;
+      padding: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.25);
+    }
+
+    .game-card-left {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .game-card-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--game-navy);
+    }
+    .game-card-level {
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--game-dark-money-green);
+    }
+    .game-card-desc {
+      font-size: 11px;
+      color: var(--game-dark-gray);
+      line-height: 1.3;
+    }
+
+    .game-buy-btn {
+      background: var(--game-mustard-gold);
+      color: var(--game-navy);
+      border: 2px solid var(--game-navy);
+      border-radius: 5px;
+      padding: 6px 12px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .game-buy-btn:hover:not(:disabled) {
+      background: var(--game-pale-gold);
+      transform: translateY(-1px);
+    }
+    .game-buy-btn:disabled {
+      background: var(--game-mid-gray);
+      color: var(--game-dark-gray);
+      border-color: var(--game-dark-gray);
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    /* ── Toast Notifications ── */
+    #toast-container {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+    }
+    .toast {
+      background: var(--game-navy);
+      border: 2px solid var(--game-mustard-gold);
+      border-radius: var(--radius-sm);
+      padding: 9px 16px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--game-cream);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      animation: toastIn 0.2s ease;
+    }
+    .toast.success { border-color: var(--game-money-green); color: var(--game-cream); }
+    .toast.error { border-color: var(--game-ketchup-red); color: var(--game-cream); }
+    @keyframes toastIn {
+      from { transform: translateY(15px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Sticky Top Control Center (Godot Estate Tab Aesthetics) -->
+  <div class="sticky-top-container">
+    <header class="app-header">
+      <div class="header-content">
+        
+        <div class="brand-group">
+          <div class="brand-icon-wrap">💎</div>
+          <div>
+            <h1 class="brand-title">ESTATE PLANNING <span>Legacy Studio</span></h1>
+          </div>
+          <span class="brand-badge">Editor & Balance</span>
+        </div>
+
+        <div class="header-stats">
+          <div class="stat-pill" data-tooltip="Total number of Legacy Upgrades currently configured in the catalog.">
+            <span>Upgrades:</span>
+            <strong id="stat-total-upgrades">0</strong>
+          </div>
+          <div class="stat-pill" data-tooltip="Total distinct categories grouping the estate shop perks.">
+            <span>Categories:</span>
+            <strong id="stat-total-cats">0</strong>
+          </div>
+          <div class="stat-pill" data-tooltip="Compounding accelerator tracks with uncapped max level (9999) governed by steepening cost curves.">
+            <span>Uncapped:</span>
+            <strong id="stat-uncapped">0</strong>
+          </div>
+          <div class="stat-pill gems" data-tooltip="Total Legacy Gems required to max all finite upgrade tracks.">
+            <span>💎 Capped Sink:</span>
+            <strong id="stat-gem-sink">0</strong>
+          </div>
+          <div class="stat-pill dirty" id="stat-dirty-wrap" style="display: none;" data-tooltip="Unsaved changes detected against project files. Press 'Save to Project' to persist.">
+            <span>⚠️ Unsaved:</span>
+            <strong id="stat-dirty-count">0</strong>
+          </div>
+        </div>
+
+        <div class="header-actions">
+          <button class="btn btn-gold" onclick="openAddUpgradeModal()" data-tooltip="Create a brand new Legacy Upgrade with custom formulas and parameters.">
+            <span>+ Add Upgrade</span>
+          </button>
+          <button class="btn btn-teal" onclick="openCategoriesModal()" data-tooltip="Manage upgrade categories, descriptions, ordering, and theme accents.">
+            <span>⚙️ Categories</span>
+          </button>
+          <button class="btn" onclick="openTuningModal()" data-tooltip="Adjust global tuning coefficients including cost_multiplier (3.0) and cost_steepening (1.1).">
+            <span>🎛️ Tuning</span>
+          </button>
+          <button class="btn btn-cycle" onclick="openStoreSimulatorModal()" data-tooltip="Test and preview the in-game Estate Office store screen in authentic Godot game palette.">
+            <span>🏪 Store Simulator</span>
+          </button>
+          <button class="btn btn-money" onclick="saveDataToServer()" data-tooltip="Save all changes directly to tools/legacy_upgrades_data.json and Plans/Legacy_Upgrades_Export.json.">
+            <span>💾 Save to Project</span>
+          </button>
+          <button class="btn btn-prestige" onclick="openExportModal()" data-tooltip="Export as JSON, generate Godot GDScript code, or view diffs.">
+            <span>📤 Export / Code</span>
+          </button>
+        </div>
+
+      </div>
+    </header>
+
+    <!-- Subheader Filter & Search Bar -->
+    <div class="subheader-bar">
+      <div class="filter-group-left">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="search-input" placeholder="Search upgrades by name, ID, effect..." oninput="handleSearchFilter()">
+        </div>
+
+        <div class="category-pills" id="category-pills-container">
+          <!-- Dynamic Category Pills -->
+        </div>
+      </div>
+
+      <div class="filter-group-right">
+        <select class="select-control" id="filter-effect-type" onchange="handleSearchFilter()" data-tooltip="Filter upgrades by mathematical effect model.">
+          <option value="all">All Effects</option>
+          <option value="compounding_multiplier">Compounding Multipliers (×)</option>
+          <option value="additive_dollars">Additive Cash (+$)</option>
+          <option value="additive_percent">Additive Percent (+%)</option>
+          <option value="reduction_percent">Discounts / Reductions (−%)</option>
+          <option value="unlock">Unlocks & Features</option>
+          <option value="additive_seconds">Time & Cadence</option>
+        </select>
+
+        <select class="select-control" id="filter-cap" onchange="handleSearchFilter()" data-tooltip="Filter by capped vs uncapped tracks.">
+          <option value="all">All Caps</option>
+          <option value="capped">Capped Only</option>
+          <option value="uncapped">Uncapped Only</option>
+        </select>
+
+        <select class="select-control" id="sort-control" onchange="handleSearchFilter()" data-tooltip="Sort cards by catalog order, cost, or name.">
+          <option value="catalog">Sort: Catalog Order</option>
+          <option value="name_asc">Sort: Name (A → Z)</option>
+          <option value="base_cost_asc">Sort: Base Cost (Low → High)</option>
+          <option value="base_cost_desc">Sort: Base Cost (High → Low)</option>
+          <option value="max_level_asc">Sort: Max Level</option>
+        </select>
+
+        <button class="btn btn-sm" onclick="toggleAllCategories()" data-tooltip="Expand or collapse all category sections.">
+          <span id="expand-all-text">Collapse All</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content Layout -->
+  <main class="main-layout" id="catalog-container">
+    <!-- Category Sections & Full-Width Short Rows Rendered Here -->
+  </main>
+
+  <!-- Global Floating Tooltip -->
+  <div id="global-tooltip">
+    <div class="tt-header" id="tt-title">Tooltip Title</div>
+    <div id="tt-body">Tooltip Content</div>
+  </div>
+
+  <!-- Edit / Add Upgrade Modal with Live Balance & Bonus Visualizer -->
+  <div class="modal-overlay" id="upgrade-modal">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modal-upgrade-title">Edit Legacy Upgrade</h2>
+        <button class="modal-close-btn" onclick="closeModal('upgrade-modal')">✕</button>
+      </div>
+      <div class="modal-body">
+        
+        <div class="form-grid-2">
+          <div class="form-field">
+            <label class="form-label" data-tooltip="Stable programmatic string ID used in Godot GDScript and save files. Must be unique snake_case.">
+              <span>Upgrade ID</span>
+              <span class="tt-code">id</span>
+            </label>
+            <input type="text" id="inp-up-id" class="form-input" placeholder="e.g. frenzy_intensity" oninput="updateModalVisualizer()">
+          </div>
+          <div class="form-field">
+            <label class="form-label" data-tooltip="Display title shown on the Estate Office card and in-game shop UI.">
+              <span>Display Name</span>
+              <span class="tt-code">name</span>
+            </label>
+            <input type="text" id="inp-up-name" class="form-input" placeholder="e.g. Killer Instinct" oninput="updateModalVisualizer()">
+          </div>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-field">
+            <label class="form-label" data-tooltip="Category grouping within the shop (Wealth, Operations, Frenzy, Rush, Career, Legacy, Labor).">
+              <span>Category</span>
+            </label>
+            <select id="inp-up-category" class="form-select"></select>
+          </div>
+          <div class="form-field">
+            <label class="form-label" data-tooltip="Prerequisite upgrade ID that must be owned at level >= 1 before this perk can be purchased.">
+              <span>Prerequisite (Requires)</span>
+            </label>
+            <select id="inp-up-requires" class="form-select">
+              <option value="">None (Standalone)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label class="form-label" data-tooltip="Flavorful description sentence explaining what this dynasty upgrade represents.">
+            <span>Description</span>
+          </label>
+          <textarea id="inp-up-desc" class="form-textarea" placeholder="e.g. Frenzies burn hotter."></textarea>
+        </div>
+
+        <div class="form-grid-3">
+          <div class="form-field">
+            <label class="form-label" data-tooltip="Maximum purchasable level. Use 9999 for uncapped compounding tracks.">
+              <span>Max Level</span>
+            </label>
+            <input type="number" id="inp-up-max-level" class="form-input" min="1" max="9999" value="20" oninput="updateModalVisualizer()">
+          </div>
+          <div class="form-field">
+            <label class="form-label" data-tooltip="Raw base gem cost before global multiplier (3.0×). Level 1 cost = floor(base_cost * cost_multiplier).">
+              <span>Base Cost (Raw)</span>
+            </label>
+            <input type="number" id="inp-up-base-cost" class="form-input" min="0.1" step="0.1" value="1.0" oninput="updateModalVisualizer()">
+          </div>
+          <div class="form-field">
+            <label class="form-label" data-tooltip="Geometric cost growth multiplier per level (e.g. 1.8 means each step costs 1.8× more).">
+              <span>Cost Growth</span>
+            </label>
+            <input type="number" id="inp-up-growth" class="form-input" min="1.0" step="0.05" value="1.8" oninput="updateModalVisualizer()">
+          </div>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-field">
+            <label class="form-label" data-tooltip="How this upgrade's level translates into concrete in-game bonuses and getters.">
+              <span>Effect Formula Model</span>
+            </label>
+            <select id="inp-up-effect-type" class="form-select" onchange="updateModalVisualizer()">
+              <option value="compounding_multiplier">Compounding Multiplier (×)</option>
+              <option value="additive_dollars">Additive Dollars (+$)</option>
+              <option value="additive_percent">Additive Percent (+%)</option>
+              <option value="reduction_percent">Discount / Reduction (−%)</option>
+              <option value="additive_seconds">Additive Seconds (s)</option>
+              <option value="additive_count">Additive Count (Holdings / Properties)</option>
+              <option value="unlock">Feature Unlock</option>
+              <option value="special">Special / Multi-axial</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label class="form-label" data-tooltip="Raw numeric magnitude added or multiplied per purchased level.">
+              <span>Effect Per Level</span>
+            </label>
+            <input type="number" id="inp-up-effect-val" class="form-input" step="any" value="0.15" oninput="updateModalVisualizer()">
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label class="form-label" data-tooltip="Formatted human-readable string explaining the effect per level.">
+            <span>Effect Description Template</span>
+          </label>
+          <input type="text" id="inp-up-effect-desc" class="form-input" placeholder="e.g. +15% frenzy multiplier per level">
+        </div>
+
+        <!-- LIVE PRICE STRUCTURE & RELATIVE BONUS VISUALIZER -->
+        <div class="modal-visualizer-box">
+          <div class="vis-header">
+            <span>📊 Live Price Structure & Relative Bonus Visualizer</span>
+            <span id="vis-selected-lvl-title" style="color: var(--game-mustard-gold); font-family: 'JetBrains Mono';">Base Stat (Level 0)</span>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <input type="range" class="stepper-slider" id="vis-slider" min="0" max="20" value="0" oninput="handleModalVisSlider(this.value)">
+          </div>
+
+          <div class="vis-stat-grid">
+            <div class="vis-stat-card">
+              <span class="vis-stat-label">Level Cost</span>
+              <span class="vis-stat-val gold" id="vis-stat-cost">0 💎 (Base)</span>
+            </div>
+            <div class="vis-stat-card">
+              <span class="vis-stat-label">Cumulative Sink</span>
+              <span class="vis-stat-val" id="vis-stat-cum">0 💎</span>
+            </div>
+            <div class="vis-stat-card">
+              <span class="vis-stat-label">Relative Gain</span>
+              <span class="vis-stat-val highlight" id="vis-stat-gain">Baseline (0%)</span>
+            </div>
+            <div class="vis-stat-card">
+              <span class="vis-stat-label">Concrete Game Value</span>
+              <span class="vis-stat-val" id="vis-stat-concrete">5.60× TURBO</span>
+            </div>
+          </div>
+
+          <div style="max-height: 140px; overflow-y: auto; border: 1px solid var(--game-navy-light); border-radius: var(--radius-xs);">
+            <table class="vis-table">
+              <thead>
+                <tr>
+                  <th>Level</th>
+                  <th>Gem Cost</th>
+                  <th>Cumulative</th>
+                  <th>Relative Multiplier</th>
+                  <th>Concrete In-Game Effect</th>
+                </tr>
+              </thead>
+              <tbody id="vis-table-body">
+                <!-- Milestone rows starting at Level 0 -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label class="form-label" data-tooltip="Design rationale, balance history, and economy notes.">
+            <span>Balance & Design Notes</span>
+          </label>
+          <textarea id="inp-up-notes" class="form-textarea" placeholder="Explain the economic intent, cap rationale, or why this track exists..."></textarea>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeModal('upgrade-modal')">Cancel</button>
+        <button class="btn btn-gold" onclick="saveUpgradeFromModal()">Apply Upgrade Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Categories Management Modal -->
+  <div class="modal-overlay" id="categories-modal">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h2 class="modal-title">Manage Categories</h2>
+        <button class="modal-close-btn" onclick="closeModal('categories-modal')">✕</button>
+      </div>
+      <div class="modal-body" id="categories-list-container"></div>
+      <div class="modal-footer">
+        <button class="btn btn-teal" onclick="addNewCategoryRow()">+ New Category</button>
+        <button class="btn btn-gold" onclick="saveCategoriesFromModal()">Save Categories</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Global Tuning Modal -->
+  <div class="modal-overlay" id="tuning-modal">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h2 class="modal-title">Global Economy & Tuning Knobs</h2>
+        <button class="modal-close-btn" onclick="closeModal('tuning-modal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 13px; color: var(--game-dark-gray); font-weight: 600;">
+          These global knobs match <code class="tt-code">game/config/tuning.tres</code> and govern cost scaling across all Legacy upgrades.
+        </p>
+        
+        <div class="form-grid-2">
+          <div class="form-field">
+            <label class="form-label" data-tooltip="Global multiplier applied to EVERY legacy upgrade's cost (default 3.0). Scaled in LegacyUpgradeCatalog.cost_for_level.">
+              <span>Cost Multiplier</span>
+              <span class="tt-code">legacy_upgrade_cost_multiplier</span>
+            </label>
+            <input type="number" id="tune-cost-mult" class="form-input" step="0.1" value="3.0">
+          </div>
+          <div class="form-field">
+            <label class="form-label" data-tooltip="Closed form runaway brake: cost(n) scales by s^((n-1)(n-2)/2). Default 1.1 steepens costs infinitely so uncapped compounders stay bounded.">
+              <span>Cost Steepening</span>
+              <span class="tt-code">legacy_cost_steepening</span>
+            </label>
+            <input type="number" id="tune-cost-steep" class="form-input" step="0.01" value="1.1">
+          </div>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-field">
+            <label class="form-label" data-tooltip="Prestige curve coefficient: legacy_gain = k_legacy * estate_net ^ alpha_legacy.">
+              <span>k_legacy (Prestige Scale)</span>
+              <span class="tt-code">k_legacy</span>
+            </label>
+            <input type="number" id="tune-k-legacy" class="form-input" step="0.01" value="0.16">
+          </div>
+          <div class="form-field">
+            <label class="form-label" data-tooltip="Prestige curve exponent (0.35). Steeper exponent rewards pushing deep into endgame epochs.">
+              <span>alpha_legacy (Prestige Exponent)</span>
+              <span class="tt-code">alpha_legacy</span>
+            </label>
+            <input type="number" id="tune-alpha-legacy" class="form-input" step="0.01" value="0.35">
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeModal('tuning-modal')">Close</button>
+        <button class="btn btn-gold" onclick="saveTuningFromModal()">Update Tuning</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Estate Office Store Simulator (Canonical Game Palette) -->
+  <div class="modal-overlay" id="store-modal">
+    <div class="modal-window" style="max-width: 520px; background: var(--game-ink-navy); border: 3px solid var(--game-navy);">
+      <div class="modal-header" style="border-bottom: 2px solid var(--game-navy); background: rgba(0,0,0,0.2);">
+        <h2 class="modal-title" style="color: var(--game-cream); font-family: 'Outfit';">🏪 Estate Office Simulator</h2>
+        <button class="modal-close-btn" style="color: var(--game-cream);" onclick="closeModal('store-modal')">✕</button>
+      </div>
+      <div class="modal-body" style="padding: 14px; background: var(--game-ink-navy);">
+        
+        <div class="game-screen-wrapper">
+          <div class="game-tab-title">ESTATE PLANNING</div>
+
+          <div class="game-wallet-plate">
+            <div class="game-wallet-left">
+              <span style="font-size: 20px;">💎</span>
+              <span class="game-wallet-amount" id="sim-wallet-amount">1,000</span>
+            </div>
+            <div style="display: flex; gap: 4px;">
+              <button class="btn btn-xs btn-gold" onclick="addSimWallet(100)">+100</button>
+              <button class="btn btn-xs btn-gold" onclick="addSimWallet(1000)">+1K</button>
+              <button class="btn btn-xs btn-gold" onclick="addSimWallet(10000)">+10K</button>
+              <button class="btn btn-xs btn-prestige" onclick="resetSimWallet()">Reset</button>
+            </div>
+          </div>
+
+          <div class="game-cards-scroll" id="sim-cards-container">
+            <!-- Simulated game cards rendered with exact Godot cream/gold palette -->
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer" style="border-top: 2px solid var(--game-navy); background: var(--game-ink-navy);">
+        <button class="btn btn-gold" onclick="closeModal('store-modal')">Close Simulator</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Export & GDScript Modal -->
+  <div class="modal-overlay" id="export-modal">
+    <div class="modal-window" style="max-width: 860px;">
+      <div class="modal-header">
+        <h2 class="modal-title">Export & Code Generation</h2>
+        <button class="modal-close-btn" onclick="closeModal('export-modal')">✕</button>
+      </div>
+      <div class="modal-body">
+        
+        <div style="display: flex; gap: 8px; border-bottom: 2px solid var(--game-navy-light); padding-bottom: 10px;">
+          <button class="btn btn-sm btn-gold" id="tab-btn-gdscript" onclick="switchExportTab('gdscript')">Godot GDScript</button>
+          <button class="btn btn-sm" id="tab-btn-json" onclick="switchExportTab('json')">JSON Database</button>
+        </div>
+
+        <div id="export-tab-content-gdscript">
+          <p style="font-size: 12px; color: var(--game-dark-gray); margin-bottom: 6px; font-weight: 600;">
+            Exact GDScript code format for <code class="tt-code">game/scripts/core/LegacyUpgradeCatalog.gd</code>.
+          </p>
+          <textarea id="gdscript-output" class="form-textarea" style="height: 320px; font-family: 'JetBrains Mono', monospace; font-size: 11px; white-space: pre;" readonly></textarea>
+        </div>
+
+        <div id="export-tab-content-json" style="display: none;">
+          <p style="font-size: 12px; color: var(--game-dark-gray); margin-bottom: 6px; font-weight: 600;">
+            Full structured JSON database format.
+          </p>
+          <textarea id="json-output" class="form-textarea" style="height: 320px; font-family: 'JetBrains Mono', monospace; font-size: 11px; white-space: pre;" readonly></textarea>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="copyExportToClipboard()">📋 Copy to Clipboard</button>
+        <button class="btn btn-teal" onclick="downloadExportJson()">💾 Download JSON File</button>
+        <button class="btn btn-money" onclick="applyGDScriptToProject()">🚀 Apply Directly to Godot Game</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notifications Container -->
+  <div id="toast-container"></div>
+
+  <script>
+    // State
+    let database = {
+      global_tuning: {
+        legacy_upgrade_cost_multiplier: 3.0,
+        legacy_cost_steepening: 1.1,
+        k_legacy: 0.16,
+        alpha_legacy: 0.35,
+        frenzy_max_multiplier: 5.6
+      },
+      categories: [],
+      upgrades: []
+    };
+
+    let originalSnapshot = "";
+    let collapsedCategories = new Set();
+    let currentCategoryFilter = "all";
+    let editingUpgradeId = null;
+    let exportActiveTab = "gdscript";
+    let simWallet = 1000;
+    let simLevels = {};
+    let modalVisLevel = 0; // Default to Level 0 (Base Stat)
+
+    // Initial Load
+    window.addEventListener("DOMContentLoaded", () => {
+      initTooltipSystem();
+      loadDatabase();
+    });
+
+    async function loadDatabase() {
+      try {
+        const res = await fetch("/api/data");
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        database = await res.json();
+        if (!database.global_tuning.frenzy_max_multiplier) {
+          database.global_tuning.frenzy_max_multiplier = 5.6;
+        }
+        originalSnapshot = JSON.stringify(database);
+        renderApp();
+        showToast("Estate Planning Database loaded", "success");
+      } catch (err) {
+        console.error("Failed to load database:", err);
+        showToast("Error loading database: " + err.message, "error");
+      }
+    }
+
+    // Math & Pricing Formulas
+    function calculateCostForLevel(upgrade, level) {
+      if (level < 1 || (upgrade.max_level && level > upgrade.max_level)) return 0;
+      const baseCost = Number(upgrade.base_cost) || 1.0;
+      const growth = Number(upgrade.cost_growth) || 1.0;
+      const multiplier = Number(database.global_tuning.legacy_upgrade_cost_multiplier) || 3.0;
+      const steepening = Number(database.global_tuning.legacy_cost_steepening) || 1.1;
+
+      const steps = level - 1;
+      const steepenTerm = Math.pow(steepening, (steps * (steps - 1.0)) / 2.0);
+      return Math.floor(baseCost * Math.pow(growth, steps) * steepenTerm * multiplier);
+    }
+
+    function calculateCumulativeCost(upgrade, targetLevel) {
+      if (targetLevel < 1) return 0;
+      let sum = 0;
+      for (let lvl = 1; lvl <= targetLevel; lvl++) {
+        sum += calculateCostForLevel(upgrade, lvl);
+      }
+      return sum;
+    }
+
+    // High-Precision Relative Bonus & Concrete Game Multiplier Computation
+    function getUpgradeEffectAnalysis(upgrade, level) {
+      const shownLevel = level;
+      const eff = Number(upgrade.effect_per_level) || 0;
+      const id = upgrade.id || "";
+      const baseTurbo = Number(database.global_tuning.frenzy_max_multiplier) || 5.6;
+
+      let pillText = "";
+      let concreteVal = "";
+      let relativeGainText = "";
+      let tooltipDetail = "";
+
+      // ── Level 0 (Base Stat Before Any Upgrade) ──────────────────────────
+      if (shownLevel === 0) {
+        if (id === "frenzy_intensity") {
+          pillText = `TURBO ${baseTurbo.toFixed(2)}× (Base Stat)`;
+          concreteVal = `${baseTurbo.toFixed(2)}× Multiplier`;
+          relativeGainText = `Baseline (0%)`;
+          tooltipDetail = `Killer Instinct (Base Stat / Level 0):\n• Base TURBO Multiplier: ${baseTurbo.toFixed(2)}×\n• Intensity Factor: ×1.00 (Unbought)`;
+        }
+        else if (id === "frenzy_duration") {
+          pillText = `TURBO 30.0s (Base Duration)`;
+          concreteVal = `30.0s Duration`;
+          relativeGainText = `Baseline (30s)`;
+          tooltipDetail = `Second Wind (Base Stat / Level 0):\n• Base TURBO Duration: 30.0s`;
+        }
+        else if (id === "family_fortune") {
+          pillText = `×1.00 Income (Base Stat)`;
+          concreteVal = `×1.00 Income`;
+          relativeGainText = `Baseline (0%)`;
+          tooltipDetail = `Family Fortune (Base Stat / Level 0):\n• Property Revenue Multiplier: 1.00×`;
+        }
+        else if (id === "efficiency") {
+          pillText = `×1.00 Speed (100.0% cycle length)`;
+          concreteVal = `×1.00 Speed`;
+          relativeGainText = `100.0% length`;
+          tooltipDetail = `Efficiency Experts (Base Stat / Level 0):\n• Cycle Speed Multiplier: 1.00×`;
+        }
+        else if (id === "connections") {
+          pillText = `×1.00 Wage/Tap (Base Stat)`;
+          concreteVal = `×1.00 Wage`;
+          relativeGainText = `Baseline (0%)`;
+          tooltipDetail = `Old-Money Connections (Base Stat / Level 0):\n• Active Tap Wage Multiplier: 1.00×`;
+        }
+        else if (id === "loyal_staff") {
+          pillText = `1.00× Staff Cost (Full Price)`;
+          concreteVal = `1.00× Cost`;
+          relativeGainText = `0% discount`;
+          tooltipDetail = `Loyal Staff (Base Stat / Level 0):\n• Staff Hiring Discount: 0%`;
+        }
+        else if (id === "seed_capital") {
+          pillText = `+$0 Starting Cash (Base Stat)`;
+          concreteVal = `+$0 Cash`;
+          relativeGainText = `+$0`;
+          tooltipDetail = `Trust Fund (Base Stat / Level 0):\n• Extra Starting Cash: $0`;
+        }
+        else if (id === "cooling_systems") {
+          pillText = `+0.0% Cruise (+25.0% Base Cruise)`;
+          concreteVal = `+25.0% Cruise`;
+          relativeGainText = `+0.0% added`;
+          tooltipDetail = `Cooling Systems (Base Stat / Level 0):\n• Tuned Base Cruise: +25.0%`;
+        }
+        else if (id === "rapid_restart") {
+          pillText = `1.00× Lockout Time (Full Lockout)`;
+          concreteVal = `1.00× Lockout`;
+          relativeGainText = `0% reduction`;
+          tooltipDetail = `Rapid Restart (Base Stat / Level 0):\n• Overheat Lockout Duration: 100% (No reduction)`;
+        }
+        else if (id === "estate_lawyers") {
+          pillText = `1.00× Legacy Yield (0% bonus)`;
+          concreteVal = `1.00× Yield`;
+          relativeGainText = `0% bonus`;
+          tooltipDetail = `Estate Lawyers (Base Stat / Level 0):\n• Succession Legacy Yield Multiplier: 1.00×`;
+        }
+        else if (id === "minigame_bonus") {
+          pillText = `Up to +25.0% Inheritance Bonus (Base Cap)`;
+          concreteVal = `+25.0% Cap`;
+          relativeGainText = `+0.0% added`;
+          tooltipDetail = `Family Reputation (Base Stat / Level 0):\n• Base Minigame Performance Cap: +25.0%`;
+        }
+        else if (id === "crisis_hedging") {
+          pillText = `50% Crash Income Retained (Base Crash)`;
+          concreteVal = `50% Retained`;
+          relativeGainText = `50% retained`;
+          tooltipDetail = `Hedging Strategies (Base Stat / Level 0):\n• Base Crash Retained Property Income: 50%`;
+        }
+        else if (id === "crisis_liquidity") {
+          pillText = `2.00 min Crash Duration (Base Duration)`;
+          concreteVal = `2.00 min`;
+          relativeGainText = `0% reduction`;
+          tooltipDetail = `Emergency Liquidity (Base Stat / Level 0):\n• Base Market Crash Duration: 2.00 minutes`;
+        }
+        else if (id === "extended_offline") {
+          pillText = `4h Offline Window (Base Cap)`;
+          concreteVal = `4h Cap`;
+          relativeGainText = `4h Base`;
+          tooltipDetail = `Night Shift (Base Stat / Level 0):\n• Base Offline Accrual Cap: 4 hours`;
+        }
+        else if (id === "auto_purchase_cadence") {
+          pillText = `3.00s Buy Interval (Base Cadence)`;
+          concreteVal = `3.00s Cadence`;
+          relativeGainText = `3.00s Base`;
+          tooltipDetail = `Standing Orders (Base Stat / Level 0):\n• Base Auto-Buy Interval: 3.00 seconds`;
+        }
+        else if (id === "auto_purchase_quantity") {
+          pillText = `1 Holding / Round (Base Desk)`;
+          concreteVal = `1 holding`;
+          relativeGainText = `1 holding Base`;
+          tooltipDetail = `Buying Power (Base Stat / Level 0):\n• Base Auto-Buy Volume: 1 holding per round`;
+        }
+        else if (id === "auto_purchase_unlock") {
+          pillText = `Locked (Manual Purchasing Only)`;
+          concreteVal = `Locked`;
+          relativeGainText = `Locked`;
+          tooltipDetail = `Acquisitions Desk (Base Stat / Level 0):\n• Mode is locked. Purchases are manual only.`;
+        }
+        else if (upgrade.effect_type === "compounding_multiplier") {
+          pillText = `×1.00 Multiplier (Base Stat)`;
+          concreteVal = `×1.00`;
+          relativeGainText = `Baseline (0%)`;
+          tooltipDetail = `Base Stat (Level 0):\n• Multiplier: 1.00×`;
+        }
+        else {
+          pillText = `Base Stat (Unbought)`;
+          concreteVal = `Base Stat`;
+          relativeGainText = `Base`;
+          tooltipDetail = `Base Stat before any purchased levels.`;
+        }
+
+        return { pillText, concreteVal, relativeGainText, tooltipDetail };
+      }
+
+      // ── Level >= 1 (Purchased Levels) ──────────────────────────────────
+      if (id === "frenzy_intensity") {
+        const intensityFactor = Math.pow(1.0 + eff, shownLevel);
+        const turboMultiplier = 1.0 + (baseTurbo - 1.0) * intensityFactor;
+        const gainPct = ((intensityFactor - 1.0) * 100).toFixed(1);
+        
+        pillText = `TURBO ${turboMultiplier.toFixed(2)}× (×${intensityFactor.toFixed(2)} pwr · +${gainPct}%)`;
+        concreteVal = `${turboMultiplier.toFixed(2)}× Multiplier`;
+        relativeGainText = `+${gainPct}% power`;
+        tooltipDetail = `Killer Instinct Level ${shownLevel}:\n• Base TURBO: ${baseTurbo.toFixed(2)}×\n• Intensity Factor: ×${intensityFactor.toFixed(2)}\n• Active TURBO Multiplier: ${turboMultiplier.toFixed(2)}×\n• Formula: 1.0 + (${baseTurbo} - 1.0) × (1.0 + ${eff})^${shownLevel}`;
+      }
+      else if (id === "frenzy_duration") {
+        const durationFactor = Math.pow(1.0 + eff, shownLevel);
+        const totalDuration = 30.0 * durationFactor;
+        const gainPct = ((durationFactor - 1.0) * 100).toFixed(1);
+
+        pillText = `TURBO ${totalDuration.toFixed(1)}s (×${durationFactor.toFixed(2)} dur · +${gainPct}%)`;
+        concreteVal = `${totalDuration.toFixed(1)}s Duration`;
+        relativeGainText = `+${gainPct}% time`;
+        tooltipDetail = `Second Wind Level ${shownLevel}:\n• Base Duration: 30.0s\n• Duration Factor: ×${durationFactor.toFixed(2)}\n• Active Duration: ${totalDuration.toFixed(1)}s`;
+      }
+      else if (id === "family_fortune") {
+        const mult = Math.pow(1.0 + eff, shownLevel);
+        const gainPct = ((mult - 1.0) * 100).toFixed(1);
+        pillText = `×${mult.toFixed(2)} Income (+${gainPct}%)`;
+        concreteVal = `×${mult.toFixed(2)} Income`;
+        relativeGainText = `+${gainPct}%`;
+        tooltipDetail = `Family Fortune Level ${shownLevel}:\n• Multiplier: ×${mult.toFixed(2)}\n• Formula: (1.0 + ${eff})^${shownLevel}`;
+      }
+      else if (id === "efficiency") {
+        const mult = Math.pow(1.0 + eff, shownLevel);
+        const timePct = (100.0 / mult).toFixed(1);
+        pillText = `×${mult.toFixed(2)} Speed (Cycles in ${timePct}% time)`;
+        concreteVal = `×${mult.toFixed(2)} Speed`;
+        relativeGainText = `${timePct}% cycle length`;
+        tooltipDetail = `Efficiency Experts Level ${shownLevel}:\n• Speed Multiplier: ×${mult.toFixed(2)}`;
+      }
+      else if (id === "connections") {
+        const mult = Math.pow(1.0 + eff, shownLevel);
+        const gainPct = ((mult - 1.0) * 100).toFixed(1);
+        pillText = `×${mult.toFixed(2)} Wage/Tap (+${gainPct}%)`;
+        concreteVal = `×${mult.toFixed(2)} Wage`;
+        relativeGainText = `+${gainPct}%`;
+        tooltipDetail = `Connections Level ${shownLevel}:\n• Wage Multiplier: ×${mult.toFixed(2)}`;
+      }
+      else if (id === "loyal_staff") {
+        const discountPct = Math.min(80, Math.round(eff * 100 * shownLevel));
+        const costScale = (1.0 - (discountPct / 100)).toFixed(2);
+        pillText = `−${discountPct}% Hire Cost (${costScale}× cost)`;
+        concreteVal = `${costScale}× Cost`;
+        relativeGainText = `−${discountPct}% cost`;
+        tooltipDetail = `Loyal Staff Level ${shownLevel}:\n• Discount: −${discountPct}%\n• Effective Hire Cost: ${costScale}×`;
+      }
+      else if (id === "seed_capital") {
+        const totalCash = eff * shownLevel;
+        pillText = `+$${totalCash.toLocaleString()} Starting Cash`;
+        concreteVal = `+$${totalCash.toLocaleString()}`;
+        relativeGainText = `+$${totalCash.toLocaleString()}`;
+        tooltipDetail = `Trust Fund Level ${shownLevel}:\n• Starting Cash: +$${totalCash.toLocaleString()}`;
+      }
+      else if (id === "cooling_systems") {
+        const cruiseBonusPct = (eff * 100 * shownLevel).toFixed(1);
+        const totalCruise = (25.0 + eff * 100 * shownLevel).toFixed(1);
+        pillText = `+${cruiseBonusPct}% Cruise (Total: +${totalCruise}%)`;
+        concreteVal = `+${totalCruise}% Cruise`;
+        relativeGainText = `+${cruiseBonusPct}% pts`;
+        tooltipDetail = `Cooling Systems Level ${shownLevel}:\n• Added Points: +${cruiseBonusPct}%\n• Effective Cruise Bonus: +${totalCruise}%`;
+      }
+      else if (id === "rapid_restart") {
+        const reductionPct = Math.min(50, Math.round(eff * 100 * shownLevel));
+        const scale = (1.0 - (reductionPct / 100)).toFixed(2);
+        pillText = `−${reductionPct}% Lockout (${scale}× time)`;
+        concreteVal = `${scale}× Lockout`;
+        relativeGainText = `−${reductionPct}% time`;
+        tooltipDetail = `Rapid Restart Level ${shownLevel}:\n• Reduction: −${reductionPct}%\n• Effective Lockout Scale: ${scale}×`;
+      }
+      else if (id === "estate_lawyers") {
+        const yieldBonusPct = (eff * 100 * shownLevel).toFixed(1);
+        pillText = `+${yieldBonusPct}% Gems (×${(1 + eff*shownLevel).toFixed(2)} yield)`;
+        concreteVal = `+${yieldBonusPct}% Yield`;
+        relativeGainText = `+${yieldBonusPct}%`;
+        tooltipDetail = `Estate Lawyers Level ${shownLevel}:\n• Legacy Yield Boost: +${yieldBonusPct}%`;
+      }
+      else if (id === "minigame_bonus") {
+        const bonusCap = (25.0 + eff * 100 * shownLevel).toFixed(1);
+        pillText = `Up to +${bonusCap}% Inheritance Bonus`;
+        concreteVal = `+${bonusCap}% Cap`;
+        relativeGainText = `+${(eff*100*shownLevel).toFixed(1)}%`;
+        tooltipDetail = `Family Reputation Level ${shownLevel}:\n• Max Inheritance Bonus: +${bonusCap}%`;
+      }
+      else if (id === "crisis_hedging") {
+        const retained = (50.0 + eff * 100 * shownLevel).toFixed(0);
+        pillText = `${retained}% Crash Income Retained (Base: 50%)`;
+        concreteVal = `${retained}% Retained`;
+        relativeGainText = `+${(eff*100*shownLevel).toFixed(0)}% cushion`;
+        tooltipDetail = `Hedging Strategies Level ${shownLevel}:\n• Retained Crash Income: ${retained}%`;
+      }
+      else if (id === "crisis_liquidity") {
+        const redPct = Math.round(eff * 100 * shownLevel);
+        const durMin = (2.0 * (1.0 - eff * shownLevel)).toFixed(2);
+        pillText = `−${redPct}% Crash Duration (${durMin} min)`;
+        concreteVal = `${durMin} min`;
+        relativeGainText = `−${redPct}%`;
+        tooltipDetail = `Emergency Liquidity Level ${shownLevel}:\n• Crash Duration: ${durMin} minutes`;
+      }
+      else if (id === "extended_offline") {
+        const hrs = ((14400 + eff * shownLevel) / 3600).toFixed(0);
+        pillText = `${hrs}h Offline Window (Base: 4h)`;
+        concreteVal = `${hrs}h Cap`;
+        relativeGainText = `+${((eff*shownLevel)/3600).toFixed(0)}h`;
+        tooltipDetail = `Night Shift Level ${shownLevel}:\n• Offline Window: ${hrs} hours`;
+      }
+      else if (id === "auto_purchase_cadence") {
+        const cadence = Math.max(0.25, 3.0 - eff * shownLevel).toFixed(2);
+        pillText = `${cadence}s Buy Interval (Base: 3.0s)`;
+        concreteVal = `${cadence}s Cadence`;
+        relativeGainText = `−${(eff*shownLevel).toFixed(2)}s`;
+        tooltipDetail = `Standing Orders Level ${shownLevel}:\n• Cadence: ${cadence}s`;
+      }
+      else if (id === "auto_purchase_quantity") {
+        const qty = shownLevel + 1;
+        pillText = `Auto-buys ${qty} holdings/round`;
+        concreteVal = `${qty} holdings`;
+        relativeGainText = `+${shownLevel} holdings`;
+        tooltipDetail = `Buying Power Level ${shownLevel}:\n• Holdings per round: ${qty}`;
+      }
+      else if (upgrade.effect_type === "compounding_multiplier") {
+        const mult = Math.pow(1.0 + eff, shownLevel);
+        const gainPct = ((mult - 1.0) * 100).toFixed(1);
+        pillText = `×${mult.toFixed(2)} Multiplier (+${gainPct}%)`;
+        concreteVal = `×${mult.toFixed(2)}`;
+        relativeGainText = `+${gainPct}%`;
+        tooltipDetail = `Level ${shownLevel}:\n• Multiplier: ×${mult.toFixed(2)}`;
+      }
+      else {
+        pillText = upgrade.effect_formula_desc || `Level ${shownLevel} Active`;
+        concreteVal = `Level ${shownLevel}`;
+        relativeGainText = `Lvl ${shownLevel}`;
+        tooltipDetail = `Level ${shownLevel} active effect.`;
+      }
+
+      return {
+        pillText,
+        concreteVal,
+        relativeGainText,
+        tooltipDetail
+      };
+    }
+
+    function describeEffect(upgrade, level) {
+      return getUpgradeEffectAnalysis(upgrade, level).pillText;
+    }
+
+    // Render Full UI
+    function renderApp() {
+      renderHeaderStats();
+      renderCategoryPills();
+      renderCatalogCards();
+    }
+
+    function renderHeaderStats() {
+      const totalUpgrades = database.upgrades.length;
+      const totalCats = database.categories.length;
+      const uncappedCount = database.upgrades.filter(u => u.max_level >= 9000).length;
+
+      let totalCappedSink = 0;
+      database.upgrades.forEach(u => {
+        if (u.max_level < 9000) {
+          totalCappedSink += calculateCumulativeCost(u, u.max_level);
+        }
+      });
+
+      document.getElementById("stat-total-upgrades").textContent = totalUpgrades;
+      document.getElementById("stat-total-cats").textContent = totalCats;
+      document.getElementById("stat-uncapped").textContent = uncappedCount;
+      document.getElementById("stat-gem-sink").textContent = formatGems(totalCappedSink);
+
+      const isDirty = JSON.stringify(database) !== originalSnapshot;
+      const dirtyWrap = document.getElementById("stat-dirty-wrap");
+      if (isDirty) {
+        dirtyWrap.style.display = "flex";
+        document.getElementById("stat-dirty-count").textContent = "Yes";
+      } else {
+        dirtyWrap.style.display = "none";
+      }
+    }
+
+    function formatGems(amount) {
+      if (amount >= 1e12) return (amount / 1e12).toFixed(2) + "T 💎";
+      if (amount >= 1e9) return (amount / 1e9).toFixed(2) + "B 💎";
+      if (amount >= 1e6) return (amount / 1e6).toFixed(2) + "M 💎";
+      if (amount >= 1e3) return (amount / 1e3).toFixed(1) + "K 💎";
+      return amount.toLocaleString() + " 💎";
+    }
+
+    function renderCategoryPills() {
+      const container = document.getElementById("category-pills-container");
+      container.innerHTML = "";
+
+      const allPill = document.createElement("button");
+      allPill.className = `pill-btn ${currentCategoryFilter === 'all' ? 'active' : ''}`;
+      allPill.innerHTML = `<span>All Categories</span><span class="pill-count">${database.upgrades.length}</span>`;
+      allPill.onclick = () => {
+        currentCategoryFilter = "all";
+        renderCategoryPills();
+        renderCatalogCards();
+      };
+      container.appendChild(allPill);
+
+      database.categories.forEach(cat => {
+        const count = database.upgrades.filter(u => u.category.toLowerCase() === cat.name.toLowerCase()).length;
+        const pill = document.createElement("button");
+        pill.className = `pill-btn ${currentCategoryFilter.toLowerCase() === cat.name.toLowerCase() ? 'active' : ''}`;
+        pill.setAttribute("data-tooltip", `${cat.name}: ${cat.description}`);
+        pill.innerHTML = `<span>${cat.name}</span><span class="pill-count">${count}</span>`;
+        pill.onclick = () => {
+          currentCategoryFilter = cat.name.toLowerCase();
+          renderCategoryPills();
+          renderCatalogCards();
+        };
+        container.appendChild(pill);
+      });
+    }
+
+    function getCategoryPlateClass(catName) {
+      const lower = (catName || "").toLowerCase();
+      if (lower.includes("wealth")) return "cat-plate-wealth";
+      if (lower.includes("operation")) return "cat-plate-operations";
+      if (lower.includes("career")) return "cat-plate-career";
+      if (lower.includes("legacy")) return "cat-plate-legacy";
+      if (lower.includes("labor")) return "cat-plate-labor";
+      if (lower.includes("frenzy")) return "cat-plate-frenzy";
+      if (lower.includes("rush")) return "cat-plate-rush";
+      return "cat-plate-default";
+    }
+
+    function renderCatalogCards() {
+      const container = document.getElementById("catalog-container");
+      container.innerHTML = "";
+
+      const searchTerm = document.getElementById("search-input").value.toLowerCase().trim();
+      const effectFilter = document.getElementById("filter-effect-type").value;
+      const capFilter = document.getElementById("filter-cap").value;
+      const sortVal = document.getElementById("sort-control").value;
+
+      const categoriesToShow = database.categories.filter(cat => {
+        if (currentCategoryFilter !== "all" && cat.name.toLowerCase() !== currentCategoryFilter) {
+          return false;
+        }
+        return true;
+      });
+
+      categoriesToShow.forEach(cat => {
+        let matchingUpgrades = database.upgrades.filter(u => u.category.toLowerCase() === cat.name.toLowerCase());
+
+        if (searchTerm) {
+          matchingUpgrades = matchingUpgrades.filter(u => 
+            u.name.toLowerCase().includes(searchTerm) ||
+            u.id.toLowerCase().includes(searchTerm) ||
+            u.description.toLowerCase().includes(searchTerm) ||
+            (u.notes && u.notes.toLowerCase().includes(searchTerm))
+          );
+        }
+
+        if (effectFilter !== "all") {
+          matchingUpgrades = matchingUpgrades.filter(u => u.effect_type === effectFilter);
+        }
+
+        if (capFilter === "capped") {
+          matchingUpgrades = matchingUpgrades.filter(u => u.max_level < 9000);
+        } else if (capFilter === "uncapped") {
+          matchingUpgrades = matchingUpgrades.filter(u => u.max_level >= 9000);
+        }
+
+        if (sortVal === "name_asc") {
+          matchingUpgrades.sort((a, b) => a.name.localeCompare(b.name));
+        } else if (sortVal === "base_cost_asc") {
+          matchingUpgrades.sort((a, b) => a.base_cost - b.base_cost);
+        } else if (sortVal === "base_cost_desc") {
+          matchingUpgrades.sort((a, b) => b.base_cost - a.base_cost);
+        } else if (sortVal === "max_level_asc") {
+          matchingUpgrades.sort((a, b) => a.max_level - b.max_level);
+        }
+
+        if (matchingUpgrades.length === 0 && (searchTerm || effectFilter !== "all" || capFilter !== "all")) {
+          return;
+        }
+
+        const section = document.createElement("section");
+        const isCollapsed = collapsedCategories.has(cat.id);
+        const plateClass = getCategoryPlateClass(cat.name);
+        section.className = `category-section ${isCollapsed ? 'collapsed' : ''}`;
+        section.id = `cat-section-${cat.id}`;
+
+        let catGemTotal = 0;
+        matchingUpgrades.forEach(u => {
+          if (u.max_level < 9000) catGemTotal += calculateCumulativeCost(u, u.max_level);
+        });
+
+        section.innerHTML = `
+          <div class="category-header ${plateClass}" onclick="toggleCategory('${cat.id}')">
+            <div class="cat-title-wrap">
+              <span class="cat-name">${cat.name}</span>
+              <span class="cat-meta-desc">${cat.description}</span>
+            </div>
+            <div class="cat-stats-right">
+              <span class="cat-stat-chip" data-tooltip="Total upgrades in ${cat.name}.">
+                <span>Items:</span> <strong>${matchingUpgrades.length}</strong>
+              </span>
+              <span class="cat-stat-chip" data-tooltip="Total Gems needed to max all finite tracks in ${cat.name}.">
+                <span>Sink:</span> <strong>${formatGems(catGemTotal)}</strong>
+              </span>
+              <span class="collapse-chevron">▼</span>
+            </div>
+          </div>
+          <div class="category-body" id="category-body-${cat.id}"></div>
+        `;
+
+        container.appendChild(section);
+
+        const categoryBody = section.querySelector(`#category-body-${cat.id}`);
+        matchingUpgrades.forEach(upgrade => {
+          const row = createUpgradeRow(upgrade, cat);
+          categoryBody.appendChild(row);
+        });
+      });
+    }
+
+    /* Create Single Full-Width Row Entry (Godot Cream Card) */
+    function createUpgradeRow(upgrade, category) {
+      const row = document.createElement("div");
+      row.className = "upgrade-row";
+      row.id = `row-${upgrade.id}`;
+
+      const isCapped = upgrade.max_level < 9000;
+      const lvl1Cost = calculateCostForLevel(upgrade, 1);
+      
+      const initialPreviewLvl = 0;
+      const previewCost = calculateCostForLevel(upgrade, initialPreviewLvl);
+      const previewCumCost = calculateCumulativeCost(upgrade, initialPreviewLvl);
+      const analysis = getUpgradeEffectAnalysis(upgrade, initialPreviewLvl);
+
+      row.innerHTML = `
+        <!-- Col 1: Identity -->
+        <div class="row-col-identity">
+          <div class="row-name" title="${upgrade.name}">
+            <span>${upgrade.name}</span>
+          </div>
+          <div class="row-tags">
+            <span class="card-id-badge" data-tooltip="GDScript symbol constant: LegacyUpgradeCatalog.${upgrade.id.toUpperCase()}">${upgrade.id}</span>
+            ${upgrade.requires ? `<span class="req-tag" data-tooltip="PREREQUISITE: Requires '${upgrade.requires}' at Level >= 1">🔒 Req: ${upgrade.requires}</span>` : ''}
+          </div>
+        </div>
+
+        <!-- Col 2: Desc & Effect with Relative Bonus -->
+        <div class="row-col-desc">
+          <div class="row-desc-text" title="${upgrade.description}">${upgrade.description}</div>
+          <div>
+            <span class="row-effect-pill" id="row-${upgrade.id}-effect-pill" data-tooltip="${analysis.tooltipDetail}">
+              ⚡ <span id="row-${upgrade.id}-effect-txt">${analysis.pillText}</span>
+            </span>
+          </div>
+        </div>
+
+        <!-- Col 3: Economics & Cap -->
+        <div class="row-col-econ">
+          <div class="econ-line">
+            <span data-tooltip="Base authored cost before 3.0× global multiplier (Level 1 = ${lvl1Cost} 💎)">Base Cost:</span>
+            <span class="econ-badge">${upgrade.base_cost} (L1: ${lvl1Cost}💎)</span>
+          </div>
+          <div class="econ-line">
+            <span data-tooltip="Cost growth factor & maximum purchasable level cap">Growth / Cap:</span>
+            <span class="econ-badge">${upgrade.cost_growth}× · ${isCapped ? 'Lvl ' + upgrade.max_level : '♾️ Endless'}</span>
+          </div>
+        </div>
+
+        <!-- Col 4: Interactive Level Stepper & Cost (Starts at Level 0 Base Stat) -->
+        <div class="row-col-stepper">
+          <div class="stepper-top">
+            <span class="stepper-lvl-title" id="row-${upgrade.id}-lvl-title">Base Stat</span>
+            <span class="stepper-cost" id="row-${upgrade.id}-cost-badge" data-tooltip="Base Stat prior to purchase. Cost: 0 Gems.">
+              💎 Base (0 Gems)
+            </span>
+          </div>
+          <input type="range" class="stepper-slider"
+            id="row-${upgrade.id}-slider"
+            min="0"
+            max="${isCapped ? upgrade.max_level : 20}"
+            value="${initialPreviewLvl}"
+            oninput="handleRowLevelSlider('${upgrade.id}', this.value)"
+            data-tooltip="Drag to preview exact stats and costs from Level 0 (Base Stat) to Max Level."
+          >
+        </div>
+
+        <!-- Col 5: Action Buttons -->
+        <div class="row-col-actions">
+          <button class="btn btn-xs btn-gold" onclick="openEditUpgradeModal('${upgrade.id}')" data-tooltip="Edit all metadata fields, price structure, and formulas for ${upgrade.name}.">✏️</button>
+          <button class="btn btn-xs" onclick="duplicateUpgrade('${upgrade.id}')" data-tooltip="Duplicate ${upgrade.name} as a new upgrade template.">📋</button>
+          <button class="btn btn-xs btn-danger" onclick="deleteUpgrade('${upgrade.id}')" data-tooltip="Delete ${upgrade.name}.">🗑️</button>
+        </div>
+      `;
+
+      return row;
+    }
+
+    function handleRowLevelSlider(id, val) {
+      const upgrade = database.upgrades.find(u => u.id === id);
+      if (!upgrade) return;
+
+      const level = parseInt(val, 10);
+      const isCapped = upgrade.max_level < 9000;
+      const cost = calculateCostForLevel(upgrade, level);
+      const cumCost = calculateCumulativeCost(upgrade, level);
+      const analysis = getUpgradeEffectAnalysis(upgrade, level);
+
+      const titleElem = document.getElementById(`row-${id}-lvl-title`);
+      const costElem = document.getElementById(`row-${id}-cost-badge`);
+
+      if (level === 0) {
+        titleElem.textContent = "Base Stat";
+        costElem.textContent = "💎 Base (0 Gems)";
+        costElem.setAttribute("data-tooltip", `Base Stat prior to purchase. Cumulative Gems: 0.`);
+      } else {
+        titleElem.textContent = `Level ${level} ${isCapped ? `/ ${upgrade.max_level}` : ''}`;
+        costElem.textContent = `💎 ${cost.toLocaleString()}`;
+        costElem.setAttribute("data-tooltip", `Cost for Level ${level}. Total cumulative gems: ${formatGems(cumCost)}.`);
+      }
+
+      document.getElementById(`row-${id}-effect-txt`).textContent = analysis.pillText;
+      document.getElementById(`row-${id}-effect-pill`).setAttribute("data-tooltip", analysis.tooltipDetail);
+    }
+
+    function toggleCategory(catId) {
+      if (collapsedCategories.has(catId)) {
+        collapsedCategories.delete(catId);
+      } else {
+        collapsedCategories.add(catId);
+      }
+      renderCatalogCards();
+    }
+
+    function toggleAllCategories() {
+      const btnText = document.getElementById("expand-all-text");
+      if (collapsedCategories.size === 0) {
+        database.categories.forEach(c => collapsedCategories.add(c.id));
+        btnText.textContent = "Expand All";
+      } else {
+        collapsedCategories.clear();
+        btnText.textContent = "Collapse All";
+      }
+      renderCatalogCards();
+    }
+
+    function handleSearchFilter() {
+      renderCatalogCards();
+    }
+
+    // Modal Operations
+    function openModal(modalId) {
+      document.getElementById(modalId).classList.add("active");
+    }
+
+    function closeModal(modalId) {
+      document.getElementById(modalId).classList.remove("active");
+    }
+
+    function populateCategoryDropdown(selectId, selectedVal) {
+      const select = document.getElementById(selectId);
+      select.innerHTML = "";
+      database.categories.forEach(cat => {
+        const opt = document.createElement("option");
+        opt.value = cat.name;
+        opt.textContent = cat.name;
+        if (cat.name.toLowerCase() === (selectedVal || "").toLowerCase()) {
+          opt.selected = true;
+        }
+        select.appendChild(opt);
+      });
+    }
+
+    function populatePrerequisiteDropdown(selectId, selectedVal, excludeId) {
+      const select = document.getElementById(selectId);
+      select.innerHTML = '<option value="">None (Standalone)</option>';
+      database.upgrades.forEach(u => {
+        if (u.id === excludeId) return;
+        const opt = document.createElement("option");
+        opt.value = u.id;
+        opt.textContent = `${u.name} (${u.id})`;
+        if (u.id === selectedVal) opt.selected = true;
+        select.appendChild(opt);
+      });
+    }
+
+    function openAddUpgradeModal() {
+      editingUpgradeId = null;
+      document.getElementById("modal-upgrade-title").textContent = "Add New Legacy Upgrade";
+      
+      document.getElementById("inp-up-id").value = "";
+      document.getElementById("inp-up-id").disabled = false;
+      document.getElementById("inp-up-name").value = "";
+      document.getElementById("inp-up-desc").value = "";
+      document.getElementById("inp-up-max-level").value = "20";
+      document.getElementById("inp-up-base-cost").value = "5.0";
+      document.getElementById("inp-up-growth").value = "2.0";
+      document.getElementById("inp-up-effect-val").value = "0.10";
+      document.getElementById("inp-up-effect-desc").value = "+10% bonus per level";
+      document.getElementById("inp-up-notes").value = "";
+      
+      populateCategoryDropdown("inp-up-category", database.categories[0]?.name || "Wealth");
+      populatePrerequisiteDropdown("inp-up-requires", "", null);
+      
+      modalVisLevel = 0;
+      updateModalVisualizer();
+      openModal("upgrade-modal");
+    }
+
+    function openEditUpgradeModal(id) {
+      const upgrade = database.upgrades.find(u => u.id === id);
+      if (!upgrade) return;
+
+      editingUpgradeId = id;
+      document.getElementById("modal-upgrade-title").textContent = `Edit Upgrade: ${upgrade.name}`;
+
+      document.getElementById("inp-up-id").value = upgrade.id;
+      document.getElementById("inp-up-id").disabled = true;
+      document.getElementById("inp-up-name").value = upgrade.name;
+      document.getElementById("inp-up-desc").value = upgrade.description;
+      document.getElementById("inp-up-max-level").value = upgrade.max_level;
+      document.getElementById("inp-up-base-cost").value = upgrade.base_cost;
+      document.getElementById("inp-up-growth").value = upgrade.cost_growth;
+      document.getElementById("inp-up-effect-type").value = upgrade.effect_type || "additive_percent";
+      document.getElementById("inp-up-effect-val").value = upgrade.effect_per_level;
+      document.getElementById("inp-up-effect-desc").value = upgrade.effect_formula_desc || "";
+      document.getElementById("inp-up-notes").value = upgrade.notes || "";
+
+      populateCategoryDropdown("inp-up-category", upgrade.category);
+      populatePrerequisiteDropdown("inp-up-requires", upgrade.requires || "", id);
+
+      modalVisLevel = 0;
+      updateModalVisualizer();
+      openModal("upgrade-modal");
+    }
+
+    function getModalUpgradeDraft() {
+      return {
+        id: document.getElementById("inp-up-id").value.trim().toLowerCase().replace(/[^a-z0-9_]/g, "_"),
+        name: document.getElementById("inp-up-name").value.trim() || "Preview Upgrade",
+        category: document.getElementById("inp-up-category").value,
+        description: document.getElementById("inp-up-desc").value.trim(),
+        max_level: parseInt(document.getElementById("inp-up-max-level").value, 10) || 1,
+        base_cost: parseFloat(document.getElementById("inp-up-base-cost").value) || 1.0,
+        cost_growth: parseFloat(document.getElementById("inp-up-growth").value) || 1.0,
+        effect_type: document.getElementById("inp-up-effect-type").value,
+        effect_per_level: parseFloat(document.getElementById("inp-up-effect-val").value) || 0.0,
+        effect_formula_desc: document.getElementById("inp-up-effect-desc").value.trim()
+      };
+    }
+
+    function handleModalVisSlider(val) {
+      modalVisLevel = parseInt(val, 10);
+      updateModalVisualizer();
+    }
+
+    function updateModalVisualizer() {
+      const draft = getModalUpgradeDraft();
+      const slider = document.getElementById("vis-slider");
+      const maxLvl = draft.max_level < 9000 ? draft.max_level : 20;
+      slider.max = maxLvl;
+      if (modalVisLevel > maxLvl) modalVisLevel = maxLvl;
+      slider.value = modalVisLevel;
+
+      if (modalVisLevel === 0) {
+        document.getElementById("vis-selected-lvl-title").textContent = "Base Stat (Level 0)";
+      } else {
+        document.getElementById("vis-selected-lvl-title").textContent = `Level ${modalVisLevel} ${draft.max_level < 9000 ? '/ ' + draft.max_level : '(Uncapped)'}`;
+      }
+
+      const cost = calculateCostForLevel(draft, modalVisLevel);
+      const cum = calculateCumulativeCost(draft, modalVisLevel);
+      const analysis = getUpgradeEffectAnalysis(draft, modalVisLevel);
+
+      document.getElementById("vis-stat-cost").textContent = modalVisLevel === 0 ? "0 💎 (Base)" : `${cost.toLocaleString()} 💎`;
+      document.getElementById("vis-stat-cum").textContent = modalVisLevel === 0 ? "0 💎" : `${formatGems(cum)}`;
+      document.getElementById("vis-stat-gain").textContent = analysis.relativeGainText;
+      document.getElementById("vis-stat-concrete").textContent = analysis.concreteVal;
+
+      // Render milestone table starting from Level 0
+      const tbody = document.getElementById("vis-table-body");
+      tbody.innerHTML = "";
+      const sampleLevels = [0, 1, 2, 3, 5, 10, 15, 20];
+      if (draft.max_level < 9000 && !sampleLevels.includes(draft.max_level)) {
+        sampleLevels.push(draft.max_level);
+        sampleLevels.sort((a, b) => a - b);
+      }
+
+      sampleLevels.forEach(lvl => {
+        if (draft.max_level < 9000 && lvl > draft.max_level) return;
+        const c = calculateCostForLevel(draft, lvl);
+        const cm = calculateCumulativeCost(draft, lvl);
+        const a = getUpgradeEffectAnalysis(draft, lvl);
+
+        const tr = document.createElement("tr");
+        if (lvl === modalVisLevel) tr.style.background = "rgba(227, 178, 60, 0.25)";
+        tr.innerHTML = `
+          <td><strong>${lvl === 0 ? 'Base Stat (L0)' : 'Lvl ' + lvl}</strong></td>
+          <td style="color:var(--game-mustard-gold); font-weight:bold;">${lvl === 0 ? '0 💎' : c.toLocaleString() + ' 💎'}</td>
+          <td>${lvl === 0 ? '0 💎' : formatGems(cm)}</td>
+          <td style="color:var(--game-atomic-teal); font-weight:bold;">${a.relativeGainText}</td>
+          <td style="color:#fff;">${a.concreteVal}</td>
+        `;
+        tr.onclick = () => {
+          modalVisLevel = lvl;
+          updateModalVisualizer();
+        };
+        tbody.appendChild(tr);
+      });
+    }
+
+    function saveUpgradeFromModal() {
+      const id = document.getElementById("inp-up-id").value.trim().toLowerCase().replace(/[^a-z0-9_]/g, "_");
+      const name = document.getElementById("inp-up-name").value.trim();
+      const category = document.getElementById("inp-up-category").value;
+      const description = document.getElementById("inp-up-desc").value.trim();
+      const max_level = parseInt(document.getElementById("inp-up-max-level").value, 10) || 1;
+      const base_cost = parseFloat(document.getElementById("inp-up-base-cost").value) || 1.0;
+      const cost_growth = parseFloat(document.getElementById("inp-up-growth").value) || 1.0;
+      const effect_type = document.getElementById("inp-up-effect-type").value;
+      const effect_per_level = parseFloat(document.getElementById("inp-up-effect-val").value) || 0.0;
+      const effect_formula_desc = document.getElementById("inp-up-effect-desc").value.trim();
+      const requires = document.getElementById("inp-up-requires").value;
+      const notes = document.getElementById("inp-up-notes").value.trim();
+
+      if (!id || !name) {
+        alert("Please provide a valid ID and Display Name.");
+        return;
+      }
+
+      const upgradeData = {
+        id,
+        name,
+        category,
+        description,
+        max_level,
+        base_cost,
+        cost_growth,
+        effect_type,
+        effect_per_level,
+        effect_formula_desc,
+        compounding: effect_type === "compounding_multiplier",
+        requires,
+        notes,
+        custom_metadata: {}
+      };
+
+      if (editingUpgradeId) {
+        const idx = database.upgrades.findIndex(u => u.id === editingUpgradeId);
+        if (idx >= 0) database.upgrades[idx] = { ...database.upgrades[idx], ...upgradeData };
+      } else {
+        if (database.upgrades.some(u => u.id === id)) {
+          alert(`Upgrade with ID '${id}' already exists!`);
+          return;
+        }
+        database.upgrades.push(upgradeData);
+      }
+
+      closeModal("upgrade-modal");
+      renderApp();
+      showToast(`Saved upgrade '${name}'`, "success");
+    }
+
+    function duplicateUpgrade(id) {
+      const original = database.upgrades.find(u => u.id === id);
+      if (!original) return;
+
+      const clone = JSON.parse(JSON.stringify(original));
+      clone.id = `${original.id}_copy`;
+      clone.name = `${original.name} (Copy)`;
+
+      database.upgrades.push(clone);
+      renderApp();
+      showToast(`Cloned upgrade as '${clone.name}'`, "success");
+    }
+
+    function deleteUpgrade(id) {
+      const dependent = database.upgrades.filter(u => u.requires === id);
+      if (dependent.length > 0) {
+        alert(`Cannot delete '${id}' because the following upgrades require it:\n` + dependent.map(d => `• ${d.name}`).join("\n"));
+        return;
+      }
+
+      if (!confirm(`Are you sure you want to delete upgrade '${id}'?`)) return;
+
+      database.upgrades = database.upgrades.filter(u => u.id !== id);
+      renderApp();
+      showToast(`Deleted upgrade '${id}'`, "success");
+    }
+
+    // Categories Modal
+    function openCategoriesModal() {
+      const container = document.getElementById("categories-list-container");
+      container.innerHTML = "";
+
+      database.categories.forEach((cat, idx) => {
+        const row = document.createElement("div");
+        row.className = "form-grid-3";
+        row.style.alignItems = "center";
+        row.style.marginBottom = "10px";
+        row.innerHTML = `
+          <input type="text" class="form-input cat-inp-name" value="${cat.name}" placeholder="Name">
+          <input type="text" class="form-input cat-inp-desc" value="${cat.description}" placeholder="Description">
+          <div style="display:flex; gap:6px; align-items:center;">
+            <input type="color" class="cat-inp-color" value="${cat.color}" style="width:40px; height:36px; border:2px solid var(--game-navy); border-radius:4px; cursor:pointer;">
+            <button class="btn btn-xs btn-danger" onclick="this.parentElement.parentElement.remove()">🗑️</button>
+          </div>
+        `;
+        container.appendChild(row);
+      });
+
+      openModal("categories-modal");
+    }
+
+    function addNewCategoryRow() {
+      const container = document.getElementById("categories-list-container");
+      const row = document.createElement("div");
+      row.className = "form-grid-3";
+      row.style.alignItems = "center";
+      row.style.marginBottom = "10px";
+      row.innerHTML = `
+        <input type="text" class="form-input cat-inp-name" value="New Category" placeholder="Name">
+        <input type="text" class="form-input cat-inp-desc" value="Category description" placeholder="Description">
+        <div style="display:flex; gap:6px; align-items:center;">
+          <input type="color" class="cat-inp-color" value="#E3B23C" style="width:40px; height:36px; border:2px solid var(--game-navy); border-radius:4px; cursor:pointer;">
+          <button class="btn btn-xs btn-danger" onclick="this.parentElement.parentElement.remove()">🗑️</button>
+        </div>
+      `;
+      container.appendChild(row);
+    }
+
+    function saveCategoriesFromModal() {
+      const rows = document.querySelectorAll("#categories-list-container > div");
+      const newCats = [];
+      rows.forEach(r => {
+        const name = r.querySelector(".cat-inp-name").value.trim();
+        const desc = r.querySelector(".cat-inp-desc").value.trim();
+        const color = r.querySelector(".cat-inp-color").value;
+        if (name) {
+          newCats.push({
+            id: name.toLowerCase().replace(/[^a-z0-9]/g, "_"),
+            name,
+            description: desc,
+            color,
+            accent: "gold"
+          });
+        }
+      });
+
+      database.categories = newCats;
+      closeModal("categories-modal");
+      renderApp();
+      showToast("Updated categories", "success");
+    }
+
+    // Tuning Modal
+    function openTuningModal() {
+      const t = database.global_tuning;
+      document.getElementById("tune-cost-mult").value = t.legacy_upgrade_cost_multiplier;
+      document.getElementById("tune-cost-steep").value = t.legacy_cost_steepening;
+      document.getElementById("tune-k-legacy").value = t.k_legacy;
+      document.getElementById("tune-alpha-legacy").value = t.alpha_legacy;
+      openModal("tuning-modal");
+    }
+
+    function saveTuningFromModal() {
+      database.global_tuning.legacy_upgrade_cost_multiplier = parseFloat(document.getElementById("tune-cost-mult").value) || 3.0;
+      database.global_tuning.legacy_cost_steepening = parseFloat(document.getElementById("tune-cost-steep").value) || 1.1;
+      database.global_tuning.k_legacy = parseFloat(document.getElementById("tune-k-legacy").value) || 0.16;
+      database.global_tuning.alpha_legacy = parseFloat(document.getElementById("tune-alpha-legacy").value) || 0.35;
+
+      closeModal("tuning-modal");
+      renderApp();
+      showToast("Updated global economy tuning", "success");
+    }
+
+    // Estate Office Store Simulator (Canonical Game Palette)
+    function openStoreSimulatorModal() {
+      simLevels = {};
+      database.upgrades.forEach(u => simLevels[u.id] = 0);
+      renderSimStore();
+      openModal("store-modal");
+    }
+
+    function addSimWallet(amount) {
+      simWallet += amount;
+      renderSimStore();
+    }
+
+    function resetSimWallet() {
+      simWallet = 1000;
+      database.upgrades.forEach(u => simLevels[u.id] = 0);
+      renderSimStore();
+    }
+
+    function renderSimStore() {
+      document.getElementById("sim-wallet-amount").textContent = simWallet.toLocaleString();
+      const container = document.getElementById("sim-cards-container");
+      container.innerHTML = "";
+
+      database.categories.forEach(cat => {
+        const catUpgrades = database.upgrades.filter(u => u.category.toLowerCase() === cat.name.toLowerCase());
+        if (catUpgrades.length === 0) return;
+
+        const header = document.createElement("div");
+        header.className = "game-section-header";
+        header.textContent = `${cat.name.toUpperCase()} UPGRADES`;
+        container.appendChild(header);
+
+        catUpgrades.forEach(u => {
+          const lvl = simLevels[u.id] || 0;
+          const nextLvl = lvl + 1;
+          const isMaxed = u.max_level && lvl >= u.max_level;
+          const nextCost = isMaxed ? 0 : calculateCostForLevel(u, nextLvl);
+          const reqMet = !u.requires || (simLevels[u.requires] && simLevels[u.requires] >= 1);
+          const canAfford = !isMaxed && reqMet && simWallet >= nextCost;
+          const analysis = getUpgradeEffectAnalysis(u, lvl);
+
+          const card = document.createElement("div");
+          card.className = "game-upgrade-card";
+
+          card.innerHTML = `
+            <div class="game-card-left">
+              <div class="game-card-title">${u.name}</div>
+              <div class="game-card-level">${lvl === 0 ? 'Base Stat (Unbought)' : 'Level ' + lvl + (u.max_level < 9000 ? '/' + u.max_level : '')} · ${analysis.pillText}</div>
+              <div class="game-card-desc">${u.description}</div>
+              ${!reqMet ? `<div style="font-size:11px; font-weight:700; color:var(--game-ketchup-red); margin-top:2px;">🔒 Requires ${u.requires}</div>` : ''}
+            </div>
+            <button class="game-buy-btn" 
+              ${!canAfford ? 'disabled' : ''}
+              onclick="buySimUpgrade('${u.id}')"
+            >
+              <span>💎</span>
+              <span>${isMaxed ? 'MAX' : nextCost.toLocaleString()}</span>
+            </button>
+          `;
+          container.appendChild(card);
+        });
+      });
+    }
+
+    function buySimUpgrade(id) {
+      const u = database.upgrades.find(up => up.id === id);
+      if (!u) return;
+
+      const lvl = simLevels[id] || 0;
+      const nextCost = calculateCostForLevel(u, lvl + 1);
+      if (simWallet >= nextCost) {
+        simWallet -= nextCost;
+        simLevels[id] = lvl + 1;
+        renderSimStore();
+      }
+    }
+
+    // Save & Export
+    async function saveDataToServer() {
+      try {
+        const res = await fetch("/api/save", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(database)
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const result = await res.json();
+        originalSnapshot = JSON.stringify(database);
+        renderHeaderStats();
+        showToast(`Saved ${result.upgrade_count} upgrades to project!`, "success");
+      } catch (err) {
+        console.error("Save error:", err);
+        showToast("Save failed: " + err.message, "error");
+      }
+    }
+
+    function openExportModal() {
+      document.getElementById("json-output").value = JSON.stringify(database, null, 2);
+      fetchGDScriptPreview();
+      openModal("export-modal");
+    }
+
+    async function fetchGDScriptPreview() {
+      try {
+        const res = await fetch("/api/export-gdscript", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(database)
+        });
+        if (res.ok) {
+          const data = await res.json();
+          document.getElementById("gdscript-output").value = data.code;
+        }
+      } catch (err) {
+        console.error("GDScript preview failed:", err);
+      }
+    }
+
+    function switchExportTab(tab) {
+      exportActiveTab = tab;
+      document.getElementById("export-tab-content-gdscript").style.display = tab === "gdscript" ? "block" : "none";
+      document.getElementById("export-tab-content-json").style.display = tab === "json" ? "block" : "none";
+      document.getElementById("tab-btn-gdscript").className = `btn btn-sm ${tab === 'gdscript' ? 'btn-gold' : ''}`;
+      document.getElementById("tab-btn-json").className = `btn btn-sm ${tab === 'json' ? 'btn-gold' : ''}`;
+    }
+
+    function copyExportToClipboard() {
+      const text = exportActiveTab === "gdscript" 
+        ? document.getElementById("gdscript-output").value
+        : document.getElementById("json-output").value;
+
+      navigator.clipboard.writeText(text).then(() => {
+        showToast("Copied to clipboard!", "success");
+      });
+    }
+
+    function downloadExportJson() {
+      const blob = new Blob([JSON.stringify(database, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "legacy_upgrades_data.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    async function applyGDScriptToProject() {
+      if (!confirm("This will overwrite game/scripts/core/LegacyUpgradeCatalog.gd with the exported code. Proceed?")) return;
+
+      try {
+        const res = await fetch("/api/export-gdscript", {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            "X-Apply-To-Project": "true"
+          },
+          body: JSON.stringify(database)
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        showToast("Applied GDScript directly to LegacyUpgradeCatalog.gd!", "success");
+        closeModal("export-modal");
+      } catch (err) {
+        showToast("Apply failed: " + err.message, "error");
+      }
+    }
+
+    // Tooltip System
+    function initTooltipSystem() {
+      const tt = document.getElementById("global-tooltip");
+      const ttTitle = document.getElementById("tt-title");
+      const ttBody = document.getElementById("tt-body");
+
+      document.addEventListener("mouseover", (e) => {
+        const target = e.target.closest("[data-tooltip]");
+        if (!target) {
+          tt.classList.remove("active");
+          return;
+        }
+
+        const text = target.getAttribute("data-tooltip");
+        if (!text) return;
+
+        ttTitle.textContent = "💡 Balance Context";
+        ttBody.innerHTML = text.replace(/\n/g, "<br>");
+        tt.classList.add("active");
+
+        updateTooltipPosition(e);
+      });
+
+      document.addEventListener("mousemove", (e) => {
+        if (tt.classList.contains("active")) {
+          updateTooltipPosition(e);
+        }
+      });
+
+      document.addEventListener("mouseout", (e) => {
+        const target = e.target.closest("[data-tooltip]");
+        if (target) {
+          tt.classList.remove("active");
+        }
+      });
+
+      function updateTooltipPosition(e) {
+        const offset = 14;
+        let left = e.clientX + offset;
+        let top = e.clientY + offset;
+
+        const ttWidth = tt.offsetWidth;
+        const ttHeight = tt.offsetHeight;
+
+        if (left + ttWidth > window.innerWidth - 10) {
+          left = e.clientX - ttWidth - offset;
+        }
+        if (top + ttHeight > window.innerHeight - 10) {
+          top = e.clientY - ttHeight - offset;
+        }
+
+        tt.style.left = `${Math.max(10, left)}px`;
+        tt.style.top = `${Math.max(10, top)}px`;
+      }
+    }
+
+    // Toast Notifications
+    function showToast(msg, type = "info") {
+      const container = document.getElementById("toast-container");
+      const toast = document.createElement("div");
+      toast.className = `toast ${type}`;
+      toast.innerHTML = `<span>${type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'}</span><span>${msg}</span>`;
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = "0";
+        toast.style.transform = "translateY(10px)";
+        toast.style.transition = "all 0.25s";
+        setTimeout(() => toast.remove(), 250);
+      }, 3500);
+    }
+  </script>
+</body>
+</html>

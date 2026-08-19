@@ -197,9 +197,9 @@ const UPGRADES := [
 		"category": "Frenzy",
 		"description": "In a market frenzy you go for the throat. TURBO's multiplier climbs higher.",
 		"max_level": 9999,            # UNCAPPED (Endgame Economy, Tim 2026-07-28): the steepening cost curve is the brake
-		"base_cost": 6,
-		"cost_growth": 2.8,
-		"effect_per_level": 0.15,     # COMPOUNDING: ×1.15 the TURBO bonus (amount above 1×) per level
+		"base_cost": 25,
+		"cost_growth": 3.0,
+		"effect_per_level": 0.10,     # COMPOUNDING: ×1.10 the TURBO bonus (amount above 1×) per level
 	},
 	{
 		"id": FRENZY_DURATION,
@@ -207,9 +207,9 @@ const UPGRADES := [
 		"category": "Frenzy",
 		"description": "The frenzy just won't quit. Every TURBO burn lasts longer.",
 		"max_level": 9999,            # UNCAPPED (Endgame Economy, Tim 2026-07-28): the steepening cost curve is the brake
-		"base_cost": 6,
-		"cost_growth": 2.8,
-		"effect_per_level": 0.15,     # COMPOUNDING: ×1.15 burn duration per level
+		"base_cost": 30,
+		"cost_growth": 3.0,
+		"effect_per_level": 0.10,     # COMPOUNDING: ×1.10 burn duration per level
 	},
 	{
 		"id": COOLING_SYSTEMS,

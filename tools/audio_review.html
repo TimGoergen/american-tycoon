@@ -2173,7 +2173,7 @@
 
     function playGameAudio(gamePath, title, btnElement) {
       let cleanPath = gamePath.replace(/^\/+/, '');
-      const url = `/game/${cleanPath}`;
+      const url = cleanPath.startsWith('game/') ? `/${cleanPath}` : `/game/${cleanPath}`;
       playStream(url, title, cleanPath, btnElement);
     }
 

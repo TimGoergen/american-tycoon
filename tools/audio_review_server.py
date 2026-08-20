@@ -90,9 +90,11 @@ class AudioReviewHandler(BaseHTTPRequestHandler):
         # 4. Stream In-Game Audio (game/audio/...)
         elif path.startswith("/audio/game/") or path.startswith("/game/audio/") or path.startswith("/game/") or path.startswith("/audio/cues/") or path.startswith("/audio/loops/") or path.startswith("/audio/music/"):
             raw_path = urllib.parse.unquote(path).lstrip("/")
+            while raw_path.startswith("game/game/"):
+                raw_path = raw_path[5:]
             file_path = os.path.join(WORKSPACE_DIR, raw_path)
             if not (os.path.exists(file_path) and os.path.isfile(file_path)):
-                for prefix in ["audio/game/audio/", "audio/game/", "game/audio/", "audio/"]:
+                for prefix in ["audio/game/audio/", "audio/game/", "game/audio/", "audio/", "game/"]:
                     if raw_path.startswith(prefix):
                         sub = raw_path[len(prefix):]
                         candidate = os.path.join(PROJECT_AUDIO_DIR, sub)

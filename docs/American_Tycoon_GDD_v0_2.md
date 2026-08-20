@@ -93,8 +93,8 @@ The exact abbreviations are fixed here so they're unambiguous (Qa vs Qi, Sx vs S
 
 ## 3. Core Loop Architecture — Three Nested Loops
 
-1. **The Run (a lifetime).** Buy the ladder, ATM → Executive Assets. Ends in death/retirement — or bankruptcy.
-2. **The Dynasty (prestige).** Estate passes to an heir, minus creditors and estate tax. Post-tax remainder converts to permanent dynastic advantage. Loopholes purchased via political assets erode the tax across generations.
+1. **The Run (a lifetime).** Buy the ladder, ATM → Executive Assets. Ends in death/retirement.
+2. **The Dynasty (prestige).** Estate passes to an heir, minus estate tax. Post-tax remainder converts to permanent dynastic advantage. Loopholes purchased via political assets erode the tax across generations.
 3. **The Epoch (alien contact).** A generation captures the entire current economy (Earth's whole value, ~$103.6T). The game does not end — instead Earth makes **first contact** with an alien civilization, which opens a market orders of magnitude larger and a new alien-tech staffer tier for every property (§6.2). A game about wanting all the money cannot, by definition, end; it just keeps finding bigger economies to consume.
 
 **Contact is the scale engine, not sci-fi spectacle.** The aliens are flavor and magnitude bands on a single dollar economy — capitalism ran out of Earth, so it opened the galaxy as a market. *(This replaces the earlier "relocate to a distinct new market" idea — see Future Features.)*
@@ -474,64 +474,31 @@ Every automated property shows a **face** in its portrait circle. There are ~312
 
 ---
 
-## 8. Origins, Death, Inheritance, Debt
+## 8. Death, Inheritance, Estate & Legacy
 
-> **SHELVED → post-prestige (Tim, 2026-06-15).** The whole **credit/class system**
-> — origins (§8.1), debt & bankruptcy (§8.5), and the offers system (§8.6) — is
-> shelved for now. Reason: handing the founder *any* early cash (even the $1,000
-> bootstrap, and especially the $200k/$500k loans) flattens the opening grind, which
-> is the most dopamine-rich part of generation one. The **founder now starts at $0**
-> and earns the first dollar by hand. The mechanic is expected to **return as a
-> post-prestige feature**: an heir — already accelerated by Legacy — could be offered
-> origins/credit as *extra options* (more ways to play a run), where an early influx
-> adds choice instead of removing the climb. Death/inheritance/estate-tax (§8.2–8.4)
-> are **NOT** shelved — they shipped in M2. Implementation is fully built and parked
-> on the `shelved/credit-and-class` branch for resurrection; the sections below are
-> the design of record for that future work.
+> **CREDIT & CLASS RETIRED (Tim, 2026-08).** The original concepts of **origins**, **debt & bankruptcy**, and **loan offers** have been permanently removed from the design. Handing the founder early cash flattens the opening climb, which is the most dopamine-rich part of generation one. The **founder starts at $0** and earns the first dollar by hand. Death, inheritance, the Will, estate tax, and the Legacy/Estate Office system (§8.1–§8.3) represent the complete dynastic loop.
 
-### 8.1 The Opening (preserved from original flowchart)
-
-First question: **"Do you have rich parents?"** Class origin as character creation.
-
-| Path | Response | Start |
-|---|---|---|
-| **No** | Game shames the player, then begrudgingly grants a $1,000 tax rebate with a sneer about government handouts | $1,000 |
-| **Yes** → token gift | "Your parents really want you to *earn your way through life*" | $50,000 gift |
-| **Yes** → interest-free loan | — | $200,000 (debt) |
-| **Yes** → high-interest loan | — | $500,000 (debt) |
-
-No origin where the first dollar was earned — even bootstraps start with a government check. The player is always an heir, including generation one. Mechanically a difficulty selector disguised as a birth lottery. Achievement: **"Bootstrapped"** — capture Earth from $1,000.
-
-### 8.2 Dynasty Identity (added v0.2)
+### 8.1 Dynasty Identity (added v0.2)
 
 - Each heir receives a **randomly generated inbred-royalty name**: stuffy first names (Bartholomew, Thurston, Wadsworth, Constance, Bitsy) + optional prep-school nickname ("Trip," "Chip," "Bunny," "Skipper") + hyphenated old-money surname (Ashworth-Vanderlyn, Pemberton-Howell). Surname persists per planet (the family brand); first names randomize.
 - **The Roman numeral suffix is the prestige counter.** By mid-week you're Wellington Pemberton IX.
 - No portraits in v1 — the names are the characters.
-- **The Family Ledger:** one screen; each ancestor's name, fortune at death, and a deadpan cause of generation-end ("Retired to Palm Beach" / "Creditors").
+- **The Family Ledger:** one screen; each ancestor's name, fortune at death, and a deadpan cause of generation-end ("Retired to Palm Beach").
 
-### 8.3 Death & The Estate — The Obituary Screen (expanded v0.2)
+### 8.2 Death & The Estate — The Obituary Screen (expanded v0.2)
 
 A **short ritual: one screen, two beats, ~30 seconds.**
 
 1. **The Obituary:** name, years, a deadpan life summary assembled from the generation's actual stats — *"Bartholomew 'Chip' Ashworth-Vanderlyn IV, beloved employer of 11, grew the family fortune from $2.1B to $847B. Hours worked: 3."* The headline figure is the generation's **lifetime cash earned** (the never-spent career total that feeds the Legacy conversion — see Future Features "Lifetime cash earned"), not net worth at death.
-2. **The Reading of the Will** — the estate math made legible as a document: gross estate → **creditors first** → estate tax line (**each purchased loophole visibly shrinking it, in ink**) → net to heir → Legacy conversion. Loophole purchases pay off on this screen, every generation: strategic feedback delivered as ceremony.
+2. **The Reading of the Will** — the estate math made legible as a document: gross estate → estate tax line (**each purchased loophole visibly shrinking it, in ink**) → net to heir → Legacy conversion. Loophole purchases pay off on this screen, every generation: strategic feedback delivered as ceremony.
 
 Then the heir's name reveals, numeral incremented, into the faster run. All obituaries re-readable in the Family Ledger.
 
-### 8.4 The Loophole Tree
+### 8.3 The Loophole Tree
 
 Legislative & Executive Assets unlock estate-tax erosion: raised exemptions, dynasty trusts, stepped-up basis, the charitable foundation that owns the yacht. **All real mechanisms, real names, estate-attorney register.** Strategic spine of the late run: income for *this* lifetime vs. loopholes that pay off for the *next* generation.
 
-### 8.5 Debt & Bankruptcy
-
-- Debt = obligation paid on one or more occasions. **Milestone-triggered payments** (net-worth/income thresholds), never wall-clock — an idle game must not punish idling. "Your success has been noticed; first payment is now due."
-- **Missed payment = forced end of generation.** Creditors strip the estate; almost nothing converts to Legacy. The individual fails; the dynasty persists from a worse position. *The dynasty is too big to fail.* The only clock that runs against the player.
-
-### 8.6 Ongoing Credit — The Offers System
-
-**Credit comes to you.** Periodic take-it-or-leave-it loan offers; fixed principal; fixed milestone schedule; **one active loan at a time.** **Terms improve as you need them less:** payday-lender terms for the bootstrapper → prime rates on enormous sums → late-game *bailouts* ("you're load-bearing now"). Implementation: a data table of offer tiers + §8.5 plumbing.
-
-### 8.7 Meta-tier upgrades — the second-order prestige track (proposed 2026-07-01)
+### 8.4 Meta-tier upgrades — the second-order prestige track (proposed 2026-07-01)
 
 > **PROPOSED — design note only, first-pass, no values or code.** Raised by Tim 2026-07-01. This deliberately **reopens the §14 / Future-Features decision that there is "exactly one spendable prestige currency"** (resolved 2026-06-14). See the "why this doesn't re-trigger the two-competing-tracks trap" note below; the reopening is intentional and flagged, not an oversight.
 
@@ -606,7 +573,7 @@ Sequenced as four playable plateaus — each a legitimate stopping point that is
 | Milestone | Contents | Exit criterion |
 |---|---|---|
 | **M1 — The Slice** | Tap wage, buy ladder, cycles/collect, count-milestone speed-ups, bulk-buy UI, income/sec hero stat. Placeholder art. | Dopaminergic on real phone hardware; the return-spike loop verified against a real 3-hour gap |
-| **M2 — The Dynasty** | Death, obituary/will screen, estate tax, Legacy (front-loaded), heir name generator, Family Ledger, origins & debt, offers system | "Speeds up every time" verified across ≥5 generations |
+| **M2 — The Dynasty** | Death, obituary/will screen, estate tax, Legacy (front-loaded), heir name generator, Family Ledger, lifetime-cash estate basis. (Origins, debt, and loans dropped from design). | "Speeds up every time" verified across ≥5 generations. **COMPLETE.** |
 | **M3 — The Theme** | Art pass (backdrops, heroes, staffers incl. per-epoch reskins §6.1), ~~audio implementation (exotica/muzak per §12)~~ **DONE 2026-08-10, assets pending**, UI polish, narrator copy pass, epoch-keyed staffing UI & first-contact beat (§6), offline/welcome-back ritual, rare events, the Ledger | The game is *itself* |
 | **M4 — The Epoch** | Earth target & percentage display, Final Dollar / first-contact sequence, epoch progression beyond Earth (alien contact, §6.2), balance simulator validation of the full week | Earth captured; first contact made |
 

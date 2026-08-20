@@ -344,17 +344,15 @@ func _configure_retention_pricing() -> void:
 # ---------------------------------------------------------------------------
 
 ## The live estate waterfall for the current generation — what the heir would
-## inherit if death happened now. Used by the succession gate below and, later,
-## displayed continuously on the Estate Planning tab. Debt is 0 until the
-## debt/offers slice lands; the waterfall already accepts it as a parameter.
+## inherit if death happened now. Used by the succession gate below and displayed
+## continuously on the Estate Planning tab.
 func get_draft_will() -> Dictionary:
 	# The gross estate is the dollars this generation EARNED over its life (Spec §9.1,
 	# GDD §8.3 decision 2026-06-14), not net worth at death. Earning over a life is what
 	# the idle loop actually is, and being monotonic it stays comparable across the
-	# order-of-magnitude epoch jumps. Granted money (birth seed, loan principal) is
-	# excluded by construction — it never entered cash_earned_this_gen.
+	# order-of-magnitude epoch jumps.
 	var estate_gross := current.economy.cash_earned_this_gen
-	var outstanding_debt := 0.0  # debt & offers system is a later M2 slice
+	var outstanding_debt := 0.0
 	var will := EstateWaterfall.compute(
 		estate_gross,
 		outstanding_debt,

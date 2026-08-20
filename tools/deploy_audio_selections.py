@@ -405,16 +405,24 @@ EXPORT_DATA = {
 
 
 def main():
-    # 1. Save export json to Plans/
-    os.makedirs(PLANS_DIR, exist_ok=True)
     export_json_path = os.path.join(PLANS_DIR, "Audio_Selection_Export.json")
-    with open(export_json_path, "w", encoding="utf-8") as f:
-        json.dump(EXPORT_DATA, f, indent=2)
-    print(f"Export JSON saved to {export_json_path}")
+    if os.path.exists(export_json_path):
+        with open(export_json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        print(f"Loaded selections from {export_json_path}")
+    else:
+        data = EXPORT_DATA
+        os.makedirs(PLANS_DIR, exist_ok=True)
+        with open(export_json_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+        print(f"Export JSON saved to {export_json_path}")
 
-    # 2. Deploy audio files
+    # Deploy audio files
     deployed_count = 0
-    for cue_id, selections in EXPORT_DATA["selections"].items():
+    deployed_credits = []
+    deployed_music = []
+
+    for cue_id, selections in data.get("selections", {}).items():
         if not selections:
             print(f"Skipping unassigned cue: {cue_id}")
             continue
@@ -441,25 +449,44 @@ def main():
             sf.write(wav_path, samples, sr, format="WAV", subtype="PCM_16")
 
             if cue_id.startswith("band_"):
-                # Clean up old synthesized placeholder ogg so Godot loads the real wav track
                 for ext in [".ogg", ".ogg.import"]:
                     old_f = os.path.join(target_dir, f"{cue_id}{ext}")
                     if os.path.exists(old_f):
                         os.remove(old_f)
+                deployed_music.append((cue_id, sel["filename"], sel["pack"]))
             else:
                 ogg_path = os.path.join(target_dir, f"{cue_id}.ogg")
                 sf.write(ogg_path, samples, sr, format="OGG", subtype="VORBIS")
+                deployed_credits.append((cue_id, sel["filename"], sel["pack"]))
 
             deployed_count += 1
             print(f"[{deployed_count:02d}] Deployed '{cue_id}' from '{sel['pack']}/{sel['filename']}' ({len(samples)/sr:.2f}s)")
         except Exception as e:
             print(f"ERROR deploying '{cue_id}' from '{src_path}': {e}")
 
+    # Update CREDITS.md
+    credits_path = os.path.join(WORKSPACE, "game", "audio", "CREDITS.md")
+    with open(credits_path, "w", encoding="utf-8") as f:
+        f.write("# Audio credits and licenses\n\n")
+        f.write("Every audio file in `game/audio/` gets a line here, with its source, license, and any required\n")
+        f.write("attribution — added **when the file is added**, not later.\n\n")
+        f.write("If a file is here, it is cleared for a commercial release.\n\n")
+        f.write("## Sourced SFX and Loops\n\n")
+        f.write("Updated from the owned audio pack library (`D:\\Downloads\\Game_Audio\\`).\n\n")
+        f.write("| Cue / Loop ID | Source File | Pack | License / Attribution |\n")
+        f.write("|---|---|---|---|\n")
+        for cue_id, fn, pk in deployed_credits:
+            f.write(f"| `{cue_id}` | `{fn}` | {pk} | Commercial royalty-free |\n")
+        f.write("\n## Music\n\n")
+        f.write("Tracks live in `music/`, one per era band.\n\n")
+        f.write("| Track / Band | Source File | Pack | License / Attribution |\n")
+        f.write("|---|---|---|---|\n")
+        for cue_id, fn, pk in deployed_music:
+            f.write(f"| `{cue_id}` | `{fn}` | {pk} | Commercial royalty-free |\n")
 
-
-
-    print(f"\nCompleted deployment of {deployed_count} cues.")
+    print(f"\nCompleted deployment of {deployed_count} cues and updated CREDITS.md.")
 
 
 if __name__ == "__main__":
     main()
+

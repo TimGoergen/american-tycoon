@@ -1,9 +1,8 @@
 {
-  "export_date": "2026-08-17T04:14:27.407Z",
+  "export_date": "2026-08-20T04:01:30.177Z",
   "app": "American Tycoon",
-  "total_assigned_cues": 31,
+  "total_assigned_cues": 81,
   "selections": {
-    "bball_grab": [],
     "tap_note": [
       {
         "file_id": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Button 6.wav",
@@ -11,7 +10,7 @@
         "filename": "Button 6.wav",
         "pack": "puzzleaudiokit",
         "role": "primary",
-        "duration": 0.099
+        "duration": 0.113
       }
     ],
     "buy_success": [
@@ -22,6 +21,14 @@
         "pack": "inventorysfxbundle_audio",
         "role": "primary",
         "duration": 0.867
+      },
+      {
+        "file_id": "westernaudiobundle/Western Audio Bundle/WAV/SFX/Misc/Coins Bag 2.wav",
+        "rel_path": "westernaudiobundle/Western Audio Bundle/WAV/SFX/Misc/Coins Bag 2.wav",
+        "filename": "Coins Bag 2.wav",
+        "pack": "westernaudiobundle",
+        "role": "layer",
+        "duration": 1.144
       }
     ],
     "hire_first": [
@@ -31,7 +38,7 @@
         "filename": "Craft Button 2.wav",
         "pack": "buildingandcraftingaudiobundle",
         "role": "primary",
-        "duration": 1.3
+        "duration": 1.315
       }
     ],
     "hire_levelled": [
@@ -41,7 +48,7 @@
         "filename": "Mining (diamond) 1.wav",
         "pack": "buildingandcraftingaudiobundle",
         "role": "primary",
-        "duration": 0.263
+        "duration": 0.285
       }
     ],
     "retain_staff": [
@@ -52,6 +59,16 @@
         "pack": "inventorysfxbundle_audio",
         "role": "primary",
         "duration": 0.827
+      }
+    ],
+    "milestone": [
+      {
+        "file_id": "Foley Sports Sound FX Pack/Foley Sports/Buzzers and Boards/Scoreboard Ding.wav",
+        "rel_path": "Foley Sports Sound FX Pack/Foley Sports/Buzzers and Boards/Scoreboard Ding.wav",
+        "filename": "Scoreboard Ding.wav",
+        "pack": "Foley Sports Sound FX Pack",
+        "role": "primary",
+        "duration": 0.413
       }
     ],
     "cycle_started": [
@@ -71,7 +88,17 @@
         "filename": "Lever 3 (Power On).wav",
         "pack": "puzzleaudiokit",
         "role": "primary",
-        "duration": 1.176
+        "duration": 1.206
+      }
+    ],
+    "frenzy_end": [
+      {
+        "file_id": "spaceaudiobundle/Space Audio Bundle/WAV/FX/Decompression 2.wav",
+        "rel_path": "spaceaudiobundle/Space Audio Bundle/WAV/FX/Decompression 2.wav",
+        "filename": "Decompression 2.wav",
+        "pack": "spaceaudiobundle",
+        "role": "primary",
+        "duration": 2.139
       }
     ],
     "overdrive_engage": [
@@ -91,7 +118,7 @@
         "filename": "Puntuation Sound.wav",
         "pack": "spaceaudiobundle",
         "role": "primary",
-        "duration": 0.05
+        "duration": 0.079
       }
     ],
     "vent_open": [
@@ -101,7 +128,7 @@
         "filename": "Button 2.wav",
         "pack": "spaceaudiobundle",
         "role": "primary",
-        "duration": 0.251
+        "duration": 0.282
       }
     ],
     "vent_lift": [
@@ -111,7 +138,7 @@
         "filename": "Place Diamond.wav",
         "pack": "buildingandcraftingaudiobundle",
         "role": "primary",
-        "duration": 0.32
+        "duration": 0.352
       }
     ],
     "vent_success": [
@@ -121,7 +148,7 @@
         "filename": "Communication Recieving 2.wav",
         "pack": "spaceaudiobundle",
         "role": "primary",
-        "duration": 0.403
+        "duration": 0.43
       }
     ],
     "vent_miss": [
@@ -131,7 +158,7 @@
         "filename": "Buzzer.wav",
         "pack": "Foley Sports Sound FX Pack",
         "role": "primary",
-        "duration": 0.337
+        "duration": 0.342
       }
     ],
     "overheat": [
@@ -151,7 +178,7 @@
         "filename": "Scoreboard Ding.wav",
         "pack": "Foley Sports Sound FX Pack",
         "role": "primary",
-        "duration": 0.408
+        "duration": 0.413
       }
     ],
     "heat_loop": [
@@ -161,7 +188,17 @@
         "filename": "Gear 3 (loop).wav",
         "pack": "puzzleaudiokit",
         "role": "primary",
-        "duration": 1.65
+        "duration": 1.703
+      }
+    ],
+    "urgency_loop": [
+      {
+        "file_id": "westernaudiobundle/Western Audio Bundle/WAV/SFX/Misc/Rain (loop) 1.wav",
+        "rel_path": "westernaudiobundle/Western Audio Bundle/WAV/SFX/Misc/Rain (loop) 1.wav",
+        "filename": "Rain (loop) 1.wav",
+        "pack": "westernaudiobundle",
+        "role": "primary",
+        "duration": 2.647
       }
     ],
     "tab_switch": [
@@ -174,6 +211,26 @@
         "duration": 0.108
       }
     ],
+    "screen_open": [
+      {
+        "file_id": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Open Drawer 2.wav",
+        "rel_path": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Open Drawer 2.wav",
+        "filename": "Open Drawer 2.wav",
+        "pack": "puzzleaudiokit",
+        "role": "primary",
+        "duration": 0.706
+      }
+    ],
+    "screen_close": [
+      {
+        "file_id": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Close Drawer 2.wav",
+        "rel_path": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Close Drawer 2.wav",
+        "filename": "Close Drawer 2.wav",
+        "pack": "puzzleaudiokit",
+        "role": "primary",
+        "duration": 1.872
+      }
+    ],
     "mode_toggle": [
       {
         "file_id": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Button 6.wav",
@@ -181,7 +238,7 @@
         "filename": "Button 6.wav",
         "pack": "puzzleaudiokit",
         "role": "primary",
-        "duration": 0.099
+        "duration": 0.113
       }
     ],
     "epoch_page": [
@@ -191,7 +248,7 @@
         "filename": "Slide Button 10.wav",
         "pack": "buttonssfxlibrary",
         "role": "primary",
-        "duration": 0.55
+        "duration": 0.563
       }
     ],
     "make_contact": [
@@ -201,7 +258,7 @@
         "filename": "Teleportation.wav",
         "pack": "spaceaudiobundle",
         "role": "primary",
-        "duration": 2.65
+        "duration": 2.676
       }
     ],
     "tip_appear": [
@@ -211,7 +268,57 @@
         "filename": "Bubble Button 5.wav",
         "pack": "buttonssfxlibrary",
         "role": "primary",
-        "duration": 0.533
+        "duration": 0.563
+      }
+    ],
+    "denied_cash": [
+      {
+        "file_id": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Wrong 1.wav",
+        "rel_path": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Wrong 1.wav",
+        "filename": "Wrong 1.wav",
+        "pack": "puzzleaudiokit",
+        "role": "primary",
+        "duration": 0.543
+      }
+    ],
+    "denied_locked": [
+      {
+        "file_id": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Wrong 3.wav",
+        "rel_path": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Wrong 3.wav",
+        "filename": "Wrong 3.wav",
+        "pack": "puzzleaudiokit",
+        "role": "primary",
+        "duration": 0.514
+      }
+    ],
+    "challenge_start": [
+      {
+        "file_id": "Foley Sports Sound FX Pack/Foley Sports/Boxing/Boxing Bell Fight Start.wav",
+        "rel_path": "Foley Sports Sound FX Pack/Foley Sports/Boxing/Boxing Bell Fight Start.wav",
+        "filename": "Boxing Bell Fight Start.wav",
+        "pack": "Foley Sports Sound FX Pack",
+        "role": "primary",
+        "duration": 1.742
+      }
+    ],
+    "challenge_credit": [
+      {
+        "file_id": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Reward 1.wav",
+        "rel_path": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Reward 1.wav",
+        "filename": "Reward 1.wav",
+        "pack": "puzzleaudiokit",
+        "role": "primary",
+        "duration": 0.483
+      }
+    ],
+    "challenge_tier": [
+      {
+        "file_id": "Foley Sports Sound FX Pack/Foley Sports/Buzzers and Boards/Scoreboard Ding.wav",
+        "rel_path": "Foley Sports Sound FX Pack/Foley Sports/Buzzers and Boards/Scoreboard Ding.wav",
+        "filename": "Scoreboard Ding.wav",
+        "pack": "Foley Sports Sound FX Pack",
+        "role": "primary",
+        "duration": 0.413
       }
     ],
     "minigame_begin": [
@@ -221,7 +328,7 @@
         "filename": "Whistle Blow Normal.wav",
         "pack": "Foley Sports Sound FX Pack",
         "role": "primary",
-        "duration": 0.975
+        "duration": 0.98
       }
     ],
     "minigame_score": [
@@ -231,7 +338,7 @@
         "filename": "Scoreboard Ding.wav",
         "pack": "Foley Sports Sound FX Pack",
         "role": "primary",
-        "duration": 0.408
+        "duration": 0.413
       }
     ],
     "minigame_miss": [
@@ -241,7 +348,7 @@
         "filename": "Scoreboard Timer A.wav",
         "pack": "Foley Sports Sound FX Pack",
         "role": "primary",
-        "duration": 0.208
+        "duration": 0.213
       }
     ],
     "minigame_countdown": [
@@ -251,7 +358,7 @@
         "filename": "Puntuation Sound.wav",
         "pack": "spaceaudiobundle",
         "role": "primary",
-        "duration": 0.05
+        "duration": 0.079
       }
     ],
     "minigame_over": [
@@ -261,7 +368,7 @@
         "filename": "Scoreboard Buzzer.wav",
         "pack": "Foley Sports Sound FX Pack",
         "role": "primary",
-        "duration": 0.936
+        "duration": 0.941
       }
     ],
     "bball_launch": [
@@ -271,7 +378,7 @@
         "filename": "Ball Throw Fast.wav",
         "pack": "Foley Sports Sound FX Pack",
         "role": "primary",
-        "duration": 0.452
+        "duration": 0.457
       }
     ],
     "bball_fizzle": [
@@ -281,7 +388,7 @@
         "filename": "Scoreboard Timer A.wav",
         "pack": "Foley Sports Sound FX Pack",
         "role": "primary",
-        "duration": 0.208
+        "duration": 0.213
       }
     ],
     "bball_wall": [
@@ -291,7 +398,45 @@
         "filename": "Generic Bounce Normal.wav",
         "pack": "Foley Sports Sound FX Pack",
         "role": "primary",
-        "duration": 0.655
+        "duration": 0.66
+      }
+    ],
+    "bball_floor": [
+      {
+        "file_id": "Foley Sports Sound FX Pack/Foley Sports/Basketball/Generic Bounce Normal.wav",
+        "rel_path": "Foley Sports Sound FX Pack/Foley Sports/Basketball/Generic Bounce Normal.wav",
+        "filename": "Generic Bounce Normal.wav",
+        "pack": "Foley Sports Sound FX Pack",
+        "role": "primary",
+        "duration": 0.66
+      }
+    ],
+    "bball_rim": [
+      {
+        "file_id": "Foley Sports Sound FX Pack/Foley Sports/Basketball/Generic Net Hit Intense.wav",
+        "rel_path": "Foley Sports Sound FX Pack/Foley Sports/Basketball/Generic Net Hit Intense.wav",
+        "filename": "Generic Net Hit Intense.wav",
+        "pack": "Foley Sports Sound FX Pack",
+        "role": "primary",
+        "duration": 1.124
+      }
+    ],
+    "bball_score": [
+      {
+        "file_id": "Foley Sports Sound FX Pack/Foley Sports/Basketball/In The Net A.wav",
+        "rel_path": "Foley Sports Sound FX Pack/Foley Sports/Basketball/In The Net A.wav",
+        "filename": "In The Net A.wav",
+        "pack": "Foley Sports Sound FX Pack",
+        "role": "primary",
+        "duration": 1.211
+      },
+      {
+        "file_id": "Foley Sports Sound FX Pack/Foley Sports/Basketball/In The Net B.wav",
+        "rel_path": "Foley Sports Sound FX Pack/Foley Sports/Basketball/In The Net B.wav",
+        "filename": "In The Net B.wav",
+        "pack": "Foley Sports Sound FX Pack",
+        "role": "variant_1",
+        "duration": 1.612
       }
     ],
     "bball_swish": [
@@ -301,7 +446,353 @@
         "filename": "Net Swoosh Normal.wav",
         "pack": "Foley Sports Sound FX Pack",
         "role": "primary",
-        "duration": 1.125
+        "duration": 1.134
+      }
+    ],
+    "bball_gem_earned": [
+      {
+        "file_id": "magicspellssfxbundle_audio/magicspellssfxbundle/Mono/Revive/Revive 3.mp3",
+        "rel_path": "magicspellssfxbundle_audio/magicspellssfxbundle/Mono/Revive/Revive 3.mp3",
+        "filename": "Revive 3.mp3",
+        "pack": "magicspellssfxbundle_audio",
+        "role": "primary",
+        "duration": 6.399
+      }
+    ],
+    "m3_select": [
+      {
+        "file_id": "buttonssfxlibrary/Buttons SFX Library/WAV/Click/Click Button 6.wav",
+        "rel_path": "buttonssfxlibrary/Buttons SFX Library/WAV/Click/Click Button 6.wav",
+        "filename": "Click Button 6.wav",
+        "pack": "buttonssfxlibrary",
+        "role": "primary",
+        "duration": 0.234
+      }
+    ],
+    "m3_swap": [
+      {
+        "file_id": "buttonssfxlibrary/Buttons SFX Library/WAV/Slide/Slide Button 13.wav",
+        "rel_path": "buttonssfxlibrary/Buttons SFX Library/WAV/Slide/Slide Button 13.wav",
+        "filename": "Slide Button 13.wav",
+        "pack": "buttonssfxlibrary",
+        "role": "primary",
+        "duration": 0.276
+      }
+    ],
+    "m3_invalid": [
+      {
+        "file_id": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Wrong 1.wav",
+        "rel_path": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Wrong 1.wav",
+        "filename": "Wrong 1.wav",
+        "pack": "puzzleaudiokit",
+        "role": "primary",
+        "duration": 0.543
+      }
+    ],
+    "m3_match": [
+      {
+        "file_id": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Reward 2.wav",
+        "rel_path": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Reward 2.wav",
+        "filename": "Reward 2.wav",
+        "pack": "puzzleaudiokit",
+        "role": "primary",
+        "duration": 0.579
+      }
+    ],
+    "m3_fall": [
+      {
+        "file_id": "westernaudiobundle/Western Audio Bundle/WAV/SFX/Misc/Card Deliver 1.wav",
+        "rel_path": "westernaudiobundle/Western Audio Bundle/WAV/SFX/Misc/Card Deliver 1.wav",
+        "filename": "Card Deliver 1.wav",
+        "pack": "westernaudiobundle",
+        "role": "primary",
+        "duration": 0.534
+      }
+    ],
+    "m3_avoid": [
+      {
+        "file_id": "Sci-Fi Horror Sound FX Pack Vol. 2/Sci-Fi Horror Sound FX Pack Vol. 2/Tech and Mech/Pathetic Alarm.wav",
+        "rel_path": "Sci-Fi Horror Sound FX Pack Vol. 2/Sci-Fi Horror Sound FX Pack Vol. 2/Tech and Mech/Pathetic Alarm.wav",
+        "filename": "Pathetic Alarm.wav",
+        "pack": "Sci-Fi Horror Sound FX Pack Vol. 2",
+        "role": "primary",
+        "duration": 2.948
+      }
+    ],
+    "m3_legacy": [
+      {
+        "file_id": "magicspellssfxbundle_audio/magicspellssfxbundle/Mono/Revive/Revive 3.mp3",
+        "rel_path": "magicspellssfxbundle_audio/magicspellssfxbundle/Mono/Revive/Revive 3.mp3",
+        "filename": "Revive 3.mp3",
+        "pack": "magicspellssfxbundle_audio",
+        "role": "primary",
+        "duration": 6.399
+      }
+    ],
+    "catch_coin": [
+      {
+        "file_id": "inventorysfxbundle_audio/inventorysfxbundle/Assets/Coins/CoinPickUp2.mp3",
+        "rel_path": "inventorysfxbundle_audio/inventorysfxbundle/Assets/Coins/CoinPickUp2.mp3",
+        "filename": "CoinPickUp2.mp3",
+        "pack": "inventorysfxbundle_audio",
+        "role": "primary",
+        "duration": 0.946
+      },
+      {
+        "file_id": "westernaudiobundle/Western Audio Bundle/WAV/SFX/Misc/Card Deliver 1.wav",
+        "rel_path": "westernaudiobundle/Western Audio Bundle/WAV/SFX/Misc/Card Deliver 1.wav",
+        "filename": "Card Deliver 1.wav",
+        "pack": "westernaudiobundle",
+        "role": "variant_2",
+        "duration": 0.534
+      },
+      {
+        "file_id": "inventorysfxbundle_audio/inventorysfxbundle/Assets/Coins/CoinPickUp1.mp3",
+        "rel_path": "inventorysfxbundle_audio/inventorysfxbundle/Assets/Coins/CoinPickUp1.mp3",
+        "filename": "CoinPickUp1.mp3",
+        "pack": "inventorysfxbundle_audio",
+        "role": "variant_1",
+        "duration": 1.026
+      }
+    ],
+    "catch_premium": [
+      {
+        "file_id": "westernaudiobundle/Western Audio Bundle/WAV/SFX/Misc/Coins Bag 1.wav",
+        "rel_path": "westernaudiobundle/Western Audio Bundle/WAV/SFX/Misc/Coins Bag 1.wav",
+        "filename": "Coins Bag 1.wav",
+        "pack": "westernaudiobundle",
+        "role": "primary",
+        "duration": 0.565
+      }
+    ],
+    "catch_legacy": [
+      {
+        "file_id": "inventorysfxbundle_audio/inventorysfxbundle/Assets/Coins/CoinPouring3.mp3",
+        "rel_path": "inventorysfxbundle_audio/inventorysfxbundle/Assets/Coins/CoinPouring3.mp3",
+        "filename": "CoinPouring3.mp3",
+        "pack": "inventorysfxbundle_audio",
+        "role": "primary",
+        "duration": 14.146
+      }
+    ],
+    "catch_spawn": [
+      {
+        "file_id": "buttonssfxlibrary/Buttons SFX Library/WAV/Bubble/Bubble Button 5.wav",
+        "rel_path": "buttonssfxlibrary/Buttons SFX Library/WAV/Bubble/Bubble Button 5.wav",
+        "filename": "Bubble Button 5.wav",
+        "pack": "buttonssfxlibrary",
+        "role": "primary",
+        "duration": 0.563
+      }
+    ],
+    "mem_pad": [
+      {
+        "file_id": "spaceaudiobundle/Space Audio Bundle/WAV/FX/Button 2.wav",
+        "rel_path": "spaceaudiobundle/Space Audio Bundle/WAV/FX/Button 2.wav",
+        "filename": "Button 2.wav",
+        "pack": "spaceaudiobundle",
+        "role": "primary",
+        "duration": 0.282
+      }
+    ],
+    "mem_round": [
+      {
+        "file_id": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Reward 1.wav",
+        "rel_path": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Reward 1.wav",
+        "filename": "Reward 1.wav",
+        "pack": "puzzleaudiokit",
+        "role": "primary",
+        "duration": 0.483
+      }
+    ],
+    "mem_wrong": [
+      {
+        "file_id": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Wrong 1.wav",
+        "rel_path": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Wrong 1.wav",
+        "filename": "Wrong 1.wav",
+        "pack": "puzzleaudiokit",
+        "role": "primary",
+        "duration": 0.543
+      }
+    ],
+    "mem_gem": [
+      {
+        "file_id": "magicspellssfxbundle_audio/magicspellssfxbundle/Mono/Revive/Revive 3.mp3",
+        "rel_path": "magicspellssfxbundle_audio/magicspellssfxbundle/Mono/Revive/Revive 3.mp3",
+        "filename": "Revive 3.mp3",
+        "pack": "magicspellssfxbundle_audio",
+        "role": "primary",
+        "duration": 6.399
+      }
+    ],
+    "bal_enter": [
+      {
+        "file_id": "buttonssfxlibrary/Buttons SFX Library/WAV/Slide/Slide Button 13.wav",
+        "rel_path": "buttonssfxlibrary/Buttons SFX Library/WAV/Slide/Slide Button 13.wav",
+        "filename": "Slide Button 13.wav",
+        "pack": "buttonssfxlibrary",
+        "role": "primary",
+        "duration": 0.276
+      }
+    ],
+    "bal_leave": [
+      {
+        "file_id": "buttonssfxlibrary/Buttons SFX Library/WAV/Click/Click Button 6.wav",
+        "rel_path": "buttonssfxlibrary/Buttons SFX Library/WAV/Click/Click Button 6.wav",
+        "filename": "Click Button 6.wav",
+        "pack": "buttonssfxlibrary",
+        "role": "primary",
+        "duration": 0.234
+      }
+    ],
+    "bal_lift": [
+      {
+        "file_id": "buildingandcraftingaudiobundle/Building and Crafting Audio Bundle/WAV/FX/Place Diamond.wav",
+        "rel_path": "buildingandcraftingaudiobundle/Building and Crafting Audio Bundle/WAV/FX/Place Diamond.wav",
+        "filename": "Place Diamond.wav",
+        "pack": "buildingandcraftingaudiobundle",
+        "role": "primary",
+        "duration": 0.352
+      }
+    ],
+    "bal_gem": [
+      {
+        "file_id": "magicspellssfxbundle_audio/magicspellssfxbundle/Mono/Revive/Revive 3.mp3",
+        "rel_path": "magicspellssfxbundle_audio/magicspellssfxbundle/Mono/Revive/Revive 3.mp3",
+        "filename": "Revive 3.mp3",
+        "pack": "magicspellssfxbundle_audio",
+        "role": "primary",
+        "duration": 6.399
+      }
+    ],
+    "time_lock_hit": [
+      {
+        "file_id": "Sci-Fi Horror Sound FX Pack Vol. 2/Sci-Fi Horror Sound FX Pack Vol. 2/Tech and Mech/Strong Accept.wav",
+        "rel_path": "Sci-Fi Horror Sound FX Pack Vol. 2/Sci-Fi Horror Sound FX Pack Vol. 2/Tech and Mech/Strong Accept.wav",
+        "filename": "Strong Accept.wav",
+        "pack": "Sci-Fi Horror Sound FX Pack Vol. 2",
+        "role": "primary",
+        "duration": 2.721
+      }
+    ],
+    "time_lock_miss": [
+      {
+        "file_id": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Wrong 1.wav",
+        "rel_path": "puzzleaudiokit/Puzzle Audio Bundle/WAV/FX/Misc/Wrong 1.wav",
+        "filename": "Wrong 1.wav",
+        "pack": "puzzleaudiokit",
+        "role": "primary",
+        "duration": 0.543
+      }
+    ],
+    "time_gem": [
+      {
+        "file_id": "magicspellssfxbundle_audio/magicspellssfxbundle/Mono/Revive/Revive 3.mp3",
+        "rel_path": "magicspellssfxbundle_audio/magicspellssfxbundle/Mono/Revive/Revive 3.mp3",
+        "filename": "Revive 3.mp3",
+        "pack": "magicspellssfxbundle_audio",
+        "role": "primary",
+        "duration": 6.399
+      }
+    ],
+    "ceremony_obituary": [
+      {
+        "file_id": "westernaudiobundle/Western Audio Bundle/WAV/SFX/Misc/Bell 1.wav",
+        "rel_path": "westernaudiobundle/Western Audio Bundle/WAV/SFX/Misc/Bell 1.wav",
+        "filename": "Bell 1.wav",
+        "pack": "westernaudiobundle",
+        "role": "primary",
+        "duration": 6.842
+      }
+    ],
+    "ceremony_will": [
+      {
+        "file_id": "westernaudiobundle/Western Audio Bundle/WAV/SFX/Misc/Card Deliver 1.wav",
+        "rel_path": "westernaudiobundle/Western Audio Bundle/WAV/SFX/Misc/Card Deliver 1.wav",
+        "filename": "Card Deliver 1.wav",
+        "pack": "westernaudiobundle",
+        "role": "primary",
+        "duration": 0.534
+      }
+    ],
+    "ceremony_heir": [
+      {
+        "file_id": "magicspellssfxbundle_audio/magicspellssfxbundle/Mono/Revive/Revive 3.mp3",
+        "rel_path": "magicspellssfxbundle_audio/magicspellssfxbundle/Mono/Revive/Revive 3.mp3",
+        "filename": "Revive 3.mp3",
+        "pack": "magicspellssfxbundle_audio",
+        "role": "primary",
+        "duration": 6.399
+      }
+    ],
+    "ceremony_contact": [
+      {
+        "file_id": "magicspellssfxbundle_audio/magicspellssfxbundle/Mono/Generic/Generic Spell (summon) 1.mp3",
+        "rel_path": "magicspellssfxbundle_audio/magicspellssfxbundle/Mono/Generic/Generic Spell (summon) 1.mp3",
+        "filename": "Generic Spell (summon) 1.mp3",
+        "pack": "magicspellssfxbundle_audio",
+        "role": "primary",
+        "duration": 6.467
+      }
+    ],
+    "ceremony_contact_reveal": [
+      {
+        "file_id": "spaceaudiobundle/Space Audio Bundle/WAV/FX/Communication Recieving 2.wav",
+        "rel_path": "spaceaudiobundle/Space Audio Bundle/WAV/FX/Communication Recieving 2.wav",
+        "filename": "Communication Recieving 2.wav",
+        "pack": "spaceaudiobundle",
+        "role": "primary",
+        "duration": 0.43
+      }
+    ],
+    "ceremony_fanfare": [
+      {
+        "file_id": "westernaudiobundle/Western Audio Bundle/WAV/SFX/Buttons and Stingers/Stinger 15.wav",
+        "rel_path": "westernaudiobundle/Western Audio Bundle/WAV/SFX/Buttons and Stingers/Stinger 15.wav",
+        "filename": "Stinger 15.wav",
+        "pack": "westernaudiobundle",
+        "role": "primary",
+        "duration": 1.672
+      }
+    ],
+    "ceremony_power_down": [
+      {
+        "file_id": "spaceaudiobundle/Space Audio Bundle/WAV/FX/Decompression 1.wav",
+        "rel_path": "spaceaudiobundle/Space Audio Bundle/WAV/FX/Decompression 1.wav",
+        "filename": "Decompression 1.wav",
+        "pack": "spaceaudiobundle",
+        "role": "primary",
+        "duration": 3.778
+      }
+    ],
+    "legacy_purchase": [
+      {
+        "file_id": "magicspellssfxbundle_audio/magicspellssfxbundle/Mono/Generic/Generic Spell (summon) 1.mp3",
+        "rel_path": "magicspellssfxbundle_audio/magicspellssfxbundle/Mono/Generic/Generic Spell (summon) 1.mp3",
+        "filename": "Generic Spell (summon) 1.mp3",
+        "pack": "magicspellssfxbundle_audio",
+        "role": "primary",
+        "duration": 6.467
+      }
+    ],
+    "welcome_back": [
+      {
+        "file_id": "inventorysfxbundle_audio/inventorysfxbundle/Assets/Coins/CoinPouring3.mp3",
+        "rel_path": "inventorysfxbundle_audio/inventorysfxbundle/Assets/Coins/CoinPouring3.mp3",
+        "filename": "CoinPouring3.mp3",
+        "pack": "inventorysfxbundle_audio",
+        "role": "primary",
+        "duration": 14.146
+      }
+    ],
+    "prestige_confirm": [
+      {
+        "file_id": "Foley Sports Sound FX Pack/Foley Sports/Boxing/Boxing Bell Fight Start.wav",
+        "rel_path": "Foley Sports Sound FX Pack/Foley Sports/Boxing/Boxing Bell Fight Start.wav",
+        "filename": "Boxing Bell Fight Start.wav",
+        "pack": "Foley Sports Sound FX Pack",
+        "role": "primary",
+        "duration": 1.742
       }
     ],
     "band_0_blue_collar": [
@@ -310,7 +801,7 @@
         "rel_path": "Jazz Music Pack/Jazz Music Pack/Harlem Nights (RT 3.003)/Jazz Harlem Nights Intensity 2.wav",
         "filename": "Jazz Harlem Nights Intensity 2.wav",
         "pack": "Jazz Music Pack",
-        "role": "variant_1",
+        "role": "primary",
         "duration": 161.881
       }
     ],
@@ -321,14 +812,6 @@
         "filename": "Corporate The Simulation Intensity 2.wav",
         "pack": "Corporate Music Pack Vol. 1",
         "role": "primary",
-        "duration": 146.049
-      },
-      {
-        "file_id": "Corporate Music Pack Vol. 1/The Simulation (RT 2.182)/Corporate The Simulation Main.wav",
-        "rel_path": "Corporate Music Pack Vol. 1/The Simulation (RT 2.182)/Corporate The Simulation Main.wav",
-        "filename": "Corporate The Simulation Main.wav",
-        "pack": "Corporate Music Pack Vol. 1",
-        "role": "layer",
         "duration": 146.049
       }
     ],
@@ -348,15 +831,7 @@
         "rel_path": "Ethereal Music Pack Vol. 3/Ethereal Music Pack Vol. 3/Mystics (RT 13.197)/Ethereal Vol3 Mystics Intensity 2.wav",
         "filename": "Ethereal Vol3 Mystics Intensity 2.wav",
         "pack": "Ethereal Music Pack Vol. 3",
-        "role": "variant_1",
-        "duration": 166.919
-      },
-      {
-        "file_id": "Ethereal Music Pack Vol. 3/Ethereal Music Pack Vol. 3/Mystics (RT 13.197)/Ethereal Vol3 Mystics Main.wav",
-        "rel_path": "Ethereal Music Pack Vol. 3/Ethereal Music Pack Vol. 3/Mystics (RT 13.197)/Ethereal Vol3 Mystics Main.wav",
-        "filename": "Ethereal Vol3 Mystics Main.wav",
-        "pack": "Ethereal Music Pack Vol. 3",
-        "role": "layer",
+        "role": "primary",
         "duration": 166.919
       }
     ],

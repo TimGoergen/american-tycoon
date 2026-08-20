@@ -28,10 +28,8 @@ const INCOME_DISPLAY_INTERVAL := 0.1
 var _income_display_timer := INCOME_DISPLAY_INTERVAL  # refresh on the very first frame
 
 var _hero_stat: HeroStat
-## The full-bleed play-field backdrop. Earth shows a prairie; it swaps to a space scene
-## after first contact and to a centered space scene after the tenth contact (see
-## _background_path_for_tier). Kept as a field so contact events can re-point its texture.
-var _background: TextureRect
+## Dynamic panoramic scrolling backdrop across epochs.
+var _background: DynamicBackground
 ## Small banner under the hero stat naming the civilization Earth is currently trading
 ## with (the reached epoch). Updates the moment a first contact advances the epoch.
 var _first_contact_overlay: FirstContactOverlay
@@ -736,16 +734,10 @@ func _build_ui() -> void:
 	bg_mask.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg_mask)
 
-	# Pick the backdrop for the epoch we are starting in: a fresh founder (or a heir after
-	# prestige) is on Earth and sees the prairie; a save loaded mid-run past first/tenth
-	# contact opens straight onto the matching space scene. _on_contact_made swaps it live.
-	_background = TextureRect.new()
+	# Dynamic scrolling backdrop spanning Earth -> Near Space -> Deep Space across epochs.
+	_background = DynamicBackground.new()
 	_background.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_background.texture = load(_background_path_for_tier(game.epoch.current_tier))
-	# COVERED scales the square art to fill the tall play-field, cropping the overflow, so there
-	# are never empty bars — the landscape always reaches all four edges of the rounded frame.
-	_background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	_background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_background.set_tier(game.epoch.current_tier)
 	bg_mask.add_child(_background)
 
 	# The viewing area: the shared rounded-rect frame (UiPalette) — inset from the screen edges by
@@ -3052,9 +3044,8 @@ func _update_plan_button() -> void:
 ## new alien property. (If a single huge tick crossed two epochs, the later contact's beat
 ## simply replaces this one — vanishingly rare given epochs are ~30× apart.)
 func _on_contact_made(new_tier: int) -> void:
-	# Swap the play-field backdrop to match the newly reached epoch before the beat plays,
-	# so when the first-contact overlay clears the player is looking at the new world.
-	_background.texture = load(_background_path_for_tier(new_tier))
+	# Advance the play-field backdrop to match the newly reached epoch.
+	_background.set_tier(new_tier)
 	# The new epoch just opened its pager tab — unlock it, then jump to it so that when the contact
 	# beat (and any trade-deal minigame) clears, the player is looking at the new civ's properties.
 	_update_tab_unlocks()
@@ -3121,27 +3112,6 @@ func _on_contact_dismissed() -> void:
 		),
 		dynasty.upgrades.minigame_bonus_max()
 	)
-
-
-# Backdrops keyed to how many alien contacts have been made (Tim, 2026-06-26). The epoch
-# tier is 1 on Earth, so the number of contacts made this run is (current_tier - 1):
-# Earth keeps the prairie; the first contact opens onto deep space; the tenth swaps to a
-# centered space composition. The space scenes cover every contact in between.
-const BACKGROUND_EARTH := "res://art/backgrounds/prairie_background.png"
-const BACKGROUND_SPACE := "res://art/backgrounds/space_background.jpg"
-const BACKGROUND_SPACE_CENTERED := "res://art/backgrounds/space_centered_background.jpg"
-
-
-## The backdrop image path for a given epoch tier. Used both to set the initial backdrop
-## on load and to swap it the moment a contact advances the epoch. Earth spans tiers 1-2
-## since the Earth split, so only ALIEN contacts (tier 3+) leave the prairie behind.
-func _background_path_for_tier(tier: int) -> String:
-	var alien_contacts_made := tier - 2
-	if alien_contacts_made >= 10:
-		return BACKGROUND_SPACE_CENTERED
-	if alien_contacts_made >= 1:
-		return BACKGROUND_SPACE
-	return BACKGROUND_EARTH
 
 
 ## The Family Ledger is now a tab (UI Notes §7), refreshed on entry by _show_tab —

@@ -301,8 +301,14 @@ static func wrap_in_tab_panel(content: Control) -> MarginContainer:
 	var margin := MarginContainer.new()
 	for side in ["margin_top", "margin_bottom"]:
 		margin.add_theme_constant_override(side, TAB_PANEL_EDGE_MARGIN)
+	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var panel := PanelContainer.new()
 	panel.add_theme_stylebox_override("panel", make_tab_panel_style())
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	panel.add_child(content)
 	margin.add_child(panel)
 	return margin

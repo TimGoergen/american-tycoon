@@ -782,6 +782,8 @@ func _build_ui() -> void:
 	# translucent-cream panel (UiPalette.wrap_in_tab_panel) so all four share one framed look.
 	# All four wrappers fill the content slot; _show_tab toggles visibility.
 	_ledger_screen = FamilyLedgerScreen.new()
+	_ledger_screen.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_ledger_screen.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_ledger_screen.setup()
 	_tab_panels = [
 		UiPalette.wrap_in_tab_panel(_build_property_tab()),

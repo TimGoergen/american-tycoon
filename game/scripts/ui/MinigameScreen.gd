@@ -1329,9 +1329,12 @@ func start_game(
 	else:
 		_begin_stakes.text = "Play well to earn a BONUS on top of your inheritance. Skip to keep it as-is — coming up short keeps less."
 	_begin_stakes.visible = true
-	# A timed game warns the clock is about to start; a no-timer game (Memory) invites the player to
-	# take their time instead, so the hint never promises a clock that won't appear.
-	if _active_minigame.uses_timer():
+	# A timed game warns the clock is about to start; a no-timer game invites the player to
+	# take their time or explains the round end condition, so the hint never promises a clock that won't appear.
+	var custom_hint := _active_minigame.begin_hint()
+	if custom_hint != "":
+		_begin_hint.text = custom_hint
+	elif _active_minigame.uses_timer():
 		_begin_hint.text = "The clock starts when you press Begin."
 	else:
 		_begin_hint.text = "No clock — take your time."

@@ -6,7 +6,8 @@ extends Minigame
 # that falls past the bottom is -MISS_PENALTY (so misses actively cost you). Ends when all
 # TARGET_COINS have dropped.
 #
-# Owns only its gameplay; the host owns countdown / spectrum / result / multiplier.
+# Owns only its gameplay; the host owns spectrum / result / multiplier (no countdown timer in base
+# mode: the duration is directly a function of how many coins fall).
 #
 # Polish pass (2026-06-29): this was the least-juiced game — bare "$" buttons, no catch or miss
 # feedback at all. It now reads clearly (round coins with a navy rim and a living glint, a spawn
@@ -139,6 +140,16 @@ func display_name() -> String:
 func how_to_play() -> String:
 	return "Tap every falling coin before it hits the floor. Catches score, " \
 		+ "misses cost — and they fall faster as you go."
+
+
+## In base (reward) mode, Catch the Money does not use a countdown timer: the game is fast-paced
+## and its duration is naturally determined by the batch of falling coins.
+func uses_timer() -> bool:
+	return false
+
+
+func begin_hint() -> String:
+	return "No clock — the round ends when all coins have fallen."
 
 
 func begin(tuning: TuningConfig) -> void:

@@ -124,6 +124,12 @@ func display_name() -> String:
 func how_to_play() -> String:
 	return ""
 
+## An optional hint shown beneath the stakes on the Get Ready gate. If empty, the host uses
+## a default based on whether the game is timed ("The clock starts when you press Begin.")
+## or untimed ("No clock — take your time."). Override to provide a custom hint.
+func begin_hint() -> String:
+	return ""
+
 ## Extra seconds this type adds on top of the host's standard round length
 ## (tuning.minigame_duration_seconds). Most types add none; a type that needs more breathing
 ## room than the shared default — e.g. the slingshot basketball — overrides this. The host reads

@@ -89,6 +89,15 @@ var _pulse_phase: float = 0.0
 # behind it and the marker stays easy to follow as it moves.
 var _prev_pos: float = 0.25
 
+# --- Balance physics & geometry tunable fields ---
+var _zone_half: float = ZONE_HALF
+var _lift_accel: float = LIFT_ACCEL
+var _gravity: float = GRAVITY
+var _damping: float = DAMPING
+var _edge_bounce: float = EDGE_BOUNCE
+var _gem_fill_seconds: float = GEM_FILL_SECONDS
+var _gem_drain_seconds: float = GEM_DRAIN_SECONDS
+
 # --- Challenge-mode knobs (captured from tuning in begin(); USED ONLY in challenge mode) ------
 # The prestige/reward round keeps the module constants above (ZONE_TARGET_CHANGE / ZONE_EASE, one
 # point per whole second); these live-tunable values shape only the CHALLENGE round's feel, so the
@@ -135,28 +144,26 @@ func begin(tuning: TuningConfig) -> void:
 	_pulse_phase = 0.0
 	# Bank time-in-zone against the whole round, so the host's spectrum bar starts empty
 	# and only climbs while the marker is in the zone (it never falls back).
-	_total_round_seconds = maxf(0.1, tuning.minigame_duration_seconds)
+	_total_round_seconds = maxf(0.1, tuning.minigame_duration_seconds) if tuning != null else 25.0
 
-	# Legacy gem: capture the live spawn chance and arm the one-time roll. We roll ONCE
-	# per round (after GEM_ROLL_DELAY) rather than on every zone re-roll, so at most one
-	# gem ever appears and its appearance is a clean per-round windfall. Works the same in
-	# Challenge Mode (endless) — the gem can still be collected; the host suppresses the
-	# actual grant there, so nothing here needs to change.
-	_gem_chance = clampf(tuning.legacy_gem_chance_balance, 0.0, 1.0)
+	if tuning != null:
+		_zone_half = clampf(tuning.balance_zone_half, 0.02, 0.5)
+		_lift_accel = maxf(0.1, tuning.balance_lift_accel)
+		_gravity = maxf(0.1, tuning.balance_gravity)
+		_damping = maxf(0.0, tuning.balance_damping)
+		_edge_bounce = clampf(tuning.balance_edge_bounce, 0.0, 1.0)
+		_gem_fill_seconds = maxf(0.1, tuning.balance_gem_fill_seconds)
+		_gem_drain_seconds = maxf(0.1, tuning.balance_gem_drain_seconds)
+		_gem_chance = clampf(tuning.legacy_gem_chance_balance, 0.0, 1.0)
+		_challenge_seconds_per_point = maxf(0.01, tuning.balance_seconds_per_point)
+		_challenge_zone_reroll_seconds = tuning.balance_zone_reroll_seconds
+		_challenge_zone_ease = tuning.balance_zone_ease
+
 	_gem_roll_timer = GEM_ROLL_DELAY
 	_gem_active = false
 	_gem_progress = 0.0
 	_gem_won_flash = 0.0
-
-	# Success-feedback bookkeeping, fresh each round.
 	_milestones_shown = 0
-
-	# Capture the CHALLENGE-mode knobs. Read even in reward mode (harmless — they're gated on
-	# challenge_mode where used), so the fields are always populated for a challenge run started next.
-	# seconds_per_point is floored so a zero/negative tuning value can't divide-by-zero the score/gauge.
-	_challenge_seconds_per_point = maxf(0.01, tuning.balance_seconds_per_point)
-	_challenge_zone_reroll_seconds = tuning.balance_zone_reroll_seconds
-	_challenge_zone_ease = tuning.balance_zone_ease
 
 	var intro := Label.new()
 	intro.text = how_to_play()
@@ -253,30 +260,26 @@ func _process(delta: float) -> void:
 	var zone_ease := _challenge_zone_ease if challenge_mode else ZONE_EASE
 	_zone_timer -= delta
 	if _zone_timer <= 0.0:
-		_zone_target = _rng.randf_range(ZONE_HALF, 1.0 - ZONE_HALF)
+		_zone_target = _rng.randf_range(_zone_half, 1.0 - _zone_half)
 		_zone_timer = reroll_seconds
 	_zone_center += (_zone_target - _zone_center) * minf(1.0, zone_ease * delta)
-	_zone_center = clampf(_zone_center, ZONE_HALF, 1.0 - ZONE_HALF)
+	_zone_center = clampf(_zone_center, _zone_half, 1.0 - _zone_half)
 
 	# The bobber physics: lift while held, gravity always, damped so it stays readable.
-	var accel := (LIFT_ACCEL if _held else 0.0) - GRAVITY
+	var accel := (_lift_accel if _held else 0.0) - _gravity
 	_vel += accel * delta
-	_vel *= maxf(0.0, 1.0 - DAMPING * delta)
+	_vel *= maxf(0.0, 1.0 - _damping * delta)
 	_prev_pos = _pos
 	_pos += _vel * delta
 	# Soft bounce off the floor and ceiling — slamming an edge costs the momentum.
 	if _pos <= 0.0:
 		_pos = 0.0
-		_vel = absf(_vel) * EDGE_BOUNCE
+		_vel = absf(_vel) * _edge_bounce
 	elif _pos >= 1.0:
 		_pos = 1.0
-		_vel = -absf(_vel) * EDGE_BOUNCE
+		_vel = -absf(_vel) * _edge_bounce
 
-	var in_zone := absf(_pos - _zone_center) <= ZONE_HALF
-	# THE ONLY MOMENTS THAT MATTER HERE ARE THE CROSSINGS. This game has no discrete input — the
-	# player holds, the beam drifts — so entering and leaving the scoring zone are the only times
-	# anything changes, and they are what the audio marks. A continuous tone tracking the beam was
-	# the obvious alternative and would be the second drone in the game; one is enough.
+	var in_zone := absf(_pos - _zone_center) <= _zone_half
 	if in_zone != _was_in_zone:
 		Audio.play(&"bal_enter" if in_zone else &"bal_leave")
 		_was_in_zone = in_zone
@@ -291,11 +294,7 @@ func _process(delta: float) -> void:
 		_track.queue_redraw()
 
 
-## Pop a gold "banking" chip the first time banked performance crosses each milestone, matching
-## Match-3's feedback (Tim, 2026-07-11 — every minigame shows success feedback). Gold marks these
-## as the exceptional "the books are balancing" beats. A per-zone-entry chip was tried but read as
-## too noisy (Tim, 2026-07-11), so milestones are the only success chip here. Spawned on the track
-## control so they float over the bar, centered on the gold zone in the track's local coordinates.
+## Pop a gold "banking" chip the first time banked performance crosses each milestone.
 func _update_success_chips() -> void:
 	if _track == null:
 		return
@@ -309,32 +308,23 @@ func _update_success_chips() -> void:
 		_milestones_shown += 1
 
 
-## Advance the legacy-gem mechanic once per frame. This is entirely SEPARATE from the
-## round score / time-in-zone — it never touches _time_in_zone or get_performance().
-##  1. Once, after GEM_ROLL_DELAY, roll _gem_chance to decide if a gem appears this round.
-##  2. While a gem is active: fill _gem_progress when in-zone, drain it (slower) when out.
-##  3. On a full bar: collect the gem, fire a brief win cue, and clear it (one gem per round).
 func _update_legacy_gem(delta: float, in_zone: bool) -> void:
-	# Fade the post-win flash regardless of whether another gem is active.
 	if _gem_won_flash > 0.0:
 		_gem_won_flash = maxf(0.0, _gem_won_flash - delta)
 
-	# One-time appearance roll, a beat into the round.
 	if _gem_roll_timer >= 0.0:
 		_gem_roll_timer -= delta
 		if _gem_roll_timer < 0.0:
-			# Don't spawn if the bonus is already earned (design rule 3 — no noise once secured).
 			_gem_active = not legacy_bonus_secured() and _rng.randf() < _gem_chance
 		return
 
 	if not _gem_active:
 		return
 
-	# Fill in-zone, drain (slower) out of it. Constant rates from the *_SECONDS knobs.
 	if in_zone:
-		_gem_progress = minf(1.0, _gem_progress + delta / GEM_FILL_SECONDS)
+		_gem_progress = minf(1.0, _gem_progress + delta / _gem_fill_seconds)
 	else:
-		_gem_progress = maxf(0.0, _gem_progress - delta / GEM_DRAIN_SECONDS)
+		_gem_progress = maxf(0.0, _gem_progress - delta / _gem_drain_seconds)
 
 	if _gem_progress >= 1.0:
 		# Bar full — bank the gem (host gates/grants it), clear it, and flash a win cue.

@@ -316,10 +316,6 @@ func _on_pad_input(event: InputEvent, pad_id: int) -> void:
 		else:
 			Audio.play(&"mem_round")
 			_set_status("Nice!", UiPalette.MONEY_GREEN)
-				_play_round_clear_celebration()
-		else:
-			Audio.play(&"mem_round")
-			_set_status("Nice!", UiPalette.MONEY_GREEN)
 			# Floating success chip over the board, matching Match-3's per-success feedback
 			# (Tim, 2026-07-11 — every minigame shows success feedback like Match-3). A round
 			# clear is a discrete event, so this can't spam like a per-tap chip would.

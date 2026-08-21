@@ -3,14 +3,14 @@ extends Minigame
 
 # The timing-bar minigame TYPE (GDD §5.5) — a quick precision game, the second entry in the
 # library so the host's random draw has variety. A marker sweeps back and forth across a
-# bar; the player taps LOCK to catch it inside the gold zone. The zone JUMPS to a new random
-# spot after every successful lock and slowly SHRINKS (down to half its width) as locks pile
-# up, so it gets harder. A miss just wastes time — the host countdown keeps running (a miss is
-# never charged a lock; that yo-yoing count only confused players, Tim 2026-07-11) and scores
-# nothing. Each successful lock scores accuracy in [0,1]; landing TARGET_LOCKS locks ends the
-# round early, otherwise the host's countdown ends it. The lock count only ever climbs, shown as
-# fill-only pips above the bar. Performance = average accuracy over TARGET_LOCKS (a never-made
-# lock counts as zero, so you must keep landing them, not just nail one).
+# bar; the player taps LOCK to catch it inside the gold zone. The zone glides smoothly across
+# the bar (reversing at edges and every few locks) and slowly SHRINKS (down to half its width
+# in normal mode) as locks pile up, so it gets harder. A miss just wastes time — the host
+# countdown keeps running (a miss is never charged a lock; that yo-yoing count only confused
+# players, Tim 2026-07-11) and scores nothing. Each successful lock scores accuracy in [0,1]; landing
+# TARGET_LOCKS locks ends the round early, otherwise the host's countdown ends it. The lock count only
+# ever climbs, shown as fill-only pips above the bar. Performance = average accuracy over TARGET_LOCKS
+# (a never-made lock counts as zero, so you must keep landing them, not just nail one).
 #
 # Owns only its gameplay; the host owns the countdown / spectrum / result / multiplier.
 
@@ -38,18 +38,26 @@ const BASE_SPEED := 0.9
 const SPEED_RAMP := 1.09
 ## Seconds a click-feedback line lingers before it has fully faded out.
 const CLICK_MARK_FADE := 2.0
-## How long (seconds) the fading "previous size" outline lingers after the zone shrinks+jumps, so
+## How long (seconds) the fading "previous size" outline lingers after the zone shrinks, so
 ## the player can SEE it got smaller (the shrink was invisible until felt before).
 const ZONE_GHOST_TIME := 0.5
 
-## --- Challenge Mode: calm, predictable difficulty (Tim playtest 2026-07-21) --------------------------
-## The previous pass made Challenge Mode too chaotic — fast oscillating zone-size/speed waves, an
-## erratic marker that surged/paused/reversed, and a zone that re-rolled its drift direction at random.
-## Tim wants it CALM and PREDICTABLE instead: the marker sweeps at a STEADY speed that only nudges up a
-## little after each lock; the zone size drifts SLOWLY between modest bounds; and the zone slides along
-## the bar SLOWLY, only reversing when it hits a track edge (a clean bounce, never a random re-roll).
-## Everything below is gated on challenge_mode; normal (reward/prestige) play is untouched.
-## ALL VALUES FIRST-PASS — DEVICE-TUNE (feel is device-only).
+## --- Zone drift (both modes) & Challenge Mode speed curves ------------------------------------------
+## The gold zone glides along the bar at a steady, predictable pace in both base and challenge modes.
+## It reverses at the ends (a clean edge bounce) AND flips direction every few locks (Tim, 2026-07-21).
+## Its glide SPEED visibly rises and falls over SECONDS (Tim, 2026-07-22) — speeding up and slowing as
+## it travels, rather than one static rate. Still far slower than the marker in absolute terms.
+## See _zone_drift_speed.
+const ZONE_DRIFT_MID := 0.08               # centre glide speed (bar-fractions per second)
+const ZONE_DRIFT_AMP := 0.045              # rise/fall swing — visible, still gentler than the marker
+const ZONE_DRIFT_PERIOD_SECONDS := 7.0     # seconds for one slow -> fast -> slow drift cycle
+const ZONE_FLIP_LOCKS_MIN := 3             # fewest locks before the drift direction flips
+const ZONE_FLIP_LOCKS_MAX := 5             # most locks before the drift direction flips
+const CHALLENGE_ZONE_DRIFT_MID := ZONE_DRIFT_MID
+const CHALLENGE_ZONE_DRIFT_AMP := ZONE_DRIFT_AMP
+const CHALLENGE_ZONE_DRIFT_PERIOD_SECONDS := ZONE_DRIFT_PERIOD_SECONDS
+const CHALLENGE_ZONE_FLIP_LOCKS_MIN := ZONE_FLIP_LOCKS_MIN
+const CHALLENGE_ZONE_FLIP_LOCKS_MAX := ZONE_FLIP_LOCKS_MAX
 
 ## Marker speed in Challenge Mode: a TIME-based wave (so the change is visible within a run) spanning the
 ## SAME range regular mode sweeps — BASE_SPEED up to its top after TARGET_LOCKS of SPEED_RAMP. Its swing
@@ -67,16 +75,6 @@ const CHALLENGE_ZONE_WIDE := ZONE_HALF               # widest (easiest) the chal
 const CHALLENGE_ZONE_NARROW := ZONE_HALF * 0.7       # narrowest (hardest) — a modest shrink, not tiny
 const CHALLENGE_ZONE_PERIOD_LOCKS := 16.0            # locks for one slow wide -> narrow -> wide cycle
 
-## Zone drift in Challenge Mode: the gold zone glides along the bar. It reverses at the ends (a clean
-## edge bounce) AND flips direction every few locks (Tim, 2026-07-21). Its glide SPEED visibly rises
-## and falls over SECONDS (Tim, 2026-07-22) — speeding up and slowing as it travels, rather than one
-## static rate. Still far slower than the marker in absolute terms. See _challenge_zone_drift_speed.
-const CHALLENGE_ZONE_DRIFT_MID := 0.08               # centre glide speed (bar-fractions per second)
-const CHALLENGE_ZONE_DRIFT_AMP := 0.045              # rise/fall swing — visible, still gentler than the marker
-const CHALLENGE_ZONE_DRIFT_PERIOD_SECONDS := 7.0     # seconds for one slow -> fast -> slow drift cycle
-const CHALLENGE_ZONE_FLIP_LOCKS_MIN := 3             # fewest locks before the drift direction flips
-const CHALLENGE_ZONE_FLIP_LOCKS_MAX := 5             # most locks before the drift direction flips
-
 ## --- Lock-count pips (normal mode) --- One dot per lock, drawn above the bar (see _draw_lock_pips).
 const PIP_RADIUS := 9.0        # dot radius
 const PIP_GAP := 12.0          # empty space between adjacent dots
@@ -86,15 +84,15 @@ const PIP_ROW_HEIGHT := 30.0   # height of the pip row control
 var _marker_pos: float = 0.0
 var _marker_dir: float = 1.0
 var _marker_speed: float = BASE_SPEED
-## Challenge Mode: which way the gold zone is currently drifting (+1 right, -1 left). Flips on an edge
-## bounce (see _process) AND every few locks (see _on_lock / _locks_until_flip).
+## Which way the gold zone is currently drifting (+1 right, -1 left). Flips on an edge bounce
+## (see _process) AND every few locks (see _on_lock / _locks_until_flip).
 var _zone_drift_dir: float = 1.0
-## Challenge Mode: successful locks left before the drift direction flips; re-rolled to a random
-## CHALLENGE_ZONE_FLIP_LOCKS_MIN..MAX after each flip.
-var _locks_until_flip: int = CHALLENGE_ZONE_FLIP_LOCKS_MIN
-## Challenge Mode: seconds of active sweeping (pauses during a freeze), the clock the zone's glide-speed
-## wave rides so the speed change is visible within a run.
-var _challenge_drift_time: float = 0.0
+## Successful locks left before the drift direction flips; re-rolled to a random
+## ZONE_FLIP_LOCKS_MIN..MAX after each flip.
+var _locks_until_flip: int = ZONE_FLIP_LOCKS_MIN
+## Seconds of active sweeping (pauses during a freeze), the clock the zone's glide-speed wave
+## (and challenge marker speed) rides so the speed change is visible within a run.
+var _drift_time: float = 0.0
 var _locks: int = 0
 ## Successful locks made this run — Challenge Mode's cumulative high-score metric. Unlike `_locks`
 ## (which a miss decrements as the normal-mode −1 penalty), this ONLY ever increases, once per good
@@ -104,7 +102,7 @@ var _accuracy_sum: float = 0.0
 var _running: bool = false
 var _flash: float = 0.0       # brief cream highlight after a successful lock, decays in _process
 var _miss_flash: float = 0.0  # brief red highlight after a missed click, decays in _process
-var _zone_center: float = 0.5  # current center of the gold zone (bar fraction); jumps each lock
+var _zone_center: float = 0.5  # current center of the gold zone (bar fraction); drifts continuously
 var _zone_half: float = ZONE_HALF
 
 # --- Live tunable parameters ---
@@ -115,7 +113,7 @@ var _zone_half_min: float = ZONE_HALF_MIN
 var _base_speed: float = BASE_SPEED
 var _speed_ramp: float = SPEED_RAMP
 var _challenge_speed_period: float = CHALLENGE_SPEED_PERIOD_SECONDS
-var _challenge_zone_drift_mid: float = CHALLENGE_ZONE_DRIFT_MID
+var _zone_drift_mid: float = ZONE_DRIFT_MID
 
 ## Freeze-burst state. While _freeze_left > 0 the marker and zone hold still, a hit/miss burst
 ## is drawn, and is_busy() is true so the host pauses its countdown for the duration.
@@ -160,7 +158,7 @@ func begin(tuning: TuningConfig) -> void:
 	_marker_pos = 0.0
 	_marker_dir = 1.0
 	_success_count = 0
-	_challenge_drift_time = 0.0
+	_drift_time = 0.0
 	if tuning != null:
 		_target_locks = tuning.timing_target_locks if tuning.timing_target_locks > 0 else TARGET_LOCKS
 		_freeze_time = maxf(0.05, tuning.timing_freeze_time)
@@ -169,11 +167,11 @@ func begin(tuning: TuningConfig) -> void:
 		_base_speed = maxf(0.1, tuning.timing_base_speed)
 		_speed_ramp = maxf(1.0, tuning.timing_speed_ramp)
 		_challenge_speed_period = maxf(1.0, tuning.timing_challenge_speed_period)
-		_challenge_zone_drift_mid = maxf(0.01, tuning.timing_challenge_zone_drift_mid)
+		_zone_drift_mid = maxf(0.01, tuning.timing_challenge_zone_drift_mid)
 		_legacy_gem_chance = clampf(tuning.legacy_gem_chance_timing, 0.0, 1.0)
 	_marker_speed = _challenge_marker_speed() if challenge_mode else _base_speed
 	_zone_drift_dir = 1.0
-	_locks_until_flip = _rng.randi_range(CHALLENGE_ZONE_FLIP_LOCKS_MIN, CHALLENGE_ZONE_FLIP_LOCKS_MAX)
+	_locks_until_flip = _rng.randi_range(ZONE_FLIP_LOCKS_MIN, ZONE_FLIP_LOCKS_MAX)
 	_locks = 0
 	_accuracy_sum = 0.0
 	_running = true
@@ -276,28 +274,27 @@ func _process(delta: float) -> void:
 			_click_marks.remove_at(i)
 	# Fade the "it just shrank" outline.
 	_zone_ghost_left = maxf(0.0, _zone_ghost_left - delta)
-	# Challenge Mode: advance the size-drift clock and slide the gold zone. Done here (after the freeze
+	# Advance the drift clock and slide the gold zone in both modes. Done here (after the freeze
 	# guard returned above) so both PAUSE during a freeze-burst, keeping the size phase and the zone
 	# position frozen while a hit/miss is shown — exactly like the marker.
-	if challenge_mode:
-		_challenge_drift_time += delta  # advance the glide-speed wave's clock (pauses during a freeze)
-		# Slowly slide the zone, cleanly bouncing off the ends so the whole zone stays on the bar (center
-		# kept within one half-width of either edge, the same safe range _move_zone uses when it jumps).
-		# The direction only ever flips at an edge — a steady, predictable glide, never a random re-roll.
-		_zone_center += _zone_drift_dir * _challenge_zone_drift_speed() * delta
-		var min_center := _zone_half
-		var max_center := 1.0 - _zone_half
-		if _zone_center <= min_center:
-			_zone_center = min_center
-			_zone_drift_dir = 1.0
-		elif _zone_center >= max_center:
-			_zone_center = max_center
-			_zone_drift_dir = -1.0
-		# Keep a pending legacy gem riding the center of the drifting zone, so it never detaches from
-		# the target it's meant to sit in. (Hit-scoring for the gem is position-independent — any hit
-		# collects it — so this is purely to keep the cue visually attached.)
-		if _legacy_gem_active:
-			_legacy_gem_center = _zone_center
+	_drift_time += delta  # advance the glide-speed wave's clock (pauses during a freeze)
+	# Slowly slide the zone, cleanly bouncing off the ends so the whole zone stays on the bar (center
+	# kept within one half-width of either edge, the same safe range _move_zone uses when clamping).
+	# The direction only ever flips at an edge — a steady, predictable glide, never a random re-roll.
+	_zone_center += _zone_drift_dir * _zone_drift_speed() * delta
+	var min_center := _zone_half
+	var max_center := 1.0 - _zone_half
+	if _zone_center <= min_center:
+		_zone_center = min_center
+		_zone_drift_dir = 1.0
+	elif _zone_center >= max_center:
+		_zone_center = max_center
+		_zone_drift_dir = -1.0
+	# Keep a pending legacy gem riding the center of the drifting zone, so it never detaches from
+	# the target it's meant to sit in. (Hit-scoring for the gem is position-independent — any hit
+	# collects it — so this is purely to keep the cue visually attached.)
+	if _legacy_gem_active:
+		_legacy_gem_center = _zone_center
 	# Challenge mode refreshes its live TIME-based sweep speed each frame so the marker visibly speeds up
 	# and slows within a run; normal mode holds _marker_speed steady within a sweep (×SPEED_RAMP per lock).
 	if challenge_mode:
@@ -364,12 +361,11 @@ func _on_lock() -> void:
 		elif accuracy >= 0.6:
 			chip_text = "GREAT!"
 		FloatingChip.spawn(_bar, Vector2(_marker_pos * _bar.size.x, _bar.size.y * 0.5), chip_text, chip_color)
-	if challenge_mode:
-		_locks_until_flip -= 1
-		if _locks_until_flip <= 0:
-			_zone_drift_dir = -_zone_drift_dir
-			_locks_until_flip = _rng.randi_range(CHALLENGE_ZONE_FLIP_LOCKS_MIN, CHALLENGE_ZONE_FLIP_LOCKS_MAX)
-	else:
+	_locks_until_flip -= 1
+	if _locks_until_flip <= 0:
+		_zone_drift_dir = -_zone_drift_dir
+		_locks_until_flip = _rng.randi_range(ZONE_FLIP_LOCKS_MIN, ZONE_FLIP_LOCKS_MAX)
+	if not challenge_mode:
 		_marker_speed *= _speed_ramp
 	_flash = 1.0
 	_freeze_success = true
@@ -401,13 +397,17 @@ func _challenge_marker_speed() -> float:
 	var fast := _base_speed * pow(_speed_ramp, float(_target_locks - 1))
 	var mid := (_base_speed + fast) * 0.5
 	var full_amp := (fast - _base_speed) * 0.5
-	var growth := clampf(_challenge_drift_time / CHALLENGE_SPEED_SWING_RAMP_SECONDS, 0.0, 1.0)
+	var growth := clampf(_drift_time / CHALLENGE_SPEED_SWING_RAMP_SECONDS, 0.0, 1.0)
 	var amp := full_amp * lerpf(CHALLENGE_SPEED_START_SWING, 1.0, growth)
-	return mid + amp * sin(TAU * _challenge_drift_time / _challenge_speed_period)
+	return mid + amp * sin(TAU * _drift_time / _challenge_speed_period)
+
+
+func _zone_drift_speed() -> float:
+	return _zone_drift_mid + ZONE_DRIFT_AMP * sin(TAU * _drift_time / ZONE_DRIFT_PERIOD_SECONDS)
 
 
 func _challenge_zone_drift_speed() -> float:
-	return _challenge_zone_drift_mid + CHALLENGE_ZONE_DRIFT_AMP * sin(TAU * _challenge_drift_time / CHALLENGE_ZONE_DRIFT_PERIOD_SECONDS)
+	return _zone_drift_speed()
 
 
 func _challenge_zone_half() -> float:
@@ -416,29 +416,24 @@ func _challenge_zone_half() -> float:
 	return mid + amp * cos(TAU * float(_success_count) / CHALLENGE_ZONE_PERIOD_LOCKS)
 
 
-## Pick a new random zone center that keeps the whole zone on the bar (center within one
-## half-width of either end), so a freshly placed zone is never clipped off the edge.
+## Updates zone half-width after a successful lock and clamps center safely within the bar.
 func _move_zone() -> void:
 	# Apply the shrink NOW (after the freeze) by refreshing the displayed half-width from the current
 	# lock count. This is the only place _zone_half changes, so the zone stays its pre-hit size for the
-	# whole result freeze and shrinks together with the jump below.
+	# whole result freeze and shrinks together with the lock progression.
 	_zone_half = _current_zone_half()
-	# Leave a brief fading outline at the PREVIOUS (larger) width at the new spot, so the player sees
-	# the zone actually shrank. _move_zone runs after _locks has incremented, so the previous width is
-	# the half for (_locks - 1). Skipped at the very first placement (_locks == 0), where nothing has
-	# shrunk yet. NORMAL MODE ONLY: Challenge Mode's width oscillates (it doesn't monotonically shrink),
-	# so a "it just shrank" cue there would be misleading.
+	# Leave a brief fading outline at the PREVIOUS (larger) width, so the player sees the zone actually
+	# shrank. _move_zone runs after _locks has incremented, so the previous width is the half for (_locks - 1).
+	# Skipped at the very first placement (_locks == 0), where nothing has shrunk yet.
+	# NORMAL MODE ONLY: Challenge Mode's width oscillates (it doesn't monotonically shrink), so a "it just
+	# shrank" cue there would be misleading.
 	if not challenge_mode and _locks > 0:
-		var prev_progress := clampf(float(_locks - 1) / float(TARGET_LOCKS), 0.0, 1.0)
-		_zone_ghost_half = lerpf(ZONE_HALF, ZONE_HALF_MIN, prev_progress)
+		var prev_progress := clampf(float(_locks - 1) / float(_target_locks), 0.0, 1.0)
+		_zone_ghost_half = lerpf(_zone_half_start, _zone_half_min, prev_progress)
 		_zone_ghost_left = ZONE_GHOST_TIME
-	# Normal mode jumps the zone to a fresh random spot each lock. Challenge Mode does NOT jump — the
-	# zone TRAVELS by drifting (see _process), so here we only keep it on the bar as its width changes;
-	# the drift direction flips on edges and every few locks (see _on_lock).
-	if challenge_mode:
-		_zone_center = clampf(_zone_center, _zone_half, 1.0 - _zone_half)
-	else:
-		_zone_center = _rng.randf_range(_zone_half, 1.0 - _zone_half)
+	# Both modes use a smoothly drifting zone rather than teleporting to a random spot on each lock.
+	# Here we keep the center safely within bounds as the half-width changes.
+	_zone_center = clampf(_zone_center, _zone_half, 1.0 - _zone_half)
 
 
 func _update_locks_label() -> void:

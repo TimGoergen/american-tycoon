@@ -59,6 +59,8 @@ const AUTO_POP_TURBO         := "auto_pop_turbo"
 const FRENZY_CYCLE_CHARGE    := "frenzy_cycle_charge"
 const FRENZY_DECAY_RESIST    := "frenzy_decay_resist"
 const FRENZY_AFTERBURN       := "frenzy_afterburn"
+const CRISIS_HEDGING         := "crisis_hedging"
+const CRISIS_LIQUIDITY       := "crisis_liquidity"
 
 
 
@@ -195,9 +197,9 @@ const UPGRADES := [
 		"category": "Frenzy",
 		"description": "In a market frenzy you go for the throat. TURBO's multiplier climbs higher.",
 		"max_level": 9999,            # UNCAPPED (Endgame Economy, Tim 2026-07-28): the steepening cost curve is the brake
-		"base_cost": 6,
-		"cost_growth": 2.8,
-		"effect_per_level": 0.15,     # COMPOUNDING: ×1.15 the TURBO bonus (amount above 1×) per level
+		"base_cost": 25,
+		"cost_growth": 3.0,
+		"effect_per_level": 0.10,     # COMPOUNDING: ×1.10 the TURBO bonus (amount above 1×) per level
 	},
 	{
 		"id": FRENZY_DURATION,
@@ -205,9 +207,9 @@ const UPGRADES := [
 		"category": "Frenzy",
 		"description": "The frenzy just won't quit. Every TURBO burn lasts longer.",
 		"max_level": 9999,            # UNCAPPED (Endgame Economy, Tim 2026-07-28): the steepening cost curve is the brake
-		"base_cost": 6,
-		"cost_growth": 2.8,
-		"effect_per_level": 0.15,     # COMPOUNDING: ×1.15 burn duration per level
+		"base_cost": 30,
+		"cost_growth": 3.0,
+		"effect_per_level": 0.10,     # COMPOUNDING: ×1.10 burn duration per level
 	},
 	{
 		"id": COOLING_SYSTEMS,
@@ -360,6 +362,26 @@ const UPGRADES := [
 		"cost_growth": 2.4,
 		"effect_per_level": 1.5,      # +1.5s afterburn duration per level
 	},
+	{
+		"id": CRISIS_HEDGING,
+		"name": "Hedging Strategies",
+		"category": "Wealth",
+		"description": "Smart short positions soften market shocks. Property income stays higher during a Market Crash.",
+		"max_level": 8,
+		"base_cost": 8,
+		"cost_growth": 2.2,
+		"effect_per_level": 0.05,     # +5% retained property income during crash per level (e.g. 50% -> 90%)
+	},
+	{
+		"id": CRISIS_LIQUIDITY,
+		"name": "Emergency Liquidity",
+		"category": "Operations",
+		"description": "Credit facilities and cash reserves stabilize operations quickly. Market Crashes end sooner.",
+		"max_level": 6,
+		"base_cost": 10,
+		"cost_growth": 2.4,
+		"effect_per_level": 0.08,     # -8% crash duration per level (up to -48%)
+	},
 ]
 
 
@@ -483,5 +505,10 @@ static func describe_effect(id: String, level: int) -> String:
 			return "+%ds grace · −%d%% decay speed" % [int(per_level * float(shown_level)), mini(80, int(8.0 * float(shown_level)))]
 		FRENZY_AFTERBURN:
 			return "+%ss post-frenzy decay tail" % Money.trim(per_level * float(shown_level), 1)
+		CRISIS_HEDGING:
+			return "+%d%% crash income retained" % int(round(per_level * 100.0 * float(shown_level)))
+		CRISIS_LIQUIDITY:
+			return "−%d%% crash duration" % int(round(per_level * 100.0 * float(shown_level)))
 	return ""
+
 

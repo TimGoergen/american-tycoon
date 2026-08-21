@@ -3,15 +3,11 @@
 > **First action on approval:** copy this file to `D:\Claude\American Tycoon\Plans\M2_Dynasty_Completion.md`
 > (Tim's rule: AT plans live in a `Plans` folder at the project root).
 
-> **STATUS UPDATE (2026-06-15).** Phase 0 (lifetime-cash basis) and Track A
-> (obituary + Family Ledger) are **built, verified, and kept** — on
-> `feature/lifetime-cash-basis` and `feature/ceremony-and-ledger`, ready for
-> `release`. **Track B (Credit & Class — origins, debt, bankruptcy, loan offers,
-> mail) is SHELVED** at Tim's call: early-game cash influx flattens the opening
-> grind. The founder starts at $0; the credit/class system is expected to return as
-> a **post-prestige** mechanic (options for accelerated heirs, not the founder). The
-> full Track B implementation is preserved, unmerged, on the `shelved/credit-and-class`
-> branch for resurrection. See GDD §8 for the design of record.
+> **STATUS UPDATE (2026-08).** Phase 0 (lifetime-cash basis) and Track A
+> (obituary + Family Ledger) are **built, verified, and shipped**.
+> **Track B (Credit & Class — origins, debt, bankruptcy, loan offers, mail) is PERMANENTLY RETIRED/KILLED**
+> per Tim's call: early-game cash influx flattens the opening grind. The founder starts at $0; the
+> game stays pure to the idle progression. With Track A + Phase 0 complete and verified, **M2 is 100% Complete**.
 
 ## Context
 
@@ -38,7 +34,6 @@ on it) and two largely independent tracks suitable for parallel agents:
 Per `project-branching-strategy`: cut feature branches off `release`, delete after
 merge. Suggested branches:
 - `feature/lifetime-cash-basis` (foundational, lands first)
-- `feature/credit-and-class`
 - `feature/ceremony-and-ledger`
 
 **Loose end (Tim's call):** today's GDD design-decision commits and recent UI

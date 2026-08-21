@@ -66,11 +66,16 @@ const MIN_PULL := 28.0
 # defaults below match the previous constants.
 ## Drag distance (px) at which the throw reaches max speed — longer drags add no more force.
 var _launch_max_drag: float = 200.0
-## Launch response exponent. 1.0 = a linear ramp; >1 eases the low end (small pulls gentle, force
-## building toward the end of the drag) for finer aim control at low power.
+## Launch response exponent. 1.0 = a linear ramp; >1 eases the low end.
 var _launch_curve_exp: float = 1.7
 ## Hard cap on the resulting throw speed (px/sec).
 var _max_throw_speed: float = 2900.0
+var _target_baskets: int = TARGET_BASKETS
+var _gravity: float = GRAVITY
+var _restitution: float = RESTITUTION
+var _ball_radius: float = BALL_RADIUS
+var _hoop_rx: float = HOOP_RX
+var _hoop_ry: float = HOOP_RY
 
 ## Aim-guide force colors (Tim, 2026-06-30; extended to four stops 2026-07-01 for readability): the
 ## force wedge is a SINGLE color that CHANGES with the current pull's force, climbing through a wider
@@ -249,20 +254,22 @@ func begin(tuning: TuningConfig) -> void:
 	_particles.clear()
 	_score_rings.clear()
 	_net_swing_time = 0.0
-	# Legacy gem: capture the spawn chance and reset the per-round gem state. Whether a gem actually
-	# appears is rolled once the board has a size (in _process), so we know where the play area is.
-	_legacy_gem_chance = clampf(tuning.legacy_gem_chance_basketball, 0.0, 1.0)
-	# Launch-curve knobs (device-tunable). Guarded so a zeroed knob can't divide by zero / kill power.
-	_launch_max_drag = maxf(1.0, tuning.basketball_launch_max_drag)
-	_launch_curve_exp = maxf(0.1, tuning.basketball_launch_curve_exp)
-	_max_throw_speed = maxf(1.0, tuning.basketball_max_throw_speed)
+	if tuning != null:
+		_legacy_gem_chance = clampf(tuning.legacy_gem_chance_basketball, 0.0, 1.0)
+		_launch_max_drag = maxf(1.0, tuning.basketball_launch_max_drag)
+		_launch_curve_exp = maxf(0.1, tuning.basketball_launch_curve_exp)
+		_max_throw_speed = maxf(1.0, tuning.basketball_max_throw_speed)
+		_target_baskets = tuning.basketball_target_baskets if tuning.basketball_target_baskets > 0 else TARGET_BASKETS
+		_gravity = maxf(100.0, tuning.basketball_gravity)
+		_restitution = clampf(tuning.basketball_restitution, 0.0, 1.0)
+		_ball_radius = maxf(10.0, tuning.basketball_ball_radius)
+		_hoop_rx = maxf(20.0, tuning.basketball_hoop_rx)
+		_hoop_ry = maxf(10.0, tuning.basketball_hoop_ry)
 	_legacy_gem_active = false
 	_legacy_gem_placed = false
 	_passed_through_gem_this_shot = false
 	_legacy_gem_win_cue = 0.0
-	# Round length is read (not hardcoded) so this type tracks whatever the host sets; only used
-	# here for the comment math — performance is baskets/target, which the host samples live.
-	var _round_seconds := maxf(0.1, tuning.minigame_duration_seconds)
+	var _round_seconds := maxf(0.1, tuning.minigame_duration_seconds) if tuning != null else 25.0
 
 	var intro := Label.new()
 	intro.text = how_to_play()
@@ -300,9 +307,7 @@ func begin(tuning: TuningConfig) -> void:
 
 
 func get_performance() -> float:
-	# Fixed denominator (TARGET_BASKETS), so the meter rises monotonically as baskets are sunk
-	# and never falls back — matching the other types' climbing spectrum.
-	return clampf(float(_baskets) / float(TARGET_BASKETS), 0.0, 1.0)
+	return clampf(float(_baskets) / float(_target_baskets), 0.0, 1.0)
 
 
 ## Challenge Mode score = total baskets made this run (Tim, 2026-06-30). Cumulative and

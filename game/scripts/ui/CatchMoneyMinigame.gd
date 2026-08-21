@@ -117,10 +117,18 @@ var _shine_phase: float = 0.0
 var _challenge_time: float = 0.0
 var _rng := RandomNumberGenerator.new()
 var _area: Control
-## Chance any single spawned coin is a "legacy coin" carrying a bonus Legacy gem (from
-## tuning.legacy_gem_chance_catch). Catching it collects the gem on top of the normal catch; a
-## missed legacy coin just falls away like any other. Captured live in begin() so Balance Tuning
-## edits take effect next round.
+## Live tunable fields captured from TuningConfig in begin()
+var _target_coins: int = TARGET_COINS
+var _spawn_interval_start: float = SPAWN_INTERVAL_START
+var _spawn_interval_end: float = SPAWN_INTERVAL_END
+var _fall_speed: float = FALL_SPEED
+var _miss_penalty: float = MISS_PENALTY
+var _shrink_factor: float = SHRINK_FACTOR
+var _challenge_spawn_interval: float = CHALLENGE_SPAWN_INTERVAL
+var _challenge_wave_period: float = CHALLENGE_WAVE_PERIOD
+var _challenge_sway_amplitude: float = CHALLENGE_SWAY_AMPLITUDE
+var _premium_coin_chance: float = PREMIUM_COIN_CHANCE
+var _premium_score_value: int = PREMIUM_SCORE_VALUE
 var _legacy_coin_chance: float = 0.0
 
 
@@ -137,8 +145,19 @@ func begin(tuning: TuningConfig) -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_rng.randomize()
 	_running = true
-	# Capture the live spawn chance so Balance Tuning edits take effect next round.
-	_legacy_coin_chance = tuning.legacy_gem_chance_catch
+	if tuning != null:
+		_legacy_coin_chance = tuning.legacy_gem_chance_catch
+		_target_coins = tuning.catch_target_coins if tuning.catch_target_coins > 0 else TARGET_COINS
+		_spawn_interval_start = maxf(0.05, tuning.catch_spawn_interval_start)
+		_spawn_interval_end = maxf(0.05, tuning.catch_spawn_interval_end)
+		_fall_speed = maxf(10.0, tuning.catch_fall_speed)
+		_miss_penalty = maxf(0.0, tuning.catch_miss_penalty)
+		_shrink_factor = clampf(tuning.catch_shrink_factor, 0.1, 1.0)
+		_challenge_spawn_interval = maxf(0.05, tuning.catch_challenge_spawn_interval)
+		_challenge_wave_period = maxf(0.5, tuning.catch_challenge_wave_period)
+		_challenge_sway_amplitude = maxf(0.0, tuning.catch_challenge_sway_amplitude)
+		_premium_coin_chance = clampf(tuning.catch_premium_coin_chance, 0.0, 1.0)
+		_premium_score_value = maxi(1, tuning.catch_premium_score_value)
 
 	var intro := Label.new()
 	intro.text = how_to_play()
@@ -166,8 +185,8 @@ func begin(tuning: TuningConfig) -> void:
 
 func get_performance() -> float:
 	# Net score = catches minus the miss penalty per coin that slipped past the bottom.
-	var net := float(_caught) - MISS_PENALTY * float(_missed)
-	return clampf(net / float(TARGET_COINS), 0.0, 1.0)
+	var net := float(_caught) - _miss_penalty * float(_missed)
+	return clampf(net / float(_target_coins), 0.0, 1.0)
 
 
 ## Challenge Mode's running high score = coins CAUGHT this run. MONOTONIC — a miss never subtracts here,
@@ -179,16 +198,16 @@ func get_score() -> int:
 
 
 func result_summary() -> String:
-	return "Caught %d of %d" % [_caught, TARGET_COINS]
+	return "Caught %d of %d" % [_caught, _target_coins]
 
 
 ## Seconds to wait before the next spawn, ramping from START down to END as the batch empties so
 ## the round speeds up toward the end (the late-round "rush").
 func _current_spawn_interval() -> float:
 	if challenge_mode:
-		return CHALLENGE_SPAWN_INTERVAL
-	var progress := float(_spawned) / float(TARGET_COINS)
-	return lerpf(SPAWN_INTERVAL_START, SPAWN_INTERVAL_END, clampf(progress, 0.0, 1.0))
+		return _challenge_spawn_interval
+	var progress := float(_spawned) / float(_target_coins)
+	return lerpf(_spawn_interval_start, _spawn_interval_end, clampf(progress, 0.0, 1.0))
 
 
 func _process(delta: float) -> void:
@@ -207,33 +226,20 @@ func _process(delta: float) -> void:
 			glint.modulate.a = glint_alpha
 
 	# Spawn coins at the current (ramping) interval. Normal mode drops one fixed batch of
-	# TARGET_COINS; Challenge Mode ignores that limit and spawns FOREVER. The ramp self-caps at
-	# SPAWN_INTERVAL_END because _current_spawn_interval() clamps its progress to 1.0, so the
-	# late-round "rush" speed becomes the sustained speed rather than accelerating without bound —
-	# fast but still playable indefinitely.
-	# Advance the challenge clock that drives the difficulty wave and the curving-fall sway.
+	# _target_coins; Challenge Mode ignores that limit and spawns FOREVER.
 	if challenge_mode:
 		_challenge_time += delta
 
-	if challenge_mode or _spawned < TARGET_COINS:
+	if challenge_mode or _spawned < _target_coins:
 		_spawn_timer += delta
 		if _spawn_timer >= _current_spawn_interval():
 			_spawn_timer = 0.0
 			_spawn_coin(area_size.x)
 
-	# Fall; a coin past the bottom is a miss — it costs points (see get_performance), shows the
-	# miss cue, and is freed. Walked backward so remove_at can't skip the next coin —
-	# this loop used to iterate a duplicate() of the array, a fresh copy every frame
-	# (minigame lag pass, Tim 2026-07-06).
 	for i in range(_coins.size() - 1, -1, -1):
 		var coin: Control = _coins[i]
-		# Each coin falls at its OWN speed (reward-mode coins all carry FALL_SPEED, so their motion is
-		# unchanged; challenge coins carry a wave/archetype speed set at spawn).
-		var fall_speed: float = coin.get_meta("fall_speed", FALL_SPEED)
+		var fall_speed: float = coin.get_meta("fall_speed", _fall_speed)
 		coin.position.y += fall_speed * delta
-		# Challenge coins also sway horizontally around their spawn column (curving falls). A coin with
-		# zero sway amplitude — every reward-mode coin — keeps its straight-down x, so reward play is
-		# untouched.
 		var sway_amp: float = coin.get_meta("sway_amp", 0.0)
 		if sway_amp > 0.0:
 			var base_x: float = coin.get_meta("base_x", coin.position.x)
@@ -242,10 +248,6 @@ func _process(delta: float) -> void:
 			coin.position.x = base_x + sway_amp * sin(_challenge_time * TAU / sway_period + sway_phase)
 		if coin.position.y > area_size.y:
 			_missed += 1
-			# CHALLENGE mode only: a dropped coin costs keep-alive time proportional to what catching it
-			# would have added. Emit the coin's OWN value (a premium coin is worth 3), so missing a premium
-			# costs proportionally more — exactly miss_penalty_ratio x that value at the host. Reward mode
-			# never emits, so its scoring/timing is unchanged.
 			if challenge_mode:
 				var dropped_value := int(coin.get_meta("value", 1))
 				challenge_time_penalty.emit(float(dropped_value))
@@ -255,31 +257,23 @@ func _process(delta: float) -> void:
 			Audio.play(&"catch_miss")
 			_spawn_miss_effect(drop_center)
 
-	# All spawned and none left on screen -> the round is over. Challenge Mode never self-completes
-	# (it keeps spawning above), so this end check applies to normal (reward) mode only.
-	if not challenge_mode and _spawned >= TARGET_COINS and _coins.is_empty():
+	if not challenge_mode and _spawned >= _target_coins and _coins.is_empty():
 		_running = false
 		completed.emit(get_performance())
 
 
-## CHALLENGE-mode wave difficulty, 0 (easiest: big + slow) to 1 (hardest: small + fast). A cosine
-## remapped to [0,1] so the round OPENS at the easy trough (t=0 -> 0) and breathes up and down from
-## there — this is what gives the round its changing texture instead of a one-way ramp.
+## CHALLENGE-mode wave difficulty, 0 (easiest: big + slow) to 1 (hardest: small + fast).
 func _challenge_difficulty() -> float:
-	return 0.5 - 0.5 * cos(_challenge_time * TAU / CHALLENGE_WAVE_PERIOD)
+	return 0.5 - 0.5 * cos(_challenge_time * TAU / _challenge_wave_period)
 
 
-## The size / fall speed / worth / premium flag for the NEXT challenge coin, combining the current
-## wave difficulty with a per-coin archetype (ordinary, big-slow, small-fast) and a premium roll.
-## Returns a dictionary so the spawn code stays readable. Challenge mode only.
+## The size / fall speed / worth / premium flag for the NEXT challenge coin.
 func _challenge_coin_params() -> Dictionary:
 	var difficulty := _challenge_difficulty()
 	var size := lerpf(CHALLENGE_SIZE_EASY, CHALLENGE_SIZE_HARD, difficulty)
 	var speed := lerpf(CHALLENGE_SPEED_SLOW, CHALLENGE_SPEED_FAST, difficulty)
 
-	# A premium coin ignores the archetype tweaks (it stays a clean, ordinary-shaped target) but is
-	# worth several catches. Never also a legacy coin — we keep the two special coins visually apart.
-	var is_premium := _rng.randf() < PREMIUM_COIN_CHANCE
+	var is_premium := _rng.randf() < _premium_coin_chance
 	if not is_premium:
 		var roll := _rng.randf()
 		if roll < ARCHETYPE_BIG_CHANCE:
@@ -289,16 +283,13 @@ func _challenge_coin_params() -> Dictionary:
 			size *= ARCHETYPE_SMALL_SIZE_MULT
 			speed *= ARCHETYPE_SMALL_SPEED_MULT
 
-	# A per-coin random jitter on the fall speed so coins don't fall in lockstep (Tim, 2026-07-22).
 	speed *= _rng.randf_range(CHALLENGE_FALL_JITTER_MIN, CHALLENGE_FALL_JITTER_MAX)
-
-	# Keep the size within the readable floor (low-vision, §1b) and a sane ceiling.
 	size = clampf(size, MIN_COIN_SIZE, START_COIN_SIZE)
 	return {
 		"size": size,
 		"fall_speed": speed,
 		"is_premium": is_premium,
-		"value": PREMIUM_SCORE_VALUE if is_premium else 1,
+		"value": _premium_score_value if is_premium else 1,
 	}
 
 

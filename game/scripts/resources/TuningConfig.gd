@@ -666,25 +666,154 @@ extends Resource
 ## (Tim, 2026-06-25) — scoring targets in each minigame assume this length.
 @export var minigame_duration_seconds: float = 25.0  # feel-tuned on device (Tim, 2026-07-09)
 
-# --- Match-3 difficulty (Tim, 2026-07-09: "too easy, I max it every time") ----------
-# The match-3 game maps its own running score onto the host's reward curve; these two knobs set
-# that mapping's difficulty and are live-tunable so Tim can dial the ceiling on device without a
-# rebuild. Higher score targets = harder to reach "full"/"max". (Cascade combos were REMOVED this
-# pass — subsequent matches now score statically by gem count only, so luck no longer inflates the
-# score; there is no combo knob anymore.)
-
+# --- Match-3 difficulty & scoring (Tim, 2026-07-09) ----------
 ## Match-3 score that maps to the host's "full" line (keep 100%) — roughly a whole round of
 ## ordinary clean matching. Below this is a "bad" result (keeps less). Tim device-tuned to 600.
 @export var match3_full_score: float = 600.0  # feel-tune
 
 ## Match-3 score that maps to performance 1.0 (the max extra-high bonus, and the early-out).
-## Raised well above the old 1000 so a single lucky chain can no longer max the round — the
-## player must sustain strong play to reach it.
+## Raised well above the old 1000 so a single lucky chain can no longer max the round.
 @export var match3_max_score: float = 2200.0  # feel-tune
 
 ## How many gems a single match must contain to drop a Legacy gem (at the swap's target cell).
-## Higher = Legacy gems are rarer. Match-3 has no other way to spawn them.
 @export var match3_legacy_match_size: int = 4  # feel-tuned on device (Tim, 2026-07-09)
+
+## Base score points awarded per gem in a match. Scales the entire point economy.
+@export var match3_points_per_gem: float = 10.0  # feel-tune
+
+## Score bonus multiplier per extra gem in matches >3 (n gems = base × n × (1 + size_bonus × (n-3))).
+@export var match3_size_bonus: float = 0.5  # feel-tune
+
+## Score multiplier bonus for match groups that avoid the designated Avoid Gem (+15% = 1.15).
+@export var match3_clean_match_factor: float = 1.15  # feel-tune
+
+## Score penalty multiplier for match groups containing the Avoid Gem (-60% = 0.40).
+@export var match3_avoid_match_factor: float = 0.40  # feel-tune
+
+## Challenge Mode: score multiplier for matching 5th-type Legacy gems (2.5x).
+@export var match3_legacy_score_mult: float = 2.5  # feel-tune
+
+# --- Micro Basketball Physics & Geometry (Tim, 2026-07-10) ------------
+## Baskets sunk to reach performance 1.0 (full reward) in a standard round.
+@export var basketball_target_baskets: int = 6  # feel-tune
+
+## Slingshot throw speed curve exponent (higher = gentler low end, finer aim).
+@export var basketball_launch_curve_exp: float = 1.7   # feel-tune
+
+## Drag distance (px) for maximum launch speed.
+@export var basketball_launch_max_drag: float = 200.0  # feel-tune (px)
+
+## Maximum throw velocity cap in px/sec.
+@export var basketball_max_throw_speed: float = 2900.0  # feel-tune (px/sec)
+
+## Downward gravity acceleration in px/sec^2.
+@export var basketball_gravity: float = 2400.0  # feel-tune
+
+## Fraction of velocity retained on bouncing off walls, hoop, and floor.
+@export var basketball_restitution: float = 0.46  # feel-tune
+
+## Ball radius in pixels (thumb-sized).
+@export var basketball_ball_radius: float = 53.2  # feel-tune
+
+## Hoop horizontal ellipse radius in pixels.
+@export var basketball_hoop_rx: float = 94.3  # feel-tune
+
+## Hoop vertical ellipse radius in pixels.
+@export var basketball_hoop_ry: float = 34.5  # feel-tune
+
+# --- Balance the Books Physics & Zones --------------------------------
+## Half-height of the gold zone as a fraction of the track (0.11 = 22% total height).
+@export var balance_zone_half: float = 0.11  # feel-tune
+
+## Upward acceleration while holding the lift button (track-fractions/sec^2).
+@export var balance_lift_accel: float = 3.0  # feel-tune
+
+## Downward gravity acceleration (track-fractions/sec^2).
+@export var balance_gravity: float = 1.9  # feel-tune
+
+## Velocity damping factor per second.
+@export var balance_damping: float = 1.8  # feel-tune
+
+## Velocity bounce restitution when hitting the top or bottom of the track.
+@export var balance_edge_bounce: float = 0.35  # feel-tune
+
+## Seconds of continuous holding inside the zone to fill and collect the bonus Legacy gem.
+@export var balance_gem_fill_seconds: float = 2.2  # feel-tune
+
+## Seconds to drain a full gem progress bar back to empty when drifting outside the zone.
+@export var balance_gem_drain_seconds: float = 4.5  # feel-tune
+
+# --- Timing Bar Sweep & Windows ---------------------------------------
+## Number of successful locks required to complete a full round.
+@export var timing_target_locks: int = 10  # feel-tune
+
+## Freeze pause duration (seconds) when a lock is pressed to show hit burst.
+@export var timing_freeze_time: float = 0.5  # feel-tune
+
+## Half-width of the gold target zone at game start (fraction of bar).
+@export var timing_zone_half: float = 0.12  # feel-tune
+
+## Minimum half-width the gold zone shrinks to at final lock.
+@export var timing_zone_half_min: float = 0.045  # feel-tune
+
+## Initial marker sweep speed (bar-fractions per second).
+@export var timing_base_speed: float = 0.9  # feel-tune
+
+## Sweep speed multiplier applied after each successful lock (1.09 = +9%/lock).
+@export var timing_speed_ramp: float = 1.09  # feel-tune
+
+## Challenge Mode: period in seconds for one full slow-fast-slow sweep wave.
+@export var timing_challenge_speed_period: float = 8.0  # feel-tune
+
+## Challenge Mode: center glide drift speed of the gold zone (bar-fractions/sec).
+@export var timing_challenge_zone_drift_mid: float = 0.08  # feel-tune
+
+# --- Catch the Money Timing, Physics & Challenge Waves ----------------
+## Coins spawned for a full standard game.
+@export var catch_target_coins: int = 18  # feel-tune
+
+## Starting spawn interval between falling coins (seconds).
+@export var catch_spawn_interval_start: float = 0.55  # feel-tune
+
+## Final spawn interval between falling coins during the late-round rush (seconds).
+@export var catch_spawn_interval_end: float = 0.38  # feel-tune
+
+## Base vertical fall speed of coins in px/sec.
+@export var catch_fall_speed: float = 340.0  # feel-tune
+
+## Penalty fraction deducted from net score for a missed coin.
+@export var catch_miss_penalty: float = 0.75  # feel-tune
+
+## Coin size shrink multiplier applied on each catch (0.95 = 5% smaller).
+@export var catch_shrink_factor: float = 0.95  # feel-tune
+
+## Challenge Mode: fixed spawn interval between coins (seconds).
+@export var catch_challenge_spawn_interval: float = 0.60  # feel-tune
+
+## Challenge Mode: duration of one easy->hard->easy difficulty wave in seconds.
+@export var catch_challenge_wave_period: float = 9.0  # feel-tune
+
+## Challenge Mode: peak horizontal sway drift amplitude in pixels.
+@export var catch_challenge_sway_amplitude: float = 45.0  # feel-tune
+
+## Challenge Mode: spawn chance for high-value green Premium Coins (0.06 = 6%).
+@export var catch_premium_coin_chance: float = 0.06  # feel-tune
+
+## Challenge Mode: score value awarded for catching a Premium Coin.
+@export var catch_premium_score_value: int = 3  # feel-tune
+
+# --- Memory Match Recall & Timing -------------------------------------
+## Number of sequence rounds required to complete a full game.
+@export var memory_target_rounds: int = 6  # feel-tune
+
+## Duration in seconds a pad stays lit during sequence playback.
+@export var memory_flash_on: float = 0.42  # feel-tune
+
+## Silence gap in seconds between pad flashes during playback.
+@export var memory_flash_gap: float = 0.18  # feel-tune
+
+## Visual scale multiplier applied to a pad while lit (1.14 = +14% zoom).
+@export var memory_pad_flash_scale: float = 1.14  # feel-tune
 
 # --- Legacy Bonus (Plans/Legacy_Bonus_System.md; Tim, 2026-07-09) --------------------
 # Every minigame has a small, game-specific chance to let the player collect a bonus Legacy gem.
@@ -712,28 +841,13 @@ extends Resource
 @export var legacy_bonus_first_contact_multiplier: float = 10.0  # feel-tune
 
 ## Per-game chance a Legacy gem becomes available in a round (small), a per-round appearance chance.
-## (Match-3 has NO random chance — its Legacy gems come only from 5+ matches — so it has no knob.)
 @export var legacy_gem_chance_catch: float = 0.12  # feel-tune
 @export var legacy_gem_chance_timing: float = 0.12  # feel-tune
 @export var legacy_gem_chance_balance: float = 0.15  # feel-tune
 @export var legacy_gem_chance_basketball: float = 0.15  # feel-tune
-
-# --- Basketball launch curve (Tim, 2026-07-10: device-tunable throw feel) ------------
-# The slingshot throw speed = (drag / basketball_launch_max_drag, clamped 0..1) ^
-# basketball_launch_curve_exp × basketball_max_throw_speed. Higher exponent = gentler low end
-# (finer aim control); larger max-drag = more pull needed for full power; larger max-speed = more
-# raw power. All feel-tune.
-@export var basketball_launch_curve_exp: float = 1.7   # feel-tune
-@export var basketball_launch_max_drag: float = 200.0  # feel-tune (px)
-@export var basketball_max_throw_speed: float = 2900.0  # feel-tune (px/sec)
-
-## Memory's Legacy gem is a chance-gated BONUS ROUND, offered only after the player clears the whole
-## game (all 6 rounds). This is the per-run chance that bonus round appears once they've earned it.
 @export var legacy_gem_chance_memory: float = 0.15  # feel-tune
 
-## How many taps the Memory bonus round's sequence is. In that round all four pads look identical
-## (each wears the gem), so this is recalled by pure position — the Memory gem's difficulty lever.
-## Higher = harder to earn. Starts at 5 (Tim, 2026-07-10).
+## How many taps the Memory bonus round's sequence is (pure position recall).
 @export var memory_gem_sequence_length: int = 5  # feel-tune
 
 
@@ -742,7 +856,16 @@ extends Resource
 ## Income multiplier during a Market Crash event.
 @export var crash_multiplier: float = 0.5  # TBD-SIM
 
-## Duration of a Market Crash event in active minutes.
+## Base duration of a Market Crash event in active minutes for generation 1.
+@export var crash_duration_base_minutes: float = 2.0  # feel-tune
+
+## Growth in crash duration per generation reached.
+@export var crash_duration_growth_per_gen: float = 0.5  # feel-tune
+
+## Maximum duration cap for a Market Crash event in active minutes.
+@export var crash_duration_max_minutes: float = 8.0  # feel-tune
+
+## Legacy fallback duration of a Market Crash event in active minutes.
 @export var crash_duration_minutes: float = 10.0  # TBD-SIM
 
 ## Settlement cost as a fraction of net worth during The Audit.
@@ -750,6 +873,19 @@ extends Resource
 
 ## Legislative Assets units required to make an audit case evaporate.
 @export var audit_threshold: int = 1  # TBD-SIM (placeholder)
+
+## Cash grant fraction of net worth during The Windfall.
+@export var windfall_net_worth_fraction: float = 0.10  # feel-tune
+
+## Cadence in active seconds between event rolls.
+@export var event_roll_interval_seconds: float = 180.0  # 3 minutes
+
+## Base probability of triggering an event on each roll interval.
+@export var event_base_chance: float = 0.35  # feel-tune
+
+## Grace period in active seconds at the start of a generation before random events can fire.
+@export var event_grace_period_seconds: float = 60.0  # feel-tune
+
 
 # --- Win condition (GDD §10) ---
 

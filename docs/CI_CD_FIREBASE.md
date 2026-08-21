@@ -76,7 +76,7 @@ on:
   workflow_dispatch:
 ```
 
-**Nothing else builds.** A push to any other branch name — `shelved/credit-and-class`, a bare
+**Nothing else builds.** A push to any other branch name — a `shelved/**` branch, a bare
 `experiment` branch, a tag — produces no build at all. Pull requests do not trigger it either.
 `workflow_dispatch` allows a manual run against any branch you pick in the Actions UI.
 

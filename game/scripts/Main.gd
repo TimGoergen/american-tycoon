@@ -28,13 +28,13 @@ const INCOME_DISPLAY_INTERVAL := 0.1
 var _income_display_timer := INCOME_DISPLAY_INTERVAL  # refresh on the very first frame
 
 var _hero_stat: HeroStat
-## The full-bleed play-field backdrop. Earth shows a prairie; it swaps to a space scene
-## after first contact and to a centered space scene after the tenth contact (see
-## _background_path_for_tier). Kept as a field so contact events can re-point its texture.
-var _background: TextureRect
+## Dynamic panoramic scrolling backdrop across epochs.
+var _background: DynamicBackground
 ## Small banner under the hero stat naming the civilization Earth is currently trading
 ## with (the reached epoch). Updates the moment a first contact advances the epoch.
 var _first_contact_overlay: FirstContactOverlay
+var _event_overlay: EventOverlay
+var _event_hud_banner: EventHudBanner
 var _final_dollar_screen: FinalDollarScreen
 var _frenzy_bar: FrenzyBar
 var _momentum_bar: MomentumBar
@@ -359,7 +359,8 @@ func _process(delta: float) -> void:
 	var modal_up := _will_screen.visible or _first_contact_overlay.visible \
 			or _final_dollar_screen.visible \
 			or _minigame_screen.visible or _minigame_review_screen.visible \
-			or _challenges_screen.visible or _venture_overlay.visible
+			or _challenges_screen.visible or _venture_overlay.visible \
+			or _event_overlay.visible
 	var overlay_up := modal_up or _welcome_overlay.visible
 	SecondaryTapButton.enabled = _active_tab == TAB_PROPERTY and not overlay_up
 
@@ -412,6 +413,19 @@ func _process(delta: float) -> void:
 	# Cash keeps updating every frame so the balance still counts up smoothly.
 	_hero_stat.set_cash(game.economy.cash)
 	_hero_stat.set_frenzy_glow(game.frenzy.get_multiplier() > 1.0)
+
+	var crash_on: bool = game.events.is_crash_active()
+	_hero_stat.set_crash_active(crash_on)
+	_wage_panel.set_crash_active(crash_on)
+
+	if crash_on:
+		_event_hud_banner.update_status(
+			game.events.active_event_remaining,
+			game.events.get_property_income_multiplier(),
+			game.events.active_crash_dollars_lost
+		)
+	else:
+		_event_hud_banner.visible = false
 
 	# Poll-driven tutorial tips: fire the first time each condition is met. This runs only AFTER
 	# the modal-freeze return above, so a card never lands on top of a full-screen beat.
@@ -720,16 +734,10 @@ func _build_ui() -> void:
 	bg_mask.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg_mask)
 
-	# Pick the backdrop for the epoch we are starting in: a fresh founder (or a heir after
-	# prestige) is on Earth and sees the prairie; a save loaded mid-run past first/tenth
-	# contact opens straight onto the matching space scene. _on_contact_made swaps it live.
-	_background = TextureRect.new()
+	# Dynamic scrolling backdrop spanning Earth -> Near Space -> Deep Space across epochs.
+	_background = DynamicBackground.new()
 	_background.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_background.texture = load(_background_path_for_tier(game.epoch.current_tier))
-	# COVERED scales the square art to fill the tall play-field, cropping the overflow, so there
-	# are never empty bars — the landscape always reaches all four edges of the rounded frame.
-	_background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	_background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_background.set_tier(game.epoch.current_tier)
 	bg_mask.add_child(_background)
 
 	# The viewing area: the shared rounded-rect frame (UiPalette) — inset from the screen edges by
@@ -757,6 +765,10 @@ func _build_ui() -> void:
 	_hero_stat = HeroStat.new()
 	column.add_child(_hero_stat)
 
+	_event_hud_banner = EventHudBanner.new()
+	_event_hud_banner.banner_tapped.connect(_on_event_banner_tapped)
+	column.add_child(_event_hud_banner)
+
 	# Tab content: the four surfaces stacked in one slot, one visible at a time. It
 	# expands so the bottom tab bar pins beneath it. Switching tabs never pauses the
 	# economy (idle game) — only the modal overlays freeze it (see _process).
@@ -770,6 +782,8 @@ func _build_ui() -> void:
 	# translucent-cream panel (UiPalette.wrap_in_tab_panel) so all four share one framed look.
 	# All four wrappers fill the content slot; _show_tab toggles visibility.
 	_ledger_screen = FamilyLedgerScreen.new()
+	_ledger_screen.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_ledger_screen.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_ledger_screen.setup()
 	_tab_panels = [
 		UiPalette.wrap_in_tab_panel(_build_property_tab()),
@@ -823,6 +837,19 @@ func _build_ui() -> void:
 	_first_contact_overlay = FirstContactOverlay.new()
 	_first_contact_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_first_contact_overlay)
+
+	# The rare events modal overlay (Market Crash, The Audit, The Windfall).
+	_event_overlay = EventOverlay.new()
+	_event_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_event_overlay.choice_selected.connect(_on_event_choice_selected)
+	_event_overlay.dismissed.connect(_on_event_overlay_dismissed)
+	add_child(_event_overlay)
+
+	# Wire Rare Events signals from the generation state
+	game.events.weather_started.connect(_on_event_weather_started)
+	game.events.weather_ended.connect(_on_event_weather_ended)
+	game.events.dilemma_opened.connect(_on_event_dilemma_opened)
+	game.events.grant_received.connect(_on_event_grant_received)
 
 	# The Final Dollar screen (GDD §10): Earth capture climax sequence
 	_final_dollar_screen = FinalDollarScreen.new()
@@ -1057,7 +1084,7 @@ func _build_property_tab() -> Control:
 		# game.rush_momentum is passed so the row can present the rush control as disabled while
 		# rushing is locked out after an overheat (Rush Overheat, Tim 2026-07-15) — read-only.
 		row.setup(i, game.economy.properties[i] as PropertyState, game.economy, game.frenzy,
-				game.epoch, game.rush_momentum, game.auto_purchase)
+				game.epoch, game.rush_momentum, game.auto_purchase, game.events)
 		row.buy_requested.connect(_on_buy_requested)
 		row.tap_requested.connect(_on_tap_requested)
 		row.hold_rush_requested.connect(_on_hold_rush_requested)
@@ -1997,6 +2024,10 @@ func _build_settings_tab() -> Control:
 	_dev_panel.jump_epoch_requested.connect(_on_dev_jump_epoch)
 	_dev_panel.grant_legacy_requested.connect(_on_dev_grant_legacy)
 	_dev_panel.grant_cash_requested.connect(_on_dev_grant_cash)
+	_dev_panel.trigger_crash_requested.connect(_on_dev_trigger_crash)
+	_dev_panel.trigger_audit_requested.connect(_on_dev_trigger_audit)
+	_dev_panel.trigger_windfall_requested.connect(_on_dev_trigger_windfall)
+	_dev_panel.clear_events_requested.connect(_on_dev_clear_events)
 	_dev_panel.closed.connect(_on_dev_closed)
 	stack.add_child(_dev_panel)
 
@@ -2467,7 +2498,7 @@ func _any_fullscreen_overlay_visible() -> bool:
 			or _final_dollar_screen.visible \
 			or _minigame_screen.visible or _minigame_review_screen.visible \
 			or _challenges_screen.visible or _about_screen.visible or _stats_screen.visible \
-			or _help_screen.visible or _venture_overlay.visible
+			or _help_screen.visible or _venture_overlay.visible or _event_overlay.visible
 
 
 ## Fire a poll-driven availability tip. Disarms ONLY once the card actually shows, so a tip whose
@@ -3015,9 +3046,8 @@ func _update_plan_button() -> void:
 ## new alien property. (If a single huge tick crossed two epochs, the later contact's beat
 ## simply replaces this one — vanishingly rare given epochs are ~30× apart.)
 func _on_contact_made(new_tier: int) -> void:
-	# Swap the play-field backdrop to match the newly reached epoch before the beat plays,
-	# so when the first-contact overlay clears the player is looking at the new world.
-	_background.texture = load(_background_path_for_tier(new_tier))
+	# Advance the play-field backdrop to match the newly reached epoch.
+	_background.set_tier(new_tier)
 	# The new epoch just opened its pager tab — unlock it, then jump to it so that when the contact
 	# beat (and any trade-deal minigame) clears, the player is looking at the new civ's properties.
 	_update_tab_unlocks()
@@ -3084,27 +3114,6 @@ func _on_contact_dismissed() -> void:
 		),
 		dynasty.upgrades.minigame_bonus_max()
 	)
-
-
-# Backdrops keyed to how many alien contacts have been made (Tim, 2026-06-26). The epoch
-# tier is 1 on Earth, so the number of contacts made this run is (current_tier - 1):
-# Earth keeps the prairie; the first contact opens onto deep space; the tenth swaps to a
-# centered space composition. The space scenes cover every contact in between.
-const BACKGROUND_EARTH := "res://art/backgrounds/prairie_background.png"
-const BACKGROUND_SPACE := "res://art/backgrounds/space_background.jpg"
-const BACKGROUND_SPACE_CENTERED := "res://art/backgrounds/space_centered_background.jpg"
-
-
-## The backdrop image path for a given epoch tier. Used both to set the initial backdrop
-## on load and to swap it the moment a contact advances the epoch. Earth spans tiers 1-2
-## since the Earth split, so only ALIEN contacts (tier 3+) leave the prairie behind.
-func _background_path_for_tier(tier: int) -> String:
-	var alien_contacts_made := tier - 2
-	if alien_contacts_made >= 10:
-		return BACKGROUND_SPACE_CENTERED
-	if alien_contacts_made >= 1:
-		return BACKGROUND_SPACE
-	return BACKGROUND_EARTH
 
 
 ## The Family Ledger is now a tab (UI Notes §7), refreshed on entry by _show_tab —
@@ -3930,6 +3939,72 @@ func _overdrive_is_teachable() -> bool:
 		return false
 	return momentum.heat >= momentum.cruise_heat() \
 			or is_equal_approx(momentum.heat, momentum.cruise_heat())
+
+
+# ---------------------------------------------------------------------------
+# Rare Events Handlers
+# ---------------------------------------------------------------------------
+
+func _on_event_weather_started(_event_id: String, duration_sec: float, mult: float) -> void:
+	Audio.play(&"screen_open")
+	var legacy_bonuses := {
+		"hedging_bonus": dynasty.upgrades.crash_income_retention_bonus(),
+		"duration_reduction_pct": dynasty.upgrades.crash_duration_reduction_pct(),
+	}
+	_event_overlay.show_crash(duration_sec / 60.0, mult, game.events.active_crash_dollars_lost, legacy_bonuses)
+
+
+func _on_event_weather_ended(_event_id: String) -> void:
+	_event_hud_banner.visible = false
+
+
+func _on_event_dilemma_opened(_event_id: String, data: Dictionary) -> void:
+	Audio.play(&"screen_open")
+	_event_overlay.show_audit(data)
+
+
+func _on_event_grant_received(_event_id: String, amount: float) -> void:
+	Audio.play(&"buy_success")
+	_event_overlay.show_windfall(amount)
+
+
+func _on_event_choice_selected(choice_index: int) -> void:
+	game.events.resolve_audit(choice_index, game)
+	Audio.play(&"screen_close")
+
+
+func _on_event_overlay_dismissed() -> void:
+	Audio.play(&"screen_close")
+
+
+func _on_event_banner_tapped() -> void:
+	if game.events.is_crash_active():
+		var legacy_bonuses := {
+			"hedging_bonus": dynasty.upgrades.crash_income_retention_bonus(),
+			"duration_reduction_pct": dynasty.upgrades.crash_duration_reduction_pct(),
+		}
+		_event_overlay.show_crash(
+			game.events.active_event_remaining / 60.0,
+			game.events.get_property_income_multiplier(),
+			game.events.active_crash_dollars_lost,
+			legacy_bonuses
+		)
+
+
+func _on_dev_trigger_crash() -> void:
+	game.events.trigger_crash(-1.0, game)
+
+
+func _on_dev_trigger_audit() -> void:
+	game.events.trigger_audit(game)
+
+
+func _on_dev_trigger_windfall() -> void:
+	game.events.trigger_windfall(game)
+
+
+func _on_dev_clear_events() -> void:
+	game.events.clear_all_events()
 
 
 # ---------------------------------------------------------------------------

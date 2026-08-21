@@ -492,11 +492,13 @@ var _hire_style_applied := -1
 ## -1 = not yet applied, 0 = owned (normal), 1 = unowned (gray).
 var _ownership_style_applied := -1
 
+var _events: EventState = null
+
 
 ## Call before adding to the tree.
 func setup(p_index: int, prop: PropertyState, economy: EconomyState, frenzy: FrenzyState,
 		epoch: EpochState, rush_momentum: RushMomentumState,
-		auto_purchase: AutoPurchaseState) -> void:
+		auto_purchase: AutoPurchaseState, events: EventState = null) -> void:
 	prop_index = p_index
 	_prop = prop
 	_economy = economy
@@ -506,6 +508,7 @@ func setup(p_index: int, prop: PropertyState, economy: EconomyState, frenzy: Fre
 	# Held read-only, exactly like rush_momentum: the row reads the live flag each frame rather
 	# than having a copy pushed at it, so it can never present a rush the core is refusing.
 	_auto_purchase = auto_purchase
+	_events = events
 
 
 ## Accessors so a tutorial coach card can anchor to a SPECIFIC control on this row (its buy button,
@@ -1470,10 +1473,12 @@ func _refresh(delta: float) -> void:
 		and effective_length > 0.0 and effective_length < SOLID_BAR_THRESHOLD_SEC
 	# The amount paid per completed cycle. For an OWNED rung get_income_per_cycle() already folds in
 	# the staffer and Family Fortune (Legacy) multipliers AND this property's own Rush Momentum factor
-	# (>1 only while it is being actively rushed — Tim 2026-07-13), with frenzy applied live on top so
-	# it matches what the player receives; for an UNOWNED rung it's the per-cycle value of a single
+	# (>1 only while it is being actively rushed — Tim 2026-07-13), with frenzy and active weather (Market Crash)
+	# applied live on top so it matches what the player receives; for an UNOWNED rung it's the per-cycle value of a single
 	# unit (a buy-in preview).
-	var per_cycle := _prop.get_income_per_cycle() * _frenzy.get_multiplier() if owned \
+	var event_mult := _events.get_property_income_multiplier() if _events != null else 1.0
+	var is_crash := _events != null and _events.is_crash_active()
+	var per_cycle := _prop.get_income_per_cycle() * _frenzy.get_multiplier() * event_mult if owned \
 		else _prop.get_single_unit_income_per_cycle()
 	# Rate context on the payout (Tim, 2026-07-02): a cycle of a second or more shows the per-cycle
 	# payout WITH its cycle length, scaled to a sensible unit — "$X/4.3m" is $X every 4.3 minutes —
@@ -1526,8 +1531,18 @@ func _refresh(delta: float) -> void:
 	if rush_engaged and effective_length > 0.0:
 		rushed_fractions_per_second = 1.0 / effective_length \
 				+ _prop.tuning.hold_rush_per_second * _prop.tuning.rush_pct * _prop.rush_power_multiplier
-	_income_label.text = _format_income_readout(
+	var raw_readout := _format_income_readout(
 		per_cycle, effective_length, rushed_fractions_per_second, owned, staffed)
+	if owned and not frozen:
+		if is_crash:
+			_income_label.add_theme_color_override("font_color", UiPalette.KETCHUP_RED)
+			_income_label.text = "📉 " + raw_readout
+		else:
+			_income_label.add_theme_color_override("font_color", Color.BLACK)
+			_income_label.text = raw_readout
+	else:
+		_income_label.text = raw_readout
+
 	# Cache the per-second equivalent of whatever the label just showed (rush-boosted
 	# while held) — Main sums these across rows for the hero panel's income headline
 	# (Tim, 2026-07-07), so the headline always equals the sum of the visible rows.
@@ -1868,8 +1883,11 @@ func _apply_ownership_styling(owned: bool, frozen: bool) -> void:
 	)
 	if want == 0:
 		add_theme_stylebox_override("panel", owned_plate)
-		# Owned: the per-cycle payout in bold black (Tim, 2026-07-01).
-		_income_label.add_theme_color_override("font_color", Color.BLACK)
+		# Owned: the per-cycle payout in bold black (or warning red during a Market Crash).
+		if _events != null and _events.is_crash_active():
+			_income_label.add_theme_color_override("font_color", UiPalette.KETCHUP_RED)
+		else:
+			_income_label.add_theme_color_override("font_color", Color.BLACK)
 		# The dollar-bill icon is FULL-COLOR art (green note, gold seal), so it shows at its
 		# own colors — modulate stays white. Tinting it to the text color turned the whole
 		# icon into a solid black silhouette (Tim, 2026-07-09).

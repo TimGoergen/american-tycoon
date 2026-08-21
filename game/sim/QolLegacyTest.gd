@@ -33,6 +33,7 @@ func _run() -> void:
 	_test_market_buzz(tuning, configs)
 	_test_market_momentum(tuning, configs)
 	_test_residual_momentum(tuning, configs)
+	_test_crisis_mitigations(tuning, configs)
 
 	print("")
 	if _failures == 0:
@@ -240,6 +241,29 @@ func _test_residual_momentum(tuning: TuningConfig, configs: Array) -> void:
 	frenzy.tick(1.6)
 	_check("afterburn completes and returns to FILLING mode", frenzy.mode == FrenzyState.Mode.FILLING)
 	_check("multiplier is back to 1.0", is_equal_approx(frenzy.get_multiplier(), 1.0))
+
+
+func _test_crisis_mitigations(tuning: TuningConfig, configs: Array) -> void:
+	print("-- Hedging Strategies & Emergency Liquidity --")
+	var dynasty := DynastyState.new(configs, tuning)
+
+	# Verify 0 level baseline
+	_check("0 levels gives 0.0 retention bonus", is_equal_approx(dynasty.upgrades.crash_income_retention_bonus(), 0.0))
+	_check("0 levels gives 0.0 duration reduction", is_equal_approx(dynasty.upgrades.crash_duration_reduction_pct(), 0.0))
+
+	# Buy Hedging Strategies Level 3 (+15%)
+	dynasty.upgrades.levels[LegacyUpgradeCatalog.CRISIS_HEDGING] = 3
+	_check("level 3 gives +15% retention bonus", is_equal_approx(dynasty.upgrades.crash_income_retention_bonus(), 0.15))
+
+	# Buy Emergency Liquidity Level 2 (-16%)
+	dynasty.upgrades.levels[LegacyUpgradeCatalog.CRISIS_LIQUIDITY] = 2
+	_check("level 2 gives -16% duration reduction", is_equal_approx(dynasty.upgrades.crash_duration_reduction_pct(), 0.16))
+
+	# Verify refresh pushes to living generation
+	dynasty.refresh_current_generation_effects()
+	_check("living generation receives retention bonus", is_equal_approx(dynasty.current.events.legacy_retention_bonus, 0.15))
+	_check("living generation receives duration reduction", is_equal_approx(dynasty.current.events.legacy_duration_reduction_pct, 0.16))
+
 
 
 func _check(label: String, condition: bool) -> void:

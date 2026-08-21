@@ -1,0 +1,2758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>American Tycoon — Audio Refinement Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #0a0c10;
+      --bg-surface: #12161f;
+      --bg-card: #181f2c;
+      --bg-card-hover: #1e2738;
+      --bg-active: #26334a;
+      
+      --border-subtle: #232d3f;
+      --border-focus: #3b82f6;
+      --border-success: #10b981;
+      
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      
+      --accent-primary: #38bdf8;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --accent-purple: #a855f7;
+      
+      --bus-sfx: #38bdf8;
+      --bus-ui: #fbbf24;
+      --bus-ceremony: #c084fc;
+      --bus-music: #34d399;
+      
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+      --radius-xl: 20px;
+      
+      --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.4);
+      --shadow-glow: 0 0 25px rgba(56, 189, 248, 0.15);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      line-height: 1.5;
+      padding-bottom: 120px;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Top Persistent Sticky Control Center */
+    .sticky-top-container {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(10, 12, 16, 0.94);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border-subtle);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+    }
+
+    /* Top Navigation / App Header */
+    header.app-header {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding: 10px 28px;
+    }
+
+    .header-content {
+      max-width: 1600px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-badge {
+      background: linear-gradient(135deg, #0284c7, #2563eb);
+      color: #fff;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 8px;
+      border-radius: var(--radius-sm);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .brand-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-title span {
+      color: var(--accent-primary);
+    }
+
+    .header-stats {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 9999px;
+      padding: 6px 18px;
+      font-size: 12px;
+      color: var(--text-muted);
+      flex-wrap: wrap;
+    }
+
+    .stat-pill strong {
+      color: var(--accent-primary);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .stat-progress-bar {
+      width: 100px;
+      height: 6px;
+      background: var(--bg-card);
+      border-radius: 999px;
+      overflow: hidden;
+      display: inline-block;
+      vertical-align: middle;
+      margin-left: 6px;
+      position: relative;
+    }
+
+    .stat-progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #10b981, #38bdf8);
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 16px;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      border: 1px solid transparent;
+      text-decoration: none;
+      user-select: none;
+    }
+
+    .btn:active {
+      transform: scale(0.97);
+    }
+
+    .btn-sm {
+      padding: 5px 11px;
+      font-size: 12px;
+      border-radius: var(--radius-sm);
+    }
+
+    .btn-xs {
+      padding: 3px 8px;
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      border-radius: var(--radius-sm);
+      font-weight: 600;
+    }
+
+    .btn-secondary {
+      background: var(--bg-surface);
+      color: var(--text-main);
+      border-color: var(--border-subtle);
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-card-hover);
+      border-color: #3b4d6b;
+      color: #fff;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #0ea5e9, #2563eb);
+      color: #fff;
+      box-shadow: 0 2px 10px rgba(14, 165, 233, 0.35);
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #38bdf8, #3b82f6);
+      box-shadow: 0 4px 16px rgba(14, 165, 233, 0.5);
+    }
+
+    .btn-emerald {
+      background: linear-gradient(135deg, #059669, #10b981);
+      color: #fff;
+      box-shadow: 0 2px 10px rgba(16, 185, 129, 0.35);
+    }
+
+    .btn-emerald:hover {
+      background: linear-gradient(135deg, #10b981, #34d399);
+      box-shadow: 0 4px 16px rgba(16, 185, 129, 0.5);
+    }
+
+    .btn-emerald-outline {
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.5);
+      color: #34d399;
+    }
+
+    .btn-emerald-outline:hover {
+      background: rgba(16, 185, 129, 0.25);
+      border-color: #10b981;
+      color: #fff;
+      box-shadow: 0 0 12px rgba(16, 185, 129, 0.25);
+    }
+
+    .btn-amber-outline {
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      color: #fbbf24;
+    }
+
+    .btn-amber-outline:hover {
+      background: rgba(245, 158, 11, 0.22);
+      border-color: #f59e0b;
+      color: #fff;
+      box-shadow: 0 0 12px rgba(245, 158, 11, 0.2);
+    }
+
+    .btn-variant {
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: #7dd3fc;
+    }
+
+    .btn-variant:hover {
+      background: rgba(56, 189, 248, 0.25);
+      color: #fff;
+      border-color: #38bdf8;
+    }
+
+    .btn-layer {
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      color: #fde68a;
+    }
+
+    .btn-layer:hover {
+      background: rgba(245, 158, 11, 0.25);
+      color: #fff;
+      border-color: #f59e0b;
+    }
+
+    /* Master Transport / Player Bar */
+    .master-transport {
+      background: rgba(18, 22, 31, 0.75);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding: 6px 28px;
+    }
+
+    .transport-content {
+      max-width: 1600px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .now-playing-info {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .audio-visualizer-wave {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 20px;
+      width: 24px;
+      padding: 2px 0;
+    }
+
+    .wave-bar {
+      flex: 1;
+      background: var(--text-dim);
+      border-radius: 2px;
+      height: 3px;
+      transition: height 0.15s ease, background-color 0.2s ease;
+    }
+
+    .audio-visualizer-wave.playing .wave-bar {
+      background: var(--accent-primary);
+      animation: wavePulse 0.8s infinite ease-in-out alternate;
+    }
+
+    .audio-visualizer-wave.playing .wave-bar:nth-child(1) { animation-delay: 0.1s; }
+    .audio-visualizer-wave.playing .wave-bar:nth-child(2) { animation-delay: 0.3s; }
+    .audio-visualizer-wave.playing .wave-bar:nth-child(3) { animation-delay: 0.5s; }
+    .audio-visualizer-wave.playing .wave-bar:nth-child(4) { animation-delay: 0.2s; }
+
+    @keyframes wavePulse {
+      0% { height: 4px; }
+      100% { height: 18px; }
+    }
+
+    .track-meta {
+      min-width: 0;
+    }
+
+    .track-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .track-source {
+      font-size: 11px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .transport-controls {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex: 1.5;
+      justify-content: flex-end;
+    }
+
+    .transport-time {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+      min-width: 76px;
+      text-align: right;
+    }
+
+    .transport-slider-container {
+      flex: 1;
+      max-width: 320px;
+      display: flex;
+      align-items: center;
+    }
+
+    .scrubber {
+      width: 100%;
+      -webkit-appearance: none;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--bg-card);
+      outline: none;
+      cursor: pointer;
+    }
+
+    .scrubber::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--accent-primary);
+      cursor: pointer;
+      box-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
+    }
+
+    .volume-slider {
+      width: 65px;
+      -webkit-appearance: none;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--bg-card);
+      outline: none;
+      cursor: pointer;
+    }
+
+    .volume-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      cursor: pointer;
+    }
+
+    /* Sticky Controls Bar */
+    .sticky-controls-bar {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 8px 28px 8px;
+    }
+
+    .filter-toolbar {
+      background: rgba(18, 22, 31, 0.6);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 6px 14px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 6px;
+    }
+
+    .search-box {
+      flex: 1;
+      min-width: 260px;
+      position: relative;
+    }
+
+    .search-input {
+      width: 100%;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 7px 14px 7px 34px;
+      font-family: inherit;
+      font-size: 12px;
+      color: var(--text-main);
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .search-input:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+      background: var(--bg-card-hover);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-dim);
+      pointer-events: none;
+    }
+
+    .filter-controls {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .select-dropdown {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-main);
+      font-family: inherit;
+      font-size: 11px;
+      padding: 6px 10px;
+      border-radius: var(--radius-md);
+      outline: none;
+      cursor: pointer;
+    }
+
+    .select-dropdown:focus {
+      border-color: var(--border-focus);
+    }
+
+    /* Section Navigator Pills */
+    .section-nav {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow-x: auto;
+      padding: 2px 0 2px;
+      margin-bottom: 0;
+      scrollbar-width: none;
+    }
+
+    .section-nav::-webkit-scrollbar {
+      display: none;
+    }
+
+    .section-pill {
+      background: rgba(24, 31, 44, 0.7);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 999px;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-decoration: none;
+    }
+
+    .section-pill:hover, .section-pill.active {
+      background: var(--bg-card-hover);
+      color: #fff;
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.2);
+    }
+
+    /* Main Container */
+    .app-main {
+      max-width: 1600px;
+      margin: 16px auto 0;
+      padding: 0 28px;
+    }
+
+    /* Group Section Panel */
+    .section-panel {
+      scroll-margin-top: 230px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-xl);
+      margin-bottom: 28px;
+      overflow: hidden;
+      box-shadow: var(--shadow-soft);
+      transition: border-color 0.2s ease;
+    }
+
+    .section-header {
+      background: linear-gradient(180deg, rgba(30, 39, 56, 0.4), rgba(24, 31, 44, 0.2));
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .section-header:hover {
+      background: rgba(30, 39, 56, 0.6);
+    }
+
+    .section-title-group {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .section-index-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--accent-primary);
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .section-name {
+      font-family: 'Outfit', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: -0.3px;
+    }
+
+    .section-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .section-summary-badges {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge-count {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+    }
+
+    .badge-count.complete {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: rgba(16, 185, 129, 0.3);
+      color: var(--accent-emerald);
+    }
+
+    .chevron-icon {
+      transition: transform 0.25s ease;
+      color: var(--text-dim);
+    }
+
+    .section-panel.collapsed .chevron-icon {
+      transform: rotate(-90deg);
+    }
+
+    .section-panel.collapsed .section-body {
+      display: none;
+    }
+
+    .section-body {
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* Audio Cue Subsection Card */
+    .cue-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 16px 20px;
+      transition: all 0.2s ease;
+    }
+
+    .cue-card:hover {
+      border-color: #3b4d6b;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+    }
+
+    .cue-card.has-selection {
+      border-color: #10b981 !important;
+      background: linear-gradient(180deg, #0c271e 0%, #081a14 100%) !important;
+      box-shadow: 0 4px 24px rgba(16, 185, 129, 0.22), inset 0 0 16px rgba(16, 185, 129, 0.06) !important;
+    }
+
+    .cue-card.has-selection .cue-header {
+      border-bottom-color: rgba(16, 185, 129, 0.3) !important;
+    }
+
+    .cue-card.has-selection .cue-id {
+      color: #34d399 !important;
+      background: rgba(16, 185, 129, 0.22) !important;
+      border-color: rgba(16, 185, 129, 0.6) !important;
+      box-shadow: 0 0 12px rgba(16, 185, 129, 0.25);
+    }
+
+    .cue-card.has-selection .cue-selected-tag {
+      display: inline-flex !important;
+      align-items: center;
+      gap: 4px;
+      background: rgba(16, 185, 129, 0.25);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.6);
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.2);
+    }
+
+    .cue-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 0;
+      flex-wrap: wrap;
+      cursor: pointer;
+      user-select: none;
+      padding: 2px 0;
+      transition: opacity 0.15s ease;
+    }
+
+    .cue-card:not(.collapsed) .cue-header {
+      margin-bottom: 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding-bottom: 12px;
+    }
+
+    .cue-header:hover {
+      opacity: 0.92;
+    }
+
+    .cue-chevron {
+      transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+      color: var(--text-dim);
+      flex-shrink: 0;
+    }
+
+    .cue-card.collapsed .cue-chevron {
+      transform: rotate(-90deg);
+    }
+
+    .cue-card.collapsed .cue-body {
+      display: none;
+    }
+
+    .cue-body {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .cue-id-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .cue-id {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 3px 10px;
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .bus-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .bus-SFX { background: rgba(56, 189, 248, 0.15); color: var(--bus-sfx); border: 1px solid rgba(56, 189, 248, 0.3); }
+    .bus-UI { background: rgba(251, 191, 36, 0.15); color: var(--bus-ui); border: 1px solid rgba(251, 191, 36, 0.3); }
+    .bus-Ceremony { background: rgba(192, 132, 252, 0.15); color: var(--bus-ceremony); border: 1px solid rgba(192, 132, 252, 0.3); }
+    .bus-Music { background: rgba(52, 211, 153, 0.15); color: var(--bus-music); border: 1px solid rgba(52, 211, 153, 0.3); }
+
+    .cue-meta-pill {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--text-dim);
+      background: rgba(0, 0, 0, 0.2);
+      padding: 2px 7px;
+      border-radius: 4px;
+    }
+
+    .ingame-status-pill {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      letter-spacing: 0.3px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .ingame-status-pill.sourced {
+      background: rgba(16, 185, 129, 0.18);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.5);
+    }
+
+    .ingame-status-pill.placeholder {
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.35);
+    }
+
+    .cue-match-count {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--text-dim);
+      background: rgba(0, 0, 0, 0.25);
+      padding: 3px 9px;
+      border-radius: 999px;
+      border: 1px solid var(--border-subtle);
+    }
+
+    .cue-selected-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--accent-emerald);
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      padding: 2px 9px;
+      border-radius: 999px;
+      display: none;
+    }
+
+    .cue-actions-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .variant-audition-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .source-attribution-box {
+      font-size: 11px;
+      color: var(--text-muted);
+      background: rgba(16, 185, 129, 0.06);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      border-radius: var(--radius-sm);
+      padding: 6px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .cue-trigger-text {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .cue-trigger-text strong {
+      color: var(--text-main);
+    }
+
+    /* Candidate Sounds List */
+    .candidates-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .candidate-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 8px 12px;
+      background: rgba(18, 22, 31, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      border-radius: var(--radius-md);
+      transition: all 0.15s ease;
+    }
+
+    .candidate-row:hover {
+      background: var(--bg-card-hover);
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .candidate-row.is-selected {
+      background: rgba(16, 185, 129, 0.08);
+      border-color: rgba(16, 185, 129, 0.4);
+    }
+
+    .candidate-row.is-deployed {
+      background: rgba(16, 185, 129, 0.12);
+      border-color: rgba(16, 185, 129, 0.6);
+      box-shadow: inset 0 0 12px rgba(16, 185, 129, 0.08);
+    }
+
+    .candidate-row.is-interesting {
+      border-color: rgba(168, 85, 247, 0.45);
+      background: rgba(168, 85, 247, 0.07);
+    }
+
+    .candidate-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .checkbox-custom {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 4px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+    }
+
+    .checkbox-custom:checked {
+      background: var(--accent-emerald);
+      border-color: var(--accent-emerald);
+    }
+
+    .checkbox-custom:checked::after {
+      content: '✓';
+      color: #fff;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .play-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+    }
+
+    .play-btn:hover {
+      background: var(--accent-primary);
+      color: #000;
+      border-color: var(--accent-primary);
+      transform: scale(1.08);
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+    }
+
+    .play-btn.playing {
+      background: var(--accent-emerald);
+      color: #000;
+      border-color: var(--accent-emerald);
+      animation: pulse 1s infinite alternate;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      100% { transform: scale(1.1); box-shadow: 0 0 12px rgba(16, 185, 129, 0.6); }
+    }
+
+    .star-btn {
+      width: 26px;
+      height: 26px;
+      border-radius: var(--radius-sm);
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-dim);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+    }
+
+    .star-btn:hover {
+      color: var(--accent-purple);
+      background: rgba(168, 85, 247, 0.1);
+      border-color: rgba(168, 85, 247, 0.3);
+      transform: scale(1.1);
+    }
+
+    .star-btn.is-active {
+      color: var(--accent-purple);
+      background: rgba(168, 85, 247, 0.18);
+      border-color: rgba(168, 85, 247, 0.5);
+    }
+
+    .candidate-info {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .candidate-filename {
+      font-size: 13px;
+      font-weight: 600;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .active-deployed-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: rgba(16, 185, 129, 0.25);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.6);
+      letter-spacing: 0.5px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.2);
+    }
+
+    .interesting-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 3px;
+      background: rgba(168, 85, 247, 0.2);
+      color: #c084fc;
+      border: 1px solid rgba(168, 85, 247, 0.5);
+      letter-spacing: 0.4px;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .candidate-pack {
+      font-size: 11px;
+      color: var(--text-dim);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .candidate-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .role-select {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-main);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      padding: 3px 6px;
+      border-radius: var(--radius-sm);
+      outline: none;
+      cursor: pointer;
+    }
+
+    .score-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .score-top { background: rgba(16, 185, 129, 0.15); color: var(--accent-emerald); border: 1px solid rgba(16, 185, 129, 0.3); }
+    .score-high { background: rgba(56, 189, 248, 0.15); color: var(--accent-primary); border: 1px solid rgba(56, 189, 248, 0.3); }
+    .score-mid { background: rgba(245, 158, 11, 0.15); color: var(--accent-amber); border: 1px solid rgba(245, 158, 11, 0.3); }
+    .score-low { background: rgba(100, 116, 139, 0.15); color: var(--text-dim); border: 1px solid rgba(100, 116, 139, 0.3); }
+
+    .duration-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+      width: 42px;
+      text-align: right;
+    }
+
+    /* Sticky Bottom Export Bar */
+    .sticky-export-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      background: rgba(10, 12, 16, 0.96);
+      backdrop-filter: blur(16px);
+      border-top: 1px solid var(--border-subtle);
+      padding: 12px 28px;
+      box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.5);
+    }
+
+    .export-bar-content {
+      max-width: 1600px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .export-summary-text {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .selection-counter-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+      background: linear-gradient(135deg, #0284c7, #2563eb);
+      padding: 4px 12px;
+      border-radius: 999px;
+    }
+
+    /* Modal Styling */
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(6px);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal-container {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-xl);
+      max-width: 800px;
+      width: 100%;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+      overflow: hidden;
+    }
+
+    .modal-header {
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .modal-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border-subtle);
+      background: rgba(0, 0, 0, 0.2);
+    }
+
+    .modal-tab-btn {
+      flex: 1;
+      padding: 10px 16px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border-bottom: 2px solid transparent;
+    }
+
+    .modal-tab-btn:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .modal-tab-btn.active {
+      color: var(--accent-primary);
+      border-bottom-color: var(--accent-primary);
+      background: rgba(56, 189, 248, 0.05);
+    }
+
+    .modal-body {
+      padding: 20px 24px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .export-textarea {
+      width: 100%;
+      height: 320px;
+      background: #080a0f;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: #38bdf8;
+      resize: none;
+      outline: none;
+      line-height: 1.5;
+    }
+
+    .modal-footer {
+      padding: 14px 24px;
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(0, 0, 0, 0.15);
+    }
+
+    /* Assign Modal Specific */
+    .assign-modal-select {
+      width: 100%;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-main);
+      font-family: inherit;
+      font-size: 13px;
+      padding: 10px 14px;
+      border-radius: var(--radius-md);
+      outline: none;
+      margin-top: 6px;
+    }
+
+    /* Toast Notification */
+    .toast {
+      position: fixed;
+      bottom: 80px;
+      right: 28px;
+      z-index: 1000;
+      background: #181f2c;
+      border: 1px solid rgba(16, 185, 129, 0.5);
+      border-radius: var(--radius-md);
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #fff;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      pointer-events: none;
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    /* Other Browser Specific Styles */
+    .other-browser {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .other-filter-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .other-table-container {
+      max-height: 480px;
+      overflow-y: auto;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      background: rgba(0, 0, 0, 0.2);
+    }
+
+    .other-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    .other-table th {
+      position: sticky;
+      top: 0;
+      background: var(--bg-surface);
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 600;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border-subtle);
+      z-index: 2;
+    }
+
+    .other-table td {
+      padding: 8px 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    }
+
+    .other-table tr:hover td {
+      background: var(--bg-card-hover);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Hidden HTML5 Audio Element -->
+  <audio id="global-audio-player" preload="none"></audio>
+
+  <!-- Sticky Top Container -->
+  <div class="sticky-top-container">
+    <!-- Top Header -->
+    <header class="app-header">
+      <div class="header-content">
+        <div class="brand-group">
+          <div class="brand-badge">Audio Studio</div>
+          <h1 class="brand-title">American Tycoon <span>Audio Selection</span></h1>
+        </div>
+
+        <div class="header-stats">
+          <div class="stat-pill">
+            In-Game Sourced: <strong id="stat-sourced-count" style="color: var(--accent-emerald);">30</strong> <span style="font-size: 11px; opacity: 0.7;">(34.5%)</span>
+          </div>
+          <div class="stat-pill">
+            Placeholders: <strong id="stat-placeholder-count" style="color: var(--accent-amber);">57</strong> <span style="font-size: 11px; opacity: 0.7;">(65.5%)</span>
+          </div>
+          <div class="stat-pill">
+            Assigned: <strong id="stat-assigned-cues">30</strong> / <span id="stat-total-cues">87</span>
+            <div class="stat-progress-bar">
+              <div class="stat-progress-fill" id="stat-progress-fill"></div>
+            </div>
+          </div>
+          <div class="stat-pill">
+            ★ Shortlist: <strong id="stat-interesting-count" style="color: var(--accent-purple);">0</strong>
+          </div>
+        </div>
+
+        <div class="header-actions">
+          <button class="btn btn-secondary" onclick="autoSelectTopPicks()" title="Automatically select top recommended audio assets for unassigned cues">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            Auto-Select Top Picks
+          </button>
+          <button class="btn btn-secondary" onclick="toggleAllSections()" title="Expand or collapse all sections">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16m-7 6h7"/></svg>
+            Sections (±)
+          </button>
+          <button class="btn btn-secondary" onclick="toggleAllCues()" title="Expand or collapse all cue cards">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 9l4-4 4 4m0 6l-4 4-4-4"/></svg>
+            Cues (±)
+          </button>
+          <button class="btn btn-emerald" onclick="openExportModal()" title="Review and export modified audio selections">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+            Export Selection
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Sticky Master Transport / Audio Player -->
+    <div class="master-transport">
+      <div class="transport-content">
+        <div class="now-playing-info">
+          <div class="audio-visualizer-wave" id="visualizer-wave">
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+          </div>
+          <div class="track-meta">
+            <div class="track-title" id="player-track-title">Ready to audition audio</div>
+            <div class="track-source" id="player-track-source">Click any play button to start</div>
+          </div>
+        </div>
+
+        <div class="transport-controls">
+          <button class="play-btn" id="master-play-pause-btn" onclick="toggleMasterPlay()" title="Play or pause current audio (Spacebar)">
+            <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24" id="master-play-icon"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </button>
+
+          <button class="btn btn-sm btn-secondary" onclick="stopAllAudio()" title="Stop playback">
+            <svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+            Stop
+          </button>
+
+          <div class="transport-time" id="player-time-display">0:00 / 0:00</div>
+
+          <div class="transport-slider-container">
+            <input type="range" class="scrubber" id="player-scrubber" min="0" max="100" value="0" step="0.1" oninput="seekAudio(this.value)" title="Seek playback position">
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <svg width="14" height="14" fill="currentColor" color="var(--text-dim)" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+            <input type="range" class="volume-slider" id="player-volume" min="0" max="1" step="0.05" value="0.8" oninput="setVolume(this.value)" title="Adjust volume">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sticky Studio Controls (Search, Filters & Section Jump Toggles) -->
+    <div class="sticky-controls-bar">
+      <div class="filter-toolbar">
+        <div class="search-box">
+          <svg class="search-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          <input type="text" id="global-search" class="search-input" placeholder="Search cues, audio files, packs, or keywords..." oninput="filterAudioStudio()">
+        </div>
+
+        <div class="filter-controls">
+          <select id="filter-bus" class="select-dropdown" onchange="filterAudioStudio()" title="Filter audio cues by bus routing">
+            <option value="ALL">All Audio Buses</option>
+            <option value="SFX">SFX Bus</option>
+            <option value="UI">UI Bus</option>
+            <option value="Ceremony">Ceremony Bus</option>
+            <option value="Music">Music Bus</option>
+          </select>
+
+          <select id="filter-status" class="select-dropdown" onchange="filterAudioStudio()" title="Filter cues by in-game deployment & selection status">
+            <option value="ALL">All 87 Audio Cues / Tracks</option>
+            <option value="SOURCED">✓ In-Game Sourced (30)</option>
+            <option value="PLACEHOLDER">⚡ Synthesized Placeholders (57)</option>
+            <option value="MULTI_VARIANT">Multi-Variant Cues (10)</option>
+            <option value="LAYERED">Layered Cues (2)</option>
+            <option value="SELECTED">Assigned in Studio</option>
+            <option value="UNSELECTED">Unassigned in Studio</option>
+            <option value="INTERESTING">★ Shortlisted / Interesting Sounds</option>
+          </select>
+
+          <select id="filter-pack" class="select-dropdown" onchange="filterAudioStudio()" title="Filter cues by candidate pack presence">
+            <option value="ALL">All 15 Audio Packs</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Section Navigator Pills -->
+      <nav class="section-nav" id="section-nav-pills"></nav>
+    </div>
+  </div>
+
+  <!-- App Main Content -->
+  <main class="app-main">
+    <div id="sections-container">
+      <div style="text-align: center; padding: 60px 0; color: var(--text-muted);">
+        Loading audio dataset...
+      </div>
+    </div>
+  </main>
+
+  <!-- Sticky Bottom Export Bar -->
+  <div class="sticky-export-bar">
+    <div class="export-bar-content">
+      <div class="export-summary-text">
+        <span class="selection-counter-badge" id="bottom-assigned-badge">30 / 87 Cues Assigned</span>
+        <span style="font-size: 13px; color: var(--text-muted);">Selections reflect current in-code audio & active assignments</span>
+      </div>
+
+      <div style="display: flex; gap: 12px;">
+        <button class="btn btn-secondary" onclick="clearAllSelections()" title="Deselect all chosen sound assets">Clear All</button>
+        <button class="btn btn-emerald" onclick="openExportModal()" title="Open export modal for audio selections and deployment scripts">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+          Export Selection to Antigravity
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Export Selection Modal -->
+  <div class="modal-backdrop" id="export-modal">
+    <div class="modal-container">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title">Export Audio Modifications</h2>
+          <div style="font-size: 12px; color: var(--text-dim); margin-top: 2px;" id="export-modal-subtitle">
+            Exporting modifications made since page load
+          </div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="closeExportModal()" title="Close export dialog">✕</button>
+      </div>
+
+      <div class="modal-tabs">
+        <button class="modal-tab-btn active" id="tab-btn-json" onclick="switchExportTab('json')" title="View JSON payload">Antigravity JSON</button>
+        <button class="modal-tab-btn" id="tab-btn-md" onclick="switchExportTab('md')" title="View Markdown checklist table">Markdown Checklist</button>
+        <button class="modal-tab-btn" id="tab-btn-ps" onclick="switchExportTab('ps')" title="View PowerShell copy script">PowerShell Copy Script</button>
+      </div>
+
+      <div class="modal-body">
+        <textarea class="export-textarea" id="export-textarea" readonly></textarea>
+      </div>
+
+      <div class="modal-footer">
+        <div style="font-size: 12px; color: var(--text-dim);" id="export-footer-status">
+          Ready to copy into Antigravity
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button class="btn btn-secondary" onclick="saveExportToServer()" title="Save modified audio selections directly to Plans/Audio_Selection_Export.json">Save to Workspace</button>
+          <button class="btn btn-primary" onclick="copyExportText()" title="Copy the exported text directly to your clipboard">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Copy to Clipboard
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Assign Sound from 'Other' Modal -->
+  <div class="modal-backdrop" id="assign-modal">
+    <div class="modal-container" style="max-width: 600px;">
+      <div class="modal-header">
+        <h2 class="modal-title">Assign Sound to Game Cue</h2>
+        <button class="btn btn-secondary btn-sm" onclick="closeAssignModal()" title="Close dialog">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="background: rgba(0,0,0,0.35); border: 1px solid var(--border-subtle); padding: 12px 16px; border-radius: var(--radius-md); margin-bottom: 16px;">
+          <div style="font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Selected Sound Asset</div>
+          <div style="font-size: 14px; font-weight: 600; color: #fff;" id="assign-filename"></div>
+          <div style="font-size: 11px; color: var(--text-muted); font-family: monospace; margin-top: 2px;" id="assign-sound-details"></div>
+        </div>
+
+        <label style="font-size: 12px; font-weight: 600; color: var(--text-main);">Target Game Audio Cue:</label>
+        <select class="assign-modal-select" id="assign-target-cue" onchange="onAssignTargetCueChange(this.value)"></select>
+
+        <div id="assign-cue-preview" style="margin-top: 12px; background: rgba(56, 189, 248, 0.05); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: var(--radius-md); padding: 12px 14px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; flex-wrap: wrap; gap: 8px;">
+            <strong style="color: var(--accent-primary); font-size: 13px;" id="assign-cue-name"></strong>
+            <span class="cue-meta-pill" id="assign-cue-bus" style="color: #38bdf8; border-color: rgba(56,189,248,0.3);"></span>
+          </div>
+          <div style="font-size: 12px; color: var(--text-muted); line-height: 1.5;" id="assign-cue-trigger"></div>
+        </div>
+
+        <div style="margin-top: 16px;">
+          <label style="font-size: 12px; font-weight: 600; color: var(--text-main);">Sound Role in Cue:</label>
+          <select class="assign-modal-select" id="assign-target-role" style="margin-top: 4px;">
+            <option value="primary">Primary (Main default sample)</option>
+            <option value="variant_1">Variant 1 (Alternate take)</option>
+            <option value="variant_2">Variant 2 (Alternate take)</option>
+            <option value="variant_3">Variant 3 (Alternate take)</option>
+            <option value="variant_4">Variant 4 (Alternate take)</option>
+            <option value="layer">Layer (Simultaneous companion layer)</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeAssignModal()" title="Cancel">Cancel</button>
+        <button class="btn btn-primary" onclick="confirmSoundAssignment()" title="Assign sound">Assign Sound</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Element -->
+  <div class="toast" id="app-toast">
+    <svg width="18" height="18" fill="none" stroke="#10b981" stroke-width="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+    <span id="toast-message">Action successful</span>
+  </div>
+
+  <script>
+    // Global Application State
+    let audioData = null;
+    let selectedCuesMap = {}; // { cue_id: [ { file_id, rel_path, filename, pack, role, duration } ] }
+    let interestingFilesMap = {}; // { cue_id: [ file_id, ... ] }
+    let initialSelectedCuesMap = {}; // Baseline captured at page load
+    let initialInterestingFilesMap = {}; // Baseline captured at page load
+    let currentlyPlayingAudio = null;
+    let currentPlayingBtn = null;
+    let currentExportTab = 'json';
+    let soundToAssign = null;
+
+    function loadInterestingStorage() {
+      try {
+        const saved = localStorage.getItem('american_tycoon_interesting_audio');
+        if (saved) interestingFilesMap = JSON.parse(saved);
+      } catch (e) {
+        interestingFilesMap = {};
+      }
+    }
+
+    function saveInterestingStorage() {
+      try {
+        localStorage.setItem('american_tycoon_interesting_audio', JSON.stringify(interestingFilesMap));
+      } catch (e) {}
+    }
+
+    function toggleInteresting(cueId, fileId, event) {
+      if (event) event.stopPropagation();
+      if (!interestingFilesMap[cueId]) interestingFilesMap[cueId] = [];
+      
+      const idx = interestingFilesMap[cueId].indexOf(fileId);
+      const starBtn = document.getElementById(`star-${cueId}-${fileId}`);
+      const row = document.getElementById(`cand-row-${cueId}-${fileId}`);
+      const badge = document.getElementById(`int-badge-${cueId}-${fileId}`);
+
+      if (idx === -1) {
+        interestingFilesMap[cueId].push(fileId);
+        if (starBtn) {
+          starBtn.classList.add('is-active');
+          starBtn.title = "Remove from interesting / shortlisted";
+          starBtn.innerHTML = `<svg width="14" height="14" fill="currentColor" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
+        }
+        if (row) row.classList.add('is-interesting');
+        if (badge) badge.style.display = 'inline-flex';
+        showToast('Marked candidate as interesting');
+      } else {
+        interestingFilesMap[cueId].splice(idx, 1);
+        if (interestingFilesMap[cueId].length === 0) delete interestingFilesMap[cueId];
+        if (starBtn) {
+          starBtn.classList.remove('is-active');
+          starBtn.title = "Mark as interesting / shortlisted candidate";
+          starBtn.innerHTML = `<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
+        }
+        if (row) row.classList.remove('is-interesting');
+        if (badge) badge.style.display = 'none';
+        showToast('Removed from interesting');
+      }
+
+      saveInterestingStorage();
+      updateSelectionStats();
+      filterAudioStudio();
+    }
+
+    const audioPlayer = document.getElementById('global-audio-player');
+    const playPauseBtn = document.getElementById('master-play-pause-btn');
+    const playIcon = document.getElementById('master-play-icon');
+    const visualizer = document.getElementById('visualizer-wave');
+    const trackTitle = document.getElementById('player-track-title');
+    const trackSource = document.getElementById('player-track-source');
+    const timeDisplay = document.getElementById('player-time-display');
+    const scrubber = document.getElementById('player-scrubber');
+
+    // Initialize App
+    document.addEventListener('DOMContentLoaded', async () => {
+      loadInterestingStorage();
+      await loadAudioData();
+      setupAudioPlayerEvents();
+    });
+
+    async function loadAudioData() {
+      try {
+        const res = await fetch('/api/data');
+        if (!res.ok) throw new Error('Network response not ok');
+        audioData = await res.json();
+
+        // Populate active sound choices based on current code deployment
+        selectedCuesMap = {};
+        if (audioData && audioData.sections) {
+          audioData.sections.forEach(sec => {
+            sec.cues.forEach(cue => {
+              if (cue.candidates && cue.candidates.length > 0) {
+                cue.candidates.forEach(cand => {
+                  // If candidate is actively deployed in code or marked selected
+                  if (cand.is_current_deployed || cand.selected) {
+                    if (!selectedCuesMap[cue.cue_id]) selectedCuesMap[cue.cue_id] = [];
+                    
+                    if (cand.role === 'primary') {
+                      const hasPrim = selectedCuesMap[cue.cue_id].some(s => s.role === 'primary');
+                      if (!hasPrim) {
+                        selectedCuesMap[cue.cue_id].push({
+                          file_id: cand.file_id,
+                          rel_path: cand.rel_path,
+                          filename: cand.filename,
+                          pack: cand.pack,
+                          role: 'primary',
+                          duration: cand.duration
+                        });
+                      }
+                    } else {
+                      selectedCuesMap[cue.cue_id].push({
+                        file_id: cand.file_id,
+                        rel_path: cand.rel_path,
+                        filename: cand.filename,
+                        pack: cand.pack,
+                        role: cand.role,
+                        duration: cand.duration
+                      });
+                    }
+                  }
+                });
+              }
+            });
+          });
+        }
+
+        populatePacksDropdown();
+        populateSectionNav();
+        renderSections();
+        updateSelectionStats();
+
+        // Capture initial baseline state after load for changes-only export
+        initialSelectedCuesMap = JSON.parse(JSON.stringify(selectedCuesMap));
+        initialInterestingFilesMap = JSON.parse(JSON.stringify(interestingFilesMap));
+      } catch (err) {
+        console.error('Failed to load data:', err);
+        document.getElementById('sections-container').innerHTML = `
+          <div style="background: rgba(244, 63, 94, 0.1); border: 1px solid rgba(244, 63, 94, 0.3); padding: 24px; border-radius: 12px; text-align: center;">
+            <h3 style="color: #f43f5e; margin-bottom: 8px;">Failed to Load Audio Dataset</h3>
+            <p style="color: var(--text-muted); font-size: 14px;">Ensure the local review server is running at <code>http://localhost:8765</code>.</p>
+          </div>
+        `;
+      }
+    }
+
+    function populatePacksDropdown() {
+      const packSelect = document.getElementById('filter-pack');
+      if (!audioData || !audioData.packs) return;
+      audioData.packs.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.name;
+        opt.textContent = `${p.name} (${p.count})`;
+        packSelect.appendChild(opt);
+      });
+    }
+
+    function populateSectionNav() {
+      const nav = document.getElementById('section-nav-pills');
+      nav.innerHTML = '';
+      if (!audioData || !audioData.sections) return;
+
+      audioData.sections.forEach((sec, idx) => {
+        const a = document.createElement('a');
+        a.className = 'section-pill';
+        a.href = `#sec-${sec.section_id}`;
+        a.textContent = `${idx + 1}. ${sec.name}`;
+        a.title = `Jump to Section ${idx + 1}: ${sec.name}`;
+        a.onclick = () => {
+          document.querySelectorAll('.section-pill').forEach(p => p.classList.remove('active'));
+          a.classList.add('active');
+          const panel = document.getElementById(`sec-${sec.section_id}`);
+          if (panel && panel.classList.contains('collapsed')) {
+            panel.classList.remove('collapsed');
+          }
+        };
+        nav.appendChild(a);
+      });
+
+      // Add 'Other' Section Nav
+      const otherA = document.createElement('a');
+      otherA.className = 'section-pill';
+      otherA.href = '#sec-other';
+      otherA.textContent = 'Other (Library Browser)';
+      otherA.title = 'Jump to full library browser of 3,763 assets';
+      otherA.onclick = () => {
+        document.querySelectorAll('.section-pill').forEach(p => p.classList.remove('active'));
+        otherA.classList.add('active');
+        const otherPanel = document.getElementById('sec-other');
+        if (otherPanel && otherPanel.classList.contains('collapsed')) {
+          otherPanel.classList.remove('collapsed');
+        }
+      };
+      nav.appendChild(otherA);
+    }
+
+    function renderSections() {
+      const container = document.getElementById('sections-container');
+      container.innerHTML = '';
+
+      if (!audioData || !audioData.sections) return;
+
+      audioData.sections.forEach((section, sIdx) => {
+        const secPanel = document.createElement('div');
+        secPanel.className = 'section-panel';
+        secPanel.id = `sec-${section.section_id}`;
+
+        const totalCues = section.cues.length;
+
+        secPanel.innerHTML = `
+          <div class="section-header" onclick="toggleSection(this)">
+            <div class="section-title-group">
+              <div class="section-index-badge">${sIdx + 1}</div>
+              <div>
+                <h2 class="section-name">${escapeHtml(section.name)}</h2>
+                <div class="section-desc">${escapeHtml(section.description)}</div>
+              </div>
+            </div>
+            <div class="section-summary-badges">
+              <span class="badge-count" id="sec-count-${section.section_id}">0 / ${totalCues} Assigned</span>
+              <svg class="chevron-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"/></svg>
+            </div>
+          </div>
+          <div class="section-body">
+            ${section.cues.map(cue => renderCueCard(cue)).join('')}
+          </div>
+        `;
+        container.appendChild(secPanel);
+      });
+
+      // Render 'Other / Full Library Browser' Section
+      renderOtherSection(container);
+    }
+
+    function renderCueCard(cue) {
+      const candCount = cue.candidates.length;
+      const ingame = cue.existing_in_game || {};
+      const isSourced = ingame.is_sourced;
+      const activeFile = ingame.active_file;
+
+      // Status Pill
+      let inGameStatusHtml = '';
+      if (activeFile) {
+        if (isSourced) {
+          inGameStatusHtml = `
+            <span class="ingame-status-pill sourced" title="Currently deployed from licensed library in Godot code">
+              <svg width="11" height="11" fill="currentColor" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+              IN-GAME SOURCED: ${escapeHtml(activeFile.filename)}
+            </span>
+          `;
+        } else {
+          inGameStatusHtml = `
+            <span class="ingame-status-pill placeholder" title="Currently using synthesized placeholder in Godot code">
+              ⚡ PLACEHOLDER: ${escapeHtml(activeFile.filename)}
+            </span>
+          `;
+        }
+      }
+
+      // Audition Button for active in-game sound
+      let auditionButtonHtml = '';
+      if (activeFile) {
+        const btnClass = isSourced ? 'btn-emerald-outline' : 'btn-amber-outline';
+        const label = isSourced ? 'Audition In-Game' : 'Audition Placeholder';
+        const fullTitle = `${cue.cue_id} (${isSourced ? 'Active In-Game Sound' : 'Placeholder'})`;
+        auditionButtonHtml = `
+          <button class="btn btn-sm ${btnClass}" onclick="event.stopPropagation(); playGameAudio('${escapeHtml(activeFile.path)}', '${escapeHtml(fullTitle)}', this)" title="Audition ${escapeHtml(activeFile.filename)} installed in Godot project">
+            <svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            ${label}
+          </button>
+        `;
+      }
+
+      // Variants bar if present
+      let variantsBarHtml = '';
+      if (ingame.variants && ingame.variants.length > 0) {
+        const varButtons = ingame.variants.map(v => `
+          <button class="btn btn-xs btn-variant" onclick="event.stopPropagation(); playGameAudio('${escapeHtml(v.path)}', '${escapeHtml(cue.cue_id)} Var ${v.variant_index} (${escapeHtml(v.filename)})', this)" title="Audition in-game variant file ${escapeHtml(v.filename)} (${v.duration.toFixed(2)}s)">
+            ▶ v${v.variant_index} (${v.duration.toFixed(2)}s)
+          </button>
+        `).join(' ');
+
+        variantsBarHtml = `
+          <div class="variant-audition-bar">
+            <strong style="color: #7dd3fc; font-family: 'JetBrains Mono', monospace;">In-Game Variants:</strong>
+            ${varButtons}
+          </div>
+        `;
+      }
+
+      // Layer bar if present
+      let layerBarHtml = '';
+      if (ingame.layer) {
+        layerBarHtml = `
+          <button class="btn btn-xs btn-layer" onclick="event.stopPropagation(); playGameAudio('${escapeHtml(ingame.layer.path)}', '${escapeHtml(cue.cue_id)} Layer (${escapeHtml(ingame.layer.filename)})', this)" title="Audition in-game layer file ${escapeHtml(ingame.layer.filename)} (${ingame.layer.duration.toFixed(2)}s)">
+            ▶ + Layer (${ingame.layer.duration.toFixed(2)}s)
+          </button>
+        `;
+      }
+
+      // Sourced license & pack info box
+      let sourceCreditHtml = '';
+      if (isSourced && ingame.source_info) {
+        const s = ingame.source_info;
+        sourceCreditHtml = `
+          <div class="source-attribution-box">
+            <div>
+              <strong style="color: #34d399;">Pack Source:</strong> ${escapeHtml(s.pack)} • <code>${escapeHtml(s.source_file)}</code>
+            </div>
+            <div>
+              <strong style="color: #34d399;">License:</strong> ${escapeHtml(s.licensor)} (${escapeHtml(s.license)})
+            </div>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="cue-card" id="cue-card-${escapeHtml(cue.cue_id)}" data-bus="${escapeHtml(cue.bus)}" data-status="${isSourced ? 'SOURCED' : 'PLACEHOLDER'}" data-variants="${cue.has_variants ? 'true' : 'false'}" data-layered="${cue.layered ? 'true' : 'false'}">
+          <div class="cue-header" onclick="toggleCueCollapse('${escapeHtml(cue.cue_id)}')">
+            <div class="cue-id-row">
+              <svg class="cue-chevron" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"/></svg>
+              <span class="cue-id">${escapeHtml(cue.cue_id)}</span>
+              <span class="bus-tag bus-${escapeHtml(cue.bus)}">${escapeHtml(cue.bus)}</span>
+              <span class="cue-meta-pill">${cue.db > 0 ? '+' : ''}${cue.db} dB</span>
+              <span class="cue-meta-pill">${cue.cooldown} ms</span>
+              ${cue.layered ? '<span class="cue-meta-pill" style="color: var(--accent-amber); border-color: rgba(245,158,11,0.3);">Layered</span>' : ''}
+              ${cue.has_variants ? '<span class="cue-meta-pill" style="color: var(--accent-primary);">Multi-Variant</span>' : ''}
+              ${inGameStatusHtml}
+              <span class="cue-selected-tag" id="cue-selected-tag-${escapeHtml(cue.cue_id)}">✓ Selected</span>
+            </div>
+            <div class="cue-actions-bar" onclick="event.stopPropagation()">
+              ${layerBarHtml}
+              ${auditionButtonHtml}
+              <span class="cue-match-count">${candCount} candidate${candCount === 1 ? '' : 's'}</span>
+            </div>
+          </div>
+
+          <div class="cue-body">
+            <div class="cue-trigger-text">
+              <strong>Fires when:</strong> ${escapeHtml(cue.trigger || 'Audio trigger event in gameplay')}
+            </div>
+
+            ${sourceCreditHtml}
+            ${variantsBarHtml}
+
+            <div class="candidates-list">
+              ${cue.candidates.length === 0 ? '<div style="color: var(--text-dim); font-size: 12px; padding: 8px;">No high-confidence candidates found. Browse Other library below.</div>' : ''}
+              ${cue.candidates.map(cand => renderCandidateRow(cue.cue_id, cand)).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function getFullAudioPath(relPath) {
+      if (!relPath) return '';
+      const cleanRel = relPath.replace(/\//g, '\\');
+      if (cleanRel.startsWith('game\\audio')) {
+        return `c:\\Claude\\American Tycoon\\${cleanRel}`;
+      }
+      return `D:\\Downloads\\Game_Audio\\${cleanRel}`;
+    }
+
+    function renderCandidateRow(cueId, cand) {
+      const isCurated = cand.reason && (cand.reason.startsWith('Curated') || cand.reason.startsWith('Curated Top Pick'));
+      const isChecked = selectedCuesMap[cueId] && selectedCuesMap[cueId].some(s => s.file_id === cand.file_id);
+      const isInteresting = interestingFilesMap[cueId] && interestingFilesMap[cueId].includes(cand.file_id);
+      const isDeployed = cand.is_current_deployed;
+      const scoreClass = cand.score >= 90 ? 'score-top' : (cand.score >= 70 ? 'score-high' : (cand.score >= 45 ? 'score-mid' : 'score-low'));
+      const fullPath = getFullAudioPath(cand.rel_path);
+      
+      return `
+        <div class="candidate-row ${isChecked ? 'is-selected' : ''} ${isDeployed ? 'is-deployed' : ''} ${isInteresting ? 'is-interesting' : ''}" id="cand-row-${escapeHtml(cueId)}-${escapeHtml(cand.file_id)}" data-file-id="${escapeHtml(cand.file_id)}" title="${escapeHtml(fullPath)}">
+          <div class="candidate-left">
+            <input type="checkbox" class="checkbox-custom" 
+              id="chk-${escapeHtml(cueId)}-${escapeHtml(cand.file_id)}"
+              ${isChecked ? 'checked' : ''}
+              title="Select this sound asset as an active choice for this cue"
+              onchange="onCandidateToggle('${escapeHtml(cueId)}', '${escapeHtml(cand.file_id)}', this.checked)">
+            
+            <button type="button" class="star-btn ${isInteresting ? 'is-active' : ''}" 
+              id="star-${escapeHtml(cueId)}-${escapeHtml(cand.file_id)}"
+              onclick="toggleInteresting('${escapeHtml(cueId)}', '${escapeHtml(cand.file_id)}', event)"
+              title="${isInteresting ? 'Remove from interesting / shortlisted candidates' : 'Mark this sound as an interesting candidate for this cue'}">
+              <svg width="14" height="14" fill="${isInteresting ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+              </svg>
+            </button>
+
+            <button class="play-btn" onclick="playLibraryAudio('${escapeHtml(cand.rel_path)}', '${escapeHtml(cand.filename)}', this)" title="Audition this sound asset in the audio player">
+              <svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            </button>
+
+            <div class="candidate-info" title="${escapeHtml(fullPath)}">
+              <div class="candidate-filename" title="${escapeHtml(fullPath)}">
+                ${escapeHtml(cand.filename)}
+                ${isDeployed ? '<span class="active-deployed-badge"><svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg> CURRENT IN-GAME SOUND</span>' : (isCurated ? '<span class="existing-choice-badge">★ CURATED PICK</span>' : '')}
+                <span class="interesting-badge" id="int-badge-${escapeHtml(cueId)}-${escapeHtml(cand.file_id)}" style="display: ${isInteresting ? 'inline-flex' : 'none'};">
+                  ★ SHORTLISTED
+                </span>
+              </div>
+              <div class="candidate-pack" title="${escapeHtml(fullPath)}">${escapeHtml(cand.pack)} • ${escapeHtml(cand.reason || '')}</div>
+            </div>
+          </div>
+
+          <div class="candidate-right">
+            <select class="role-select" id="role-${escapeHtml(cueId)}-${escapeHtml(cand.file_id)}" onchange="onRoleChange('${escapeHtml(cueId)}', '${escapeHtml(cand.file_id)}', this.value)" title="Assign playback role for this sound within the cue (Primary, Variant, or Layer)">
+              <option value="primary" ${cand.role === 'primary' ? 'selected' : ''}>Primary</option>
+              <option value="variant_1" ${cand.role === 'variant_1' ? 'selected' : ''}>Variant 1</option>
+              <option value="variant_2" ${cand.role === 'variant_2' ? 'selected' : ''}>Variant 2</option>
+              <option value="variant_3" ${cand.role === 'variant_3' ? 'selected' : ''}>Variant 3</option>
+              <option value="variant_4" ${cand.role === 'variant_4' ? 'selected' : ''}>Variant 4</option>
+              <option value="layer" ${cand.role === 'layer' ? 'selected' : ''}>Layer</option>
+            </select>
+
+            <span class="score-badge ${scoreClass}">${cand.score}%</span>
+            <span class="duration-tag">${cand.duration.toFixed(2)}s</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderOtherSection(container) {
+      const otherSec = document.createElement('div');
+      otherSec.className = 'section-panel collapsed';
+      otherSec.id = 'sec-other';
+
+      otherSec.innerHTML = `
+        <div class="section-header" onclick="toggleSection(this)" title="Click to expand or collapse the full library browser">
+          <div class="section-title-group">
+            <div class="section-index-badge">∞</div>
+            <div>
+              <h2 class="section-name">Other (Full Library Browser)</h2>
+              <div class="section-desc">Search and audition all 3,763 sound assets across all 15 licensed packs. Assign any sound to any game cue.</div>
+            </div>
+          </div>
+          <div class="section-summary-badges">
+            <span class="badge-count">3,763 Assets</span>
+            <svg class="chevron-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"/></svg>
+          </div>
+        </div>
+        <div class="section-body">
+          <div class="other-browser">
+            <div class="other-filter-row">
+              <input type="text" id="other-search-input" class="search-input" style="flex: 1; max-width: 400px;" placeholder="Search library sounds..." oninput="filterOtherLibrary()">
+              <select id="other-pack-select" class="select-dropdown" onchange="filterOtherLibrary()" title="Filter full sound library by pack">
+                <option value="ALL">All 15 Audio Packs</option>
+              </select>
+              <span id="other-results-count" style="font-size: 12px; color: var(--text-dim);">Showing 30 of 3,763 assets</span>
+            </div>
+
+            <div class="other-table-container">
+              <table class="other-table">
+                <thead>
+                  <tr>
+                    <th style="width: 40px;">Play</th>
+                    <th>Filename</th>
+                    <th>Audio Pack</th>
+                    <th>Subfolder / Category</th>
+                    <th style="width: 70px;">Duration</th>
+                    <th style="width: 100px;">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="other-table-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+      container.appendChild(otherSec);
+
+      // Populate other pack dropdown
+      const otherPackSelect = document.getElementById('other-pack-select');
+      if (audioData && audioData.packs && otherPackSelect) {
+        audioData.packs.forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = p.name;
+          opt.textContent = `${p.name} (${p.count})`;
+          otherPackSelect.appendChild(opt);
+        });
+      }
+
+      filterOtherLibrary();
+    }
+
+    function filterOtherLibrary() {
+      const tbody = document.getElementById('other-table-body');
+      if (!tbody || !audioData || !audioData.library_sample) return;
+
+      const q = (document.getElementById('other-search-input')?.value || '').toLowerCase().trim();
+      const pack = document.getElementById('other-pack-select')?.value || 'ALL';
+
+      let matches = audioData.library_sample.filter(item => {
+        if (pack !== 'ALL' && item.pack !== pack) return false;
+        if (q) {
+          const itemText = (item.filename + ' ' + item.pack + ' ' + item.subfolder).toLowerCase();
+          if (!itemText.includes(q)) return false;
+        }
+        return true;
+      });
+
+      const countEl = document.getElementById('other-results-count');
+      if (countEl) {
+        countEl.textContent = `Showing ${Math.min(50, matches.length)} of ${matches.length} matching assets`;
+      }
+
+      tbody.innerHTML = matches.slice(0, 50).map(item => `
+        <tr>
+          <td>
+            <button class="play-btn" onclick="playLibraryAudio('${escapeHtml(item.rel_path)}', '${escapeHtml(item.filename)}', this)" title="Audition ${escapeHtml(item.filename)}">
+              <svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            </button>
+          </td>
+          <td>
+            <strong style="color: #fff;">${escapeHtml(item.filename)}</strong>
+          </td>
+          <td><span style="color: var(--text-muted); font-size: 11px;">${escapeHtml(item.pack)}</span></td>
+          <td><span style="color: var(--text-dim); font-size: 11px;">${escapeHtml(item.subfolder)}</span></td>
+          <td style="font-family: 'JetBrains Mono', monospace; font-size: 11px;">${item.duration.toFixed(2)}s</td>
+          <td>
+            <button class="btn btn-sm btn-secondary" onclick="openAssignModal('${escapeHtml(item.id)}', '${escapeHtml(item.filename)}')" title="Assign this sound to a specific game cue">
+              Assign →
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // Audio Playback Engine
+    function setupAudioPlayerEvents() {
+      audioPlayer.addEventListener('timeupdate', () => {
+        if (!audioPlayer.duration) return;
+        const current = audioPlayer.currentTime;
+        const total = audioPlayer.duration;
+        timeDisplay.textContent = `${formatTime(current)} / ${formatTime(total)}`;
+        scrubber.value = (current / total) * 100;
+      });
+
+      audioPlayer.addEventListener('play', () => {
+        visualizer.classList.add('playing');
+        playIcon.innerHTML = '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
+        if (currentPlayingBtn) {
+          currentPlayingBtn.classList.add('playing');
+          currentPlayingBtn.innerHTML = '<svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
+        }
+      });
+
+      audioPlayer.addEventListener('pause', () => {
+        visualizer.classList.remove('playing');
+        playIcon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"/>';
+        if (currentPlayingBtn) {
+          currentPlayingBtn.classList.remove('playing');
+          currentPlayingBtn.innerHTML = '<svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+        }
+      });
+
+      audioPlayer.addEventListener('ended', () => {
+        visualizer.classList.remove('playing');
+        playIcon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"/>';
+        if (currentPlayingBtn) {
+          currentPlayingBtn.classList.remove('playing');
+          currentPlayingBtn.innerHTML = '<svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+        }
+        currentPlayingBtn = null;
+      });
+
+      // Spacebar toggle
+      window.addEventListener('keydown', (e) => {
+        if (e.code === 'Space' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'SELECT') {
+          e.preventDefault();
+          toggleMasterPlay();
+        }
+      });
+    }
+
+    function playLibraryAudio(relPath, title, btnElement) {
+      const url = `/audio/library/${encodeURIComponent(relPath)}`;
+      playStream(url, title, relPath, btnElement);
+    }
+
+    function playGameAudio(gamePath, title, btnElement) {
+      let cleanPath = gamePath.replace(/^\/+/, '');
+      const url = cleanPath.startsWith('game/') ? `/${cleanPath}` : `/game/${cleanPath}`;
+      playStream(url, title, cleanPath, btnElement);
+    }
+
+    function playStream(url, title, sourceInfo, btnElement) {
+      if (currentlyPlayingAudio === url && !audioPlayer.paused) {
+        audioPlayer.pause();
+        return;
+      }
+
+      if (currentPlayingBtn && currentPlayingBtn !== btnElement) {
+        currentPlayingBtn.classList.remove('playing');
+        currentPlayingBtn.innerHTML = '<svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+      }
+
+      currentlyPlayingAudio = url;
+      currentPlayingBtn = btnElement;
+
+      trackTitle.textContent = title;
+      trackSource.textContent = sourceInfo;
+
+      audioPlayer.src = url;
+      audioPlayer.play().catch(e => {
+        console.warn('Playback interrupted:', e);
+      });
+    }
+
+    function toggleMasterPlay() {
+      if (!audioPlayer.src) return;
+      if (audioPlayer.paused) {
+        audioPlayer.play().catch(() => {});
+      } else {
+        audioPlayer.pause();
+      }
+    }
+
+    function stopAllAudio() {
+      audioPlayer.pause();
+      audioPlayer.currentTime = 0;
+      scrubber.value = 0;
+      timeDisplay.textContent = '0:00 / 0:00';
+      visualizer.classList.remove('playing');
+      if (currentPlayingBtn) {
+        currentPlayingBtn.classList.remove('playing');
+        currentPlayingBtn.innerHTML = '<svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+        currentPlayingBtn = null;
+      }
+    }
+
+    function seekAudio(percent) {
+      if (audioPlayer.duration) {
+        audioPlayer.currentTime = (percent / 100) * audioPlayer.duration;
+      }
+    }
+
+    function setVolume(val) {
+      audioPlayer.volume = parseFloat(val);
+    }
+
+    function formatTime(secs) {
+      if (isNaN(secs)) return '0:00';
+      const m = Math.floor(secs / 60);
+      const s = Math.floor(secs % 60);
+      return `${m}:${s < 10 ? '0' : ''}${s}`;
+    }
+
+    // Selection & Assignment State Management
+    function onCandidateToggle(cueId, fileId, isChecked) {
+      if (!selectedCuesMap[cueId]) selectedCuesMap[cueId] = [];
+
+      let candObj = null;
+      if (audioData && audioData.sections) {
+        for (const sec of audioData.sections) {
+          const cue = sec.cues.find(c => c.cue_id === cueId);
+          if (cue) {
+            candObj = cue.candidates.find(c => c.file_id === fileId);
+            break;
+          }
+        }
+      }
+
+      if (isChecked) {
+        const roleSel = document.getElementById(`role-${cueId}-${fileId}`);
+        const currentRole = roleSel ? roleSel.value : 'primary';
+
+        if (currentRole === 'primary') {
+          // Uncheck any previous primary for single-primary cues
+          const prevPrimaryIdx = selectedCuesMap[cueId].findIndex(s => s.role === 'primary');
+          if (prevPrimaryIdx !== -1) {
+            const prevFileId = selectedCuesMap[cueId][prevPrimaryIdx].file_id;
+            const prevChk = document.getElementById(`chk-${cueId}-${prevFileId}`);
+            if (prevChk) prevChk.checked = false;
+            const prevRow = document.getElementById(`cand-row-${cueId}-${prevFileId}`);
+            if (prevRow) prevRow.classList.remove('is-selected');
+            selectedCuesMap[cueId].splice(prevPrimaryIdx, 1);
+          }
+        }
+
+        selectedCuesMap[cueId].push({
+          file_id: fileId,
+          rel_path: candObj ? candObj.rel_path : fileId,
+          filename: candObj ? candObj.filename : fileId.split('/').pop(),
+          pack: candObj ? candObj.pack : 'Library',
+          role: currentRole,
+          duration: candObj ? candObj.duration : 1.0
+        });
+
+        const row = document.getElementById(`cand-row-${cueId}-${fileId}`);
+        if (row) row.classList.add('is-selected');
+      } else {
+        selectedCuesMap[cueId] = selectedCuesMap[cueId].filter(s => s.file_id !== fileId);
+        const row = document.getElementById(`cand-row-${cueId}-${fileId}`);
+        if (row) row.classList.remove('is-selected');
+      }
+
+      updateSelectionStats();
+      filterAudioStudio();
+    }
+
+    function onRoleChange(cueId, fileId, newRole) {
+      if (!selectedCuesMap[cueId]) return;
+      const item = selectedCuesMap[cueId].find(s => s.file_id === fileId);
+      if (item) {
+        item.role = newRole;
+      }
+    }
+
+    function autoSelectTopPicks() {
+      if (!audioData || !audioData.sections) return;
+      
+      let count = 0;
+      audioData.sections.forEach(sec => {
+        sec.cues.forEach(cue => {
+          if (cue.candidates && cue.candidates.length > 0) {
+            // Find top candidate
+            const topCandidate = cue.candidates[0];
+            const chk = document.getElementById(`chk-${cue.cue_id}-${topCandidate.file_id}`);
+            if (chk && !chk.checked) {
+              chk.checked = true;
+              onCandidateToggle(cue.cue_id, topCandidate.file_id, true);
+              count++;
+            }
+
+            // If layered cue, also check layer candidate if available
+            if (cue.layered && cue.candidates.length > 1) {
+              const layerCand = cue.candidates.find(c => c.role === 'layer');
+              if (layerCand) {
+                const layerChk = document.getElementById(`chk-${cue.cue_id}-${layerCand.file_id}`);
+                if (layerChk && !layerChk.checked) {
+                  layerChk.checked = true;
+                  onCandidateToggle(cue.cue_id, layerCand.file_id, true);
+                }
+              }
+            }
+          }
+        });
+      });
+
+      filterAudioStudio();
+      showToast(`Auto-selected top recommendations for ${count} cues`);
+    }
+
+    function clearAllSelections() {
+      selectedCuesMap = {};
+      document.querySelectorAll('.checkbox-custom').forEach(chk => chk.checked = false);
+      document.querySelectorAll('.candidate-row').forEach(row => row.classList.remove('is-selected'));
+      updateSelectionStats();
+      filterAudioStudio();
+      showToast('All selections cleared');
+    }
+
+    function updateSelectionStats() {
+      const assignedCuesCount = Object.keys(selectedCuesMap).filter(k => selectedCuesMap[k] && selectedCuesMap[k].length > 0).length;
+      const totalCues = audioData ? audioData.total_cues : 87;
+      const totalSourced = audioData ? audioData.total_sourced : 30;
+      const totalPlaceholders = audioData ? audioData.total_placeholders : 57;
+
+      let totalInteresting = 0;
+      for (const k in interestingFilesMap) {
+        if (interestingFilesMap[k]) totalInteresting += interestingFilesMap[k].length;
+      }
+      const statInt = document.getElementById('stat-interesting-count');
+      if (statInt) statInt.textContent = totalInteresting;
+
+      document.getElementById('stat-sourced-count').textContent = totalSourced;
+      document.getElementById('stat-placeholder-count').textContent = totalPlaceholders;
+      document.getElementById('stat-assigned-cues').textContent = assignedCuesCount;
+      document.getElementById('stat-total-cues').textContent = totalCues;
+      document.getElementById('bottom-assigned-badge').textContent = `${assignedCuesCount} / ${totalCues} Cues Assigned`;
+
+      const pct = Math.min(100, Math.round((assignedCuesCount / totalCues) * 100));
+      document.getElementById('stat-progress-fill').style.width = `${pct}%`;
+
+      // Update per-section badges & cue cards
+      if (audioData && audioData.sections) {
+        audioData.sections.forEach(sec => {
+          let secAssigned = 0;
+          sec.cues.forEach(c => {
+            const hasSel = selectedCuesMap[c.cue_id] && selectedCuesMap[c.cue_id].length > 0;
+            if (hasSel) secAssigned++;
+            const card = document.getElementById(`cue-card-${c.cue_id}`);
+            if (card) {
+              if (hasSel) card.classList.add('has-selection');
+              else card.classList.remove('has-selection');
+            }
+          });
+          const badge = document.getElementById(`sec-count-${sec.section_id}`);
+          if (badge) {
+            badge.textContent = `${secAssigned} / ${sec.cues.length} Assigned`;
+            if (secAssigned === sec.cues.length && secAssigned > 0) {
+              badge.classList.add('complete');
+            } else {
+              badge.classList.remove('complete');
+            }
+          }
+        });
+      }
+    }
+
+    // UI Filtering
+    function filterAudioStudio() {
+      const query = (document.getElementById('global-search')?.value || '').toLowerCase().trim();
+      const bus = document.getElementById('filter-bus')?.value || 'ALL';
+      const status = document.getElementById('filter-status')?.value || 'ALL';
+      const pack = document.getElementById('filter-pack')?.value || 'ALL';
+
+      document.querySelectorAll('.cue-card').forEach(card => {
+        const cueId = card.id.replace('cue-card-', '');
+        const cardBus = card.dataset.bus;
+        const cueStatus = card.dataset.status; // SOURCED or PLACEHOLDER
+        const isMultiVariant = card.dataset.variants === 'true';
+        const isLayered = card.dataset.layered === 'true';
+        const hasSelection = selectedCuesMap[cueId] && selectedCuesMap[cueId].length > 0;
+        const hasInteresting = interestingFilesMap[cueId] && interestingFilesMap[cueId].length > 0;
+
+        let visible = true;
+
+        if (bus !== 'ALL' && cardBus !== bus) visible = false;
+        
+        if (status === 'SOURCED' && cueStatus !== 'SOURCED') visible = false;
+        if (status === 'PLACEHOLDER' && cueStatus !== 'PLACEHOLDER') visible = false;
+        if (status === 'MULTI_VARIANT' && !isMultiVariant) visible = false;
+        if (status === 'LAYERED' && !isLayered) visible = false;
+        if (status === 'SELECTED' && !hasSelection) visible = false;
+        if (status === 'UNSELECTED' && hasSelection) visible = false;
+        if (status === 'INTERESTING' && !hasInteresting) visible = false;
+
+        if (query) {
+          const cardText = card.textContent.toLowerCase();
+          if (!cardText.includes(query)) {
+            visible = false;
+          } else {
+            card.classList.remove('collapsed');
+          }
+        }
+
+        card.style.display = visible ? 'block' : 'none';
+      });
+    }
+
+    function toggleCueCollapse(cueId) {
+      const card = document.getElementById(`cue-card-${cueId}`);
+      if (card) {
+        card.classList.toggle('collapsed');
+      }
+    }
+
+    function toggleAllCues() {
+      const cards = document.querySelectorAll('.cue-card');
+      const shouldCollapse = Array.from(cards).some(c => !c.classList.contains('collapsed'));
+      cards.forEach(c => {
+        if (shouldCollapse) c.classList.add('collapsed');
+        else c.classList.remove('collapsed');
+      });
+    }
+
+    function toggleSection(headerEl) {
+      const panel = headerEl.closest('.section-panel');
+      if (panel) {
+        panel.classList.toggle('collapsed');
+      }
+    }
+
+    function toggleAllSections() {
+      const panels = document.querySelectorAll('.section-panel');
+      const shouldCollapse = Array.from(panels).some(p => !p.classList.contains('collapsed'));
+      panels.forEach(p => {
+        if (shouldCollapse) p.classList.add('collapsed');
+        else p.classList.remove('collapsed');
+      });
+    }
+
+    // Modal & Export Generation
+    function openExportModal() {
+      generateExportData();
+      document.getElementById('export-modal').classList.add('open');
+    }
+
+    function closeExportModal() {
+      document.getElementById('export-modal').classList.remove('open');
+    }
+
+    function switchExportTab(tab) {
+      currentExportTab = tab;
+      document.querySelectorAll('.modal-tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.getElementById(`tab-btn-${tab}`).classList.add('active');
+      generateExportData();
+    }
+
+    function getModifiedSessionData() {
+      const modifiedSelections = {};
+      const modifiedInteresting = {};
+      let modifiedCueCount = 0;
+
+      const allCueIds = new Set([
+        ...Object.keys(selectedCuesMap),
+        ...Object.keys(initialSelectedCuesMap),
+        ...Object.keys(interestingFilesMap),
+        ...Object.keys(initialInterestingFilesMap)
+      ]);
+
+      allCueIds.forEach(cueId => {
+        const curSel = (selectedCuesMap[cueId] || []).map(s => ({ f: s.file_id, r: s.role, p: s.rel_path, n: s.filename, pk: s.pack, d: s.duration })).sort((a,b) => a.f.localeCompare(b.f));
+        const initSel = (initialSelectedCuesMap[cueId] || []).map(s => ({ f: s.file_id, r: s.role, p: s.rel_path, n: s.filename, pk: s.pack, d: s.duration })).sort((a,b) => a.f.localeCompare(b.f));
+        
+        const selChanged = JSON.stringify(curSel) !== JSON.stringify(initSel);
+        if (selChanged) {
+          modifiedSelections[cueId] = selectedCuesMap[cueId] || [];
+        }
+
+        const curInt = (interestingFilesMap[cueId] || []).slice().sort();
+        const initInt = (initialInterestingFilesMap[cueId] || []).slice().sort();
+        const intChanged = JSON.stringify(curInt) !== JSON.stringify(initInt);
+        if (intChanged) {
+          modifiedInteresting[cueId] = interestingFilesMap[cueId] || [];
+        }
+
+        if (selChanged || intChanged) {
+          modifiedCueCount++;
+        }
+      });
+
+      return {
+        modifiedSelections,
+        modifiedInteresting,
+        modifiedCueCount
+      };
+    }
+
+    function generateExportData() {
+      const textarea = document.getElementById('export-textarea');
+      const statusEl = document.getElementById('export-footer-status');
+      const subtitleEl = document.getElementById('export-modal-subtitle');
+      
+      const { modifiedSelections, modifiedInteresting, modifiedCueCount } = getModifiedSessionData();
+
+      if (subtitleEl) {
+        subtitleEl.textContent = modifiedCueCount > 0 
+          ? `Exporting ${modifiedCueCount} modified cue${modifiedCueCount === 1 ? '' : 's'} changed since page load`
+          : `All 87 cues (Baseline active in Godot project)`;
+      }
+
+      // If no modifications, export full active selections as default
+      const exportSelections = modifiedCueCount > 0 ? modifiedSelections : selectedCuesMap;
+      const activeCount = Object.keys(exportSelections).length;
+
+      if (currentExportTab === 'json') {
+        const exportObj = {
+          export_type: modifiedCueCount > 0 ? "session_changes_only" : "full_active_selection",
+          export_date: new Date().toISOString(),
+          app: "American Tycoon",
+          total_assigned_cues: activeCount,
+          selections: exportSelections,
+          shortlisted_candidates: interestingFilesMap
+        };
+        textarea.value = JSON.stringify(exportObj, null, 2);
+        statusEl.textContent = `Structured JSON of ${activeCount} active audio selection(s)`;
+      } else if (currentExportTab === 'md') {
+        let md = `# American Tycoon — Audio Selection State (${activeCount} Cues)\n\n`;
+        md += `*Export generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}*\n\n`;
+        
+        const selKeys = Object.keys(exportSelections);
+        if (selKeys.length > 0) {
+          md += '## Active Audio Selections\n\n';
+          md += '| Cue ID | Status / Role | Source Pack | Source File | Duration |\n';
+          md += '|---|---|---|---|---|\n';
+          for (const cueId of selKeys) {
+            const selections = exportSelections[cueId];
+            if (!selections || selections.length === 0) {
+              md += `| \`${cueId}\` | *(Cleared / None)* | — | — | — |\n`;
+            } else {
+              selections.forEach(sel => {
+                md += `| \`${cueId}\` | **${sel.role}** | ${sel.pack} | \`${sel.filename}\` | ${sel.duration.toFixed(2)}s |\n`;
+              });
+            }
+          }
+        }
+
+        const intKeys = Object.keys(interestingFilesMap);
+        if (intKeys.length > 0) {
+          md += '\n## Shortlisted / Interesting Candidates\n\n';
+          md += '| Cue ID | Shortlisted Candidate Files |\n';
+          md += '|---|---|\n';
+          for (const cueId of intKeys) {
+            const files = interestingFilesMap[cueId];
+            const fileList = files.length > 0 ? files.map(f => `\`${f}\``).join(', ') : '*(None / Cleared)*';
+            md += `| \`${cueId}\` | ${fileList} |\n`;
+          }
+        }
+
+        textarea.value = md;
+        statusEl.textContent = `Markdown checklist of ${activeCount} audio selection(s)`;
+      } else if (currentExportTab === 'ps') {
+        let ps = `# PowerShell Automated Asset Deployment Script (${activeCount} cues)\n`;
+        ps += '$AudioSrc = "D:\\Downloads\\Game_Audio"\n';
+        ps += '$GameDest = "game\\audio\\cues"\n';
+        ps += 'New-Item -ItemType Directory -Force -Path $GameDest | Out-Null\n\n';
+
+        for (const [cueId, selections] of Object.entries(exportSelections)) {
+          if (!selections || selections.length === 0) {
+            ps += `# Cue ${cueId} has no assigned library file\n`;
+          } else {
+            selections.forEach(sel => {
+              let targetName = `${cueId}.ogg`;
+              if (sel.role === 'layer') targetName = `${cueId}_layer.ogg`;
+              else if (sel.role.startsWith('variant_')) {
+                const num = sel.role.replace('variant_', '');
+                targetName = `${cueId}_${num}.ogg`;
+              }
+              ps += `Copy-Item -Force "$AudioSrc\\${sel.rel_path.replace(/\//g, '\\')}" "$GameDest\\${targetName}"\n`;
+            });
+          }
+        }
+
+        ps += '\nWrite-Host "Audio assets deployment complete!" -ForegroundColor Green\n';
+        textarea.value = ps;
+        statusEl.textContent = `PowerShell deployment script for ${activeCount} cue(s)`;
+      }
+    }
+
+    async function copyExportText() {
+      const textarea = document.getElementById('export-textarea');
+      try {
+        await navigator.clipboard.writeText(textarea.value);
+        showToast('Export content copied to clipboard!');
+      } catch (err) {
+        textarea.select();
+        document.execCommand('copy');
+        showToast('Export copied to clipboard!');
+      }
+    }
+
+    async function saveExportToServer() {
+      try {
+        const payload = {
+          export_date: new Date().toISOString(),
+          app: "American Tycoon",
+          total_assigned_cues: Object.keys(selectedCuesMap).length,
+          selections: selectedCuesMap,
+          shortlisted_candidates: interestingFilesMap
+        };
+
+        const res = await fetch('/api/export', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) throw new Error('Save request failed');
+        const data = await res.json();
+        showToast(`Saved ${data.count} cue selections to Plans/Audio_Selection_Export.json`);
+        closeExportModal();
+      } catch (err) {
+        showToast(`Save failed: ${err.message}`);
+      }
+    }
+
+    // Sound Assignment Modal Logic (from 'Other' Library Browser)
+    function openAssignModal(fileId, filename) {
+      soundToAssign = { fileId, filename };
+      
+      document.getElementById('assign-filename').textContent = filename;
+      document.getElementById('assign-sound-details').textContent = fileId;
+
+      const cueSelect = document.getElementById('assign-target-cue');
+      cueSelect.innerHTML = '';
+
+      if (audioData && audioData.sections) {
+        audioData.sections.forEach(sec => {
+          const optGroup = document.createElement('optgroup');
+          optGroup.label = sec.name;
+          sec.cues.forEach(cue => {
+            const opt = document.createElement('option');
+            opt.value = cue.cue_id;
+            opt.textContent = `${cue.cue_id} (${cue.bus}, ${cue.db} dB)`;
+            optGroup.appendChild(opt);
+          });
+          cueSelect.appendChild(optGroup);
+        });
+      }
+
+      if (cueSelect.options.length > 0) {
+        cueSelect.selectedIndex = 0;
+        onAssignTargetCueChange(cueSelect.value);
+      }
+
+      document.getElementById('assign-modal').classList.add('open');
+    }
+
+    function onAssignTargetCueChange(cueId) {
+      let cueObj = null;
+      if (audioData && audioData.sections) {
+        for (const sec of audioData.sections) {
+          const found = sec.cues.find(c => c.cue_id === cueId);
+          if (found) {
+            cueObj = found;
+            break;
+          }
+        }
+      }
+
+      if (cueObj) {
+        document.getElementById('assign-cue-name').textContent = cueObj.cue_id;
+        document.getElementById('assign-cue-bus').textContent = `${cueObj.bus} • ${cueObj.db > 0 ? '+' : ''}${cueObj.db} dB`;
+        document.getElementById('assign-cue-trigger').textContent = cueObj.trigger || 'Audio trigger event in gameplay';
+      }
+    }
+
+    function closeAssignModal() {
+      document.getElementById('assign-modal').classList.remove('open');
+      soundToAssign = null;
+    }
+
+    function confirmSoundAssignment() {
+      if (!soundToAssign) return;
+
+      const cueId = document.getElementById('assign-target-cue').value;
+      const role = document.getElementById('assign-target-role').value;
+
+      let fileItem = audioData.library_sample.find(item => item.id === soundToAssign.fileId);
+
+      if (!selectedCuesMap[cueId]) selectedCuesMap[cueId] = [];
+
+      // Replace primary or append variant/layer
+      if (role === 'primary') {
+        selectedCuesMap[cueId] = selectedCuesMap[cueId].filter(s => s.role !== 'primary');
+      }
+
+      selectedCuesMap[cueId].push({
+        file_id: soundToAssign.fileId,
+        rel_path: fileItem ? fileItem.rel_path : soundToAssign.fileId,
+        filename: soundToAssign.filename,
+        pack: fileItem ? fileItem.pack : 'Library',
+        role: role,
+        duration: fileItem ? fileItem.duration : 1.0
+      });
+
+      updateSelectionStats();
+      filterAudioStudio();
+      showToast(`Assigned ${soundToAssign.filename} to ${cueId} (${role})`);
+      closeAssignModal();
+    }
+
+    // Helper functions
+    function showToast(msg) {
+      const toast = document.getElementById('app-toast');
+      document.getElementById('toast-message').textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2800);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+  </script>
+</body>
+</html>

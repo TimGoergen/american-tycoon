@@ -54,32 +54,27 @@ const PAD_FLASH_SCALE := 1.14
 var _sequence: Array = []
 var _input_index: int = 0
 var _rounds_done: int = 0
-## Challenge Mode only: how many full 1->6 CLIMBS have been completed this run. This is the challenge
-## SCORE (get_score reports it) — each finished climb is one point. Unused in reward mode.
 var _climbs_done: int = 0
 var _accepting_input: bool = false
 var _running: bool = false
-## True only while an end beat (game-over flash / round-clear celebration) is playing. The host
-## holds its countdown while this is set (see is_busy) so the beat is actually seen before the
-## result screen appears. It does NOT cover normal watch/play, so round difficulty is unchanged.
 var _beat_playing: bool = false
 var _rng := RandomNumberGenerator.new()
+
+# --- Live tunable parameters ---
+var _target_rounds: int = TARGET_ROUNDS
+var _flash_on: float = FLASH_ON
+var _flash_gap: float = FLASH_GAP
+var _pad_flash_scale: float = PAD_FLASH_SCALE
 
 var _pads: Array = []  # the four pad Panels (index = pad id)
 var _status_label: Label
 
-## --- Legacy bonus round -----------------------------------------------------------------------
-## Rolled once in begin(): true if this real run offers the gem bonus round after a full clear.
+## --- Legacy bonus round ---
 var _gem_round_available: bool = false
-## True only while the bonus round is on screen (routes pad taps to the gem handler, and tells the
-## main-game guards the normal game is over). The four pads are gem-skinned while this is set.
 var _gem_round_active: bool = false
-## The bonus round's target sequence and the player's cursor into it, kept separate from the main
-## game's `_sequence`/`_input_index` so the two phases never interfere.
 var _gem_sequence: Array = []
 var _gem_input_index: int = 0
 var _gem_accepting_input: bool = false
-## How long the bonus sequence is (from tuning.memory_gem_sequence_length) — the gem's difficulty lever.
 var _gem_length: int = 5
 
 
@@ -92,16 +87,10 @@ func how_to_play() -> String:
 		+ "Each round adds a step — the deeper you go, the more it pays."
 
 
-## Memory runs WITHOUT the host countdown (Tim, 2026-07-10): recalling a sequence against a clock
-## adds nothing, and the bonus round can't be rushed. The host hides the timer and lets this game
-## end itself (it always emits `completed` on a clear, a miss, or the end of the bonus round).
 func uses_timer() -> bool:
 	return false
 
 
-## Challenge Mode self-ending (Wave B): TRUE, so the host runs NO shared keep-alive timer for Memory and
-## treats this game's `completed` signal as the end of the challenge run. Memory ends itself on a wrong
-## tap (the game-over beat emits `completed`); the host then records get_score() and credits the run.
 func challenge_self_ends() -> bool:
 	return true
 
@@ -111,13 +100,22 @@ func begin(tuning: TuningConfig) -> void:
 	_rng.randomize()
 	_running = true
 
-	# Decide up front whether this run earns a shot at the gem bonus round. Real runs only — Challenge
-	# Mode never grants a bonus — and only when the roll succeeds. The round itself is offered later,
-	# after the player actually clears all TARGET_ROUNDS (mastery gates eligibility; this chance gates
-	# whether it appears at all).
-	_gem_length = maxi(1, tuning.memory_gem_sequence_length)
-	if not challenge_mode:
-		_gem_round_available = _rng.randf() < tuning.legacy_gem_chance_memory
+	if tuning != null:
+		_gem_length = maxi(1, tuning.memory_gem_sequence_length)
+		_target_rounds = tuning.memory_target_rounds if tuning.memory_target_rounds > 0 else TARGET_ROUNDS
+		_flash_on = maxf(0.05, tuning.memory_flash_on)
+		_flash_gap = maxf(0.01, tuning.memory_flash_gap)
+		_pad_flash_scale = maxf(1.0, tuning.memory_pad_flash_scale)
+		if not challenge_mode:
+			_gem_round_available = _rng.randf() < tuning.legacy_gem_chance_memory
+	else:
+		_gem_length = 5
+		_target_rounds = TARGET_ROUNDS
+		_flash_on = FLASH_ON
+		_flash_gap = FLASH_GAP
+		_pad_flash_scale = PAD_FLASH_SCALE
+		if not challenge_mode:
+			_gem_round_available = false
 
 	var intro := Label.new()
 	intro.text = how_to_play()
@@ -163,13 +161,9 @@ func begin(tuning: TuningConfig) -> void:
 
 
 func get_performance() -> float:
-	return clampf(float(_rounds_done) / float(TARGET_ROUNDS), 0.0, 1.0)
+	return clampf(float(_rounds_done) / float(_target_rounds), 0.0, 1.0)
 
 
-## The Challenge Mode high-score: the number of full 1->6 CLIMBS completed this run (each climb = one
-## point). ChallengeGoals pairs this with STEP 0.2, so one climb clears one payout tier and six climbs
-## master the ladder. Reward mode is untouched — the host never reads get_score() there — but for
-## clarity it still reports rounds cleared, its old meaning.
 func get_score() -> int:
 	if challenge_mode:
 		return _climbs_done
@@ -177,11 +171,9 @@ func get_score() -> int:
 
 
 func result_summary() -> String:
-	return "Recalled %d of %d rounds" % [_rounds_done, TARGET_ROUNDS]
+	return "Recalled %d of %d rounds" % [_rounds_done, _target_rounds]
 
 
-## Hold the host's countdown only while an end beat is playing, so the game-over / round-clear
-## celebration is seen before the result screen takes over (the host pauses on is_busy by design).
 func is_busy() -> bool:
 	return _beat_playing
 
@@ -196,14 +188,6 @@ func _style_pad(pad: Panel, pad_id: int, lit: bool) -> void:
 	pad.add_theme_stylebox_override("panel", box)
 
 
-## Light a pad AND bounce it (color + scale together), so a flash pops out at a glance. `lit`
-## false restores the resting look and eases the scale back to normal.
-## Each pad has its OWN PITCH, so a sequence is a little tune the player can rehearse by ear rather
-## than only by position. That is the point of sound in a memory game: it carries the information the
-## game is asking you to remember, and it means the same cue serves both the playback and the input.
-##
-## Only the LIT edge sounds — _flash_pad is called again to unlight, and a note on the way out would
-## double every pad in the sequence.
 const MEM_PAD_SEMITONES := [0, 4, 7, 12]
 
 
@@ -213,8 +197,8 @@ func _flash_pad(pad_id: int, lit: bool) -> void:
 			pow(2.0, float(MEM_PAD_SEMITONES[pad_id % MEM_PAD_SEMITONES.size()]) / 12.0))
 	var pad: Panel = _pads[pad_id]
 	_style_pad(pad, pad_id, lit)
-	pad.pivot_offset = pad.size / 2.0  # scale about the pad's center, not its corner
-	var target := Vector2(PAD_FLASH_SCALE, PAD_FLASH_SCALE) if lit else Vector2.ONE
+	pad.pivot_offset = pad.size / 2.0
+	var target := Vector2(_pad_flash_scale, _pad_flash_scale) if lit else Vector2.ONE
 	var bounce := create_tween()
 	bounce.tween_property(pad, "scale", target, 0.12) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
@@ -278,26 +262,23 @@ func _play_sequence() -> void:
 		if not _running or not is_inside_tree():
 			return
 		_flash_pad(pad_id, true)
-		await get_tree().create_timer(FLASH_ON).timeout
+		await get_tree().create_timer(_flash_on).timeout
 		if not _running or not is_inside_tree():
 			return
 		_flash_pad(pad_id, false)
-		await get_tree().create_timer(FLASH_GAP).timeout
+		await get_tree().create_timer(_flash_gap).timeout
 
 
 func _on_pad_input(event: InputEvent, pad_id: int) -> void:
 	if not (event is InputEventMouseButton and event.pressed \
 			and event.button_index == MOUSE_BUTTON_LEFT):
 		return
-	# During the bonus round the same pads mean something different — route to the gem handler.
 	if _gem_round_active:
 		_on_gem_pad_input(pad_id)
 		return
 	if not _accepting_input or not _running:
 		return
 
-	# Quick press feedback: light + bounce the pad, then un-flash shortly after (only schedule the
-	# un-flash if we're still in the tree).
 	_flash_pad(pad_id, true)
 	if is_inside_tree():
 		get_tree().create_timer(0.15).timeout.connect(
@@ -307,9 +288,6 @@ func _on_pad_input(event: InputEvent, pad_id: int) -> void:
 		)
 
 	if pad_id != _sequence[_input_index]:
-		# A wrong tap ends the game (classic Simon fail), in BOTH modes, after a red game-over beat that
-		# emits `completed`. Reward mode ends with whatever rounds were banked; Challenge Mode ends the
-		# run, and the host credits the completed-climb count (get_score) it routes off that `completed`.
 		_running = false
 		_accepting_input = false
 		_play_game_over_beat(pad_id)
@@ -317,16 +295,10 @@ func _on_pad_input(event: InputEvent, pad_id: int) -> void:
 
 	_input_index += 1
 	if _input_index >= _sequence.size():
-		# Whole sequence repeated — round complete.
 		_rounds_done += 1
 		_accepting_input = false
 		if challenge_mode:
-			# Challenge Mode climbs 1->6, then resets and climbs again — endless until a wrong tap. When
-			# the TARGET_ROUNDS-length round is recalled, a full CLIMB is done: bank it (that's the score),
-			# clear the sequence, and _start_round() rebuilds from length 1. Otherwise keep growing by one.
-			# There is no end-beat here, so the floating chip is the per-round success cue (Tim, 2026-07-11
-			# — every minigame shows success feedback like Match-3); a completed climb gets a bigger gold one.
-			if _sequence.size() >= TARGET_ROUNDS:
+			if _sequence.size() >= _target_rounds:
 				_climbs_done += 1
 				_sequence.clear()
 				_set_status("Climb %d complete — again!" % _climbs_done, UiPalette.MONEY_GREEN)
@@ -335,15 +307,15 @@ func _on_pad_input(event: InputEvent, pad_id: int) -> void:
 				_set_status("Round %d cleared!" % _sequence.size(), UiPalette.MONEY_GREEN)
 				FloatingChip.spawn(self, _board_center(), "CLEARED!", UiPalette.MONEY_GREEN)
 			_start_round()
-		elif _rounds_done >= TARGET_ROUNDS:
-			# Full game — the main reward is now maxed. If this run earned a shot at the gem bonus
-			# round, first flash a big "GEM ROUND" banner (same size as MAX!) so the player sees they
-			# cleared the game and knows a bonus is coming BEFORE the pads change (Tim, 2026-07-10) —
-			# the host runs _begin_gem_round when the banner finishes. Otherwise celebrate and finish.
+		elif _rounds_done >= _target_rounds:
 			_running = false
 			if _gem_round_available:
 				banner_requested.emit("GEM ROUND", UiPalette.MUSTARD_GOLD, _begin_gem_round)
 			else:
+				_play_round_clear_celebration()
+		else:
+			Audio.play(&"mem_round")
+			_set_status("Nice!", UiPalette.MONEY_GREEN)
 				_play_round_clear_celebration()
 		else:
 			Audio.play(&"mem_round")

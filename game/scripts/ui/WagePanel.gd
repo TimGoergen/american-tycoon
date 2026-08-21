@@ -18,6 +18,8 @@ signal wage_hold_tapped
 var _wage: WageState
 var _tuning: TuningConfig
 var _frenzy: FrenzyState
+var _crash_active: bool = false
+var _crash_proof_badge: Label
 
 ## Accumulates held-down time on the clock-in button to pace auto-tap pulses.
 var _hold_accumulator := 0.0
@@ -284,6 +286,10 @@ func _ready() -> void:
 	row.add_child(_wage_title_label)
 
 	# Right: the live per-tap earnings, e.g. "+$4.20" (set each frame in _process).
+	var amount_cell := VBoxContainer.new()
+	amount_cell.alignment = BoxContainer.ALIGNMENT_CENTER
+	amount_cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
 	_wage_amount_label = Label.new()
 	_wage_amount_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_wage_amount_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -291,11 +297,32 @@ func _ready() -> void:
 	# Full black to match the CLOCK IN label (Tim, 2026-06-28).
 	_wage_amount_label.add_theme_color_override("font_color", Color.BLACK)
 	_wage_amount_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_child(_wage_amount_label)
+	amount_cell.add_child(_wage_amount_label)
+
+	_crash_proof_badge = Label.new()
+	_crash_proof_badge.text = "🛡️ 100% CRASH-PROOF"
+	_crash_proof_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_crash_proof_badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_crash_proof_badge.add_theme_font_size_override("font_size", UiPalette.FONT_BUTTON)
+	_crash_proof_badge.add_theme_font_override("font", UiPalette.make_bold_font())
+	_crash_proof_badge.add_theme_color_override("font_color", UiPalette.DARK_MONEY_GREEN)
+	_crash_proof_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_crash_proof_badge.visible = false
+	amount_cell.add_child(_crash_proof_badge)
+
+	row.add_child(amount_cell)
 
 	# (The old title/next-title context line and the promotion claim button were removed when
 	# the wage ladder became a numeric level — Tim, 2026-06-24. The level reads from the
 	# "<level> / <next>" label on the clock-in row instead.)
+
+
+## Toggle the crash-proof indicator during active Market Crash weather.
+func set_crash_active(active: bool) -> void:
+	_crash_active = active
+	if _crash_proof_badge != null:
+		_crash_proof_badge.visible = active
+
 
 
 func _process(delta: float) -> void:

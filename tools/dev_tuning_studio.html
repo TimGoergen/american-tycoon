@@ -1,0 +1,2267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>American Tycoon — Developer Tuning Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Outfit:wght@500;600;700;800;900&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    /* ═════════════════════════════════════════════════════════════════════
+       AMERICAN TYCOON — CANONICAL PALETTE & DESIGN SYSTEM (UiPalette.gd)
+       ═════════════════════════════════════════════════════════════════════ */
+    :root {
+      /* Canon Godot Palette Constants */
+      --game-cream: #F4ECD8;
+      --game-cream-light: #FAF5E9;
+      --game-cream-dark: #E6DCB8;
+      --game-navy: #1D2D50;
+      --game-navy-light: #2B3F6C;
+      --game-ink-navy: #0D1830;
+      --game-mustard-gold: #E3B23C;
+      --game-dark-gold: #A87C16;
+      --game-pale-gold: #F0D49A;
+      --game-atomic-teal: #9FD8D4;
+      --game-dark-teal: #508E89;
+      --game-money-green: #7DA87B;
+      --game-dark-money-green: #4D724B;
+      --game-ketchup-red: #B5402A;
+      --game-brick: #8E2F1E;
+      --game-cycle-blue: #5E86B8;
+      --game-dark-cycle-blue: #3E608C;
+      --game-purple: #9B5DE5;
+      --game-dark-purple: #5E3499;
+      --game-bright-purple: #C77DFF;
+      --game-light-gray: #CBCBCB;
+      --game-mid-gray: #9A9A9A;
+      --game-dark-gray: #555555;
+      --game-charcoal: #333333;
+
+      /* Page Canvas */
+      --bg-base: #0D1830;
+      --bg-surface: #1D2D50;
+      --bg-card: #F4ECD8;
+      --bg-card-alt: #EFE6CD;
+      
+      --border-game: #1D2D50;
+      --border-gold: #E3B23C;
+      --border-dark-gold: #A87C16;
+      
+      --radius-xs: 4px;
+      --radius-sm: 6px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      
+      --shadow-game: 0 4px 10px rgba(0, 0, 0, 0.4);
+      --shadow-card: 0 3px 6px rgba(0, 0, 0, 0.25);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      color: var(--game-navy);
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      line-height: 1.45;
+      padding-bottom: 120px;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--game-ink-navy);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--game-mustard-gold);
+      border: 2px solid var(--game-ink-navy);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--game-pale-gold);
+    }
+
+    /* ── Sticky Top Header ── */
+    .sticky-top-container {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--game-ink-navy);
+      border-bottom: 3px solid var(--game-mustard-gold);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+    }
+
+    header.app-header {
+      padding: 10px 24px;
+      background: linear-gradient(180deg, rgba(29, 45, 80, 0.95) 0%, rgba(13, 24, 48, 0.98) 100%);
+      border-bottom: 1px solid rgba(227, 178, 60, 0.25);
+    }
+
+    .header-content {
+      max-width: 1800px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon-wrap {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-md);
+      background: var(--game-navy);
+      border: 2px solid var(--game-mustard-gold);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+
+    .brand-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 21px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      color: var(--game-cream);
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    }
+    .brand-title span {
+      color: var(--game-mustard-gold);
+    }
+
+    .brand-badge {
+      background: var(--game-mustard-gold);
+      color: var(--game-navy);
+      border: 1px solid var(--game-dark-gold);
+      font-family: 'Outfit', sans-serif;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: var(--radius-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .header-stats {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: var(--game-navy);
+      border: 2px solid var(--game-mustard-gold);
+      border-radius: var(--radius-md);
+      padding: 6px 16px;
+      font-size: 13px;
+      color: var(--game-cream);
+      flex-wrap: wrap;
+    }
+
+    .stat-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: help;
+    }
+    .stat-pill strong {
+      color: var(--game-mustard-gold);
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+    }
+    .stat-pill.overridden strong {
+      color: var(--game-mustard-gold);
+      background: rgba(227, 178, 60, 0.2);
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--game-mustard-gold);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 13px;
+      font-weight: 800;
+      padding: 7px 14px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all 0.1s ease;
+      border: 2px solid var(--game-navy);
+      user-select: none;
+      text-decoration: none;
+      color: var(--game-navy);
+      background: var(--game-cream);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+    }
+    .btn:hover {
+      background: #ffffff;
+      transform: translateY(-1px);
+      box-shadow: 0 3px 6px rgba(0, 0, 0, 0.35);
+    }
+    .btn:active {
+      transform: translateY(1px);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    }
+    .btn-sm {
+      padding: 5px 10px;
+      font-size: 12px;
+    }
+    .btn-xs {
+      padding: 3px 8px;
+      font-size: 11px;
+      border-radius: 4px;
+      border-width: 1.5px;
+    }
+    
+    .btn-gold {
+      background: var(--game-mustard-gold);
+      color: var(--game-navy);
+      border-color: var(--game-navy);
+    }
+    .btn-gold:hover {
+      background: var(--game-pale-gold);
+    }
+    .btn-red {
+      background: var(--game-ketchup-red);
+      color: var(--game-cream);
+      border-color: var(--game-ink-navy);
+    }
+    .btn-red:hover {
+      background: #c94931;
+      color: #fff;
+    }
+    .btn-blue {
+      background: var(--game-cycle-blue);
+      color: var(--game-cream);
+      border-color: var(--game-ink-navy);
+    }
+    .btn-blue:hover {
+      background: #739ccf;
+    }
+    .btn-green {
+      background: var(--game-money-green);
+      color: var(--game-ink-navy);
+      border-color: var(--game-ink-navy);
+    }
+    .btn-green:hover {
+      background: #92bd90;
+    }
+    .btn-teal {
+      background: var(--game-atomic-teal);
+      color: var(--game-navy);
+      border-color: var(--game-navy);
+    }
+    .btn-teal:hover {
+      background: #b5e8e4;
+    }
+    .btn-outline-gold {
+      background: transparent;
+      color: var(--game-mustard-gold);
+      border-color: var(--game-mustard-gold);
+    }
+    .btn-outline-gold:hover {
+      background: rgba(227, 178, 60, 0.15);
+      color: var(--game-pale-gold);
+    }
+
+    /* ── Subheader Controls & Filters ── */
+    .subheader-bar {
+      padding: 8px 24px;
+      background: var(--game-ink-navy);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+      max-width: 1800px;
+      margin: 0 auto;
+    }
+
+    .filter-group-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      flex: 1;
+    }
+
+    .search-box {
+      position: relative;
+      min-width: 250px;
+      flex: 1;
+      max-width: 380px;
+    }
+    .search-box input {
+      width: 100%;
+      background: var(--game-cream);
+      border: 2px solid var(--game-navy);
+      border-radius: var(--radius-sm);
+      padding: 7px 12px 7px 34px;
+      color: var(--game-navy);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      outline: none;
+    }
+    .search-box input:focus {
+      border-color: var(--game-mustard-gold);
+      background: #ffffff;
+    }
+    .search-box .search-icon {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--game-navy);
+      font-weight: bold;
+      pointer-events: none;
+    }
+
+    .category-pills {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-wrap: wrap;
+    }
+
+    .pill-btn {
+      background: var(--game-navy);
+      border: 2px solid var(--game-navy-light);
+      color: var(--game-cream);
+      font-family: 'Outfit', sans-serif;
+      font-size: 12px;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.1s;
+    }
+    .pill-btn:hover {
+      border-color: var(--game-mustard-gold);
+      color: var(--game-mustard-gold);
+    }
+    .pill-btn.active {
+      background: var(--game-mustard-gold);
+      border-color: var(--game-dark-gold);
+      color: var(--game-navy);
+    }
+    .pill-count {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      background: rgba(0, 0, 0, 0.25);
+      color: inherit;
+      padding: 1px 5px;
+      border-radius: 3px;
+    }
+
+    .filter-group-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .select-control {
+      background: var(--game-cream);
+      border: 2px solid var(--game-navy);
+      border-radius: var(--radius-sm);
+      padding: 6px 10px;
+      color: var(--game-navy);
+      font-family: 'Outfit', sans-serif;
+      font-size: 12px;
+      font-weight: 800;
+      outline: none;
+      cursor: pointer;
+    }
+    .select-control:focus {
+      border-color: var(--game-mustard-gold);
+    }
+
+    /* ── Main Layout ── */
+    main.main-layout {
+      max-width: 1800px;
+      margin: 16px auto 0;
+      padding: 0 24px;
+    }
+
+    /* ── Live Curve & Balance Inspector Panel ── */
+    .curve-inspector-panel {
+      margin-bottom: 20px;
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      box-shadow: var(--shadow-game);
+      border: 3px solid var(--game-mustard-gold);
+      background: var(--game-navy);
+    }
+    .curve-header {
+      padding: 10px 16px;
+      background: linear-gradient(90deg, var(--game-navy-light) 0%, var(--game-navy) 100%);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+      border-bottom: 2px solid var(--game-mustard-gold);
+      font-family: 'Outfit', sans-serif;
+      color: var(--game-cream);
+    }
+    .curve-body {
+      padding: 16px 20px;
+      background: var(--game-ink-navy);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .curve-nav {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 2px solid var(--game-navy-light);
+      padding-bottom: 10px;
+    }
+
+    .calc-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      background: var(--game-navy);
+      border-radius: var(--radius-xs);
+      overflow: hidden;
+    }
+    .calc-table th {
+      background: var(--game-ink-navy);
+      color: var(--game-pale-gold);
+      padding: 8px 12px;
+      text-align: left;
+      font-family: 'Outfit', sans-serif;
+      font-weight: 800;
+      border-bottom: 1.5px solid var(--game-mustard-gold);
+    }
+    .calc-table td {
+      padding: 7px 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--game-cream);
+    }
+    .calc-table tr:hover {
+      background: rgba(227, 178, 60, 0.1);
+    }
+
+    /* ── Tuning Sections ── */
+    .tuning-section {
+      margin-bottom: 20px;
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      box-shadow: var(--shadow-game);
+      border: 3px solid var(--game-navy);
+      background: var(--game-navy);
+    }
+
+    .tuning-section-header {
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+      border-bottom: 2px solid var(--game-navy);
+      font-family: 'Outfit', sans-serif;
+      background: var(--game-cycle-blue);
+      color: var(--game-cream);
+    }
+
+    .section-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .section-title {
+      font-size: 17px;
+      font-weight: 900;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .section-desc {
+      font-size: 12px;
+      font-weight: 600;
+      opacity: 0.85;
+      margin-left: 8px;
+    }
+
+    .section-meta-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    /* Modified dot indicator on header (matching DevTuningPanel.gd) */
+    .section-mod-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #ffffff;
+      box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+      display: none;
+    }
+    .section-mod-dot.active {
+      display: inline-block;
+    }
+
+    .section-count-badge {
+      font-size: 12px;
+      font-weight: 700;
+      background: rgba(0, 0, 0, 0.25);
+      padding: 3px 8px;
+      border-radius: var(--radius-xs);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .collapse-chevron {
+      font-size: 13px;
+      font-weight: 900;
+      transition: transform 0.2s;
+    }
+    .tuning-section.collapsed .collapse-chevron {
+      transform: rotate(-90deg);
+    }
+    .tuning-section.collapsed .tuning-section-body {
+      display: none;
+    }
+
+    .tuning-section-body {
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      background: var(--game-ink-navy);
+    }
+
+    /* ── Knob Row (Canonical Godot Cream Card) ── */
+    .knob-row {
+      background: var(--game-cream);
+      border: 2px solid var(--game-navy);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      display: grid;
+      grid-template-columns: 320px 1fr 240px 160px;
+      align-items: center;
+      gap: 16px;
+      box-shadow: var(--shadow-card);
+      transition: all 0.12s ease;
+      color: var(--game-navy);
+      position: relative;
+    }
+    .knob-row:nth-child(even) {
+      background: var(--game-cream-light);
+    }
+    .knob-row:hover {
+      background: #ffffff;
+      border-color: var(--game-mustard-gold);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+    .knob-row.is-overridden {
+      border: 2.5px solid var(--game-mustard-gold);
+      background: #fffdf5;
+    }
+    .knob-row.is-overridden::before {
+      content: "●";
+      position: absolute;
+      left: 6px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--game-mustard-gold);
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    /* Col 1: Identity & Badges */
+    .knob-col-identity {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 0;
+      padding-left: 8px;
+    }
+    .knob-name {
+      font-family: 'Outfit', sans-serif;
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--game-navy);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .knob-id-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--game-navy);
+      background: var(--game-pale-gold);
+      border: 1px solid var(--game-dark-gold);
+      padding: 1px 6px;
+      border-radius: 3px;
+      display: inline-block;
+      width: fit-content;
+    }
+    .knob-badges {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-wrap: wrap;
+      margin-top: 2px;
+    }
+    .badge-type {
+      font-size: 10px;
+      font-weight: 800;
+      color: var(--game-cream);
+      background: var(--game-navy);
+      padding: 1px 5px;
+      border-radius: 3px;
+      text-transform: uppercase;
+    }
+    .badge-provenance {
+      font-size: 10px;
+      font-weight: 800;
+      padding: 1px 5px;
+      border-radius: 3px;
+      text-transform: uppercase;
+    }
+    .badge-fitted { background: #3b82f6; color: #fff; }
+    .badge-device { background: var(--game-cycle-blue); color: #fff; }
+    .badge-feel { background: var(--game-money-green); color: var(--game-ink-navy); }
+    .badge-tbd { background: var(--game-mid-gray); color: #fff; }
+    .badge-solved { background: var(--game-atomic-teal); color: var(--game-ink-navy); }
+    .badge-deviation {
+      background: var(--game-ketchup-red);
+      color: #fff;
+      font-weight: 900;
+      animation: pulse-warn 2s infinite;
+    }
+    @keyframes pulse-warn {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.75; }
+    }
+
+    /* ── Minigame Subcategory Filter & Headers ── */
+    .minigame-subcat-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 8px 12px;
+      background: rgba(13, 24, 48, 0.75);
+      border-bottom: 2px solid var(--game-navy);
+      border-radius: var(--radius-xs) var(--radius-xs) 0 0;
+      align-items: center;
+    }
+    .minigame-subcat-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 800;
+      font-family: 'Outfit', sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 4px 10px;
+      border-radius: var(--radius-xs);
+      background: var(--game-navy);
+      color: var(--game-cream);
+      border: 1.5px solid rgba(255, 255, 255, 0.15);
+      cursor: pointer;
+      transition: all 0.12s ease;
+    }
+    .minigame-subcat-pill:hover {
+      background: var(--game-cycle-blue);
+      border-color: var(--game-mustard-gold);
+      transform: translateY(-1px);
+    }
+    .minigame-subcat-pill.active {
+      background: var(--game-mustard-gold);
+      color: var(--game-navy);
+      border-color: #ffffff;
+      box-shadow: 0 0 8px rgba(227, 178, 60, 0.6);
+    }
+    .minigame-subcat-pill .subcat-count {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      background: rgba(0, 0, 0, 0.3);
+      color: inherit;
+      padding: 1px 5px;
+      border-radius: 3px;
+    }
+    .minigame-subcat-pill.active .subcat-count {
+      background: var(--game-navy);
+      color: var(--game-mustard-gold);
+    }
+
+    .subcat-divider {
+      margin: 12px 0 6px 0;
+      padding: 8px 14px;
+      border-radius: var(--radius-xs);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-left: 6px solid var(--game-mustard-gold);
+      background: linear-gradient(90deg, rgba(227, 178, 60, 0.2) 0%, rgba(20, 36, 74, 0.7) 100%);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    }
+    .subcat-divider:first-child {
+      margin-top: 2px;
+    }
+    .subcat-divider-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .subcat-divider-icon {
+      font-size: 18px;
+      line-height: 1;
+    }
+    .subcat-divider-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 14px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--game-cream);
+    }
+    .subcat-divider-count {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      background: rgba(0, 0, 0, 0.4);
+      color: var(--game-cream);
+      padding: 2px 8px;
+      border-radius: var(--radius-xs);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .badge-subcat-tag {
+      font-size: 10px;
+      font-weight: 800;
+      font-family: 'Outfit', sans-serif;
+      text-transform: uppercase;
+      padding: 1px 6px;
+      border-radius: 3px;
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .badge-mode {
+      font-size: 10px;
+      font-weight: 800;
+      font-family: 'Outfit', sans-serif;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      border-radius: 3px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      letter-spacing: 0.4px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+    }
+    .badge-mode-base {
+      background: #0284c7;
+      color: #ffffff;
+      border: 1px solid #0369a1;
+    }
+    .badge-mode-challenge {
+      background: #dc2626;
+      color: #ffffff;
+      border: 1px solid #991b1b;
+    }
+
+    /* Col 2: Descriptions & Notes */
+    .knob-col-desc {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 0;
+    }
+    .knob-desc-text {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--game-charcoal);
+      line-height: 1.35;
+    }
+    .knob-provenance-note {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--game-dark-cycle-blue);
+      background: rgba(94, 134, 184, 0.15);
+      border-left: 2px solid var(--game-cycle-blue);
+      padding: 2px 6px;
+      border-radius: 2px;
+    }
+
+    /* Col 3: Interactive Slider & Input */
+    .knob-col-editor {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      background: var(--game-navy);
+      padding: 8px 12px;
+      border-radius: var(--radius-xs);
+      border: 1px solid var(--game-dark-gold);
+      color: var(--game-cream);
+    }
+    .editor-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .editor-input {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 13px;
+      background: var(--game-cream);
+      border: 1.5px solid var(--game-mustard-gold);
+      color: var(--game-navy);
+      padding: 4px 8px;
+      border-radius: var(--radius-xs);
+      width: 130px;
+      outline: none;
+    }
+    .editor-input:focus {
+      background: #ffffff;
+      border-color: #ffffff;
+      box-shadow: 0 0 4px var(--game-mustard-gold);
+    }
+    .editor-baked-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--game-light-gray);
+      white-space: nowrap;
+    }
+    .editor-slider {
+      width: 100%;
+      accent-color: var(--game-mustard-gold);
+      height: 4px;
+      cursor: pointer;
+    }
+
+    /* Col 4: Quick Tweaks & Reset */
+    .knob-col-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      align-items: flex-end;
+    }
+    .quick-adj-group {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    /* ── Modals ── */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(13, 24, 48, 0.85);
+      backdrop-filter: blur(4px);
+      z-index: 200;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-overlay.open {
+      display: flex;
+    }
+    .modal-window {
+      background: var(--game-cream);
+      border: 3px solid var(--game-mustard-gold);
+      border-radius: var(--radius-md);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+      width: 100%;
+      max-width: 960px;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      color: var(--game-navy);
+    }
+    .modal-header {
+      padding: 14px 20px;
+      background: var(--game-navy);
+      color: var(--game-cream);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 2px solid var(--game-mustard-gold);
+    }
+    .modal-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 18px;
+      font-weight: 800;
+    }
+    .modal-close-btn {
+      background: none;
+      border: none;
+      color: var(--game-cream);
+      font-size: 20px;
+      font-weight: 800;
+      cursor: pointer;
+      padding: 0 4px;
+    }
+    .modal-close-btn:hover {
+      color: var(--game-mustard-gold);
+    }
+    .modal-body {
+      padding: 20px;
+      overflow-y: auto;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .modal-footer {
+      padding: 12px 20px;
+      background: var(--game-cream-dark);
+      border-top: 2px solid var(--game-navy);
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    /* Comparison Table in Diff Modal */
+    .diff-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .diff-table th {
+      background: var(--game-navy);
+      color: var(--game-cream);
+      padding: 8px 12px;
+      text-align: left;
+      font-family: 'Outfit', sans-serif;
+      font-weight: 800;
+    }
+    .diff-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--game-light-gray);
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .diff-table tr:nth-child(even) {
+      background: var(--game-cream-light);
+    }
+
+    /* Presets Grid */
+    .presets-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 14px;
+    }
+    .preset-card {
+      background: var(--game-cream-light);
+      border: 2px solid var(--game-navy);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      cursor: pointer;
+      transition: all 0.1s;
+    }
+    .preset-card:hover {
+      border-color: var(--game-mustard-gold);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-card);
+    }
+    .preset-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--game-navy);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .preset-desc {
+      font-size: 12px;
+      color: var(--game-dark-gray);
+    }
+
+    /* Toast */
+    #toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 300;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .toast {
+      background: var(--game-ink-navy);
+      border: 2px solid var(--game-mustard-gold);
+      color: var(--game-cream);
+      padding: 10px 16px;
+      border-radius: var(--radius-sm);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+      font-family: 'Outfit', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      animation: toast-in 0.2s ease-out;
+    }
+    .toast.success { border-color: var(--game-money-green); }
+    .toast.error { border-color: var(--game-ketchup-red); }
+    @keyframes toast-in {
+      from { transform: translateX(50px); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Sticky Top Navigation & Control Center -->
+  <div class="sticky-top-container">
+    <header class="app-header">
+      <div class="header-content">
+        <div class="brand-group">
+          <div class="brand-icon-wrap">⚙️</div>
+          <div>
+            <div class="brand-title">American Tycoon <span>Developer Tuning Studio</span></div>
+          </div>
+          <span class="brand-badge">GODOT 4 RUNTIME</span>
+        </div>
+
+        <div class="header-stats">
+          <div class="stat-pill" title="Total active parameters exposed by TuningConfig.gd">
+            Knobs: <strong id="stat-total-knobs">142</strong>
+          </div>
+          <div class="stat-pill overridden" title="Knobs whose values differ from baked config/tuning.tres defaults">
+            Overrides: <strong id="stat-overrides-count">0</strong>
+          </div>
+          <div class="stat-pill" title="Current active preset mode">
+            Preset: <strong id="stat-active-preset">Baked Defaults</strong>
+          </div>
+        </div>
+
+        <div class="header-actions">
+          <button class="btn btn-sm" onclick="toggleAllSections(true)" title="Collapse all sections">▲ Fold All</button>
+          <button class="btn btn-sm" onclick="toggleAllSections(false)" title="Expand all sections">▼ Unfold All</button>
+          <button class="btn btn-sm btn-outline-gold" onclick="openDiffModal()">📊 Diff View</button>
+          <button class="btn btn-sm btn-teal" onclick="openPresetsModal()">🎛️ Presets</button>
+          <button class="btn btn-sm btn-gold" onclick="openExportModal()">💾 Export & Apply</button>
+          <button class="btn btn-sm btn-red" onclick="resetAllToDefaults()">↺ Reset Defaults</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Subheader Filter & Search Bar -->
+    <div class="subheader-bar">
+      <div class="filter-group-left">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="filter-search" placeholder="Search knobs, descriptions, formulas..." oninput="handleSearchChange(this.value)">
+        </div>
+
+        <div class="category-pills" id="section-pills-container">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+      <div class="filter-group-right">
+        <select class="select-control" id="filter-provenance" onchange="handleProvenanceFilter(this.value)">
+          <option value="all">Provenance: All (142)</option>
+          <option value="Fitted">Fitted (Sim Study)</option>
+          <option value="Device-tuned">Device-tuned</option>
+          <option value="Feel-tune">Feel-tune</option>
+          <option value="TBD-SIM">TBD-SIM</option>
+          <option value="Solved">Solved</option>
+          <option value="deviations">⚠️ Deviations & Warnings</option>
+        </select>
+
+        <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--game-cream); font-weight: 700; cursor: pointer; user-select: none;">
+          <input type="checkbox" id="filter-modified-only" onchange="handleModifiedOnlyToggle(this.checked)">
+          Modified Only
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Studio Canvas -->
+  <main class="main-layout">
+
+    <!-- Live Curve & Balance Inspector Panel -->
+    <section class="curve-inspector-panel" id="curve-panel">
+      <div class="curve-header" onclick="toggleCurvePanel()">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 16px;">📈</span>
+          <strong style="font-size: 15px; letter-spacing: 0.5px;">LIVE BALANCE & FORMULA CURVE INSPECTOR</strong>
+        </div>
+        <span class="collapse-chevron" id="curve-chevron">▼</span>
+      </div>
+      <div class="curve-body" id="curve-body">
+        
+        <div class="curve-nav">
+          <button class="btn btn-sm btn-gold" id="curve-tab-btn-legacy" onclick="switchCurveTab('legacy')">💎 Legacy Mint Power Curve</button>
+          <button class="btn btn-sm" id="curve-tab-btn-vent" onclick="switchCurveTab('vent')">🔥 Overdrive & Vent Escalation</button>
+          <button class="btn btn-sm" id="curve-tab-btn-frenzy" onclick="switchCurveTab('frenzy')">⚡ Frenzy & Wage Pacing</button>
+        </div>
+
+        <!-- 1. Legacy Mint Curve Calculator -->
+        <div id="curve-tab-legacy">
+          <p style="font-size: 12px; color: var(--game-cream); margin-bottom: 8px;">
+            Simulates <code style="font-family:'JetBrains Mono'; color:var(--game-mustard-gold)">EstateWaterfall.legacy_gain()</code> across estate scales based on active <code style="color:var(--game-atomic-teal)">k_legacy</code>, <code style="color:var(--game-atomic-teal)">alpha_legacy</code>, <code style="color:var(--game-atomic-teal)">legacy_knee_net</code>, and <code style="color:var(--game-atomic-teal)">alpha_legacy_deep</code>.
+          </p>
+          <table class="calc-table">
+            <thead>
+              <tr>
+                <th>Estate Milestone</th>
+                <th>Post-Tax Net ($)</th>
+                <th>Baked Default Gems</th>
+                <th>Live Tuned Gems</th>
+                <th>Effective Delta</th>
+                <th>Regime</th>
+              </tr>
+            </thead>
+            <tbody id="legacy-calc-tbody">
+              <!-- Live computed rows -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 2. Overdrive & Vent Windows Escalation -->
+        <div id="curve-tab-vent" style="display: none;">
+          <p style="font-size: 12px; color: var(--game-cream); margin-bottom: 8px;">
+            Simulates escalating vent windows and bonus rungs across Tiers 0 to 10 (<code style="font-family:'JetBrains Mono'; color:var(--game-mustard-gold)">RushMomentumState.gd</code>).
+          </p>
+          <table class="calc-table">
+            <thead>
+              <tr>
+                <th>Vent Tier</th>
+                <th>Demanded Gesture</th>
+                <th>Window Duration</th>
+                <th>Ladder Peak Bonus</th>
+                <th>Telegraph Warning</th>
+                <th>Hazard Rate (Shallow → Deep)</th>
+              </tr>
+            </thead>
+            <tbody id="vent-calc-tbody">
+              <!-- Live computed vent rows -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 3. Frenzy & Wage Calculator -->
+        <div id="curve-tab-frenzy" style="display: none;">
+          <p style="font-size: 12px; color: var(--game-cream); margin-bottom: 8px;">
+            Live inspection of Frenzy POP payout bounds and active clock-in wage multipliers.
+          </p>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px;">
+            <div style="background:var(--game-navy); padding:12px; border-radius:var(--radius-xs); border:1px solid var(--game-dark-gold);">
+              <div style="font-size:11px; font-weight:800; color:var(--game-mustard-gold); text-transform:uppercase;">TURBO Multiplier Payout Bounds</div>
+              <div style="margin-top:6px; font-size:12px; color:var(--game-cream); line-height:1.6;" id="frenzy-bounds-preview">
+                <!-- Computed live -->
+              </div>
+            </div>
+            <div style="background:var(--game-navy); padding:12px; border-radius:var(--radius-xs); border:1px solid var(--game-dark-gold);">
+              <div style="font-size:11px; font-weight:800; color:var(--game-atomic-teal); text-transform:uppercase;">Active Wage ("Clock In") Executive Floor</div>
+              <div style="margin-top:6px; font-size:12px; color:var(--game-cream); line-height:1.6;" id="wage-bounds-preview">
+                <!-- Computed live -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Tuning Sections & Knobs Container -->
+    <div id="sections-container">
+      <!-- Dynamically generated sections and knob cards -->
+    </div>
+
+  </main>
+
+  <!-- Diff & Comparison Modal -->
+  <div class="modal-overlay" id="diff-modal">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h2 class="modal-title">📊 Overridden Tuning Knobs Comparison</h2>
+        <button class="modal-close-btn" onclick="closeModal('diff-modal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 13px; color: var(--game-dark-gray); font-weight: 600;">
+          Showing all tuning constants that deviate from the baked defaults in <code style="font-family:'JetBrains Mono'">game/config/tuning.tres</code>.
+        </p>
+        <div id="diff-content">
+          <!-- Rendered diff table -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-red" onclick="resetAllToDefaults(); closeModal('diff-modal')">↺ Revert All to Defaults</button>
+        <button class="btn btn-gold" onclick="closeModal('diff-modal')">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Presets Manager Modal -->
+  <div class="modal-overlay" id="presets-modal">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h2 class="modal-title">🎛️ Tuning Presets & Scenarios</h2>
+        <button class="modal-close-btn" onclick="closeModal('presets-modal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="presets-grid" id="presets-grid-container">
+          <!-- Preset Cards -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-teal" onclick="saveCustomPresetPrompt()">💾 Save Current as Custom Preset</button>
+        <button class="btn btn-gold" onclick="closeModal('presets-modal')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Export & Godot Sync Modal -->
+  <div class="modal-overlay" id="export-modal">
+    <div class="modal-window" style="max-width: 900px;">
+      <div class="modal-header">
+        <h2 class="modal-title">💾 Export Tuning & Godot Sync</h2>
+        <button class="modal-close-btn" onclick="closeModal('export-modal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="display: flex; gap: 8px; border-bottom: 2px solid var(--game-navy-light); padding-bottom: 10px;">
+          <button class="btn btn-sm btn-gold" id="tab-btn-tres" onclick="switchExportTab('tres')">Godot tuning.tres</button>
+          <button class="btn btn-sm" id="tab-btn-overrides" onclick="switchExportTab('overrides')">tuning_overrides.json</button>
+          <button class="btn btn-sm" id="tab-btn-json" onclick="switchExportTab('json')">Full JSON Database</button>
+        </div>
+
+        <div id="export-tab-content-tres">
+          <p style="font-size: 12px; color: var(--game-dark-gray); margin-bottom: 6px; font-weight: 600;">
+            Exact Godot 4 Resource format for <code style="font-family:'JetBrains Mono'">game/config/tuning.tres</code>.
+          </p>
+          <textarea id="tres-output" style="width: 100%; height: 320px; font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 10px; background: var(--game-ink-navy); color: var(--game-cream); border: 2px solid var(--game-navy); border-radius: var(--radius-xs);" readonly></textarea>
+        </div>
+
+        <div id="export-tab-content-overrides" style="display: none;">
+          <p style="font-size: 12px; color: var(--game-dark-gray); margin-bottom: 6px; font-weight: 600;">
+            Dictionary format for <code style="font-family:'JetBrains Mono'">user://tuning_overrides.json</code> (only modified keys).
+          </p>
+          <textarea id="overrides-output" style="width: 100%; height: 320px; font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 10px; background: var(--game-ink-navy); color: var(--game-cream); border: 2px solid var(--game-navy); border-radius: var(--radius-xs);" readonly></textarea>
+        </div>
+
+        <div id="export-tab-content-json" style="display: none;">
+          <p style="font-size: 12px; color: var(--game-dark-gray); margin-bottom: 6px; font-weight: 600;">
+            Complete structured database format with metadata and provenance.
+          </p>
+          <textarea id="json-output" style="width: 100%; height: 320px; font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 10px; background: var(--game-ink-navy); color: var(--game-cream); border: 2px solid var(--game-navy); border-radius: var(--radius-xs);" readonly></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="copyExportToClipboard()">📋 Copy to Clipboard</button>
+        <button class="btn btn-teal" onclick="downloadExportFile()">💾 Download File</button>
+        <button class="btn btn-green" onclick="applyDirectlyToGodot()">🚀 Apply Directly to game/config/tuning.tres</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container"></div>
+
+  <script>
+    // State
+    let database = {
+      sections: [],
+      knobs: []
+    };
+
+    let originalBaked = {};
+    let collapsedSections = new Set();
+    let currentSectionFilter = "all";
+    let currentProvenanceFilter = "all";
+    let searchFilterText = "";
+    let modifiedOnlyFilter = false;
+    let exportActiveTab = "tres";
+    let activePresetName = "Baked Defaults";
+    let activeCurveTab = "legacy";
+
+    // Presets definitions
+    const PRESETS = [
+      {
+        id: "vanilla",
+        name: "Baked Defaults (Production)",
+        description: "Official balanced defaults shipped in game/config/tuning.tres.",
+        badge: "CANONICAL",
+        apply: (knobs) => {
+          knobs.forEach(k => k.current_value = k.baked_value);
+        }
+      },
+      {
+        id: "rapid_playtest",
+        name: "Turbo Playtest Pace",
+        description: "Ultra-fast cycle floors (0.1s), 10x rush speeds, instant hold repeats, and 60s frenzy burns for high-speed device testing.",
+        badge: "TESTING",
+        apply: (knobs) => {
+          knobs.forEach(k => {
+            if (k.id === "cycle_floor") k.current_value = 0.1;
+            if (k.id === "hold_rush_per_second") k.current_value = 15.0;
+            if (k.id === "buy_hold_initial_delay") k.current_value = 0.05;
+            if (k.id === "buy_hold_repeat_interval") k.current_value = 0.02;
+            if (k.id === "frenzy_burn_duration") k.current_value = 60.0;
+            if (k.id === "frenzy_max_multiplier") k.current_value = 10.0;
+            if (k.id === "rush_momentum_cruise_bonus") k.current_value = 0.5;
+          });
+        }
+      },
+      {
+        id: "hardcore_stress",
+        name: "Hardcore Economy & Hazards",
+        description: "Aggressive market crashes (75% drop), unforgiving vent gesture windows, steep 80% estate taxes, and rapid meter decays.",
+        badge: "STRESS TEST",
+        apply: (knobs) => {
+          knobs.forEach(k => {
+            if (k.id === "crash_multiplier") k.current_value = 0.25;
+            if (k.id === "estate_tax_rate_base") k.current_value = 0.80;
+            if (k.id === "rush_momentum_vent_window_duration") k.current_value = 0.6;
+            if (k.id === "rush_momentum_vent_duration_floor") k.current_value = 0.3;
+            if (k.id === "frenzy_decay_per_second") k.current_value = 0.02;
+          });
+        }
+      },
+      {
+        id: "endgame_arc",
+        name: "Endgame Arc Study Fitted",
+        description: "Enforces the DynastyArcStudy fitted values (legacy_cost_steepening = 1.10, alpha_legacy_deep = 0.05) with balanced prestige scaling.",
+        badge: "STUDY FITTED",
+        apply: (knobs) => {
+          knobs.forEach(k => {
+            if (k.id === "legacy_cost_steepening") k.current_value = 1.10;
+            if (k.id === "alpha_legacy_deep") k.current_value = 0.05;
+            if (k.id === "alpha_legacy") k.current_value = 0.35;
+            if (k.id === "k_legacy") k.current_value = 0.16;
+            if (k.id === "legacy_upgrade_cost_multiplier") k.current_value = 3.0;
+          });
+        }
+      }
+    ];
+
+    // Initialization
+    window.addEventListener("DOMContentLoaded", () => {
+      loadDatabase();
+    });
+
+    async function loadDatabase() {
+      try {
+        const res = await fetch("/api/data");
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        database = await res.json();
+        
+        // Cache original baked values
+        database.knobs.forEach(k => {
+          originalBaked[k.id] = k.baked_value;
+          if (k.current_value === undefined) {
+            k.current_value = k.baked_value;
+          }
+        });
+
+        renderSectionPills();
+        renderSections();
+        updateCurveInspector();
+        updateStats();
+        showToast("Tuning database loaded (" + database.knobs.length + " knobs)", "success");
+      } catch (err) {
+        console.error("Failed to load tuning database:", err);
+        showToast("Failed to load tuning database: " + err.message, "error");
+      }
+    }
+
+    function getKnobValue(id) {
+      const k = database.knobs.find(item => item.id === id);
+      return k ? Number(k.current_value) : 0;
+    }
+
+    function getBakedKnobValue(id) {
+      const k = database.knobs.find(item => item.id === id);
+      return k ? Number(k.baked_value) : 0;
+    }
+
+    function updateStats() {
+      const total = database.knobs.length;
+      let overridden = 0;
+      database.knobs.forEach(k => {
+        if (isKnobOverridden(k)) overridden++;
+      });
+
+      document.getElementById("stat-total-knobs").textContent = total;
+      document.getElementById("stat-overrides-count").textContent = overridden;
+      document.getElementById("stat-active-preset").textContent = activePresetName;
+
+      // Update section header dots
+      database.sections.forEach(sec => {
+        const dot = document.getElementById(`sec-mod-dot-${sec.id}`);
+        if (dot) {
+          const secKnobs = database.knobs.filter(k => k.section === sec.title);
+          const hasOverridden = secKnobs.some(k => isKnobOverridden(k));
+          if (hasOverridden) {
+            dot.classList.add("active");
+          } else {
+            dot.classList.remove("active");
+          }
+        }
+      });
+
+      updateCurveInspector();
+    }
+
+    function isKnobOverridden(knob) {
+      if (knob.type === "int") {
+        return Math.round(Number(knob.current_value)) !== Math.round(Number(knob.baked_value));
+      }
+      return Math.abs(Number(knob.current_value) - Number(knob.baked_value)) > 1e-9;
+    }
+
+    function toggleCurvePanel() {
+      const body = document.getElementById("curve-body");
+      const chevron = document.getElementById("curve-chevron");
+      if (body.style.display === "none") {
+        body.style.display = "flex";
+        chevron.textContent = "▼";
+      } else {
+        body.style.display = "none";
+        chevron.textContent = "▶";
+      }
+    }
+
+    function switchCurveTab(tab) {
+      activeCurveTab = tab;
+      document.getElementById("curve-tab-btn-legacy").className = tab === "legacy" ? "btn btn-sm btn-gold" : "btn btn-sm";
+      document.getElementById("curve-tab-btn-vent").className = tab === "vent" ? "btn btn-sm btn-gold" : "btn btn-sm";
+      document.getElementById("curve-tab-btn-frenzy").className = tab === "frenzy" ? "btn btn-sm btn-gold" : "btn btn-sm";
+
+      document.getElementById("curve-tab-legacy").style.display = tab === "legacy" ? "block" : "none";
+      document.getElementById("curve-tab-vent").style.display = tab === "vent" ? "block" : "none";
+      document.getElementById("curve-tab-frenzy").style.display = tab === "frenzy" ? "block" : "none";
+
+      updateCurveInspector();
+    }
+
+    function calculateLegacyGain(estateNet, kLegacy, alphaLegacy, kneeNet, alphaDeep) {
+      const LEGACY_BASE = 1000.0;
+      if (estateNet <= LEGACY_BASE) return 0;
+      if (kneeNet > LEGACY_BASE && estateNet > kneeNet) {
+        const gemsAtKnee = kLegacy * Math.pow(kneeNet / LEGACY_BASE, alphaLegacy);
+        return Math.floor(gemsAtKnee * Math.pow(estateNet / kneeNet, alphaDeep));
+      }
+      return Math.floor(kLegacy * Math.pow(estateNet / LEGACY_BASE, alphaLegacy));
+    }
+
+    function updateCurveInspector() {
+      // 1. Legacy Mint Calculator
+      const tbody = document.getElementById("legacy-calc-tbody");
+      if (tbody) {
+        const kCurr = getKnobValue("k_legacy") || 0.16;
+        const aCurr = getKnobValue("alpha_legacy") || 0.35;
+        const kneeCurr = getKnobValue("legacy_knee_net") || 1e21;
+        const deepCurr = getKnobValue("alpha_legacy_deep") || 0.05;
+
+        const kBaked = getBakedKnobValue("k_legacy") || 0.16;
+        const aBaked = getBakedKnobValue("alpha_legacy") || 0.35;
+        const kneeBaked = getBakedKnobValue("legacy_knee_net") || 1e21;
+        const deepBaked = getBakedKnobValue("alpha_legacy_deep") || 0.05;
+
+        const milestones = [
+          { name: "Early Run (G1 Roster)", net: 10000 },
+          { name: "Mid Game ($1M Startup)", net: 1000000 },
+          { name: "First Contact ($1B)", net: 1000000000 },
+          { name: "Earth Win Target ($103.6T)", net: 103600000000000 },
+          { name: "Frontier Tier 5 ($1.0e18)", net: 1e18 },
+          { name: "Piecewise Knee ($1.0e21)", net: 1e21 },
+          { name: "Mid Frontier ($1.0e30)", net: 1e30 },
+          { name: "Late Frontier ($1.0e50)", net: 1e50 },
+          { name: "Deep Frontier ($1.0e80)", net: 1e80 }
+        ];
+
+        let html = "";
+        milestones.forEach(m => {
+          const bakedGems = calculateLegacyGain(m.net, kBaked, aBaked, kneeBaked, deepBaked);
+          const currGems = calculateLegacyGain(m.net, kCurr, aCurr, kneeCurr, deepCurr);
+          const isKnee = m.net >= kneeCurr;
+          const delta = currGems - bakedGems;
+          let deltaStr = "—";
+          let deltaColor = "var(--game-mid-gray)";
+
+          if (delta !== 0) {
+            const pct = bakedGems > 0 ? ((delta / bakedGems) * 100).toFixed(1) : "0";
+            deltaStr = `${delta > 0 ? '+' : ''}${delta.toLocaleString()} (${delta > 0 ? '+' : ''}${pct}%)`;
+            deltaColor = delta > 0 ? "var(--game-money-green)" : "var(--game-ketchup-red)";
+          }
+
+          html += `
+            <tr>
+              <td><strong>${m.name}</strong></td>
+              <td>$${m.net >= 1e6 ? m.net.toExponential(1) : m.net.toLocaleString()}</td>
+              <td style="color:var(--game-mid-gray)">${bakedGems.toLocaleString()} 💎</td>
+              <td style="color:var(--game-mustard-gold); font-weight:bold">${currGems.toLocaleString()} 💎</td>
+              <td style="color:${deltaColor}">${deltaStr}</td>
+              <td><span style="font-size:10px; padding:2px 6px; border-radius:3px; background:${isKnee ? 'var(--game-dark-purple)' : 'var(--game-cycle-blue)'}; color:#fff">${isKnee ? 'BEND / DEEP' : 'STANDARD POWER'}</span></td>
+            </tr>
+          `;
+        });
+        tbody.innerHTML = html;
+      }
+
+      // 2. Vent Windows Escalation Table
+      const ventTbody = document.getElementById("vent-calc-tbody");
+      if (ventTbody) {
+        const stepTiers = getKnobValue("rush_momentum_vent_lifts_step_tiers") || 3;
+        const winDuration = getKnobValue("rush_momentum_vent_window_duration") || 1.0;
+        const winDecay = getKnobValue("rush_momentum_vent_duration_decay") || 0.975;
+        const winFloor = getKnobValue("rush_momentum_vent_duration_floor") || 0.45;
+        const bonusPeak = getKnobValue("rush_momentum_bonus_peak") || 0.55;
+        const bonusStep = getKnobValue("rush_momentum_vent_bonus_step") || 0.30;
+        const approachSec = getKnobValue("rush_momentum_vent_approach_seconds") || 0.7;
+        const rateCruise = getKnobValue("rush_momentum_vent_rate_at_cruise") || 0.7;
+        const rateCeiling = getKnobValue("rush_momentum_vent_rate_at_ceiling") || 3.4;
+
+        let ventHtml = "";
+        for (let tier = 0; tier <= 10; tier++) {
+          const lifts = Math.min(3, 1 + Math.floor(tier / stepTiers));
+          const duration = Math.max(winFloor, winDuration * Math.pow(winDecay, tier));
+          const peak = (bonusPeak + tier * bonusStep) * 100;
+
+          let gestureText = "VENT (1 Lift)";
+          let gestureBadge = "var(--game-cycle-blue)";
+          if (lifts === 2) {
+            gestureText = "VENT ×2 (Double Release)";
+            gestureBadge = "var(--game-mustard-gold); color:var(--game-navy);";
+          } else if (lifts === 3) {
+            gestureText = "VENT ×3 (Triple Tap)";
+            gestureBadge = "var(--game-ketchup-red);";
+          }
+
+          ventHtml += `
+            <tr>
+              <td><strong>Tier ${tier}</strong></td>
+              <td><span style="font-size:11px; padding:2px 8px; border-radius:3px; font-weight:bold; background:${gestureBadge}">${gestureText}</span></td>
+              <td style="font-weight:bold; color:${duration <= winFloor + 0.05 ? 'var(--game-ketchup-red)' : 'var(--game-cream)'}">${duration.toFixed(3)}s</td>
+              <td style="color:var(--game-mustard-gold); font-weight:bold">+${peak.toFixed(0)}% Income</td>
+              <td>${approachSec.toFixed(2)}s telegraph flight</td>
+              <td>${rateCruise.toFixed(1)} /s → ${rateCeiling.toFixed(1)} /s</td>
+            </tr>
+          `;
+        }
+        ventTbody.innerHTML = ventHtml;
+      }
+
+      // 3. Frenzy & Wage Preview
+      const frenzyPreview = document.getElementById("frenzy-bounds-preview");
+      if (frenzyPreview) {
+        const maxMult = getKnobValue("frenzy_max_multiplier") || 5.6;
+        const popFloor = getKnobValue("frenzy_pop_floor") || 0.2174;
+        const burnDuration = getKnobValue("frenzy_burn_duration") || 30.0;
+        const worstPop = 1.0 + (maxMult - 1.0) * 1.0 * popFloor;
+
+        frenzyPreview.innerHTML = `
+          • <strong>Worst Possible Pop (at floor):</strong> <span style="color:var(--game-mustard-gold); font-family:'JetBrains Mono'">${worstPop.toFixed(2)}×</span><br>
+          • <strong>Full Charge Burn Peak:</strong> <span style="color:var(--game-mustard-gold); font-family:'JetBrains Mono'">${maxMult.toFixed(2)}×</span> for ${burnDuration.toFixed(1)}s<br>
+          • <strong>Required Pop Floor Charge:</strong> ${(popFloor * 100).toFixed(1)}% bar fill
+        `;
+      }
+
+      const wagePreview = document.getElementById("wage-bounds-preview");
+      if (wagePreview) {
+        const passiveFrac = getKnobValue("wage_passive_fraction") || 0.25;
+        const bonusLevel = getKnobValue("wage_floor_bonus_per_level") || 0.15;
+        const holdTaps = getKnobValue("wage_hold_taps_per_second") || 2.5;
+
+        wagePreview.innerHTML = `
+          • <strong>Base Exec Floor Payout:</strong> <span style="color:var(--game-atomic-teal); font-family:'JetBrains Mono'">${(passiveFrac * 100).toFixed(1)}%</span> of passive/sec per tap<br>
+          • <strong>Held Wage Generation:</strong> ${holdTaps.toFixed(1)} auto-taps/sec (~+${(passiveFrac * holdTaps * 100).toFixed(0)}% passive)<br>
+          • <strong>Level-Up Payout Growth:</strong> +${(bonusLevel * 100).toFixed(1)}% floor payout per career level
+        `;
+      }
+    }
+
+    function renderSectionPills() {
+      const container = document.getElementById("section-pills-container");
+      if (!container) return;
+      container.innerHTML = "";
+
+      const allPill = document.createElement("button");
+      allPill.className = `pill-btn ${currentSectionFilter === "all" ? "active" : ""}`;
+      allPill.innerHTML = `All <span class="pill-count">${database.knobs.length}</span>`;
+      allPill.onclick = () => {
+        currentSectionFilter = "all";
+        renderSectionPills();
+        renderSections();
+      };
+      container.appendChild(allPill);
+
+      database.sections.forEach(sec => {
+        const secKnobs = database.knobs.filter(k => k.section === sec.title);
+        if (secKnobs.length === 0) return;
+
+        const pill = document.createElement("button");
+        pill.className = `pill-btn ${currentSectionFilter === sec.title ? "active" : ""}`;
+        pill.innerHTML = `${sec.title} <span class="pill-count">${secKnobs.length}</span>`;
+        pill.onclick = () => {
+          currentSectionFilter = sec.title;
+          renderSectionPills();
+          renderSections();
+        };
+        container.appendChild(pill);
+      });
+    }
+
+    let currentMinigameSubcatFilter = "all";
+
+    function renderSections() {
+      const container = document.getElementById("sections-container");
+      if (!container) return;
+      container.innerHTML = "";
+
+      const query = searchFilterText.toLowerCase().trim();
+
+      database.sections.forEach(sec => {
+        if (currentSectionFilter !== "all" && currentSectionFilter !== sec.title) {
+          return;
+        }
+
+        let secKnobs = database.knobs.filter(k => k.section === sec.title);
+
+        // Apply search filter
+        if (query) {
+          secKnobs = secKnobs.filter(k => {
+            return k.id.toLowerCase().includes(query) ||
+                   k.name.toLowerCase().includes(query) ||
+                   (k.description && k.description.toLowerCase().includes(query)) ||
+                   (k.provenance_notes && k.provenance_notes.toLowerCase().includes(query));
+          });
+        }
+
+        // Apply provenance filter
+        if (currentProvenanceFilter === "deviations") {
+          secKnobs = secKnobs.filter(k => k.is_deviation || k.load_bearing);
+        } else if (currentProvenanceFilter !== "all") {
+          secKnobs = secKnobs.filter(k => k.provenance === currentProvenanceFilter);
+        }
+
+        // Apply modified-only filter
+        if (modifiedOnlyFilter) {
+          secKnobs = secKnobs.filter(k => isKnobOverridden(k));
+        }
+
+        if (secKnobs.length === 0) return;
+
+        const isCollapsed = collapsedSections.has(sec.id);
+
+        const sectionEl = document.createElement("section");
+        sectionEl.className = `tuning-section ${isCollapsed ? "collapsed" : ""}`;
+        sectionEl.id = `section-card-${sec.id}`;
+
+        const headerEl = document.createElement("div");
+        headerEl.className = "tuning-section-header";
+        headerEl.onclick = () => toggleSection(sec.id);
+
+        headerEl.innerHTML = `
+          <div class="section-title-wrap">
+            <span class="section-title">${sec.title}</span>
+            <span class="section-desc">${sec.description || ""}</span>
+          </div>
+          <div class="section-meta-right">
+            <span class="section-mod-dot" id="sec-mod-dot-${sec.id}"></span>
+            <span class="section-count-badge">${secKnobs.length} Knobs</span>
+            <span class="collapse-chevron">${isCollapsed ? "▶" : "▼"}</span>
+          </div>
+        `;
+
+        const bodyEl = document.createElement("div");
+        bodyEl.className = "tuning-section-body";
+
+        if (sec.id === "minigames" || sec.title === "Minigames") {
+          // Render Subcategory Filter Navigation
+          const subcats = [
+            { id: "all", name: "All Minigames", icon: "🎮" },
+            { id: "shared", name: "Host Timing", icon: "⏱️" },
+            { id: "match3", name: "Match Three", icon: "💎" },
+            { id: "basketball", name: "Basketball", icon: "🏀" },
+            { id: "balance", name: "Balance Books", icon: "⚖️" },
+            { id: "timing", name: "Timing Bar", icon: "🎯" },
+            { id: "catch", name: "Catch Money", icon: "💰" },
+            { id: "memory", name: "Memory Match", icon: "🧠" }
+          ];
+
+          const navEl = document.createElement("div");
+          navEl.className = "minigame-subcat-nav";
+
+          subcats.forEach(sub => {
+            let count = 0;
+            if (sub.id === "all") {
+              count = secKnobs.length;
+            } else {
+              count = secKnobs.filter(k => k.subcategory && k.subcategory.id === sub.id).length;
+            }
+            if (count === 0 && sub.id !== "all") return;
+
+            const pill = document.createElement("button");
+            pill.className = `minigame-subcat-pill ${currentMinigameSubcatFilter === sub.id ? "active" : ""}`;
+            pill.innerHTML = `<span>${sub.icon}</span> ${sub.name} <span class="subcat-count">${count}</span>`;
+            pill.onclick = (e) => {
+              e.stopPropagation();
+              currentMinigameSubcatFilter = sub.id;
+              renderSections();
+            };
+            navEl.appendChild(pill);
+          });
+          bodyEl.appendChild(navEl);
+
+          // Group and render by subcategory
+          const subcatOrder = ["shared", "match3", "basketball", "balance", "timing", "catch", "memory"];
+          subcatOrder.forEach(subcatKey => {
+            if (currentMinigameSubcatFilter !== "all" && currentMinigameSubcatFilter !== subcatKey) {
+              return;
+            }
+
+            const groupKnobs = secKnobs.filter(k => k.subcategory && k.subcategory.id === subcatKey);
+            if (groupKnobs.length === 0) return;
+
+            // Sort: Base Game parameters first, Challenge Mode parameters second
+            groupKnobs.sort((a, b) => {
+              const aChal = a.is_challenge_mode ? 1 : 0;
+              const bChal = b.is_challenge_mode ? 1 : 0;
+              return aChal - bChal;
+            });
+
+            const baseCount = groupKnobs.filter(k => !k.is_challenge_mode).length;
+            const chalCount = groupKnobs.filter(k => k.is_challenge_mode).length;
+            const breakdownText = chalCount > 0 ? `${baseCount} Base • ${chalCount} Challenge` : `${baseCount} Base`;
+
+            const subcatMeta = groupKnobs[0].subcategory;
+            const dividerEl = document.createElement("div");
+            dividerEl.className = "subcat-divider";
+            dividerEl.style.borderLeftColor = subcatMeta.color || "var(--game-mustard-gold)";
+            dividerEl.innerHTML = `
+              <div class="subcat-divider-left">
+                <span class="subcat-divider-icon">${subcatMeta.icon || "🎮"}</span>
+                <span class="subcat-divider-title" style="color:${subcatMeta.color || 'var(--game-cream)'}">${subcatMeta.name}</span>
+              </div>
+              <span class="subcat-divider-count">${groupKnobs.length} Knobs (${breakdownText})</span>
+            `;
+            bodyEl.appendChild(dividerEl);
+
+            groupKnobs.forEach(knob => {
+              bodyEl.appendChild(createKnobRow(knob));
+            });
+          });
+        } else {
+          secKnobs.sort((a, b) => {
+            const aChal = a.is_challenge_mode ? 1 : 0;
+            const bChal = b.is_challenge_mode ? 1 : 0;
+            return aChal - bChal;
+          });
+          secKnobs.forEach(knob => {
+            bodyEl.appendChild(createKnobRow(knob));
+          });
+        }
+
+        sectionEl.appendChild(headerEl);
+        sectionEl.appendChild(bodyEl);
+        container.appendChild(sectionEl);
+      });
+
+      updateStats();
+    }
+
+    function createKnobRow(knob) {
+      const row = document.createElement("div");
+      const isOverridden = isKnobOverridden(knob);
+      row.className = `knob-row ${isOverridden ? "is-overridden" : ""}`;
+      row.id = `knob-row-${knob.id}`;
+
+      let provBadgeClass = "badge-feel";
+      if (knob.provenance === "Fitted") provBadgeClass = "badge-fitted";
+      else if (knob.provenance === "Device-tuned") provBadgeClass = "badge-device";
+      else if (knob.provenance === "TBD-SIM") provBadgeClass = "badge-tbd";
+      else if (knob.provenance === "Solved") provBadgeClass = "badge-solved";
+
+      let warningBadge = "";
+      if (knob.is_deviation) {
+        warningBadge = `<span class="badge-provenance badge-deviation" title="This value was study-fitted and deviates from Tim's seed!">⚠️ DEVIATION</span>`;
+      } else if (knob.load_bearing) {
+        warningBadge = `<span class="badge-provenance badge-deviation" title="Load-bearing parameter: critical to economic progression.">⭐ LOAD BEARING</span>`;
+      }
+
+      let subcatBadge = "";
+      if (knob.subcategory) {
+        subcatBadge = `<span class="badge-subcat-tag" style="background:${knob.subcategory.color};">${knob.subcategory.icon} ${knob.subcategory.name}</span>`;
+      }
+
+      const modeBadge = knob.is_challenge_mode
+        ? `<span class="badge-mode badge-mode-challenge" title="Challenge Mode parameter">⚡ CHALLENGE</span>`
+        : `<span class="badge-mode badge-mode-base" title="Base game parameter">🎮 BASE GAME</span>`;
+
+      const currentValFormatted = formatVal(knob.current_value, knob.type);
+      const bakedValFormatted = formatVal(knob.baked_value, knob.type);
+
+      const minVal = knob.min !== undefined ? knob.min : 0;
+      const maxVal = knob.max !== undefined ? knob.max : Math.max(10, Number(knob.baked_value) * 3);
+      const stepVal = knob.step || (knob.type === "int" ? 1 : 0.01);
+
+      row.innerHTML = `
+        <!-- Col 1: Identity -->
+        <div class="knob-col-identity">
+          <div class="knob-name">${knob.name}</div>
+          <div class="knob-id-badge">${knob.id}</div>
+          <div class="knob-badges">
+            ${subcatBadge}
+            ${modeBadge}
+            <span class="badge-type">${knob.type}</span>
+            <span class="badge-provenance ${provBadgeClass}">${knob.provenance}</span>
+            ${warningBadge}
+          </div>
+        </div>
+
+        <!-- Col 2: Desc & Provenance Notes -->
+        <div class="knob-col-desc">
+          <div class="knob-desc-text">${knob.description || "No description provided."}</div>
+          ${knob.provenance_notes ? `<div class="knob-provenance-note">${knob.provenance_notes}</div>` : ""}
+        </div>
+
+        <!-- Col 3: Interactive Slider & Input -->
+        <div class="knob-col-editor">
+          <div class="editor-top">
+            <input type="text" class="editor-input" id="input-${knob.id}" value="${currentValFormatted}"
+                   onchange="handleInputChange('${knob.id}', this.value)"
+                   onkeydown="if(event.key==='Enter') this.blur();">
+            <span class="editor-baked-val" title="Baked default in tuning.tres">Default: ${bakedValFormatted}</span>
+          </div>
+          <input type="range" class="editor-slider" id="slider-${knob.id}"
+                 min="${minVal}" max="${maxVal}" step="${stepVal}" value="${knob.current_value}"
+                 oninput="handleSliderChange('${knob.id}', this.value)">
+        </div>
+
+        <!-- Col 4: Quick Multipliers & Reset -->
+        <div class="knob-col-actions">
+          <div class="quick-adj-group">
+            <button class="btn btn-xs" onclick="adjustKnobMultiplier('${knob.id}', 0.5)">0.5×</button>
+            <button class="btn btn-xs" onclick="adjustKnobMultiplier('${knob.id}', 0.9)">-10%</button>
+            <button class="btn btn-xs" onclick="adjustKnobMultiplier('${knob.id}', 1.1)">+10%</button>
+            <button class="btn btn-xs" onclick="adjustKnobMultiplier('${knob.id}', 2.0)">2.0×</button>
+          </div>
+          <button class="btn btn-xs ${isOverridden ? 'btn-red' : ''}" onclick="resetKnobToDefault('${knob.id}')" title="Reset to baked default">
+            ↺ Default
+          </button>
+        </div>
+      `;
+
+      return row;
+    }
+
+    function formatVal(val, type) {
+      if (val === null || val === undefined) return "0";
+      if (type === "int") return Math.round(Number(val)).toString();
+      const num = Number(val);
+      if (Math.abs(num) >= 1e9 || (Math.abs(num) < 1e-4 && num !== 0)) {
+        return num.toExponential(4).replace("+", "");
+      }
+      return num.toString();
+    }
+
+    function handleInputChange(knobId, textVal) {
+      const knob = database.knobs.find(k => k.id === knobId);
+      if (!knob) return;
+
+      let parsed = Number(textVal.trim());
+      if (isNaN(parsed)) {
+        showToast(`Invalid number for ${knobId}`, "error");
+        document.getElementById(`input-${knobId}`).value = formatVal(knob.current_value, knob.type);
+        return;
+      }
+
+      if (knob.type === "int") {
+        parsed = Math.round(parsed);
+      }
+
+      knob.current_value = parsed;
+      activePresetName = "Custom Overrides";
+      refreshKnobRow(knobId);
+      updateStats();
+    }
+
+    function handleSliderChange(knobId, sliderVal) {
+      const knob = database.knobs.find(k => k.id === knobId);
+      if (!knob) return;
+
+      let parsed = Number(sliderVal);
+      if (knob.type === "int") parsed = Math.round(parsed);
+
+      knob.current_value = parsed;
+      activePresetName = "Custom Overrides";
+      
+      const inputEl = document.getElementById(`input-${knobId}`);
+      if (inputEl) inputEl.value = formatVal(parsed, knob.type);
+
+      refreshKnobRow(knobId);
+      updateStats();
+    }
+
+    function adjustKnobMultiplier(knobId, mult) {
+      const knob = database.knobs.find(k => k.id === knobId);
+      if (!knob) return;
+
+      let nextVal = Number(knob.current_value) * mult;
+      if (knob.type === "int") nextVal = Math.max(1, Math.round(nextVal));
+
+      knob.current_value = nextVal;
+      activePresetName = "Custom Overrides";
+      refreshKnobRow(knobId);
+      updateStats();
+    }
+
+    function resetKnobToDefault(knobId) {
+      const knob = database.knobs.find(k => k.id === knobId);
+      if (!knob) return;
+
+      knob.current_value = knob.baked_value;
+      refreshKnobRow(knobId);
+      updateStats();
+      showToast(`Reset ${knob.name} to default`, "success");
+    }
+
+    function refreshKnobRow(knobId) {
+      const knob = database.knobs.find(k => k.id === knobId);
+      if (!knob) return;
+
+      const rowEl = document.getElementById(`knob-row-${knobId}`);
+      if (!rowEl) return;
+
+      const isOverridden = isKnobOverridden(knob);
+      if (isOverridden) {
+        rowEl.classList.add("is-overridden");
+      } else {
+        rowEl.classList.remove("is-overridden");
+      }
+
+      const inputEl = document.getElementById(`input-${knobId}`);
+      if (inputEl) inputEl.value = formatVal(knob.current_value, knob.type);
+
+      const sliderEl = document.getElementById(`slider-${knobId}`);
+      if (sliderEl) sliderEl.value = knob.current_value;
+    }
+
+    function resetAllToDefaults() {
+      database.knobs.forEach(k => {
+        k.current_value = k.baked_value;
+      });
+      activePresetName = "Baked Defaults";
+      renderSections();
+      updateStats();
+      showToast("Reset all 142 tuning knobs to baked defaults", "success");
+    }
+
+    function toggleSection(secId) {
+      if (collapsedSections.has(secId)) {
+        collapsedSections.delete(secId);
+      } else {
+        collapsedSections.add(secId);
+      }
+      renderSections();
+    }
+
+    function toggleAllSections(collapse) {
+      if (collapse) {
+        database.sections.forEach(sec => collapsedSections.add(sec.id));
+      } else {
+        collapsedSections.clear();
+      }
+      renderSections();
+    }
+
+    function handleSearchChange(val) {
+      searchFilterText = val;
+      renderSections();
+    }
+
+    function handleProvenanceFilter(val) {
+      currentProvenanceFilter = val;
+      renderSections();
+    }
+
+    function handleModifiedOnlyToggle(checked) {
+      modifiedOnlyFilter = checked;
+      renderSections();
+    }
+
+    // Modals
+    function openDiffModal() {
+      const modal = document.getElementById("diff-modal");
+      const content = document.getElementById("diff-content");
+      if (!modal || !content) return;
+
+      const overriddenKnobs = database.knobs.filter(k => isKnobOverridden(k));
+      if (overriddenKnobs.length === 0) {
+        content.innerHTML = `<div style="text-align:center; padding: 30px; font-size: 14px; font-weight: 700; color: var(--game-dark-gray);">No knobs are currently overridden. All values match baked defaults.</div>`;
+      } else {
+        let rowsHtml = "";
+        overriddenKnobs.forEach(k => {
+          const bakedStr = formatVal(k.baked_value, k.type);
+          const currStr = formatVal(k.current_value, k.type);
+          const delta = Number(k.current_value) - Number(k.baked_value);
+          const deltaStr = delta > 0 ? `+${formatVal(delta, k.type)}` : formatVal(delta, k.type);
+
+          rowsHtml += `
+            <tr>
+              <td><strong>${k.name}</strong><br><span style="font-size:10px; color:var(--game-mid-gray)">${k.id}</span></td>
+              <td>${k.section}</td>
+              <td style="color:var(--game-mid-gray)">${bakedStr}</td>
+              <td style="color:var(--game-mustard-gold); font-weight:bold">${currStr}</td>
+              <td style="color:${delta >= 0 ? 'var(--game-money-green)' : 'var(--game-ketchup-red)'}">${deltaStr}</td>
+              <td><button class="btn btn-xs btn-red" onclick="resetKnobToDefault('${k.id}'); openDiffModal();">Revert</button></td>
+            </tr>
+          `;
+        });
+
+        content.innerHTML = `
+          <table class="diff-table">
+            <thead>
+              <tr>
+                <th>Knob Name</th>
+                <th>Section</th>
+                <th>Baked Default</th>
+                <th>Current Value</th>
+                <th>Delta</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+        `;
+      }
+
+      modal.classList.add("open");
+    }
+
+    function openPresetsModal() {
+      const modal = document.getElementById("presets-modal");
+      const grid = document.getElementById("presets-grid-container");
+      if (!modal || !grid) return;
+
+      grid.innerHTML = "";
+      PRESETS.forEach(p => {
+        const card = document.createElement("div");
+        card.className = "preset-card";
+        card.innerHTML = `
+          <div class="preset-title">
+            <span>${p.name}</span>
+            <span class="badge-type">${p.badge}</span>
+          </div>
+          <div class="preset-desc">${p.description}</div>
+          <div style="margin-top: 6px;">
+            <button class="btn btn-sm btn-gold" onclick="applyPreset('${p.id}')">Apply Preset</button>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+
+      modal.classList.add("open");
+    }
+
+    function applyPreset(presetId) {
+      const preset = PRESETS.find(p => p.id === presetId);
+      if (!preset) return;
+
+      preset.apply(database.knobs);
+      activePresetName = preset.name;
+      renderSections();
+      updateStats();
+      closeModal('presets-modal');
+      showToast(`Applied preset: ${preset.name}`, "success");
+    }
+
+    function saveCustomPresetPrompt() {
+      const name = prompt("Enter a name for this custom preset:", "My Custom Balance");
+      if (!name) return;
+      activePresetName = name;
+      updateStats();
+      showToast(`Saved preset: ${name}`, "success");
+      closeModal('presets-modal');
+    }
+
+    function openExportModal() {
+      generateExportOutputs();
+      document.getElementById("export-modal").classList.add("open");
+    }
+
+    function closeModal(modalId) {
+      document.getElementById(modalId).classList.remove("open");
+    }
+
+    function switchExportTab(tabName) {
+      exportActiveTab = tabName;
+      document.getElementById("tab-btn-tres").className = tabName === "tres" ? "btn btn-sm btn-gold" : "btn btn-sm";
+      document.getElementById("tab-btn-overrides").className = tabName === "overrides" ? "btn btn-sm btn-gold" : "btn btn-sm";
+      document.getElementById("tab-btn-json").className = tabName === "json" ? "btn btn-sm btn-gold" : "btn btn-sm";
+
+      document.getElementById("export-tab-content-tres").style.display = tabName === "tres" ? "block" : "none";
+      document.getElementById("export-tab-content-overrides").style.display = tabName === "overrides" ? "block" : "none";
+      document.getElementById("export-tab-content-json").style.display = tabName === "json" ? "block" : "none";
+    }
+
+    function generateExportOutputs() {
+      // 1. TRES
+      let tresLines = [
+        '[gd_resource type="Resource" script_class="TuningConfig" load_steps=2 format=3]',
+        '',
+        '[ext_resource type="Script" path="res://scripts/resources/TuningConfig.gd" id="1"]',
+        '',
+        '[resource]',
+        'script = ExtResource("1")'
+      ];
+      database.knobs.forEach(k => {
+        const val = k.current_value;
+        if (k.type === "int") {
+          tresLines.push(`${k.id} = ${Math.round(Number(val))}`);
+        } else {
+          const fval = Number(val);
+          if (Math.abs(fval) >= 1e12) {
+            tresLines.push(`${k.id} = ${fval}`);
+          } else if (Number.isInteger(fval)) {
+            tresLines.push(`${k.id} = ${fval.toFixed(1)}`);
+          } else {
+            tresLines.push(`${k.id} = ${fval}`);
+          }
+        }
+      });
+      tresLines.push('');
+      document.getElementById("tres-output").value = tresLines.join('\n');
+
+      // 2. Overrides dict
+      const overrides = {};
+      database.knobs.forEach(k => {
+        if (isKnobOverridden(k)) {
+          overrides[k.id] = k.type === "int" ? Math.round(Number(k.current_value)) : Number(k.current_value);
+        }
+      });
+      document.getElementById("overrides-output").value = JSON.stringify(overrides, null, 2);
+
+      // 3. Full JSON
+      document.getElementById("json-output").value = JSON.stringify(database, null, 2);
+    }
+
+    async function applyDirectlyToGodot() {
+      try {
+        const res = await fetch("/api/export-tres", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Apply-To-Project": "true"
+          },
+          body: JSON.stringify(database)
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const result = await res.json();
+        showToast("Successfully applied tuning directly to game/config/tuning.tres!", "success");
+      } catch (err) {
+        console.error("Direct sync failed:", err);
+        showToast("Direct project sync failed: " + err.message, "error");
+      }
+    }
+
+    function copyExportToClipboard() {
+      let targetId = "tres-output";
+      if (exportActiveTab === "overrides") targetId = "overrides-output";
+      if (exportActiveTab === "json") targetId = "json-output";
+
+      const text = document.getElementById(targetId).value;
+      navigator.clipboard.writeText(text).then(() => {
+        showToast("Copied to clipboard!", "success");
+      }).catch(err => {
+        showToast("Copy failed: " + err.message, "error");
+      });
+    }
+
+    function downloadExportFile() {
+      let content = "";
+      let filename = "tuning.tres";
+      let mime = "text/plain";
+
+      if (exportActiveTab === "tres") {
+        content = document.getElementById("tres-output").value;
+        filename = "tuning.tres";
+      } else if (exportActiveTab === "overrides") {
+        content = document.getElementById("overrides-output").value;
+        filename = "tuning_overrides.json";
+        mime = "application/json";
+      } else {
+        content = document.getElementById("json-output").value;
+        filename = "dev_tuning_data.json";
+        mime = "application/json";
+      }
+
+      const blob = new Blob([content], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast(`Downloaded ${filename}`, "success");
+    }
+
+    function showToast(msg, type = "info") {
+      const container = document.getElementById("toast-container");
+      if (!container) return;
+      const toast = document.createElement("div");
+      toast.className = `toast ${type}`;
+      toast.textContent = msg;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = "0";
+        toast.style.transform = "translateX(50px)";
+        toast.style.transition = "all 0.3s ease";
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+  </script>
+</body>
+</html>

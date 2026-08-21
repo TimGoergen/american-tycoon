@@ -47,6 +47,10 @@ signal reset_dynasty_requested
 signal jump_epoch_requested(tier: int)
 signal grant_legacy_requested(amount: int)
 signal grant_cash_requested(epoch_target_multiplier: float)
+signal trigger_crash_requested
+signal trigger_audit_requested
+signal trigger_windfall_requested
+signal clear_events_requested
 
 
 # Large, legible type for phone reading (UI notes §1) — sized up 25% from the first
@@ -106,9 +110,55 @@ const DESCRIPTIONS := {
 	"minigame_duration_seconds": "Seconds each transition minigame lasts (shared by all games).",
 	"minigame_keep_floor": "Reward kept on the WORST round (modest downside; higher = gentler, 1.0 = no penalty).",
 	"minigame_full_performance": "Performance (0-1) that keeps exactly 100% — 'standard' play; below eases down, above earns bonus.",
+	"minigame_full_score": "Gems cleared to keep full base Legacy (Match-3 anchor).",
+	"minigame_extra_score": "Gems cleared to reach max extra-high bonus.",
 	"match3_full_score": "Match-3 score that keeps 100% (higher = harder to reach full).",
 	"match3_max_score": "Match-3 score for the max bonus / early win (higher = harder to max).",
 	"match3_legacy_match_size": "Gems in a match needed to drop a Legacy gem (higher = rarer).",
+	"match3_points_per_gem": "Match-3: base points awarded per gem in a match.",
+	"match3_size_bonus": "Match-3: score bonus multiplier per extra gem in matches >3.",
+	"match3_clean_match_factor": "Match-3: score multiplier bonus for avoiding Avoid Gem (+15% = 1.15).",
+	"match3_avoid_match_factor": "Match-3: score penalty multiplier for matching Avoid Gem (-60% = 0.40).",
+	"match3_legacy_score_mult": "Match-3 Challenge: score multiplier for matching 5th-type Legacy gems.",
+	"basketball_target_baskets": "Basketball: baskets needed for performance 1.0 in standard round.",
+	"basketball_launch_curve_exp": "Basketball throw ease (higher = gentler small pulls, finer aim).",
+	"basketball_launch_max_drag": "Drag distance (px) for a full-power basketball throw (higher = more pull needed).",
+	"basketball_max_throw_speed": "Max basketball throw speed (px/sec) — raw power.",
+	"basketball_gravity": "Basketball: downward gravity acceleration (px/sec^2).",
+	"basketball_restitution": "Basketball: bounce restitution on walls, floor, and rim (0-1).",
+	"basketball_ball_radius": "Basketball: ball radius in pixels.",
+	"basketball_hoop_rx": "Basketball: hoop horizontal ellipse radius (px).",
+	"basketball_hoop_ry": "Basketball: hoop vertical ellipse radius (px).",
+	"balance_zone_half": "Balance: half-height of the gold zone (fraction of track).",
+	"balance_lift_accel": "Balance: upward acceleration while holding the lift button.",
+	"balance_gravity": "Balance: downward gravity acceleration.",
+	"balance_damping": "Balance: velocity damping per second.",
+	"balance_edge_bounce": "Balance: bounce restitution on hitting top/bottom track edges.",
+	"balance_gem_fill_seconds": "Balance: seconds in zone to fill bonus Legacy gem.",
+	"balance_gem_drain_seconds": "Balance: seconds out of zone to drain gem progress.",
+	"timing_target_locks": "Timing Bar: target locks required to complete full round.",
+	"timing_freeze_time": "Timing Bar: freeze pause duration (seconds) when lock is pressed.",
+	"timing_zone_half": "Timing Bar: initial gold zone half-width fraction.",
+	"timing_zone_half_min": "Timing Bar: minimum gold zone half-width fraction at final lock.",
+	"timing_base_speed": "Timing Bar: initial marker sweep speed (bar-fractions/sec).",
+	"timing_speed_ramp": "Timing Bar: sweep speed multiplier per lock.",
+	"timing_challenge_speed_period": "Timing Bar Challenge: period (seconds) for sweep speed wave.",
+	"timing_challenge_zone_drift_mid": "Timing Bar Challenge: center glide drift speed of gold zone.",
+	"catch_target_coins": "Catch Money: total coins spawned for a full standard game.",
+	"catch_spawn_interval_start": "Catch Money: initial spawn interval between coins (seconds).",
+	"catch_spawn_interval_end": "Catch Money: final spawn interval during late rush (seconds).",
+	"catch_fall_speed": "Catch Money: vertical fall speed of coins (px/sec).",
+	"catch_miss_penalty": "Catch Money: score penalty fraction deducted for missed coin.",
+	"catch_shrink_factor": "Catch Money: coin size shrink multiplier per catch (0.95 = 5%).",
+	"catch_challenge_spawn_interval": "Catch Money Challenge: fixed spawn interval between coins (seconds).",
+	"catch_challenge_wave_period": "Catch Money Challenge: difficulty wave duration in seconds.",
+	"catch_challenge_sway_amplitude": "Catch Money Challenge: peak horizontal sway drift in pixels.",
+	"catch_premium_coin_chance": "Catch Money Challenge: spawn chance for emerald Premium Coins.",
+	"catch_premium_score_value": "Catch Money Challenge: score value for catching Premium Coin.",
+	"memory_target_rounds": "Memory Match: sequence rounds required for full game.",
+	"memory_flash_on": "Memory Match: duration (seconds) a pad stays lit during playback.",
+	"memory_flash_gap": "Memory Match: gap between pad flashes during playback.",
+	"memory_pad_flash_scale": "Memory Match: visual scale multiplier when pad is lit.",
 	"legacy_bonus_fraction": "Legacy granted per collected gem, as a fraction of lifetime (0.001 = 0.1%).",
 	"legacy_bonus_max_gems": "Most legacy moments one round can bank (1 = flat windfall).",
 	"legacy_bonus_great_multiplier": "Bonus to the legacy grant on a great round (1.10 = +10%).",
@@ -120,9 +170,6 @@ const DESCRIPTIONS := {
 	"legacy_gem_chance_basketball": "Chance a legacy gem appears in Basketball.",
 	"legacy_gem_chance_memory": "Chance the Memory gem bonus round appears after a full clear.",
 	"memory_gem_sequence_length": "Length of the Memory gem bonus sequence (identical pads; higher = harder).",
-	"basketball_launch_curve_exp": "Basketball throw ease (higher = gentler small pulls, finer aim).",
-	"basketball_launch_max_drag": "Drag distance (px) for a full-power basketball throw (higher = more pull needed).",
-	"basketball_max_throw_speed": "Max basketball throw speed (px/sec) — raw power.",
 	"offline_efficiency": "Offline income rate vs live play (0–1).",
 	"offline_cap_seconds": "Longest offline accrual window (seconds; 14400 = 4h).",
 	"rush_momentum_heat_build_per_second": "How fast heat climbs while rushing (heat/sec; 1.0 heat = the Hot edge).",
@@ -190,9 +237,16 @@ const DESCRIPTIONS := {
 	"balance_zone_reroll_seconds": "Balance the Books Challenge: seconds between the gold zone re-rolling a new target center.",
 	"balance_zone_ease": "Balance the Books Challenge: how fast the gold zone eases toward its target center, per second.",
 	"crash_multiplier": "Income multiplier during a Market Crash event.",
-	"crash_duration_minutes": "Market Crash length (active minutes).",
+	"crash_duration_base_minutes": "Market Crash base length for Gen 1 (active minutes).",
+	"crash_duration_growth_per_gen": "Market Crash duration increase per generation (+min/gen).",
+	"crash_duration_max_minutes": "Market Crash maximum duration cap (active minutes).",
+	"crash_duration_minutes": "Market Crash fallback length (active minutes).",
 	"audit_settle_rate": "Audit settlement cost as a fraction of net worth.",
 	"audit_threshold": "Legislative Assets needed to void an audit.",
+	"windfall_net_worth_fraction": "The Windfall: fraction of net worth granted as cash.",
+	"event_roll_interval_seconds": "Rare Events: seconds between random roll checks.",
+	"event_base_chance": "Rare Events: base probability on each roll interval (0..1).",
+	"event_grace_period_seconds": "Rare Events: grace period at generation start before events fire.",
 	"earth_economy_target": "Total money on Earth; capture it to win ($).",
 	"autosave_cadence": "Seconds between autosaves.",
 	"audio_rush_harmony_interval_seconds": "Rush Audio: seconds between harmonic chord changes (2-4s).",
@@ -237,13 +291,58 @@ const DISPLAY_NAMES := {
 	"rush_momentum_haptic_vent_gap_ms": "Vent Haptic Gap ms",
 	"k_legacy": "Legacy Payout Scale",
 	"alpha_legacy": "Legacy Payout Curve",
-	"legacy_upgrade_cost_multiplier": "Legacy Upgrade Cost x",
 	"minigame_duration_seconds": "Minigame Timer Seconds",
 	"minigame_keep_floor": "Minigame Downside Floor",
 	"minigame_full_performance": "Minigame Neutral Point",
+	"minigame_full_score": "Minigame Full Score",
+	"minigame_extra_score": "Minigame Extra Score",
 	"match3_full_score": "Match3 Full Score",
 	"match3_max_score": "Match3 Max Score",
 	"match3_legacy_match_size": "Match3 Legacy Match Size",
+	"match3_points_per_gem": "Match3 Points / Gem",
+	"match3_size_bonus": "Match3 Size Bonus",
+	"match3_clean_match_factor": "Match3 Clean Factor",
+	"match3_avoid_match_factor": "Match3 Avoid Penalty",
+	"match3_legacy_score_mult": "Match3 Legacy Score x",
+	"basketball_target_baskets": "Basketball Target Baskets",
+	"basketball_launch_curve_exp": "Basketball Launch Ease",
+	"basketball_launch_max_drag": "Basketball Full-Power Drag",
+	"basketball_max_throw_speed": "Basketball Max Speed",
+	"basketball_gravity": "Basketball Gravity",
+	"basketball_restitution": "Basketball Bounce Restitution",
+	"basketball_ball_radius": "Basketball Ball Radius",
+	"basketball_hoop_rx": "Basketball Hoop RX",
+	"basketball_hoop_ry": "Basketball Hoop RY",
+	"balance_zone_half": "Balance Zone Half Height",
+	"balance_lift_accel": "Balance Lift Accel",
+	"balance_gravity": "Balance Gravity",
+	"balance_damping": "Balance Damping",
+	"balance_edge_bounce": "Balance Edge Bounce",
+	"balance_gem_fill_seconds": "Balance Gem Fill Sec",
+	"balance_gem_drain_seconds": "Balance Gem Drain Sec",
+	"timing_target_locks": "Timing Target Locks",
+	"timing_freeze_time": "Timing Freeze Sec",
+	"timing_zone_half": "Timing Zone Half Start",
+	"timing_zone_half_min": "Timing Zone Half Min",
+	"timing_base_speed": "Timing Base Speed",
+	"timing_speed_ramp": "Timing Speed Ramp / Lock",
+	"timing_challenge_speed_period": "Timing Speed Period Sec",
+	"timing_challenge_zone_drift_mid": "Timing Zone Drift Speed",
+	"catch_target_coins": "Catch Target Coins",
+	"catch_spawn_interval_start": "Catch Spawn Start Sec",
+	"catch_spawn_interval_end": "Catch Spawn End Sec",
+	"catch_fall_speed": "Catch Fall Speed px/s",
+	"catch_miss_penalty": "Catch Miss Penalty",
+	"catch_shrink_factor": "Catch Shrink Factor",
+	"catch_challenge_spawn_interval": "Catch Challenge Spawn Sec",
+	"catch_challenge_wave_period": "Catch Challenge Wave Period",
+	"catch_challenge_sway_amplitude": "Catch Challenge Sway px",
+	"catch_premium_coin_chance": "Catch Premium Coin Chance",
+	"catch_premium_score_value": "Catch Premium Score Val",
+	"memory_target_rounds": "Memory Target Rounds",
+	"memory_flash_on": "Memory Flash Lit Sec",
+	"memory_flash_gap": "Memory Flash Gap Sec",
+	"memory_pad_flash_scale": "Memory Pad Flash Scale",
 	"legacy_bonus_fraction": "Legacy Bonus Fraction",
 	"legacy_bonus_max_gems": "Legacy Bonus Max Gems",
 	"legacy_bonus_great_multiplier": "Legacy Bonus Great Multiplier",
@@ -255,9 +354,6 @@ const DISPLAY_NAMES := {
 	"legacy_gem_chance_basketball": "Legacy Gem Chance Basketball",
 	"legacy_gem_chance_memory": "Legacy Gem Chance Memory",
 	"memory_gem_sequence_length": "Memory Gem Sequence Length",
-	"basketball_launch_curve_exp": "Basketball Launch Ease",
-	"basketball_launch_max_drag": "Basketball Full-Power Drag",
-	"basketball_max_throw_speed": "Basketball Max Speed",
 }
 
 
@@ -270,37 +366,29 @@ const DISPLAY_NAMES := {
 ## (CATCH_ALL_SECTION_TITLE) appended at the end. Each entry is { "title": String, "prefixes":
 ## Array[String] } — a prefix that is a full knob name (e.g. "logic_hz") matches only that knob.
 const SECTIONS := [
-	# Core Loop is the general "base economy" bucket. It also absorbs the input-repeat holds
-	# (buy_hold_ / hire_hold_), the offline pacing (offline_), and the carbonation bubble visuals
-	# (carb_) — each was its own header, but they are all facets of the core loop and its feedback,
-	# so folding them here trims the panel from 14 section headers to 10 (Tim, 2026-07-22 — the
-	# collapsed headers had grown to fill the whole tab).
 	{"title": "Core Loop", "prefixes": [
 		"logic_hz", "m1_starting_cash", "band_step", "cycle_floor", "rush_pct",
 		"hold_rush_per_second", "earth_economy_target", "autosave_cadence",
-		"buy_hold_", "hire_hold_", "offline_", "carb_",
+		"buy_hold_", "hire_hold_", "offline_", "carb_", "epoch_flagship_", "auto_purchase_"
 	]},
 	{"title": "Wage", "prefixes": ["wage_"]},
-	# Audio needs its own entry or every audio_* knob lands in the catch-all section, which is
-	# titled "Challenge Mode" and would be a confusing home for the tap-scale timing.
 	{"title": "Audio", "prefixes": ["audio_"]},
 	{"title": "Frenzy", "prefixes": ["frenzy_"]},
 	{"title": "Rush Momentum", "prefixes": ["rush_momentum_"]},
-	# Staff absorbs the retention pricing knobs (retention_*) — retention is just staff-level pricing.
 	{"title": "Staff", "prefixes": ["staff_", "retention_"]},
-	# NOTE: this section holds the non-challenge minigame knobs (physics / features) ONLY. The
-	# per-game challenge dials — basketball_tier_*, the *_keepalive_seconds_per_point knobs, etc. —
-	# belong to the "Challenge Mode" catch-all (Tim, 2026-07-22). So the basketball and match3 prefixes
-	# are SPECIFIC (basketball_launch_, match3_full_score, …) rather than broad "basketball_" / "match3_",
-	# which would otherwise scoop challenge knobs like basketball_keepalive_* / match3_keepalive_* back in.
+	{"title": "Challenge Mode", "prefixes": [
+		"challenge_", "basketball_tier_", "memory_tier_",
+		"basketball_keepalive_", "memory_keepalive_", "match3_keepalive_",
+		"timing_keepalive_", "catch_keepalive_", "balance_seconds_per_point",
+		"balance_keepalive_", "balance_zone_"
+	]},
 	{"title": "Minigames", "prefixes": [
-		"minigame_", "match3_full_score", "match3_max_score", "match3_legacy_match_size",
-		"basketball_launch_", "basketball_max_", "memory_gem_",
+		"minigame_", "match3_", "basketball_", "memory_", "balance_", "timing_", "catch_"
 	]},
 	{"title": "Legacy Bonus", "prefixes": ["legacy_bonus_", "legacy_gem_chance_"]},
 	{"title": "Estate & Legacy", "prefixes": ["estate_", "loophole_", "k_legacy", "alpha_legacy",
-		"legacy_knee_net", "legacy_cost_steepening", "legacy_upgrade_cost_multiplier"]},
-	{"title": "Events", "prefixes": ["crash_", "audit_"]},
+		"legacy_knee_net", "legacy_cost_steepening", "legacy_upgrade_cost_multiplier", "alpha_legacy_deep"]},
+	{"title": "Events", "prefixes": ["crash_", "audit_", "windfall_", "event_"]},
 ]
 
 ## The catch-all section title for knobs no SECTIONS prefix matched (so a newly added knob always
@@ -598,6 +686,31 @@ func _add_playtest_section() -> void:
 		var m: float = mult
 		var cb := _playtest_button("x%d" % int(m))
 		cb.pressed.connect(func() -> void: grant_cash_requested.emit(m))
+		cash_row.add_child(cb)
+	body.add_child(cash_row)
+
+	body.add_child(_playtest_label("Rare Events (trigger on demand):"))
+	var event_row := HFlowContainer.new()
+	event_row.add_theme_constant_override("h_separation", 8)
+	event_row.add_theme_constant_override("v_separation", 8)
+
+	var btn_crash := _playtest_button("CRASH")
+	btn_crash.pressed.connect(func() -> void: trigger_crash_requested.emit())
+	event_row.add_child(btn_crash)
+
+	var btn_audit := _playtest_button("AUDIT")
+	btn_audit.pressed.connect(func() -> void: trigger_audit_requested.emit())
+	event_row.add_child(btn_audit)
+
+	var btn_windfall := _playtest_button("WINDFALL")
+	btn_windfall.pressed.connect(func() -> void: trigger_windfall_requested.emit())
+	event_row.add_child(btn_windfall)
+
+	var btn_clear := _playtest_button("CLEAR ALL")
+	btn_clear.pressed.connect(func() -> void: clear_events_requested.emit())
+	event_row.add_child(btn_clear)
+	body.add_child(event_row)
+
 	body.add_child(_playtest_label("Diagnostics & Crash Trace Log:"))
 	var trace_row := HBoxContainer.new()
 	trace_row.add_theme_constant_override("separation", 8)

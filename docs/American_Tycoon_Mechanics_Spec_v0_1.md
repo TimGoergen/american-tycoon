@@ -219,25 +219,21 @@ State machine: `FILLING ⇄ BURNING`.
 - Pop button always previews live value: "×2.4 for 38s" (house rule: every irreversible decision shows its reward first).
 - Live constants (`tuning.tres`): FRENZY_MAX_MULT 5.6×, T_BURN 30s (device-tuned from the provisional 4×/90s), FRENZY_FILL 0.4%/tap (held rush pulses fill at ×0.6), FRENZY_DECAY 0.5%/s, IDLE_GRACE 5s. The Killer Instinct / Second Wind Legacy upgrades compound the popped multiplier and burn duration further (§9.4). Presented in-game as **TURBO**.
 
-## 8. Debt, Loans, Credit Offers
+## 8. Debt, Loans, Credit Offers (Retired)
 
-- **Origin debts** per GDD §8.1 ($200k interest-free / $500k high-interest).
-- **Repayment schedule: milestone-triggered**, never wall-clock. Each loan = ordered list of (trigger: net_worth ≥ X OR income_per_sec ≥ Y, amount due). Trigger fires only during active sessions (never resolves while away). Due presented as mail (§10 delivery rule); a GRACE window of active play time to pay; UI shows next trigger transparently.
-- **Miss = forced generation end** (bankruptcy death): creditors seize `min(estate, outstanding_balance)` before tax; see §9.2.
-- **Offers system:** data-driven tier table (schema §11): {eligibility band (net worth range), principal, payment schedule, flavor}. One active loan max. Terms improve with eligibility band (payday → prime → bailout). Offer cadence: rolled at generation start + on band promotion `TBD-SIM`. Offers arrive as mail; expire silently if ignored (never nag — Principle 5).
+*Retired from design (2026-08).* Origins, debt obligations, and loan offers are permanently removed. The founder starts at $0 with no starting debt, and the game progression relies on pure idle accumulation and prestige acceleration.
 
 ## 9. Death, Estate, Legacy
 
-### 9.1 Generation end (non-bankruptcy)
+### 9.1 Generation end
 Player-confirmed, always — no aging system. Available once projected Legacy gain ≥ 1 (the minimum-estate gate, emergent from §9.3). Initiated from the **Estate Planning tab**, which displays the live draft will (full §9.2 waterfall) at all times. Advisor pressure: heir status line escalates with upgrade-cadence decay (thresholds `TBD-SIM`); estate planner prompt at sustained stagnation (GDD §0.1).
 
 ### 9.2 The estate waterfall (executed at death, itemized on the will screen)
 ```
 estate_gross   = cash_earned_this_gen               (the dollars THIS generation earned over its life; GDD Future Features decision 2026-06-14)
-after_credit   = estate_gross − min(estate_gross, outstanding_debt)     (creditors first)
-taxable        = max(0, after_credit − EXEMPTION)
+taxable        = max(0, estate_gross − EXEMPTION)
 tax            = floor(taxable × TAX_RATE)
-estate_net     = after_credit − tax
+estate_net     = estate_gross − tax
 ```
 - **Gross-estate basis changed 2026-06-14 (GDD Future Features "Lifetime cash earned"):** the gross is now the generation's **lifetime cash earned**, not net-worth-at-death (`cash + asset_book_value`). This rewards earning over a life rather than terminal hoarding, and gives a monotonic, cross-epoch-comparable basis. The per-generation figure feeds the waterfall; the dynasty also keeps a cumulative `lifetime_cash_earned` accumulator as the display/yardstick stat. Everything below the gross is unchanged. (`K_LEGACY`/`ALPHA` re-tuning expected once magnitude shifts — `TBD-SIM`.)
 - `EXEMPTION` base $1M; `TAX_RATE` base 60% — both provisional `TBD-SIM`, deliberately brutal so the loophole tree feels like a jailbreak.
@@ -479,7 +475,7 @@ Main (ladder, wage button, frenzy bar, income/sec hero stat, backdrop) · The Le
 ## 15. Open Items (content pass / later decisions)
 
 1. Estate valuation rule (book value vs. alternatives) — validate in simulator (§9.2).
-2. Title table; loophole catalog; Legacy upgrade catalog; loan tier table; (Hon.) title list; staffer names — content pass, M2–M3.
+2. Title table; loophole catalog; Legacy upgrade catalog; (Hon.) title list; staffer names — content pass, M2–M3.
 3. R0 per property; all TBD-SIM constants — simulator pass.
 4. Earth canonical figure ($103.6T) — confirm.
 5. Family Office upgrade ladder (cap/efficiency steps).

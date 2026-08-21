@@ -105,41 +105,32 @@ var _running: bool = false
 var _flash: float = 0.0       # brief cream highlight after a successful lock, decays in _process
 var _miss_flash: float = 0.0  # brief red highlight after a missed click, decays in _process
 var _zone_center: float = 0.5  # current center of the gold zone (bar fraction); jumps each lock
-## Displayed half-width of the gold zone. Refreshed ONLY in _move_zone (which runs after the freeze),
-## never straight from _current_zone_half(), so a hit doesn't visibly shrink the zone mid-freeze — the
-## zone holds its pre-hit size through the whole result freeze and only shrinks+jumps once it ends
-## (Tim, 2026-07-11). _current_zone_half() is the target size for the live lock count; this is what's
-## actually drawn until the next _move_zone applies it.
 var _zone_half: float = ZONE_HALF
+
+# --- Live tunable parameters ---
+var _target_locks: int = TARGET_LOCKS
+var _freeze_time: float = FREEZE_TIME
+var _zone_half_start: float = ZONE_HALF
+var _zone_half_min: float = ZONE_HALF_MIN
+var _base_speed: float = BASE_SPEED
+var _speed_ramp: float = SPEED_RAMP
+var _challenge_speed_period: float = CHALLENGE_SPEED_PERIOD_SECONDS
+var _challenge_zone_drift_mid: float = CHALLENGE_ZONE_DRIFT_MID
+
 ## Freeze-burst state. While _freeze_left > 0 the marker and zone hold still, a hit/miss burst
 ## is drawn, and is_busy() is true so the host pauses its countdown for the duration.
 var _freeze_left: float = 0.0
 var _freeze_success: bool = false  # true -> draw the white/gold "hit" burst; false -> gray "miss" burst
-## Set when the FINAL lock lands: we keep running through that lock's freeze so its success burst
-## is visible, then emit completed once the freeze ends (see _on_freeze_ended).
 var _finish_after_freeze: bool = false
-## Click-feedback lines left where each click landed; each is {pos, age, hit} and fades over
-## CLICK_MARK_FADE seconds so the player can see exactly where their taps were perceived. `hit`
-## colors the line green (a scored lock) or red (a wasted, lock-costing miss).
 var _click_marks: Array = []
-## Fading "previous size" outline drawn when the zone shrinks+jumps, so the shrink is visible.
-## _zone_ghost_half is the OLD (larger) half-width; _zone_ghost_left counts down ZONE_GHOST_TIME.
 var _zone_ghost_half: float = 0.0
 var _zone_ghost_left: float = 0.0
 
 # --- Legacy gem (Plans/Legacy_Bonus_System.md) -------------------------------
-## Chance, per successful lock, that a legacy gem appears in the center of the NEXT target zone
-## (from tuning.legacy_gem_chance_timing). Only one gem opportunity is ever active at a time.
 var _legacy_gem_chance: float = 0.0
-## True while a legacy gem is sitting in the zone waiting to be grabbed. The player's next lock
-## consumes it: a hit collects it, a miss loses it (see _on_lock). Drawn at _legacy_gem_center.
 var _legacy_gem_active: bool = false
-## Bar-fraction center of the pending legacy gem (always the zone center it spawned in).
 var _legacy_gem_center: float = 0.5
-## Brief gold "you grabbed it" burst after a legacy gem is collected, decays in _process like _flash.
 var _legacy_win_flash: float = 0.0
-## Brief gray "it slipped away" cue after a gem is LOST to a missed lock, so a lost gem is never
-## invisible (Tim, 2026-07-11 — a gem was vanishing with no indication). Decays like _legacy_win_flash.
 var _legacy_lost_flash: float = 0.0
 ## The legacy gem art, drawn centered in the target zone as a "grab this on your next lock" cue.
 const LEGACY_GEM_TEXTURE = preload("res://art/icons/legacy_gem.svg")
@@ -170,17 +161,22 @@ func begin(tuning: TuningConfig) -> void:
 	_marker_dir = 1.0
 	_success_count = 0
 	_challenge_drift_time = 0.0
-	# Challenge Mode's sweep speed rides a TIME-based wave across regular mode's speed range, the swing
-	# growing over the run (see _challenge_marker_speed); normal mode starts at BASE_SPEED, ×SPEED_RAMP.
-	_marker_speed = _challenge_marker_speed() if challenge_mode else BASE_SPEED
+	if tuning != null:
+		_target_locks = tuning.timing_target_locks if tuning.timing_target_locks > 0 else TARGET_LOCKS
+		_freeze_time = maxf(0.05, tuning.timing_freeze_time)
+		_zone_half_start = clampf(tuning.timing_zone_half, 0.02, 0.5)
+		_zone_half_min = clampf(tuning.timing_zone_half_min, 0.01, _zone_half_start)
+		_base_speed = maxf(0.1, tuning.timing_base_speed)
+		_speed_ramp = maxf(1.0, tuning.timing_speed_ramp)
+		_challenge_speed_period = maxf(1.0, tuning.timing_challenge_speed_period)
+		_challenge_zone_drift_mid = maxf(0.01, tuning.timing_challenge_zone_drift_mid)
+		_legacy_gem_chance = clampf(tuning.legacy_gem_chance_timing, 0.0, 1.0)
+	_marker_speed = _challenge_marker_speed() if challenge_mode else _base_speed
 	_zone_drift_dir = 1.0
 	_locks_until_flip = _rng.randi_range(CHALLENGE_ZONE_FLIP_LOCKS_MIN, CHALLENGE_ZONE_FLIP_LOCKS_MAX)
 	_locks = 0
 	_accuracy_sum = 0.0
 	_running = true
-	# Live legacy-gem spawn chance so Balance Tuning edits take effect next round. No gem is
-	# active until a successful lock rolls one into the next zone (see _on_freeze_ended).
-	_legacy_gem_chance = tuning.legacy_gem_chance_timing
 	_legacy_gem_active = false
 	_move_zone()
 
@@ -232,7 +228,7 @@ func begin(tuning: TuningConfig) -> void:
 
 
 func get_performance() -> float:
-	return clampf(_accuracy_sum / float(TARGET_LOCKS), 0.0, 1.0)
+	return clampf(_accuracy_sum / float(_target_locks), 0.0, 1.0)
 
 
 ## Challenge Mode's raw score: how many successful (in-the-gold-zone) locks the player has made this
@@ -243,7 +239,7 @@ func get_score() -> int:
 
 
 func result_summary() -> String:
-	return "Locked %d of %d" % [_locks, TARGET_LOCKS]
+	return "Locked %d of %d" % [_locks, _target_locks]
 
 
 ## True only during a freeze-burst; the host pauses its countdown so the 0.5s freeze (and its
@@ -326,19 +322,12 @@ func _on_lock() -> void:
 		return
 	# Every LOCK press freezes the bar for a beat so the player can read a hit/miss burst. The
 	# success flag (set below, once we know hit vs miss) chooses which burst _draw_bar shows.
-	_freeze_left = FREEZE_TIME
-	# Judge the tap against the zone AS DISPLAYED (its pre-hit size), not _current_zone_half() for the
-	# soon-to-be-incremented lock count — the player aimed at the zone they can see.
+	_freeze_left = _freeze_time
 	var half := _zone_half
 	var distance := absf(_marker_pos - _zone_center)
 	var hit := distance <= half
-	# Drop a fading line wherever the marker was at the moment of the click — hit or miss — colored
-	# green (scored) or red (wasted) so the player gets clear feedback on exactly where, and how
-	# well, their tap was perceived.
 	Audio.play(&"time_lock_hit" if hit else &"time_lock_miss")
 	_click_marks.append({"pos": _marker_pos, "age": 0.0, "hit": hit})
-	# A pending legacy gem is consumed by THIS lock, whichever way it goes: a hit (lock landed in
-	# the zone the gem sits in) collects it with a win cue; a miss simply loses it (no penalty).
 	var grabbed_gem := false
 	if _legacy_gem_active:
 		_legacy_gem_active = false
@@ -346,38 +335,23 @@ func _on_lock() -> void:
 			collect_legacy_gem()
 			Audio.play(&"time_gem")
 			_legacy_win_flash = 1.0
-			grabbed_gem = true  # this lock's success chip becomes the gold "LEGACY GEM!" cue
+			grabbed_gem = true
 		else:
-			# Lost it. Show it slip away (gray fade at the gem's spot) so the gem never just
-			# disappears with no cue — the missed lock already carries its own penalty.
 			_legacy_lost_flash = 1.0
 	if not hit:
-		# Missed the zone. A miss scores nothing and does NOT change the lock count — its only cost
-		# is the time it burns, since the host countdown keeps running during play. (This used to
-		# subtract a lock, but the count yo-yoing up and down read as a treadmill; Tim, 2026-07-11.)
 		_miss_flash = 1.0
-		_freeze_success = false  # draw the gray drop-shadow "miss" burst during the freeze
-		# CHALLENGE mode only: a missed lock costs keep-alive time. A successful lock earns 1 point, so
-		# we emit 1.0 and the host drains miss_penalty_ratio x 1 x seconds_per_point. Reward mode never
-		# emits, so its "a miss just wastes time" behavior is unchanged.
+		_freeze_success = false
 		if challenge_mode:
 			challenge_time_penalty.emit(1.0)
-		# Red "MISS!" chip at the marker so a wasted lock reads like every other game's feedback
-		# (Tim, 2026-07-11). Red = failure, never a success.
 		if _bar != null:
 			FloatingChip.spawn(_bar, Vector2(_marker_pos * _bar.size.x, _bar.size.y * 0.5),
 					"MISS!", UiPalette.KETCHUP_RED)
 		return
 
-	# Hit: accuracy 1.0 dead-center of the zone, falling to 0 at its (current) edges.
 	var accuracy := clampf(1.0 - distance / half, 0.0, 1.0)
 	_accuracy_sum += accuracy
 	_locks += 1
 	_success_count += 1
-	# Success chip floating up from the marker, so a good lock reads at a glance like Match-3's match
-	# chips (Tim, 2026-07-11). A lock that GRABBED a legacy gem shows the gold "LEGACY GEM!" chip so
-	# earning the gem is unmistakable on the game itself (Tim, 2026-07-11 — it wasn't reflected before);
-	# otherwise the text reflects how clean the lock was — gold "PERFECT!" dead-center, else green.
 	if _bar != null:
 		var chip_text := "NICE!"
 		var chip_color := UiPalette.MONEY_GREEN
@@ -390,85 +364,52 @@ func _on_lock() -> void:
 		elif accuracy >= 0.6:
 			chip_text = "GREAT!"
 		FloatingChip.spawn(_bar, Vector2(_marker_pos * _bar.size.x, _bar.size.y * 0.5), chip_text, chip_color)
-	# Per successful lock: normal mode speeds the sweep up (×SPEED_RAMP). Challenge Mode's sweep speed is a
-	# live time-based wave set each frame in _process, so here it only flips the zone's drift direction
-	# every few locks (on top of the edge bounce).
 	if challenge_mode:
 		_locks_until_flip -= 1
 		if _locks_until_flip <= 0:
 			_zone_drift_dir = -_zone_drift_dir
 			_locks_until_flip = _rng.randi_range(CHALLENGE_ZONE_FLIP_LOCKS_MIN, CHALLENGE_ZONE_FLIP_LOCKS_MAX)
 	else:
-		_marker_speed *= SPEED_RAMP
+		_marker_speed *= _speed_ramp
 	_flash = 1.0
-	_freeze_success = true  # draw the white-with-gold-glow "hit" burst during the freeze
+	_freeze_success = true
 	_update_locks_label()
-	# Normal mode ends after TARGET_LOCKS successful locks. Challenge Mode ignores the target and
-	# runs forever (never emits completed), so we skip this end check entirely when it's on.
-	if not challenge_mode and _locks >= TARGET_LOCKS:
-		# Final lock: keep _running through the freeze so this success burst is visible, then
-		# emit completed once the freeze ends (in _on_freeze_ended). The zone does NOT jump.
+	if not challenge_mode and _locks >= _target_locks:
 		_finish_after_freeze = true
 		return
-	# The zone holds where it was hit during the freeze, then jumps to a fresh spot once the
-	# freeze ends (in _on_freeze_ended), so the burst clearly lands on the gold it just caught.
 
 
-## Called once when a freeze finishes. Resolves whatever that lock set up: end the round on the
-## final lock, or jump the zone after a non-final hit. (A miss leaves the zone where it is.)
 func _on_freeze_ended() -> void:
 	if _finish_after_freeze:
 		_running = false
 		completed.emit(get_performance())
 	elif _freeze_success:
 		_move_zone()
-		# After the zone jumps to its fresh spot, roll the small chance to drop a legacy gem into
-		# its center for the player to grab on their next lock. Rolled here (not once per round) so
-		# the gem always sits in a freshly-placed zone, and only one is ever active at a time. Works
-		# unchanged in Challenge Mode's endless loop — the host suppresses the actual grant there.
-		# Skip once the bonus is already earned (design rule 3 — no more gems once secured).
 		if not _legacy_gem_active and not legacy_bonus_secured() and _rng.randf() < _legacy_gem_chance:
 			_legacy_gem_active = true
 			_legacy_gem_center = _zone_center
 
 
-## The zone's current half-width. Normal mode: starts at ZONE_HALF and shrinks linearly to
-## ZONE_HALF_MIN as successful locks climb toward TARGET_LOCKS, so the target gets steadily harder.
-## Challenge Mode: a slow gentle drift between modest bounds (see _challenge_zone_half), so the
-## endless run breathes between slightly-easier and slightly-harder rather than pinning at one size.
 func _current_zone_half() -> float:
 	if challenge_mode:
 		return _challenge_zone_half()
-	var progress := clampf(float(_locks) / float(TARGET_LOCKS), 0.0, 1.0)
-	return lerpf(ZONE_HALF, ZONE_HALF_MIN, progress)
+	var progress := clampf(float(_locks) / float(_target_locks), 0.0, 1.0)
+	return lerpf(_zone_half_start, _zone_half_min, progress)
 
 
-## Challenge Mode: the marker's current sweep speed — a time-based wave with a growing swing across
-## regular mode's speed range (details below).
 func _challenge_marker_speed() -> float:
-	# Spans regular mode's range (BASE_SPEED up to its top after a full run) but rides a TIME clock so the
-	# speed visibly rises and falls WITHIN a run (the lock-based version barely moved in short runs). The
-	# swing GROWS from a fraction to the full range over CHALLENGE_SPEED_SWING_RAMP_SECONDS, so the
-	# variation grows more noticeable the longer you last — a gentle rate of change, not a wobble.
-	var fast := BASE_SPEED * pow(SPEED_RAMP, float(TARGET_LOCKS - 1))
-	var mid := (BASE_SPEED + fast) * 0.5
-	var full_amp := (fast - BASE_SPEED) * 0.5
+	var fast := _base_speed * pow(_speed_ramp, float(_target_locks - 1))
+	var mid := (_base_speed + fast) * 0.5
+	var full_amp := (fast - _base_speed) * 0.5
 	var growth := clampf(_challenge_drift_time / CHALLENGE_SPEED_SWING_RAMP_SECONDS, 0.0, 1.0)
 	var amp := full_amp * lerpf(CHALLENGE_SPEED_START_SWING, 1.0, growth)
-	return mid + amp * sin(TAU * _challenge_drift_time / CHALLENGE_SPEED_PERIOD_SECONDS)
+	return mid + amp * sin(TAU * _challenge_drift_time / _challenge_speed_period)
 
 
-## Challenge Mode: the zone's current glide speed — a gentle lock-based wave around CHALLENGE_ZONE_DRIFT_MID
-## (a much smaller swing than the marker's, per Tim 2026-07-22), so the target speeds up and slows a
-## little as it travels rather than gliding at one static rate.
 func _challenge_zone_drift_speed() -> float:
-	return CHALLENGE_ZONE_DRIFT_MID + CHALLENGE_ZONE_DRIFT_AMP * sin(TAU * _challenge_drift_time / CHALLENGE_ZONE_DRIFT_PERIOD_SECONDS)
+	return _challenge_zone_drift_mid + CHALLENGE_ZONE_DRIFT_AMP * sin(TAU * _challenge_drift_time / CHALLENGE_ZONE_DRIFT_PERIOD_SECONDS)
 
 
-## Challenge Mode only: the zone half-width for the current LOCK count — a slow cosine wave between
-## CHALLENGE_ZONE_WIDE (the run starts here) and CHALLENGE_ZONE_NARROW at the half-period, over the long
-## CHALLENGE_ZONE_PERIOD_LOCKS. Sampled once per lock by _move_zone, so the width is steady through each
-## freeze and only nudges between locks — a gentle grow/shrink over many locks, never a fast bounce.
 func _challenge_zone_half() -> float:
 	var mid := (CHALLENGE_ZONE_WIDE + CHALLENGE_ZONE_NARROW) * 0.5
 	var amp := (CHALLENGE_ZONE_WIDE - CHALLENGE_ZONE_NARROW) * 0.5

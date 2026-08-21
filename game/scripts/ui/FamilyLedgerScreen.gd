@@ -42,16 +42,22 @@ func setup() -> void:
 
 func _build_chrome() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
+	size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	size_flags_vertical = Control.SIZE_EXPAND_FILL
 
 	# No inner margin (Tim, 2026-06-28): the shared tab panel (UiPalette.wrap_in_tab_panel) already
 	# pads this tab, and an extra inset here pushed the title 8px lower than the Estate/Settings
 	# titles, breaking their vertical alignment.
 	var margin := MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	add_child(margin)
 
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 12)
+	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	column.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	margin.add_child(column)
 
 	# ── Header: the centered "FAMILY LEDGER" title (shared tab-title style, matching the Settings
@@ -61,12 +67,15 @@ func _build_chrome() -> void:
 
 	_total_label = Label.new()
 	_total_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_total_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_total_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_total_label.add_theme_color_override("font_color", UiPalette.DARK_MONEY_GREEN)
 	_total_label.add_theme_font_size_override("font_size", TOTAL_SIZE)
 	column.add_child(_total_label)
 
 	# ── Scrollable list of ancestor rows ──
 	var scroll := ScrollContainer.new()
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_RESERVE
@@ -101,6 +110,8 @@ func refresh(ancestors: Array, lifetime_total: float, earth_captured: bool = fal
 	if ancestors.is_empty():
 		var empty := Label.new()
 		empty.text = "No ancestors yet. The dynasty begins with you."
+		empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		empty.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		empty.add_theme_color_override("font_color", UiPalette.NAVY)
 		empty.add_theme_font_size_override("font_size", BODY_SIZE)
 		_list.add_child(empty)
@@ -119,15 +130,19 @@ func _add_earth_certificate_card(generation_captured: int) -> void:
 	style.set_corner_radius_all(14)
 	style.set_content_margin_all(16)
 	cert_card.add_theme_stylebox_override("panel", style)
+	cert_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_list.add_child(cert_card)
 
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 6)
+	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	cert_card.add_child(column)
 
 	var title := Label.new()
 	title.text = "★ COMMENDATION OF TOTAL EARTH SATURATION ★"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title.add_theme_color_override("font_color", UiPalette.DARK_GOLD)
 	title.add_theme_font_size_override("font_size", UiPalette.FONT_SUBHEAD)
 	column.add_child(title)
@@ -136,6 +151,7 @@ func _add_earth_certificate_card(generation_captured: int) -> void:
 	detail.text = "Earth's Entire Economy Captured in Generation %d ($103.6T)\nCertified 100%% Monopoly by the Dept. of Commerce" % generation_captured
 	detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	detail.add_theme_color_override("font_color", UiPalette.NAVY)
 	detail.add_theme_font_size_override("font_size", BODY_SIZE)
 	column.add_child(detail)
@@ -145,15 +161,18 @@ func _add_earth_certificate_card(generation_captured: int) -> void:
 func _add_ancestor_row(record: Dictionary) -> void:
 	var card := PanelContainer.new()
 	card.add_theme_stylebox_override("panel", UiPalette.make_panel_style())
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_list.add_child(card)
 
 	var card_column := VBoxContainer.new()
 	card_column.add_theme_constant_override("separation", 6)
+	card_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	card.add_child(card_column)
 
 	var name_label := Label.new()
 	name_label.text = String(record.get("name", ""))
 	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_label.add_theme_color_override("font_color", UiPalette.NAVY)
 	name_label.add_theme_font_size_override("font_size", NAME_SIZE)
 	card_column.add_child(name_label)
@@ -165,6 +184,7 @@ func _add_ancestor_row(record: Dictionary) -> void:
 		String(record.get("cause", "")),
 	]
 	detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	detail.add_theme_color_override("font_color", UiPalette.MONEY_GREEN)
 	detail.add_theme_font_size_override("font_size", BODY_SIZE)
 	card_column.add_child(detail)

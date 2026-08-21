@@ -284,12 +284,12 @@ markers are load-bearing — `Tuning_Record.md` reads them as the provenance sys
 | Milestone | GDD exit criterion | Status |
 | :--- | :--- | :--- |
 | **M1 — The Slice** | Dopaminergic on real hardware; return-spike verified against a real 3-hour gap | ✅ **Complete** — shipped and long since superseded |
-| **M2 — The Dynasty** | "Speeds up every time" across ≥5 generations | ⚠️ **Complete except Track B.** Death, obituary, will/heir, estate tax, Legacy shop, heir names, Family Ledger, lifetime-cash basis all shipped. **Origins, debt, bankruptcy, loan offers, and mail are SHELVED** on `shelved/credit-and-class` — Tim's call: early-game cash influx flattened the opening grind. Expected to return as a *post-prestige* mechanic for accelerated heirs |
+| **M2 — The Dynasty** | "Speeds up every time" across ≥5 generations | ✅ **Complete.** Death, obituary, will/heir, estate tax, Legacy shop, heir names, Family Ledger, lifetime-cash basis all shipped. "Speeds up every time" verified in the sim. Origins, debt, bankruptcy, and loan offers are permanently killed/dropped from the design — founder starts at $0 and builds wealth through the pure idle climb with no early-cash distortion |
 | **M3 — The Theme** | "The game is *itself*" | ⚠️ **Mostly built.** Audio implementation done 2026-08-10 (assets still placeholder); epoch-keyed staffing UI, first-contact beat, welcome-back ritual, the Ledger, staffer portraits, tutorial/onboarding all shipped. **Outstanding: the art pass** (hero illustrations, backdrops beyond the five that exist), **narrator copy pass**, and **rare events** |
 | **M4 — The Epoch** | Earth captured; first contact made | ⚠️ **Partially built.** Epoch progression well beyond the milestone's ask — 27 tiers, 25 alien civs, MAKE CONTACT as a deliberate player verb, the full endgame economy fitted by `DynastyArcStudy`. **Not built: the Earth target/percentage display and the Final Dollar sequence** (GDD §10) — `grep` finds no implementation of either |
 
-The blunt read: the project has run *past* its milestone framing. M4's epoch content shipped while
-M3's art pass and M2's credit track did not, so the M1–M4 ladder no longer describes the work
+The blunt read: the project has run *past* its original milestone framing. M4's epoch content and M2 shipped while
+M3's art pass did not, so the M1–M4 ladder no longer describes the work
 remaining. See [§3.4](#34-documentation-drift).
 
 ### 2.2 Systems shipped since the milestones stopped describing the work
@@ -333,9 +333,6 @@ and shipped. **Live, ungraduated entries:**
 - **The Final Dollar / win condition** (GDD §10) — no implementation exists.
 - **Earth target & percentage display** (M4) — not built.
 - **Meta-tier upgrades**, the second-order prestige track (GDD §8.7) — proposed 2026-07-01, unbuilt.
-- **Origins / debt / bankruptcy / loan offers / mail** — built and preserved on
-  `shelved/credit-and-class`. `DynastyState` already threads `outstanding_debt` (hardcoded `0.0`)
-  through the estate waterfall as a parameter, so the seam is open for its return.
 
 ---
 
@@ -395,7 +392,7 @@ live trap for the next session:
 | `CLAUDE.md` (root) | "**M1 Brief** — canon for the current milestone scope" | M1 shipped ~June 2026; the brief describes 12 Earth properties and one screen. It is history, not scope |
 | `game/project.godot` | `config/description="Idle/tycoon — M1 The Slice"`, `config/version="0.0.0.0001"` | Version is stamped by CI at build time, so the committed value is cosmetic — but the description is simply wrong now |
 | `scripts/core/CLAUDE.md` | Bump `SAVE_VERSION` for any new persisted field | Practice since 2026-08-05 is **additive keys that default sensibly do not need a bump** — set by `ui_currency_format`, followed by the met-minigame set and the audio settings. `docs/Save_Format_And_Migrations.md` flags this contradiction explicitly |
-| GDD §13 milestones | M1→M4 as sequenced plateaus | M4 content shipped while M2's credit track and M3's art pass did not. The ladder no longer describes remaining work |
+| GDD §13 milestones | M1→M4 as sequenced plateaus | M4 content and M2 shipped while M3's art pass did not. The ladder no longer describes remaining work |
 
 ### 3.5 Technical debt
 
@@ -459,9 +456,6 @@ is precisely what these two govern, remain unverified by play.
 - `sim/` holds 28 scripts of which 12 are gates; the other 16 are studies and one generator
   (`AudioCueDoc` *writes* `game/audio/README.md`). Nothing in the filenames distinguishes them —
   only `run_gates.ps1` and `sim/CLAUDE.md` do.
-- `shelved/credit-and-class` is an unmerged branch carrying a complete feature. It will bit-rot
-  against `main` for as long as it sits there; `DynastyState`'s `outstanding_debt` parameter is the
-  seam that keeps its return cheap.
 - **The MAX-buy collision** (Roadmap §1) is a design decision blocking an idea, recorded so nobody
   ships the take-away by accident.
 

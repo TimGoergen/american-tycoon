@@ -67,11 +67,13 @@ const AVOID_MATCH_FACTOR := 0.40
 ## bonus instead (see _score_steps).
 const LEGACY_SCORE_MULT := 2.5
 
-# The score-to-performance thresholds are LIVE tuning knobs (Balance Tuning), captured from
-# TuningConfig in begin() so Tim can dial the ceiling on device without a rebuild. Defaults live in
-# TuningConfig (match3_full_score / match3_max_score).
 var _score_full: float = 600.0   # score that maps to the host's "full" (keep 100%) line
 var _score_max: float = 2200.0   # score that maps to performance 1.0 (max bonus + early-out)
+var _points_per_gem: float = POINTS_PER_GEM
+var _size_bonus: float = SIZE_BONUS
+var _clean_match_factor: float = CLEAN_MATCH_FACTOR
+var _avoid_match_factor: float = AVOID_MATCH_FACTOR
+var _legacy_score_mult: float = LEGACY_SCORE_MULT
 
 ## A square cell, generously sized for thumb taps and low-vision readability (§1b),
 ## plus the gap between cells. PITCH is the cell-to-cell pixel stride. Sized so the 7-wide
@@ -181,18 +183,20 @@ func how_to_play() -> String:
 func begin(tuning: TuningConfig) -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_rng.randomize()
-	# Capture the live difficulty knobs so Balance Tuning edits take effect next round.
-	_score_full = tuning.match3_full_score
-	_score_max = maxf(_score_full + 1.0, tuning.match3_max_score)  # keep max strictly above full
-	# Board carries GEM_COLORS regular gems PLUS the special Legacy gem (id LEGACY_COLOR): it never
-	# seeds the starting grid and never appears in an ordinary refill — it is created ONLY by a 5+
-	# match, which places it at the swap's target cell (Tim, 2026-07-09: no random legacy spawns).
-	_board = Board.new(GRID_WIDTH, GRID_HEIGHT, GEM_COLORS + 1, 0, LEGACY_COLOR)
-	# How big a match must be to drop a Legacy gem is live-tunable from Balance Tuning.
-	_board.special_match_size = maxi(3, tuning.match3_legacy_match_size)
+	if tuning != null:
+		_score_full = tuning.match3_full_score
+		_score_max = maxf(_score_full + 1.0, tuning.match3_max_score)
+		_points_per_gem = maxf(0.1, tuning.match3_points_per_gem)
+		_size_bonus = maxf(0.0, tuning.match3_size_bonus)
+		_clean_match_factor = maxf(0.1, tuning.match3_clean_match_factor)
+		_avoid_match_factor = maxf(0.01, tuning.match3_avoid_match_factor)
+		_legacy_score_mult = maxf(0.1, tuning.match3_legacy_score_mult)
+		_board = Board.new(GRID_WIDTH, GRID_HEIGHT, GEM_COLORS + 1, 0, LEGACY_COLOR)
+		_board.special_match_size = maxi(3, tuning.match3_legacy_match_size)
+	else:
+		_board = Board.new(GRID_WIDTH, GRID_HEIGHT, GEM_COLORS + 1, 0, LEGACY_COLOR)
+		_board.special_match_size = 4
 	_choose_avoid_type()
-	# A big match of the AVOID gem must NOT force-spawn a Legacy gem (no reward for matching the gem
-	# you're told to steer around). _choose_avoid_type set _avoid_type; tell the board to skip it.
 	_board.special_exclude_color = _avoid_type
 
 	# NOTE: no in-play instruction label. The Get Ready gate already shows how_to_play() before the
@@ -766,29 +770,21 @@ func _score_steps(steps: Array) -> Dictionary:
 
 			if group_color == LEGACY_COLOR:
 				if challenge_mode:
-					# CHALLENGE mode: Legacy gems are a PREMIUM 5th gem type, not a currency
-					# collectible. We never count them as a collection here, so the board's spawn
-					# shutoff never trips and every 5+ match keeps planting new Legacy gems
-					# (Tim, 2026-07-21). Matching a group scores a premium over a same-size clean
-					# match — a rare, high-value line that helps sustain the keep-alive timer.
-					var legacy_points := POINTS_PER_GEM * float(n) * (1.0 + SIZE_BONUS * float(n - 3)) * LEGACY_SCORE_MULT
+					var legacy_points := _points_per_gem * float(n) * (1.0 + _size_bonus * float(n - 3)) * _legacy_score_mult
 					step_raw += legacy_points
 					group_details.append({"points": legacy_points, "is_avoid": false, "is_legacy": true})
 					continue
-				# Reward rounds: matching 3+ Legacy gems collects a Legacy bonus and scores NO points
-				# ("by themselves they do nothing"). The host gates the payout by the round result.
 				legacy_matches += 1
 				group_details.append({"points": 0.0, "is_avoid": false, "is_legacy": true})
 				continue
 
-			# Bigger lines score more per gem (see SIZE_BONUS). No cascade combo — static by size.
-			var group_points := POINTS_PER_GEM * float(n) * (1.0 + SIZE_BONUS * float(n - 3))
+			var group_points := _points_per_gem * float(n) * (1.0 + _size_bonus * float(n - 3))
 			var is_avoid := group_color == _avoid_type
 			if is_avoid:
-				group_points *= AVOID_MATCH_FACTOR
+				group_points *= _avoid_match_factor
 				matched_avoid = true
 			else:
-				group_points *= CLEAN_MATCH_FACTOR
+				group_points *= _clean_match_factor
 			step_raw += group_points
 			group_details.append({"points": group_points, "is_avoid": is_avoid, "is_legacy": false})
 		step_points.append(step_raw)

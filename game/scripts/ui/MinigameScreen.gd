@@ -1157,6 +1157,23 @@ static func first_contact_reward(
 	)
 
 
+## The Promotion round (Earth White Collar, tier 2 — Plans/Earth_Split_Epochs.md): negotiating your
+## uptown executive package. Like First Contact, it sets a permanent, upside-only bonus on the
+## White Collar cohort (income + cycle-time) — see Main._first_contact_bonus_for.
+static func promotion_reward(
+		base_income: float, property_name: String
+) -> Dictionary:
+	return make_reward(
+		base_income, "", property_name.to_upper(),
+		"Negotiate your executive package", true, true,  # as_money, upside_only
+		("Across the mahogany desk: the board of directors. The terms you negotiate "
+		+ "cover every White Collar venture — close the deal strong and elevate "
+		+ "your earnings for good."),
+		"Base income", "Opening income"
+	)
+
+
+
 ## Start a round. `reward` is a context from `make_reward` (or one of the named builders)
 ## describing what is being scaled and how to show it; `bonus_max` is the max extra-high
 ## bonus fraction (Family Reputation). Normally picks a random minigame type; the review

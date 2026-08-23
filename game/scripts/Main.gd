@@ -3079,14 +3079,8 @@ func _on_contact_dismissed() -> void:
 	_pending_contact_tier = 0
 	# THE BAND CHANGE WAITS FOR THE OVERLAY (Plans/Audio_System.md §3.1). Crossfading while the card
 	# is up would put the new track's first bar underneath that beat's own sting and ruin both, so
-	# the music turns over here rather than on contact_made. Note this runs BEFORE the Earth-promotion
-	# early return below: tier 2 is its own band, and a quiet card is still a band change.
+	# the music turns over here rather than on contact_made.
 	Audio.set_music_band(Audio.band_for_tier(tier))
-	# The Earth→Earth promotion beat (White Collar, tier 2) is a quiet card only for now —
-	# no trade-deal minigame (Tim, 2026-07-27). SEAM: when the promotion minigame gets its
-	# own moving-up copy (planned follow-up, Plans/Earth_Split_Epochs.md), remove this guard.
-	if EpochCatalog.civilization(tier) == "Earth":
-		return
 	var prop_index := game.economy.get_property_index_for_unlock_tier(tier)
 	if prop_index < 0:
 		return  # no new business this epoch — nothing more to negotiate
@@ -3104,14 +3098,20 @@ func _on_contact_dismissed() -> void:
 	# an epoch transition is a milestone, so its gem pays much more than a routine gem (Tim 2026-07-12).
 	_minigame_screen.set_legacy_lifetime(dynasty.upgrades.earned_lifetime)
 	_minigame_screen.set_legacy_bonus_multiplier(tuning.legacy_bonus_first_contact_multiplier)
-	# Frame the negotiation around the FLAGSHIP's per-unit base income (the concrete
-	# number being talked up), but pitched at the civilization: the terms struck here
-	# apply to the epoch's whole cohort (Phase 2).
-	_minigame_screen.start_game(
-		MinigameScreen.first_contact_reward(
+	# Tier 2 is the Earth→Earth White Collar promotion (executive package terms); tier 3+ are alien
+	# trade-deal negotiations (civilization trade terms). Both cover the epoch's whole cohort.
+	var reward_dict: Dictionary
+	if EpochCatalog.civilization(tier) == "Earth":
+		reward_dict = MinigameScreen.promotion_reward(
+			prop.get_single_unit_income_per_cycle(), prop.config.display_name
+		)
+	else:
+		reward_dict = MinigameScreen.first_contact_reward(
 			prop.get_single_unit_income_per_cycle(), prop.config.display_name,
 			EpochCatalog.civilization(tier)
-		),
+		)
+	_minigame_screen.start_game(
+		reward_dict,
 		dynasty.upgrades.minigame_bonus_max()
 	)
 

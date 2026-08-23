@@ -12,8 +12,6 @@ extends SceneTree
 #   4. HOME-EPOCH anchoring: a block's prices never change when a later epoch arrives
 #      (the regression test for Tim's 2026-07-03 transition repricing bug).
 #   5. Save → reload round-trips staff_level; pre-v9 tier+level saves migrate.
-#   6. Retention wills COMPLETE blocks across prestige, escalating Legacy cost per block.
-#
 # Exits with code 0 only if every check passes (1 otherwise), so CI/headless runs fail loudly.
 
 var _failures := 0
@@ -574,6 +572,20 @@ func _test_first_contact_grant(configs: Array, tuning: TuningConfig) -> void:
 				or not is_equal_approx(prop_state.first_contact_cycle_multiplier, 0.88):
 			all_bonused = false
 	_check("a cohort-wide First Contact bonus reaches every member", all_bonused)
+
+	# Tier 2 (White Collar promotion): verify cohort bonus propagation across all 6 properties
+	for member in bonus_game.economy.get_property_indices_for_unlock_tier(2):
+		(bonus_game.economy.properties[member] as PropertyState).set_first_contact_bonus(1.8, 0.80)
+	var white_collar_bonused := true
+	var white_collar_indices := bonus_game.economy.get_property_indices_for_unlock_tier(2)
+	if white_collar_indices.size() != 6:
+		white_collar_bonused = false
+	for member in white_collar_indices:
+		var prop_state := bonus_game.economy.properties[member] as PropertyState
+		if not is_equal_approx(prop_state.first_contact_income_multiplier, 1.8) \
+				or not is_equal_approx(prop_state.first_contact_cycle_multiplier, 0.80):
+			white_collar_bonused = false
+	_check("a cohort-wide Promotion bonus reaches all 6 White Collar properties", white_collar_bonused)
 
 	# The shipped ladder includes at least one alien property gated to a later epoch.
 	var alien_index := -1

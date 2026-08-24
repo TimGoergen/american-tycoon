@@ -1043,3 +1043,44 @@ func _draw_net() -> void:
 			var a := lerpf(0.0, TAU, float(i) / 16.0)
 			ring_points.append(ring_center + Vector2(cos(a) * ring_rx, sin(a) * ring_ry))
 		_play.draw_polyline(ring_points, ring_gray, 2.0, true)
+
+
+## End-of-round wipe: a giant basketball grows to fill the screen (Plans/Minigame_Polish_Pass.md §6.2).
+func play_wipe(on_covered: Callable, on_complete: Callable) -> void:
+	var container := Control.new()
+	container.set_anchors_preset(Control.PRESET_FULL_RECT)
+	container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	container.z_index = 20
+	add_child(container)
+
+	var center := size / 2.0
+	var ball_rect := TextureRect.new()
+	ball_rect.texture = BALL_TEX
+	ball_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	ball_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	var base_diameter := BALL_RADIUS * 2.0
+	ball_rect.custom_minimum_size = Vector2(base_diameter, base_diameter)
+	ball_rect.size = Vector2(base_diameter, base_diameter)
+	ball_rect.pivot_offset = ball_rect.size / 2.0
+	ball_rect.position = center - ball_rect.size / 2.0
+	ball_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	container.add_child(ball_rect)
+
+	var tween := create_tween().set_parallel(true)
+	tween.tween_property(ball_rect, "scale", Vector2(28.0, 28.0), 0.38) \
+			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+	tween.tween_property(ball_rect, "rotation", 0.5, 0.38)
+	await tween.finished
+
+	if on_covered.is_valid():
+		on_covered.call()
+
+	var fade := create_tween().set_parallel(true)
+	fade.tween_property(ball_rect, "modulate:a", 0.0, 0.25)
+	fade.tween_property(ball_rect, "scale", Vector2(34.0, 34.0), 0.25)
+	await fade.finished
+	container.queue_free()
+
+	if on_complete.is_valid():
+		on_complete.call()
+

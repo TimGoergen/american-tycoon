@@ -830,13 +830,25 @@ func _animate_step(step: Dictionary, points: float, step_index: int, group_detai
 			Audio.play(&"m3_avoid")
 			break
 
-	# Every match flashes the same (no combo now): a plain, consistent pop as it clears.
+	# Every match flashes: avoid matches flash alarm red, legacy matches flash gold, clean matches bloom bright white.
 	var flash_scale := 1.25
 	var flash := create_tween().set_parallel(true)
-	for cell in step["cleared"]:
-		var gem: Control = _gem_nodes[cell[0]][cell[1]]
-		if gem != null:
-			flash.tween_property(gem, "scale", Vector2(flash_scale, flash_scale), FLASH_TIME)
+	for gi in range(matches.size()):
+		var detail: Dictionary = group_details[gi]
+		var is_avoid: bool = bool(detail.get("is_avoid", false))
+		var is_legacy: bool = bool(detail.get("is_legacy", false))
+		var flash_color: Color
+		if is_legacy:
+			flash_color = Color(1.6, 1.4, 0.7, 1.0)
+		elif is_avoid:
+			flash_color = Color(2.4, 0.35, 0.35, 1.0)
+		else:
+			flash_color = Color(1.5, 1.5, 1.5, 1.0)
+		for cell in matches[gi]:
+			var gem: Control = _gem_nodes[cell[0]][cell[1]]
+			if gem != null:
+				flash.tween_property(gem, "scale", Vector2(flash_scale, flash_scale), FLASH_TIME)
+				flash.tween_property(gem, "modulate", flash_color, FLASH_TIME)
 	await flash.finished
 
 	var clear := create_tween().set_parallel(true)
@@ -898,8 +910,8 @@ func _apply_spawns(spawns: Array, drop: Tween) -> void:
 
 ## A color-coded result chip that pops over a cleared match. It shows the NUMBER OF GEMS in the
 ## match (Tim, 2026-07-09 — a plain count reads better than an abstract point total now that combos
-## are gone), colored by outcome: green for a clean match, red for one that hit the avoid gem, and a
-## gold "LEGACY GEM!" for a legacy match (which pays a Legacy bonus, not points).
+## are gone), colored by outcome: green with "+N" for a clean match, red with "N (-60%)" for one
+## that hit the avoid gem, and a gold "LEGACY GEM!" for a legacy match (which pays a Legacy bonus, not points).
 func _spawn_match_badge(group: Array, is_avoid: bool, is_legacy: bool = false) -> void:
 	if group.is_empty():
 		return
@@ -912,7 +924,7 @@ func _spawn_match_badge(group: Array, is_avoid: bool, is_legacy: bool = false) -
 	# a match that hit the AVOID gem, green with the gem count for a clean match. The shared helper
 	# (FloatingChip) owns the look and float-up animation so every minigame's feedback matches.
 	var chip_color := UiPalette.MONEY_GREEN
-	var chip_text := "%d" % group.size()  # merged L/T/+ shapes count as one big match
+	var chip_text := "+%d" % group.size()  # merged L/T/+ shapes count as one big match
 	if is_legacy:
 		chip_color = UiPalette.MUSTARD_GOLD
 		# In challenge mode a Legacy match is a scored PREMIUM, not a collected gem — show a gold
@@ -920,6 +932,7 @@ func _spawn_match_badge(group: Array, is_avoid: bool, is_legacy: bool = false) -
 		chip_text = ("★%d" % group.size()) if challenge_mode else "LEGACY GEM!"
 	elif is_avoid:
 		chip_color = UiPalette.KETCHUP_RED
+		chip_text = "%d (−60%%)" % group.size()
 	FloatingChip.spawn(_board_area, center, chip_text, chip_color)
 
 
@@ -947,6 +960,60 @@ func _pop_legacy_gem(cell: Array) -> void:
 	gem.z_index = 0
 
 
+## End-of-round wipe: a fountain burst of all gem colors erupting from board center (Plans/Minigame_Polish_Pass.md §6.2).
+func play_wipe(on_covered: Callable, on_complete: Callable) -> void:
+	var container := Control.new()
+	container.set_anchors_preset(Control.PRESET_FULL_RECT)
+	container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	container.z_index = 20
+	add_child(container)
+
+	var center := size / 2.0
+	var gems: Array[TextureRect] = []
+	var gem_count := 20
+	for i in range(gem_count):
+		var tr := TextureRect.new()
+		var color_id := i % GEM_TEXTURE.size()
+		tr.texture = GEM_TEXTURE[color_id]
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		tr.custom_minimum_size = Vector2(CELL_SIZE, CELL_SIZE)
+		tr.size = Vector2(CELL_SIZE, CELL_SIZE)
+		tr.pivot_offset = tr.size / 2.0
+		tr.position = center - tr.size / 2.0
+		tr.scale = Vector2(0.2, 0.2)
+		tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		container.add_child(tr)
+		gems.append(tr)
+
+	var tween := create_tween().set_parallel(true)
+	for i in range(gem_count):
+		var tr := gems[i]
+		var angle := float(i) * TAU / float(gem_count) + _rng.randf_range(-0.15, 0.15)
+		var dist := _rng.randf_range(300.0, 580.0)
+		var target_pos := center + Vector2(cos(angle), sin(angle)) * dist - tr.size / 2.0
+		var target_scale := _rng.randf_range(2.2, 3.4)
+		var rot := _rng.randf_range(-TAU, TAU)
+		tween.tween_property(tr, "position", target_pos, 0.36) \
+				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tween.tween_property(tr, "scale", Vector2(target_scale, target_scale), 0.36) \
+				.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tween.tween_property(tr, "rotation", rot, 0.36)
+
+	await tween.finished
+	if on_covered.is_valid():
+		on_covered.call()
+
+	var fade_tween := create_tween().set_parallel(true)
+	for tr in gems:
+		fade_tween.tween_property(tr, "modulate:a", 0.0, 0.26)
+		fade_tween.tween_property(tr, "scale", tr.scale * 1.25, 0.26)
+	await fade_tween.finished
+	container.queue_free()
+	if on_complete.is_valid():
+		on_complete.call()
+
+
 func result_summary() -> String:
 	# No point total, and no AVOID-gem scolding (Tim, 2026-07-09) — just a bit of flavor tied to how
 	# the round went. A round below the "full" line keeps only the minimum, so acknowledge the miss.
@@ -955,3 +1022,4 @@ func result_summary() -> String:
 	if get_performance() < _full_line_performance():
 		return "Nice try!"
 	return "Nicely done!"
+

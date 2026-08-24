@@ -580,3 +580,75 @@ func _spawn_miss_effect(drop_center: Vector2) -> void:
 	var edge_tween := create_tween()
 	edge_tween.tween_property(edge, "modulate:a", 0.0, 0.35)
 	edge_tween.tween_callback(edge.queue_free)
+
+
+## End-of-round wipe: a fountain of coins erupting to fill the screen (Plans/Minigame_Polish_Pass.md §6.2).
+func play_wipe(on_covered: Callable, on_complete: Callable) -> void:
+	var container := Control.new()
+	container.set_anchors_preset(Control.PRESET_FULL_RECT)
+	container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	container.z_index = 20
+	add_child(container)
+
+	var center_x := size.x / 2.0
+	var bottom_y := size.y * 0.85
+	var coins: Array[Control] = []
+	var coin_count := 16
+	for i in range(coin_count):
+		var coin := Panel.new()
+		var c_size := float(COIN_SIZE)
+		coin.custom_minimum_size = Vector2(c_size, c_size)
+		coin.size = Vector2(c_size, c_size)
+		coin.pivot_offset = coin.size / 2.0
+		coin.position = Vector2(center_x - c_size / 2.0, bottom_y)
+		coin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+		var style := StyleBoxFlat.new()
+		style.bg_color = UiPalette.MUSTARD_GOLD
+		style.border_color = UiPalette.INK_NAVY
+		style.set_border_width_all(5)
+		style.set_corner_radius_all(int(c_size / 2.0))
+		coin.add_theme_stylebox_override("panel", style)
+
+		var lbl := Label.new()
+		lbl.text = "$"
+		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
+		lbl.add_theme_font_size_override("font_size", UiPalette.FONT_HEADLINE)
+		lbl.add_theme_color_override("font_color", UiPalette.INK_NAVY)
+		lbl.add_theme_font_override("font", UiPalette.make_bold_font())
+		coin.add_child(lbl)
+
+		container.add_child(coin)
+		coins.append(coin)
+
+	var tween := create_tween().set_parallel(true)
+	for i in range(coin_count):
+		var coin := coins[i]
+		var spread := lerpf(-size.x * 0.45, size.x * 0.45, float(i) / float(coin_count - 1)) + _rng.randf_range(-30.0, 30.0)
+		var peak_y := _rng.randf_range(size.y * 0.1, size.y * 0.4)
+		var target_pos := Vector2(center_x + spread - coin.size.x / 2.0, peak_y)
+		var target_scale := _rng.randf_range(2.0, 3.2)
+		var rot := _rng.randf_range(-PI, PI)
+		tween.tween_property(coin, "position", target_pos, 0.38) \
+				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tween.tween_property(coin, "scale", Vector2(target_scale, target_scale), 0.38) \
+				.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tween.tween_property(coin, "rotation", rot, 0.38)
+
+	await tween.finished
+	if on_covered.is_valid():
+		on_covered.call()
+
+	var fade := create_tween().set_parallel(true)
+	for coin in coins:
+		fade.tween_property(coin, "modulate:a", 0.0, 0.26)
+		fade.tween_property(coin, "position:y", coin.position.y + 120.0, 0.26) \
+				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	await fade.finished
+	container.queue_free()
+
+	if on_complete.is_valid():
+		on_complete.call()
+

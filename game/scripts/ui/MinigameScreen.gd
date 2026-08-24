@@ -2009,9 +2009,25 @@ func _end_round() -> void:
 	# expired just shows the result normally. Universal here in the host, so every minigame behaves alike.
 	var ended_on_max := performance >= 1.0 and _seconds_left > 0.0 and not _challenge_mode
 	if ended_on_max:
-		_flash_max_then(func() -> void: _show_result(_multiplier_for_performance(performance)))
+		_flash_max_then(func() -> void: _play_end_wipe(_multiplier_for_performance(performance)))
 		return
-	_show_result(_multiplier_for_performance(performance))
+	_play_end_wipe(_multiplier_for_performance(performance))
+
+
+## Play the active minigame's end-of-round wipe transition before showing the result statement
+## (Plans/Minigame_Polish_Pass.md §6.2 / Plans/Roadmap.md §9).
+func _play_end_wipe(mult: float) -> void:
+	_skip_button.visible = false
+	if _active_minigame != null and is_instance_valid(_active_minigame):
+		_active_minigame.play_wipe(
+			func() -> void:
+				_show_result(mult),
+			func() -> void:
+				pass
+		)
+	else:
+		_show_result(mult)
+
 
 
 ## Flash a big "MAX!" over the card for about a second, then run `after` (which shows the result).

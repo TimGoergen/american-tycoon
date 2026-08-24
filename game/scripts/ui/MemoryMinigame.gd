@@ -519,3 +519,60 @@ func _play_gem_fail_beat() -> void:
 	_beat_playing = false
 	if is_inside_tree():
 		completed.emit(get_performance())
+
+
+## End-of-round wipe: the 4 board panels spin as a group and grow to fill the screen (Plans/Minigame_Polish_Pass.md §6.2).
+func play_wipe(on_covered: Callable, on_complete: Callable) -> void:
+	var container := Control.new()
+	container.set_anchors_preset(Control.PRESET_FULL_RECT)
+	container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	container.z_index = 20
+	add_child(container)
+
+	var center := size / 2.0
+	var spinner := Control.new()
+	spinner.size = Vector2(300, 300)
+	spinner.pivot_offset = spinner.size / 2.0
+	spinner.position = center - spinner.size / 2.0
+	spinner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	container.add_child(spinner)
+
+	# Build 4 color quadrant pads (Red, Gold, Teal, Green)
+	var half := 145.0
+	var offsets := [
+		Vector2(0, 0),
+		Vector2(155, 0),
+		Vector2(0, 155),
+		Vector2(155, 155)
+	]
+	for i in range(4):
+		var p := Panel.new()
+		p.position = offsets[i]
+		p.size = Vector2(half, half)
+		var style := StyleBoxFlat.new()
+		style.bg_color = PAD_COLORS[i]
+		style.border_color = UiPalette.INK_NAVY
+		style.set_border_width_all(6)
+		style.set_corner_radius_all(16)
+		p.add_theme_stylebox_override("panel", style)
+		spinner.add_child(p)
+
+	var tween := create_tween().set_parallel(true)
+	tween.tween_property(spinner, "scale", Vector2(10.0, 10.0), 0.38) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	tween.tween_property(spinner, "rotation", TAU, 0.38) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+
+	await tween.finished
+	if on_covered.is_valid():
+		on_covered.call()
+
+	var fade := create_tween().set_parallel(true)
+	fade.tween_property(spinner, "modulate:a", 0.0, 0.25)
+	fade.tween_property(spinner, "scale", Vector2(14.0, 14.0), 0.25)
+	await fade.finished
+	container.queue_free()
+
+	if on_complete.is_valid():
+		on_complete.call()
+

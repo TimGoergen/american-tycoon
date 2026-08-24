@@ -447,3 +447,47 @@ func _draw_track() -> void:
 	_track.draw_rect(Rect2(marker_left, marker_y - 2.0, marker_w, 4.0), marker_color.lerp(Color.WHITE, 0.6))
 
 	_track.draw_rect(Rect2(0, 0, w, h), UiPalette.NAVY, false, 3.0)
+
+
+## End-of-round wipe: the gold balance zone swells to fill the screen (Plans/Minigame_Polish_Pass.md §6.2).
+func play_wipe(on_covered: Callable, on_complete: Callable) -> void:
+	var container := Control.new()
+	container.set_anchors_preset(Control.PRESET_FULL_RECT)
+	container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	container.z_index = 20
+	add_child(container)
+
+	var center := size / 2.0
+	var swell := Panel.new()
+	swell.custom_minimum_size = Vector2(TRACK_WIDTH, 140.0)
+	swell.size = Vector2(TRACK_WIDTH, 140.0)
+	swell.pivot_offset = swell.size / 2.0
+	swell.position = center - swell.size / 2.0
+	swell.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var style := StyleBoxFlat.new()
+	style.bg_color = UiPalette.MUSTARD_GOLD
+	style.border_color = Color(UiPalette.INK_NAVY, 0.8)
+	style.set_border_width_all(6)
+	style.set_corner_radius_all(16)
+	swell.add_theme_stylebox_override("panel", style)
+	container.add_child(swell)
+
+	var tween := create_tween().set_parallel(true)
+	tween.tween_property(swell, "size", Vector2(size.x * 1.5, size.y * 1.5), 0.36) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(swell, "position", center - Vector2(size.x * 0.75, size.y * 0.75), 0.36) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+	await tween.finished
+	if on_covered.is_valid():
+		on_covered.call()
+
+	var fade := create_tween().set_parallel(true)
+	fade.tween_property(swell, "modulate:a", 0.0, 0.25)
+	await fade.finished
+	container.queue_free()
+
+	if on_complete.is_valid():
+		on_complete.call()
+

@@ -143,3 +143,16 @@ func extra_seconds() -> float:
 ## multiplier/amount. Override in each type.
 func result_summary() -> String:
 	return ""
+
+
+## Play a signature end-of-round wipe transition before the host swaps to the result screen
+## (Plans/Minigame_Polish_Pass.md §6.2). `on_covered` is called at peak coverage when the play area
+## is completely masked (so the host can switch _play_view -> _result_view underneath).
+## `on_complete` is called once the wipe visual has cleared / settled.
+## Base implementation provides a clean fallback if not overridden by a specific type.
+func play_wipe(on_covered: Callable, on_complete: Callable) -> void:
+	if on_covered.is_valid():
+		on_covered.call()
+	if on_complete.is_valid():
+		on_complete.call()
+

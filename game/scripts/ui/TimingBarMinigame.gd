@@ -566,3 +566,47 @@ func _draw_bar() -> void:
 		var marker_color := UiPalette.CREAM.lightened(_flash * 0.6).lerp(UiPalette.KETCHUP_RED, _miss_flash)
 		_bar.draw_rect(Rect2(mx - 5.0, 0, 10.0, h), marker_color)
 	_bar.draw_rect(Rect2(0, 0, w, h), UiPalette.NAVY, false, 3.0)
+
+
+## End-of-round wipe: the marker/zone expands outward to fill the screen (Plans/Minigame_Polish_Pass.md §6.2).
+func play_wipe(on_covered: Callable, on_complete: Callable) -> void:
+	var container := Control.new()
+	container.set_anchors_preset(Control.PRESET_FULL_RECT)
+	container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	container.z_index = 20
+	add_child(container)
+
+	var center := size / 2.0
+	var beam := Panel.new()
+	beam.custom_minimum_size = Vector2(24.0, 120.0)
+	beam.size = Vector2(24.0, 120.0)
+	beam.pivot_offset = beam.size / 2.0
+	beam.position = center - beam.size / 2.0
+	beam.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var style := StyleBoxFlat.new()
+	style.bg_color = UiPalette.MUSTARD_GOLD
+	style.border_color = Color.WHITE
+	style.set_border_width_all(8)
+	style.set_corner_radius_all(12)
+	beam.add_theme_stylebox_override("panel", style)
+	container.add_child(beam)
+
+	var tween := create_tween().set_parallel(true)
+	tween.tween_property(beam, "size", Vector2(size.x * 1.5, size.y * 1.5), 0.35) \
+			.set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	tween.tween_property(beam, "position", center - Vector2(size.x * 0.75, size.y * 0.75), 0.35) \
+			.set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+
+	await tween.finished
+	if on_covered.is_valid():
+		on_covered.call()
+
+	var fade := create_tween().set_parallel(true)
+	fade.tween_property(beam, "modulate:a", 0.0, 0.25)
+	await fade.finished
+	container.queue_free()
+
+	if on_complete.is_valid():
+		on_complete.call()
+

@@ -425,3 +425,40 @@ out of that placement for free rather than needing its own reset path.
   path, which is the natural place to tell the two apart.
 - **The Balance Tuning toggle** is a display override only — it must not write to the encounter
   set, or testing with it on would permanently unlock everything.
+
+## 9. End-of-minigame "grow to fill" wipe transition (Tim, 2026-07-20)
+
+> Source: `Plans/Minigame_Polish_Pass.md` §6.2.
+
+When a round ends, a **game-specific object grows to fill the screen** as a wipe transition
+into the result screen — delivering a signature celebration payoff per game:
+- **Basketball** → A basketball grows to fill the screen.
+- **Catch Money** → A fountain of coins.
+- **Match Three** → A fountain of all gem colors.
+- **Memory** → The four board panels spin as a group and grow to fill the screen.
+- **Timing Bar / Balance** → Marker expands outward / gold zone swells to fill.
+
+**Take:** Strong juice that gives each minigame an identity beat. Build as **one shared
+transition hook driven by `MinigameScreen`**, with each minigame supplying its own grow/wipe
+effect. Preserves the reward-agnostic host contract (presentation only; never touches math).
+
+## 10. Deep Planet Watermark Treatment (Tim, 2026-07-27)
+
+> Source: `Plans/Add_20_Civs_And_Alien_Portraits.md` §9, `Plans/Device_Feel_Test_Checklist.md` §7.3.
+
+`HeroStat.PLANET_IMAGE_PATHS` holds 6 authored world SVGs (Earth through Chronophage).
+Tiers 7–27 currently have no art assets and rely on a bounds guard.
+
+**Open decision:** Settle whether deeper civilizations use a generic/procedural planet tinted
+by each civ's accent color (zero external asset overhead) or commission ~20 authored world SVG
+illustrations for the full 27-epoch ladder.
+
+## 11. Denial Audio Feedback (Tim, 2026-08-08)
+
+> Source: `Plans/Audio_System.md` §4.5 & §Still Open.
+
+Auditory feedback when tapping disabled or unaffordable buttons. Deferred per Audio System
+decision 15 to avoid auditory spam, but interacts with player perception of unresponsive UI.
+Needs a quiet, subtle cue (e.g. low-volume wooden click) that respects the no-moving-UI principle
+without fatiguing the player.
+

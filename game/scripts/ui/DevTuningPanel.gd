@@ -719,8 +719,6 @@ func _add_playtest_section() -> void:
 	trace_row.add_child(tb)
 	body.add_child(trace_row)
 
-	_toggle_section(title)  # open it by default
-
 
 ## Display an on-screen scrollable modal overlay with the last session's action trace log.
 func _show_trace_modal() -> void:
@@ -895,6 +893,7 @@ func _pan_scroll_on_drag(event: InputEvent) -> void:
 	_drag_accum += absf(delta_y)
 	if _drag_accum >= DRAG_TOGGLE_THRESHOLD:
 		_drag_moved = true
+	_update_edge_fade()
 
 
 ## A header was released: toggle it ONLY when the gesture was a genuine tap. If the press turned into a

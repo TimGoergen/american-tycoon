@@ -89,9 +89,10 @@ const BACKGROUND_IMAGE := "res://art/backgrounds/minigame_background.png"
 const LEGACY_GEM_TEXTURE := preload("res://art/icons/legacy_gem.svg")
 
 ## The centered panel that frames every minigame, as anchor fractions of the full-screen scrim, so
-## it stays centered and scales with the screen. Expanded by 40% in height (0.672 * 1.4 = 0.9408).
+## it stays centered and scales with the screen. 0.72 height gives generous top/bottom background framing
+## (more than twice the side margin) and room for the SKIP button below the card.
 const PANEL_WIDTH_FRACTION := 0.855   # 0.95 * 0.90  (10% narrower)
-const PANEL_HEIGHT_FRACTION := 0.9408  # 0.672 * 1.40 (40% taller)
+const PANEL_HEIGHT_FRACTION := 0.72
 ## Thickness of that black outline. It is the ONLY thing setting the card apart from the cream
 ## background behind it (same fill), so it is deliberately thick and well above the 2px screen
 ## bezel frame.
@@ -429,9 +430,8 @@ func _ready() -> void:
 	_skip_button.anchor_bottom = 0.5 + half_h
 	_skip_button.offset_left = side_inset
 	_skip_button.offset_right = -side_inset
-	_skip_button.offset_top = -(SKIP_BUTTON_HEIGHT + side_inset)
-	_skip_button.offset_bottom = -side_inset
-	_skip_button.z_index = 10
+	_skip_button.offset_top = CHROME_MARGIN
+	_skip_button.offset_bottom = CHROME_MARGIN + SKIP_BUTTON_HEIGHT
 	_skip_button.visible = false  # revealed on Begin (see _start_active_round)
 	add_child(_skip_button)
 
@@ -679,7 +679,7 @@ func _build_play_view() -> Control:
 	# collapsing; the expand flags make it take all the room left inside the centered panel
 	# after the top section, timer, spectrum bar, and skip controls.
 	_play_area = Control.new()
-	_play_area.custom_minimum_size = Vector2(0, 560)
+	_play_area.custom_minimum_size = Vector2(0, 400)
 	_play_area.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_play_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	column.add_child(_play_area)

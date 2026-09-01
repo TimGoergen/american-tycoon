@@ -911,9 +911,9 @@ extends Resource
 ## Seconds between harmonic chord changes during sustained rush mode (2-4s).
 @export var audio_rush_harmony_interval_seconds: float = 3.0
 
-## How long after a player action the game still counts them as PRESENT. Phase 2's idle music fade
-## is what will consume this; nothing reads it today (see Audio.player_is_present).
-@export var audio_presence_window_ms: float = 2000.0
+## How long after a player action the game still counts them as PRESENT (idle music fade window).
+## Defaults to 180,000 ms (3 minutes of inactivity before music drifts out; Audio_System.md §3.3).
+@export var audio_presence_window_ms: float = 180000.0
 
 ## How quiet the smallest version of an intensity-scaled sound is, relative to its loudest.
 @export var audio_scaled_min_db: float = -10.0

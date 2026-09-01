@@ -424,7 +424,7 @@ var _last_interaction_ms := 0
 ## like everything else. Defaults here match TuningConfig's and keep Audio usable before any push.
 var _tap_scale_reset_seconds := 1.0
 var _rush_harmony_interval_seconds := 3.0
-var _presence_window_ms := 2000.0
+var _presence_window_ms := 180000.0
 var _scaled_min_db := -10.0
 var _layer_threshold := 0.5
 

@@ -1937,15 +1937,6 @@ func _build_settings_tab() -> Control:
 	# NOTE this is headroom, not a structural fix — the next thing added to this tab will
 	# overflow again. See the comment on the spacer above.
 
-	# Dev tools entry: the balance tuning panel (GDD §13). Moved here from the action row.
-	bottom_buttons.add_child(
-		_make_settings_button("BALANCE TUNING", tuning_button_height, TUNING_BUTTON_FONT, _on_dev_pressed))
-
-	# Minigame review tool: opens the full-screen list of every minigame so they can each be
-	# played and reviewed on demand (GDD §5.5), independent of a real prestige.
-	bottom_buttons.add_child(
-		_make_settings_button("MINIGAME TUNING", tuning_button_height, TUNING_BUTTON_FONT, _on_minigame_tuning_pressed))
-
 	# CHALLENGES takes a WHOLE ROW of its own (Tim, 2026-08-08). It is the only player-facing entry
 	# among these six — the rest are dev tools and reference screens — and the full width is what lets
 	# it carry a gamepad big enough to read as a picture rather than as a bullet point. STATS moved
@@ -1964,7 +1955,7 @@ func _build_settings_tab() -> Control:
 	_refresh_challenges_button()
 	bottom_buttons.add_child(_challenges_button)
 
-	# STATS + ABOUT + HELP share the last row — three short labels across, which all three carry
+	# STATS + ABOUT + HELP share the next row — three short labels across, which all three carry
 	# comfortably. Stats opens the Statistics modal (Best Vent Streak and other bloodline numbers,
 	# Tim 2026-07-20); About opens the logo/name/version/credits modal (Tim, 2026-07-09); Help opens
 	# the tutorial glossary + Replay action (Plans/Tutorial_Onboarding_Plan.md). STATS leads because
@@ -1978,6 +1969,15 @@ func _build_settings_tab() -> Control:
 	reference_row.add_child(
 		_make_settings_button("HELP", tuning_button_height, TUNING_BUTTON_FONT, _on_help_pressed))
 	bottom_buttons.add_child(reference_row)
+
+	# Dev tools entry: the balance tuning panel (GDD §13). Moved here from the action row.
+	bottom_buttons.add_child(
+		_make_settings_button("BALANCE TUNING", tuning_button_height, TUNING_BUTTON_FONT, _on_dev_pressed))
+
+	# Minigame review tool: opens the full-screen list of every minigame so they can each be
+	# played and reviewed on demand (GDD §5.5), independent of a real prestige.
+	bottom_buttons.add_child(
+		_make_settings_button("MINIGAME TUNING", tuning_button_height, TUNING_BUTTON_FONT, _on_minigame_tuning_pressed))
 
 	# THE PAGE SCROLLS (Plans/Audio_System.md §6.1 Phase 0). It used to be a bare VBox, where content
 	# that did not fit was not clipped but UNREACHABLE — and the spacer above hid the problem by
